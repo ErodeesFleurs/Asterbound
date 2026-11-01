@@ -45,7 +45,7 @@ struct AssetWorkerBenchmarkAccess {
 
 namespace {
 
-void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session) {
+void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session, bool mixed = false) {
   auto directory = File::temporaryDirectory(session.root.random());
   if (!directory) {
     session.fail(state, directory.error());
@@ -70,7 +70,8 @@ void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session)
       session.fail(state, written.error());
       return;
     }
-    auto patch = File::writeFile(String(R"lua(function patch(asset)
+    if (!mixed || i % 2 == 0) {
+      auto patch = File::writeFile(String(R"lua(function patch(asset)
   local garbage = {}
   for i = 1, 256 do
     local node = {value = i, text = "asset-temporary-" .. i}
@@ -81,10 +82,11 @@ void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session)
   return asset
 end
 )lua"),
-                                 File::relativeTo(*directory, name + ".patch.lua"));
-    if (!patch) {
-      session.fail(state, patch.error());
-      return;
+                                   File::relativeTo(*directory, name + ".patch.lua"));
+      if (!patch) {
+        session.fail(state, patch.error());
+        return;
+      }
     }
     paths.append("/" + name);
   }
@@ -119,9 +121,10 @@ end
         valid = false;
         break;
       }
-      auto checksum = json->getInt("checksum");
-      if (!checksum || *checksum != 257 + i) {
-        session.fail(state, "Asset worker Lua patch produced an incorrect JSON result");
+      auto patched = !mixed || i % 2 == 0;
+      auto checksum = patched ? json->getInt("checksum") : json->getInt("index");
+      if (!checksum || *checksum != (patched ? 257 + i : i)) {
+        session.fail(state, "Asset worker produced an incorrect JSON result");
         valid = false;
         break;
       }
@@ -140,8 +143,9 @@ end
   state.counters["lua_heap_after_queue_bytes"] = static_cast<double>(heapAfterQueue);
   state.counters["lua_heap_after_full_collect_bytes"] = static_cast<double>(heapAfterCollect);
   state.SetItemsProcessed(state.iterations() * count);
-  state.SetLabel("real async JSON workers; cyclic Lua patch garbage; queue/readback/full-GC/destruction timed; "
-                 "source/setup untimed; heap is not peak");
+  state.SetLabel(mixed
+      ? "256 JSONs, alternating plain/Lua; queue/readback/full-GC/destruction timed; source/setup untimed; heap is not peak"
+      : "real async JSON workers; cyclic Lua patch garbage; queue/readback/full-GC/destruction timed; source/setup untimed; heap is not peak");
 }
 
 }// namespace
@@ -151,6 +155,12 @@ std::expected<void, StarException> registerAssetsPerformanceBenchmarks(Performan
                                [&](benchmark::State& state) { assetWorkers(state, session); })
     ->Args({64, 1})
     ->Args({256, 1})
+    ->Args({256, 4})
+    ->UseRealTime();
+  benchmark::RegisterBenchmark("Assets/MixedQueuedJsonPatchesAndReclaim",
+                               [&](benchmark::State& state) { assetWorkers(state, session, true); })
+    ->Args({256, 1})
+    ->Args({256, 2})
     ->Args({256, 4})
     ->UseRealTime();
   return {};

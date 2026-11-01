@@ -26,7 +26,7 @@ Use `/help` for commands. See the [command reference](assets/opensb/help.config.
 Compound assignment, safe navigation, `math.round` and `math.copysign` remain available.
 
 - `global` is reserved; rename it or use `_ENV["global"]`.
-- Numeric loop variables and the first generic-loop variable are read-only. OSB repairs vanilla `/scripts/actions/flying.lua` in memory; mod scripts still need migration.
+- Numeric loop variables and the first generic-loop variable are read-only. OSB repairs vanilla `/scripts/actions/flying.lua` and `/stagehands/coordinator/npccombat.lua` in memory, preserving their fractional sample bounds; mod scripts still need migration.
 - Rebuild Lua 5.3 bytecode. Finalizer errors become warnings; `math.random` sequences may change.
 - Text templates use `<name>` and `<<` for a literal `<`, not brace-format placeholders.
 
@@ -34,7 +34,19 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 
 Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and [xclang](https://github.com/clice-io/xclang) **23.1.2.9** with bundled libc++/`std` modules. Dependencies must use the same C++ runtime; Windows uses MinGW. GCC, Apple Clang and MSVC builds are unsupported.
 
-All configurations use **static mimalloc** with `MI_OVERRIDE=OFF`; there are no allocator switches or process-wide C allocator overrides. Lua is fetched with a [version/hash lock](cmake/dependencies/lua.json) and [project patch](cmake/patches/lua-openstarbound.patch); Git is required unless using Nix or prepatched sources.
+All configurations use **static mimalloc** with `MI_OVERRIDE=OFF`; there are no allocator switches or process-wide C allocator overrides. ELF executables keep C++ allocation/deallocation operators private so dynamically loaded drivers cannot mix allocator heaps; other diagnostic symbols remain exported.
+
+The liquid solver's per-phase working-cell cache keeps stable node references with a monotonic allocation resource. Cache hits use `try_emplace` without allocating a discarded node; whole-phase reclamation releases arena blocks rather than searching the block allocator for every node. The solver still discards failed transient state at the next setup and rereads cells after publishing flow and interaction callbacks. Readback queues reuse each checked working cell's canonical position instead of repeating world-coordinate canonicalization.
+
+World-server sector packets are shared read-only between clients only inside the final snapshot phase of one update. Tile data is converted once per sector while each connection still serializes it with its own protocol rules. Ordinary region signaling only queues generation; synchronous dungeon activation clears the snapshot cache. No snapshot is reused across simulation ticks, and queued packets retain their original owning lifetime.
+
+Lighting propagation preserves its forward/backward dependency order while reusing each scalar source cell's straight and diagonal contributions. Point-light rays obtain integer cell coordinates with truncation plus the negative-fraction correction instead of calling `floor` for every ray step. Fractional weights retain their original float/double conversions, contribution order and early exits; the coordinate range requirements are unchanged.
+
+TilePainter terrain misses acquire checked asset/material generation leases once per chunk and reuse one local material-piece matching buffer across that chunk's tiles and layers. Within one setup, logical piece/damage cache misses sharing the same immutable `Image` also share one uploaded texture; logical keys, directives, TTL updates, rule matching and geometry remain unchanged. Setup releases the upload-deduplication owners on both success and failure, so native frame boundaries and existing cache eviction still determine texture/atlas lifetime.
+
+Asset workers still serialize patches and collection through the shared Lua VM. Bulk queues wake workers once after insertion, and a pending-collection claim coalesces idle full GC only when all queued/in-flight work has drained. Terminal load/postprocess transitions wake the idle predicate, including synchronous loads and loads arriving during collection. Ordinary per-resource errors remain cached independently of worker infrastructure failures; queue completion is not a GC barrier, and post-queue Lua heap counters are not peak-memory measurements.
+
+Lua is fetched with a [version/hash lock](cmake/dependencies/lua.json) and [project patch](cmake/patches/lua-openstarbound.patch); Git is required unless using Nix or prepatched sources.
 
 ### Nix on Linux
 
@@ -116,7 +128,13 @@ OPENSTARBOUND_ASSETS=/path/to/Starbound/assets OPENSTARBOUND_TEST_JOBS=4 nix run
 
 Each case gets a private runtime. `OPENSTARBOUND_TEST_JOBS` defaults to `1`; reports go to `./game-tests-report`, overridden by `OPENSTARBOUND_TEST_OUT`.
 
+Liquid lifetime tests cover initialized-engine moves, consecutive read failures and recovery across changing readback scales. Keep long-running residency probes separate from the default regression suite, and sample current RSS rather than interpreting a process high-water mark as allocator live bytes or fragmentation. Recorded state or callback-trace digests require an explicit cross-version comparison; two individually passing runs are not that comparison.
+
 Sanitized builds enable mimalloc's `MI_TRACK_ASAN` and `MI_DEBUG`. Small overruns may be detected on free rather than at the write. LSan checks intercepted system allocations, **not individual mimalloc allocations**; passing it does not prove engine/Lua allocations are leak-free.
+
+Descriptor-lifetime tests check handles to the owned resource, not process-wide counts affected by lazy symbolizer caches. Nonfinite floating-point oracles compare IEEE object bytes with integer constants; constructing a NaN through a floating return or arithmetic expression conflicts with the production fast-math contract.
+
+Reallocation resolves the initialized default mimalloc thread heap before touching a transferred block, including when a shrinking reallocation is a fresh thread's first allocation operation.
 
 Benchmarks are opt-in:
 
@@ -127,6 +145,8 @@ nix build .#benchmarks
 ```
 
 Native presets need `STAR_BUILD_BENCHMARKS=ON` and `VCPKG_MANIFEST_FEATURES="qt-tools;benchmarks"`; see [benchmark targets](source/benchmark/CMakeLists.txt). Asset-backed cases need owned assets and a private `-bootconfig`; **never use your saves**. GUI cases require a real display. Compare identical inputs/build flags with repeated samples, not shared-CI timing thresholds. `BlockAllocator` remains in production: tested PMR pools retained more memory or ran slower in the representative workload.
+
+The asset-worker suite keeps its fully Lua-patched workloads and adds an alternating plain/Lua JSON workload at one, two and four workers. Both include queue completion, every JSON readback, explicit full collection and worker destruction in the timed operation. More workers do not parallelize the shared Lua VM; compare the mixed workload before changing scheduling, and do not infer mutex wait time from flat CPU samples.
 
 ## Development
 

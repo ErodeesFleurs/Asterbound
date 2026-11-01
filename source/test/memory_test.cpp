@@ -21,6 +21,29 @@ TEST(MemoryTest, FailedReallocationPreservesOwnedBytes) {
   Star::free(data, size);
 }
 
+TEST(MemoryTest, FirstAllocationOnFreshThreadCanShrinkTransferredBytes) {
+  constexpr std::size_t size = 1024;
+  constexpr std::size_t resizedSize = 768;
+  auto data = static_cast<unsigned char*>(Star::malloc(size));
+  ASSERT_NE(data, nullptr);
+  for (std::size_t i = 0; i < size; ++i)
+    data[i] = static_cast<unsigned char>(i);
+
+  unsigned char* resized = nullptr;
+  std::thread consumer([&] {
+    resized = static_cast<unsigned char*>(Star::realloc(data, resizedSize));
+  });
+  consumer.join();
+  EXPECT_NE(resized, nullptr);
+  if (!resized) {
+    Star::free(data);
+    return;
+  }
+  for (std::size_t i = 0; i < resizedSize; ++i)
+    EXPECT_EQ(resized[i], static_cast<unsigned char>(i));
+  Star::free(resized);
+}
+
 TEST(MemoryTest, LargeAlignedObjectsTransferAcrossThreads) {
   // Keep type alignment within the Windows x64 ABI limit; test larger allocations below.
   struct alignas(8192) Value {

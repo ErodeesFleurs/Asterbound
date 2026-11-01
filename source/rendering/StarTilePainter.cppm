@@ -161,8 +161,10 @@ private:
   getLiquidChunk(WorldRenderData& renderData, Vec2I chunkIndex, ChunkHash hash);
 
   [[nodiscard]] std::expected<bool, StarException> produceTerrainPrimitives(HashMap<QuadZLevel, List<RenderPrimitive>>& primitives,
-      TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData);
+      MaterialPieceResultList& pieces, TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData,
+      std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase);
   [[nodiscard]] std::expected<void, StarException> produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive>>& primitives, Vec2I const& pos, WorldRenderData const& renderData);
+  [[nodiscard]] std::expected<TexturePtr, StarException> setupTexture(std::shared_ptr<Image const> const& image);
 
   float liquidDrawLevel(float liquidLevel) const;
 
@@ -182,6 +184,8 @@ private:
   List<std::shared_ptr<LiquidChunk const>> m_pendingLiquidChunks;
   List<std::shared_ptr<TerrainChunk const>> m_setupTerrainChunks;
   List<std::shared_ptr<LiquidChunk const>> m_setupLiquidChunks;
+  // Only deduplicates uploads within setup; never retains an extra frame owner.
+  HashMap<std::shared_ptr<Image const>, TexturePtr> m_setupTextures;
 
   std::optional<Vec2F> m_lastCameraCenter;
   Vec2F m_cameraPan;

@@ -414,10 +414,6 @@ namespace {
     return -1;
   }
 
-  std::size_t descriptorCount() {
-    auto entries = std::filesystem::directory_iterator("/proc/self/fd");
-    return std::distance(entries, std::filesystem::directory_iterator());
-  }
 }
 
 TEST(FileTest, AppendSeekFailureReleasesDescriptor) {
@@ -430,13 +426,13 @@ TEST(FileTest, AppendSeekFailureReleasesDescriptor) {
   auto cleanup = finally([&]() { removeTree(dir); });
   auto path = File::relativeTo(dir, "pipe");
   ASSERT_EQ(::mkfifo(path.utf8Ptr(), 0600), 0);
-  auto before = descriptorCount();
+  // Exception symbolization may cache ELF descriptors; only this FIFO is owned here.
   for (unsigned i = 0; i < 8; ++i) {
     auto opened = File::open(path, IOMode::ReadWrite | IOMode::Append);
     ASSERT_FALSE(opened);
     EXPECT_TRUE(opened.error().is<IOException>());
+    EXPECT_LT(descriptorForFile(path), 0);
   }
-  EXPECT_EQ(descriptorCount(), before);
 }
 
 TEST(FileTest, FailedCloseConsumesDescriptorOwnership) {

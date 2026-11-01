@@ -321,6 +321,7 @@ public:
 
 private:
   friend struct AssetWorkerBenchmarkAccess;
+  friend struct AssetWorkerTestAccess;
 
   explicit Assets(Logger& logger);
   [[nodiscard]] std::expected<void, StarException> initialize(RandomService& random, LogMap& logMap, Settings settings, StringList assetSources);
@@ -329,7 +330,7 @@ private:
 
   void queueAssets(List<AssetId> const& assetIds) const;
   //Lock before calling!
-  void queueAsset(AssetId const& assetId) const;
+  bool queueAsset(AssetId const& assetId) const;
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> tryAsset(AssetId const& id) const;
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> getAsset(AssetId const& id) const;
 
@@ -384,6 +385,9 @@ private:
 
   mutable std::condition_variable m_assetsQueued;
   mutable OrderedHashMap<AssetId, QueuePriority, AssetIdHash> m_queue;
+  // Protected by m_assetsMutex. One worker claims collection for a drained
+  // load burst; in-flight work must not compete with idle full collections.
+  mutable bool m_luaGcPending = true;
 
   mutable std::condition_variable m_assetsDone;
   mutable HashMap<AssetId, std::shared_ptr<AssetData>, AssetIdHash> m_assetsCache;

@@ -1803,6 +1803,9 @@ std::expected<void, StarException> WorldServer::update(float dt) {
 
   bool sendRemoteUpdates = m_entityUpdateTimer.wrapTick(dt);
   std::optional<Vec2I> activeRegionPad;
+  // These protocol-neutral packets are read-only after construction. Retain
+  // them only through this final snapshot phase, never across simulation ticks.
+  SectorSnapshotCache sectorSnapshots;
   for (auto const& pair : m_clientInfo) {
     auto result190 = pair.second->monitoringRegions(m_entityMap);
     if (!result190)
@@ -1823,7 +1826,11 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       if (!result193)
         return std::unexpected(std::move(result193.error()));
     }
-    auto result194 = queueUpdatePackets(pair.first, sendRemoteUpdates, *result190);
+    // Dungeon activation can synchronously load tiles; ordinary activation
+    // only queues future generation and refreshes sector TTLs.
+    if (m_generatingDungeon)
+      sectorSnapshots.clear();
+    auto result194 = queueUpdatePackets(pair.first, sendRemoteUpdates, *result190, sectorSnapshots);
     if (!result194)
       return std::unexpected(std::move(result194.error()));
   }
@@ -3648,7 +3655,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
 }
 
 std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId clientId, bool sendRemoteUpdates,
-                                                                   List<RectI> const& monitoringRegions) {
+    List<RectI> const& monitoringRegions, SectorSnapshotCache& sectorSnapshots) {
   auto result394 = m_clientInfo.get(clientId);
   if (!result394)
     return std::unexpected(std::move(result394.error()));
@@ -3697,19 +3704,23 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     if (!m_worldStorage->sectorActive(sector))
       continue;
 
-    auto tileArrayUpdate = std::make_shared<TileArrayUpdatePacket>();
-    auto sectorTiles = m_tileArray->sectorRegion(sector);
-    tileArrayUpdate->min = sectorTiles.min();
-    tileArrayUpdate->array.resize(Vec2S(sectorTiles.width(), sectorTiles.height()));
-    for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-      for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
-        auto result400 = writeNetTile({x, y}, tileArrayUpdate->array(x - sectorTiles.xMin(), y - sectorTiles.yMin()));
-        if (!result400)
-          return std::unexpected(std::move(result400.error()));
+    auto snapshot = sectorSnapshots.find(sector);
+    if (snapshot == sectorSnapshots.end()) {
+      auto tileArrayUpdate = std::make_shared<TileArrayUpdatePacket>();
+      auto sectorTiles = m_tileArray->sectorRegion(sector);
+      tileArrayUpdate->min = sectorTiles.min();
+      tileArrayUpdate->array.resize(Vec2S(sectorTiles.width(), sectorTiles.height()));
+      for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
+        for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+          auto result400 = writeNetTile({x, y}, tileArrayUpdate->array(x - sectorTiles.xMin(), y - sectorTiles.yMin()));
+          if (!result400)
+            return std::unexpected(std::move(result400.error()));
+        }
       }
+      snapshot = sectorSnapshots.insert(sector, std::move(tileArrayUpdate)).first;
     }
 
-    clientInfo->outgoingPackets.append(tileArrayUpdate);
+    clientInfo->outgoingPackets.append(snapshot->second);
     clientInfo->pendingSectors.remove(sector);
   }
 

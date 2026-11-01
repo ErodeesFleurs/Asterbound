@@ -910,7 +910,8 @@ std::expected<void, StarException> Assets::queueJsons(CaseInsensitiveStringSet c
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, true, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    queueAsset({AssetType::Json, {std::move(components.basePath), {}, {}}});
+    if (queueAsset({AssetType::Json, {std::move(components.basePath), {}, {}}}))
+      m_assetsQueued.notify_one();
   }
   return {};
 }
@@ -940,7 +941,8 @@ std::expected<void, StarException> Assets::queueImages(CaseInsensitiveStringSet 
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, true, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    queueAsset({AssetType::Image, std::move(components)});
+    if (queueAsset({AssetType::Image, std::move(components)}))
+      m_assetsQueued.notify_one();
   }
   return {};
 }
@@ -990,7 +992,8 @@ std::expected<void, StarException> Assets::queueAudios(CaseInsensitiveStringSet 
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, false, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    queueAsset({AssetType::Audio, std::move(components)});
+    if (queueAsset({AssetType::Audio, std::move(components)}))
+      m_assetsQueued.notify_one();
   }
   return {};
 }
@@ -1215,11 +1218,16 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
 void Assets::queueAssets(List<AssetId> const& assetIds) const {
   std::lock_guard assetsLocker(m_assetsMutex);
 
+  std::size_t queued = 0;
   for (auto const& id : assetIds)
-    queueAsset(id);
+    queued += queueAsset(id);
+  if (queued == 1)
+    m_assetsQueued.notify_one();
+  else if (queued > 1)
+    m_assetsQueued.notify_all();
 }
 
-void Assets::queueAsset(AssetId const& assetId) const {
+bool Assets::queueAsset(AssetId const& assetId) const {
   auto i = m_assetsCache.find(assetId);
   if (i != m_assetsCache.end()) {
     if (i->second)
@@ -1228,9 +1236,10 @@ void Assets::queueAsset(AssetId const& assetId) const {
     auto j = m_queue.find(assetId);
     if (j == m_queue.end()) {
       m_queue[assetId] = QueuePriority::Load;
-      m_assetsQueued.notify_one();
+      return true;
     }
   }
+  return false;
 }
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::tryAsset(AssetId const& id) const {
@@ -1297,28 +1306,32 @@ std::expected<void, StarException> Assets::workerMain() {
     }
 
     if (queuePriority != QueuePriority::Load && queuePriority != QueuePriority::PostProcess) {
-      // Automatic Lua GC remains enabled during load bursts. Collect fully
-      // only before sleeping, rather than rescanning every live patch context
-      // before every asset (including assets which do not execute Lua).
-      assetsLocker.unlock();
-      std::expected<void, StarException> collected;
-      {
-        std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-        lockWithDiagnostics(luaLocker);
-        collected = asRef<LuaEngine>(*m_luaEngine)->get().collectGarbage();
-      }
-      assetsLocker.lock();
-      if (!collected) {
-        if (!m_workerError)
-          m_workerError = collected.error();
-        m_stopThreads = true;
-        m_assetsQueued.notify_all();
-        m_assetsDone.notify_all();
-        return std::unexpected(std::move(collected.error()));
+      // Only one worker collects a fully drained load burst. In particular,
+      // queued Working entries still need the shared Lua VM, not an idle GC.
+      if (m_queue.empty() && m_luaGcPending) {
+        m_luaGcPending = false;
+        assetsLocker.unlock();
+        std::expected<void, StarException> collected;
+        {
+          std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
+          lockWithDiagnostics(luaLocker);
+          collected = asRef<LuaEngine>(*m_luaEngine)->get().collectGarbage();
+        }
+        assetsLocker.lock();
+        if (!collected) {
+          if (!m_workerError)
+            m_workerError = collected.error();
+          m_stopThreads = true;
+          m_assetsQueued.notify_all();
+          m_assetsDone.notify_all();
+          return std::unexpected(std::move(collected.error()));
+        }
       }
       // Queueing and shutdown can happen while the asset mutex is released.
       m_assetsQueued.wait(assetsLocker, [&] {
         if (m_stopThreads)
+          return true;
+        if (m_queue.empty() && m_luaGcPending)
           return true;
         for (auto const& entry : m_queue)
           if (entry.second == QueuePriority::Load || entry.second == QueuePriority::PostProcess)
@@ -1614,7 +1627,6 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       PatchContextKey contextKey{std::ref(*patchSource), patchBasePath};
       std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
       lockWithDiagnostics(luaLocker);
-      // Kae: i don't like that lock. perhaps have a LuaEngine and patch context cache per worker thread later on?
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
         auto createdContext = asRef<LuaEngine>(*m_luaEngine)->get().createContext();
@@ -1718,6 +1730,8 @@ std::expected<bool, StarException> Assets::doPost(AssetId const& id) const {
     freshen(asset);
     m_assetsDone.notify_all();
   }
+  if (m_queue.empty() && m_luaGcPending)
+    m_assetsQueued.notify_one();
   if (logError)
     return std::unexpected(std::move(*logError));
   return true;
@@ -1730,6 +1744,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
     return asset;
   if (m_queue.value(id, QueuePriority::None) == QueuePriority::Working)
     return std::shared_ptr<AssetData>{};
+  m_luaGcPending = true;
   m_queue[id] = QueuePriority::Working;
   auto loaded = [&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     switch (id.type) {
@@ -1761,6 +1776,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
     m_assetsCache[id] = {};
     m_assetErrors[id] = loaded.error();
     m_assetsDone.notify_all();
+    if (m_queue.empty() && m_luaGcPending)
+      m_assetsQueued.notify_one();
     return std::unexpected(std::move(loaded.error()));
   }
   auto asset = std::move(*loaded);
@@ -1772,6 +1789,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
     m_assetsCache[id] = asset;
     m_assetsDone.notify_all();
     freshen(asset);
+    if (m_queue.empty() && m_luaGcPending)
+      m_assetsQueued.notify_one();
   } else {
     m_queue[id] = QueuePriority::Load;
     m_assetsQueued.notify_one();

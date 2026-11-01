@@ -7,7 +7,11 @@ namespace Star {
 
 void* malloc(std::size_t size) { return mi_malloc(size); }
 
-void* realloc(void* ptr, std::size_t size) { return mi_realloc(ptr, size); }
+void* realloc(void* ptr, std::size_t size) {
+  // A migrated allocation may be this thread's first allocator operation.
+  auto heap = mi_theap_get_default();
+  return heap ? mi_theap_realloc(heap, ptr, size) : nullptr;
+}
 
 void free(void* ptr) { mi_free(ptr); }
 

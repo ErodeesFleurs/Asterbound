@@ -239,9 +239,10 @@ TEST(LexicalCastTest, FloatingSpecialValuesKeepSignsAndDiscardNanPayloads) {
   for (std::string_view text : {"NaN", "-NaN", "nan()", "nan(123)", "nan(foo_bar)", "-nan(123)"}) {
     auto result = castNumber<double>(text);
     ASSERT_TRUE(result);
-    auto expected = text[0] == '-' ? -std::numeric_limits<double>::quiet_NaN()
-                                   : std::numeric_limits<double>::quiet_NaN();
-    EXPECT_EQ(std::bit_cast<std::uint64_t>(*result), std::bit_cast<std::uint64_t>(expected));
+    // Observe the object representation without producing NaNs through fast-math FP expressions.
+    std::uint64_t bits;
+    std::memcpy(&bits, &*result, sizeof(bits));
+    EXPECT_EQ(bits, text[0] == '-' ? 0xfff8000000000000ULL : 0x7ff8000000000000ULL);
   }
   for (std::string_view text : {"+inf", "nan(a-b)", "nan(foo", "infinityx"})
     EXPECT_FALSE(castNumber<double>(text));

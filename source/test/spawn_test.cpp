@@ -39,6 +39,8 @@ import star.assets;
 import star.root_base;
 import star.configuration;
 import star.root;
+import star.lua;
+import star.lua_root;
 
 import star.test_universe;
 #include "gtest/gtest.h"
@@ -97,6 +99,24 @@ const GameTestRegistration randomCelestialWorld("SpawnTest", "RandomCelestialWor
   EXPECT_EQ((*testUniverse)->currentPlayerWorld(), worldId);
   ASSERT_TRUE(validateWorld(fixture.root(), **testUniverse));
   ASSERT_TRUE((*testUniverse)->close());
+});
+
+const GameTestRegistration celestialCoordinatorMigration("SpawnTest", "CelestialCoordinatorLua55Migration", [](GameTest& fixture) {
+  // This exact world exposed vanilla npccombat.lua's reassigned loop control.
+  auto worldId = parseWorldId("CelestialWorld:399373772:-84992261:-27065884:9");
+  ASSERT_TRUE(worldId) << worldId.error().what();
+  auto testUniverse = TestUniverse::create(fixture.root(), Vec2U(100, 100));
+  ASSERT_TRUE(testUniverse);
+  ASSERT_TRUE((*testUniverse)->warpPlayer(*worldId));
+  EXPECT_EQ((*testUniverse)->currentPlayerWorld(), *worldId);
+  ASSERT_TRUE(validateWorld(fixture.root(), **testUniverse));
+  ASSERT_TRUE((*testUniverse)->close());
+
+  // Compile that same asset explicitly even if NPC scheduling changes.
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua) << lua.error().what();
+  auto context = (*lua)->createContext("/stagehands/coordinator/npccombat.lua");
+  ASSERT_TRUE(context) << context.error().what();
 });
 
 const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld", [](GameTest& fixture) {

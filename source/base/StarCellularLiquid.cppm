@@ -124,6 +124,20 @@ private:
     std::optional<std::reference_wrapper<WorkingCellState>> bottomCell;
   };
 
+  // The cache has phase lifetime: no individual node is reclaimed while its
+  // neighbors borrow it. A monotonic resource avoids searching the block
+  // allocator's free lists once per node when the entire phase is discarded.
+  struct WorkingCells {
+    using Entry = std::pair<Vec2I const, std::optional<WorkingCell>>;
+    WorkingCells(std::size_t bucketCount = 0)
+      : cells(bucketCount, hash<Vec2I>(), std::equal_to<Vec2I>(),
+          std::pmr::polymorphic_allocator<Entry>(&storage)) {}
+
+    std::pmr::monotonic_buffer_resource storage;
+    StableHashMap<Vec2I, std::optional<WorkingCell>, hash<Vec2I>, std::equal_to<Vec2I>,
+        std::pmr::polymorphic_allocator<Entry>> cells;
+  };
+
   template <typename Key, typename Value>
   using BAHashMap = StableHashMap<Key, Value, hash<Key>, std::equal_to<Key>, BlockAllocator<std::pair<Key const, Value>, 4096>>;
 
@@ -167,7 +181,7 @@ private:
   BAHashMap<LiquidId, BAOrderedHashSet<Vec2I>> m_unlimitedActiveCells;
   std::uint64_t m_step;
 
-  BAHashMap<Vec2I, std::optional<WorkingCell>> m_workingCells;
+  std::unique_ptr<WorkingCells> m_workingCells;
   List<std::reference_wrapper<WorkingCell>> m_currentActiveCells;
   BAHashSet<Vec2I> m_nextActiveCells;
   BAHashSet<std::tuple<Vec2I, LiquidId, Vec2I, LiquidId>> m_liquidInteractions;
@@ -295,7 +309,13 @@ template <typename LiquidId> bool LiquidCellEngine<LiquidId>::inNoProcessingLimi
 template <typename LiquidId>
 [[nodiscard]] std::expected<void, StarException> LiquidCellEngine<LiquidId>::setup() {
   // Clear transient state left by a failed update.
-  m_workingCells.clear();
+  if (m_workingCells) {
+    // clear() retained this bucket count before arena allocation. Preserve it:
+    // bucket grouping determines flow write order, including failed prefixes.
+    auto bucketCount = m_workingCells->cells.bucket_count();
+    m_workingCells.reset();
+    m_workingCells = std::make_unique<WorkingCells>(bucketCount);
+  }
   m_currentActiveCells.clear();
 
   for (auto& activeCellsPair : m_activeCells) {
@@ -566,7 +586,8 @@ template <typename LiquidId>
 [[nodiscard]] std::expected<void, StarException> LiquidCellEngine<LiquidId>::finish() {
   m_currentActiveCells.clear();
 
-  for (auto& workingCellPair : take(m_workingCells)) {
+  auto workingCells = take(m_workingCells);
+  if (workingCells) for (auto& workingCellPair : workingCells->cells) {
     if (workingCellPair.second && !workingCellPair.second->sourceCell) {
       if (workingCellPair.second->liquid) {
         if (workingCellPair.second->level < m_engineParameters.minimumLiquidLevel)
@@ -585,6 +606,7 @@ template <typename LiquidId>
       if (!set) return std::unexpected(std::move(set.error()));
     }
   }
+  workingCells.reset();
 
   for (auto const& interaction : take(m_liquidInteractions)) {
     auto applied = m_cellWorld->liquidInteraction(std::get<0>(interaction), std::get<1>(interaction), std::get<2>(interaction), std::get<3>(interaction));
@@ -598,16 +620,16 @@ template <typename LiquidId>
 
   for (auto const& c : take(m_nextActiveCells)) {
     auto visit = [this](Vec2I p) -> std::expected<void, StarException> {
-      p = m_cellWorld->uniqueLocation(p);
       auto found = workingCell(p);
       if (!found) return std::unexpected(std::move(found.error()));
       auto cell = *found;
       if (cell && cell->get().liquid) {
         auto liquid = *cell->get().liquid;
-        if (m_activeCells[liquid].add(p)) {
+        auto const& position = cell->get().position;
+        if (m_activeCells[liquid].add(position)) {
           auto unlimited = m_unlimitedActiveCells.find(liquid);
-          if (unlimited != m_unlimitedActiveCells.end() && inNoProcessingLimitRegion(p))
-            unlimited->second.add(p);
+          if (unlimited != m_unlimitedActiveCells.end() && inNoProcessingLimitRegion(position))
+            unlimited->second.add(position);
         }
       }
       return {};
@@ -627,11 +649,14 @@ template <typename LiquidId>
 [[nodiscard]] std::expected<std::optional<std::reference_wrapper<typename LiquidCellEngine<LiquidId>::WorkingCell>>, StarException> LiquidCellEngine<LiquidId>::workingCell(Vec2I p) {
   p = m_cellWorld->uniqueLocation(p);
 
-  auto res = m_workingCells.insert(std::make_pair(p, std::optional<WorkingCell>()));
+  if (!m_workingCells)
+    m_workingCells = std::make_unique<WorkingCells>();
+  // try_emplace does not allocate a candidate node on a cache hit.
+  auto res = m_workingCells->cells.try_emplace(p);
   if (res.second) {
     auto cellData = m_cellWorld->cell(p);
     if (!cellData) {
-      m_workingCells.remove(p);
+      m_workingCells->cells.erase(res.first);
       return std::unexpected(std::move(cellData.error()));
     }
     if (std::holds_alternative<CellularLiquidFlowCell<LiquidId>>(*cellData)) {

@@ -34,6 +34,23 @@ import star.effect_source_database;
 #include "gtest/gtest.h"
 
 import star.algorithm;
+namespace Star {
+struct AssetWorkerTestAccess {
+  static std::expected<void, StarException> drain(Assets& assets) {
+    std::unique_lock lock(assets.m_assetsMutex);
+    if (!assets.m_assetsDone.wait_for(lock, std::chrono::seconds(60), [&] {
+          return assets.m_queue.empty() || assets.m_workerError || assets.m_stopThreads;
+        }))
+      return std::unexpected(StarException("Asset queue regression did not drain"));
+    if (assets.m_workerError)
+      return std::unexpected(*assets.m_workerError);
+    if (assets.m_stopThreads)
+      return std::unexpected(StarException("Asset queue stopped before draining"));
+    return {};
+  }
+};
+}
+
 using namespace Star;
 
 namespace {
@@ -565,6 +582,79 @@ const GameTestRegistration
     }
     EXPECT_FALSE((*assets)->json("/broken.json"));
   });
+
+const GameTestRegistration assetsSharedPatchStateAcrossDrains(
+    "AssetsTest", "SharedPatchStateSurvivesQueueDrainsAndErrors", [](GameTest& fixture) {
+  auto directory = File::temporaryDirectory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+  ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
+  StringList paths;
+  JsonArray targets;
+  for (unsigned i = 0; i <= 32; ++i) {
+    auto name = strf("shared{}.json", i);
+    ASSERT_TRUE(File::writeFile(String(strf("{{\"index\":{}}}", i)), File::relativeTo(*directory, name)));
+    paths.append("/" + name);
+    targets.emplace_back(paths.back());
+  }
+  Json patchList = JsonArray{JsonObject{{"paths", std::move(targets)}, {"patches", JsonArray{"/shared.lua"}}}};
+  auto encoded = patchList.repr();
+  ASSERT_TRUE(encoded);
+  // Patch lists attach to already registered targets in source scan order.
+  ASSERT_TRUE(File::writeFile(*encoded, File::relativeTo(*directory, "zz-shared.patchlist")));
+  ASSERT_TRUE(File::writeFile(String(R"lua(counter = 0
+function patch(asset)
+  counter = counter + 1
+  local garbage = {}
+  for i = 1, 128 do
+    local node = {value = i}
+    node.self = node
+    garbage[i] = node
+  end
+  if asset.index == 17 then error("shared patch failure") end
+  asset.serial = counter
+  return asset
+end
+)lua"), File::relativeTo(*directory, "shared.lua")));
+  for (unsigned workerCount : {1u, 4u}) {
+    Assets::Settings settings{};
+    settings.workerPoolSize = workerCount;
+    settings.assetTimeToLive = 600;
+    Logger logger;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets);
+    std::set<std::int64_t> serials;
+    for (unsigned begin = 0; begin < 32; begin += 8) {
+      StringList batch;
+      for (unsigned i = begin; i < begin + 8; ++i)
+        batch.append(paths[i]);
+      ASSERT_TRUE((*assets)->queueJsons(batch));
+      auto drained = AssetWorkerTestAccess::drain(**assets);
+      ASSERT_TRUE(drained) << drained.error().what();
+      for (unsigned i = begin; i < begin + 8; ++i) {
+        auto loaded = (*assets)->json(paths[i]);
+        if (i == 17) {
+          EXPECT_FALSE(loaded);
+          continue;
+        }
+        ASSERT_TRUE(loaded) << loaded.error().what();
+        auto serial = loaded->getInt("serial");
+        ASSERT_TRUE(serial);
+        EXPECT_GE(*serial, 1);
+        EXPECT_LE(*serial, 32);
+        EXPECT_TRUE(serials.insert(*serial).second);
+      }
+    }
+    EXPECT_EQ(serials.size(), 31u);
+    auto final = (*assets)->json(paths[32]);
+    ASSERT_TRUE(final) << final.error().what();
+    auto count = final->getInt("serial");
+    ASSERT_TRUE(count);
+    EXPECT_EQ(*count, 33);
+    EXPECT_FALSE((*assets)->json(paths[17]));
+    assets->reset();
+  }
+});
 
 const GameTestRegistration pngRoundTripPreservesPixelsAndMetadata("ImageTest", "PngRoundTripPreservesPixelsAndMetadata", [](GameTest& fixture) {
   for (auto format : {PixelFormat::RGB24, PixelFormat::RGBA32}) {

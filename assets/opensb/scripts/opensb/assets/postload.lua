@@ -10,6 +10,17 @@ if flyingFixes > 0 then
   assets.add(flyingPath, flyingScript)
 end
 
+-- Clamp the visible sample without assigning Lua 5.5's numeric loop control.
+local npcCombatPath = "/stagehands/coordinator/npccombat.lua"
+local npcCombatScript, npcCombatFixes = assets.bytes(npcCombatPath):gsub(
+  "(for range = math%.floor%(minRange%), math%.ceil%(maxRange%) do%s+)range = math%.max%(minRange, math%.min%(maxRange, range%)%)",
+  "%1local range = math.max(minRange, math.min(maxRange, range))",
+  1
+)
+if npcCombatFixes > 0 then
+  assets.add(npcCombatPath, npcCombatScript)
+end
+
 -- Revert cursor frames if a mod replaced cursors.png with a SD version again
 -- Otherwise, scale down our HD cursors
 if assets.image("/cursors/cursors.png"):size()[1] == 64 then

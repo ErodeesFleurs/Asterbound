@@ -28,10 +28,11 @@ TEST(LiquidStoreTest, OverfullLevelSaturatesNetworkUpdates) {
 }
 
 namespace {
-class LiquidBasin : public CellularLiquidWorld<LiquidId> {
+template <int BasinWidth, int BasinHeight>
+class SizedLiquidBasin : public CellularLiquidWorld<LiquidId> {
 public:
-  static constexpr int Width = 5;
-  static constexpr int Height = 3;
+  static constexpr int Width = BasinWidth;
+  static constexpr int Height = BasinHeight;
   std::array<CellularLiquidFlowCell<LiquidId>, Width * Height> cells{};
   mutable bool failNextRead = false;
 
@@ -63,6 +64,7 @@ public:
     return total;
   }
 };
+using LiquidBasin = SizedLiquidBasin<5, 3>;
 
 const GameTestRegistration liquidBorrowRecovery("LiquidEngine", "WrappedFlowConservesMassAfterReadFailure", [](GameTest& fixture) {
   auto database = fixture.root().liquidsDatabase();
@@ -93,6 +95,131 @@ const GameTestRegistration liquidBorrowRecovery("LiquidEngine", "WrappedFlowCons
     bottomMass += basin->cells[x].level;
   EXPECT_GT(bottomMass, 0.5f);
   EXPECT_GT(basin->cells[LiquidBasin::Width - 1].level, 0.01f);
+});
+
+class CallbackLiquidBasin : public CellularLiquidWorld<LiquidId> {
+public:
+  LiquidId water;
+  LiquidId lava;
+  std::optional<char> failure;
+  std::vector<char> calls;
+  unsigned sourceWrites = 0;
+  std::array<CellularLiquidFlowCell<LiquidId>, 2> flows;
+  std::vector<Vec2I> committedWrites;
+  std::function<void()> interaction;
+
+  CallbackLiquidBasin(LiquidId water, LiquidId lava)
+    : water(water), lava(lava), flows{{{water, 0.5f, 0}, {lava, 0.5f, 0}}} {}
+
+  std::expected<CellularLiquidCell<LiquidId>, StarException> cell(Vec2I const& p) const override {
+    if (p == Vec2I(0, 0))
+      return CellularLiquidSourceCell<LiquidId>{water, 0};
+    if (p[1] == 0 && p[0] >= 1 && p[0] <= 2)
+      return flows[p[0] - 1];
+    return CellularLiquidCollisionCell{};
+  }
+
+  std::expected<void, StarException> record(char kind) {
+    calls.push_back(kind);
+    if (failure == kind && (kind != 'w' || !committedWrites.empty()))
+      return std::unexpected(StarException(strf("Injected liquid callback {}", kind)));
+    return {};
+  }
+
+  std::expected<void, StarException> setFlow(Vec2I const& p,
+      CellularLiquidFlowCell<LiquidId> const& flow) override {
+    if (p == Vec2I(0, 0)) {
+      ++sourceWrites;
+      return std::unexpected(StarException("Source cell was written as flow"));
+    }
+    auto recorded = record('w');
+    if (!recorded)
+      return recorded;
+    flows[p[0] - 1] = flow;
+    committedWrites.push_back(p);
+    return {};
+  }
+
+  std::expected<void, StarException> liquidInteraction(Vec2I const&, LiquidId, Vec2I const&, LiquidId) override {
+    auto recorded = record('i');
+    if (recorded && interaction)
+      interaction();
+    return recorded;
+  }
+
+  std::expected<void, StarException> liquidCollision(Vec2I const&, LiquidId, Vec2I const&) override {
+    return record('c');
+  }
+};
+
+const GameTestRegistration liquidCallbackRecovery(
+    "LiquidEngine", "PhaseStorageSurvivesSourceAndCallbackFailures", [](GameTest& fixture) {
+  auto database = fixture.root().liquidsDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  auto water = (*database)->liquidId("water");
+  ASSERT_TRUE(water) << water.error().what();
+  auto lava = (*database)->liquidId("lava");
+  ASSERT_TRUE(lava) << lava.error().what();
+  for (char failure : {'w', 'i', 'c'}) {
+    SCOPED_TRACE(failure);
+    auto basin = std::make_shared<CallbackLiquidBasin>(*water, *lava);
+    LiquidCellEngine<LiquidId> engine(43, {}, basin);
+    engine.visitRegion(RectI(0, 0, 3, 1));
+    ASSERT_TRUE(engine.update());
+    basin->failure = failure;
+    auto failed = engine.update();
+    ASSERT_FALSE(failed);
+    auto expectedError = StarException(strf("Injected liquid callback {}", failure));
+    EXPECT_STREQ(failed.error().what(), expectedError.what());
+    ASSERT_FALSE(basin->calls.empty());
+    EXPECT_EQ(basin->calls.back(), failure);
+    if (failure == 'w') {
+      EXPECT_EQ(basin->calls.size(), 2u);
+      EXPECT_EQ(basin->committedWrites.size(), 1u);
+      EXPECT_FLOAT_EQ(basin->flows[basin->committedWrites.front()[0] - 1].level, 0.5f);
+      auto committed = basin->committedWrites.front()[0] - 1;
+      EXPECT_FLOAT_EQ(basin->flows[committed].pressure, 0.5f);
+      EXPECT_FLOAT_EQ(basin->flows[1 - committed].pressure, 0.0f);
+    } else {
+      EXPECT_EQ(std::count(basin->calls.begin(), basin->calls.end(), failure), 1);
+      EXPECT_EQ(std::count(basin->calls.begin(), basin->calls.end(), 'w'), 2);
+      if (failure == 'i')
+        EXPECT_EQ(std::count(basin->calls.begin(), basin->calls.end(), 'c'), 0);
+    }
+    basin->failure.reset();
+    // Exercise repeated fresh activation/simulation phases after all three
+    // early returns, with source-state neighbors borrowing arena-backed cells.
+    for (unsigned tick = 0; tick < 128; ++tick) {
+      basin->calls.clear();
+      engine.visitRegion(RectI(0, 0, 3, 1));
+      ASSERT_TRUE(engine.update());
+    }
+    EXPECT_EQ(basin->sourceWrites, 0u);
+  }
+  auto basin = std::make_shared<CallbackLiquidBasin>(*water, *lava);
+  LiquidCellEngine<LiquidId> engine(43, {}, basin);
+  engine.visitRegion(RectI(0, 0, 3, 1));
+  ASSERT_TRUE(engine.update());
+  basin->interaction = [&] {
+    basin->flows[1].liquid = *water;
+    engine.visitLocation({2, 0});
+  };
+  ASSERT_TRUE(engine.update());
+  // The pressure correction also revisits x=1 and its source neighbor x=0.
+  EXPECT_EQ(engine.activeCells(*water), 3u);
+  EXPECT_EQ(engine.activeCells(*lava), 0u);
+  EXPECT_EQ(basin->sourceWrites, 0u);
+
+  auto emitting = std::make_shared<CallbackLiquidBasin>(*water, *lava);
+  LiquidCellEngineParameters sourceParameters{};
+  sourceParameters.lateralMoveFactor = 0.5f;
+  LiquidCellEngine<LiquidId> sourceEngine(43, sourceParameters, emitting);
+  sourceEngine.visitRegion(RectI(0, 0, 3, 1));
+  ASSERT_TRUE(sourceEngine.update());
+  ASSERT_TRUE(sourceEngine.update());
+  EXPECT_FLOAT_EQ(emitting->flows[0].level, 0.75f);
+  EXPECT_FLOAT_EQ(emitting->flows[1].level, 0.5f);
+  EXPECT_EQ(emitting->sourceWrites, 0u);
 });
 
 class BudgetLiquidBasin : public CellularLiquidWorld<LiquidId> {
@@ -281,4 +408,98 @@ const GameTestRegistration
       expectConservedBasin();
     }
   });
+const GameTestRegistration liquidCacheMoves(
+    "LiquidEngine", "WorkingCacheSurvivesMovesAndRepeatedPhaseFailures", [](GameTest& fixture) {
+      auto database = fixture.root().liquidsDatabase();
+      ASSERT_TRUE(database) << database.error().what();
+      auto water = (*database)->liquidId("water");
+      ASSERT_TRUE(water) << water.error().what();
+      auto parameters = (*database)->liquidEngineParameters();
+      parameters.minimumLiquidLevel = 0;
+      auto basin = std::make_shared<LiquidBasin>();
+      basin->cells[0] = {*water, 2.0f, 0.0f};
+      LiquidCellEngine<LiquidId> original(43, parameters, basin);
+      original.visitRegion(RectI(0, 0, LiquidBasin::Width, LiquidBasin::Height));
+      ASSERT_TRUE(original.update());
+      auto moved = std::move(original);
+      LiquidCellEngine<LiquidId> engine(44, parameters, basin);
+      engine.visitLocation({0, 0});
+      ASSERT_TRUE(engine.update());
+      engine = std::move(moved);
+      for (unsigned tick = 0; tick < 4096; ++tick) {
+        if (tick % 31 == 0) {
+          engine.visitLocation({0, 0});
+          basin->failNextRead = true;
+          EXPECT_FALSE(engine.update());
+          // A second consecutive failure must discard the first phase too.
+          basin->failNextRead = true;
+          EXPECT_FALSE(engine.update());
+        }
+        engine.visitRegion(RectI(0, 0, LiquidBasin::Width, LiquidBasin::Height));
+        auto updated = engine.update();
+        ASSERT_TRUE(updated) << updated.error().what();
+        EXPECT_NEAR(basin->mass(), 2.0f, 0.0001f);
+      }
+    });
+
+const GameTestRegistration liquidReadbackScales(
+    "LiquidEngine", "ReadbackScaleChangesRecoverFromLateReadFailure", [](GameTest& fixture) {
+      auto database = fixture.root().liquidsDatabase();
+      ASSERT_TRUE(database) << database.error().what();
+      auto water = (*database)->liquidId("water");
+      ASSERT_TRUE(water) << water.error().what();
+      struct Basin : SizedLiquidBasin<8194, 1> {
+        mutable std::optional<unsigned> readsBeforeFailure;
+        mutable std::uint64_t trace = 1469598103934665603ULL;
+        void mix(std::uint32_t value) const { trace = (trace ^ value) * 1099511628211ULL; }
+        std::expected<CellularLiquidCell<LiquidId>, StarException> cell(Vec2I const& p) const override {
+          mix(p[0]);
+          mix(p[1]);
+          if (readsBeforeFailure) {
+            if (*readsBeforeFailure == 0) {
+              readsBeforeFailure.reset();
+              return std::unexpected(StarException("Late scalable readback failure"));
+            }
+            --*readsBeforeFailure;
+          }
+          return SizedLiquidBasin<8194, 1>::cell(p);
+        }
+        std::expected<void, StarException> setFlow(
+            Vec2I const& p, CellularLiquidFlowCell<LiquidId> const& flow) override {
+          mix(p[0]);
+          mix(p[1]);
+          mix(std::bit_cast<std::uint32_t>(flow.level));
+          mix(std::bit_cast<std::uint32_t>(flow.pressure));
+          return SizedLiquidBasin<8194, 1>::setFlow(p, flow);
+        }
+      };
+      auto basin = std::make_shared<Basin>();
+      for (auto& cell : basin->cells)
+        cell = {*water, 0.5f, 0.5f};
+      LiquidCellEngine<LiquidId> engine(43, {}, basin);
+      for (unsigned visits : {512u, 2048u, 8192u, 2048u}) {
+        SCOPED_TRACE(visits);
+        engine.setProcessingLimit(0);
+        engine.visitRegion(RectI(0, 0, visits, 1));
+        if (visits >= 2048) {
+          basin->readsBeforeFailure = 20;
+          auto failed = engine.update();
+          ASSERT_FALSE(failed);
+          auto expectedError = StarException("Late scalable readback failure");
+          EXPECT_STREQ(failed.error().what(), expectedError.what());
+          engine.visitRegion(RectI(0, 0, visits, 1));
+        }
+        ASSERT_TRUE(engine.update());
+        EXPECT_EQ(engine.activeCells(), visits + 2);
+        engine.setProcessingLimit({});
+        ASSERT_TRUE(engine.update());
+        EXPECT_EQ(engine.activeCells(), 0u);
+        for (auto const& cell : basin->cells) {
+          EXPECT_EQ(cell.liquid, *water);
+          EXPECT_FLOAT_EQ(cell.level, 0.5f);
+          EXPECT_FLOAT_EQ(cell.pressure, 0.5f);
+        }
+      }
+      testing::Test::RecordProperty("read_write_trace", std::to_string(basin->trace));
+    });
 }

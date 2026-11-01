@@ -45,6 +45,11 @@ if(STAR_SYSTEM_MACOS)
   target_link_options(star_build_config INTERFACE "LINKER:-export_dynamic")
 elseif(NOT STAR_SYSTEM_WINDOWS)
   target_link_options(star_build_config INTERFACE "LINKER:--export-dynamic")
+  # Driver DSOs must not bind to the engine's private mimalloc operators.
+  # Keep other dynamic symbols available for diagnostics.
+  set(star_allocator_symbols "${CMAKE_CURRENT_LIST_DIR}/StarAllocator.map")
+  target_link_options(star_build_config INTERFACE "LINKER:--version-script=${star_allocator_symbols}")
+  set_property(TARGET star_build_config APPEND PROPERTY INTERFACE_LINK_DEPENDS "${star_allocator_symbols}")
 endif()
 
 if(NOT STAR_SYSTEM_WINDOWS AND NOT STAR_SYSTEM_MACOS)

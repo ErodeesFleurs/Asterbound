@@ -366,6 +366,24 @@ void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std
   xMax = std::min(m_width, xMax + (std::size_t)std::ceil(m_spreadMaxAir));
   yMax = std::min(m_height, yMax + (std::size_t)std::ceil(m_spreadMaxAir));
 
+  auto propagate = [&](Cell const& source, Cell& straightA, Cell& straightB, Cell& diagonalA, Cell& diagonalB) {
+    float straightDropoff = source.obstacle ? dropoffObstacle : dropoffAir;
+    float diagonalDropoff = source.obstacle ? dropoffObstacleDiag : dropoffAirDiag;
+    if constexpr (std::same_as<LightTraits, ScalarLightTraits>) {
+      auto straightLight = source.light - straightDropoff;
+      auto diagonalLight = source.light - diagonalDropoff;
+      straightA.light = LightTraits::max(straightLight, straightA.light);
+      straightB.light = LightTraits::max(straightLight, straightB.light);
+      diagonalA.light = LightTraits::max(diagonalLight, diagonalA.light);
+      diagonalB.light = LightTraits::max(diagonalLight, diagonalB.light);
+    } else {
+      straightA.light = LightTraits::spread(source.light, straightA.light, straightDropoff);
+      straightB.light = LightTraits::spread(source.light, straightB.light, straightDropoff);
+      diagonalA.light = LightTraits::spread(source.light, diagonalA.light, diagonalDropoff);
+      diagonalB.light = LightTraits::spread(source.light, diagonalB.light, diagonalDropoff);
+    }
+  };
+
   for (unsigned p = 0; p < m_spreadPasses; ++p) {
     // Spread right and up and diag up right / diag down right
     for (std::size_t x = xMin + 1; x < xMax - 1; ++x) {
@@ -379,14 +397,7 @@ void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std
         auto& cellRightUp = cellAtIndex(xRightCellOffset + y + 1);
         auto& cellRightDown = cellAtIndex(xRightCellOffset + y - 1);
 
-        float straightDropoff = cell.obstacle ? dropoffObstacle : dropoffAir;
-        float diagDropoff = cell.obstacle ? dropoffObstacleDiag : dropoffAirDiag;
-
-        cellRight.light = LightTraits::spread(cell.light, cellRight.light, straightDropoff);
-        cellUp.light = LightTraits::spread(cell.light, cellUp.light, straightDropoff);
-
-        cellRightUp.light = LightTraits::spread(cell.light, cellRightUp.light, diagDropoff);
-        cellRightDown.light = LightTraits::spread(cell.light, cellRightDown.light, diagDropoff);
+        propagate(cell, cellRight, cellUp, cellRightUp, cellRightDown);
       }
     }
 
@@ -402,14 +413,7 @@ void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std
         auto& cellLeftUp = cellAtIndex(xLeftCellOffset + y + 1);
         auto& cellLeftDown = cellAtIndex(xLeftCellOffset + y - 1);
 
-        float straightDropoff = cell.obstacle ? dropoffObstacle : dropoffAir;
-        float diagDropoff = cell.obstacle ? dropoffObstacleDiag : dropoffAirDiag;
-
-        cellLeft.light = LightTraits::spread(cell.light, cellLeft.light, straightDropoff);
-        cellDown.light = LightTraits::spread(cell.light, cellDown.light, straightDropoff);
-
-        cellLeftUp.light = LightTraits::spread(cell.light, cellLeftUp.light, diagDropoff);
-        cellLeftDown.light = LightTraits::spread(cell.light, cellLeftDown.light, diagDropoff);
+        propagate(cell, cellLeft, cellDown, cellLeftUp, cellLeftDown);
       }
     }
   }
@@ -420,6 +424,19 @@ float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F
     float perObstacleAttenuation, float maxAttenuation) {
   // Run Xiaolin Wu's line algorithm from start to end, summing over colliding
   // blocks using perObstacleAttenuation.
+  // Ray coordinates already require a finite, int-representable floor for
+  // indexing. Truncation plus the negative-fraction correction gives that
+  // same integer without a floor/floorf library call in every ray step.
+  auto integerPart = [](auto value) {
+    int whole = static_cast<int>(value);
+    return whole - static_cast<int>(value < static_cast<decltype(value)>(whole));
+  };
+  auto fractionalPart = [&](auto value) -> decltype(value) {
+    return value - integerPart(value);
+  };
+  auto reverseFractionalPart = [&](auto value) -> decltype(value) {
+    return 1.0 - fractionalPart(value);
+  };
   float obstacleAttenuation = 0.0;
 
   // Apply correction because integer coordinates are lower left corner.
@@ -442,15 +459,15 @@ float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F
     // first end point
     float yend = std::round(y1);
     float xend = x1 + gradient * (yend - y1);
-    float ygap = rfpart(y1 + 0.5);
+    float ygap = reverseFractionalPart(y1 + 0.5);
     int ypxl1 = yend;
-    int xpxl1 = ipart(xend);
+    int xpxl1 = integerPart(xend);
 
     if (cell(xpxl1, ypxl1).obstacle)
-      obstacleAttenuation += rfpart(xend) * ygap * perObstacleAttenuation;
+      obstacleAttenuation += reverseFractionalPart(xend) * ygap * perObstacleAttenuation;
 
     if (cell(xpxl1 + 1, ypxl1).obstacle)
-      obstacleAttenuation += fpart(xend) * ygap * perObstacleAttenuation;
+      obstacleAttenuation += fractionalPart(xend) * ygap * perObstacleAttenuation;
 
     if (obstacleAttenuation >= maxAttenuation)
       return maxAttenuation;
@@ -460,21 +477,21 @@ float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F
     // second end point
     yend = std::round(y2);
     xend = x2 + gradient * (yend - y2);
-    ygap = fpart(y2 + 0.5);
+    ygap = fractionalPart(y2 + 0.5);
     int ypxl2 = yend;
-    int xpxl2 = ipart(xend);
+    int xpxl2 = integerPart(xend);
 
     if (cell(xpxl2, ypxl2).obstacle)
-      obstacleAttenuation += rfpart(xend) * ygap * perObstacleAttenuation;
+      obstacleAttenuation += reverseFractionalPart(xend) * ygap * perObstacleAttenuation;
 
     if (cell(xpxl2 + 1, ypxl2).obstacle)
-      obstacleAttenuation += fpart(xend) * ygap * perObstacleAttenuation;
+      obstacleAttenuation += fractionalPart(xend) * ygap * perObstacleAttenuation;
 
     if (obstacleAttenuation >= maxAttenuation)
       return maxAttenuation;
 
     for (int y = ypxl1 + 1; y < ypxl2; ++y) {
-      int interxIpart = ipart(interx);
+      int interxIpart = integerPart(interx);
       float interxFpart = interx - interxIpart;
       float interxRFpart = 1.0 - interxFpart;
 
@@ -499,15 +516,15 @@ float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F
     // first end point
     float xend = std::round(x1);
     float yend = y1 + gradient * (xend - x1);
-    float xgap = rfpart(x1 + 0.5);
+    float xgap = reverseFractionalPart(x1 + 0.5);
     int xpxl1 = xend;
-    int ypxl1 = ipart(yend);
+    int ypxl1 = integerPart(yend);
 
     if (cell(xpxl1, ypxl1).obstacle)
-      obstacleAttenuation += rfpart(yend) * xgap * perObstacleAttenuation;
+      obstacleAttenuation += reverseFractionalPart(yend) * xgap * perObstacleAttenuation;
 
     if (cell(xpxl1, ypxl1 + 1).obstacle)
-      obstacleAttenuation += fpart(yend) * xgap * perObstacleAttenuation;
+      obstacleAttenuation += fractionalPart(yend) * xgap * perObstacleAttenuation;
 
     if (obstacleAttenuation >= maxAttenuation)
       return maxAttenuation;
@@ -517,21 +534,21 @@ float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F
     // second end point
     xend = std::round(x2);
     yend = y2 + gradient * (xend - x2);
-    xgap = fpart(x2 + 0.5);
+    xgap = fractionalPart(x2 + 0.5);
     int xpxl2 = xend;
-    int ypxl2 = ipart(yend);
+    int ypxl2 = integerPart(yend);
 
     if (cell(xpxl2, ypxl2).obstacle)
-      obstacleAttenuation += rfpart(yend) * xgap * perObstacleAttenuation;
+      obstacleAttenuation += reverseFractionalPart(yend) * xgap * perObstacleAttenuation;
 
     if (cell(xpxl2, ypxl2 + 1).obstacle)
-      obstacleAttenuation += fpart(yend) * xgap * perObstacleAttenuation;
+      obstacleAttenuation += fractionalPart(yend) * xgap * perObstacleAttenuation;
 
     if (obstacleAttenuation >= maxAttenuation)
       return maxAttenuation;
 
     for (int x = xpxl1 + 1; x < xpxl2; ++x) {
-      int interyIpart = ipart(intery);
+      int interyIpart = integerPart(intery);
       float interyFpart = intery - interyIpart;
       float interyRFpart = 1.0 - interyFpart;
 

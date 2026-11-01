@@ -37,6 +37,7 @@ import star.set;
 import star.worker_pool;
 
 import std;
+import star.byte_array;
 import star.format;
 import star.sector_array_2d;
 import star.net_compatibility;
@@ -638,7 +639,15 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         world->handleIncomingPackets(MinClientConnectionId + i, {std::make_shared<WorldStartAcknowledgePacket>()}));
     }
     std::array<HashMap<EntityId, std::shared_ptr<Entity>>, 2> visible;
+    std::array<HashMap<Vec2I, NetTile>, 2> clientTiles;
+    struct RetainedSnapshot {
+      std::shared_ptr<TileArrayUpdatePacket> packet;
+      ByteArray wire;
+      NetCompatibilityRules rules;
+    };
+    std::vector<RetainedSnapshot> retainedSnapshots;
     for (unsigned phase = 0; phase < 3; ++phase) {
+      HashMap<Vec2I, std::shared_ptr<TileArrayUpdatePacket>> sharedSectors;
       for (unsigned i = 0; i < states.size(); ++i) {
         // The presence region remains near the anchor while the camera crosses
         // sectors. Re-entering must create the target again, not reuse a delta
@@ -649,6 +658,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         ASSERT_TRUE(world->handleIncomingPackets(MinClientConnectionId + i,
                                                  {std::make_shared<WorldClientStateUpdatePacket>(*delta)}));
       }
+      ASSERT_TRUE(world->setLiquid(Vec2I(1100, 1004), LiquidId(1), 0.5f + phase * 0.1f, 0.5f));
       ASSERT_TRUE(world->update(1.0f / 60.0f));
       for (unsigned i = 0; i < states.size(); ++i) {
         NetCompatibilityRules rules(i ? LegacyVersion : OpenProtocolVersion);
@@ -702,6 +712,53 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           auto const& packet = *decoded;
           if (packet->type() == PacketType::StepUpdate)
             stepSeen = true;
+          if (auto array = as<TileArrayUpdatePacket>(packet)) {
+            auto source = as<TileArrayUpdatePacket>(original);
+            ASSERT_TRUE(source);
+            auto [shared, first] = sharedSectors.insert(source->min, source);
+            if (!first)
+              EXPECT_EQ(source, shared->second);
+            retainedSnapshots.push_back({source, wire.data(), rules});
+            for (std::size_t x = 0; x < array->array.size(0); ++x) {
+              for (std::size_t y = 0; y < array->array.size(1); ++y) {
+                auto pos = array->min + Vec2I(x, y);
+                auto server = world->getServerTile(pos);
+                ASSERT_TRUE(server) << server.error().what();
+                auto const& tile = server->get();
+                NetTile expected;
+                expected.foreground = tile.foreground;
+                expected.foregroundHueShift = tile.foregroundHueShift;
+                expected.foregroundColorVariant = tile.foregroundColorVariant;
+                expected.foregroundMod = tile.foregroundMod;
+                expected.foregroundModHueShift = tile.foregroundModHueShift;
+                expected.background = tile.background;
+                expected.backgroundHueShift = tile.backgroundHueShift;
+                expected.backgroundColorVariant = tile.backgroundColorVariant;
+                expected.backgroundMod = tile.backgroundMod;
+                expected.backgroundModHueShift = tile.backgroundModHueShift;
+                expected.liquid = tile.liquid.netUpdate();
+                expected.collision = tile.getCollision();
+                expected.blockBiomeIndex = tile.blockBiomeIndex;
+                expected.environmentBiomeIndex = tile.environmentBiomeIndex;
+                expected.dungeonId = tile.dungeonId;
+                DataStreamBuffer expectedWire;
+                expectedWire.setStreamCompatibilityVersion(rules);
+                ASSERT_TRUE(expectedWire.write(expected));
+                DataStreamBuffer actualWire;
+                actualWire.setStreamCompatibilityVersion(rules);
+                ASSERT_TRUE(actualWire.write(array->array(x, y)));
+                EXPECT_EQ(expectedWire.data(), actualWire.data());
+                clientTiles[i].set(pos, array->array(x, y));
+              }
+            }
+          } else if (auto tile = as<TileUpdatePacket>(packet)) {
+            EXPECT_TRUE(clientTiles[i].contains(tile->position));
+            clientTiles[i].set(tile->position, tile->tile);
+          } else if (auto liquid = as<TileLiquidUpdatePacket>(packet)) {
+            auto tile = clientTiles[i].get(liquid->position);
+            ASSERT_TRUE(tile) << tile.error().what();
+            tile->get().liquid = liquid->liquidUpdate;
+          }
           if (auto entityCreate = as<EntityCreatePacket>(packet)) {
             EXPECT_TRUE(stepSeen);
             EXPECT_FALSE(updateSetSeen);
@@ -729,6 +786,23 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         EXPECT_EQ(visible[i].contains((*target)->entityId()), phase != 1);
         EXPECT_EQ(targetCreated, phase != 1);
         EXPECT_EQ(targetDestroyed, phase == 1);
+        if (phase != 1) {
+          auto installed = clientTiles[i].get(Vec2I(1100, 1004));
+          ASSERT_TRUE(installed) << installed.error().what();
+          auto live = world->getServerTile(Vec2I(1100, 1004));
+          ASSERT_TRUE(live) << live.error().what();
+          auto expected = live->get().liquid.netUpdate();
+          EXPECT_EQ(installed->get().liquid.liquid, expected.liquid);
+          EXPECT_EQ(installed->get().liquid.level, expected.level);
+        }
+      }
+      // Later world changes and snapshots must not mutate packets already
+      // handed to an asynchronous consumer, including the other wire version.
+      for (auto const& retained : retainedSnapshots) {
+        DataStreamBuffer wire;
+        wire.setStreamCompatibilityVersion(retained.rules);
+        ASSERT_TRUE(static_cast<Packet const&>(*retained.packet).write(wire, retained.rules));
+        EXPECT_EQ(wire.data(), retained.wire);
       }
     }
   });

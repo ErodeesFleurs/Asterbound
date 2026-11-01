@@ -2,6 +2,8 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.collision_block;
+import star.tile_damage;
 import star.application;
 import star.application_controller;
 import star.file;
@@ -37,6 +39,21 @@ struct TilePainterPerformanceAccess {
   static std::expected<std::pair<std::uint64_t, std::uint64_t>, StarException>
   hashes(TilePainter& painter, WorldRenderData& data, Vec2I chunk) {
     return painter.chunkHashes(data, chunk);
+  }
+  static std::expected<void, StarException> failSetupPreservingFrame(
+      TilePainter& painter, WorldCamera const& camera, WorldRenderData& data) {
+    auto terrain = painter.m_pendingTerrainChunks;
+    auto liquid = painter.m_pendingLiquidChunks;
+    auto textures = painter.m_textureCache.currentSize();
+    auto failed = painter.setup(camera, data);
+    if (failed)
+      return std::unexpected(StarException("Tile failure fixture unexpectedly succeeded"));
+    if (painter.m_textureCache.currentSize() <= textures)
+      return std::unexpected(StarException("Tile failure occurred before exercising a texture miss"));
+    if (!painter.m_setupTextures.empty() || painter.m_pendingTerrainChunks != terrain
+        || painter.m_pendingLiquidChunks != liquid)
+      return std::unexpected(StarException("Failed tile setup retained uploads or replaced the pending frame"));
+    return {};
   }
 };
 
@@ -145,10 +162,12 @@ std::expected<void, StarException> advanceNativeFrame(Renderer& renderer) {
 }
 
 std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, TileFixture& fixture, Renderer& renderer,
-                                                      bool liquidOnly = false) {
-  auto setup = painter.setup(fixture.camera, fixture.data);
-  if (!setup)
-    return std::unexpected(std::move(setup.error()));
+                                                      bool liquidOnly = false, bool prepare = true) {
+  if (prepare) {
+    auto setup = painter.setup(fixture.camera, fixture.data);
+    if (!setup)
+      return std::unexpected(std::move(setup.error()));
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glClear(GL_COLOR_BUFFER_BIT);
   if (!liquidOnly) {
@@ -247,6 +266,76 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
     return std::unexpected(StarException("Liquid-bottom fixture does not distinguish the two geometries"));
   if (!matches)
     return std::unexpected(StarException("Foreground edit left cached liquid geometry stale"));
+  auto materials = root.materialDatabase();
+  if (!materials)
+    return std::unexpected(std::move(materials.error()));
+  for (bool damage : {true, false}) {
+    fixture->reset();
+    auto painter = TilePainter::create(root, renderer);
+    if (!painter) return std::unexpected(std::move(painter.error()));
+    auto before = imageHash(**painter, *fixture, *renderer);
+    if (!before) return std::unexpected(std::move(before.error()));
+    if (damage) {
+      fixture->tile({480, 479}).foregroundDamageLevel = 180;
+      fixture->tile({480, 479}).foregroundDamageType = TileDamageType::Blockish;
+      fixture->tile({480, 481}).backgroundDamageLevel = 170;
+      fixture->tile({480, 481}).backgroundDamageType = TileDamageType::Blockish;
+    } else {
+      std::optional<MaterialId> nonBlock;
+      for (auto const& name : (*materials)->materialNames()) {
+        auto id = (*materials)->materialId(name);
+        if (!id) return std::unexpected(std::move(id.error()));
+        auto collision = (*materials)->materialCollisionKind(*id);
+        if (!collision) return std::unexpected(std::move(collision.error()));
+        if (!BlockCollisionSet.contains(*collision) && (*materials)->materialRenderProfile(*id)) {
+          nonBlock = *id;
+          break;
+        }
+      }
+      if (!nonBlock)
+        return std::unexpected(StarException("Tile fixture found no rendered non-block material"));
+      fixture->tile({480, 479}).foreground = *nonBlock;
+    }
+    auto observed = imageHash(**painter, *fixture, *renderer);
+    if (!observed) return std::unexpected(std::move(observed.error()));
+    auto reference = TilePainter::create(root, renderer);
+    if (!reference) return std::unexpected(std::move(reference.error()));
+    auto expected = imageHash(**reference, *fixture, *renderer);
+    if (!expected) return std::unexpected(std::move(expected.error()));
+    std::printf("TILE_EXTRA damage=%d before=%016llx cached=%016llx fresh=%016llx\n", damage,
+        static_cast<unsigned long long>(*before), static_cast<unsigned long long>(*observed),
+        static_cast<unsigned long long>(*expected));
+    if (*observed != *expected || *before == *expected)
+      return std::unexpected(StarException("Damage or midground fixture failed its visible pixel oracle"));
+  }
+  fixture->reset();
+  auto recovery = TilePainter::create(root, renderer);
+  if (!recovery) return std::unexpected(std::move(recovery.error()));
+  auto normal = imageHash(**recovery, *fixture, *renderer);
+  if (!normal) return std::unexpected(std::move(normal.error()));
+  auto pending = (*recovery)->setup(fixture->camera, fixture->data);
+  if (!pending) return std::unexpected(std::move(pending.error()));
+  MaterialId missing = FirstMetaMaterialId - 1;
+  while ((*materials)->materialCollisionKind(missing)) {
+    if (missing == 0)
+      return std::unexpected(StarException("Tile fixture found no absent real material"));
+    --missing;
+  }
+  fixture->tile({448, 464}).foregroundHueShift = 37;
+  fixture->tile({512, 464}).foreground = missing;
+  auto failed = TilePainterPerformanceAccess::failSetupPreservingFrame(
+      **recovery, fixture->camera, fixture->data);
+  if (!failed) return std::unexpected(std::move(failed.error()));
+  auto retained = imageHash(**recovery, *fixture, *renderer, false, false);
+  if (!retained) return std::unexpected(std::move(retained.error()));
+  fixture->reset();
+  auto restored = imageHash(**recovery, *fixture, *renderer);
+  if (!restored) return std::unexpected(std::move(restored.error()));
+  if (*retained != *normal || *restored != *normal)
+    return std::unexpected(StarException("Failed setup did not retain and restore its visible frame"));
+  std::printf("TILE_FAILED_SETUP_RETAINED normal=%016llx retained=%016llx restored=%016llx uploadsCleared=1\n",
+      static_cast<unsigned long long>(*normal), static_cast<unsigned long long>(*retained),
+      static_cast<unsigned long long>(*restored));
   return {};
 }
 

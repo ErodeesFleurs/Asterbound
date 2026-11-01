@@ -455,9 +455,12 @@ private:
 
   [[nodiscard]] std::expected<TileModificationList, StarException> doApplyTileModifications(TileModificationList const& modificationList, bool allowEntityOverlap, bool ignoreTileProtection = false, bool updateNeighbors = true);
 
+  using SectorSnapshotCache = HashMap<ServerTileSectorArray::Sector, std::shared_ptr<TileArrayUpdatePacket>>;
+
   // Queues pending (step based) updates to the given player
   [[nodiscard]] std::expected<void, StarException> queueUpdatePackets(ConnectionId clientId, bool sendRemoteUpdates,
-                                                                      List<RectI> const& monitoringRegions);
+                                                                      List<RectI> const& monitoringRegions,
+                                                                      SectorSnapshotCache& sectorSnapshots);
   [[nodiscard]] std::expected<void, StarException> updateDamage(float dt);
 
   [[nodiscard]] std::expected<void, StarException> updateDamagedBlocks(float dt);

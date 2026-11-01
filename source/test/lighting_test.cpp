@@ -2,6 +2,7 @@
 
 import std;
 import star.assets;
+import star.cellular_light_array;
 import star.cellular_lighting;
 import star.format;
 import star.game_test;
@@ -22,6 +23,105 @@ import star.world_tiles;
 using namespace Star;
 
 namespace {
+
+template <typename Traits>
+void checkPointObstacleSnapshotRefresh() {
+  using Array = CellularLightArray<Traits>;
+  typename Traits::Value value;
+  if constexpr (std::same_as<Traits, ScalarLightTraits>)
+    value = 1.0f;
+  else
+    value = Vec3F(1.0f, 0.8f, 0.6f);
+  Array reused;
+  Array reference;
+  for (auto* array : {&reused, &reference}) {
+    array->setParameters(0, 20, 1, 20, 1, 0, false);
+    array->begin(20, 20);
+    array->addPointLight({{4.5f, 10.5f}, value, 0, 0, 0, false});
+  }
+  auto& retainedCell = reused.cell(10, 10);
+  reused.calculate(1, 1, 19, 19);
+  auto unobstructed = Traits::maxIntensity(reused.getLight(15, 10));
+  ASSERT_GT(unobstructed, 0.0f);
+  for (bool obstacle : {true, false, true}) {
+    for (std::size_t i = 0; i < 400; ++i) {
+      reused.cellAtIndex(i).light = {};
+      reference.cellAtIndex(i).light = {};
+    }
+    // Mutate through a reference obtained before the previous calculation,
+    // bypassing setObstacle. A cache updated only by setters would be stale.
+    retainedCell.obstacle = obstacle;
+    reference.setObstacle(10, 10, obstacle);
+    reused.calculate(1, 1, 19, 19);
+    reference.calculate(1, 1, 19, 19);
+    for (std::size_t i = 0; i < 400; ++i)
+      EXPECT_EQ(std::memcmp(&reused.cellAtIndex(i).light, &reference.cellAtIndex(i).light,
+          sizeof(typename Traits::Value)), 0);
+    auto brightness = Traits::maxIntensity(reused.getLight(15, 10));
+    if (obstacle)
+      EXPECT_LT(brightness, unobstructed);
+    else
+      EXPECT_EQ(brightness, unobstructed);
+  }
+  reused.begin(8, 12);
+  reused.addPointLight({{2.5f, 4.5f}, value, 0, 0, 0, false});
+  reused.cellAtIndex(3 * 12 + 5).obstacle = true;
+  reused.calculate(1, 1, 7, 11);
+  // The horizontal ray misses (3,5), while the ray to (6,5) crosses it
+  // with weight 1/4. Distance alone differs by less than 0.01 here, so an
+  // old 20-cell column stride cannot satisfy this attenuation difference.
+  EXPECT_GT(Traits::maxIntensity(reused.getLight(6, 4))
+      - Traits::maxIntensity(reused.getLight(6, 5)), 0.1f);
+}
+
+template <typename Traits>
+void checkPointRayOrientations() {
+  typename Traits::Value value;
+  if constexpr (std::same_as<Traits, ScalarLightTraits>)
+    value = 1.0f;
+  else
+    value = Vec3F(1.0f, 0.8f, 0.6f);
+  for (auto [obstacle, obstacleRange] :
+      {std::pair{false, 2.0f}, std::pair{true, 2.0f}, std::pair{true, 0.25f}}) {
+    CellularLightArray<Traits> array;
+    array.setParameters(0, 20, 1, 20, obstacleRange, 0, false);
+    array.begin(24, 24);
+    array.addPointLight({{10.5f, 10.5f}, value, 0, 0, 0, false});
+    array.setObstacle(10, 10, obstacle);
+    array.calculate(1, 1, 23, 23);
+    for (auto target : {Vec2I(15, 10), Vec2I(5, 10), Vec2I(10, 15), Vec2I(10, 5),
+        Vec2I(15, 15), Vec2I(5, 5), Vec2I(5, 15), Vec2I(15, 5),
+        Vec2I(17, 12), Vec2I(3, 8), Vec2I(12, 17), Vec2I(8, 3)}) {
+      auto delta = Vec2F(target - Vec2I(10, 10));
+      float distance = delta.magnitude();
+      float expected = 1.0f - distance / 20.0f;
+      if (obstacle) {
+        // An isolated source-center obstacle covers exactly half a ray cell.
+        // Circularization scales that half by the dominant direction axis.
+        float dominant = std::max(std::fabs(delta[0] / distance), std::fabs(delta[1] / distance));
+        expected -= 0.5f / obstacleRange / dominant;
+      }
+      expected = std::max(expected, 0.0f);
+      EXPECT_NEAR(Traits::maxIntensity(array.getLight(target[0], target[1])), expected, 0.000001f)
+          << target[0] << "," << target[1] << " obstacle=" << obstacle << " range=" << obstacleRange;
+    }
+  }
+  for (bool vertical : {false, true}) {
+    CellularLightArray<Traits> array;
+    array.setParameters(0, 20, 1, 20, 2, 0, false);
+    array.begin(24, 24);
+    array.addPointLight({vertical ? Vec2F(10.5f, 10.0f) : Vec2F(10.0f, 10.5f),
+        value, 0, 0, 0, false});
+    array.setObstacle(10, 10, true);
+    array.setObstacle(vertical ? 10 : 9, vertical ? 9 : 10, true);
+    array.calculate(1, 1, 23, 23);
+    // Corrected source coordinates are 9.5, an endpoint-rounding tie.
+    // Both directions cross one full obstacle cell at distance 5.5.
+    for (int coordinate : {4, 15})
+      EXPECT_NEAR(Traits::maxIntensity(array.getLight(vertical ? 10 : coordinate,
+          vertical ? coordinate : 10)), 0.225f, 0.000001f);
+  }
+}
 
 void addBoundaryLights(CellularLightingCalculator& calculator, RectI const& query) {
   Vec2F origin(query.min());
@@ -142,6 +242,15 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
 }
 
 }// namespace
+TEST(CellularLightArray, PointObstacleSnapshotRefreshesMutableCellsAndStride) {
+  checkPointObstacleSnapshotRefresh<ScalarLightTraits>();
+  checkPointObstacleSnapshotRefresh<ColoredLightTraits>();
+}
+TEST(CellularLightArray, PointRaysMatchGeometricAttenuationInEveryOrientation) {
+  checkPointRayOrientations<ScalarLightTraits>();
+  checkPointRayOrientations<ColoredLightTraits>();
+}
+
 
 const GameTestRegistration
   clientLightingGatherMatchesTileSnapshot("ClientLighting", "GatherMatchesTileSnapshot", [](GameTest& fixture) {
