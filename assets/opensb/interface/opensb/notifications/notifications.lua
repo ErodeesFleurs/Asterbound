@@ -1,15 +1,15 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local canvas, config, style, fontSize, maximum, overflowText
 local screen, scale
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float, viewportBounds = UiGeometry.float32, UiGeometry.bounds
 
 local function layout()
   local size, nextScale = camera.screenSize(), interface.scale()
   if screen and screen[1] == size[1] and screen[2] == size[2] and scale == nextScale then return end
   screen, scale = size, nextScale
-  local bounds = {math.ceil(float(size[1] / scale)), math.ceil(float(size[2] / scale))}
+  local bounds = viewportBounds(size, scale)
   pane.setSize(bounds)
   widget.setSize("notifications", bounds)
   style.fontSize = math.floor(float(fontSize * scale))

@@ -1,4 +1,5 @@
 require "/interface/opensb/ui/api.lua"
+require "/interface/opensb/ui/geometry.lua"
 
 local style
 local cache
@@ -8,9 +9,7 @@ local function add(a, b)
   return {a[1] + b[1], a[2] + b[2]}
 end
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float = UiGeometry.float32
 
 local function changed(key, value, apply)
   if cache[key] ~= value then

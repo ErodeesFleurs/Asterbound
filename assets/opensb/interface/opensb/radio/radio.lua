@@ -1,11 +1,11 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local settings
 local state
 local rendered = {}
 local stages = {AnimateIn = "ScrollText", ScrollText = "Persist", Persist = "AnimateOut", AnimateOut = "Hidden"}
 
-local function f32(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local f32 = UiGeometry.float32
 
 local function trunc(value)
   return (math.modf(value))

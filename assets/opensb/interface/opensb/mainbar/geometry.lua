@@ -1,8 +1,8 @@
+require "/interface/opensb/ui/geometry.lua"
+
 mainbarPresentation = {}
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float = UiGeometry.float32
 
 function mainbarPresentation.layout(config, screen, scale)
   local origin = {

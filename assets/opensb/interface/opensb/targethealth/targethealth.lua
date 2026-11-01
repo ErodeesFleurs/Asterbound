@@ -1,11 +1,11 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local canvas, config, sizes, textStyle, state
 local screen, scale, paintStyle, dirty
 local portraitRevision, portrait, portraitBounds
 local previousId, previousName, previousBlocks, previousRevision
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float, viewportBounds = UiGeometry.float32, UiGeometry.bounds
 
 local function trunc(value)
   return (math.modf(value))
@@ -51,7 +51,7 @@ local function refreshLayout()
   local nextScreen, nextScale = camera.screenSize(), interface.scale()
   if screen and screen[1] == nextScreen[1] and screen[2] == nextScreen[2] and scale == nextScale then return end
   screen, scale, dirty = nextScreen, nextScale, true
-  local bounds = {math.ceil(float(screen[1] / scale)), math.ceil(float(screen[2] / scale))}
+  local bounds = viewportBounds(screen, scale)
   pane.setSize(bounds)
   widget.setSize("targetHealth", bounds)
   paintStyle = sb.jsonMerge(textStyle, {fontSize = trunc(float((textStyle.fontSize or 8) * scale))})

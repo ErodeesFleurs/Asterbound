@@ -1,9 +1,9 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local duration, fadeTime, format, offset
 local previousName, previousScale, previousPosition, previousAlpha
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float = UiGeometry.float32
 
 local function visible(show)
   if storage.visible ~= show then

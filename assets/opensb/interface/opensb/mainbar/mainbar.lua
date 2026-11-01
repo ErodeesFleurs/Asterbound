@@ -1,4 +1,5 @@
 require "/interface/opensb/mainbar/geometry.lua"
+require "/interface/opensb/ui/geometry.lua"
 
 local canvas, config, tooltips, screen, scale, geometry, previousTooltip
 local paneIds = {
@@ -11,9 +12,7 @@ local tooltipKeys = {
 }
 local clickOrder = {"inventory", "craft", "codex", "deploy", "beam", "questLog", "mmUpgrade", "collections"}
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float = UiGeometry.float32
 
 local function layout()
   local size, nextScale = camera.screenSize(), interface.scale()

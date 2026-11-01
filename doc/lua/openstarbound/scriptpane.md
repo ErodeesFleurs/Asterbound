@@ -137,6 +137,13 @@ Use `jarray()` when an empty array must remain an array across a JSON round trip
 Storage belongs to the instance, not global configuration or a player save.
 The Lua interface manager decides when an instance is discarded.
 
+Keep derived caches and runtime handles in locals; checkpoint only data needed
+across reinitialization. Retained native widgets already own their text and
+selection, so do not mirror those values into `storage`. Share small pure helpers
+through explicit namespaces without allocating runtime resources at module load.
+Use the existing interface manager event queue and lifecycle hooks rather than
+adding a second subscription or timer layer.
+
 `pane.isVisible()` queries drawing visibility. `pane.show()` and `pane.hide()`
 change drawing visibility independently of display membership, reported by
 `pane.isDisplayed()`. PaneManager continues ticking hidden displayed panes.

@@ -1,11 +1,11 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local style, previous, visible, layoutExpanded
 local frameHeight, progressPresent, compassPresent, progressValue, compassRotation
 local widgets = {"imgFrame", "imgFrameExpanded", "lblQuestObjectiveList", "imgProgressFrame",
     "questProgress", "imgCompassFrame", "imgCompass"}
 
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float = UiGeometry.float32
 
 local function objectivesEqual(a, b)
   if a == nil or b == nil then return a == b end

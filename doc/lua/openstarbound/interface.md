@@ -358,11 +358,14 @@ not filtered indices. Play submits `{resource, abc}` with the original asset
 bytes and the entered band to the current player's `songbook.play`; no selection
 leaves the window open. Closing the window never stops playback.
 
-Ordinary dismissal retains the actual widgets, including search, band and
-selection. Live reload rescans and clears selection without replaying a song.
-World transitions retain the instance; player changes and interface shutdown
-release it. Instrument keepalive, ABC playback, audio and network synchronization
-remain native services.
+The derived catalog, display names, folded search keys and last-query cache are
+context-local. `storage` checkpoints only ordered resource paths and the true
+dismissal marker; the retained native widgets own search, band and selection.
+Ordinary dismissal preserves those widgets when the catalog is unchanged.
+Catalog changes while closed rebuild the list on reopening; live reload always
+rescans and clears selection without replaying a song. World transitions retain
+the instance; player changes and interface shutdown release it. Instrument
+keepalive, ABC playback, audio and network synchronization remain native services.
 
 Native `/swap` may reuse the current Songbook and continue its playback;
 discarding player-scoped UI does not add an implicit `songbook.stop()`.

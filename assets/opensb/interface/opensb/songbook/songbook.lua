@@ -1,5 +1,6 @@
 local songPathPrefix = "/songs/"
 local songList = "songs.list"
+local files, lastSearch
 
 -- String::CaseInsensitive folds ASCII only. Keep UTF-8 bytes and literal
 -- search metacharacters unchanged, just as the original native songbook did.
@@ -37,11 +38,11 @@ end
 
 local function refresh(force)
   local searchText = widget.getText("search")
-  if not force and searchText == storage.lastSearch then return end
-  storage.lastSearch = searchText
+  if not force and searchText == lastSearch then return end
+  lastSearch = searchText
   local query = lower(searchText)
   widget.clearListItems(songList)
-  for _, file in ipairs(storage.files) do
+  for _, file in ipairs(files) do
     local text = highlighted(file.name, query)
     if text then
       local row = songList .. "." .. widget.addListItem(songList)
@@ -55,14 +56,21 @@ local function refresh(force)
 end
 
 function init()
-  local files = scanSongs()
-  local changed = not storage.files or #files ~= #storage.files
+  files = scanSongs()
+  local paths = {}
+  for index, file in ipairs(files) do paths[index] = file.path end
+  local previous = storage.songPaths
+  local changed = not previous or #paths ~= #previous
   if not changed then
-    for index, file in ipairs(files) do
-      if file.path ~= storage.files[index].path then changed = true break end
+    for index, path in ipairs(paths) do
+      if path ~= previous[index] then changed = true break end
     end
   end
-  storage.files = files
+  -- Only catalog identity crosses sessions; derived names/keys and filter
+  -- caches stay local. Native widgets already retain text and selection.
+  storage.songPaths = paths
+  storage.files, storage.lastSearch = nil, nil
+  lastSearch = widget.getText("search")
   -- Dismiss/reopen keeps the actual widgets (including band and selection).
   -- A live script/asset reload rebuilds the catalog without playing anything.
   refresh(changed or not storage.dismissed)

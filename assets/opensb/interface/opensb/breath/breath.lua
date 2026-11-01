@@ -1,11 +1,11 @@
+require "/interface/opensb/ui/geometry.lua"
+
 local canvas, offset, barOffset, emptyWidth
 local screen, scale, geometry, dirty, previousBlocks, previousWarning
 
 -- Keep the native float32 operation boundaries, rather than quantizing the
 -- resource percentage in Lua double precision at a different half-block edge.
-local function float(value)
-  return (string.unpack("f", string.pack("f", value)))
-end
+local float, viewportBounds = UiGeometry.float32, UiGeometry.bounds
 
 breathPresentation = {}
 
@@ -39,7 +39,7 @@ local function refreshLayout()
   -- Widget clipping stays in interface pixels, while the Canvas commands below
   -- use physical pixels. Do not anchor to ceil(screen / scale): that shifts the
   -- original physical screen center on odd windows and fractional UI scales.
-  local bounds = {math.ceil(float(screen[1] / scale)), math.ceil(float(screen[2] / scale))}
+  local bounds = viewportBounds(screen, scale)
   pane.setSize(bounds)
   widget.setSize("breath", bounds)
   dirty = true

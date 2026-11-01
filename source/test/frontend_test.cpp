@@ -1919,6 +1919,11 @@ const GameTestRegistration songbookPresentation("LuaSongbook", "NativeListLitera
   ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
   ASSERT_TRUE((*search)->setText("zzsongbook"));
   ASSERT_TRUE(pane->call("search", {}));
+  ASSERT_TRUE((*list)->setSelected(0));
+  ASSERT_TRUE(root.reload());
+  ASSERT_TRUE(pane->call("update", {}));
+  EXPECT_FALSE((*list)->selectedWidget());
+  EXPECT_EQ((*group)->getText(), String("Band Ω"));
   ASSERT_TRUE(File::writeFile(String("X:5\nK:C\nF|\n"), File::relativeTo(overlay, "songs/zzsongbookNew.abc")));
   ASSERT_TRUE(root.reload());
   ASSERT_TRUE(pane->call("update", {}));
@@ -1933,6 +1938,24 @@ const GameTestRegistration songbookPresentation("LuaSongbook", "NativeListLitera
   EXPECT_FALSE((*list)->selectedWidget());
   EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
   EXPECT_EQ((*domain)->timeSource(), std::optional<String>("Band Ω"));
+  ASSERT_TRUE((*list)->setSelected(0));
+  ASSERT_TRUE(panes.dismissPane(pane));
+  ASSERT_TRUE(File::writeFile(String("X:6\nK:C\nG|\n"), File::relativeTo(overlay, "songs/zzsongbookClosed.abc")));
+  ASSERT_TRUE(root.reload());
+  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+  visibleResources.clear();
+  for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
+    auto path = (*list)->itemAt(index)->data().toString();
+    ASSERT_TRUE(path);
+    visibleResources.append(std::move(*path));
+  }
+  EXPECT_EQ(visibleResources,
+            (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookClosed.abc",
+                        "/songs/zzsongbookNew.abc", "/songs/zzsongbookZ.abc"}));
+  EXPECT_FALSE((*list)->selectedWidget());
+  EXPECT_EQ((*search)->getText(), String("zzsongbook"));
+  EXPECT_EQ((*group)->getText(), String("Band Ω"));
+  EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
   ASSERT_TRUE(panes.dismissAllPanes());
 });
 
