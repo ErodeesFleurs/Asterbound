@@ -147,6 +147,31 @@ std::expected<void, StarException> LuaStack::call(lua_CFunction function, int na
   return m_engine.handleError(m_state, m_engine.pcallWithTraceback(m_state, nargs, nresults));
 }
 
+std::expected<void, StarException> LuaStack::load(LuaStackValue environment, std::span<char const> contents,
+                                                  String const& name) const {
+  if (&environment.stack().engine() != &m_engine)
+    return std::unexpected(LuaException("Lua environments cannot be shared between engines"));
+  if (environment.stack().state() != m_state)
+    return std::unexpected(LuaException("Lua environments must belong to the loading stack"));
+  if (!environment.is<LuaTable>())
+    return std::unexpected(LuaConversionException("Lua script environment must be a table"));
+  LuaStackRestore restore(m_state);
+  if (!lua_checkstack(m_state, 2))
+    return std::unexpected(LuaException("Exhausted the Lua stack while loading a script"));
+  auto loaded = m_engine.handleError(
+    m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()));
+  if (!loaded)
+    return std::unexpected(std::move(loaded.error()));
+  lua_pushvalue(m_state, environment.index());
+  lua_setupvalue(m_state, -2, 1);
+  auto entered = m_engine.incrementRecursionLevel();
+  if (!entered)
+    return std::unexpected(std::move(entered.error()));
+  int res = m_engine.pcallWithTraceback(m_state, 0, 0);
+  m_engine.decrementRecursionLevel();
+  return m_engine.handleError(m_state, res);
+}
+
 std::expected<void, StarException> LuaStack::pushString(std::string_view value) const {
   if (!lua_checkstack(m_state, 2))
     return std::unexpected(LuaException("Exhausted the Lua stack while pushing a string"));
@@ -345,7 +370,13 @@ std::expected<bool, StarException> LuaContext::containsPath(String path) const {
 }
 
 std::expected<void, StarException> LuaContext::load(std::span<char const> contents, String const& name) {
-  return engine().contextLoad(handleIndex(), contents, name);
+  auto& eng = engine();
+  LuaStackRestore restore(eng.m_state);
+  if (!lua_checkstack(eng.m_state, 1))
+    return std::unexpected(LuaException("Exhausted the Lua stack while loading a context"));
+  eng.pushHandle(eng.m_state, handleIndex());
+  LuaStack stack(eng, eng.m_state);
+  return stack.load(stack.value(-1), contents, name);
 }
 
 std::expected<void, StarException> LuaContext::load(String const& contents, String const& name) {
@@ -1237,20 +1268,15 @@ std::expected<void, StarException> LuaEngine::setContextRequire(int handleIndex,
         auto& self = luaEngine(state);
         if (lua_gettop(state) == 0)
           return std::unexpected(LuaException("require expects a module name"));
-        auto moduleValue = self.popLuaValue(state);
-        if (!moduleValue)
-          return std::unexpected(std::move(moduleValue.error()));
-        auto moduleName = self.luaTo<LuaString>(std::move(*moduleValue));
-        if (!moduleName)
-          return std::unexpected(std::move(moduleName.error()));
+        LuaStack stack(self, state);
+        auto module = stack.value(-1);
+        if (!module.is<LuaString>())
+          return std::unexpected(LuaConversionException("require expects a string module name"));
+        auto moduleName = module.stringView();
         lua_pushvalue(state, lua_upvalueindex(2));
-        auto handle = self.popHandle(state);
-        if (!handle)
-          return std::unexpected(std::move(handle.error()));
-        LuaContext context(LuaDetail::LuaHandle(RefPtr<LuaEngine>(&self), *handle));
         if (!require)
           return std::unexpected(LuaException("Cannot invoke an empty Lua require function"));
-        return require(context, *moduleName);
+        return require(stack.value(-1), moduleName);
       };
       auto result = invoke();
       if (result)
@@ -1282,23 +1308,6 @@ std::expected<void, StarException> LuaEngine::setContextRequire(int handleIndex,
   pushHandle(m_state, handleIndex);
   lua_pushlightuserdata(m_state, &input);
   return handleError(m_state, pcallWithTraceback(m_state, 2, 0));
-}
-
-std::expected<void, StarException> LuaEngine::contextLoad(int handleIndex, std::span<char const> contents, String const& name) {
-  LuaStackRestore stack(m_state);
-  if (!lua_checkstack(m_state, 2))
-    return std::unexpected(LuaException("Exhausted the Lua stack while loading a script"));
-  auto loaded = handleError(m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()));
-  if (!loaded)
-    return std::unexpected(std::move(loaded.error()));
-  pushHandle(m_state, handleIndex);
-  lua_setupvalue(m_state, -2, 1);
-  auto entered = incrementRecursionLevel();
-  if (!entered)
-    return std::unexpected(std::move(entered.error()));
-  int res = pcallWithTraceback(m_state, 0, 0);
-  decrementRecursionLevel();
-  return handleError(m_state, res);
 }
 
 std::expected<int, StarException> LuaEngine::contextEval(int handleIndex, String const& lua, int nresults) {

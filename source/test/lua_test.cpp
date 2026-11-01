@@ -823,17 +823,19 @@ TEST(LuaTest, Require) {
   auto contextResult = luaEngine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
-  ASSERT_TRUE((context.setRequireFunction([](LuaContext& context, LuaString const& arg) -> std::expected<void, StarException> {
-      auto callback = context.createFunction([arg]() { return arg; });
+  ASSERT_TRUE(
+    (context.setRequireFunction([](LuaStackValue environment, StringView arg) -> std::expected<void, StarException> {
+      auto callback = environment.stack().engine().createFunction([arg = String(arg.utf8())]() { return arg; });
       if (!callback)
         return std::unexpected(std::move(callback.error()));
-      return context.set(arg, *callback);
+      return environment.set(arg.utf8(), *callback);
     })));
 
   ASSERT_TRUE((context.load(R"SCRIPT(
       require "a"
       require "b"
       require "c"
+      requireResultCount = select("#", require "c")
 
       function res()
         return a() .. b() .. c()
@@ -843,14 +845,10 @@ TEST(LuaTest, Require) {
   auto required = context.invokePath<LuaString>("res");
   ASSERT_TRUE(required);
   EXPECT_EQ(required->toString(), String("abc"));
-
-  // The require function above stored closures that capture a Lua reference
-  // (LuaString), and such a closure keeps the engine alive from inside its own
-  // Lua state: the state would never be destroyed and everything it allocated
-  // leaks (LeakSanitizer reports ~22KB for this test alone).  Drop the globals
-  // and collect before the engine goes out of scope.
-  ASSERT_TRUE((context.load("a = nil b = nil c = nil res = nil")));
-  ASSERT_TRUE(luaEngine->collectGarbage());
+  EXPECT_EQ(context.get<int>("requireResultCount"), 0);
+  auto invalid = context.load("require {}");
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<LuaException>());
 }
 
 TEST(LuaTest, Eval) {
@@ -1137,7 +1135,7 @@ TEST(LuaTest, ErrorDiagnosticsLeaveBothCBoundariesClean) {
   });
   ASSERT_TRUE(callbackResult12);
   ASSERT_TRUE((context.set("failWrapped", *callbackResult12)));
-  ASSERT_TRUE((context.setRequireFunction([&](LuaContext&, LuaString const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE((context.setRequireFunction([&](LuaStackValue, StringView) -> std::expected<void, StarException> {
     auto lifetime = std::make_shared<int>(2);
     requireLifetime = lifetime;
     return std::unexpected(IOException("require callback failure",
@@ -1715,4 +1713,108 @@ TEST(LuaTest, BorrowedCrossStatePushReservesSourceCapacityAndKeepsValueRooted) {
   ASSERT_TRUE(result) << result.error().what();
   EXPECT_EQ(*result, std::optional<int>(42));
   EXPECT_EQ(thread->status(), LuaThread::Status::Dead);
+}
+
+TEST(LuaTest, RequireExecutesOnCallingCoroutine) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->setRequireFunction([](LuaStackValue environment, StringView) {
+    constexpr std::string_view script = "moduleIsMain = select(2, coroutine.running())";
+    return environment.stack().load(environment, std::span(script));
+  }));
+  ASSERT_TRUE(context->load("function loadModule() require 'module'; return moduleIsMain end"));
+  auto function = context->get<LuaFunction>("loadModule");
+  ASSERT_TRUE(function);
+  auto thread = (*engine)->createThread();
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(thread->pushFunction(*function));
+  auto result = thread->resume<bool>();
+  ASSERT_TRUE(result) << result.error().what();
+  ASSERT_TRUE(*result);
+  EXPECT_FALSE(**result);
+}
+
+TEST(LuaTest, StackLoadRejectsForeignEnvironment) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto otherEngine = LuaEngine::create();
+  ASSERT_TRUE(otherEngine);
+  auto otherContext = (*otherEngine)->createContext();
+  ASSERT_TRUE(otherContext);
+  LuaStackValue* callingEnvironment = nullptr;
+  ASSERT_TRUE(otherContext->setRequireFunction([&](LuaStackValue environment, StringView) {
+    constexpr std::string_view script = "foreignExecuted = true";
+    return environment.stack().load(*callingEnvironment, std::span(script));
+  }));
+  ASSERT_TRUE(context->setRequireFunction([&](LuaStackValue environment, StringView) {
+    callingEnvironment = &environment;
+    auto result = otherContext->load("require 'foreign'");
+    callingEnvironment = nullptr;
+    return result;
+  }));
+  auto loaded = context->load("require 'foreign'");
+  ASSERT_FALSE(loaded);
+  EXPECT_TRUE(loaded.error().is<LuaException>());
+  auto foreignExecuted = otherContext->contains("foreignExecuted");
+  ASSERT_TRUE(foreignExecuted);
+  EXPECT_FALSE(*foreignExecuted);
+  ASSERT_TRUE(context->load("healthy = 42"));
+  EXPECT_EQ(context->get<int>("healthy"), 42);
+  ASSERT_TRUE(otherContext->load("healthy = 43"));
+  EXPECT_EQ(otherContext->get<int>("healthy"), 43);
+}
+
+TEST(LuaTest, StackLoadRejectsNonTableEnvironment) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->setRequireFunction([](LuaStackValue environment, StringView) {
+    constexpr std::string_view script = "executed = true";
+    return environment.stack().load(environment.stack().value(1), std::span(script));
+  }));
+  auto loaded = context->load("require 'not a table'");
+  ASSERT_FALSE(loaded);
+  EXPECT_TRUE(loaded.error().is<LuaException>());
+  auto executed = context->contains("executed");
+  ASSERT_TRUE(executed);
+  EXPECT_FALSE(*executed);
+  ASSERT_TRUE(context->load("healthy = 42"));
+  EXPECT_EQ(context->get<int>("healthy"), 42);
+}
+
+TEST(LuaTest, StackLoadRejectsDifferentCoroutineEnvironment) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  LuaStackValue* callingEnvironment = nullptr;
+  ASSERT_TRUE(context->setRequireFunction([&](LuaStackValue environment, StringView) {
+    if (callingEnvironment) {
+      constexpr std::string_view script = "executed = true";
+      return environment.stack().load(*callingEnvironment, std::span(script));
+    }
+    callingEnvironment = &environment;
+    auto result = context->load("require 'main'");
+    callingEnvironment = nullptr;
+    return result;
+  }));
+  ASSERT_TRUE(context->load("function loadModule() require 'coroutine' end"));
+  auto function = context->get<LuaFunction>("loadModule");
+  ASSERT_TRUE(function);
+  auto thread = (*engine)->createThread();
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(thread->pushFunction(*function));
+  auto result = thread->resume<bool>();
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<LuaException>());
+  auto executed = context->contains("executed");
+  ASSERT_TRUE(executed);
+  EXPECT_FALSE(*executed);
+  ASSERT_TRUE(context->load("healthy = 42"));
+  EXPECT_EQ(context->get<int>("healthy"), 42);
 }

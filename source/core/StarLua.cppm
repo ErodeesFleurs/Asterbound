@@ -157,6 +157,9 @@ public:
   [[nodiscard]] std::expected<void, StarException> pushString(std::string_view value) const;
   template <typename T> [[nodiscard]] std::expected<void, StarException> pushUserData(T value) const;
   [[nodiscard]] std::expected<void, StarException> call(lua_CFunction function, int nargs, int nresults) const;
+  // Execute source or bytecode in a borrowed environment on this same stack.
+  [[nodiscard]] std::expected<void, StarException> load(LuaStackValue environment, std::span<char const> contents,
+                                                        String const& name = {}) const;
 
 private:
   LuaEngine& m_engine;
@@ -413,7 +416,7 @@ private:
 // LuaContext can (mostly) not affect any other.
 class LuaContext : protected LuaTable {
 public:
-  typedef std::function<std::expected<void, StarException>(LuaContext&, LuaString const&)> RequireFunction;
+  typedef std::function<std::expected<void, StarException>(LuaStackValue, StringView)> RequireFunction;
 
   using LuaTable::LuaTable;
 
@@ -450,8 +453,8 @@ public:
   template <typename T = LuaValue>
   [[nodiscard]] std::expected<T, StarException> eval(String const& lua);
 
-  // Override the built-in require function with the given function that takes
-  // this LuaContext and the module name to load.
+  // Override require with a synchronous callback borrowing its environment and
+  // module name from the calling Lua stack.
   [[nodiscard]] std::expected<void, StarException> setRequireFunction(RequireFunction requireFunction);
 
   [[nodiscard]] std::expected<void, StarException> setCallbacks(String const& tableName, LuaCallbacks const& callbacks) const;
@@ -774,8 +777,6 @@ private:
   [[nodiscard]] std::expected<std::reference_wrapper<T>, StarException> getUserData(int handleIndex);
 
   [[nodiscard]] std::expected<void, StarException> setContextRequire(int handleIndex, LuaContext::RequireFunction requireFunction);
-
-  [[nodiscard]] std::expected<void, StarException> contextLoad(int handleIndex, std::span<char const> contents, String const& name);
 
   [[nodiscard]] std::expected<int, StarException> contextEval(int handleIndex, String const& lua, int nresults);
   [[nodiscard]] std::expected<bool, StarException> pushContextPath(int handleIndex, std::string_view path);

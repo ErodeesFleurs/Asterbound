@@ -282,6 +282,325 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
   EXPECT_EQ(result->getString("recovered"), String("again"));
 });
 
+[[nodiscard]] std::expected<void, StarException>
+writeIsolationModules(String const& overlay, std::initializer_list<std::pair<String, String>> modules) {
+  for (auto const& [name, source] : modules) {
+    auto written = File::writeFile(source, File::relativeTo(overlay, name));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
+  }
+  return {};
+}
+
+void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
+  auto message = result.getString(field);
+  ASSERT_TRUE(message) << message.error().what();
+  EXPECT_TRUE(message->contains(fragment)) << *message;
+}
+
+const GameTestRegistration
+  luaModulesExecuteOncePerContext("RootTest", "LuaModulesExecuteOncePerContext", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = isolationSettings(fixture.rootSettings(), *directory, "modules");
+    ASSERT_TRUE(settings) << settings.error().what();
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(writeIsolationModules(overlay,
+                                      {{"p5-top.lua", R"LUA(
+      topRuns = (topRuns or 0) + 1
+      state = {value = 10}
+      function advance() state.value = state.value + 1; return state.value end
+    )LUA"},
+                                       {"p5-dependency.lua", "dependencyRuns = (dependencyRuns or 0) + 1"},
+                                       {"p5-entry.lua", R"LUA(
+      entryRuns = (entryRuns or 0) + 1
+      topResults = select("#", require("/p5-top.lua"))
+      dependencyResults = select("#", require("/p5-dependency.lua"))
+      require("/p5-dependency.lua")
+    )LUA"}}));
+    auto root = Root::create(std::move(*settings));
+    ASSERT_TRUE(root) << root.error().what();
+    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    auto lua = isolationLua(**root);
+    ASSERT_TRUE(lua) << lua.error().what();
+    StringList scripts{"/p5-top.lua", "/p5-entry.lua", "/p5-top.lua", "/p5-dependency.lua", "/p5-entry.lua"};
+    auto first = (*lua)->createContext(scripts);
+    ASSERT_TRUE(first) << first.error().what();
+    auto second = (*lua)->createContext(scripts);
+    ASSERT_TRUE(second) << second.error().what();
+    for (auto* context : {&*first, &*second}) {
+      auto result = context->eval<Json>(R"LUA(
+      _SBLOADED = {}
+      return {
+        top = topRuns, entry = entryRuns, dependency = dependencyRuns,
+        topResults = topResults, dependencyResults = dependencyResults,
+        repeatedResults = select("#", require("/p5-top.lua")), value = state.value
+      }
+    )LUA");
+      ASSERT_TRUE(result) << result.error().what();
+      EXPECT_EQ(*result,
+                Json(JsonObject{{"top", 1},
+                                {"entry", 1},
+                                {"dependency", 1},
+                                {"topResults", 0},
+                                {"dependencyResults", 0},
+                                {"repeatedResults", 0},
+                                {"value", 10}}));
+      EXPECT_EQ(context->eval<int>("topRuns"), 1);
+    }
+    EXPECT_EQ(first->invokePath<int>("advance"), 11);
+    EXPECT_EQ(first->invokePath<int>("advance"), 12);
+    EXPECT_EQ(second->eval<int>("state.value"), 10);
+    EXPECT_EQ(second->invokePath<int>("advance"), 11);
+    EXPECT_EQ(first->eval<int>("state.value"), 12);
+  });
+
+const GameTestRegistration
+  luaModulesRetryFailuresAndCycles("RootTest", "LuaModulesRetryFailuresAndCycles", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-retries");
+    ASSERT_TRUE(settings) << settings.error().what();
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(writeIsolationModules(overlay,
+                                      {{"p5-dependency.lua", "dependencyRuns = (dependencyRuns or 0) + 1"},
+                                       {"p5-failure.lua", R"LUA(
+      failureRuns = (failureRuns or 0) + 1
+      require("/p5-dependency.lua")
+      if not allowSuccess then error("controlled module failure") end
+      failureReady = true
+    )LUA"},
+                                       {"p5-self.lua", R"LUA(
+      selfRuns = (selfRuns or 0) + 1
+      if not allowSelf then require("/p5-self.lua") end
+      selfReady = true
+    )LUA"},
+                                       {"p5-cycle-a.lua", R"LUA(
+      cycleARuns = (cycleARuns or 0) + 1
+      if not allowCycle then require("/p5-cycle-b.lua") end
+      cycleAReady = true
+    )LUA"},
+                                       {"p5-cycle-b.lua", R"LUA(
+      cycleBRuns = (cycleBRuns or 0) + 1
+      require("/p5-cycle-a.lua")
+      cycleBReady = true
+    )LUA"}}));
+    auto root = Root::create(std::move(*settings));
+    ASSERT_TRUE(root) << root.error().what();
+    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    auto lua = isolationLua(**root);
+    ASSERT_TRUE(lua) << lua.error().what();
+    auto context = (*lua)->createContext(StringList{});
+    ASSERT_TRUE(context) << context.error().what();
+    auto failures = context->eval<Json>(R"LUA(
+    local firstOk, firstError = pcall(require, "/p5-failure.lua")
+    local secondOk, secondError = pcall(require, "/p5-failure.lua")
+    return {
+      firstOk = firstOk, secondOk = secondOk,
+      firstError = tostring(firstError), secondError = tostring(secondError),
+      attempts = failureRuns, dependencies = dependencyRuns, ready = failureReady == true
+    }
+  )LUA");
+    ASSERT_TRUE(failures) << failures.error().what();
+    EXPECT_EQ(failures->getBool("firstOk"), false);
+    EXPECT_EQ(failures->getBool("secondOk"), false);
+    expectIsolationModuleError(*failures, "firstError", "controlled module failure");
+    expectIsolationModuleError(*failures, "secondError", "controlled module failure");
+    EXPECT_EQ(failures->getInt("attempts"), 2);
+    EXPECT_EQ(failures->getInt("dependencies"), 1);
+    EXPECT_EQ(failures->getBool("ready"), false);
+    auto retry = context->eval<Json>(R"LUA(
+    allowSuccess = true
+    local results = select("#", require("/p5-failure.lua"))
+    require("/p5-failure.lua")
+    return {results = results, attempts = failureRuns, dependencies = dependencyRuns, ready = failureReady}
+  )LUA");
+    ASSERT_TRUE(retry) << retry.error().what();
+    EXPECT_EQ(*retry, Json(JsonObject{{"results", 0}, {"attempts", 3}, {"dependencies", 1}, {"ready", true}}));
+    auto cycles = context->eval<Json>(R"LUA(
+    local selfOk, selfError = pcall(require, "/p5-self.lua")
+    local cycleOk, cycleError = pcall(require, "/p5-cycle-a.lua")
+    return {
+      selfOk = selfOk, selfError = tostring(selfError),
+      cycleOk = cycleOk, cycleError = tostring(cycleError),
+      selfAttempts = selfRuns, aAttempts = cycleARuns, bAttempts = cycleBRuns,
+      selfReady = selfReady == true, aReady = cycleAReady == true, bReady = cycleBReady == true
+    }
+  )LUA");
+    ASSERT_TRUE(cycles) << cycles.error().what();
+    EXPECT_EQ(cycles->getBool("selfOk"), false);
+    EXPECT_EQ(cycles->getBool("cycleOk"), false);
+    expectIsolationModuleError(*cycles, "selfError", "/p5-self.lua -> /p5-self.lua");
+    expectIsolationModuleError(*cycles, "cycleError", "/p5-cycle-a.lua -> /p5-cycle-b.lua -> /p5-cycle-a.lua");
+    EXPECT_EQ(cycles->getInt("selfAttempts"), 1);
+    EXPECT_EQ(cycles->getInt("aAttempts"), 1);
+    EXPECT_EQ(cycles->getInt("bAttempts"), 1);
+    EXPECT_EQ(cycles->getBool("selfReady"), false);
+    EXPECT_EQ(cycles->getBool("aReady"), false);
+    EXPECT_EQ(cycles->getBool("bReady"), false);
+    auto recovered = context->eval<Json>(R"LUA(
+    allowSelf = true
+    allowCycle = true
+    local selfResults = select("#", require("/p5-self.lua"))
+    local aResults = select("#", require("/p5-cycle-a.lua"))
+    local bResults = select("#", require("/p5-cycle-b.lua"))
+    require("/p5-self.lua")
+    require("/p5-cycle-a.lua")
+    require("/p5-cycle-b.lua")
+    return {
+      selfResults = selfResults, aResults = aResults, bResults = bResults,
+      selfAttempts = selfRuns, aAttempts = cycleARuns, bAttempts = cycleBRuns,
+      selfReady = selfReady, aReady = cycleAReady, bReady = cycleBReady
+    }
+  )LUA");
+    ASSERT_TRUE(recovered) << recovered.error().what();
+    EXPECT_EQ(*recovered,
+              Json(JsonObject{{"selfResults", 0},
+                              {"aResults", 0},
+                              {"bResults", 0},
+                              {"selfAttempts", 2},
+                              {"aAttempts", 2},
+                              {"bAttempts", 2},
+                              {"selfReady", true},
+                              {"aReady", true},
+                              {"bReady", true}}));
+  });
+
+const GameTestRegistration
+  luaModulesRejectStaleContexts("RootTest", "LuaModulesRejectStaleContexts", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-revisions");
+    ASSERT_TRUE(settings) << settings.error().what();
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(writeIsolationModules(
+      overlay,
+      {{"p5-version.lua", "versionRuns = (versionRuns or 0) + 1; function version() return 1 end"},
+       {"p5-after-reload.lua", "function afterReload() return 1 end"},
+       {"p5-after-restart.lua", "function afterRestart() return 1 end"}}));
+    auto root = Root::create(std::move(*settings));
+    ASSERT_TRUE(root) << root.error().what();
+    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    auto lua = isolationLua(**root);
+    ASSERT_TRUE(lua) << lua.error().what();
+    auto original = (*lua)->createContext("/p5-version.lua");
+    ASSERT_TRUE(original) << original.error().what();
+    EXPECT_EQ(original->invokePath<int>("version"), 1);
+    ASSERT_TRUE(writeIsolationModules(
+      overlay,
+      {{"p5-version.lua", "versionRuns = (versionRuns or 0) + 1; function version() return 2 end"},
+       {"p5-after-reload.lua", "function afterReload() return 2 end"}}));
+    ASSERT_TRUE((*root)->reload());
+    auto staleReload = original->eval<Json>(R"LUA(
+    local ok, message = pcall(require, "/p5-after-reload.lua")
+    return {
+      ok = ok, message = tostring(message), version = version(),
+      loadedResults = select("#", require("/p5-version.lua")), runs = versionRuns,
+      unseenAbsent = afterReload == nil
+    }
+  )LUA");
+    ASSERT_TRUE(staleReload) << staleReload.error().what();
+    EXPECT_EQ(staleReload->getBool("ok"), false);
+    expectIsolationModuleError(*staleReload, "message", "/p5-after-reload.lua");
+    EXPECT_EQ(staleReload->getInt("version"), 1);
+    EXPECT_EQ(staleReload->getInt("loadedResults"), 0);
+    EXPECT_EQ(staleReload->getInt("runs"), 1);
+    EXPECT_EQ(staleReload->getBool("unseenAbsent"), true);
+    auto reloaded = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-reload.lua"});
+    ASSERT_TRUE(reloaded) << reloaded.error().what();
+    EXPECT_EQ(reloaded->invokePath<int>("version"), 2);
+    EXPECT_EQ(reloaded->invokePath<int>("afterReload"), 2);
+    auto beforeRestart = (*lua)->createContext("/p5-version.lua");
+    ASSERT_TRUE(beforeRestart) << beforeRestart.error().what();
+    // This asset has never been fetched: restart alone is the invalidation under
+    // test, without a hotReload that could independently make this context stale.
+    ASSERT_TRUE(writeIsolationModules(overlay, {{"p5-after-restart.lua", "function afterRestart() return 3 end"}}));
+    ASSERT_TRUE((*lua)->restart());
+    auto staleRestart = beforeRestart->eval<Json>(R"LUA(
+    local ok, message = pcall(require, "/p5-after-restart.lua")
+    return {
+      ok = ok, message = tostring(message), version = version(),
+      loadedResults = select("#", require("/p5-version.lua")), runs = versionRuns,
+      unseenAbsent = afterRestart == nil
+    }
+  )LUA");
+    ASSERT_TRUE(staleRestart) << staleRestart.error().what();
+    EXPECT_EQ(staleRestart->getBool("ok"), false);
+    expectIsolationModuleError(*staleRestart, "message", "/p5-after-restart.lua");
+    EXPECT_EQ(staleRestart->getInt("version"), 2);
+    EXPECT_EQ(staleRestart->getInt("loadedResults"), 0);
+    EXPECT_EQ(staleRestart->getInt("runs"), 1);
+    EXPECT_EQ(staleRestart->getBool("unseenAbsent"), true);
+    EXPECT_EQ(original->invokePath<int>("version"), 1);
+    EXPECT_EQ(reloaded->invokePath<int>("afterReload"), 2);
+    auto restarted = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-restart.lua"});
+    ASSERT_TRUE(restarted) << restarted.error().what();
+    EXPECT_EQ(restarted->invokePath<int>("version"), 2);
+    EXPECT_EQ(restarted->invokePath<int>("afterRestart"), 3);
+  });
+
+const GameTestRegistration
+  luaModulesRejectReentrantInvalidation("RootTest", "LuaModulesRejectReentrantInvalidation", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-reentrancy");
+    ASSERT_TRUE(settings) << settings.error().what();
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(writeIsolationModules(overlay, {{"p5-reentrant.lua", R"LUA(
+      moduleRuns = (moduleRuns or 0) + 1
+      if invalidateDuringLoad then test.invalidate() end
+      function retainedValue() return moduleRuns end
+    )LUA"}}));
+    auto root = Root::create(std::move(*settings));
+    ASSERT_TRUE(root) << root.error().what();
+    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    auto lua = isolationLua(**root);
+    ASSERT_TRUE(lua) << lua.error().what();
+    for (bool restart : {false, true}) {
+      SCOPED_TRACE(restart ? "native restart" : "native hot reload");
+      int invalidations = 0;
+      LuaCallbacks callbacks;
+      ASSERT_TRUE(callbacks.registerCallback("invalidate", [&]() -> std::expected<void, StarException> {
+        ++invalidations;
+        return restart ? (*lua)->restart() : (*root)->hotReload();
+      }));
+      auto context = (*lua)->createContext(StringList{});
+      ASSERT_TRUE(context) << context.error().what();
+      ASSERT_TRUE(context->setCallbacks("test", callbacks));
+      auto interrupted = context->eval<Json>(R"LUA(
+      invalidateDuringLoad = true
+      local ok, message = pcall(require, "/p5-reentrant.lua")
+      return {ok = ok, message = tostring(message), runs = moduleRuns, retained = retainedValue()}
+    )LUA");
+      ASSERT_TRUE(interrupted) << interrupted.error().what();
+      EXPECT_EQ(interrupted->getBool("ok"), false);
+      expectIsolationModuleError(*interrupted, "message", "/p5-reentrant.lua");
+      EXPECT_EQ(interrupted->getInt("runs"), 1);
+      EXPECT_EQ(interrupted->getInt("retained"), 1);
+      EXPECT_EQ(invalidations, 1);
+      auto staleRetry = context->eval<Json>(R"LUA(
+      invalidateDuringLoad = false
+      local ok, message = pcall(require, "/p5-reentrant.lua")
+      return {ok = ok, message = tostring(message), runs = moduleRuns}
+    )LUA");
+      ASSERT_TRUE(staleRetry) << staleRetry.error().what();
+      EXPECT_EQ(staleRetry->getBool("ok"), false);
+      expectIsolationModuleError(*staleRetry, "message", "/p5-reentrant.lua");
+      EXPECT_EQ(staleRetry->getInt("runs"), 1);
+      EXPECT_EQ(invalidations, 1);
+      auto fresh = (*lua)->createContext("/p5-reentrant.lua");
+      ASSERT_TRUE(fresh) << fresh.error().what();
+      EXPECT_EQ(fresh->invokePath<int>("retainedValue"), 1);
+      EXPECT_EQ(fresh->eval<int>("select('#', require('/p5-reentrant.lua'))"), 0);
+      EXPECT_EQ(fresh->eval<int>("moduleRuns"), 1);
+      EXPECT_EQ(context->invokePath<int>("retainedValue"), 1);
+    }
+  });
+
 const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", [](GameTest& fixture) {
   auto directoryA = File::temporaryDirectory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();

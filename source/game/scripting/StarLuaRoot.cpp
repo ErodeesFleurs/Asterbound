@@ -1,4 +1,6 @@
 import star.json_extra;
+import star.algorithm;
+import star.byte_array;
 import star.json;
 import star.ordered_map;
 import star.bi_map;
@@ -18,6 +20,7 @@ import star.listener;
 import std;
 import star.time;
 import star.string;
+import star.set;
 import star.file;
 import star.lua;
 import star.format;
@@ -68,16 +71,8 @@ Root& LuaRoot::root() const {
   return m_root;
 }
 
-std::expected<void, StarException> LuaRoot::loadScript(String const& assetPath) {
-  return m_scriptCache->loadScript(*m_luaEngine, assetPath);
-}
-
 bool LuaRoot::scriptLoaded(String const& assetPath) const {
   return m_scriptCache->scriptLoaded(assetPath);
-}
-
-void LuaRoot::unloadScript(String const& assetPath) {
-  m_scriptCache->unloadScript(assetPath);
 }
 
 std::expected<void, StarException> LuaRoot::restart() {
@@ -138,7 +133,7 @@ std::expected<void, StarException> LuaRoot::restart() {
 }
 
 std::expected<void, StarException> LuaRoot::shutdown() {
-  clearScriptCache();
+  m_scriptCache->clear();
   if (!m_luaEngine)
     return {};
 
@@ -200,49 +195,56 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
     return std::unexpected(std::move(created.error()));
   auto context = std::move(*created);
   auto cache = m_scriptCache;
-  if (auto required = context.setRequireFunction([cache](LuaContext& context, LuaString const& module) -> std::expected<void, StarException> {
-    auto loaded = context.get("_SBLOADED");
-    if (!loaded)
-      return std::unexpected(std::move(loaded.error()));
-    if (!std::holds_alternative<LuaTable>(*loaded)) {
-      auto loadedTable = context.createTable();
-      if (!loadedTable)
-        return std::unexpected(std::move(loadedTable.error()));
-      if (auto result = context.set("_SBLOADED", std::move(*loadedTable)); !result)
-        return std::unexpected(std::move(result.error()));
-    }
-    auto table = context.get<LuaTable>("_SBLOADED");
-    if (!table)
-      return std::unexpected(std::move(table.error()));
-    auto contains = table->contains(module);
-    if (!contains)
-      return std::unexpected(std::move(contains.error()));
-    if (!*contains) {
-      if (auto result = table->set(module, true); !result)
-        return std::unexpected(std::move(result.error()));
-      if (auto result = cache->loadContextScript(context, module.toString()); !result) {
-        auto error = std::move(result.error());
-        if (auto rollback = table->remove(module); !rollback)
-          return std::unexpected(rollback.error().withContext(strf("Could not roll back failed Lua module load; original load failure: {}", outputException(error, true))));
-        return std::unexpected(std::move(error));
-      }
-    }
-    return {};
-  }); !required)
+  if (auto required = context.setRequireFunction(
+        [cache, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
+         loading = std::vector<String>{}](LuaStackValue environment,
+                                          StringView module) mutable -> std::expected<void, StarException> {
+          if (loaded.contains(module))
+            return {};
+          String path(module.utf8());
+          if (std::ranges::find(loading, path) != loading.end()) {
+            String chain;
+            for (auto const& entry : loading) {
+              if (!chain.empty())
+                chain += " -> ";
+              chain += entry;
+            }
+            return std::unexpected(LuaException::format("Cyclic Lua require: {} -> {}", chain, path));
+          }
+          auto script = cache->script(environment.stack().engine(), path, revision);
+          if (!script)
+            return std::unexpected(std::move(script.error()));
+          loading.push_back(path);
+          auto popped = finally([&] { loading.pop_back(); });
+          if (auto result = environment.stack().load(environment, (*script)->span()); !result)
+            return std::unexpected(std::move(result.error()));
+          if (cache->revision() != revision)
+            return std::unexpected(
+              LuaException::format("Lua script cache changed while loading '{}'; recreate the context", path));
+          (void)loaded.insert(std::move(path));
+          return {};
+        });
+      !required)
     return std::unexpected(std::move(required.error()));
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  for (auto const& path : scriptPaths) {
-    auto exists = (*assets)->assetExists(path);
-    if (!exists)
-      return std::unexpected(std::move(exists.error()));
-    if (*exists) {
-      if (auto result = cache->loadContextScript(context, path); !result)
-        return std::unexpected(std::move(result.error()));
-    } else {
-      if (auto logged = m_root.logger().error("Script '{}' does not exist", path); !logged)
-        return std::unexpected(std::move(logged.error()));
+  if (!scriptPaths.empty()) {
+    // Retain the loader while entry scripts can replace their global require.
+    auto require = context.get<LuaFunction>("require");
+    if (!require)
+      return std::unexpected(std::move(require.error()));
+    for (auto const& path : scriptPaths) {
+      auto exists = (*assets)->assetExists(path);
+      if (!exists)
+        return std::unexpected(std::move(exists.error()));
+      if (*exists) {
+        if (auto result = require->invoke<void>(path); !result)
+          return std::unexpected(std::move(result.error()));
+      } else {
+        if (auto logged = m_root.logger().error("Script '{}' does not exist", path); !logged)
+          return std::unexpected(std::move(logged.error()));
+      }
     }
   }
   for (auto const& callbacks : m_luaCallbacks) {
@@ -276,10 +278,6 @@ std::size_t LuaRoot::scriptCacheMemoryUsage() const {
   return m_luaEngine ? m_scriptCache->memoryUsage() : 0;
 }
 
-void LuaRoot::clearScriptCache() const {
-  m_scriptCache->clear();
-}
-
 void LuaRoot::addCallbacks(String const& groupName, LuaCallbacks const& callbacks) {
   m_luaCallbacks[groupName] = callbacks;
 }
@@ -288,56 +286,58 @@ LuaEngine& LuaRoot::luaEngine() const {
   return *m_luaEngine;
 }
 
-std::expected<void, StarException> LuaRoot::ScriptCache::loadScript(LuaEngine& engine, String const& path) {
+std::expected<std::shared_ptr<ByteArray const>, StarException>
+LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_t revision) {
+  auto stale = [&] {
+    return LuaException::format("Lua script cache changed before loading '{}'; recreate the context", path);
+  };
+  {
+    std::lock_guard locker(mutex);
+    if (m_revision != revision)
+      return std::unexpected(stale());
+    if (auto cached = scripts.maybeRef(path))
+      return cached->get();
+  }
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
   auto bytes = (*assets)->bytes(path);
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   auto compiled = engine.compile((*bytes)->span(), path);
   if (!compiled)
     return std::unexpected(std::move(compiled.error()));
-  scripts[path] = std::move(*compiled);
-  return {};
+  auto script = std::make_shared<ByteArray const>(std::move(*compiled));
+  {
+    std::lock_guard locker(mutex);
+    if (m_revision != revision)
+      return std::unexpected(stale());
+    scripts.set(path, script);
+  }
+  return script;
 }
 
 bool LuaRoot::ScriptCache::scriptLoaded(String const& path) const {
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  std::lock_guard locker(mutex);
   return scripts.contains(path);
 }
 
-void LuaRoot::ScriptCache::unloadScript(String const& path) {
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
-  scripts.remove(path);
-}
-
 void LuaRoot::ScriptCache::clear() {
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  std::lock_guard locker(mutex);
+  ++m_revision;
   scripts.clear();
 }
 
-std::expected<void, StarException> LuaRoot::ScriptCache::loadContextScript(LuaContext& context, String const& path) {
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
-  if (!scriptLoaded(path)) {
-    if (auto result = loadScript(context.engine(), path); !result)
-      return std::unexpected(std::move(result.error()));
-  }
-  return context.load(scripts.maybeRef(path)->get().span());
+std::uint64_t LuaRoot::ScriptCache::revision() const {
+  std::lock_guard locker(mutex);
+  return m_revision;
 }
 
 std::size_t LuaRoot::ScriptCache::memoryUsage() const {
-  std::unique_lock locker(mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  std::lock_guard locker(mutex);
   std::size_t total = 0;
   for (auto const& p : scripts)
-    total += p.second.size();
+    total += p.second->size();
   return total;
 }
 

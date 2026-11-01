@@ -37,9 +37,7 @@ public:
   ~LuaRoot();
   Root& root() const;
 
-  [[nodiscard]] std::expected<void, StarException> loadScript(String const& assetPath);
   bool scriptLoaded(String const& assetPath) const;
-  void unloadScript(String const& assetPath);
 
   [[nodiscard]] std::expected<void, StarException> restart();
   [[nodiscard]] std::expected<void, StarException> shutdown();
@@ -48,9 +46,9 @@ public:
   // the functions / data in each script will be loaded in order, so that later
   // specified scripts will overwrite previous ones.
   //
-  // The LuaContext that is returned will have its 'require' function
-  // overloaded to take absolute asset paths and load that asset path as a lua
-  // module, with protection from duplicate loading.
+  // Top-level scripts and require share per-context load-once state. Modules
+  // execute for side effects; cycles fail rather than expose partial modules.
+  // Cache invalidation requires a fresh context to load any new module.
   [[nodiscard]] std::expected<LuaContext, StarException> createContext(String const& script);
   [[nodiscard]] std::expected<LuaContext, StarException> createContext(StringList const& scriptPaths = {});
 
@@ -60,7 +58,6 @@ public:
   std::size_t luaMemoryUsage() const;
 
   std::size_t scriptCacheMemoryUsage() const;
-  void clearScriptCache() const;
 
   void addCallbacks(String const& groupName, LuaCallbacks const& callbacks);
 
@@ -72,17 +69,18 @@ private:
   class ScriptCache {
   public:
     explicit ScriptCache(Root& root) : m_root(root) {}
-    [[nodiscard]] std::expected<void, StarException> loadScript(LuaEngine& engine, String const& assetPath);
-    bool scriptLoaded(String const& assetPath) const;
-    void unloadScript(String const& assetPath);
+    [[nodiscard]] std::expected<std::shared_ptr<ByteArray const>, StarException>
+    script(LuaEngine& engine, String const& path, std::uint64_t revision);
+    bool scriptLoaded(String const& path) const;
     void clear();
-    [[nodiscard]] std::expected<void, StarException> loadContextScript(LuaContext& context, String const& assetPath);
+    std::uint64_t revision() const;
     std::size_t memoryUsage() const;
 
   private:
     Root& m_root;
-    mutable std::recursive_mutex mutex;
-    StringMap<ByteArray> scripts;
+    mutable std::mutex mutex;
+    std::uint64_t m_revision = 0;
+    StringMap<std::shared_ptr<ByteArray const>> scripts;
   };
 
   Root& m_root;
