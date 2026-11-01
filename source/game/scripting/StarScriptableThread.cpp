@@ -157,7 +157,11 @@ std::expected<bool, StarException> ScriptableThread::start() {
 }
 
 std::expected<void, StarException> ScriptableThread::stop() {
-  m_stop = true;
+  {
+    std::lock_guard lock(m_sleepMutex);
+    m_stop = true;
+  }
+  m_stopped.notify_one();
   auto joined = Thread::join();
   List<Message> messages;
   {
@@ -241,8 +245,10 @@ std::expected<void, StarException> ScriptableThread::run() {
       approacher.setTargetTickRate(1.0f / m_timestep);
       approacher.tick();
       std::int64_t spare = std::floor(approacher.spareTime() * 1000);
-      if (spare > 0)
-        Thread::sleepPrecise(spare);
+      if (spare > 0) {
+        std::unique_lock lock(m_sleepMutex);
+        m_stopped.wait_for(lock, std::chrono::milliseconds(spare), [&] { return m_stop.load(); });
+      }
     }
     return {};
   }();

@@ -37,6 +37,9 @@ Pauses or unpauses a thread.
 #### `void` threads.stop(`String` name)
 
 Stops and joins the thread, then removes it. Its script contexts finish shutdown and queued message requests are cancelled before it can be reclaimed.
+Stopping wakes a worker's tick-rate wait; it does not interrupt running Lua callbacks.
+Normal updates and message dispatch remain tick-driven; incoming messages do not
+wake an idle worker or change the configured tick rate.
 
 ---
 

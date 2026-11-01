@@ -1120,6 +1120,7 @@ const GameTestRegistration workerChainedReplyClosure(
     LuaMessageScript parent(**root);
     auto created = ScriptableThread::create(JsonObject{{"name", "chained-close"},
                                                        {"scripts", JsonObject{{"worker", JsonArray{"/p6-worker.lua"}}}},
+                                                       {"tickRate", 0.05},
                                                        {"logMapped", false}},
                                             parent);
     ASSERT_TRUE(created);
@@ -1140,7 +1141,10 @@ const GameTestRegistration workerChainedReplyClosure(
     ASSERT_TRUE(started);
     ASSERT_TRUE(*started);
     ASSERT_EQ(handlerEntered.wait_for(std::chrono::seconds(10)), std::future_status::ready);
-    ASSERT_TRUE(worker->stop());
+    // A low tick rate must not make session shutdown wait for the next tick.
+    auto stopped = std::async(std::launch::async, [&] { return worker->stop(); });
+    EXPECT_EQ(stopped.wait_for(std::chrono::seconds(5)), std::future_status::ready);
+    ASSERT_TRUE(stopped.get());
     EXPECT_TRUE(worker->isJoined());
     EXPECT_TRUE(worker->shouldExpire());
     EXPECT_FALSE(worker->errorOccurred());

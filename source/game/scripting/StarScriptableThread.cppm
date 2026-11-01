@@ -54,8 +54,9 @@ private:
   [[nodiscard]] std::expected<void, StarException> update();
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, JsonArray const& args);
 
-  mutable std::recursive_mutex m_mutex;
-  
+  std::mutex m_sleepMutex;
+  std::condition_variable m_stopped;
+
   std::shared_ptr<LuaRoot> m_luaRoot;
   StringMap<std::shared_ptr<ScriptableThread::ScriptComponent>> m_scriptContexts;
   
