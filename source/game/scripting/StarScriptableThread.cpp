@@ -139,9 +139,21 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
 }
 
 std::expected<bool, StarException> ScriptableThread::start() {
+  if (!isJoined())
+    return false;
   m_stop = false;
   m_errorOccurred = false;
-  return Thread::start();
+  m_shouldExpire = false;
+  auto started = Thread::start();
+  if (!started) {
+    m_stop = true;
+    m_errorOccurred = true;
+    if (auto stopped = stop(); !stopped)
+      started.error() = started.error().withContext(
+        strf("Error settling failed worker startup: {}", outputException(stopped.error(), true)));
+    m_shouldExpire.store(true, std::memory_order_release);
+  }
+  return started;
 }
 
 std::expected<void, StarException> ScriptableThread::stop() {
@@ -171,12 +183,12 @@ std::expected<void, StarException> ScriptableThread::stop() {
 
 void ScriptableThread::setPause(bool pause) { m_pause = pause; }
 bool ScriptableThread::errorOccurred() { return m_errorOccurred; }
-bool ScriptableThread::shouldExpire() { return m_shouldExpire; }
+bool ScriptableThread::shouldExpire() { return m_shouldExpire.load(std::memory_order_acquire); }
 
 std::expected<void, StarException> ScriptableThread::passMessage(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (m_stop || m_errorOccurred)
+  if (m_stop || m_errorOccurred || m_shouldExpire)
     return message.promise.fail("Thread is stopped");
   m_messages.append(std::move(message));
   return {};
@@ -230,20 +242,19 @@ std::expected<void, StarException> ScriptableThread::run() {
     }
     return {};
   }();
-  if (!result) {
+  if (!result)
     m_errorOccurred = true;
-    if (auto logged = m_luaRoot->root().logger().error("ScriptableThread exception caught: {}", outputException(result.error(), true)); !logged)
-      result.error() = logged.error().withContext(strf("Could not log ScriptableThread failure: {}", outputException(result.error(), true)));
-  }
   // Always tear down all contexts and settle messages, including failed startup.
   for (auto const& p : m_scriptContexts) {
     if (auto uninitialized = p.second->uninit(); !uninitialized) {
       if (result)
         result = std::unexpected(std::move(uninitialized.error()));
       else
-        EmergencyLog::error("Error uninitializing ScriptableThread: {}", outputException(uninitialized.error(), true));
+        result.error() = result.error().withContext(
+          strf("Error uninitializing ScriptableThread: {}", outputException(uninitialized.error(), true)));
     }
   }
+  m_scriptContexts.clear();
   List<Message> messages;
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
@@ -256,9 +267,24 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (result)
         result = std::unexpected(std::move(failed.error()));
       else
-        EmergencyLog::error("Error settling ScriptableThread message: {}", outputException(failed.error(), true));
+        result.error() = result.error().withContext(
+          strf("Error settling ScriptableThread message: {}", outputException(failed.error(), true)));
     }
   }
+  if (!result) {
+    m_errorOccurred = true;
+    if (auto logged = m_luaRoot->root().logger().error("ScriptableThread exception caught: {}",
+                                                       outputException(result.error(), true));
+        !logged)
+      result.error() = result.error().withContext(
+        strf("Could not log ScriptableThread failure: {}", outputException(logged.error(), true)));
+    else
+      // This boundary handled the failure; Thread must not log it a second time.
+      result = {};
+  }
+  // Release-publish only after all borrowed contexts and accepted messages
+  // have been retired. The parent must still join before reclaiming us.
+  m_shouldExpire.store(true, std::memory_order_release);
   return result;
 }
 
@@ -328,7 +354,6 @@ std::expected<LuaCallbacks, StarException> ScriptableThread::makeThreadCallbacks
   LuaCallbacks callbacks;
   if (auto result = callbacks.registerCallback("stop", [&self = *this]() {
     self.m_stop = true;
-    self.m_shouldExpire = true;
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("sendParentMessage", [&self = *this](String const& message, LuaVariadic<Json> args) {

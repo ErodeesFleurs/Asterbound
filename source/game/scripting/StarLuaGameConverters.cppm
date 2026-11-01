@@ -29,25 +29,25 @@ enum class NodeStatus;
 
 template <>
 struct LuaConverter<InventorySlot> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, InventorySlot k);
-  [[nodiscard]] static std::expected<std::optional<InventorySlot>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, InventorySlot k);
+  [[nodiscard]] static std::expected<std::optional<InventorySlot>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<CollisionKind> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, CollisionKind k);
-  [[nodiscard]] static std::expected<std::optional<CollisionKind>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, CollisionKind k);
+  [[nodiscard]] static std::expected<std::optional<CollisionKind>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<CollisionSet> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, CollisionSet const& s);
-  [[nodiscard]] static std::expected<std::optional<CollisionSet>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, CollisionSet const& s);
+  [[nodiscard]] static std::expected<std::optional<CollisionSet>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<PlatformerAStar::Path> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, PlatformerAStar::Path const& path);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, PlatformerAStar::Path const& path);
 };
 
 template <>
@@ -60,73 +60,73 @@ struct LuaUserDataMethods<std::shared_ptr<PlatformerAStar::PathFinder>> {
 
 template <>
 struct LuaConverter<PlatformerAStar::Parameters> {
-  [[nodiscard]] static std::expected<std::optional<PlatformerAStar::Parameters>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<std::optional<PlatformerAStar::Parameters>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<ActorJumpProfile> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, ActorJumpProfile const& v);
-  [[nodiscard]] static std::expected<std::optional<ActorJumpProfile>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, ActorJumpProfile const& v);
+  [[nodiscard]] static std::expected<std::optional<ActorJumpProfile>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<ActorMovementParameters> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, ActorMovementParameters const& v);
-  [[nodiscard]] static std::expected<std::optional<ActorMovementParameters>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, ActorMovementParameters const& v);
+  [[nodiscard]] static std::expected<std::optional<ActorMovementParameters>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<ActorMovementModifiers> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, ActorMovementModifiers const& v);
-  [[nodiscard]] static std::expected<std::optional<ActorMovementModifiers>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, ActorMovementModifiers const& v);
+  [[nodiscard]] static std::expected<std::optional<ActorMovementModifiers>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<StatModifier> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, StatModifier const& v);
-  [[nodiscard]] static std::expected<std::optional<StatModifier>, StarException> to(LuaEngine& engine, LuaValue v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, StatModifier const& v);
+  [[nodiscard]] static std::expected<std::optional<StatModifier>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<EphemeralStatusEffect> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, EphemeralStatusEffect const& v);
-  [[nodiscard]] static std::expected<std::optional<EphemeralStatusEffect>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, EphemeralStatusEffect const& v);
+  [[nodiscard]] static std::expected<std::optional<EphemeralStatusEffect>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<DamageRequest> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, DamageRequest const& v);
-  [[nodiscard]] static std::expected<std::optional<DamageRequest>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, DamageRequest const& v);
+  [[nodiscard]] static std::expected<std::optional<DamageRequest>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<DamageNotification> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, DamageNotification const& v);
-  [[nodiscard]] static std::expected<std::optional<DamageNotification>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, DamageNotification const& v);
+  [[nodiscard]] static std::expected<std::optional<DamageNotification>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<LiquidLevel> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, LiquidLevel const& v);
-  [[nodiscard]] static std::expected<std::optional<LiquidLevel>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, LiquidLevel const& v);
+  [[nodiscard]] static std::expected<std::optional<LiquidLevel>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<Drawable> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, Drawable const& v);
-  [[nodiscard]] static std::expected<std::optional<Drawable>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Drawable const& v);
+  [[nodiscard]] static std::expected<std::optional<Drawable>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<Collection> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, Collection const& c);
-  [[nodiscard]] static std::expected<std::optional<Collection>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Collection const& c);
+  [[nodiscard]] static std::expected<std::optional<Collection>, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<Collectable> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, Collectable const& c);
-  [[nodiscard]] static std::expected<std::optional<Collectable>, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Collectable const& c);
+  [[nodiscard]] static std::expected<std::optional<Collectable>, StarException> to(LuaStackValue v);
 };
 
 // BehaviorState contains Lua references, putting it in a UserData violates
@@ -142,13 +142,13 @@ struct LuaUserDataMethods<std::weak_ptr<BehaviorState>> {
 
 template <>
 struct LuaConverter<NodeStatus> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, NodeStatus const& status);
-  [[nodiscard]] static std::expected<NodeStatus, StarException> to(LuaEngine& engine, LuaValue const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, NodeStatus const& status);
+  [[nodiscard]] static std::expected<NodeStatus, StarException> to(LuaStackValue v);
 };
 
 template <>
 struct LuaConverter<PhysicsMovingCollision> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, PhysicsMovingCollision const& v);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, PhysicsMovingCollision const& v);
 };
 
 // Weak pointer for the same reasons as BehaviorState.

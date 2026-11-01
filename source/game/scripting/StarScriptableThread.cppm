@@ -13,8 +13,8 @@ import star.rpc_promise;
 
 namespace Star {
 
-// Runs Lua on a separate thread. Failures are logged and returned after script
-// contexts and every accepted asynchronous message have been settled.
+// Runs Lua on a separate thread. Worker failures are published through
+// errorOccurred and logged once after teardown and accepted-message settlement.
 class ScriptableThread : public Thread {
 public:
   struct Message {
@@ -35,6 +35,8 @@ public:
 
   // A script failure stopped the thread.
   bool errorOccurred();
+  // Published only after terminal teardown/message settlement. The parent
+  // joins before releasing its ownership, including failed worker startup.
   bool shouldExpire();
 
   // 

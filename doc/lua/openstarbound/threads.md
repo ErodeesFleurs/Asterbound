@@ -2,7 +2,7 @@
 # Threads
 
 The new `threads` table is accessible from every script and allows creating, communicating with, and destroying scriptable threads.
-Scriptable threads are also automatically destroyed when their parent script component is destroyed.
+Scriptable threads are stopped and joined when their parent script session shuts down or reloads. A lifecycle change requested inside a callback is deferred until the outermost callback returns, so its bindings remain valid during that call.
 
 ---
 
@@ -36,13 +36,13 @@ Pauses or unpauses a thread.
 
 #### `void` threads.stop(`String` name)
 
-Stops and destroys a thread.
+Stops and joins the thread, then removes it. Its script contexts finish shutdown and queued message requests are settled before it can be reclaimed.
 
 ---
 
 #### `RpcPromise<Json>` threads.sendMessage(`String` threadName, `String` messageName, [`LuaValue` args...])
 
-Sends a message to the given thread. Note that the return value from this is currently the only way to get data from the thread.
+Sends a message to the given thread. The promise resolves to the handler's JSON result, or chains a returned `RpcPromise<Json>`. Queued requests fail if startup fails or the worker shuts down before handling them.
 
 ---
 
@@ -60,6 +60,8 @@ This means everything **except** the following:
 Messages of the specified message type sent by any thread will call the specified function.
 The function is passed the following arguments:
     (`String` threadName, `String` message, `Json` args...)
+
+Pass `nil` as the handler to remove it. A running handler may replace or remove itself; the current call finishes using the handler it started with.
 
 ---
 
@@ -81,7 +83,7 @@ The `thread` table is accessible only in scriptable threads.
 
 #### `void` thread.stop()
 
-Stops the thread.
+Requests termination after the current callback. The parent reclaims the worker only after its contexts have shut down and queued requests have been settled.
 
 ---
 

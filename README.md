@@ -148,6 +148,8 @@ Native presets need `STAR_BUILD_BENCHMARKS=ON` and `VCPKG_MANIFEST_FEATURES="qt-
 
 The asset-worker suite keeps its fully Lua-patched workloads and adds an alternating plain/Lua JSON workload at one, two and four workers. Both include queue completion, every JSON readback, explicit full collection and worker destruction in the timed operation. More workers do not parallelize the shared Lua VM; compare the mixed workload before changing scheduling, and do not infer mutex wait time from flat CPU samples.
 
+`core_benchmarks --benchmark_filter='Lua/'` covers direct/path invocation, scalar/string/vector/JSON callbacks, typed return arity, context teardown and coroutine yield/resume. Setup validates results outside the timed loop; use the same binary inputs and repeated samples for before/after comparisons.
+
 ## Development
 
 - C++ uses named modules, `import std;` and `std::expected`, without RTTI or exceptions. Use fresh build trees after compiler, ABI or sanitizer changes.
@@ -157,6 +159,13 @@ The asset-worker suite keeps its fully Lua-patched workloads and adds an alterna
 ```sh
 nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/format-source.sh --check
 ```
+
+### Lua embedding
+
+- `LuaConverter<T>::from(LuaStack, value)` appends one value; `to(LuaStackValue)` reads a borrowed stack value. `LuaStackValue` and its string views must not escape the synchronous frame or survive stack mutation that removes their value. Use `own()` or owning `LuaTable`/`LuaFunction`/`LuaThread`/`LuaUserData` when retaining values.
+- Synchronous callbacks decode arguments and encode results directly on the calling Lua state, including coroutines. Owning `LuaEngine::luaFrom`/`luaTo` remain explicit persistence boundaries; copies of an owning handle share its registry reference.
+- Typed invocation requests zero results for `void`, one for a scalar, the declared tuple arity, or all results for `LuaVariadic`. Extra results are discarded before conversion; named invocation resolves the current function on every call.
+- `LuaBaseComponent` owns session execution, reload and shutdown. Reentrant lifecycle changes retire the context only after the outermost call finishes; workers are joined before dependent bindings disappear. Evaluation errors keep the context, invocation/message errors disable it, and infrastructure failures retain their native error category.
 
 ## Community
 

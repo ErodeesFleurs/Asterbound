@@ -288,19 +288,19 @@ std::expected<void, StarException> LuaHttpSession::stop() {
 
 template <>
 struct LuaConverter<LuaHttpResponse> {
-  [[nodiscard]] static std::expected<LuaValue, StarException> from(LuaEngine& engine, LuaHttpResponse const& response) {
-    auto table = engine.createTable();
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, LuaHttpResponse const& response) {
+    auto table = stack.createTable(0, 2);
     if (!table)
       return std::unexpected(std::move(table.error()));
     if (auto result = table->set("status", response.statusCode); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = table->set("body", response.body); !result)
       return std::unexpected(std::move(result.error()));
-    return std::move(*table);
+    return {};
   }
-  [[nodiscard]] static std::expected<std::optional<LuaHttpResponse>, StarException> to(LuaEngine&, LuaValue const& value) {
-    if (std::holds_alternative<LuaTable>(value)) {
-      auto const& table = std::get<LuaTable>(value);
+  [[nodiscard]] static std::expected<std::optional<LuaHttpResponse>, StarException> to(LuaStackValue value) {
+    if (value.is<LuaTable>()) {
+      auto table = value;
       auto status = table.get<std::optional<int>>("status");
       if (!status)
         return std::unexpected(std::move(status.error()));

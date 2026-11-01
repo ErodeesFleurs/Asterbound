@@ -621,24 +621,20 @@ const GameTestRegistration scriptShutdownFailure("ScriptPane", "ReentrantOwnerHo
   std::expected<void, StarException> stopped;
   testing::TestPartResultArray expectedErrors;
   {
-    // Keep the fixture's ErrorLogSink active and assert its two expected
-    // failures, instead of disabling production logging for this error path.
+    // The shared execution boundary logs the original reentrant failure once.
     testing::ScopedFakeTestPartResultReporter capture(
         testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &expectedErrors);
     stopped = script.uninit("dismissed");
   }
-  ASSERT_EQ(expectedErrors.size(), 2);
-  std::array<std::string_view, 2> prefixes{
-      "Error was logged: Exception while invoking lua function 'fail'.",
-      "Error was logged: Exception while calling script shutdown hook:"};
+  ASSERT_EQ(expectedErrors.size(), 1);
   for (int i = 0; i < expectedErrors.size(); ++i) {
     auto const& result = expectedErrors.GetTestPartResult(i);
     EXPECT_EQ(result.type(), testing::TestPartResult::kNonFatalFailure);
     auto message = std::string_view(result.message());
-    EXPECT_NE(message.find(prefixes[i]), std::string_view::npos);
     EXPECT_NE(message.find("shutdown reentry failure"), std::string_view::npos);
   }
-  EXPECT_FALSE(stopped);
+  ASSERT_FALSE(stopped);
+  EXPECT_TRUE(stopped.error().is<LuaException>());
   EXPECT_FALSE(script.initialized());
   EXPECT_EQ(script.shutdowns, 1u);
   EXPECT_EQ(uninitReached, 0u);
@@ -1846,11 +1842,6 @@ const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalRe
   }
 });
 
-class CallbackScopeTestScript : public LuaBaseComponent {
-public:
-  explicit CallbackScopeTestScript(Root& root) : LuaBaseComponent(root) {}
-  std::expected<void, StarException> retireWithError() { return setError("scope regression"); }
-};
 
 const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDomainAndLiveCallbacksRetireWithoutRevivingOnRebind", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
@@ -1865,7 +1856,7 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   ASSERT_TRUE(secondCallbacks) << secondCallbacks.error().what();
   (*luaRoot)->addCallbacks("inheritedSongbook", *firstCallbacks);
   Json song = JsonObject{{"resource", "/songs/scope.abc"}, {"abc", "X:1\nK:C\nC|\n"}};
-  CallbackScopeTestScript component(fixture.root());
+  LuaBaseComponent component(fixture.root());
   ASSERT_TRUE(component.setLuaRoot(*luaRoot));
   ASSERT_TRUE(component.addCallbacks("songbook", *firstCallbacks));
   ASSERT_TRUE(component.init());
@@ -1900,7 +1891,16 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   EXPECT_EQ((*second)->timeSource(), std::optional<String>("current"));
   EXPECT_FALSE(oldPlay->invoke<LuaValue>(song, "revived"));
   EXPECT_EQ((*first)->timeSource(), std::optional<String>("inherited"));
-  ASSERT_TRUE(component.retireWithError());
+  ASSERT_TRUE(component.eval<LuaValue>("function failScope() error('scope regression') end"));
+  testing::TestPartResultArray errors;
+  {
+    testing::ScopedFakeTestPartResultReporter capture(
+      testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
+    auto failed = component.invoke<LuaValue>("failScope");
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<LuaException>());
+  }
+  EXPECT_EQ(errors.size(), 1);
   EXPECT_FALSE(newPlay->invoke<LuaValue>(song, "error revived"));
   EXPECT_EQ((*second)->timeSource(), std::optional<String>("current"));
   ASSERT_TRUE(component.init());

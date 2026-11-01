@@ -1,3 +1,4 @@
+#include <lua.hpp>
 import std;
 import star.format;
 import star.string;
@@ -16,6 +17,27 @@ import star.poly;
 import star.math_common;
 import star.algorithm;
 using namespace Star;
+
+struct BorrowedCrossStateProbe {
+  LuaContext& target;
+};
+
+namespace Star {
+template <> struct LuaConverter<BorrowedCrossStateProbe> {
+  static std::expected<void, StarException> from(LuaStack source, BorrowedCrossStateProbe probe) {
+    auto top = source.top();
+    if (!lua_checkstack(source.state(), 64))
+      return std::unexpected(LuaException("Cannot reserve probe stack"));
+    for (int i = 0; i < 64; ++i)
+      lua_pushnil(source.state());
+    auto result = probe.target.invokePath<int>("consume", source.value(1));
+    lua_settop(source.state(), top);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+    return source.push(*result);
+  }
+};
+}// namespace Star
 
 namespace {
 template <typename T, typename U>
@@ -1458,4 +1480,239 @@ TEST(LuaTest, PromiseKeeperCollectionPreservesChainAndFailure) {
   EXPECT_EQ(**failedError, "from Lua");
   ASSERT_TRUE((context.load("source = nil promise = nil")));
   ASSERT_TRUE(engine->collectGarbage());
+}
+
+TEST(LuaTest, TypedCallsResolveCurrentFunctionsAndOnlyDecodeRequestedResults) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto contextResult = engine.createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine.createRawFunction(+[](lua_State* state) {
+    lua_pushinteger(state, 43);
+    lua_pushlightuserdata(state, state);
+    return 2;
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("native", *native));
+  ASSERT_TRUE(context.load(R"LUA(
+    routes = {entry = function() return native() end}
+    function nothing() return nil end
+    function tuple() return 17, "payload" end
+    function values() return 1, nil, 3 end
+  )LUA"));
+  EXPECT_EQ(context.invokePath<int>("routes.entry"), 43);
+  ASSERT_TRUE(context.invokePath<void>("routes.entry"));
+  auto unsupported = context.invokePath<LuaVariadic<LuaValue>>("routes.entry");
+  ASSERT_FALSE(unsupported);
+  EXPECT_TRUE(unsupported.error().is<LuaException>());
+  auto tuple = context.invokePath<LuaTupleReturn<int, String, std::optional<int>>>("tuple");
+  ASSERT_TRUE(tuple);
+  EXPECT_EQ(std::get<0>(*tuple), 17);
+  EXPECT_EQ(std::get<1>(*tuple), "payload");
+  EXPECT_FALSE(std::get<2>(*tuple));
+  auto values = context.invokePath<LuaVariadic<std::optional<int>>>("values");
+  ASSERT_TRUE(values);
+  EXPECT_EQ(*values, (LuaVariadic<std::optional<int>>{1, std::nullopt, 3}));
+  auto missing = context.invokePathIfPresent<LuaValue>("routes.missing");
+  ASSERT_TRUE(missing);
+  EXPECT_FALSE(*missing);
+  auto nil = context.invokePathIfPresent<LuaValue>("nothing");
+  ASSERT_TRUE(nil);
+  ASSERT_TRUE(*nil);
+  EXPECT_TRUE(std::holds_alternative<LuaNilType>(**nil));
+  ASSERT_TRUE(context.load("routes.entry = function() return 59 end"));
+  EXPECT_EQ(context.invokePath<int>("routes.entry"), 59);
+}
+
+TEST(LuaTest, BorrowedCoroutineArgumentsSurviveReentryAndOnlyExplicitReferencesPersist) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto contextResult = engine.createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  std::optional<LuaFunction> retained;
+  auto native = engine.createFunction([&](LuaFunction function, Vec2F position) {
+    retained = std::move(function);
+    return position;
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("native", *native));
+  auto nested = engine.createFunction([&]() -> std::expected<int, StarException> {
+    if (auto collected = engine.collectGarbage(); !collected)
+      return std::unexpected(std::move(collected.error()));
+    return context.eval<int>("6");
+  });
+  ASSERT_TRUE(nested);
+  ASSERT_TRUE(context.set("nested", *nested));
+  ASSERT_TRUE(context.load(R"LUA(
+    function run()
+      local input = setmetatable({}, {__index = function(_, key) return nested() + key end})
+      return coroutine.yield(native(function() return 29 end, input))
+    end
+  )LUA"));
+  {
+    auto thread = engine.createThread();
+    ASSERT_TRUE(thread);
+    auto function = context.get<LuaFunction>("run");
+    ASSERT_TRUE(function);
+    ASSERT_TRUE(thread->pushFunction(*function));
+    auto yielded = thread->resume<Vec2F>();
+    ASSERT_TRUE(yielded);
+    ASSERT_TRUE(*yielded);
+    EXPECT_EQ(**yielded, Vec2F(7, 8));
+  }
+  ASSERT_TRUE(engine.collectGarbage());
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(retained->invoke<int>(), 29);
+  ASSERT_TRUE(context.load(R"LUA(
+    observed = setmetatable({}, {__mode = "v"})
+    do
+      local candidate = function() return 71 end
+      observed[1] = candidate
+      local ok = pcall(native, candidate, setmetatable({}, {
+        __index = function() error("argument decode failed") end
+      }))
+      assert(not ok)
+    end
+  )LUA"));
+  ASSERT_TRUE(engine.collectGarbage());
+  EXPECT_EQ(context.eval<bool>("observed[1] == nil"), true);
+  EXPECT_EQ(retained->invoke<int>(), 29);
+}
+
+TEST(LuaTest, MissingJsonArgumentsAndEmptyCoroutineResultsAreNil) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto context = engine.createContext();
+  ASSERT_TRUE(context);
+  auto native = engine.createFunction([](Json value) { return value; });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context->set("native", *native));
+  EXPECT_EQ(context->eval<Json>("native()"), Json());
+  EXPECT_EQ(context->eval<Json>("native(nil)"), Json());
+  ASSERT_TRUE(context->load("function empty() end"));
+  auto function = context->get<LuaFunction>("empty");
+  ASSERT_TRUE(function);
+  auto thread = engine.createThread();
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(thread->pushFunction(*function));
+  auto result = thread->resume<Json>();
+  ASSERT_TRUE(result);
+  ASSERT_TRUE(*result);
+  EXPECT_EQ(**result, Json());
+}
+
+TEST(LuaTest, NativeCoroutineResultsUseTopSliceAndPreserveContinuationArguments) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto function = engine.createRawFunction(+[](lua_State* state) {
+    lua_pushinteger(state, 42);
+    return lua_yieldk(
+      state, 1, 0, +[](lua_State* state, int, lua_KContext) {
+        lua_pushinteger(state, lua_tointeger(state, 1) + lua_tointeger(state, 2));
+        return 1;
+      });
+  });
+  ASSERT_TRUE(function);
+  auto thread = engine.createThread();
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(thread->pushFunction(*function));
+  auto yielded = thread->resume<int>(10);
+  ASSERT_TRUE(yielded);
+  EXPECT_EQ(*yielded, std::optional<int>(42));
+  auto finished = thread->resume<int>(7);
+  ASSERT_TRUE(finished);
+  EXPECT_EQ(*finished, std::optional<int>(17));
+  EXPECT_EQ(thread->status(), LuaThread::Status::Dead);
+}
+
+TEST(LuaTest, FixedReturnTuplesReserveCapacityAndPadMissingValues) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto context = (*created)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load("function one() return 7 end"));
+  [&]<std::size_t... I>(std::index_sequence<I...>) {
+    using Result = LuaTupleReturn<decltype((void)I, std::optional<int>{})...>;
+    auto verify = [](Result const& result) {
+      std::apply(
+        [](auto const& first, auto const&... rest) {
+          EXPECT_EQ(first, std::optional<int>(7));
+          EXPECT_TRUE((!rest && ...));
+        },
+        static_cast<typename Result::Base const&>(result));
+    };
+    auto direct = context->invokePath<Result>("one");
+    ASSERT_TRUE(direct);
+    verify(*direct);
+    auto evaluated = context->eval<Result>("one()");
+    ASSERT_TRUE(evaluated);
+    verify(*evaluated);
+  }(std::make_index_sequence<64>{});
+}
+
+TEST(LuaTest, OwningIdentityConversionsShareOriginalRegistryReferences) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto table = engine.createTable();
+  auto function = engine.createFunction([] { return 1; });
+  auto thread = engine.createThread();
+  auto userdata = engine.createUserData(9);
+  ASSERT_TRUE(table);
+  ASSERT_TRUE(function);
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(userdata);
+  auto verify = [&]<typename T>(T const& original) {
+    auto encoded = engine.luaFrom(original);
+    ASSERT_TRUE(encoded);
+    ASSERT_TRUE(std::holds_alternative<T>(*encoded));
+    EXPECT_TRUE(std::get<T>(*encoded) == original);
+    auto decoded = engine.luaTo<T>(*encoded);
+    ASSERT_TRUE(decoded);
+    EXPECT_TRUE(*decoded == original);
+    auto moved = engine.luaMaybeTo<T>(std::move(*encoded));
+    ASSERT_TRUE(moved);
+    ASSERT_TRUE(*moved);
+    EXPECT_TRUE(**moved == original);
+  };
+  verify(*table);
+  verify(*function);
+  verify(*thread);
+  verify(*userdata);
+}
+
+TEST(LuaTest, BorrowedCrossStatePushReservesSourceCapacityAndKeepsValueRooted) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto& engine = **created;
+  auto context = engine.createContext();
+  ASSERT_TRUE(context);
+  auto collect = engine.createFunction([&] { return engine.collectGarbage(); });
+  ASSERT_TRUE(collect);
+  ASSERT_TRUE(context->set("collect", *collect));
+  auto callback = engine.createFunction([&] { return BorrowedCrossStateProbe{*context}; });
+  ASSERT_TRUE(callback);
+  ASSERT_TRUE(context->set("probe", *callback));
+  ASSERT_TRUE(context->load(R"LUA(
+    function consume(value)
+      collect()
+      return value.counter + 1
+    end
+    function run() return probe({counter = 41}) end
+  )LUA"));
+  auto function = context->get<LuaFunction>("run");
+  ASSERT_TRUE(function);
+  auto thread = engine.createThread();
+  ASSERT_TRUE(thread);
+  ASSERT_TRUE(thread->pushFunction(*function));
+  auto result = thread->resume<int>();
+  ASSERT_TRUE(result) << result.error().what();
+  EXPECT_EQ(*result, std::optional<int>(42));
+  EXPECT_EQ(thread->status(), LuaThread::Status::Dead);
 }

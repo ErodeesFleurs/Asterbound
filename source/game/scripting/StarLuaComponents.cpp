@@ -157,84 +157,91 @@ std::expected<void, StarException> LuaBaseComponent::setLuaRoot(std::shared_ptr<
 std::shared_ptr<LuaRoot> const& LuaBaseComponent::luaRoot() { return m_luaRoot; }
 
 std::expected<bool, StarException> LuaBaseComponent::init() {
-  ++m_activeCalls;
-  auto finished = finally([this] { --m_activeCalls; });
-  if (auto result = uninit({}); !result)
-    return std::unexpected(std::move(result.error()));
-  if (!m_luaRoot)
-    return false;
-  m_error.reset();
-  auto context = m_luaRoot->createContext(m_scripts);
-  if (!context) {
-    if (auto cleanup = setError(printException(context.error(), false)); !cleanup)
-      context.error() = cleanup.error().withContext(strf("Original Lua context creation failure: {}", outputException(context.error(), true)));
-    if (auto logged = m_root.logger().error("Exception while creating lua context for scripts '{}': {}", m_scripts, outputException(context.error(), true)); !logged)
-      return std::unexpected(logged.error().withContext(strf("Could not log Lua context creation failure: {}", outputException(context.error(), true))));
-    return std::unexpected(std::move(context.error()));
+  if (m_activeCalls != 0) {
+    m_initPending = true;
+    m_pendingUninit.reset();
+    m_pendingWorldUninit.reset();
+    return initialized();
   }
-  m_context = std::move(*context);
-  m_callbackScope = std::stop_source{};
-  auto result = [&]() -> std::expected<void, StarException> {
-    if (auto setup = contextSetup(); !setup)
-      return std::unexpected(std::move(setup.error()));
-    auto hasInit = m_context->containsPath("init");
-    if (!hasInit)
-      return std::unexpected(std::move(hasInit.error()));
-    if (*hasInit) {
-      if (auto invoked = m_context->invokePath("init"); !invoked)
+  auto result = execute<bool>(
+    "init", "Exception while initializing Lua session", ErrorPolicy::DisableContext,
+    [&]() -> std::expected<std::optional<bool>, StarException> {
+      m_initPending = false;
+      if (m_reloadTracker)
+        (void)m_reloadTracker->pullTriggered();
+      m_rootGeneration = m_luaRoot ? m_luaRoot->generation() : 0;
+      if (auto stopped = shutdownContext({}); !stopped)
+        return std::unexpected(std::move(stopped.error()));
+      if (!m_luaRoot)
+        return std::optional<bool>(false);
+      auto context = m_luaRoot->createContext(m_scripts);
+      if (!context)
+        return std::unexpected(context.error().withContext(strf("Creating Lua context for scripts '{}'", m_scripts)));
+      m_context = std::move(*context);
+      m_callbackScope = std::stop_source{};
+      if (auto setup = contextSetup(); !setup)
+        return std::unexpected(std::move(setup.error()));
+      if (auto invoked = invoke<LuaValue>("init"); !invoked)
         return std::unexpected(std::move(invoked.error()));
-    }
-    return {};
-  }();
-  if (!result) {
-    if (auto logged = m_root.logger().error("Exception while calling script init: {}", outputException(result.error(), true)); !logged)
-      result.error() = logged.error().withContext(strf("Could not log Lua initialization failure: {}", outputException(result.error(), true)));
-    if (auto cleanup = setError(printException(result.error(), false)); !cleanup)
-      result.error() = cleanup.error().withContext(strf("Original Lua initialization failure: {}", outputException(result.error(), true)));
+      return std::optional<bool>(true);
+    },
+    Entry::Lifecycle);
+  if (!result)
     return std::unexpected(std::move(result.error()));
-  }
-  return true;
+  return result->value_or(false) && initialized();
 }
 
 std::expected<void, StarException> LuaBaseComponent::uninit(String const& beforeUninit) {
-  ++m_activeCalls;
-  auto finished = finally([this] { --m_activeCalls; });
-  // Consume reload identity before hooks: callbacks may reenter invoke(), and
-  // must observe this lifecycle operation rather than recursively rebuilding.
-  if (m_reloadTracker)
-    (void)m_reloadTracker->pullTriggered();
-  m_rootGeneration = m_luaRoot ? m_luaRoot->generation() : 0;
+  if (m_activeCalls != 0) {
+    if (!m_shuttingDown) {
+      m_initPending = false;
+      m_pendingUninit = beforeUninit;
+    }
+    return {};
+  }
+  auto result = execute<bool>(
+    "uninit", "Exception while uninitializing Lua session", ErrorPolicy::KeepContext,
+    [&]() -> std::expected<std::optional<bool>, StarException> {
+      m_initPending = false;
+      if (m_reloadTracker)
+        (void)m_reloadTracker->pullTriggered();
+      m_rootGeneration = m_luaRoot ? m_luaRoot->generation() : 0;
+      if (auto stopped = shutdownContext(beforeUninit); !stopped)
+        return std::unexpected(std::move(stopped.error()));
+      return std::optional<bool>(true);
+    },
+    Entry::Lifecycle);
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  return {};
+}
+
+std::expected<void, StarException> LuaBaseComponent::shutdownContext(String const& beforeUninit) {
+  m_shuttingDown = true;
+  auto finished = finally([this] { m_shuttingDown = false; });
   std::optional<StarException> error;
-  auto remember = [&](auto result, std::string_view operation) {
+  auto remember = [&](std::expected<void, StarException> result) {
     if (!result) {
-      if (auto logged = m_root.logger().error("{}: {}", operation, outputException(result.error(), true)); !logged)
-        result.error() = logged.error().withContext(strf("Could not log Lua cleanup failure: {}", outputException(result.error(), true)));
       if (!error)
         error = std::move(result.error());
       else
-        error = result.error().withContext(strf("Earlier Lua cleanup failure: {}", outputException(*error, true)));
+        error = error->withContext(strf("Additional Lua shutdown failure: {}", outputException(result.error(), true)));
     }
   };
+  auto invokeHook = [&](String const& name) {
+    auto result = execute<LuaValue>(
+      name, "Exception while calling Lua shutdown hook", ErrorPolicy::KeepContext,
+      [&] { return m_context->invokePathIfPresent<LuaValue>(name); }, Entry::Lifecycle);
+    if (!result)
+      remember(std::unexpected(std::move(result.error())));
+  };
   if (m_context) {
-    auto invokeHook = [&](String const& name) {
-      auto present = m_context->containsPath(name);
-      if (!present)
-        remember(std::move(present), "Exception while finding script shutdown hook");
-      else if (*present)
-        remember(m_context->invokePath(name), "Exception while calling script shutdown hook");
-    };
     if (!beforeUninit.empty())
       invokeHook(beforeUninit);
-    if (m_context)
+    if (!m_shutdownPending)
       invokeHook("uninit");
-    // Reentrant invoke failures can already shut down and release this context.
-    if (m_context)
-      remember(contextShutdown(), "Exception while shutting down script context");
   }
-  (void)m_callbackScope.request_stop();
-  m_context.reset();
-  remember(stopThreads(), "Error stopping script threads");
-  m_threads.clear();
+  remember(retireContext());
   m_error.reset();
   if (error)
     return std::unexpected(std::move(*error));
@@ -242,15 +249,16 @@ std::expected<void, StarException> LuaBaseComponent::uninit(String const& before
 }
 
 std::expected<bool, StarException> LuaBaseComponent::hasMethod(String const& name) {
-  auto ready = checkInitialization();
-  if (!ready)
-    return std::unexpected(std::move(ready.error()));
-  if (!*ready)
-    return false;
-  auto value = m_context->getPath(name);
-  if (!value)
-    return std::unexpected(std::move(value.error()));
-  return std::holds_alternative<LuaFunction>(*value);
+  auto result = execute<bool>(name, "Exception while finding Lua method", ErrorPolicy::KeepContext,
+                              [&]() -> std::expected<std::optional<bool>, StarException> {
+                                auto value = m_context->getPath(name);
+                                if (!value)
+                                  return std::unexpected(std::move(value.error()));
+                                return std::optional<bool>(std::holds_alternative<LuaFunction>(*value));
+                              });
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  return result->value_or(false);
 }
 
 bool LuaBaseComponent::initialized() const { return m_context.has_value(); }
@@ -298,39 +306,95 @@ std::expected<void, StarException> LuaBaseComponent::contextSetup() {
 
 std::expected<void, StarException> LuaBaseComponent::contextShutdown() { return {}; }
 
-std::expected<void, StarException> LuaBaseComponent::setError(String error) {
+std::expected<void, StarException> LuaBaseComponent::retireContext() {
   std::expected<void, StarException> shutdown;
   if (m_context)
     shutdown = contextShutdown();
   (void)m_callbackScope.request_stop();
   m_context.reset();
-  m_error = std::move(error);
-  return shutdown;
+  m_shutdownPending = false;
+  auto stopped = stopThreads();
+  m_threads.clear();
+  if (!shutdown) {
+    if (!stopped)
+      shutdown.error() =
+        shutdown.error().withContext(strf("Error stopping Lua threads: {}", outputException(stopped.error(), true)));
+    return shutdown;
+  }
+  return stopped;
+}
+
+std::expected<void, StarException> LuaBaseComponent::finishExecution() {
+  // Teardown callbacks may reenter, but cannot recursively finish the boundary.
+  ++m_activeCalls;
+  auto finished = finally([this] { --m_activeCalls; });
+  std::expected<void, StarException> cleanup;
+  if (m_pendingUninit) {
+    auto hook = std::move(*m_pendingUninit);
+    m_pendingUninit.reset();
+    cleanup = shutdownContext(hook);
+  } else if (m_shutdownPending) {
+    m_shuttingDown = true;
+    cleanup = retireContext();
+    m_shuttingDown = false;
+  }
+  if (m_pendingWorldUninit) {
+    auto& world = m_pendingWorldUninit->get();
+    m_pendingWorldUninit.reset();
+    auto detached = world.finishShutdown();
+    if (!detached)
+      cleanup = cleanup ? std::move(detached)
+                        : std::unexpected(detached.error().withContext(
+                            strf("Earlier Lua shutdown failure: {}", outputException(cleanup.error(), true))));
+  }
+  if (!cleanup && !m_boundaryError)
+    m_boundaryError = cleanup.error();
+  auto error = std::move(m_boundaryError);
+  m_boundaryError.reset();
+  if (error) {
+    if (auto logged = m_root.logger().error("Lua session failure: {}", outputException(*error, true)); !logged) {
+      auto failure =
+        logged.error().withContext(strf("Original Lua session failure: {}", outputException(*error, true)));
+      if (!cleanup)
+        failure = failure.withContext(strf("Lua session cleanup failure: {}", outputException(cleanup.error(), true)));
+      return std::unexpected(std::move(failure));
+    }
+  }
+  return cleanup;
 }
 
 std::expected<bool, StarException> LuaBaseComponent::checkInitialization() {
-  // Native callbacks can synchronously reenter a component (for example a
-  // TextBox change callback after a command reloads assets). Retiring that
-  // context would invalidate the outer Lua frame's callbacks mid-execution.
-  // Leave reload signals pending until the next top-level entry boundary.
   if (m_activeCalls != 0)
-    return initialized();
-  bool shouldBeInitialized = initialized() || error();
+    return initialized() && !m_shutdownPending;
   bool reloaded = m_reloadTracker && m_reloadTracker->pullTriggered();
   bool replaced = m_luaRoot && m_rootGeneration != m_luaRoot->generation();
-  if (shouldBeInitialized && (reloaded || replaced))
+  if (m_initPending || ((initialized() || error()) && (reloaded || replaced)))
     return init();
   return initialized();
 }
 
-void LuaBaseComponent::cleanThreads() {
+std::expected<void, StarException> LuaBaseComponent::cleanThreads() {
   StringList expired;
   for (auto const& p : m_threads) {
     if (p.second->shouldExpire())
       expired.append(p.first);
   }
-  for (auto const& name : expired)
-    m_threads.remove(name);
+  std::optional<StarException> error;
+  for (auto const& name : expired) {
+    // Recyclable is published by the worker only after teardown; still join
+    // before releasing the parent's last owning reference.
+    auto thread = m_threads.maybeTake(name);
+    if (auto stopped = (*thread)->stop(); !stopped) {
+      if (!error)
+        error = std::move(stopped.error());
+      else
+        error = error->withContext(
+          strf("Additional Lua thread reclamation failure: {}", outputException(stopped.error(), true)));
+    }
+  }
+  if (error)
+    return std::unexpected(std::move(*error));
+  return {};
 }
 
 std::expected<void, StarException> LuaBaseComponent::stopThreads() {
@@ -350,32 +414,36 @@ std::expected<void, StarException> LuaBaseComponent::stopThreads() {
 
 std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallbacks() {
   LuaCallbacks callbacks;
-  if (auto result = callbacks.registerCallback("create", [&self = *this](Json parameters) -> std::expected<String, StarException> {
-    self.cleanThreads();
-    auto name = parameters.getString("name", Uuid(self.m_root.random()).hex());
-    if (!name)
-      return std::unexpected(std::move(name.error()));
-    if (auto old = self.m_threads.maybeRef(*name)) {
-      if (auto stopped = old->get()->stop(); !stopped)
-        return std::unexpected(std::move(stopped.error()));
-      self.m_threads.remove(*name);
-    }
-    auto named = parameters.set("name", *name);
-    if (!named)
-      return std::unexpected(std::move(named.error()));
-    auto thread = ScriptableThread::create(std::move(*named), self);
-    if (!thread)
-      return std::unexpected(std::move(thread.error()));
-    for (auto const& p : self.m_threadCallbacks) {
-      if (auto added = (*thread)->addCallbacks(p.first, p.second); !added)
-        return std::unexpected(std::move(added.error()));
-    }
-    (*thread)->setPause(false);
-    if (auto started = (*thread)->start(); !started)
-      return std::unexpected(std::move(started.error()));
-    self.m_threads.set(*name, std::move(*thread));
-    return std::move(*name);
-  }); !result)
+  if (auto result =
+        callbacks.registerCallback("create",
+                                   [&self = *this](Json parameters) -> std::expected<String, StarException> {
+                                     if (auto cleaned = self.cleanThreads(); !cleaned)
+                                       return std::unexpected(std::move(cleaned.error()));
+                                     auto name = parameters.getString("name", Uuid(self.m_root.random()).hex());
+                                     if (!name)
+                                       return std::unexpected(std::move(name.error()));
+                                     if (auto old = self.m_threads.maybeRef(*name)) {
+                                       if (auto stopped = old->get()->stop(); !stopped)
+                                         return std::unexpected(std::move(stopped.error()));
+                                       self.m_threads.remove(*name);
+                                     }
+                                     auto named = parameters.set("name", *name);
+                                     if (!named)
+                                       return std::unexpected(std::move(named.error()));
+                                     auto thread = ScriptableThread::create(std::move(*named), self);
+                                     if (!thread)
+                                       return std::unexpected(std::move(thread.error()));
+                                     for (auto const& p : self.m_threadCallbacks) {
+                                       if (auto added = (*thread)->addCallbacks(p.first, p.second); !added)
+                                         return std::unexpected(std::move(added.error()));
+                                     }
+                                     (*thread)->setPause(false);
+                                     if (auto started = (*thread)->start(); !started)
+                                       return std::unexpected(std::move(started.error()));
+                                     self.m_threads.set(*name, std::move(*thread));
+                                     return std::move(*name);
+                                   });
+      !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("setPause", [&self = *this](String const& name, bool paused) {
     if (auto thread = self.m_threads.maybeRef(name))
@@ -388,7 +456,8 @@ std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallback
         return std::unexpected(std::move(stopped.error()));
       self.m_threads.remove(name);
     }
-    self.cleanThreads();
+    if (auto cleaned = self.cleanThreads(); !cleaned)
+      return std::unexpected(std::move(cleaned.error()));
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -498,20 +567,20 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
 }
 
 [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> LuaScriptUpdate::handleThreadMessage(ThreadMessage const& message) {
-  if (!m_host.initialized())
-    return std::optional<ChainableJsonMessageResponse>{};
-  if (auto handler = m_threadMessageHandlers.maybeRef(message.message); handler && handler->get().function) {
-    auto result = handler->get().function->template invoke<ChainableJsonMessageResponse>(message.originThread, message.message, luaUnpack(message.args));
-    if (!result) {
-      if (auto cleanup = m_host.setError(printException(result.error(), false)); !cleanup)
-        result.error() = cleanup.error().withContext(strf("Original Lua thread message failure: {}", outputException(result.error(), true)));
-      if (auto logged = m_host.root().logger().error("Exception while invoking lua thread message handler for message '{}'. {}", message.message, outputException(result.error(), true)); !logged)
-        return std::unexpected(logged.error().withContext(strf("Could not log Lua thread message failure: {}", outputException(result.error(), true))));
-      return std::unexpected(std::move(result.error()));
-    }
-    return std::optional<ChainableJsonMessageResponse>(std::move(*result));
-  }
-  return std::optional<ChainableJsonMessageResponse>{};
+  return m_host.execute<ChainableJsonMessageResponse>(
+    message.message, "Exception while invoking Lua thread message handler",
+    LuaBaseComponent::ErrorPolicy::DisableContext,
+    [&]() -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+      auto handler = m_threadMessageHandlers.maybeRef(message.message);
+      if (!handler || !handler->get().function)
+        return std::optional<ChainableJsonMessageResponse>{};
+      auto function = *handler->get().function;
+      auto result =
+        function.invoke<ChainableJsonMessageResponse>(message.originThread, message.message, luaUnpack(message.args));
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return std::optional<ChainableJsonMessageResponse>(std::move(*result));
+    });
 }
 
 [[nodiscard]] std::expected<void, StarException> LuaScriptUpdate::addThreadsCallbacks(LuaCallbacks& callbacks) {
@@ -604,6 +673,11 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
 }
 
 [[nodiscard]] std::expected<void, StarException> LuaScriptWorld::uninit() {
+  m_host.m_pendingWorldUninit = std::ref(*this);
+  return m_host.uninit({});
+}
+
+[[nodiscard]] std::expected<void, StarException> LuaScriptWorld::finishShutdown() {
   std::optional<StarException> error;
   auto remember = [&](auto result) {
     if (!result) {
@@ -613,7 +687,6 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
         error = result.error().withContext(strf("Earlier Lua world shutdown failure: {}", outputException(*error, true)));
     }
   };
-  remember(m_host.uninit({}));
   remember(m_host.removeCallbacks("world"));
   remember(m_host.removeThreadCallbacks("world"));
   for (auto const& name : m_worldThreadCallbacks)
@@ -661,29 +734,30 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
 }
 
 [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> LuaScriptMessages::handleMessage(String const& message, bool local, JsonArray const& args) {
-  if (!m_host.initialized())
-    return std::optional<ChainableJsonMessageResponse>{};
-  auto handler = m_messageHandlers.maybeRef(message);
-  if (!handler || !handler->get().function || (handler->get().localOnly && !local))
-    return std::optional<ChainableJsonMessageResponse>{};
-  auto result = [&]() -> std::expected<ChainableJsonMessageResponse, StarException> {
-    if (handler->get().localOnly) {
-      if (handler->get().passName)
-        return handler->get().function->template invoke<ChainableJsonMessageResponse>(message, luaUnpack(args));
-      return handler->get().function->template invoke<ChainableJsonMessageResponse>(luaUnpack(args));
-    }
-    if (handler->get().passName)
-      return handler->get().function->template invoke<ChainableJsonMessageResponse>(message, local, luaUnpack(args));
-    return handler->get().function->template invoke<ChainableJsonMessageResponse>(local, luaUnpack(args));
-  }();
-  if (!result) {
-    if (auto cleanup = m_host.setError(printException(result.error(), false)); !cleanup)
-      result.error() = cleanup.error().withContext(strf("Original Lua message handler failure: {}", outputException(result.error(), true)));
-    if (auto logged = m_host.root().logger().error("Exception while invoking lua message handler for message '{}'. {}", message, outputException(result.error(), true)); !logged)
-      return std::unexpected(logged.error().withContext(strf("Could not log Lua message handler failure: {}", outputException(result.error(), true))));
-    return std::unexpected(std::move(result.error()));
-  }
-  return std::optional<ChainableJsonMessageResponse>(std::move(*result));
+  return m_host.execute<ChainableJsonMessageResponse>(
+    message, "Exception while invoking Lua message handler", LuaBaseComponent::ErrorPolicy::DisableContext,
+    [&]() -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+      auto handler = m_messageHandlers.maybeRef(message);
+      if (!handler || !handler->get().function || (handler->get().localOnly && !local))
+        return std::optional<ChainableJsonMessageResponse>{};
+      // Lua can replace/remove this handler or request a reload while it runs.
+      auto function = *handler->get().function;
+      bool localOnly = handler->get().localOnly;
+      bool passName = handler->get().passName;
+      auto result = [&]() -> std::expected<ChainableJsonMessageResponse, StarException> {
+        if (localOnly) {
+          if (passName)
+            return function.invoke<ChainableJsonMessageResponse>(message, luaUnpack(args));
+          return function.invoke<ChainableJsonMessageResponse>(luaUnpack(args));
+        }
+        if (passName)
+          return function.invoke<ChainableJsonMessageResponse>(message, local, luaUnpack(args));
+        return function.invoke<ChainableJsonMessageResponse>(local, luaUnpack(args));
+      }();
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return std::optional<ChainableJsonMessageResponse>(std::move(*result));
+    });
 }
 
 void LuaScriptMessages::contextShutdown() {

@@ -43,12 +43,11 @@ namespace Star {
 
 namespace {
 
-[[nodiscard]] std::expected<void, StarException> setFields(LuaTable&) {
-  return {};
-}
+[[nodiscard]] std::expected<void, StarException> setFields(LuaStackValue) { return {}; }
 
 template <typename Key, typename Value, typename... Rest>
-[[nodiscard]] std::expected<void, StarException> setFields(LuaTable& table, Key&& key, Value&& value, Rest&&... rest) {
+[[nodiscard]] std::expected<void, StarException> setFields(LuaStackValue table, Key&& key, Value&& value,
+                                                           Rest&&... rest) {
   auto result = table.set(std::forward<Key>(key), std::forward<Value>(value));
   if (!result)
     return std::unexpected(std::move(result.error()));
@@ -56,43 +55,39 @@ template <typename Key, typename Value, typename... Rest>
 }
 
 template <typename... Fields>
-[[nodiscard]] std::expected<LuaValue, StarException> makeTable(LuaEngine& engine, Fields&&... fields) {
+[[nodiscard]] std::expected<void, StarException> makeTable(LuaStack stack, Fields&&... fields) {
   constexpr auto arrayFields = []<std::size_t... I>(std::index_sequence<I...>) {
     return (0 + ... + int(std::is_integral_v<std::remove_cvref_t<
         std::tuple_element_t<2 * I, std::tuple<Fields...>>>>));
   }(std::make_index_sequence<sizeof...(Fields) / 2>{});
-  auto created = engine.createTable(arrayFields, static_cast<int>(sizeof...(Fields) / 2) - arrayFields);
+  auto created = stack.createTable(arrayFields, static_cast<int>(sizeof...(Fields) / 2) - arrayFields);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
   auto result = setFields(table, std::forward<Fields>(fields)...);
   if (!result)
     return std::unexpected(std::move(result.error()));
-  return table;
+  return {};
 }
 
 template <typename T, typename Key>
-[[nodiscard]] std::expected<std::optional<T>, StarException> maybeField(LuaEngine& engine, LuaTable const& table, Key&& key) {
-  auto value = table.get<LuaValue>(std::forward<Key>(key));
-  if (!value)
-    return std::unexpected(std::move(value.error()));
-  return engine.luaMaybeTo<T>(*value);
+[[nodiscard]] std::expected<std::optional<T>, StarException> maybeField(LuaStackValue table, Key&& key) {
+  return table.maybeGet<T>(std::forward<Key>(key));
 }
 
-[[nodiscard]] std::expected<bool, StarException> readFields(LuaEngine&, LuaTable const&) {
-  return true;
-}
+[[nodiscard]] std::expected<bool, StarException> readFields(LuaStackValue) { return true; }
 
 // A failed probe is distinct from a failed table operation or converter.
 template <typename Key, typename Value, typename... Rest>
-[[nodiscard]] std::expected<bool, StarException> readFields(LuaEngine& engine, LuaTable const& table, Key&& key, Value& value, Rest&&... rest) {
-  auto converted = maybeField<Value>(engine, table, std::forward<Key>(key));
+[[nodiscard]] std::expected<bool, StarException> readFields(LuaStackValue table, Key&& key, Value& value,
+                                                            Rest&&... rest) {
+  auto converted = maybeField<Value>(table, std::forward<Key>(key));
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
     return false;
   value = std::move(**converted);
-  return readFields(engine, table, std::forward<Rest>(rest)...);
+  return readFields(table, std::forward<Rest>(rest)...);
 }
 
 template <typename Enum>
@@ -121,26 +116,26 @@ template <typename Enum>
 
 }
 
-std::expected<LuaValue, StarException> LuaConverter<InventorySlot>::from(LuaEngine& engine, InventorySlot k) {
+std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack stack, InventorySlot k) {
   if (std::holds_alternative<EquipmentSlot>(k)) {
     auto name = enumName(EquipmentSlotNames, std::get<EquipmentSlot>(k));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    return engine.createString(name->get());
+    return stack.push(name->get());
   } else if (std::holds_alternative<BagSlot>(k)) {
     auto const& bag = std::get<BagSlot>(k);
-    return makeTable(engine, 1, bag.first, 2, bag.second);
+    return makeTable(stack, 1, bag.first, 2, bag.second);
   } else if (std::holds_alternative<SwapSlot>(k)) {
-    return engine.createString("swap");
+    return stack.push("swap");
   } else if (std::holds_alternative<TrashSlot>(k)) {
-    return engine.createString("trash");
+    return stack.push("trash");
   }
-  return LuaNil;
+  return stack.push(LuaNil);
 }
 
-std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaEngine& engine, LuaValue const& v) {
-  if (std::holds_alternative<LuaString>(v)) {
-    auto string = std::get<LuaString>(v).toString();
+std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
+  if (v.is<LuaString>()) {
+    auto string = v.toString();
     auto swap = string.equalsIgnoreCase("swap");
     if (!swap)
       return std::unexpected(std::move(swap.error()));
@@ -156,10 +151,10 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
       return std::unexpected(std::move(equipment.error()));
     if (*equipment)
       return InventorySlot(**equipment);
-  } else if (std::holds_alternative<LuaTable>(v)) {
+  } else if (v.is<LuaTable>()) {
     String name;
     unsigned index;
-    auto read = readFields(engine, std::get<LuaTable>(v), 1, name, 2, index);
+    auto read = readFields(v, 1, name, 2, index);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (!*read)
@@ -169,23 +164,23 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
   return std::nullopt;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<CollisionKind>::from(LuaEngine& engine, CollisionKind k) {
+std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack stack, CollisionKind k) {
   auto name = enumName(CollisionKindNames, k);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return engine.createString(name->get());
+  return stack.push(name->get());
 }
 
-std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaEngine&, LuaValue const& v) {
-  if (std::holds_alternative<LuaString>(v))
-    return enumValue(CollisionKindNames, std::get<LuaString>(v).toString());
+std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
+  if (v.is<LuaString>())
+    return enumValue(CollisionKindNames, v.toString());
   return std::nullopt;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<CollisionSet>::from(LuaEngine& engine, CollisionSet const& s) {
+std::expected<void, StarException> LuaConverter<CollisionSet>::from(LuaStack stack, CollisionSet const& s) {
   if (!CollisionKindNames)
     return std::unexpected(CollisionKindNames.error());
-  auto created = engine.createTable(static_cast<int>(CollisionKindNames->size()), 0);
+  auto created = stack.createTable(static_cast<int>(CollisionKindNames->size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
@@ -197,17 +192,17 @@ std::expected<LuaValue, StarException> LuaConverter<CollisionSet>::from(LuaEngin
         return std::unexpected(std::move(result.error()));
     }
   }
-  return table;
+  return {};
 }
 
-std::expected<std::optional<CollisionSet>, StarException> LuaConverter<CollisionSet>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<CollisionSet>, StarException> LuaConverter<CollisionSet>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   CollisionSet result;
   bool compatible = true;
-  auto iterated = table.iterate([&](LuaValue, LuaValue value) -> std::expected<bool, StarException> {
-    auto kind = engine.luaMaybeTo<CollisionKind>(std::move(value));
+  auto iterated = table.iterate([&](LuaStackValue, LuaStackValue value) -> std::expected<bool, StarException> {
+    auto kind = value.maybeTo<CollisionKind>();
     if (!kind)
       return std::unexpected(std::move(kind.error()));
     if (!*kind) {
@@ -224,13 +219,14 @@ std::expected<std::optional<CollisionSet>, StarException> LuaConverter<Collision
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<PlatformerAStar::Path>::from(LuaEngine& engine, PlatformerAStar::Path const& path) {
-  auto convertNode = [&engine](PlatformerAStar::Node const& node) {
-    return makeTable(engine, "position", node.position, "velocity", node.velocity);
+std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(LuaStack stack,
+                                                                             PlatformerAStar::Path const& path) {
+  auto convertNode = [&stack](PlatformerAStar::Node const& node) {
+    return makeTable(stack, "position", node.position, "velocity", node.velocity);
   };
   if (path.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
     return std::unexpected(LuaException("Too many entries for a Lua path table"));
-  auto created = engine.createTable(static_cast<int>(path.size()), 0);
+  auto created = stack.createTable(static_cast<int>(path.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto pathTable = std::move(*created);
@@ -242,18 +238,21 @@ std::expected<LuaValue, StarException> LuaConverter<PlatformerAStar::Path>::from
     auto source = convertNode(edge.source);
     if (!source)
       return std::unexpected(std::move(source.error()));
+    auto sourceTable = stack.value(-1);
     auto target = convertNode(edge.target);
     if (!target)
       return std::unexpected(std::move(target.error()));
-    auto converted = makeTable(engine, "cost", edge.cost, "action", action->get(),
-        "jumpVelocity", edge.jumpVelocity, "source", std::move(*source), "target", std::move(*target));
+    auto targetTable = stack.value(-1);
+    auto converted = makeTable(stack, "cost", edge.cost, "action", action->get(), "jumpVelocity", edge.jumpVelocity,
+                               "source", sourceTable, "target", targetTable);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    auto inserted = pathTable.set(index++, std::move(*converted));
+    auto inserted = pathTable.set(index++, stack.value(-1));
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
+    stack.pop(3);
   }
-  return pathTable;
+  return {};
 }
 
 std::expected<LuaMethods<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException> LuaUserDataMethods<std::shared_ptr<PlatformerAStar::PathFinder>>::make() {
@@ -269,26 +268,26 @@ std::expected<LuaMethods<std::shared_ptr<PlatformerAStar::PathFinder>>, StarExce
   return methods;
 }
 
-std::expected<std::optional<PlatformerAStar::Parameters>, StarException> LuaConverter<PlatformerAStar::Parameters>::to(LuaEngine& engine, LuaValue const& v) {
+std::expected<std::optional<PlatformerAStar::Parameters>, StarException>
+LuaConverter<PlatformerAStar::Parameters>::to(LuaStackValue v) {
   PlatformerAStar::Parameters p;
   p.returnBest = false;
   p.mustEndOnGround = false;
   p.enableWalkSpeedJumps = false;
   p.enableVerticalJumpAirControl = false;
-  if (std::holds_alternative<LuaNilType>(v))
+  if (v.is<LuaNilType>())
     return p;
-  if (!std::holds_alternative<LuaTable>(v))
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   std::optional<bool> returnBest, mustEndOnGround, enableWalkSpeedJumps, enableVerticalJumpAirControl;
-  auto read = readFields(engine, table,
-      "maxDistance", p.maxDistance, "returnBest", returnBest, "mustEndOnGround", mustEndOnGround,
-      "enableWalkSpeedJumps", enableWalkSpeedJumps, "enableVerticalJumpAirControl", enableVerticalJumpAirControl,
-      "swimCost", p.swimCost, "jumpCost", p.jumpCost, "liquidJumpCost", p.liquidJumpCost,
-      "dropCost", p.dropCost, "boundBox", p.boundBox, "standingBoundBox", p.standingBoundBox,
-      "droppingBoundBox", p.droppingBoundBox, "smallJumpMultiplier", p.smallJumpMultiplier,
-      "jumpDropXMultiplier", p.jumpDropXMultiplier, "maxFScore", p.maxFScore,
-      "maxNodesToSearch", p.maxNodesToSearch, "maxLandingVelocity", p.maxLandingVelocity);
+  auto read = readFields(table, "maxDistance", p.maxDistance, "returnBest", returnBest, "mustEndOnGround",
+                         mustEndOnGround, "enableWalkSpeedJumps", enableWalkSpeedJumps, "enableVerticalJumpAirControl",
+                         enableVerticalJumpAirControl, "swimCost", p.swimCost, "jumpCost", p.jumpCost, "liquidJumpCost",
+                         p.liquidJumpCost, "dropCost", p.dropCost, "boundBox", p.boundBox, "standingBoundBox",
+                         p.standingBoundBox, "droppingBoundBox", p.droppingBoundBox, "smallJumpMultiplier",
+                         p.smallJumpMultiplier, "jumpDropXMultiplier", p.jumpDropXMultiplier, "maxFScore", p.maxFScore,
+                         "maxNodesToSearch", p.maxNodesToSearch, "maxLandingVelocity", p.maxLandingVelocity);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -300,24 +299,25 @@ std::expected<std::optional<PlatformerAStar::Parameters>, StarException> LuaConv
   return p;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<ActorJumpProfile>::from(LuaEngine& engine, ActorJumpProfile const& v) {
-  return makeTable(engine, "jumpSpeed", v.jumpSpeed, "jumpControlForce", v.jumpControlForce,
-      "jumpInitialPercentage", v.jumpInitialPercentage, "jumpHoldTime", v.jumpHoldTime,
-      "jumpTotalHoldTime", v.jumpTotalHoldTime, "multiJump", v.multiJump, "reJumpDelay", v.reJumpDelay,
-      "autoJump", v.autoJump, "collisionCancelled", v.collisionCancelled);
+std::expected<void, StarException> LuaConverter<ActorJumpProfile>::from(LuaStack stack, ActorJumpProfile const& v) {
+  return makeTable(stack, "jumpSpeed", v.jumpSpeed, "jumpControlForce", v.jumpControlForce, "jumpInitialPercentage",
+                   v.jumpInitialPercentage, "jumpHoldTime", v.jumpHoldTime, "jumpTotalHoldTime", v.jumpTotalHoldTime,
+                   "multiJump", v.multiJump, "reJumpDelay", v.reJumpDelay, "autoJump", v.autoJump, "collisionCancelled",
+                   v.collisionCancelled);
 }
 
-std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<ActorJumpProfile>::to(LuaEngine& engine, LuaValue const& v) {
-  if (std::holds_alternative<LuaNilType>(v))
+std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<ActorJumpProfile>::to(LuaStackValue v) {
+  if (v.is<LuaNilType>())
     return ActorJumpProfile();
-  if (!std::holds_alternative<LuaTable>(v))
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   ActorJumpProfile result;
-  auto read = readFields(engine, table, "jumpSpeed", result.jumpSpeed, "jumpControlForce", result.jumpControlForce,
-      "jumpInitialPercentage", result.jumpInitialPercentage, "jumpHoldTime", result.jumpHoldTime,
-      "jumpTotalHoldTime", result.jumpTotalHoldTime, "multiJump", result.multiJump, "reJumpDelay", result.reJumpDelay,
-      "autoJump", result.autoJump, "collisionCancelled", result.collisionCancelled);
+  auto read =
+    readFields(table, "jumpSpeed", result.jumpSpeed, "jumpControlForce", result.jumpControlForce,
+               "jumpInitialPercentage", result.jumpInitialPercentage, "jumpHoldTime", result.jumpHoldTime,
+               "jumpTotalHoldTime", result.jumpTotalHoldTime, "multiJump", result.multiJump, "reJumpDelay",
+               result.reJumpDelay, "autoJump", result.autoJump, "collisionCancelled", result.collisionCancelled);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -325,54 +325,57 @@ std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<Actor
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<ActorMovementParameters>::from(LuaEngine& engine, ActorMovementParameters const& v) {
-  return makeTable(engine, "mass", v.mass, "gravityMultiplier", v.gravityMultiplier,
-      "liquidBuoyancy", v.liquidBuoyancy, "airBuoyancy", v.airBuoyancy, "bounceFactor", v.bounceFactor,
-      "slopeSlidingFactor", v.slopeSlidingFactor, "maxMovementPerStep", v.maxMovementPerStep,
-      "maximumCorrection", v.maximumCorrection, "speedLimit", v.speedLimit, "standingPoly", v.standingPoly,
-      "crouchingPoly", v.crouchingPoly, "stickyCollision", v.stickyCollision, "stickyForce", v.stickyForce,
-      "walkSpeed", v.walkSpeed, "runSpeed", v.runSpeed, "flySpeed", v.flySpeed,
-      "airFriction", v.airFriction, "liquidFriction", v.liquidFriction,
-      "minimumLiquidPercentage", v.minimumLiquidPercentage, "liquidImpedance", v.liquidImpedance,
-      "normalGroundFriction", v.normalGroundFriction, "ambulatingGroundFriction", v.ambulatingGroundFriction,
-      "groundForce", v.groundForce, "airForce", v.airForce, "liquidForce", v.liquidForce,
-      "airJumpProfile", v.airJumpProfile, "liquidJumpProfile", v.liquidJumpProfile,
-      "fallStatusSpeedMin", v.fallStatusSpeedMin, "fallThroughSustainFrames", v.fallThroughSustainFrames,
-      "maximumPlatformCorrection", v.maximumPlatformCorrection,
-      "maximumPlatformCorrectionVelocityFactor", v.maximumPlatformCorrectionVelocityFactor,
-      "physicsEffectCategories", v.physicsEffectCategories, "groundMovementMinimumSustain", v.groundMovementMinimumSustain,
-      "groundMovementMaximumSustain", v.groundMovementMaximumSustain, "groundMovementCheckDistance", v.groundMovementCheckDistance,
-      "collisionEnabled", v.collisionEnabled, "frictionEnabled", v.frictionEnabled, "gravityEnabled", v.gravityEnabled);
+std::expected<void, StarException> LuaConverter<ActorMovementParameters>::from(LuaStack stack,
+                                                                               ActorMovementParameters const& v) {
+  return makeTable(
+    stack, "mass", v.mass, "gravityMultiplier", v.gravityMultiplier, "liquidBuoyancy", v.liquidBuoyancy, "airBuoyancy",
+    v.airBuoyancy, "bounceFactor", v.bounceFactor, "stopOnFirstBounce", v.stopOnFirstBounce,
+    "enableSurfaceSlopeCorrection", v.enableSurfaceSlopeCorrection, "slopeSlidingFactor", v.slopeSlidingFactor,
+    "maxMovementPerStep", v.maxMovementPerStep, "maximumCorrection", v.maximumCorrection, "speedLimit", v.speedLimit,
+    "standingPoly", v.standingPoly, "crouchingPoly", v.crouchingPoly, "stickyCollision", v.stickyCollision,
+    "stickyForce", v.stickyForce, "walkSpeed", v.walkSpeed, "runSpeed", v.runSpeed, "flySpeed", v.flySpeed,
+    "airFriction", v.airFriction, "liquidFriction", v.liquidFriction, "minimumLiquidPercentage",
+    v.minimumLiquidPercentage, "liquidImpedance", v.liquidImpedance, "normalGroundFriction", v.normalGroundFriction,
+    "ambulatingGroundFriction", v.ambulatingGroundFriction, "groundForce", v.groundForce, "airForce", v.airForce,
+    "liquidForce", v.liquidForce, "airJumpProfile", v.airJumpProfile, "liquidJumpProfile", v.liquidJumpProfile,
+    "fallStatusSpeedMin", v.fallStatusSpeedMin, "fallThroughSustainFrames", v.fallThroughSustainFrames,
+    "maximumPlatformCorrection", v.maximumPlatformCorrection, "maximumPlatformCorrectionVelocityFactor",
+    v.maximumPlatformCorrectionVelocityFactor, "physicsEffectCategories", v.physicsEffectCategories,
+    "groundMovementMinimumSustain", v.groundMovementMinimumSustain, "groundMovementMaximumSustain",
+    v.groundMovementMaximumSustain, "groundMovementCheckDistance", v.groundMovementCheckDistance, "collisionEnabled",
+    v.collisionEnabled, "frictionEnabled", v.frictionEnabled, "gravityEnabled", v.gravityEnabled, "pathExploreRate",
+    v.pathExploreRate);
 }
 
-std::expected<std::optional<ActorMovementParameters>, StarException> LuaConverter<ActorMovementParameters>::to(LuaEngine& engine, LuaValue const& v) {
-  if (std::holds_alternative<LuaNilType>(v))
+std::expected<std::optional<ActorMovementParameters>, StarException>
+LuaConverter<ActorMovementParameters>::to(LuaStackValue v) {
+  if (v.is<LuaNilType>())
     return ActorMovementParameters();
-  if (!std::holds_alternative<LuaTable>(v))
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   ActorMovementParameters result;
   std::optional<PolyF> standingFallback, crouchingFallback;
-  auto read = readFields(engine, table,
-      "mass", result.mass, "gravityMultiplier", result.gravityMultiplier,
-      "liquidBuoyancy", result.liquidBuoyancy, "airBuoyancy", result.airBuoyancy, "bounceFactor", result.bounceFactor,
-      "slopeSlidingFactor", result.slopeSlidingFactor, "maxMovementPerStep", result.maxMovementPerStep,
-      "maximumCorrection", result.maximumCorrection, "speedLimit", result.speedLimit,
-      "standingPoly", result.standingPoly, "collisionPoly", standingFallback,
-      "crouchingPoly", result.crouchingPoly, "collisionPoly", crouchingFallback,
-      "stickyCollision", result.stickyCollision, "stickyForce", result.stickyForce,
-      "walkSpeed", result.walkSpeed, "runSpeed", result.runSpeed, "flySpeed", result.flySpeed,
-      "airFriction", result.airFriction, "liquidFriction", result.liquidFriction,
-      "minimumLiquidPercentage", result.minimumLiquidPercentage, "liquidImpedance", result.liquidImpedance,
-      "normalGroundFriction", result.normalGroundFriction, "ambulatingGroundFriction", result.ambulatingGroundFriction,
-      "groundForce", result.groundForce, "airForce", result.airForce, "liquidForce", result.liquidForce,
-      "airJumpProfile", result.airJumpProfile, "liquidJumpProfile", result.liquidJumpProfile,
-      "fallStatusSpeedMin", result.fallStatusSpeedMin, "fallThroughSustainFrames", result.fallThroughSustainFrames,
-      "maximumPlatformCorrection", result.maximumPlatformCorrection,
-      "maximumPlatformCorrectionVelocityFactor", result.maximumPlatformCorrectionVelocityFactor,
-      "physicsEffectCategories", result.physicsEffectCategories, "groundMovementMinimumSustain", result.groundMovementMinimumSustain,
-      "groundMovementMaximumSustain", result.groundMovementMaximumSustain, "groundMovementCheckDistance", result.groundMovementCheckDistance,
-      "collisionEnabled", result.collisionEnabled, "frictionEnabled", result.frictionEnabled, "gravityEnabled", result.gravityEnabled);
+  auto read = readFields(
+    table, "mass", result.mass, "gravityMultiplier", result.gravityMultiplier, "liquidBuoyancy", result.liquidBuoyancy,
+    "airBuoyancy", result.airBuoyancy, "bounceFactor", result.bounceFactor, "stopOnFirstBounce",
+    result.stopOnFirstBounce, "enableSurfaceSlopeCorrection", result.enableSurfaceSlopeCorrection, "slopeSlidingFactor",
+    result.slopeSlidingFactor, "maxMovementPerStep", result.maxMovementPerStep, "maximumCorrection",
+    result.maximumCorrection, "speedLimit", result.speedLimit, "standingPoly", result.standingPoly, "collisionPoly",
+    standingFallback, "crouchingPoly", result.crouchingPoly, "collisionPoly", crouchingFallback, "stickyCollision",
+    result.stickyCollision, "stickyForce", result.stickyForce, "walkSpeed", result.walkSpeed, "runSpeed",
+    result.runSpeed, "flySpeed", result.flySpeed, "airFriction", result.airFriction, "liquidFriction",
+    result.liquidFriction, "minimumLiquidPercentage", result.minimumLiquidPercentage, "liquidImpedance",
+    result.liquidImpedance, "normalGroundFriction", result.normalGroundFriction, "ambulatingGroundFriction",
+    result.ambulatingGroundFriction, "groundForce", result.groundForce, "airForce", result.airForce, "liquidForce",
+    result.liquidForce, "airJumpProfile", result.airJumpProfile, "liquidJumpProfile", result.liquidJumpProfile,
+    "fallStatusSpeedMin", result.fallStatusSpeedMin, "fallThroughSustainFrames", result.fallThroughSustainFrames,
+    "maximumPlatformCorrection", result.maximumPlatformCorrection, "maximumPlatformCorrectionVelocityFactor",
+    result.maximumPlatformCorrectionVelocityFactor, "physicsEffectCategories", result.physicsEffectCategories,
+    "groundMovementMinimumSustain", result.groundMovementMinimumSustain, "groundMovementMaximumSustain",
+    result.groundMovementMaximumSustain, "groundMovementCheckDistance", result.groundMovementCheckDistance,
+    "collisionEnabled", result.collisionEnabled, "frictionEnabled", result.frictionEnabled, "gravityEnabled",
+    result.gravityEnabled, "pathExploreRate", result.pathExploreRate);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -384,26 +387,28 @@ std::expected<std::optional<ActorMovementParameters>, StarException> LuaConverte
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<ActorMovementModifiers>::from(LuaEngine& engine, ActorMovementModifiers const& v) {
-  return makeTable(engine, "groundMovementModifier", v.groundMovementModifier,
-      "liquidMovementModifier", v.liquidMovementModifier, "speedModifier", v.speedModifier,
-      "airJumpModifier", v.airJumpModifier, "liquidJumpModifier", v.liquidJumpModifier,
-      "runningSuppressed", v.runningSuppressed, "jumpingSuppressed", v.jumpingSuppressed,
-      "facingSuppressed", v.facingSuppressed, "movementSuppressed", v.movementSuppressed);
+std::expected<void, StarException> LuaConverter<ActorMovementModifiers>::from(LuaStack stack,
+                                                                              ActorMovementModifiers const& v) {
+  return makeTable(stack, "groundMovementModifier", v.groundMovementModifier, "liquidMovementModifier",
+                   v.liquidMovementModifier, "speedModifier", v.speedModifier, "airJumpModifier", v.airJumpModifier,
+                   "liquidJumpModifier", v.liquidJumpModifier, "runningSuppressed", v.runningSuppressed,
+                   "jumpingSuppressed", v.jumpingSuppressed, "facingSuppressed", v.facingSuppressed,
+                   "movementSuppressed", v.movementSuppressed);
 }
 
-std::expected<std::optional<ActorMovementModifiers>, StarException> LuaConverter<ActorMovementModifiers>::to(LuaEngine& engine, LuaValue const& v) {
-  if (std::holds_alternative<LuaNilType>(v))
+std::expected<std::optional<ActorMovementModifiers>, StarException>
+LuaConverter<ActorMovementModifiers>::to(LuaStackValue v) {
+  if (v.is<LuaNilType>())
     return ActorMovementModifiers();
-  if (!std::holds_alternative<LuaTable>(v))
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   std::optional<float> ground, liquid, speed, airJump, liquidJump;
   std::optional<bool> running, jumping, facing, movement;
-  auto read = readFields(engine, table, "groundMovementModifier", ground, "liquidMovementModifier", liquid,
-      "speedModifier", speed, "airJumpModifier", airJump, "liquidJumpModifier", liquidJump,
-      "runningSuppressed", running, "jumpingSuppressed", jumping,
-      "facingSuppressed", facing, "movementSuppressed", movement);
+  auto read =
+    readFields(table, "groundMovementModifier", ground, "liquidMovementModifier", liquid, "speedModifier", speed,
+               "airJumpModifier", airJump, "liquidJumpModifier", liquidJump, "runningSuppressed", running,
+               "jumpingSuppressed", jumping, "facingSuppressed", facing, "movementSuppressed", movement);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -421,15 +426,15 @@ std::expected<std::optional<ActorMovementModifiers>, StarException> LuaConverter
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<StatModifier>::from(LuaEngine& engine, StatModifier const& v) {
+std::expected<void, StarException> LuaConverter<StatModifier>::from(LuaStack stack, StatModifier const& v) {
   auto json = jsonFromStatModifier(v);
   if (!json)
     return std::unexpected(std::move(json.error()));
-  return engine.luaFrom(std::move(*json));
+  return stack.push(std::move(*json));
 }
 
-std::expected<std::optional<StatModifier>, StarException> LuaConverter<StatModifier>::to(LuaEngine& engine, LuaValue v) {
-  auto json = engine.luaMaybeTo<Json>(std::move(v));
+std::expected<std::optional<StatModifier>, StarException> LuaConverter<StatModifier>::to(LuaStackValue v) {
+  auto json = v.maybeTo<Json>();
   if (!json)
     return std::unexpected(std::move(json.error()));
   if (!*json)
@@ -443,24 +448,26 @@ std::expected<std::optional<StatModifier>, StarException> LuaConverter<StatModif
   return std::move(*modifier);
 }
 
-std::expected<LuaValue, StarException> LuaConverter<EphemeralStatusEffect>::from(LuaEngine& engine, EphemeralStatusEffect const& v) {
-  return makeTable(engine, "effect", v.uniqueEffect, "duration", v.duration);
+std::expected<void, StarException> LuaConverter<EphemeralStatusEffect>::from(LuaStack stack,
+                                                                             EphemeralStatusEffect const& v) {
+  return makeTable(stack, "effect", v.uniqueEffect, "duration", v.duration);
 }
 
-std::expected<std::optional<EphemeralStatusEffect>, StarException> LuaConverter<EphemeralStatusEffect>::to(LuaEngine& engine, LuaValue const& v) {
-  if (std::holds_alternative<LuaString>(v))
-    return EphemeralStatusEffect{UniqueStatusEffect(std::get<LuaString>(v).toString()), {}};
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<EphemeralStatusEffect>, StarException>
+LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
+  if (v.is<LuaString>())
+    return EphemeralStatusEffect{UniqueStatusEffect(v.toString()), {}};
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
-  auto effect = maybeField<String>(engine, table, "effect");
+  auto const& table = v;
+  auto effect = maybeField<String>(table, "effect");
   if (!effect)
     return std::unexpected(std::move(effect.error()));
-  auto duration = maybeField<std::optional<float>>(engine, table, "duration");
+  auto duration = maybeField<std::optional<float>>(table, "duration");
   if (!duration)
     return std::unexpected(std::move(duration.error()));
   if (!*duration) {
-    duration = maybeField<std::optional<float>>(engine, table, "duratino");
+    duration = maybeField<std::optional<float>>(table, "duratino");
     if (!duration)
       return std::unexpected(std::move(duration.error()));
   }
@@ -469,30 +476,30 @@ std::expected<std::optional<EphemeralStatusEffect>, StarException> LuaConverter<
   return std::nullopt;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<DamageRequest>::from(LuaEngine& engine, DamageRequest const& v) {
+std::expected<void, StarException> LuaConverter<DamageRequest>::from(LuaStack stack, DamageRequest const& v) {
   auto hitType = enumName(HitTypeNames, v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
   auto damageType = enumName(DamageTypeNames, v.damageType);
   if (!damageType)
     return std::unexpected(std::move(damageType.error()));
-  return makeTable(engine, "hitType", hitType->get(), "damageType", damageType->get(), "damage", v.damage,
-      "knockbackMomentum", v.knockbackMomentum, "sourceEntityId", v.sourceEntityId,
-      "damageSourceKind", v.damageSourceKind, "statusEffects", v.statusEffects);
+  return makeTable(stack, "hitType", hitType->get(), "damageType", damageType->get(), "damage", v.damage,
+                   "knockbackMomentum", v.knockbackMomentum, "sourceEntityId", v.sourceEntityId, "damageSourceKind",
+                   v.damageSourceKind, "statusEffects", v.statusEffects);
 }
 
-std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRequest>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRequest>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   DamageRequest result;
   std::optional<String> hitType, damageType, damageSourceKind;
   std::optional<Vec2F> knockback;
   std::optional<EntityId> source;
   std::optional<List<EphemeralStatusEffect>> effects;
-  auto read = readFields(engine, table, "hitType", hitType, "damageType", damageType,
-      "damage", result.damage, "knockbackMomentum", knockback, "sourceEntityId", source,
-      "damageSourceKind", damageSourceKind, "statusEffects", effects);
+  auto read =
+    readFields(table, "hitType", hitType, "damageType", damageType, "damage", result.damage, "knockbackMomentum",
+               knockback, "sourceEntityId", source, "damageSourceKind", damageSourceKind, "statusEffects", effects);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -524,24 +531,25 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<DamageNotification>::from(LuaEngine& engine, DamageNotification const& v) {
+std::expected<void, StarException> LuaConverter<DamageNotification>::from(LuaStack stack, DamageNotification const& v) {
   auto hitType = enumName(HitTypeNames, v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
-  return makeTable(engine, "sourceEntityId", v.sourceEntityId, "targetEntityId", v.targetEntityId,
-      "position", v.position, "damageDealt", v.damageDealt, "healthLost", v.healthLost,
-      "hitType", hitType->get(), "damageSourceKind", v.damageSourceKind, "targetMaterialKind", v.targetMaterialKind);
+  return makeTable(stack, "sourceEntityId", v.sourceEntityId, "targetEntityId", v.targetEntityId, "position",
+                   v.position, "damageDealt", v.damageDealt, "healthLost", v.healthLost, "hitType", hitType->get(),
+                   "damageSourceKind", v.damageSourceKind, "targetMaterialKind", v.targetMaterialKind);
 }
 
-std::expected<std::optional<DamageNotification>, StarException> LuaConverter<DamageNotification>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<DamageNotification>, StarException> LuaConverter<DamageNotification>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   DamageNotification result;
   String hitType;
-  auto read = readFields(engine, table, "sourceEntityId", result.sourceEntityId, "targetEntityId", result.targetEntityId,
-      "position", result.position, "damageDealt", result.damageDealt, "healthLost", result.healthLost,
-      "hitType", hitType, "damageSourceKind", result.damageSourceKind, "targetMaterialKind", result.targetMaterialKind);
+  auto read =
+    readFields(table, "sourceEntityId", result.sourceEntityId, "targetEntityId", result.targetEntityId, "position",
+               result.position, "damageDealt", result.damageDealt, "healthLost", result.healthLost, "hitType", hitType,
+               "damageSourceKind", result.damageSourceKind, "targetMaterialKind", result.targetMaterialKind);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -555,17 +563,17 @@ std::expected<std::optional<DamageNotification>, StarException> LuaConverter<Dam
   return result;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<LiquidLevel>::from(LuaEngine& engine, LiquidLevel const& v) {
-  return makeTable(engine, 1, v.liquid, 2, v.level);
+std::expected<void, StarException> LuaConverter<LiquidLevel>::from(LuaStack stack, LiquidLevel const& v) {
+  return makeTable(stack, 1, v.liquid, 2, v.level);
 }
 
-std::expected<std::optional<LiquidLevel>, StarException> LuaConverter<LiquidLevel>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<LiquidLevel>, StarException> LuaConverter<LiquidLevel>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   LiquidId liquid;
   std::uint8_t level;
-  auto read = readFields(engine, table, 1, liquid, 2, level);
+  auto read = readFields(table, 1, liquid, 2, level);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -573,8 +581,8 @@ std::expected<std::optional<LiquidLevel>, StarException> LuaConverter<LiquidLeve
   return LiquidLevel(liquid, level);
 }
 
-std::expected<LuaValue, StarException> LuaConverter<Drawable>::from(LuaEngine& engine, Drawable const& v) {
-  auto created = engine.createTable(0, std::holds_alternative<Drawable::PolyPart>(v.part) ? 4 : 5);
+std::expected<void, StarException> LuaConverter<Drawable>::from(LuaStack stack, Drawable const& v) {
+  auto created = stack.createTable(0, std::holds_alternative<Drawable::PolyPart>(v.part) ? 4 : 5);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
@@ -597,22 +605,22 @@ std::expected<LuaValue, StarException> LuaConverter<Drawable>::from(LuaEngine& e
   auto result = setFields(table, "position", v.position, "color", v.color, "fullbright", v.fullbright);
   if (!result)
     return std::unexpected(std::move(result.error()));
-  return table;
+  return {};
 }
 
-std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   std::optional<Mat3F> transformation;
-  auto readTransformation = readFields(engine, table, "transformation", transformation);
+  auto readTransformation = readFields(table, "transformation", transformation);
   if (!readTransformation)
     return std::unexpected(std::move(readTransformation.error()));
   if (!*readTransformation)
     return std::nullopt;
   std::optional<Color> color;
   std::optional<Line2F> line;
-  auto read = readFields(engine, table, "color", color, "line", line);
+  auto read = readFields(table, "color", color, "line", line);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -620,7 +628,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
   Drawable drawable;
   if (line) {
     float width;
-    auto readWidth = readFields(engine, table, "width", width);
+    auto readWidth = readFields(table, "width", width);
     if (!readWidth)
       return std::unexpected(std::move(readWidth.error()));
     if (!*readWidth)
@@ -628,7 +636,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
     drawable = Drawable::makeLine(std::move(*line), width, color.value_or(Color::White));
   } else {
     std::optional<PolyF> poly;
-    auto readPoly = readFields(engine, table, "poly", poly);
+    auto readPoly = readFields(table, "poly", poly);
     if (!readPoly)
       return std::unexpected(std::move(readPoly.error()));
     if (!*readPoly)
@@ -637,18 +645,18 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       drawable = Drawable::makePoly(std::move(*poly), color.value_or(Color::White));
     } else {
       std::optional<String> image;
-      auto readImage = readFields(engine, table, "image", image);
+      auto readImage = readFields(table, "image", image);
       if (!readImage)
         return std::unexpected(std::move(readImage.error()));
       if (!*readImage || !image)
         return std::nullopt;
       std::optional<bool> centered;
-      auto readCentered = readFields(engine, table, "centered", centered);
+      auto readCentered = readFields(table, "centered", centered);
       if (!readCentered)
         return std::unexpected(std::move(readCentered.error()));
       if (!*readCentered)
         return std::nullopt;
-      auto root = luaExecutionRoot(engine);
+      auto root = luaExecutionRoot(v.stack().engine());
       if (!root)
         return std::unexpected(std::move(root.error()));
       auto metadata = root->get().imageMetadataDatabase();
@@ -668,7 +676,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       drawable.transform(*transformation);
   }
   std::optional<float> rotation;
-  auto readRotation = readFields(engine, table, "rotation", rotation);
+  auto readRotation = readFields(table, "rotation", rotation);
   if (!readRotation)
     return std::unexpected(std::move(readRotation.error()));
   if (!*readRotation)
@@ -676,7 +684,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
   if (rotation)
     drawable.rotate(*rotation);
   bool mirrored;
-  auto readMirrored = readFields(engine, table, "mirrored", mirrored);
+  auto readMirrored = readFields(table, "mirrored", mirrored);
   if (!readMirrored)
     return std::unexpected(std::move(readMirrored.error()));
   if (!*readMirrored)
@@ -684,7 +692,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
   if (mirrored)
     drawable.scale(Vec2F(-1, 1));
   std::optional<float> scale;
-  auto readScale = readFields(engine, table, "scale", scale);
+  auto readScale = readFields(table, "scale", scale);
   if (!readScale)
     return std::unexpected(std::move(readScale.error()));
   if (!*readScale)
@@ -692,14 +700,14 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
   if (scale)
     drawable.scale(*scale);
   std::optional<Vec2F> position;
-  auto readPosition = readFields(engine, table, "position", position);
+  auto readPosition = readFields(table, "position", position);
   if (!readPosition)
     return std::unexpected(std::move(readPosition.error()));
   if (!*readPosition)
     return std::nullopt;
   if (position)
     drawable.translate(*position);
-  auto readFullbright = readFields(engine, table, "fullbright", drawable.fullbright);
+  auto readFullbright = readFields(table, "fullbright", drawable.fullbright);
   if (!readFullbright)
     return std::unexpected(std::move(readFullbright.error()));
   if (!*readFullbright)
@@ -707,19 +715,19 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
   return drawable;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<Collection>::from(LuaEngine& engine, Collection const& c) {
+std::expected<void, StarException> LuaConverter<Collection>::from(LuaStack stack, Collection const& c) {
   auto type = enumName(CollectionTypeNames, c.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  return makeTable(engine, "name", c.name, "type", type->get(), "title", c.title);
+  return makeTable(stack, "name", c.name, "type", type->get(), "title", c.title);
 }
 
-std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
+  auto const& table = v;
   String name, type, title;
-  auto read = readFields(engine, table, "name", name, "type", type, "title", title);
+  auto read = readFields(table, "name", name, "type", type, "title", title);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -732,42 +740,52 @@ std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>
   return Collection(name, **converted, title);
 }
 
-std::expected<LuaValue, StarException> LuaConverter<Collectable>::from(LuaEngine& engine, Collectable const& c) {
-  return makeTable(engine, "name", c.name, "order", c.order, "title", c.title, "description", c.description, "icon", c.icon);
+std::expected<void, StarException> LuaConverter<Collectable>::from(LuaStack stack, Collectable const& c) {
+  return makeTable(stack, "name", c.name, "order", c.order, "title", c.title, "description", c.description, "icon",
+                   c.icon);
 }
 
-std::expected<std::optional<Collectable>, StarException> LuaConverter<Collectable>::to(LuaEngine& engine, LuaValue const& v) {
-  if (!std::holds_alternative<LuaTable>(v))
+std::expected<std::optional<Collectable>, StarException> LuaConverter<Collectable>::to(LuaStackValue v) {
+  if (!v.is<LuaTable>())
     return std::nullopt;
-  auto const& table = std::get<LuaTable>(v);
-  auto name = maybeField<String>(engine, table, "name");
+  auto const& table = v;
+  auto name = maybeField<String>(table, "name");
   if (!name)
     return std::unexpected(std::move(name.error()));
   if (!*name)
     return std::nullopt;
-  auto order = maybeField<int>(engine, table, "order");
+  auto order = maybeField<int>(table, "order");
   if (!order)
     return std::unexpected(std::move(order.error()));
-  auto title = maybeField<String>(engine, table, "title");
+  auto title = maybeField<String>(table, "title");
   if (!title)
     return std::unexpected(std::move(title.error()));
-  auto description = maybeField<String>(engine, table, "description");
+  auto description = maybeField<String>(table, "description");
   if (!description)
     return std::unexpected(std::move(description.error()));
-  auto icon = maybeField<String>(engine, table, "icon");
+  auto icon = maybeField<String>(table, "icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   return Collectable(std::move(**name), order->value_or(0), title->value_or(""), description->value_or(""), icon->value_or(""));
 }
 
-std::expected<LuaValue, StarException> LuaConverter<PhysicsMovingCollision>::from(LuaEngine& engine, PhysicsMovingCollision const& v) {
-  auto categoryTable = makeTable(engine,
-      v.categoryFilter.type == PhysicsCategoryFilter::Type::Whitelist ? String("categoryWhitelist") : String("categoryBlacklist"),
-      v.categoryFilter.categories);
+std::expected<void, StarException> LuaConverter<PhysicsMovingCollision>::from(LuaStack stack,
+                                                                              PhysicsMovingCollision const& v) {
+  auto created = stack.createTable(0, 4);
+  if (!created)
+    return std::unexpected(std::move(created.error()));
+  auto table = *created;
+  auto categoryTable = makeTable(
+    stack, v.categoryFilter.type == PhysicsCategoryFilter::Type::Whitelist ? "categoryWhitelist" : "categoryBlacklist",
+    v.categoryFilter.categories);
   if (!categoryTable)
     return std::unexpected(std::move(categoryTable.error()));
-  return makeTable(engine, "position", v.position, "collision", v.collision, "collisionKind", v.collisionKind,
-      "categoryFilter", std::move(*categoryTable));
+  auto result = setFields(table, "position", v.position, "collision", v.collision, "collisionKind", v.collisionKind,
+                          "categoryFilter", stack.value(-1));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  stack.pop();
+  return {};
 }
 
 std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDataMethods<std::weak_ptr<BehaviorState>>::make() {
@@ -803,17 +821,17 @@ std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDa
   return methods;
 }
 
-std::expected<LuaValue, StarException> LuaConverter<NodeStatus>::from(LuaEngine&, NodeStatus const& status) {
+std::expected<void, StarException> LuaConverter<NodeStatus>::from(LuaStack stack, NodeStatus const& status) {
   if (status == NodeStatus::Success)
-    return true;
+    return stack.push(true);
   else if (status == NodeStatus::Failure)
-    return false;
-  return LuaNil;
+    return stack.push(false);
+  return stack.push(LuaNil);
 }
 
-std::expected<NodeStatus, StarException> LuaConverter<NodeStatus>::to(LuaEngine&, LuaValue const& v) {
-  if (std::holds_alternative<LuaBoolean>(v))
-    return std::get<LuaBoolean>(v) ? NodeStatus::Success : NodeStatus::Failure;
+std::expected<NodeStatus, StarException> LuaConverter<NodeStatus>::to(LuaStackValue v) {
+  if (v.is<LuaBoolean>())
+    return v.as<LuaBoolean>() ? NodeStatus::Success : NodeStatus::Failure;
   return NodeStatus::Running;
 }
 

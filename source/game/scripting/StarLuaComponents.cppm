@@ -2,6 +2,7 @@ module;
 import std;
 import star.optional;
 import star.string;
+import star.string_view;
 import star.lua;
 import star.format;
 import star.json;
@@ -28,10 +29,11 @@ struct LuaComponentExceptionTag {
 using LuaComponentException = StarError<LuaComponentExceptionTag, LuaException>;
 
 class ScriptableThread;
+class LuaScriptWorld;
 
-// Owns a script context. Missing entry points are successful empty results;
-// script failures are logged, returned, and disable the context until reinit.
-// Builtin callbacks are installed during contextSetup, not construction.
+// Sole owner of a script session, including lifecycle, execution and reloads.
+// Missing entry points succeed; invoke/message failures disable the session,
+// while eval failures leave it usable. Active Lua frames are never retired.
 class LuaBaseComponent {
 public:
   explicit LuaBaseComponent(Root& root);
@@ -77,10 +79,18 @@ protected:
   [[nodiscard]] virtual std::expected<void, StarException> contextSetup();
   [[nodiscard]] virtual std::expected<void, StarException> contextShutdown();
   bool hasCallbacks(String const& groupName) const;
-  [[nodiscard]] std::expected<void, StarException> setError(String error);
+  enum class ErrorPolicy { KeepContext, DisableContext };
+  enum class Entry { ReadyContext, Lifecycle, Update };
+  template <typename Ret, typename Function>
+  [[nodiscard]] std::expected<std::optional<Ret>, StarException> execute(StringView name, char const* operation,
+                                                                         ErrorPolicy policy, Function&& function,
+                                                                         Entry entry = Entry::ReadyContext);
+  [[nodiscard]] std::expected<void, StarException> shutdownContext(String const& beforeUninit);
+  [[nodiscard]] std::expected<void, StarException> retireContext();
+  [[nodiscard]] std::expected<void, StarException> finishExecution();
   [[nodiscard]] std::expected<bool, StarException> checkInitialization();
   [[nodiscard]] virtual std::expected<LuaCallbacks, StarException> makeThreadsCallbacks();
-  void cleanThreads();
+  [[nodiscard]] std::expected<void, StarException> cleanThreads();
   [[nodiscard]] std::expected<void, StarException> stopThreads();
 
 private:
@@ -88,6 +98,7 @@ private:
   friend class LuaScriptUpdate;
   friend class LuaScriptMessages;
   friend class LuaScriptAnimation;
+  friend class LuaScriptWorld;
 
   Root& m_root;
   StringList m_scripts;
@@ -100,6 +111,12 @@ private:
   std::optional<LuaContext> m_context;
   std::stop_source m_callbackScope{std::nostopstate};
   unsigned m_activeCalls = 0;
+  bool m_initPending = false;
+  bool m_shutdownPending = false;
+  bool m_shuttingDown = false;
+  std::optional<String> m_pendingUninit;
+  std::optional<std::reference_wrapper<LuaScriptWorld>> m_pendingWorldUninit;
+  std::optional<StarException> m_boundaryError;
   std::optional<String> m_error;
   StringMap<std::shared_ptr<ScriptableThread>> m_threads;
 };
@@ -169,6 +186,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(World& world);
   [[nodiscard]] std::expected<void, StarException> uninit();
 private:
+  friend class LuaBaseComponent;
+  [[nodiscard]] std::expected<void, StarException> finishShutdown();
   LuaBaseComponent& m_host;
   StringSet m_worldThreadCallbacks;
 };
@@ -192,92 +211,100 @@ private:
   StringMap<MessageHandler> m_messageHandlers;
 };
 
-template <typename Ret, typename... V>
-[[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaBaseComponent::invoke(String const& name, V&&... args) {
-  auto initialized = checkInitialization();
-  if (!initialized)
-    return std::unexpected(std::move(initialized.error()));
-  if (!*initialized)
-    return std::optional<Ret>{};
-  ++m_activeCalls;
-  auto finished = finally([this] { --m_activeCalls; });
-  auto result = [&]() -> std::expected<std::optional<Ret>, StarException> {
-    auto method = m_context->getPath(name);
-    if (!method)
-      return std::unexpected(std::move(method.error()));
-    if (std::holds_alternative<LuaNilType>(*method))
+template <typename Ret, typename Function>
+[[nodiscard]] std::expected<std::optional<Ret>, StarException>
+LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy policy, Function&& function,
+                          Entry entry) {
+  if (entry != Entry::Lifecycle) {
+    auto ready = checkInitialization();
+    if (!ready)
+      return std::unexpected(std::move(ready.error()));
+    if (!*ready && entry == Entry::ReadyContext)
       return std::optional<Ret>{};
-    auto function = m_context->template luaTo<LuaFunction>(std::move(*method));
-    if (!function)
-      return std::unexpected(std::move(function.error()));
-    auto value = function->template invoke<Ret>(std::forward<V>(args)...);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    return std::optional<Ret>(std::move(*value));
-  }();
+  }
+  ++m_activeCalls;
+  auto result = std::forward<Function>(function)();
   if (!result) {
-    if (auto cleanup = setError(printException(result.error(), false)); !cleanup)
-      result.error() = cleanup.error().withContext(strf("Original Lua context failure: {}", outputException(result.error(), true)));
-    if (auto logged = root().logger().error("Exception while invoking lua function '{}'. {}", name, outputException(result.error(), true)); !logged)
-      return std::unexpected(logged.error().withContext(strf("Could not log Lua function failure: {}", outputException(result.error(), true))));
+    result.error() = result.error().withContext(strf("{} '{}'", operation, name));
+    if (!m_boundaryError)
+      m_boundaryError = result.error();
+    if (policy == ErrorPolicy::DisableContext) {
+      m_error = printException(result.error(), false);
+      m_shutdownPending = true;
+    }
+  }
+  if (--m_activeCalls == 0) {
+    if (auto finished = finishExecution(); !finished) {
+      auto error = std::move(finished.error());
+      if (!result)
+        error = error.withContext(strf("Original Lua failure: {}", outputException(result.error(), true)));
+      return std::unexpected(std::move(error));
+    }
   }
   return result;
 }
 
+template <typename Ret, typename... V>
+[[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaBaseComponent::invoke(String const& name,
+                                                                                        V&&... args) {
+  return execute<Ret>(name, "Exception while invoking Lua function", ErrorPolicy::DisableContext,
+                      [&] { return m_context->template invokePathIfPresent<Ret>(name, std::forward<V>(args)...); });
+}
+
 template <typename Ret>
 [[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaBaseComponent::eval(String const& code) {
-  auto initialized = checkInitialization();
-  if (!initialized)
-    return std::unexpected(std::move(initialized.error()));
-  if (!*initialized)
-    return std::optional<Ret>{};
-  ++m_activeCalls;
-  auto finished = finally([this] { --m_activeCalls; });
-  auto result = m_context->template eval<Ret>(code);
-  if (!result) {
-    if (auto logged = root().logger().error("Exception while evaluating lua in context: {}", outputException(result.error(), true)); !logged)
-      return std::unexpected(logged.error().withContext(strf("Could not log Lua evaluation failure: {}", outputException(result.error(), true))));
-    return std::unexpected(std::move(result.error()));
-  }
-  return std::optional<Ret>(std::move(*result));
+  return execute<Ret>({}, "Exception while evaluating Lua", ErrorPolicy::KeepContext,
+                      [&]() -> std::expected<std::optional<Ret>, StarException> {
+                        auto result = m_context->template eval<Ret>(code);
+                        if (!result)
+                          return std::unexpected(std::move(result.error()));
+                        return std::optional<Ret>(std::move(*result));
+                      });
 }
 
 template <typename Ret, typename... V>
 [[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaScriptUpdate::update(V&&... args) {
-  List<ThreadMessage> messages;
-  {
-    std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
-    messages = std::move(m_threadMessages);
-  }
-  std::optional<StarException> error;
-  for (auto& message : messages) {
-    auto response = handleThreadMessage(message);
-    std::expected<void, StarException> settled;
-    if (!response) {
-      settled = message.promise.fail(printException(response.error(), false));
-      if (!error)
-        error = std::move(response.error());
-    } else if (!*response) {
-      settled = message.promise.fail("Message not handled");
-    } else if (std::holds_alternative<RpcPromise<Json>>(**response)) {
-      settled = message.promise.chain(std::get<RpcPromise<Json>>(**response));
-    } else {
-      settled = message.promise.fulfill(std::get<Json>(**response));
-    }
-    if (!settled) {
+  return m_host.execute<Ret>(
+    "update", "Exception while updating Lua session", LuaBaseComponent::ErrorPolicy::KeepContext,
+    [&]() -> std::expected<std::optional<Ret>, StarException> {
+      List<ThreadMessage> messages;
+      {
+        std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
+        lockWithDiagnostics(locker);
+        messages = std::move(m_threadMessages);
+      }
+      std::optional<StarException> error;
+      for (auto& message : messages) {
+        auto response = handleThreadMessage(message);
+        std::expected<void, StarException> settled;
+        if (!response) {
+          settled = message.promise.fail(printException(response.error(), false));
+          if (!error)
+            error = std::move(response.error());
+        } else if (!*response) {
+          settled = message.promise.fail("Message not handled");
+        } else if (std::holds_alternative<RpcPromise<Json>>(**response)) {
+          settled = message.promise.chain(std::get<RpcPromise<Json>>(**response));
+        } else {
+          settled = message.promise.fulfill(std::get<Json>(**response));
+        }
+        if (!settled) {
+          if (error)
+            error =
+              error->withContext(strf("Error settling Lua thread message: {}", outputException(settled.error(), true)));
+          else
+            error = std::move(settled.error());
+        }
+      }
       if (error)
-        error = settled.error().withContext(strf("Earlier Lua thread message failure: {}", outputException(*error, true)));
-      else
-        error = std::move(settled.error());
-    }
-  }
-  if (error)
-    return std::unexpected(std::move(*error));
-  if (!m_updatePeriodic.tick())
-    return std::optional<Ret>{};
-  m_host.cleanThreads();
-  return m_host.template invoke<Ret>("update", std::forward<V>(args)...);
+        return std::unexpected(std::move(*error));
+      if (!m_updatePeriodic.tick())
+        return std::optional<Ret>{};
+      if (auto cleaned = m_host.cleanThreads(); !cleaned)
+        return std::unexpected(std::move(cleaned.error()));
+      return m_host.template invoke<Ret>("update", std::forward<V>(args)...);
+    },
+    LuaBaseComponent::Entry::Update);
 }
 
 // Fireable-item contexts need world callbacks, but no periodic update queue.
