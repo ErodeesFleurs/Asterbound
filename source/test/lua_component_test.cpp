@@ -32,6 +32,22 @@ import star.world_lua_bindings;
 import star.logging;
 
 using namespace Star;
+namespace Star {
+struct SessionPromiseFactory {
+  RpcPromise<Json> source;
+};
+
+template <> struct LuaUserDataMethods<SessionPromiseFactory> {
+  static std::expected<LuaMethods<SessionPromiseFactory>, StarException> make() {
+    LuaMethods<SessionPromiseFactory> methods;
+    if (auto registered =
+          methods.registerMethod("request", [](SessionPromiseFactory const& factory) { return factory.source; });
+        !registered)
+      return std::unexpected(std::move(registered.error()));
+    return methods;
+  }
+};
+}// namespace Star
 
 namespace {
 
@@ -66,6 +82,12 @@ void expectPromiseFailure(RpcPromise<Json> const& promise) {
   auto error = promise.error();
   ASSERT_TRUE(error) << error.error().what();
   ASSERT_TRUE(*error);
+}
+
+void expectPromiseStatus(RpcPromise<Json> const& promise, RpcPromiseStatus expected) {
+  auto status = promise.status();
+  ASSERT_TRUE(status) << status.error().what();
+  EXPECT_EQ(*status, expected);
 }
 
 template <typename Function> auto expectLoggedFailure(Function&& function, std::string_view detail) {
@@ -514,9 +536,11 @@ const GameTestRegistration workerStartupFailure(
     EXPECT_TRUE(worker->shouldExpire());
     EXPECT_TRUE(worker->isJoined());
     expectPromiseFailure(accepted.first);
+    expectPromiseStatus(accepted.first, RpcPromiseStatus::Failed);
     auto late = RpcPromise<Json>::createPair();
     ASSERT_TRUE(worker->passMessage({"after-failure", {}, late.second}));
     expectPromiseFailure(late.first);
+    expectPromiseStatus(late.first, RpcPromiseStatus::Failed);
     ASSERT_TRUE(worker->stop());
     cleanup.cancel();
   });
@@ -815,5 +839,339 @@ const GameTestRegistration luaEntityIdentifiers(
       ASSERT_TRUE(lengths);
       EXPECT_EQ(*lengths, Json(JsonArray{15, 15}));
     }
+  });
+
+const GameTestRegistration
+  chainedReplyShutdown("LuaComponentLifecycle", "ClosingSessionSettlesChainedReplyAndIgnoresLateCompletion",
+                       [](GameTest& fixture) {
+                         auto luaRoot = LuaRoot::create(fixture.root());
+                         ASSERT_TRUE(luaRoot);
+                         auto remote = RpcPromise<Json>::createPair();
+                         LuaMessageScript component(fixture.root());
+                         auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                         ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                         LuaCallbacks host;
+                         ASSERT_TRUE(host.registerCallback("promise", [&] { return remote.first; }));
+                         ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                         ASSERT_TRUE(component.init());
+                         ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      threads.setMessageHandler("async", function() return host.promise() end)
+    )LUA"));
+                         auto response = component.threadPassMessage("worker", "async", {});
+                         ASSERT_TRUE(component.update<LuaValue>());
+                         expectPending(response);
+                         ASSERT_TRUE(component.uninit());
+                         EXPECT_EQ(response.finished(), true);
+                         expectPromiseStatus(response, RpcPromiseStatus::Cancelled);
+                         expectPromiseStatus(remote.first, RpcPromiseStatus::Pending);
+                         EXPECT_EQ(response.succeeded(), false);
+                         ASSERT_TRUE(remote.second.fulfill(Json(53)));
+                         EXPECT_EQ(response.succeeded(), false);
+                         auto result = response.result();
+                         ASSERT_TRUE(result);
+                         EXPECT_FALSE(*result);
+                       });
+
+const GameTestRegistration
+  injectedReplyRetirement("LuaComponentLifecycle",
+                          "InjectedRepliesRetireOnUninitReinitAndReloadWithoutCancellingSource", [](GameTest& fixture) {
+                            for (int retirement : {0, 1, 2}) {
+                              SCOPED_TRACE(retirement);
+                              auto luaRoot = LuaRoot::create(fixture.root());
+                              ASSERT_TRUE(luaRoot);
+                              LuaMessageScript component(fixture.root());
+                              auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                              ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                              ASSERT_TRUE(component.init());
+                              auto producer = RpcPromise<Json>::createPair();
+                              ASSERT_TRUE(component.context()->set("injected", producer.first));
+                              ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+        message.setHandler("async", function() return injected end)
+        threads.setMessageHandler("async", function() return injected end)
+      )LUA"));
+                              auto ordinary = component.handleMessage("async", true);
+                              ASSERT_TRUE(ordinary);
+                              ASSERT_TRUE(*ordinary);
+                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**ordinary));
+                              auto reply = std::get<RpcPromise<Json>>(**ordinary);
+                              auto queued = component.threadPassMessage("worker", "async", {});
+                              ASSERT_TRUE(component.update<LuaValue>());
+                              expectPending(reply);
+                              expectPending(queued);
+                              if (retirement == 0) {
+                                ASSERT_TRUE(component.uninit());
+                              } else if (retirement == 1) {
+                                ASSERT_TRUE(component.init());
+                              } else {
+                                ASSERT_TRUE((*luaRoot)->restart());
+                                expectNoResponse(component.handleMessage("async", true));
+                              }
+                              expectPromiseStatus(reply, RpcPromiseStatus::Cancelled);
+                              expectPromiseStatus(queued, RpcPromiseStatus::Cancelled);
+                              expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
+                              ASSERT_TRUE(producer.second.fulfill(Json(67)));
+                              expectPromiseStatus(producer.first, RpcPromiseStatus::Succeeded);
+                              expectPromiseStatus(reply, RpcPromiseStatus::Cancelled);
+                              expectPromiseStatus(queued, RpcPromiseStatus::Cancelled);
+                              auto result = producer.first.result();
+                              ASSERT_TRUE(result);
+                              ASSERT_TRUE(*result);
+                              EXPECT_EQ(**result, Json(67));
+                            }
+                          });
+
+const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
+                                              "PublishedAndDirectNullRepliesSurviveSessionClose",
+                                              [](GameTest& fixture) {
+                                                auto luaRoot = LuaRoot::create(fixture.root());
+                                                ASSERT_TRUE(luaRoot);
+                                                LuaMessageScript component(fixture.root());
+                                                auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                                                ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                                                ASSERT_TRUE(component.init());
+                                                for (bool completedBeforeDispatch : {true, false}) {
+                                                  SCOPED_TRACE(completedBeforeDispatch);
+                                                  auto producer = RpcPromise<Json>::createPair();
+                                                  if (completedBeforeDispatch)
+                                                    ASSERT_TRUE(producer.second.fulfill(Json()));
+                                                  ASSERT_TRUE(component.context()->set("injected", producer.first));
+                                                  ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+        message.setHandler("async", function() return injected end)
+      )LUA"));
+                                                  auto response = component.handleMessage("async", true);
+                                                  ASSERT_TRUE(response);
+                                                  ASSERT_TRUE(*response);
+                                                  ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**response));
+                                                  auto reply = std::get<RpcPromise<Json>>(**response);
+                                                  if (!completedBeforeDispatch)
+                                                    ASSERT_TRUE(producer.second.fulfill(Json()));
+                                                  expectPromiseStatus(reply, RpcPromiseStatus::Succeeded);
+                                                  ASSERT_TRUE(component.uninit());
+                                                  expectPromiseStatus(reply, RpcPromiseStatus::Succeeded);
+                                                  auto result = reply.result();
+                                                  ASSERT_TRUE(result);
+                                                  ASSERT_TRUE(*result);
+                                                  EXPECT_EQ(**result, Json());
+                                                  EXPECT_EQ(reply.failed(), false);
+                                                  EXPECT_EQ(reply.cancelled(), false);
+                                                  ASSERT_TRUE(component.init());
+                                                }
+                                              });
+
+const GameTestRegistration
+  independentSessionReplies("LuaComponentLifecycle", "SharedNativeSourceHasIndependentSessionObservers",
+                            [](GameTest& fixture) {
+                              auto luaRoot = LuaRoot::create(fixture.root());
+                              ASSERT_TRUE(luaRoot);
+                              auto producer = RpcPromise<Json>::createPair();
+                              LuaMessageScript first(fixture.root());
+                              LuaMessageScript second(fixture.root());
+                              auto cleanup = finally([&] {
+                                EXPECT_TRUE(first.uninit());
+                                EXPECT_TRUE(second.uninit());
+                              });
+                              for (auto component : {&first, &second}) {
+                                ASSERT_TRUE(component->setLuaRoot(*luaRoot));
+                                ASSERT_TRUE(component->init());
+                                ASSERT_TRUE(component->context()->set("injected", producer.first));
+                                ASSERT_TRUE(component->eval<LuaValue>(R"LUA(
+        message.setHandler("async", function() return injected end)
+      )LUA"));
+                              }
+                              auto firstResponse = first.handleMessage("async", true);
+                              auto secondResponse = second.handleMessage("async", true);
+                              ASSERT_TRUE(firstResponse);
+                              ASSERT_TRUE(secondResponse);
+                              ASSERT_TRUE(*firstResponse);
+                              ASSERT_TRUE(*secondResponse);
+                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**firstResponse));
+                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**secondResponse));
+                              auto firstReply = std::get<RpcPromise<Json>>(**firstResponse);
+                              auto secondReply = std::get<RpcPromise<Json>>(**secondResponse);
+                              ASSERT_TRUE(first.uninit());
+                              expectPromiseStatus(firstReply, RpcPromiseStatus::Cancelled);
+                              expectPromiseStatus(secondReply, RpcPromiseStatus::Pending);
+                              expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
+                              ASSERT_TRUE(producer.second.fulfill(Json()));
+                              expectPromiseStatus(secondReply, RpcPromiseStatus::Succeeded);
+                              expectPromiseStatus(producer.first, RpcPromiseStatus::Succeeded);
+                              expectPromiseStatus(firstReply, RpcPromiseStatus::Cancelled);
+                            });
+
+const GameTestRegistration
+  methodPromiseLifetime("LuaComponentLifecycle", "UserdataMethodsInheritSessionScopeAndRestoreOuterEngineMarker",
+                        [](GameTest& fixture) {
+                          auto luaRoot = LuaRoot::create(fixture.root());
+                          ASSERT_TRUE(luaRoot);
+                          LuaMessageScript component(fixture.root());
+                          auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                          ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                          ASSERT_TRUE(component.init());
+                          auto producer = RpcPromise<Json>::createPair();
+                          auto userdata = component.context()->createUserData(SessionPromiseFactory{producer.first});
+                          ASSERT_TRUE(userdata);
+                          ASSERT_TRUE(component.context()->set("factory", *userdata));
+                          std::stop_source outer;
+                          auto& engine = (*luaRoot)->luaEngine();
+                          auto previous = engine.setPromiseLifetime(outer.get_token());
+                          auto restore = finally([&] { engine.setPromiseLifetime(previous); });
+                          ASSERT_TRUE(component.eval<LuaValue>("savedRequest = factory:request()"));
+                          EXPECT_EQ(engine.promiseLifetime(), outer.get_token());
+                          auto saved = component.context()->get<RpcPromise<Json>>("savedRequest");
+                          ASSERT_TRUE(saved);
+                          expectPending(*saved);
+                          ASSERT_TRUE(component.uninit());
+                          expectPromiseStatus(*saved, RpcPromiseStatus::Cancelled);
+                          expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
+                          EXPECT_EQ(engine.promiseLifetime(), outer.get_token());
+                          ASSERT_TRUE(producer.second.fulfill(Json(79)));
+                          expectPromiseStatus(*saved, RpcPromiseStatus::Cancelled);
+                        });
+
+const GameTestRegistration deferredReplyCancellation(
+  "LuaComponentLifecycle", "DeferredCloseCancelsPendingReplyButPreservesDirectNull", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    for (bool completed : {false, true}) {
+      SCOPED_TRACE(completed);
+      LuaMessageScript component(fixture.root());
+      auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+      ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+      auto producer = RpcPromise<Json>::createPair();
+      if (completed)
+        ASSERT_TRUE(producer.second.fulfill(Json()));
+      LuaCallbacks host;
+      ASSERT_TRUE(host.registerCallback("close", [&] { return component.uninit(); }));
+      ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+      ASSERT_TRUE(component.init());
+      ASSERT_TRUE(component.context()->set("injected", producer.first));
+      ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+        message.setHandler("close", function()
+          host.close()
+          return injected
+        end)
+      )LUA"));
+      auto response = component.handleMessage("close", true);
+      ASSERT_TRUE(response);
+      ASSERT_TRUE(*response);
+      ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**response));
+      auto reply = std::get<RpcPromise<Json>>(**response);
+      EXPECT_FALSE(component.initialized());
+      expectPromiseStatus(reply, completed ? RpcPromiseStatus::Succeeded : RpcPromiseStatus::Cancelled);
+      if (completed) {
+        auto result = reply.result();
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(*result);
+        EXPECT_EQ(**result, Json());
+      } else {
+        expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
+        ASSERT_TRUE(producer.second.fulfill(Json(83)));
+        expectPromiseStatus(reply, RpcPromiseStatus::Cancelled);
+      }
+    }
+  });
+
+const GameTestRegistration closedWorkerMessages(
+  "LuaComponentLifecycle", "ActualWorkerClosureCancelsLateMessagesAndPrestartQueue", [](GameTest& fixture) {
+    LuaMessageScript parent(fixture.root());
+    auto created = ScriptableThread::create(
+      JsonObject{{"name", "clean-close"}, {"scripts", JsonObject{}}, {"logMapped", false}}, parent);
+    ASSERT_TRUE(created);
+    auto worker = *created;
+    auto cleanup = finally([&] { EXPECT_TRUE(worker->stop()); });
+    auto beforeStart = RpcPromise<Json>::createPair();
+    ASSERT_TRUE(worker->passMessage({"queued", {}, beforeStart.second}));
+    ASSERT_TRUE(worker->stop());
+    expectPromiseStatus(beforeStart.first, RpcPromiseStatus::Cancelled);
+    auto started = worker->start();
+    ASSERT_TRUE(started);
+    ASSERT_TRUE(*started);
+    ASSERT_TRUE(worker->stop());
+    EXPECT_TRUE(worker->isJoined());
+    EXPECT_TRUE(worker->shouldExpire());
+    EXPECT_FALSE(worker->errorOccurred());
+    auto late = RpcPromise<Json>::createPair();
+    ASSERT_TRUE(worker->passMessage({"after-close", {}, late.second}));
+    expectPromiseStatus(late.first, RpcPromiseStatus::Cancelled);
+  });
+
+const GameTestRegistration workerChainedReplyClosure(
+  "LuaComponentLifecycle", "ActualWorkerClosureCancelsDelegatedReplyWithoutCancellingProducer", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto removeDirectory = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(File::makeDirectory(overlay));
+    ASSERT_TRUE(File::writeFile(String(R"LUA(
+      function init()
+        message.setHandler("pending", function() return host.promise() end)
+      end
+    )LUA"),
+                                File::relativeTo(overlay, "p6-worker.lua")));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.append(overlay);
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = String("p6-worker.config");
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root);
+    LuaMessageScript parent(**root);
+    auto created = ScriptableThread::create(JsonObject{{"name", "chained-close"},
+                                                       {"scripts", JsonObject{{"worker", JsonArray{"/p6-worker.lua"}}}},
+                                                       {"logMapped", false}},
+                                            parent);
+    ASSERT_TRUE(created);
+    auto worker = *created;
+    auto producer = RpcPromise<Json>::createPair();
+    std::promise<void> entered;
+    auto handlerEntered = entered.get_future();
+    LuaCallbacks host;
+    ASSERT_TRUE(host.registerCallback("promise", [&] {
+      entered.set_value();
+      return producer.first;
+    }));
+    ASSERT_TRUE(worker->addCallbacks("host", host));
+    auto response = RpcPromise<Json>::createPair();
+    auto cleanup = finally([&] { EXPECT_TRUE(worker->stop()); });
+    ASSERT_TRUE(worker->passMessage({"pending", {}, response.second}));
+    auto started = worker->start();
+    ASSERT_TRUE(started);
+    ASSERT_TRUE(*started);
+    ASSERT_EQ(handlerEntered.wait_for(std::chrono::seconds(10)), std::future_status::ready);
+    ASSERT_TRUE(worker->stop());
+    EXPECT_TRUE(worker->isJoined());
+    EXPECT_TRUE(worker->shouldExpire());
+    EXPECT_FALSE(worker->errorOccurred());
+    expectPromiseStatus(response.first, RpcPromiseStatus::Cancelled);
+    expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
+    ASSERT_TRUE(producer.second.fulfill(Json(89)));
+    expectPromiseStatus(producer.first, RpcPromiseStatus::Succeeded);
+    expectPromiseStatus(response.first, RpcPromiseStatus::Cancelled);
+  });
+
+const GameTestRegistration
+  shutDownRootSetup("LuaComponentLifecycle", "ShutDownRootFailsSetupAndRestartRecovers", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE((*luaRoot)->shutdown());
+    auto failed = [&] {
+      testing::TestPartResultArray errors;
+      testing::ScopedFakeTestPartResultReporter capture(
+        testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
+      return component.init();
+    }();
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<LuaException>());
+    EXPECT_FALSE(component.initialized());
+    ASSERT_TRUE((*luaRoot)->restart());
+    auto recovered = component.init();
+    ASSERT_TRUE(recovered);
+    EXPECT_TRUE(*recovered);
+    EXPECT_TRUE(component.initialized());
   });
 }

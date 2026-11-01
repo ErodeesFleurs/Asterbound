@@ -1214,6 +1214,16 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   if (m_chatProcessor)
     m_chatProcessor->clearCommandHandler();
   record(stopLua());
+  {
+    std::unique_lock locker(m_mainLock, std::defer_lock);
+    lockWithDiagnostics(locker);
+    auto messages = take(m_pendingWorldMessages);
+    locker.unlock();
+    for (auto& worldMessages : messages) {
+      for (auto& message : worldMessages.second)
+        record(message.promise.cancel("ServerShutdown"));
+    }
+  }
   if (m_celestialDatabase)
     record(m_celestialDatabase->close());
   if (error)

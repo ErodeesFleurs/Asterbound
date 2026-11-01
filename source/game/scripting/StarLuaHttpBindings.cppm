@@ -8,6 +8,7 @@ class LuaCallbacks;
 class Root;
 class String;
 class LuaHttpSession;
+struct LuaHttpProgress;
 
 namespace LuaBindings {
   using HttpTrustRequestCallback = std::function<std::expected<void, StarException>(String const& domain)>;
@@ -30,14 +31,16 @@ public:
   void clearHttpTrustRequestCallback();
   [[nodiscard]] std::expected<void, StarException> handleHttpTrustReply(String const& domain, bool allowed);
 
-  // Fail outstanding Lua promises, cancel queued work, and join active requests.
-  // Late trust replies and userdata polling stay bound to this stopped session.
+  // Cancel outstanding Lua promises, cancel queued work, and join active requests.
+  // Late trust replies and promise polling stay bound to this stopped session.
   [[nodiscard]] std::expected<void, StarException> stop();
   [[nodiscard]] std::expected<void, StarException> poll();
 
 private:
   struct Impl;
   explicit LuaHttpSession(std::unique_ptr<Impl> impl);
+  [[nodiscard]] std::expected<void, StarException> cancel(std::uint64_t id);
+  friend struct LuaHttpProgress;
   friend std::expected<LuaCallbacks, StarException> LuaBindings::makeHttpCallbacks(std::shared_ptr<LuaHttpSession> const& session, bool enabled);
 
   std::unique_ptr<Impl> m_impl;

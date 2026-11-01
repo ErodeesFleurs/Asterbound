@@ -512,3 +512,388 @@ TEST(RpcPromiseTest, WrapperCachesOwnedValue) {
   ASSERT_TRUE(cachedResult);
   EXPECT_EQ(*cachedResult, std::optional<int>{13});
 }
+
+TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
+  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  EXPECT_EQ(promise.status(), RpcPromiseStatus::Pending);
+  EXPECT_EQ(keeper.cancel(17), true);
+  EXPECT_EQ(promise.status(), RpcPromiseStatus::Cancelled);
+  EXPECT_EQ(promise.finished(), true);
+  EXPECT_EQ(promise.succeeded(), false);
+  EXPECT_EQ(promise.failed(), true);
+  EXPECT_EQ(promise.cancelled(), true);
+  auto error = promise.error();
+  ASSERT_TRUE(error);
+  EXPECT_EQ(*error, (std::optional<int>{17}));
+  auto result = promise.result();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, (std::optional<int>{}));
+  EXPECT_EQ(promise.cancel(19), false);
+  EXPECT_EQ(keeper.cancel(20), false);
+  ASSERT_TRUE(keeper.fulfill(1));
+  ASSERT_TRUE(keeper.fail(2));
+  ASSERT_TRUE(keeper.chain(RpcPromise<int, int>{}));
+  error = promise.error();
+  ASSERT_TRUE(error);
+  EXPECT_EQ(*error, (std::optional<int>{17}));
+
+  EXPECT_EQ((RpcPromise<int, int>::createFulfilled(3).cancel(9)), false);
+  EXPECT_EQ((RpcPromise<int, int>::createFailed(4).cancel(9)), false);
+  auto [delegated, delegatedKeeper] = RpcPromise<int, int>::createPair();
+  auto [target, targetKeeper] = RpcPromise<int, int>::createPair();
+  ASSERT_TRUE(delegatedKeeper.chain(target));
+  EXPECT_EQ(delegated.cancel(8), false);
+  EXPECT_EQ(targetKeeper.cancel(7), true);
+  EXPECT_EQ(delegated.status(), RpcPromiseStatus::Cancelled);
+
+  RpcPromise<int> empty;
+  RpcPromiseKeeper<int> emptyKeeper;
+  EXPECT_FALSE(empty.status());
+  EXPECT_FALSE(empty.cancel("closed"));
+  EXPECT_FALSE(emptyKeeper.cancel("closed"));
+  EXPECT_FALSE(empty.withCancellation(std::stop_token{}, "closed"));
+  auto [automaticPromise, automaticKeeper] = RpcPromise<int>::createPair();
+  {
+    AutoFailRpcPromiseKeeper<int> automatic(automaticKeeper);
+    EXPECT_EQ(automatic.cancel("closed"), true);
+  }
+  EXPECT_EQ(automaticPromise.status(), RpcPromiseStatus::Cancelled);
+  auto automaticError = automaticPromise.error();
+  ASSERT_TRUE(automaticError);
+  EXPECT_EQ(*automaticError, (std::optional<String>{"closed"}));
+}
+
+TEST(RpcPromiseTest, CancellationAndCompletionChooseOneNativeDecision) {
+  for (bool cancelFirst : {false, true}) {
+    auto [promise, keeper] = RpcPromise<int, int>::createPair();
+    std::latch firstDecision(1);
+    std::thread producer([&] {
+      if (cancelFirst)
+        firstDecision.wait();
+      EXPECT_TRUE(keeper.fulfill(42));
+      if (!cancelFirst)
+        firstDecision.count_down();
+    });
+    std::thread canceller([&] {
+      if (!cancelFirst)
+        firstDecision.wait();
+      EXPECT_EQ(promise.cancel(9), cancelFirst);
+      if (cancelFirst)
+        firstDecision.count_down();
+    });
+    producer.join();
+    canceller.join();
+    EXPECT_EQ(promise.status(), cancelFirst ? RpcPromiseStatus::Cancelled : RpcPromiseStatus::Succeeded);
+  }
+}
+
+TEST(RpcPromiseTest, ScopedChainedViewCancelsWithoutChangingSourceObservers) {
+  auto [source, sourceKeeper] = RpcPromise<int>::createPair();
+  auto [chained, chainedKeeper] = RpcPromise<int>::createPair();
+  ASSERT_TRUE(chainedKeeper.chain(source));
+  std::stop_source lifetime;
+  auto scoped = chained.withCancellation(lifetime.get_token(), "closed");
+  ASSERT_TRUE(scoped);
+  auto reused = scoped->withCancellation(lifetime.get_token(), "different reason");
+  ASSERT_TRUE(reused);
+  auto independent = chained.withCancellation(lifetime.get_token(), "independent");
+  ASSERT_TRUE(independent);
+  EXPECT_EQ(scoped->cancel("manual"), true);
+  auto error = reused->error();
+  ASSERT_TRUE(error);
+  EXPECT_EQ(*error, (std::optional<String>{"manual"}));
+  EXPECT_EQ(independent->status(), RpcPromiseStatus::Pending);
+  EXPECT_EQ(chained.status(), RpcPromiseStatus::Pending);
+  lifetime.request_stop();
+  EXPECT_EQ(independent->status(), RpcPromiseStatus::Cancelled);
+  EXPECT_EQ(source.status(), RpcPromiseStatus::Pending);
+  ASSERT_TRUE(sourceKeeper.fulfill(51));
+  auto result = source.result();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, (std::optional<int>{51}));
+  auto chainedResult = chained.result();
+  ASSERT_TRUE(chainedResult);
+  EXPECT_EQ(*chainedResult, (std::optional<int>{51}));
+  EXPECT_EQ(scoped->status(), RpcPromiseStatus::Cancelled);
+  EXPECT_EQ(independent->status(), RpcPromiseStatus::Cancelled);
+}
+
+TEST(RpcPromiseTest, ScopedCancellationWinsBeforePublicationButNotAfter) {
+  struct Progress {
+    std::latch& entered;
+    std::latch& resume;
+    std::atomic<int>& cancelled;
+    std::expected<void, StarException> poll() {
+      entered.count_down();
+      resume.wait();
+      return {};
+    }
+    std::expected<void, StarException> cancel() {
+      ++cancelled;
+      return {};
+    }
+  };
+  auto [source, keeper] = RpcPromise<int>::createPair();
+  std::stop_source lifetime;
+  std::latch entered(1), resume(1);
+  std::atomic<int> cancelled = 0;
+  auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{entered, resume, cancelled});
+  ASSERT_TRUE(view);
+  ASSERT_TRUE(keeper.fulfill(22));
+  std::thread observer([&] { EXPECT_EQ(view->status(), RpcPromiseStatus::Cancelled); });
+  entered.wait();
+  lifetime.request_stop();
+  EXPECT_EQ(cancelled.load(), 1);
+  EXPECT_EQ(view->cancel("again"), false);
+  resume.count_down();
+  observer.join();
+  auto result = source.result();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, (std::optional<int>{22}));
+
+  auto [completedSource, completedKeeper] = RpcPromise<int>::createPair();
+  std::stop_source completedLifetime;
+  auto completedView = completedSource.withCancellation(completedLifetime.get_token(), "closed");
+  ASSERT_TRUE(completedView);
+  ASSERT_TRUE(completedKeeper.fulfill(23));
+  EXPECT_EQ(completedView->status(), RpcPromiseStatus::Succeeded);
+  completedLifetime.request_stop();
+  auto completedResult = completedView->result();
+  ASSERT_TRUE(completedResult);
+  EXPECT_EQ(*completedResult, (std::optional<int>{23}));
+}
+
+TEST(RpcPromiseTest, ScopedProgressMayReenterCancellationAndQueries) {
+  struct Progress {
+    RpcPromise<int>& view;
+    int& cancellations;
+    std::expected<void, StarException> poll() {
+      auto cancelled = view.cancel("poll cancelled");
+      if (!cancelled)
+        return std::unexpected(std::move(cancelled.error()));
+      return {};
+    }
+    std::expected<void, StarException> cancel() {
+      ++cancellations;
+      EXPECT_EQ(view.status(), RpcPromiseStatus::Cancelled);
+      EXPECT_EQ(view.cancel("reentrant"), false);
+      return {};
+    }
+  };
+  int conversions = 0;
+  auto source = RpcPromise<int>::createFulfilled(5).wrap([&](int value) -> std::expected<int, StarException> {
+    ++conversions;
+    return value;
+  });
+  ASSERT_TRUE(source);
+  RpcPromise<int> view;
+  int cancellations = 0;
+  auto scoped = source->withCancellation(std::stop_token{}, "closed", Progress{view, cancellations});
+  ASSERT_TRUE(scoped);
+  view = *scoped;
+  EXPECT_EQ(view.status(), RpcPromiseStatus::Cancelled);
+  EXPECT_EQ(cancellations, 1);
+  EXPECT_EQ(conversions, 0);
+  EXPECT_EQ(source->status(), RpcPromiseStatus::Succeeded);
+  EXPECT_EQ(conversions, 1);
+}
+
+TEST(RpcPromiseTest, StopCallbackPinsStateWhileHookDropsLastObservation) {
+  struct Progress {
+    RpcPromise<int>& observation;
+    std::weak_ptr<int>& capture;
+    std::shared_ptr<int> owned;
+    int& cancellations;
+    std::expected<void, StarException> poll() { return {}; }
+    std::expected<void, StarException> cancel() {
+      observation = {};
+      EXPECT_FALSE(capture.expired());
+      EXPECT_EQ(*owned, 7);
+      ++cancellations;
+      return {};
+    }
+  };
+  auto [source, keeper] = RpcPromise<int>::createPair();
+  std::stop_source lifetime;
+  RpcPromise<int> observation;
+  std::weak_ptr<int> capture;
+  int cancellations = 0;
+  {
+    auto owned = std::make_shared<int>(7);
+    capture = owned;
+    auto scoped = source.withCancellation(lifetime.get_token(), "closed",
+                                          Progress{observation, capture, std::move(owned), cancellations});
+    ASSERT_TRUE(scoped);
+    observation = std::move(*scoped);
+  }
+  EXPECT_FALSE(capture.expired());
+  lifetime.request_stop();
+  EXPECT_EQ(cancellations, 1);
+  EXPECT_TRUE(capture.expired());
+  EXPECT_EQ(source.status(), RpcPromiseStatus::Pending);
+  ASSERT_TRUE(keeper.fulfill(6));
+}
+
+TEST(RpcPromiseTest, DroppingScopedObservationUnregistersWithoutCancellingOperation) {
+  struct Progress {
+    int& cancellations;
+    std::expected<void, StarException> poll() { return {}; }
+    std::expected<void, StarException> cancel() {
+      ++cancellations;
+      return {};
+    }
+  };
+  auto [source, keeper] = RpcPromise<int>::createPair();
+  std::stop_source lifetime;
+  int cancellations = 0;
+  {
+    auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{cancellations});
+    ASSERT_TRUE(view);
+  }
+  lifetime.request_stop();
+  EXPECT_EQ(cancellations, 0);
+  EXPECT_EQ(source.status(), RpcPromiseStatus::Pending);
+  ASSERT_TRUE(keeper.fulfill(3));
+}
+
+TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCopies) {
+  std::stop_source stopped;
+  stopped.request_stop();
+  auto terminal = RpcPromise<Json>::createFulfilled(Json()).withCancellation(stopped.get_token(), "closed");
+  ASSERT_TRUE(terminal);
+  EXPECT_EQ(terminal->status(), RpcPromiseStatus::Succeeded);
+  auto null = terminal->result();
+  ASSERT_TRUE(null);
+  ASSERT_TRUE(*null);
+  EXPECT_TRUE((*null)->isNull());
+
+  auto [source, keeper] = RpcPromise<Json>::createPair();
+  std::stop_source lifetime;
+  auto view = source.withCancellation(lifetime.get_token(), "closed");
+  ASSERT_TRUE(view);
+  ASSERT_TRUE(keeper.fulfill(Json()));
+  auto result = view->result();
+  ASSERT_TRUE(result);
+  ASSERT_TRUE(*result);
+  EXPECT_TRUE((*result)->isNull());
+  lifetime.request_stop();
+  EXPECT_EQ(view->status(), RpcPromiseStatus::Succeeded);
+
+  auto [nonDefault, nonDefaultKeeper] = RpcPromise<NonDefaultValue, NonDefaultValue>::createPair();
+  std::stop_source nonDefaultLifetime;
+  auto nonDefaultView = nonDefault.withCancellation(nonDefaultLifetime.get_token(), NonDefaultValue(12));
+  ASSERT_TRUE(nonDefaultView);
+  nonDefaultLifetime.request_stop();
+  EXPECT_EQ(nonDefaultView->status(), RpcPromiseStatus::Cancelled);
+  auto reason = nonDefaultView->error();
+  ASSERT_TRUE(reason);
+  ASSERT_TRUE(*reason);
+  EXPECT_EQ((**reason).value, 12);
+  ASSERT_TRUE(nonDefaultKeeper.fulfill(NonDefaultValue(13)));
+  EXPECT_EQ(nonDefault.status(), RpcPromiseStatus::Succeeded);
+  auto completedNonDefault = nonDefault.withCancellation(stopped.get_token(), NonDefaultValue(20));
+  ASSERT_TRUE(completedNonDefault);
+  EXPECT_EQ(completedNonDefault->status(), RpcPromiseStatus::Succeeded);
+  auto cachedNonDefault = completedNonDefault->result();
+  ASSERT_TRUE(cachedNonDefault);
+  ASSERT_TRUE(*cachedNonDefault);
+  EXPECT_EQ((**cachedNonDefault).value, 13);
+
+  auto [moveOnly, moveOnlyKeeper] = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::createPair();
+  std::stop_source moveOnlyLifetime;
+  auto moveOnlyView = moveOnly.withCancellation(moveOnlyLifetime.get_token(), std::make_unique<int>(9));
+  ASSERT_TRUE(moveOnlyView);
+  ASSERT_TRUE(moveOnlyKeeper.fulfill(std::make_unique<int>(2)));
+  EXPECT_EQ(moveOnlyView->status(), RpcPromiseStatus::Succeeded);
+  moveOnlyLifetime.request_stop();
+  EXPECT_EQ(moveOnlyView->status(), RpcPromiseStatus::Succeeded);
+}
+
+TEST(RpcPromiseTest, WrapperSupportsReentrantCancellationAndPropagatesCancelledSources) {
+  RpcPromise<int> observation;
+  int calls = 0;
+  auto wrapper = RpcPromise<int>::createFulfilled(1).wrap([&](int) -> std::expected<int, StarException> {
+    ++calls;
+    EXPECT_EQ(observation.cancel("inside transform"), true);
+    return std::unexpected(StarException("discarded diagnostic"));
+  });
+  ASSERT_TRUE(wrapper);
+  observation = *wrapper;
+  EXPECT_EQ(observation.status(), RpcPromiseStatus::Cancelled);
+  auto error = observation.error();
+  ASSERT_TRUE(error);
+  EXPECT_EQ(*error, (std::optional<String>{"inside transform"}));
+  EXPECT_EQ(calls, 1);
+
+  auto [source, keeper] = RpcPromise<int, int>::createPair();
+  auto propagated = source.wrap([](int value) -> std::expected<int, StarException> { return value; });
+  ASSERT_TRUE(propagated);
+  EXPECT_EQ(keeper.cancel(4), true);
+  EXPECT_EQ(propagated->status(), RpcPromiseStatus::Cancelled);
+  auto propagatedError = propagated->error();
+  ASSERT_TRUE(propagatedError);
+  EXPECT_EQ(*propagatedError, (std::optional<int>{4}));
+}
+
+TEST(RpcPromiseTest, SingleFlightCancellationWakesObserversAndDiscardsLateTransform) {
+  std::latch entered(1), resume(1), observerStarted(1), observerFinished(1);
+  std::atomic<int> calls = 0;
+  auto wrapped = RpcPromise<int>::createFulfilled(7).wrap([&](int value) -> std::expected<int, StarException> {
+    ++calls;
+    entered.count_down();
+    resume.wait();
+    return value * 2;
+  });
+  ASSERT_TRUE(wrapped);
+  std::thread evaluator([&] { EXPECT_EQ(wrapped->status(), RpcPromiseStatus::Cancelled); });
+  entered.wait();
+  std::thread observer([&] {
+    observerStarted.count_down();
+    EXPECT_EQ(wrapped->status(), RpcPromiseStatus::Cancelled);
+    observerFinished.count_down();
+  });
+  observerStarted.wait();
+  EXPECT_EQ(wrapped->cancel("closed"), true);
+  observerFinished.wait();
+  EXPECT_EQ(calls.load(), 1);
+  resume.count_down();
+  evaluator.join();
+  observer.join();
+  auto result = wrapped->result();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, (std::optional<int>{}));
+  auto error = wrapped->error();
+  ASSERT_TRUE(error);
+  EXPECT_EQ(*error, (std::optional<String>{"closed"}));
+}
+
+TEST(RpcPromiseTest, AlreadyStoppedLifetimeEagerlyCancelsOnlyPendingViews) {
+  struct Progress {
+    int& polls;
+    int& cancellations;
+    std::expected<void, StarException> poll() {
+      ++polls;
+      return {};
+    }
+    std::expected<void, StarException> cancel() {
+      ++cancellations;
+      return {};
+    }
+  };
+  std::stop_source lifetime;
+  lifetime.request_stop();
+  int polls = 0, cancellations = 0;
+  auto [source, keeper] = RpcPromise<int>::createPair();
+  auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
+  ASSERT_TRUE(view);
+  EXPECT_EQ(cancellations, 1);
+  EXPECT_EQ(polls, 0);
+  EXPECT_EQ(view->status(), RpcPromiseStatus::Cancelled);
+  EXPECT_EQ(source.status(), RpcPromiseStatus::Pending);
+  ASSERT_TRUE(keeper.fulfill(8));
+  auto terminal = source.withCancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
+  ASSERT_TRUE(terminal);
+  EXPECT_EQ(terminal->status(), RpcPromiseStatus::Succeeded);
+  EXPECT_EQ(cancellations, 1);
+  EXPECT_EQ(polls, 0);
+}

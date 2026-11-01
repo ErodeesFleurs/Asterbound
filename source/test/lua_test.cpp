@@ -1818,3 +1818,94 @@ TEST(LuaTest, StackLoadRejectsDifferentCoroutineEnvironment) {
   ASSERT_TRUE(context->load("healthy = 42"));
   EXPECT_EQ(context->get<int>("healthy"), 42);
 }
+
+TEST(LuaTest, PromiseStatusDistinguishesNullFailureAndCancellation) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto [source, keeper] = RpcPromise<Json>::createPair();
+  std::stop_source lifetime;
+  auto previous = (*engine)->setPromiseLifetime(lifetime.get_token());
+  ASSERT_TRUE(context->set("pending", source));
+  (*engine)->setPromiseLifetime(std::move(previous));
+  ASSERT_TRUE(context->set("success", RpcPromise<Json>::createFulfilled(Json())));
+  ASSERT_TRUE(context->set("failure", RpcPromise<Json>::createFailed("remote failure")));
+  EXPECT_EQ(context->eval<bool>(R"LUA(
+    pending:status() == "pending" and not pending:finished() and
+    success:status() == "succeeded" and success:succeeded() and success:result() == nil and
+    failure:status() == "failed" and failure:failed() and not failure:cancelled()
+  )LUA"),
+            true);
+  EXPECT_EQ(context->eval<bool>(R"LUA(
+    pending:cancel() and pending:status() == "cancelled" and
+    pending:finished() and pending:failed() and pending:cancelled() and
+    not pending:succeeded() and pending:result() == nil and pending:error() ~= nil
+  )LUA"),
+            true);
+  ASSERT_TRUE(keeper.fulfill(Json(77)));
+  auto native = source.result();
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(*native);
+  EXPECT_EQ(**native, Json(77));
+  EXPECT_EQ(context->eval<bool>(R"LUA(
+    not pending:cancel() and pending:status() == "cancelled" and pending:result() == nil
+  )LUA"),
+            true);
+  auto [producer, producerKeeper] = RpcPromise<Json>::createPair();
+  ASSERT_TRUE(context->set("producer", producer));
+  ASSERT_TRUE(context->set("keeper", std::make_shared<AutoFailRpcPromiseKeeper<Json>>(producerKeeper)));
+  EXPECT_EQ(context->eval<bool>("keeper:cancel() and producer:status() == 'cancelled'"), true);
+}
+
+TEST(LuaTest, PromiseScopeSeparatesObserversAndKeepsPublishedNull) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto first = (*engine)->createContext();
+  auto second = (*engine)->createContext();
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  std::stop_source firstLifetime;
+  std::stop_source secondLifetime;
+  auto [source, keeper] = RpcPromise<Json>::createPair();
+  auto previous = (*engine)->setPromiseLifetime(firstLifetime.get_token());
+  ASSERT_TRUE(first->set("promise", source));
+  (*engine)->setPromiseLifetime(secondLifetime.get_token());
+  ASSERT_TRUE(second->set("promise", source));
+  (*engine)->setPromiseLifetime(std::move(previous));
+  firstLifetime.request_stop();
+  EXPECT_EQ(first->eval<String>("promise:status()"), String("cancelled"));
+  EXPECT_EQ(second->eval<String>("promise:status()"), String("pending"));
+  EXPECT_EQ(source.finished(), false);
+  ASSERT_TRUE(keeper.fulfill(Json()));
+  EXPECT_EQ(second->eval<bool>("promise:succeeded() and promise:result() == nil"), true);
+  secondLifetime.request_stop();
+  EXPECT_EQ(second->eval<String>("promise:status()"), String("succeeded"));
+  EXPECT_EQ(first->eval<String>("promise:status()"), String("cancelled"));
+}
+
+TEST(LuaTest, ClosingPromiseScopeDoesNotEvaluateLazyConversion) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  int evaluations = 0;
+  auto source = RpcPromise<Json>::createFulfilled(Json(27));
+  auto wrapped = source.wrap([&](Json value) -> std::expected<Json, StarException> {
+    ++evaluations;
+    return value;
+  });
+  ASSERT_TRUE(wrapped);
+  std::stop_source lifetime;
+  auto previous = (*engine)->setPromiseLifetime(lifetime.get_token());
+  ASSERT_TRUE(context->set("promise", *wrapped));
+  (*engine)->setPromiseLifetime(std::move(previous));
+  lifetime.request_stop();
+  EXPECT_EQ(context->eval<bool>("promise:cancelled() and promise:result() == nil"), true);
+  EXPECT_EQ(evaluations, 0);
+  auto independent = wrapped->result();
+  ASSERT_TRUE(independent);
+  ASSERT_TRUE(*independent);
+  EXPECT_EQ(**independent, Json(27));
+  EXPECT_EQ(evaluations, 1);
+}

@@ -161,7 +161,8 @@ function sb.monotonicTime() end
 ---@field chain fun(self: RpcPromiseKeeper<T>, promise: RpcPromise<T>)
 ---@field fulfill fun(self: RpcPromiseKeeper<T>, value: T)
 ---@field fail fun(self: RpcPromiseKeeper<T>, reason: string)
+---@field cancel fun(self: RpcPromiseKeeper<T>):boolean Whether producer cancellation won.
 
---- Returns a pair containing the promise and its fulfiller.
+--- Returns one {promise, keeper} pair table; fulfilling nil is successful JSON null.
 ---@return {[1]: RpcPromise<Json>, [2]: RpcPromiseKeeper<Json>}
 function sb.makePromise() end

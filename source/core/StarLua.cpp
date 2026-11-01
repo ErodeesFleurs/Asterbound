@@ -352,6 +352,10 @@ LuaCallbacks LuaCallbacks::withLifetime(std::stop_token lifetime) const {
                             [callback = entry.second, lifetime](LuaStack stack) -> std::expected<int, StarException> {
                               if (lifetime.stop_requested())
                                 return std::unexpected(LuaException("Lua callback scope is retired"));
+                              if (stack.engine().promiseLifetime() == lifetime)
+                                return callback(stack);
+                              auto previous = stack.engine().setPromiseLifetime(lifetime);
+                              auto restored = finally([&] { stack.engine().setPromiseLifetime(std::move(previous)); });
                               return callback(stack);
                             });
   }

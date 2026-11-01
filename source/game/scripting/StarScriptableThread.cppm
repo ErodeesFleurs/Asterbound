@@ -29,7 +29,7 @@ public:
   ~ScriptableThread();
 
   [[nodiscard]] std::expected<bool, StarException> start();
-  // Signals the ScriptableThread to stop, joins it, and fails pending messages.
+  // Stops and joins the worker; closing cancels queued messages, failures fail them.
   [[nodiscard]] std::expected<void, StarException> stop();
   void setPause(bool pause);
 

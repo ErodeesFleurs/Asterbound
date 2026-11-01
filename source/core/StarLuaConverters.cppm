@@ -209,8 +209,23 @@ struct LuaConverter<LuaCallbacks> {
   [[nodiscard]] static std::expected<std::optional<LuaCallbacks>, StarException> to(LuaStackValue v);
 };
 
-template <typename T>
-struct LuaConverter<RpcPromise<T>> : LuaUserDataConverter<RpcPromise<T>> {};
+template <typename T> struct LuaConverter<RpcPromise<T>> {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, RpcPromise<T> const& promise) {
+    auto scoped = promise.withCancellation(stack.engine().promiseLifetime(), "Lua session stopped");
+    if (!scoped)
+      return std::unexpected(std::move(scoped.error()));
+    return LuaUserDataConverter<RpcPromise<T>>::from(stack, std::move(*scoped));
+  }
+  [[nodiscard]] static std::expected<std::optional<RpcPromise<T>>, StarException> to(LuaStackValue value) {
+    auto promise = LuaUserDataConverter<RpcPromise<T>>::to(value);
+    if (!promise || !*promise)
+      return promise;
+    auto scoped = (**promise).withCancellation(value.stack().engine().promiseLifetime(), "Lua session stopped");
+    if (!scoped)
+      return std::unexpected(std::move(scoped.error()));
+    return std::optional<RpcPromise<T>>(std::move(*scoped));
+  }
+};
 
 template <typename T>
 struct LuaUserDataMethods<RpcPromise<T>> {
@@ -220,6 +235,32 @@ struct LuaUserDataMethods<RpcPromise<T>> {
 template <typename T>
 [[nodiscard]] std::expected<LuaMethods<RpcPromise<T>>, StarException> LuaUserDataMethods<RpcPromise<T>>::make() {
   LuaMethods<RpcPromise<T>> methods;
+  if (auto registered =
+        methods.registerMethod("status",
+                               [](RpcPromise<T>& promise) -> std::expected<std::string_view, StarException> {
+                                 auto status = promise.status();
+                                 if (!status)
+                                   return std::unexpected(std::move(status.error()));
+                                 switch (*status) {
+                                 case RpcPromiseStatus::Pending: return "pending";
+                                 case RpcPromiseStatus::Succeeded: return "succeeded";
+                                 case RpcPromiseStatus::Failed: return "failed";
+                                 case RpcPromiseStatus::Cancelled: return "cancelled";
+                                 }
+                                 std::unreachable();
+                               });
+      !registered)
+    return std::unexpected(std::move(registered.error()));
+  if (auto registered = methods.registerMethod("failed", [](RpcPromise<T>& promise) { return promise.failed(); });
+      !registered)
+    return std::unexpected(std::move(registered.error()));
+  if (auto registered = methods.registerMethod("cancelled", [](RpcPromise<T>& promise) { return promise.cancelled(); });
+      !registered)
+    return std::unexpected(std::move(registered.error()));
+  if (auto registered =
+        methods.registerMethod("cancel", [](RpcPromise<T>& promise) { return promise.cancel("Cancelled"); });
+      !registered)
+    return std::unexpected(std::move(registered.error()));
   auto finished = methods.template registerMethodWithSignature<bool, RpcPromise<T>&>("finished", std::mem_fn(&RpcPromise<T>::finished));
   if (!finished)
     return std::unexpected(std::move(finished.error()));
@@ -262,6 +303,11 @@ template <typename T>
   });
   if (!fail)
     return std::unexpected(std::move(fail.error()));
+  if (auto registered = methods.registerMethod(
+        "cancel",
+        [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper) { return keeper->cancel("Cancelled"); });
+      !registered)
+    return std::unexpected(std::move(registered.error()));
   return methods;
 }
 

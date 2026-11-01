@@ -36,13 +36,13 @@ Pauses or unpauses a thread.
 
 #### `void` threads.stop(`String` name)
 
-Stops and joins the thread, then removes it. Its script contexts finish shutdown and queued message requests are settled before it can be reclaimed.
+Stops and joins the thread, then removes it. Its script contexts finish shutdown and queued message requests are cancelled before it can be reclaimed.
 
 ---
 
 #### `RpcPromise<Json>` threads.sendMessage(`String` threadName, `String` messageName, [`LuaValue` args...])
 
-Sends a message to the given thread. The promise resolves to the handler's JSON result, or chains a returned `RpcPromise<Json>`. Queued requests fail if startup fails or the worker shuts down before handling them.
+Sends a message to the given thread. The promise resolves to the handler's JSON result, or chains a returned `RpcPromise<Json>`. Startup failures fail queued requests; shutdown cancels unhandled requests and pending deferred replies. A late producer cannot overwrite cancellation. Successful JSON `null` is still success; see [promise methods](utility.md#pairrpcpromisejsonrpcpromisekeeperjson-sbmakepromise).
 
 ---
 

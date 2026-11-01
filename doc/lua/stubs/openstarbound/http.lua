@@ -6,19 +6,25 @@ http = {}
 
 ---@class HttpOptions
 ---@field headers table<string, string>|nil Optional. HTTP headers to include in the request
----@field body string|nil Optional. Request body content
----@field timeout number|nil Optional. Request timeout in seconds
+---@field body string|table|nil Optional. Request body; tables are JSON-encoded
+---@field timeout integer|nil Optional. Request timeout in seconds (default 30; 0 disables the timeout)
 
 ---@class HttpResponse
 ---@field status number HTTP status code (e.g., 200, 404, 500)
 ---@field body string Response body content
 
 ---@class HttpPromise
----@field finished fun(self: HttpPromise): boolean Returns `true` if the HTTP request has completed
----@field succeeded fun(self: HttpPromise): boolean Returns `true` if the HTTP request completed successfully
----@field failed fun(self: HttpPromise): boolean Returns `true` if the HTTP request failed or was denied
----@field result fun(self: HttpPromise): HttpResponse|nil Returns the HTTP response table or `nil` if not finished or failed
----@field error fun(self: HttpPromise): string|nil Returns the error message if the request failed
+---@field status fun(self: HttpPromise): "pending"|"succeeded"|"failed"|"cancelled" Returns the standard promise state
+---@field finished fun(self: HttpPromise): boolean Returns `true` after success, failure, or cancellation
+---@field succeeded fun(self: HttpPromise): boolean Returns `true` for a completed HTTP response, including HTTP 4xx/5xx
+---@field failed fun(self: HttpPromise): boolean Returns `true` after failure, denial, or cancellation
+---@field cancelled fun(self: HttpPromise): boolean Returns `true` if this request was cancelled
+---@field cancel fun(self: HttpPromise): boolean Cancels a pending request without affecting other requests; a running native operation may still finish
+---@field result fun(self: HttpPromise): HttpResponse|nil Returns the successful response, preserving empty and literal "null" body strings
+---@field error fun(self: HttpPromise): string|nil Returns the failure or cancellation reason
+
+--- Owning Lua-session closure cancels outstanding requests, including discarded promises.
+--- Late approval cannot submit a cancelled trust request. Approval persists domain trust only when remembered.
 
 --- Returns `true` if HTTP functionality is enabled in the configuration, `false` otherwise. ---
 ---@return boolean

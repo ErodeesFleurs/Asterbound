@@ -79,8 +79,26 @@ do not persist it for comparisons across application runs.
 
 #### `pair<RpcPromise<Json>,RpcPromiseKeeper<Json>>` sb.makePromise()
 
-Returns a promise and its keeper.
-RpcPromises can be returned in message handlers to delay the fulfilling of the message promise until that promise is fulfilled.
+Returns one pair table: `{promise, keeper}`. A message handler may return the promise to defer its reply. Fulfilling with `nil` is a successful JSON `null`, not a pending result.
+
+Promises provide these methods:
+
+| Method | Result |
+| --- | --- |
+| `status()` | `"pending"`, `"succeeded"`, `"failed"` or `"cancelled"` |
+| `finished()` | Whether a terminal outcome has been published |
+| `succeeded()` | Whether the outcome is successful |
+| `failed()` | Whether the outcome is failed **or cancelled** |
+| `cancelled()` | Whether the outcome is cancelled |
+| `result()` | Successful value, otherwise `nil` |
+| `error()` | Failure or cancellation reason, otherwise `nil` |
+| `cancel()` | Cancels a pending observation; returns whether cancellation won |
+
+Use `status()` or `succeeded()` to distinguish successful `null` from an unfinished result. A published terminal outcome cannot be overwritten by cancellation or a late producer.
+
+Pending observations created or received during script-session execution belong to that session. Shutdown or reload cancels them and its pending deferred replies, without cancelling other sessions' observations of a shared native producer. Native hosts that create standalone Lua contexts must supply a lifetime to opt into this isolation; otherwise promises retain shared-reference semantics.
+
+Cancellation does not undo a sent message or interrupt an already running native operation. It stops waiting for and publishing that observation's result.
 
 The `RpcPromiseKeeper` has the following methods:
 
@@ -94,5 +112,9 @@ Fails the promise with the provided error.
 
 ##### `void` chain(`RpcPromise<Json>` promise)
 
-Fulfills or fails the promise depending on the provided promise.
+Delegates the outcome to the provided promise, including cancellation. Chaining assigns the keeper immediately, even while the delegated promise is pending.
+
+##### `bool` cancel()
+
+Cancels an unassigned producer; returns whether cancellation won. To cancel a pending observation after its keeper has chained another promise, use the promise's `cancel()` instead. Late producer decisions after cancellation are discarded; other duplicate producer decisions remain errors.
 

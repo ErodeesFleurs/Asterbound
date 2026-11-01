@@ -174,11 +174,14 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
         return std::unexpected(std::move(stopped.error()));
       if (!m_luaRoot)
         return std::optional<bool>(false);
-      auto context = m_luaRoot->createContext(m_scripts);
+      m_callbackScope = std::stop_source{};
+      auto context = m_luaRoot->createContext(m_scripts, m_callbackScope.get_token());
       if (!context)
         return std::unexpected(context.error().withContext(strf("Creating Lua context for scripts '{}'", m_scripts)));
       m_context = std::move(*context);
-      m_callbackScope = std::stop_source{};
+      LuaEnginePtr engine(&m_context->engine());
+      auto previousLifetime = engine->setPromiseLifetime(m_callbackScope.get_token());
+      auto restoreLifetime = finally([&] { engine->setPromiseLifetime(previousLifetime); });
       if (auto setup = contextSetup(); !setup)
         return std::unexpected(std::move(setup.error()));
       if (auto invoked = invoke<LuaValue>("init"); !invoked)
@@ -528,7 +531,7 @@ void LuaScriptUpdate::destroy() {
     messages = std::move(m_threadMessages);
   }
   for (auto& message : messages) {
-    if (auto failed = message.promise.fail("Lua component destroyed"); !failed)
+    if (auto failed = message.promise.cancel("Lua component destroyed"); !failed)
       EmergencyLog::error("Error settling destroyed Lua component message: {}", outputException(failed.error(), true));
   }
 }
@@ -612,7 +615,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
   if (!stopped)
     error = std::move(stopped.error());
   for (auto& message : messages) {
-    if (auto result = message.promise.fail("Lua component uninitialized"); !result) {
+    if (auto result = message.promise.cancel("Lua component uninitialized"); !result) {
       if (!error)
         error = std::move(result.error());
       else

@@ -61,6 +61,10 @@ import star.npc_database;
 import star.status_controller;
 import star.world_lua_bindings;
 import star.lua_game_converters;
+import star.lua_http_bindings;
+import star.tcp;
+import star.socket;
+import star.host_address;
 
 #include "gtest/gtest.h"
 
@@ -280,6 +284,190 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
   EXPECT_EQ(result->getString("binary"), String(std::string("a\0z\0qb", 6)));
   EXPECT_EQ(result->get("rejected"), Json(JsonArray{true, true, true}));
   EXPECT_EQ(result->getString("recovered"), String("again"));
+});
+
+const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
+  auto directory = File::temporaryDirectory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "http");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto configuration = (*root)->configuration();
+  ASSERT_TRUE(configuration) << configuration.error().what();
+  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{}));
+  auto session = LuaHttpSession::create(**root);
+  ASSERT_TRUE(session) << session.error().what();
+  auto callbacks = LuaBindings::makeHttpCallbacks(*session, true);
+  ASSERT_TRUE(callbacks) << callbacks.error().what();
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine) << engine.error().what();
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context) << context.error().what();
+  ASSERT_TRUE(context->setCallbacks("http", *callbacks));
+  auto listener = TcpSocket::listen((*root)->logger(), {HostAddress::localhost(), 0});
+  ASSERT_TRUE(listener) << listener.error().what();
+  ASSERT_TRUE((*listener)->setNonBlocking(true));
+  ASSERT_TRUE(context->setPath("url", strf("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
+  unsigned trustRequests = 0;
+  (*session)->setHttpTrustRequestCallback([&](String const&) -> std::expected<void, StarException> {
+    ++trustRequests;
+    return {};
+  });
+  std::stop_source firstScope;
+  (*engine)->setPromiseLifetime(firstScope.get_token());
+  ASSERT_TRUE(context->eval<void>("first = http.get(url)"));
+  std::stop_source secondScope;
+  (*engine)->setPromiseLifetime(secondScope.get_token());
+  ASSERT_TRUE(context->eval<void>("second = http.get('http://other.invalid/')"));
+  EXPECT_EQ(trustRequests, 2u);
+  EXPECT_EQ(context->eval<bool>(R"LUA(
+    assert(first:status() == "pending" and second:status() == "pending")
+    assert(first:cancel() and not first:cancel())
+    return first:finished() and first:failed() and first:cancelled()
+      and not first:succeeded() and first:result() == nil
+      and first:error() ~= nil and second:status() == "pending"
+  )LUA"),
+            true);
+  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
+  ASSERT_TRUE((*session)->handleHttpTrustReply("other.invalid", false));
+  EXPECT_EQ(context->eval<bool>("return second:status() == 'failed' and not second:cancelled()"), true);
+
+  // Dropping Lua observation must not drop the native owner's stop registration.
+  std::stop_source discardedScope;
+  (*engine)->setPromiseLifetime(discardedScope.get_token());
+  ASSERT_TRUE(context->eval<void>("http.get(url)"));
+  ASSERT_TRUE((*engine)->collectGarbage());
+  discardedScope.request_stop();
+  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
+  (*engine)->setPromiseLifetime(discardedScope.get_token());
+  ASSERT_TRUE(context->eval<void>("alreadyStopped = http.get(url)"));
+  EXPECT_EQ(context->eval<bool>("return alreadyStopped:cancelled()"), true);
+  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
+
+  // Synchronous trust callbacks may cancel and approve reentrantly.
+  std::stop_source reentrantScope;
+  (*session)->setHttpTrustRequestCallback([&](String const& domain) -> std::expected<void, StarException> {
+    reentrantScope.request_stop();
+    return (*session)->handleHttpTrustReply(domain, true);
+  });
+  (*engine)->setPromiseLifetime(reentrantScope.get_token());
+  ASSERT_TRUE(context->eval<void>("reentrant = http.get(url)"));
+  EXPECT_EQ(context->eval<bool>("return reentrant:status() == 'cancelled'"), true);
+  (*session)->setHttpTrustRequestCallback([](String const&) -> std::expected<void, StarException> { return {}; });
+  (*engine)->setPromiseLifetime({});
+  ASSERT_TRUE(context->eval<void>("stopPending = http.get(url)"));
+  ASSERT_TRUE((*session)->stop());
+  EXPECT_EQ(context->eval<bool>("return stopPending:cancelled()"), true);
+  // stop joins all worker submissions: a removed trust entry cannot connect late.
+  auto unexpectedConnection = (*listener)->accept((*root)->logger());
+  ASSERT_TRUE(unexpectedConnection) << unexpectedConnection.error().what();
+  EXPECT_FALSE(*unexpectedConnection);
+  (*engine)->setPromiseLifetime({});
+  ASSERT_TRUE(context->eval<void>("stopped = http.get(url)"));
+  EXPECT_EQ(context->eval<bool>("return stopped:status() == 'cancelled' and first:cancelled()"), true);
+  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
+  ASSERT_TRUE((*session)->poll());
+
+  // Real loopback requests exercise active cancellation and late native completion.
+  auto liveSession = LuaHttpSession::create(**root);
+  ASSERT_TRUE(liveSession) << liveSession.error().what();
+  auto liveCallbacks = LuaBindings::makeHttpCallbacks(*liveSession, true);
+  ASSERT_TRUE(liveCallbacks) << liveCallbacks.error().what();
+  ASSERT_TRUE(context->setPath("http", LuaNil));
+  ASSERT_TRUE(context->setCallbacks("http", *liveCallbacks));
+  (*liveSession)->setHttpTrustRequestCallback([&](String const& domain) {
+    return (*liveSession)->handleHttpTrustReply(domain, true);
+  });
+  auto acceptRequest = [&]() -> std::expected<std::shared_ptr<TcpSocket>, StarException> {
+    auto ready = (*listener)->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(5));
+    if (!ready)
+      return std::unexpected(std::move(ready.error()));
+    auto socket = (*listener)->accept((*root)->logger());
+    if (!socket)
+      return std::unexpected(std::move(socket.error()));
+    if (!*socket)
+      return std::unexpected(StarException("HTTP loopback request was not accepted"));
+    if (auto timeout = (*socket)->setTimeout(5000); !timeout)
+      return std::unexpected(std::move(timeout.error()));
+    std::string headers;
+    while (headers.find("\r\n\r\n") == std::string::npos) {
+      std::array<char, 1024> buffer;
+      auto received = (*socket)->receive(buffer);
+      if (!received)
+        return std::unexpected(std::move(received.error()));
+      if (!*received)
+        return std::unexpected(StarException("HTTP loopback closed before request headers"));
+      headers.append(buffer.data(), *received);
+    }
+    return std::move(*socket);
+  };
+  auto respond = [](std::shared_ptr<TcpSocket> const& socket,
+                    std::string_view body) -> std::expected<void, StarException> {
+    auto response =
+      std::format("HTTP/1.1 503 Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.size(), body);
+    std::span<char const> remaining(response.data(), response.size());
+    while (!remaining.empty()) {
+      auto sent = socket->send(remaining);
+      if (!sent)
+        return std::unexpected(std::move(sent.error()));
+      if (!*sent)
+        return std::unexpected(StarException("HTTP loopback send made no progress"));
+      remaining = remaining.subspan(*sent);
+    }
+    socket->close();
+    return {};
+  };
+  std::stop_source activeScope;
+  (*engine)->setPromiseLifetime(activeScope.get_token());
+  ASSERT_TRUE(context->eval<void>("active = http.get(url, {timeout = 5})"));
+  auto active = acceptRequest();
+  ASSERT_TRUE(active) << active.error().what() << "; "
+                      << context
+                           ->eval<String>("return active:status() .. ': ' .. tostring(active:error()) .. ' at ' .. url")
+                           .value_or("Lua query failed");
+  (*engine)->setPromiseLifetime({});
+  ASSERT_TRUE(context->eval<void>("successful = http.get(url, {timeout = 5})"));
+  auto successful = acceptRequest();
+  ASSERT_TRUE(successful) << successful.error().what();
+  activeScope.request_stop();
+  ASSERT_TRUE(respond(*active, "late"));
+  ASSERT_TRUE(respond(*successful, "null"));
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  bool finished = false;
+  while (!finished && (deadline - std::chrono::steady_clock::now()).count() > 0) {
+    auto queried = context->eval<bool>("return successful:finished()");
+    ASSERT_TRUE(queried) << queried.error().what();
+    finished = *queried;
+    std::this_thread::yield();
+  }
+  ASSERT_TRUE(finished);
+  EXPECT_EQ(context->eval<bool>(R"LUA(
+    assert(active:cancelled() and active:result() == nil)
+    assert(successful:status() == "succeeded" and not successful:failed())
+    assert(not successful:cancel())
+    local response = successful:result()
+    return response.status == 503 and response.body == "null"
+  )LUA"),
+            true);
+  ASSERT_TRUE(context->eval<void>("empty = http.get(url, {timeout = 5})"));
+  auto empty = acceptRequest();
+  ASSERT_TRUE(empty) << empty.error().what();
+  ASSERT_TRUE(respond(*empty, ""));
+  deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  finished = false;
+  while (!finished && (deadline - std::chrono::steady_clock::now()).count() > 0) {
+    auto queried = context->eval<bool>("return empty:finished()");
+    ASSERT_TRUE(queried) << queried.error().what();
+    finished = *queried;
+    std::this_thread::yield();
+  }
+  ASSERT_TRUE(finished);
+  EXPECT_EQ(context->eval<bool>("return empty:succeeded() and empty:result().body == ''"), true);
+  ASSERT_TRUE((*liveSession)->stop());
+  ASSERT_TRUE((*liveSession)->poll());
+  EXPECT_EQ(context->eval<bool>("return active:cancelled() and successful:succeeded() and empty:succeeded()"), true);
 });
 
 [[nodiscard]] std::expected<void, StarException>

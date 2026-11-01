@@ -6,6 +6,21 @@ asynchronously and return promises that can be checked for completion.
 For security, domains must be explicitly trusted before requests can be made to them. Requests to untrusted domains will
 trigger a trust dialog (if configured) before execution.
 
+HTTP promises use the standard promise methods: `status()`, `finished()`, `succeeded()`, `failed()`,
+`cancelled()`, `cancel()`, `result()`, and `error()`. `status()` returns `"pending"`, `"succeeded"`,
+`"failed"`, or `"cancelled"`. A cancelled promise is finished and failed, with no result and a cancellation
+reason returned by `error()`. `cancel()` returns `true` only when it cancels a pending promise.
+
+Cancelling a request removes it from pending trust approval or active result tracking without cancelling
+other requests. Closing the owning Lua session also cancels its outstanding requests, even when the
+script discarded the promise. A late trust approval cannot submit a cancelled pending request. An already
+running native HTTP operation may still finish; cancellation discards its result rather than promising
+transport interruption or rolling back server-side effects.
+
+Successful responses contain `{status = <HTTP status code>, body = <response string>}`. HTTP error status
+codes such as 404 or 503 are still successful HTTP responses; trust denial and transport errors fail the
+promise. Empty bodies and the literal text `"null"` remain successful string results.
+
 ---
 
 #### `bool` http.available()
@@ -21,7 +36,7 @@ Creates and executes an asynchronous HTTP GET request to the specified URL.
 **Options table fields:**
 
 * `headers` - `Table<String, String>` - Optional. HTTP headers to include in the request
-* `timeout` - `int` - Optional. Request timeout in milliseconds
+* `timeout` - `int` - Optional. Request timeout in seconds (default 30; 0 disables the timeout)
 * `body` - `String` or `Table` - Optional. Request body (not typically used with GET)
 
 Returns an `HttpPromise` object that can be checked for completion.
@@ -104,7 +119,7 @@ HTTP requests require domain trust for security. When a script attempts to make 
 
 1. The request is queued and not immediately executed
 2. A trust dialog is shown to the user (if configured)
-3. If the user approves, the domain is added to the trusted list and the request executes
+3. If the user approves, the request executes; the domain is saved to the trusted list only if the user chooses to remember the decision
 4. If the user denies, the request fails with an error
 
 Trusted domains are stored in the configuration under `safe.luaHttp.trustedSites`.

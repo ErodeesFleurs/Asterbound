@@ -117,9 +117,15 @@
 ---@field description string
 ---@field icon string
 
+---@alias RpcPromiseStatus "pending"|"succeeded"|"failed"|"cancelled"
+
 ---@class RpcPromise<T>
+---@field status fun(self:RpcPromise):RpcPromiseStatus
 ---@field finished fun(self:RpcPromise):boolean
 ---@field succeeded fun(self:RpcPromise):boolean
+---@field failed fun(self:RpcPromise):boolean Includes cancellation.
+---@field cancelled fun(self:RpcPromise):boolean
+---@field cancel fun(self:RpcPromise):boolean Whether cancellation won.
 ---@field result fun(self:RpcPromise):T?
 ---@field error fun(self:RpcPromise):string?
 

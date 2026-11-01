@@ -580,6 +580,10 @@ public:
   ImageResolver const& imageResolver() const { return m_imageResolver; }
   void setExecutionHost(std::unique_ptr<LuaExecutionHost> host) { m_executionHost = std::move(host); }
   std::optional<std::reference_wrapper<LuaExecutionHost>> executionHost() const { return optionalRef(m_executionHost); }
+  std::stop_token const& promiseLifetime() const { return m_promiseLifetime; }
+  std::stop_token setPromiseLifetime(std::stop_token lifetime) {
+    return std::exchange(m_promiseLifetime, std::move(lifetime));
+  }
 
   // Set the instruction limit for computation sequences in the engine.  During
   // any function invocation, thread resume, or code evaluation, an instruction
@@ -823,6 +827,7 @@ private:
   lua_State* m_state;
   ImageResolver m_imageResolver;
   std::unique_ptr<LuaExecutionHost> m_executionHost;
+  std::stop_token m_promiseLifetime;
   int m_pcallTracebackMessageHandlerRegistryId;
   int m_scriptDefaultEnvRegistryId;
   int m_wrappedFunctionMetatableRegistryId;

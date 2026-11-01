@@ -3505,8 +3505,14 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     m_spaceSound = {};
   }
 
-  m_entityMessageResponses = {};
-  m_findUniqueEntityResponses = {};
+  for (auto& response : take(m_entityMessageResponses))
+    remember(response.second.cancel("Client world closed"));
+  for (auto& responses : take(m_findUniqueEntityResponses)) {
+    for (auto& response : responses.second)
+      remember(response.cancel("Client world closed"));
+  }
+  for (auto& response : take(m_entityInteractionResponses))
+    remember(response.second.cancel("Client world closed"));
   m_entityMessagePromises = {};
 
   m_forceRegions.clear();

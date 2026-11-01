@@ -169,7 +169,9 @@ std::expected<void, StarException> ScriptableThread::stop() {
   if (!joined)
     error = std::move(joined.error());
   for (auto& message : messages) {
-    if (auto failed = message.promise.fail("Thread is stopped"); !failed) {
+    auto settled = m_errorOccurred ? message.promise.fail("Thread failed")
+                                   : message.promise.cancel("Thread is stopped").transform([](bool) {});
+    if (auto failed = std::move(settled); !failed) {
       if (!error)
         error = std::move(failed.error());
       else
@@ -188,8 +190,10 @@ bool ScriptableThread::shouldExpire() { return m_shouldExpire.load(std::memory_o
 std::expected<void, StarException> ScriptableThread::passMessage(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (m_stop || m_errorOccurred || m_shouldExpire)
-    return message.promise.fail("Thread is stopped");
+  if (m_errorOccurred)
+    return message.promise.fail("Thread failed");
+  if (m_stop || m_shouldExpire)
+    return message.promise.cancel("Thread is stopped").transform([](bool) {});
   m_messages.append(std::move(message));
   return {};
 }
@@ -263,7 +267,9 @@ std::expected<void, StarException> ScriptableThread::run() {
     messages = std::move(m_messages);
   }
   for (auto& message : messages) {
-    if (auto failed = message.promise.fail("Thread is stopped"); !failed) {
+    auto settled = m_errorOccurred ? message.promise.fail("Thread failed")
+                                   : message.promise.cancel("Thread is stopped").transform([](bool) {});
+    if (auto failed = std::move(settled); !failed) {
       if (result)
         result = std::unexpected(std::move(failed.error()));
       else
