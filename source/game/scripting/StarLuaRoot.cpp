@@ -252,7 +252,10 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
     }
   }
   for (auto const& callbacks : m_luaCallbacks) {
-    if (auto result = context.setCallbacks(callbacks.first, callbacks.second); !result)
+    auto result = loadLifetime.stop_possible()
+      ? context.setCallbacks(callbacks.first, callbacks.second.withLifetime(loadLifetime))
+      : context.setCallbacks(callbacks.first, callbacks.second);
+    if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return context;

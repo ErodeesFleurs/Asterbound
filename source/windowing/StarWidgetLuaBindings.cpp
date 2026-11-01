@@ -1,5 +1,6 @@
 import star.json_extra;
 import std;
+import star.algorithm;
 import star.memory;
 import star.json;
 import star.id_map;
@@ -155,132 +156,227 @@ std::expected<TextStyle, StarException> canvasTextStyle(Json const& sizeOrStyle,
   return style;
 }
 
+struct RetireMemberCallback {
+  std::optional<LuaFunction>* callback;
+  void operator()() const { callback->reset(); }
+};
+
+struct ScopedMemberCallback {
+  ScopedMemberCallback(LuaFunction function, std::stop_token lifetime)
+      : callback(std::move(function)), retirement(lifetime, RetireMemberCallback{&callback}) {}
+
+  std::optional<LuaFunction> callback;
+  std::stop_callback<RetireMemberCallback> retirement;
+};
 }
 
-std::expected<LuaMethods<std::shared_ptr<CanvasWidget>>, StarException> LuaUserDataMethods<std::shared_ptr<CanvasWidget>>::make() {
-  LuaMethods<std::shared_ptr<CanvasWidget>> methods;
-  if (auto registered = methods.registerMethod("size", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->size(); }); !registered)
+std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas>::make() {
+  LuaMethods<LuaCanvas> methods;
+  auto registerCanvasMethod = [&]<typename Function>(String name, Function function) {
+    using Return = typename AlgorithmResultInfo<typename FunctionTraits<Function>::Return>::Value;
+    auto guarded = [function = std::move(function)]<typename... Args>(
+                     std::type_identity<std::tuple<std::shared_ptr<CanvasWidget>, Args...>>) mutable {
+      return [function = std::move(function)](LuaCanvas const& handle,
+                                              Args... args) mutable -> std::expected<Return, StarException> {
+        if (handle.lifetime.stop_requested() || handle.hostLifetime.stop_requested())
+          return std::unexpected(GuiException("Canvas callback scope is retired"));
+        auto owner = handle.owner ? handle.owner->lock() : std::shared_ptr<Widget>{};
+        if (handle.owner && !owner)
+          return std::unexpected(GuiException("Canvas callback target no longer exists"));
+        if constexpr (std::is_void_v<typename FunctionTraits<Function>::Return>) {
+          std::invoke(function, handle.canvas, std::forward<Args>(args)...);
+          return {};
+        } else {
+          return std::invoke(function, handle.canvas, std::forward<Args>(args)...);
+        }
+      };
+    }(std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+    return methods.registerMethod(std::move(name), std::move(guarded));
+  };
+  if (auto registered =
+        registerCanvasMethod("size", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->size(); });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("mousePosition", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->mousePosition(); }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "mousePosition", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->mousePosition(); });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("clear", [](std::shared_ptr<CanvasWidget> canvas) { canvas->clear(); }); !registered)
+  if (auto registered = registerCanvasMethod("clear", [](std::shared_ptr<CanvasWidget> canvas) { canvas->clear(); });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("pushClipRect", [](std::shared_ptr<CanvasWidget> canvas, RectF const& rect) {
-    canvas->pushClipRect(rect);
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "pushClipRect", [](std::shared_ptr<CanvasWidget> canvas, RectF const& rect) { canvas->pushClipRect(rect); });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("popClipRect", [](std::shared_ptr<CanvasWidget> canvas) {
-    return canvas->popClipRect();
-  }); !registered)
+  if (auto registered =
+        registerCanvasMethod("popClipRect", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->popClipRect(); });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawDrawable", [](std::shared_ptr<CanvasWidget> canvas, Drawable drawable, std::optional<Vec2F> position, std::optional<float> scale, std::optional<Vec2F> translation, std::optional<float> finalScale) {
-    canvas->drawDrawable(std::move(drawable), position.value_or(Vec2F()), scale.value_or(1), translation.value_or(Vec2F()), finalScale.value_or(1));
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "drawDrawable",
+        [](std::shared_ptr<CanvasWidget> canvas, Drawable drawable, std::optional<Vec2F> position,
+           std::optional<float> scale, std::optional<Vec2F> translation, std::optional<float> finalScale) {
+          canvas->drawDrawable(std::move(drawable), position.value_or(Vec2F()), scale.value_or(1),
+                               translation.value_or(Vec2F()), finalScale.value_or(1));
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawDrawables", [](std::shared_ptr<CanvasWidget> canvas, List<Drawable> drawables, std::optional<Vec2F> position, std::optional<float> scale, std::optional<Vec2F> translation, std::optional<float> finalScale) {
-    canvas->drawDrawables(std::move(drawables), position.value_or(Vec2F()), scale.value_or(1), translation.value_or(Vec2F()), finalScale.value_or(1));
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "drawDrawables",
+        [](std::shared_ptr<CanvasWidget> canvas, List<Drawable> drawables, std::optional<Vec2F> position,
+           std::optional<float> scale, std::optional<Vec2F> translation, std::optional<float> finalScale) {
+          canvas->drawDrawables(std::move(drawables), position.value_or(Vec2F()), scale.value_or(1),
+                                translation.value_or(Vec2F()), finalScale.value_or(1));
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawJsonDrawable", [](std::shared_ptr<CanvasWidget> canvas, Json config, std::optional<Vec2F> position) -> std::expected<void, StarException> {
-    auto metadata = canvas->context().root().imageMetadataDatabase();
-    if (!metadata)
-      return std::unexpected(std::move(metadata.error()));
-    auto drawable = Drawable::create(**metadata, config);
-    if (!drawable)
-      return std::unexpected(std::move(drawable.error()));
-    canvas->drawDrawable(std::move(*drawable), position.value_or(Vec2F()));
-    return {};
-  }); !registered)
+  if (auto registered = registerCanvasMethod("drawJsonDrawable",
+                                             [](std::shared_ptr<CanvasWidget> canvas, Json config,
+                                                std::optional<Vec2F> position) -> std::expected<void, StarException> {
+                                               auto metadata = canvas->context().root().imageMetadataDatabase();
+                                               if (!metadata)
+                                                 return std::unexpected(std::move(metadata.error()));
+                                               auto drawable = Drawable::create(**metadata, config);
+                                               if (!drawable)
+                                                 return std::unexpected(std::move(drawable.error()));
+                                               canvas->drawDrawable(std::move(*drawable), position.value_or(Vec2F()));
+                                               return {};
+                                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawJsonDrawables", [](std::shared_ptr<CanvasWidget> canvas, JsonArray configs, std::optional<Vec2F> position) -> std::expected<void, StarException> {
-    auto metadata = canvas->context().root().imageMetadataDatabase();
-    if (!metadata)
-      return std::unexpected(std::move(metadata.error()));
-    for (auto const& config : configs) {
-      auto drawable = Drawable::create(**metadata, config);
-      if (!drawable)
-        return std::unexpected(std::move(drawable.error()));
-      canvas->drawDrawable(std::move(*drawable), position.value_or(Vec2F()));
-    }
-    return {};
-  }); !registered)
+  if (auto registered = registerCanvasMethod("drawJsonDrawables",
+                                             [](std::shared_ptr<CanvasWidget> canvas, JsonArray configs,
+                                                std::optional<Vec2F> position) -> std::expected<void, StarException> {
+                                               auto metadata = canvas->context().root().imageMetadataDatabase();
+                                               if (!metadata)
+                                                 return std::unexpected(std::move(metadata.error()));
+                                               for (auto const& config : configs) {
+                                                 auto drawable = Drawable::create(**metadata, config);
+                                                 if (!drawable)
+                                                   return std::unexpected(std::move(drawable.error()));
+                                                 canvas->drawDrawable(std::move(*drawable), position.value_or(Vec2F()));
+                                               }
+                                               return {};
+                                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawImage", [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position, std::optional<float> scale, std::optional<Color> color, std::optional<bool> centered) {
-    if (centered.value_or(false))
-      canvas->drawImageCentered(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
-    else
-      canvas->drawImage(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "drawImage",
+        [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position, std::optional<float> scale,
+           std::optional<Color> color, std::optional<bool> centered) {
+          if (centered.value_or(false))
+            canvas->drawImageCentered(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
+          else
+            canvas->drawImage(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawImageDrawable", [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position, std::variant<std::monostate, Vec2F, float> scale, std::optional<Color> color, std::optional<float> rotation) -> std::expected<void, StarException> {
-    auto metadata = canvas->context().root().imageMetadataDatabase();
-    if (!metadata)
-      return std::unexpected(std::move(metadata.error()));
-    auto drawable = Drawable::makeImage(**metadata, image, 1.0, true, {0.0, 0.0}, color.value_or(Color::White));
-    if (!drawable)
-      return std::unexpected(std::move(drawable.error()));
-    if (std::holds_alternative<Vec2F>(scale))
-      drawable->transform(Mat3F::scaling(std::get<Vec2F>(scale)));
-    else if (std::holds_alternative<float>(scale))
-      drawable->transform(Mat3F::scaling(std::get<float>(scale)));
-    if (rotation)
-      drawable->rotate(*rotation);
-    canvas->drawDrawable(std::move(*drawable), position);
-    return {};
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "drawImageDrawable",
+        [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position,
+           std::variant<std::monostate, Vec2F, float> scale, std::optional<Color> color,
+           std::optional<float> rotation) -> std::expected<void, StarException> {
+          auto metadata = canvas->context().root().imageMetadataDatabase();
+          if (!metadata)
+            return std::unexpected(std::move(metadata.error()));
+          auto drawable = Drawable::makeImage(**metadata, image, 1.0, true, {0.0, 0.0}, color.value_or(Color::White));
+          if (!drawable)
+            return std::unexpected(std::move(drawable.error()));
+          if (std::holds_alternative<Vec2F>(scale))
+            drawable->transform(Mat3F::scaling(std::get<Vec2F>(scale)));
+          else if (std::holds_alternative<float>(scale))
+            drawable->transform(Mat3F::scaling(std::get<float>(scale)));
+          if (rotation)
+            drawable->rotate(*rotation);
+          canvas->drawDrawable(std::move(*drawable), position);
+          return {};
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawImageRect", [](std::shared_ptr<CanvasWidget> canvas, String image, RectF texture, RectF screen, std::optional<Color> color) {
-    canvas->drawImageRect(image, texture, screen, color.value_or(Color::White).toRgba());
-  }); !registered)
+  if (auto registered = registerCanvasMethod("drawImageRect",
+                                             [](std::shared_ptr<CanvasWidget> canvas, String image, RectF texture,
+                                                RectF screen, std::optional<Color> color) {
+                                               canvas->drawImageRect(image, texture, screen,
+                                                                     color.value_or(Color::White).toRgba());
+                                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawTiledImage", [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2D offset, RectF screen, std::optional<float> scale, std::optional<Color> color) {
-    canvas->drawTiledImage(image, scale.value_or(1.0f), offset, screen, color.value_or(Color::White).toRgba());
-  }); !registered)
+  if (auto registered = registerCanvasMethod("drawTiledImage",
+                                             [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2D offset,
+                                                RectF screen, std::optional<float> scale, std::optional<Color> color) {
+                                               canvas->drawTiledImage(image, scale.value_or(1.0f), offset, screen,
+                                                                      color.value_or(Color::White).toRgba());
+                                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawLine", [](std::shared_ptr<CanvasWidget> canvas, Vec2F begin, Vec2F end, std::optional<Color> color, std::optional<float> width) {
-    canvas->drawLine(begin, end, color.value_or(Color::White).toRgba(), width.value_or(1.0f));
-  }); !registered)
+  if (auto registered = registerCanvasMethod("drawLine",
+                                             [](std::shared_ptr<CanvasWidget> canvas, Vec2F begin, Vec2F end,
+                                                std::optional<Color> color, std::optional<float> width) {
+                                               canvas->drawLine(begin, end, color.value_or(Color::White).toRgba(),
+                                                                width.value_or(1.0f));
+                                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawRect", [](std::shared_ptr<CanvasWidget> canvas, RectF rect, std::optional<Color> color) {
-    canvas->drawRect(rect, color.value_or(Color::White).toRgba());
-  }); !registered)
+  if (auto registered =
+        registerCanvasMethod("drawRect",
+                             [](std::shared_ptr<CanvasWidget> canvas, RectF rect, std::optional<Color> color) {
+                               canvas->drawRect(rect, color.value_or(Color::White).toRgba());
+                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawPoly", [](std::shared_ptr<CanvasWidget> canvas, PolyF poly, std::optional<Color> color, std::optional<float> width) {
-    canvas->drawPoly(poly, color.value_or(Color::White).toRgba(), width.value_or(1.0f));
-  }); !registered)
+  if (auto registered = registerCanvasMethod(
+        "drawPoly",
+        [](std::shared_ptr<CanvasWidget> canvas, PolyF poly, std::optional<Color> color, std::optional<float> width) {
+          canvas->drawPoly(poly, color.value_or(Color::White).toRgba(), width.value_or(1.0f));
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawTriangles", [](std::shared_ptr<CanvasWidget> canvas, List<PolyF> polygons, std::optional<Color> color) -> std::expected<void, StarException> {
-    List<std::tuple<Vec2F, Vec2F, Vec2F>> triangles;
-    triangles.reserve(polygons.size());
-    for (auto const& polygon : polygons) {
-      if (polygon.sides() != 3)
-        return std::unexpected(StarException("Triangle must have exactly 3 sides"));
-      triangles.emplace_back(polygon.vertex(0), polygon.vertex(1), polygon.vertex(2));
-    }
-    canvas->drawTriangles(triangles, color.value_or(Color::White).toRgba());
-    return {};
-  }); !registered)
+  if (auto registered =
+        registerCanvasMethod("drawTriangles",
+                             [](std::shared_ptr<CanvasWidget> canvas, List<PolyF> polygons,
+                                std::optional<Color> color) -> std::expected<void, StarException> {
+                               List<std::tuple<Vec2F, Vec2F, Vec2F>> triangles;
+                               triangles.reserve(polygons.size());
+                               for (auto const& polygon : polygons) {
+                                 if (polygon.sides() != 3)
+                                   return std::unexpected(StarException("Triangle must have exactly 3 sides"));
+                                 triangles.emplace_back(polygon.vertex(0), polygon.vertex(1), polygon.vertex(2));
+                               }
+                               canvas->drawTriangles(triangles, color.value_or(Color::White).toRgba());
+                               return {};
+                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("drawText", [](std::shared_ptr<CanvasWidget> canvas, String text, Json config, Json sizeOrStyle, std::optional<Color> color, std::optional<float> spacing, std::optional<String> font, std::optional<String> directives) -> std::expected<void, StarException> {
-    auto positioning = TextPositioning::create(config);
-    if (!positioning)
-      return std::unexpected(std::move(positioning.error()));
-    auto style = canvasTextStyle(sizeOrStyle, color, spacing, font, directives);
-    if (!style)
-      return std::unexpected(std::move(style.error()));
-    canvas->drawText(std::move(text), *positioning, std::move(*style));
-    return {};
-  }); !registered)
+  if (auto registered =
+        registerCanvasMethod("drawText",
+                             [](std::shared_ptr<CanvasWidget> canvas, String text, Json config, Json sizeOrStyle,
+                                std::optional<Color> color, std::optional<float> spacing, std::optional<String> font,
+                                std::optional<String> directives) -> std::expected<void, StarException> {
+                               auto positioning = TextPositioning::create(config);
+                               if (!positioning)
+                                 return std::unexpected(std::move(positioning.error()));
+                               auto style = canvasTextStyle(sizeOrStyle, color, spacing, font, directives);
+                               if (!style)
+                                 return std::unexpected(std::move(style.error()));
+                               canvas->drawText(std::move(text), *positioning, std::move(*style));
+                               return {};
+                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("measureText", [](std::shared_ptr<CanvasWidget> canvas, String text, Json config, Json sizeOrStyle, std::optional<Color> color, std::optional<float> spacing, std::optional<String> font, std::optional<String> directives) -> std::expected<RectF, StarException> {
-    auto positioning = TextPositioning::create(config);
-    if (!positioning)
-      return std::unexpected(std::move(positioning.error()));
-    auto style = canvasTextStyle(sizeOrStyle, color, spacing, font, directives);
-    if (!style)
-      return std::unexpected(std::move(style.error()));
-    return canvas->measureText(text, *positioning, *style);
-  }); !registered)
+  if (auto registered =
+        registerCanvasMethod("measureText",
+                             [](std::shared_ptr<CanvasWidget> canvas, String text, Json config, Json sizeOrStyle,
+                                std::optional<Color> color, std::optional<float> spacing, std::optional<String> font,
+                                std::optional<String> directives) -> std::expected<RectF, StarException> {
+                               auto positioning = TextPositioning::create(config);
+                               if (!positioning)
+                                 return std::unexpected(std::move(positioning.error()));
+                               auto style = canvasTextStyle(sizeOrStyle, color, spacing, font, directives);
+                               if (!style)
+                                 return std::unexpected(std::move(style.error()));
+                               return canvas->measureText(text, *positioning, *style);
+                             });
+      !registered)
     return std::unexpected(std::move(registered.error()));
   return methods;
 }
@@ -302,11 +398,17 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("bindCanvas", [parentWidget](String const& widgetName) -> std::expected<std::optional<std::shared_ptr<CanvasWidget>>, StarException> {
-    return withWidget<CanvasWidget>(parentWidget, widgetName, [&](std::shared_ptr<CanvasWidget> widget) -> std::expected<std::optional<std::shared_ptr<CanvasWidget>>, StarException> {
-      return widget;
-    });
-  }); !registered)
+  if (auto registered = callbacks.registerCallback(
+        "bindCanvas",
+        [parentWidget](LuaEngine& engine,
+                       String const& widgetName) -> std::expected<std::optional<LuaCanvas>, StarException> {
+          return withWidget<CanvasWidget>(
+            parentWidget, widgetName,
+            [&](std::shared_ptr<CanvasWidget> widget) -> std::expected<std::optional<LuaCanvas>, StarException> {
+              return LuaCanvas{std::move(widget), engine.promiseLifetime(), {}, parentWidget};
+            });
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("getPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<Vec2I>, StarException> {
@@ -769,14 +871,25 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("registerMemberCallback", [parentWidget](String const& widgetName, String const& name, LuaFunction callback) -> std::expected<void, StarException> {
-    return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
-      widget->registerMemberCallback(name, [callback](Widget& member) -> std::expected<void, StarException> {
-        return callback.invoke<void>(member.name(), member.data());
-      });
-      return {};
-    });
-  }); !registered)
+  if (auto registered = callbacks.registerCallback(
+        "registerMemberCallback",
+        [parentWidget](LuaEngine& engine, String const& widgetName, String const& name,
+                       LuaFunction callback) -> std::expected<void, StarException> {
+          return withWidget<ListWidget>(
+            parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
+              auto scoped = std::make_shared<ScopedMemberCallback>(std::move(callback), engine.promiseLifetime());
+              widget->registerMemberCallback(
+                name, [scoped = std::move(scoped)](Widget& member) -> std::expected<void, StarException> {
+                  if (!scoped->callback)
+                    return {};
+                  // The call may retire its own group and release the stored reference.
+                  auto callback = *scoped->callback;
+                  return callback.invoke<void>(member.name(), member.data());
+                });
+              return {};
+            });
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("refreshLayout", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<Layout>(parentWidget, widgetName, [](std::shared_ptr<Layout> widget) {

@@ -260,6 +260,8 @@ Attempts to synchronously pathfind between the specified positions using the spe
 
 Creates and returns a Lua UserData value which can be used for pathfinding over multiple frames. The `PathFinder` returned has the following two methods:
 
+The finder owns its search state, not the world. `explore()` rejects calls after the issuing world binding/session retires; the already computed `result()` remains an accessible snapshot. Create a new finder after reload rather than reusing an old world's search.
+
 ##### `bool` explore([`int` nodeLimit])
 
 Explores the path up to the specified node count limit. Returns `true` if the pathfinding is complete and `false` if it is still incomplete. If nodeLimit is unspecified, this will search up to the configured maximum number of nodes, making it equivalent to world.platformerPathStart.

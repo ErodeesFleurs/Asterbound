@@ -118,3 +118,13 @@ Delegates the outcome to the provided promise, including cancellation. Chaining 
 
 Cancels an unassigned producer; returns whether cancellation won. To cancel a pending observation after its keeper has chained another promise, use the promise's `cancel()` instead. Late producer decisions after cancellation are discarded; other duplicate producer decisions remain errors.
 
+
+## Binding lifetimes
+
+Bindings are capabilities supplied by the script's host, not a universal service registry. Entity, pane, universe and worker contexts keep their existing method sets; forwarding a capability to a worker does not grant the full host API.
+
+Closing or reloading a session retires its callbacks, including inherited groups and callback tables returned by other bindings. Removing a group retires its saved functions and derived capabilities immediately; replacing it never revives old aliases. Shutdown hooks run before retirement while their services remain valid.
+
+Reacquire callbacks and borrowed-service handles after reopening or reloading a script. Canvas access retires with its issuing group/session, while pathfinder exploration cannot outlive its world binding. This does not weaken the existing strong ownership of entity userdata or native canvas surfaces. Retained native list rows release retired Lua member callbacks and no longer call the old session.
+
+Native hosts using standalone contexts must supply a lifetime or explicitly guard borrowed capabilities; an unscoped context does not infer ownership of its services. Failed callback installation revokes escaped functions, and reentrant removal cannot revoke a replacement registration.

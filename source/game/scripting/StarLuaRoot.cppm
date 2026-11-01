@@ -49,7 +49,7 @@ public:
   // Top-level scripts and require share per-context load-once state. Modules
   // execute for side effects; cycles fail rather than expose partial modules.
   // Cache invalidation requires a fresh context to load any new module.
-  // loadLifetime scopes async work during entry-script loading; the host owns later execution.
+  // loadLifetime scopes entry-script async work and inherited callbacks; the host owns later execution.
   [[nodiscard]] std::expected<LuaContext, StarException> createContext(String const& script,
                                                                        std::stop_token loadLifetime = {});
   [[nodiscard]] std::expected<LuaContext, StarException> createContext(StringList const& scriptPaths = {},

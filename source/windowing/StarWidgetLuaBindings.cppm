@@ -52,12 +52,18 @@ namespace Star {
 class Widget;
 class CanvasWidget;
 
-template <>
-struct LuaConverter<std::shared_ptr<CanvasWidget>> : LuaUserDataConverter<std::shared_ptr<CanvasWidget>> {};
+// Keep the native surface owned, but retire its script access with its issuer.
+struct LuaCanvas {
+  std::shared_ptr<CanvasWidget> canvas;
+  std::stop_token lifetime;
+  std::stop_token hostLifetime;
+  std::optional<std::weak_ptr<Widget>> owner;
+};
 
-template <>
-struct LuaUserDataMethods<std::shared_ptr<CanvasWidget>> {
-  [[nodiscard]] static std::expected<LuaMethods<std::shared_ptr<CanvasWidget>>, StarException> make();
+template <> struct LuaConverter<LuaCanvas> : LuaUserDataConverter<LuaCanvas> {};
+
+template <> struct LuaUserDataMethods<LuaCanvas> {
+  [[nodiscard]] static std::expected<LuaMethods<LuaCanvas>, StarException> make();
 };
 
 namespace LuaBindings {
@@ -69,16 +75,15 @@ namespace LuaBindings {
 export module star.widget_lua_bindings;
 
 export namespace Star {
-  template <>
-  struct LuaConverter<std::shared_ptr<CanvasWidget>>;
+template <> struct LuaConverter<LuaCanvas>;
 
-  template <>
-  struct LuaUserDataMethods<std::shared_ptr<CanvasWidget>>;
+template <> struct LuaUserDataMethods<LuaCanvas>;
 
-  using ::Star::LuaConverter;
-  using ::Star::LuaUserDataMethods;
-  using ::Star::Widget;
-  using ::Star::CanvasWidget;
+using ::Star::CanvasWidget;
+using ::Star::LuaCanvas;
+using ::Star::LuaConverter;
+using ::Star::LuaUserDataMethods;
+using ::Star::Widget;
 }
 
 export namespace Star::LuaBindings {

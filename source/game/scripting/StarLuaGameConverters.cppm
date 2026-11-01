@@ -50,12 +50,11 @@ struct LuaConverter<PlatformerAStar::Path> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, PlatformerAStar::Path const& path);
 };
 
-template <>
-struct LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>> : LuaUserDataConverter<std::shared_ptr<PlatformerAStar::PathFinder>> {};
-
-template <>
-struct LuaUserDataMethods<std::shared_ptr<PlatformerAStar::PathFinder>> {
-  [[nodiscard]] static std::expected<LuaMethods<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException> make();
+template <> struct LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>> {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack,
+                                                               std::shared_ptr<PlatformerAStar::PathFinder> finder);
+  [[nodiscard]] static std::expected<std::optional<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException>
+  to(LuaStackValue value);
 };
 
 template <>
@@ -191,8 +190,7 @@ export namespace Star {
   struct LuaConverter<PlatformerAStar::Path>;
   template <>
   struct LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>;
-  template <>
-  struct LuaUserDataMethods<std::shared_ptr<PlatformerAStar::PathFinder>>;
+
   template <>
   struct LuaConverter<PlatformerAStar::Parameters>;
   template <>

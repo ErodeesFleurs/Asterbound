@@ -222,13 +222,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
     return mainInterface.playCinematic(config);
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("bindCanvas", [&mainInterface, lifetime](String const& name, std::optional<bool> ignoreScale) -> std::expected<std::optional<std::shared_ptr<CanvasWidget>>, StarException> {
-    if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    auto canvas = mainInterface.fetchCanvas(name, ignoreScale.value_or(false));
-    if (!canvas) return std::unexpected(std::move(canvas.error()));
-    if (*canvas) return std::optional<std::shared_ptr<CanvasWidget>>(std::move(*canvas));
-    return std::optional<std::shared_ptr<CanvasWidget>>{};
-  }); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.registerCallback(
+        "bindCanvas",
+        [&mainInterface, lifetime](LuaEngine& engine, String const& name, std::optional<bool> ignoreScale)
+          -> std::expected<std::optional<LuaCanvas>, StarException> {
+          if (lifetime.stop_requested())
+            return std::unexpected(GuiException("Interface is detached"));
+          auto canvas = mainInterface.fetchCanvas(name, ignoreScale.value_or(false));
+          if (!canvas)
+            return std::unexpected(std::move(canvas.error()));
+          if (*canvas)
+            return std::optional<LuaCanvas>(LuaCanvas{std::move(*canvas), engine.promiseLifetime(), lifetime, {}});
+          return std::optional<LuaCanvas>{};
+        });
+      !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("callPane", [&mainInterface, lifetime](String const& id, String const& method, std::optional<JsonArray> arguments) -> std::expected<std::optional<Json>, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.callPane(id, method, arguments.value_or(JsonArray{}));

@@ -47,6 +47,8 @@ LuaBaseComponent::LuaBaseComponent(Root& root) : m_root(root) {
 }
 
 LuaBaseComponent::~LuaBaseComponent() {
+  for (auto& group : m_callbacks)
+    group.second.scope.request_stop();
   (void)m_callbackScope.request_stop();
   if (auto stopped = stopThreads(); !stopped)
     EmergencyLog::error("Error stopping Lua component threads: {}", outputException(stopped.error(), true));
@@ -70,25 +72,40 @@ std::expected<void, StarException> LuaBaseComponent::setScripts(StringList scrip
 std::expected<void, StarException> LuaBaseComponent::addCallbacks(String groupName, LuaCallbacks callbacks) {
   if (m_callbacks.contains(groupName))
     return std::unexpected(LuaComponentException::format("Duplicate callbacks named '{}' in LuaBaseComponent", groupName));
+  CallbackGroup group{std::move(callbacks), {}};
+  // Installation can run Lua metamethods; revoke escaped values on rollback or session retirement.
+  auto retire = [scope = group.scope]() mutable { scope.request_stop(); };
+  auto rollback = finally([&] { retire(); });
+  std::stop_callback duringInstallation(m_context ? m_callbackScope.get_token() : std::stop_token{}, retire);
   if (m_context) {
     // Component-owned groups override inherited root/script tables.
     if (auto result = m_context->remove(groupName); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_context->setCallbacks(groupName, callbacks.withLifetime(m_callbackScope.get_token())); !result)
+    if (auto result = m_context->setCallbacks(groupName, group.callbacks.withLifetime(group.scope.get_token()));
+        !result)
       return std::unexpected(std::move(result.error()));
   }
-  m_callbacks.insert(std::move(groupName), std::move(callbacks));
+  if (group.scope.stop_requested())
+    return std::unexpected(LuaComponentException("Lua session retired during callback installation"));
+  if (!m_callbacks.insert(std::move(groupName), std::move(group)).second)
+    return std::unexpected(LuaComponentException("Callback group changed during installation"));
+  rollback.cancel();
   return {};
 }
 
 std::expected<bool, StarException> LuaBaseComponent::removeCallbacks(String const& groupName) {
-  if (!m_callbacks.contains(groupName))
+  auto group = m_callbacks.maybeRef(groupName);
+  if (!group)
     return false;
+  auto scope = group->get().scope;
   if (m_context) {
     if (auto result = m_context->remove(groupName); !result)
       return std::unexpected(std::move(result.error()));
   }
-  m_callbacks.remove(groupName);
+  scope.request_stop();
+  auto current = m_callbacks.maybeRef(groupName);
+  if (current && current->get().scope.get_token() == scope.get_token())
+    m_callbacks.remove(groupName);
   return true;
 }
 
@@ -277,10 +294,12 @@ std::expected<void, StarException> LuaBaseComponent::contextSetup() {
     return std::unexpected(std::move(result.error()));
   // Install explicit groups before adding missing builtins, so each callback
   // table is constructed once and inherited groups cannot mask fresh targets.
-  for (auto const& p : m_callbacks) {
+  for (auto& p : m_callbacks) {
+    p.second.scope = std::stop_source{};
     if (auto result = m_context->remove(p.first); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_context->setCallbacks(p.first, p.second.withLifetime(m_callbackScope.get_token())); !result)
+    if (auto result = m_context->setCallbacks(p.first, p.second.callbacks.withLifetime(p.second.scope.get_token()));
+        !result)
       return std::unexpected(std::move(result.error()));
   }
   if (!hasCallbacks("sb")) {
@@ -313,6 +332,8 @@ std::expected<void, StarException> LuaBaseComponent::retireContext() {
   std::expected<void, StarException> shutdown;
   if (m_context)
     shutdown = contextShutdown();
+  for (auto& group : m_callbacks)
+    group.second.scope.request_stop();
   (void)m_callbackScope.request_stop();
   m_context.reset();
   m_shutdownPending = false;

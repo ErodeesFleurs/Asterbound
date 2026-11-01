@@ -129,6 +129,7 @@
 ---@field result fun(self:RpcPromise):T?
 ---@field error fun(self:RpcPromise):string?
 
+--- Owns search state; explore requires the issuing world binding to remain live, result is a cached snapshot.
 ---@class PlatformerPathFinder
 ---@field explore fun(self:PlatformerPathFinder, nodeLimit?:integer):boolean?
 ---@field result fun(self:PlatformerPathFinder):PlatformerPath?
@@ -197,6 +198,7 @@
 ---@class NativePortraitHandle: userdata
 ---@class NativePaneHandle: userdata
 
+--- Retains its native surface, but methods require a live issuing binding/session and host.
 ---@class CanvasWidget
 ---@field size fun(self:CanvasWidget):Vec2I
 ---@field mousePosition fun(self:CanvasWidget):Vec2I

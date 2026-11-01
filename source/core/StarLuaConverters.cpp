@@ -45,19 +45,23 @@ std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaSt
 }
 
 std::expected<void, StarException> LuaConverter<LuaCallbacks>::from(LuaStack stack, LuaCallbacks const& c) {
-  auto created = stack.createTable(0, c.callbacks().size());
-  if (!created)
-    return std::unexpected(std::move(created.error()));
-  auto table = std::move(*created);
-  for (auto& callback : c.callbacks()) {
-    auto function = stack.engine().createWrappedFunction(callback.second);
-    if (!function)
-      return std::unexpected(std::move(function.error()));
-    auto result = table.set(callback.first, std::move(*function));
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-  }
-  return {};
+  auto convert = [&](LuaCallbacks const& callbacks) -> std::expected<void, StarException> {
+    auto created = stack.createTable(0, callbacks.callbacks().size());
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    auto table = std::move(*created);
+    for (auto& callback : callbacks.callbacks()) {
+      auto function = stack.engine().createWrappedFunction(callback.second);
+      if (!function)
+        return std::unexpected(std::move(function.error()));
+      auto result = table.set(callback.first, std::move(*function));
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+    }
+    return {};
+  };
+  auto const& lifetime = stack.engine().promiseLifetime();
+  return lifetime.stop_possible() ? convert(c.withLifetime(lifetime)) : convert(c);
 }
 
 std::expected<std::optional<LuaCallbacks>, StarException> LuaConverter<LuaCallbacks>::to(LuaStackValue) {

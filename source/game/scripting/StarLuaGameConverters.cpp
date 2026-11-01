@@ -255,17 +255,48 @@ std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(Lua
   return {};
 }
 
-std::expected<LuaMethods<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException> LuaUserDataMethods<std::shared_ptr<PlatformerAStar::PathFinder>>::make() {
-  LuaMethods<std::shared_ptr<PlatformerAStar::PathFinder>> methods;
-  auto explore = methods.registerMethodWithSignature<std::optional<bool>, std::shared_ptr<PlatformerAStar::PathFinder> const&, std::optional<unsigned>>(
-      "explore", std::mem_fn(&PlatformerAStar::PathFinder::explore));
-  if (!explore)
-    return std::unexpected(std::move(explore.error()));
-  auto result = methods.registerMethodWithSignature<std::optional<PlatformerAStar::Path>, std::shared_ptr<PlatformerAStar::PathFinder> const&>(
-      "result", std::mem_fn(&PlatformerAStar::PathFinder::result));
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return methods;
+struct LuaPathFinder {
+  std::shared_ptr<PlatformerAStar::PathFinder> finder;
+  std::stop_token lifetime;
+};
+
+template <> struct LuaUserDataMethods<LuaPathFinder> {
+  static std::expected<LuaMethods<LuaPathFinder>, StarException> make() {
+    LuaMethods<LuaPathFinder> methods;
+    if (auto registered = methods.registerMethod(
+          "explore",
+          [](LuaPathFinder const& value,
+             std::optional<unsigned> limit) -> std::expected<std::optional<bool>, StarException> {
+            if (value.lifetime.stop_requested())
+              return std::unexpected(LuaException("Lua pathfinder scope is retired"));
+            return value.finder->explore(limit);
+          });
+        !registered)
+      return std::unexpected(std::move(registered.error()));
+    if (auto registered =
+          methods.registerMethod("result", [](LuaPathFinder const& value) { return value.finder->result(); });
+        !registered)
+      return std::unexpected(std::move(registered.error()));
+    return methods;
+  }
+};
+
+std::expected<void, StarException>
+LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::from(LuaStack stack,
+                                                                 std::shared_ptr<PlatformerAStar::PathFinder> finder) {
+  return stack.pushUserData(LuaPathFinder{std::move(finder), stack.engine().promiseLifetime()});
+}
+
+std::expected<std::optional<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException>
+LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::to(LuaStackValue value) {
+  auto finder = LuaUserDataConverter<LuaPathFinder>::to(value);
+  if (!finder)
+    return std::unexpected(std::move(finder.error()));
+  if (!*finder)
+    return std::nullopt;
+  if ((*finder)->lifetime.stop_requested())
+    return std::unexpected(LuaException("Lua pathfinder scope is retired"));
+  return (*finder)->finder;
 }
 
 std::expected<std::optional<PlatformerAStar::Parameters>, StarException>

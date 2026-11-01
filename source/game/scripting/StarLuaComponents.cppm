@@ -102,7 +102,11 @@ private:
 
   Root& m_root;
   StringList m_scripts;
-  StringMap<LuaCallbacks> m_callbacks;
+  struct CallbackGroup {
+    LuaCallbacks callbacks;
+    std::stop_source scope;
+  };
+  StringMap<CallbackGroup> m_callbacks;
   StringMap<LuaCallbacks> m_threadCallbacks;
   std::shared_ptr<LuaRoot> m_luaRoot;
   std::shared_ptr<TrackerListener> m_reloadTracker;

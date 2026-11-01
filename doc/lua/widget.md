@@ -301,7 +301,7 @@ Sets the selected widget of a ListWidget.
 
 #### `void` widget.registerMemberCallback(`String` widgetName, `String` callbackName, `LuaFunction` callback)
 
-Registers a member callback for a ListWidget's list items to use.
+Registers a member callback for a ListWidget's list items to use. Removing the issuing callback group or closing/reloading the script releases the retained Lua function; existing native rows become inert. Register again for new rows in the replacement session.
 
 ---
 
@@ -332,6 +332,8 @@ Sets the progress overlay on the item slot to the specified value (between 0 and
 #### `CanvasWidget` widget.bindCanvas(`String` widgetName)
 
 Binds the canvas widget with the specified name as userdata for easy access. The `CanvasWidget` has the following methods:
+
+The userdata retains the native canvas surface, but script access retires with its issuing binding group/session or destroyed widget owner. An `interface.bindCanvas` handle also requires its interface host to remain attached. Rebind after reopening or reloading a pane; retaining an old handle does not revive access. See [binding lifetimes](openstarbound/utility.md#binding-lifetimes).
 
 With `ignoreInterfaceScale`, drawing and clip coordinates are physical pixels,
 but rendering still adds the raw, **unscaled** Widget screen position. Widget

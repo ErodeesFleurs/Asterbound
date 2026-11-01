@@ -1174,4 +1174,224 @@ const GameTestRegistration
     EXPECT_TRUE(*recovered);
     EXPECT_TRUE(component.initialized());
   });
+
+const GameTestRegistration removedCapability(
+  "LuaComponentBindings", "RemovingGroupRevokesSavedFunctionsWithoutClosingOtherGroups", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    int oldCalls = 0;
+    LuaCallbacks old;
+    ASSERT_TRUE(old.registerCallback("read", [&] { return ++oldCalls; }));
+    ASSERT_TRUE(component.addCallbacks("capability", std::move(old)));
+    ASSERT_TRUE(component.init());
+    auto saved = component.context()->getPath<LuaFunction>("capability.read");
+    ASSERT_TRUE(saved);
+    EXPECT_EQ(saved->invoke<int>(), 1);
+    ASSERT_TRUE(component.removeCallbacks("capability"));
+    EXPECT_FALSE(saved->invoke<int>());
+    EXPECT_EQ(oldCalls, 1);
+    EXPECT_EQ(component.eval<bool>("return capability == nil and type(sb.makePromise) == 'function'"), true);
+    LuaCallbacks fresh;
+    ASSERT_TRUE(fresh.registerCallback("read", [] { return 73; }));
+    ASSERT_TRUE(component.addCallbacks("capability", std::move(fresh)));
+    EXPECT_EQ(component.eval<int>("return capability.read()"), 73);
+    EXPECT_FALSE(saved->invoke<int>());
+    EXPECT_EQ(oldCalls, 1);
+  });
+
+const GameTestRegistration
+  inheritedCapability("LuaComponentBindings", "InheritedCapabilitiesRetireWithTheirSession", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    int calls = 0;
+    LuaCallbacks inherited;
+    ASSERT_TRUE(inherited.registerCallback("read", [&] { return ++calls; }));
+    (*luaRoot)->addCallbacks("inherited", inherited);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.init());
+    auto saved = component.context()->getPath<LuaFunction>("inherited.read");
+    ASSERT_TRUE(saved);
+    EXPECT_EQ(saved->invoke<int>(), 1);
+    ASSERT_TRUE(component.uninit());
+    EXPECT_FALSE(saved->invoke<int>());
+    EXPECT_EQ(calls, 1);
+    ASSERT_TRUE(component.init());
+    EXPECT_EQ(component.eval<int>("return inherited.read()"), 2);
+    EXPECT_FALSE(saved->invoke<int>());
+    EXPECT_EQ(calls, 2);
+  });
+
+const GameTestRegistration
+  nestedCapability("LuaComponentBindings", "ReturnedCallbackTablesInheritGroupRevocation", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    int calls = 0;
+    LuaCallbacks host;
+    ASSERT_TRUE(host.registerCallback("nested", [&]() -> std::expected<LuaCallbacks, StarException> {
+      LuaCallbacks nested;
+      auto result = nested.registerCallback("read", [&] { return ++calls; });
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return nested;
+    }));
+    ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+    ASSERT_TRUE(component.init());
+    ASSERT_TRUE(component.eval<LuaValue>("nested = host.nested()"));
+    auto read = component.context()->getPath<LuaFunction>("nested.read");
+    ASSERT_TRUE(read);
+    EXPECT_EQ(read->invoke<int>(), 1);
+    ASSERT_TRUE(component.removeCallbacks("host"));
+    EXPECT_FALSE(read->invoke<int>());
+    EXPECT_EQ(calls, 1);
+  });
+
+const GameTestRegistration scopedPathFinder("LuaComponentBindings",
+                                            "PathFinderCannotExploreRetiredWorldButKeepsResultSnapshot",
+                                            [](GameTest& fixture) {
+                                              auto storage = File::ephemeralFile(fixture.root().random());
+                                              ASSERT_TRUE(storage);
+                                              auto world =
+                                                WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+                                              ASSERT_TRUE(world);
+                                              auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+                                              LuaStoredEntityScript component(fixture.root());
+                                              auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                                              ASSERT_TRUE(component.init(**world));
+                                              ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      finder = world.platformerPathStart({10, 10}, {10, 10}, {}, {boundBox = {-0.5, -0.5, 0.5, 0.5}})
+      finder:explore(1)
+      function exploreSaved() return finder:explore(1) end
+      function resultSaved() return finder:result() end
+    )LUA"));
+                                              auto explore = component.context()->get<LuaFunction>("exploreSaved");
+                                              auto result = component.context()->get<LuaFunction>("resultSaved");
+                                              ASSERT_TRUE(explore);
+                                              ASSERT_TRUE(result);
+                                              auto before = result->invoke<Json>();
+                                              ASSERT_TRUE(before);
+                                              ASSERT_TRUE(component.uninit());
+                                              ASSERT_TRUE((*world)->close());
+                                              EXPECT_FALSE(explore->invoke<LuaValue>());
+                                              auto after = result->invoke<Json>();
+                                              ASSERT_TRUE(after);
+                                              EXPECT_EQ(*after, *before);
+                                            });
+
+const GameTestRegistration
+  failedCapabilityInstallation("LuaComponentBindings", "FailedInstallationRevokesFunctionsEscapedThroughMetamethod",
+                               [](GameTest& fixture) {
+                                 auto lua = LuaRoot::create(fixture.root());
+                                 ASSERT_TRUE(lua);
+                                 LuaMessageScript component(fixture.root());
+                                 auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                                 ASSERT_TRUE(component.setLuaRoot(*lua));
+                                 ASSERT_TRUE(component.init());
+                                 ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      setmetatable(_ENV, {__newindex = function(env, name, value)
+        if name == "candidate" and value ~= nil then
+          rawset(env, "escaped", value.read)
+          error("installation rejected")
+        end
+        rawset(env, name, value)
+      end})
+    )LUA"));
+                                 int calls = 0;
+                                 LuaCallbacks callbacks;
+                                 ASSERT_TRUE(callbacks.registerCallback("read", [&] { return ++calls; }));
+                                 EXPECT_FALSE(component.addCallbacks("candidate", std::move(callbacks)));
+                                 auto escaped = component.context()->get<LuaFunction>("escaped");
+                                 ASSERT_TRUE(escaped);
+                                 EXPECT_FALSE(escaped->invoke<int>());
+                                 ASSERT_TRUE(component.uninit());
+                                 EXPECT_FALSE(escaped->invoke<int>());
+                                 EXPECT_EQ(calls, 0);
+                               });
+
+const GameTestRegistration reentrantCapabilityRemoval(
+  "LuaComponentBindings", "ReentrantRemovalPreservesReplacementRegistration", [](GameTest& fixture) {
+    auto lua = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(lua);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*lua));
+    LuaCallbacks old;
+    ASSERT_TRUE(old.registerCallback("read", [] { return 17; }));
+    ASSERT_TRUE(component.addCallbacks("candidate", std::move(old)));
+    LuaCallbacks control;
+    ASSERT_TRUE(control.registerCallback("replace", [&]() -> std::expected<void, StarException> {
+      auto removed = component.removeCallbacks("candidate");
+      if (!removed)
+        return std::unexpected(std::move(removed.error()));
+      LuaCallbacks fresh;
+      auto registered = fresh.registerCallback("read", [] { return 83; });
+      if (!registered)
+        return std::unexpected(std::move(registered.error()));
+      return component.addCallbacks("candidate", std::move(fresh));
+    }));
+    ASSERT_TRUE(component.addCallbacks("control", std::move(control)));
+    ASSERT_TRUE(component.init());
+    auto oldRead = component.context()->getPath<LuaFunction>("candidate.read");
+    ASSERT_TRUE(oldRead);
+    ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      rawset(_ENV, "candidate", nil)
+      local removing = false
+      setmetatable(_ENV, {__newindex = function(env, name, value)
+        if name == "candidate" and value == nil and not removing then
+          removing = true
+          control.replace()
+          removing = false
+          return
+        end
+        rawset(env, name, value)
+      end})
+    )LUA"));
+    ASSERT_TRUE(component.removeCallbacks("candidate"));
+    EXPECT_EQ(component.eval<int>("return candidate.read()"), 83);
+    EXPECT_FALSE(oldRead->invoke<int>());
+    auto freshRead = component.context()->getPath<LuaFunction>("candidate.read");
+    ASSERT_TRUE(freshRead);
+    ASSERT_TRUE(component.uninit());
+    EXPECT_FALSE(freshRead->invoke<int>());
+  });
+
+const GameTestRegistration
+  retiringCapabilityInstallation("LuaComponentBindings", "SessionRetirementDuringInstallationRevokesEscapedFunctions",
+                                 [](GameTest& fixture) {
+                                   auto lua = LuaRoot::create(fixture.root());
+                                   ASSERT_TRUE(lua);
+                                   LuaMessageScript component(fixture.root());
+                                   auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+                                   ASSERT_TRUE(component.setLuaRoot(*lua));
+                                   LuaCallbacks control;
+                                   ASSERT_TRUE(control.registerCallback("close", [&] { return component.uninit(); }));
+                                   ASSERT_TRUE(component.addCallbacks("control", std::move(control)));
+                                   ASSERT_TRUE(component.init());
+                                   auto retained = *component.context();
+                                   ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      setmetatable(_ENV, {__newindex = function(env, name, value)
+        if name == "candidate" and value ~= nil then
+          rawset(env, "escaped", value.read)
+          control.close()
+        end
+        rawset(env, name, value)
+      end})
+    )LUA"));
+                                   int calls = 0;
+                                   LuaCallbacks callbacks;
+                                   ASSERT_TRUE(callbacks.registerCallback("read", [&] { return ++calls; }));
+                                   EXPECT_FALSE(component.addCallbacks("candidate", std::move(callbacks)));
+                                   EXPECT_FALSE(component.initialized());
+                                   auto escaped = retained.get<LuaFunction>("escaped");
+                                   ASSERT_TRUE(escaped);
+                                   EXPECT_FALSE(escaped->invoke<int>());
+                                   EXPECT_EQ(calls, 0);
+                                 });
 }

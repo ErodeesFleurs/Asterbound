@@ -66,6 +66,7 @@ import star.celestial_parameters;
 import star.celestial_coordinate;
 import star.canvas_widget;
 import star.camera_lua_bindings;
+import star.widget_lua_bindings;
 import star.world_camera;
 import star.poly;
 import star.json_extra;
@@ -420,6 +421,191 @@ const GameTestRegistration scriptStorage("ScriptPane", "StorageSurvivesLifecycle
   ASSERT_TRUE(stopped) << stopped.error().what();
   EXPECT_FALSE(*stopped);
 });
+
+const GameTestRegistration
+  canvasSessionLifetime("ScriptPane", "CanvasCapabilitiesRetireWithoutChangingSurfaceOwnership", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto created = ScriptTestPane::create(**context);
+    ASSERT_TRUE(created) << created.error().what();
+    auto pane = std::move(*created);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    auto surface = CanvasWidget::create(**context);
+    ASSERT_TRUE(surface) << surface.error().what();
+    (*surface)->setSize({31, 17});
+    std::weak_ptr<CanvasWidget> ownedSurface = *surface;
+    ASSERT_TRUE(pane->addChild("surface", *surface));
+    List<LuaFunction> retained;
+    LuaCallbacks probe;
+    ASSERT_TRUE(probe.registerCallback("capture", [&](LuaFunction function) { retained.append(std::move(function)); }));
+    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE(pane->displayed());
+    String capture = R"LUA(
+    local canvas = widget.bindCanvas("surface")
+    assert(canvas.setPosition == nil and canvas.dismiss == nil)
+    probe.capture(function() canvas:clear(); return canvas:size() end)
+  )LUA";
+    ASSERT_TRUE(pane->evaluate(capture));
+    ASSERT_EQ(retained.size(), 1u);
+    auto initial = retained[0].invoke<Vec2I>();
+    ASSERT_TRUE(initial) << initial.error().what();
+    EXPECT_EQ(*initial, (Vec2I{31, 17}));
+    ASSERT_TRUE(pane->dismissed());
+    EXPECT_FALSE(retained[0].invoke<Vec2I>());
+    ASSERT_TRUE(pane->displayed());
+    ASSERT_TRUE(pane->evaluate(capture));
+    ASSERT_EQ(retained.size(), 2u);
+    EXPECT_TRUE(retained[1].invoke<Vec2I>());
+    EXPECT_FALSE(retained[0].invoke<Vec2I>());
+
+    ASSERT_TRUE(fixture.root().reload());
+    ASSERT_TRUE(pane->evaluate(capture));
+    ASSERT_EQ(retained.size(), 3u);
+    EXPECT_FALSE(retained[1].invoke<Vec2I>());
+    EXPECT_TRUE(retained[2].invoke<Vec2I>());
+    auto removed = pane->removeCallbacks("widget");
+    ASSERT_TRUE(removed) << removed.error().what();
+    EXPECT_TRUE(*removed);
+    EXPECT_FALSE(retained[2].invoke<Vec2I>());
+    auto callbacks = LuaBindings::makeWidgetCallbacks(**context, *pane);
+    ASSERT_TRUE(callbacks) << callbacks.error().what();
+    ASSERT_TRUE(pane->addCallbacks("widget", std::move(*callbacks)));
+    ASSERT_TRUE(pane->evaluate(capture));
+    ASSERT_EQ(retained.size(), 4u);
+    EXPECT_TRUE(retained[3].invoke<Vec2I>());
+
+    // Lua still owns the surface after its native parent releases it.
+    EXPECT_TRUE(pane->removeChild("surface"));
+    surface->reset();
+    EXPECT_FALSE(ownedSurface.expired());
+    EXPECT_TRUE(retained[3].invoke<Vec2I>());
+    pane.reset();
+    EXPECT_FALSE(retained[3].invoke<Vec2I>());
+    retained.clear();
+    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    EXPECT_TRUE(ownedSurface.expired());
+  });
+
+const GameTestRegistration
+  canvasHostLifetime("WidgetBorrow", "CanvasRejectsDestroyedOwnerAndRetiredInterfaceHost", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    auto engine = LuaEngine::create();
+    ASSERT_TRUE(engine) << engine.error().what();
+    auto lua = (*engine)->createContext();
+    ASSERT_TRUE(lua) << lua.error().what();
+    auto owner = std::make_shared<Widget>(**context);
+    auto surface = CanvasWidget::create(**context);
+    ASSERT_TRUE(surface) << surface.error().what();
+    ASSERT_TRUE(owner->addChild("surface", *surface));
+    auto callbacks = LuaBindings::makeWidgetCallbacks(**context, *owner);
+    ASSERT_TRUE(callbacks) << callbacks.error().what();
+    ASSERT_TRUE(lua->setCallbacks("widget", *callbacks));
+    auto retained =
+      lua->eval<LuaFunction>("local canvas = widget.bindCanvas('surface'); return function() return canvas:size() end");
+    ASSERT_TRUE(retained) << retained.error().what();
+    EXPECT_TRUE(retained->invoke<Vec2I>());
+    owner.reset();
+    EXPECT_FALSE(retained->invoke<Vec2I>());
+
+    std::stop_source host;
+    auto interfaceCanvas = (*engine)->createUserData(LuaCanvas{*surface, {}, host.get_token(), {}});
+    ASSERT_TRUE(interfaceCanvas) << interfaceCanvas.error().what();
+    ASSERT_TRUE(lua->set("surface", *interfaceCanvas));
+    auto beforeStop = lua->eval<Json>("return surface:size()");
+    ASSERT_TRUE(beforeStop) << beforeStop.error().what();
+    ASSERT_TRUE(host.request_stop());
+    EXPECT_FALSE(lua->eval<Json>("return surface:size()"));
+  });
+
+const GameTestRegistration widgetMemberLifetime(
+  "ScriptPane", "RetiringMemberCallbacksReleasesLuaRootsAndLeavesOldRowsInert", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto created = ScriptTestPane::create(**context);
+    ASSERT_TRUE(created) << created.error().what();
+    auto pane = std::move(*created);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    auto schema = Json::parseJson(R"JSON({
+    "spacing":[0,0], "memberSize":[80,12],
+    "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
+  })JSON");
+    ASSERT_TRUE(schema) << schema.error().what();
+    auto list = ListWidget::create(**context, *schema);
+    ASSERT_TRUE(list) << list.error().what();
+    ASSERT_TRUE(pane->addChild("list", *list));
+    int calls = 0;
+    std::weak_ptr<int> sentinel;
+    LuaCallbacks probe;
+    ASSERT_TRUE(probe.registerCallback("sentinel", [&](LuaEngine& engine) -> std::expected<LuaUserData, StarException> {
+      auto value = std::make_shared<int>(0);
+      sentinel = value;
+      return engine.createUserData(std::move(value));
+    }));
+    ASSERT_TRUE(probe.registerCallback("called", [&]() { ++calls; }));
+    ASSERT_TRUE(probe.registerCallback("retire", [&]() -> std::expected<void, StarException> {
+      auto removed = pane->removeCallbacks("widget");
+      if (!removed)
+        return std::unexpected(std::move(removed.error()));
+      return {};
+    }));
+    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE(pane->displayed());
+    String registerMember = R"LUA(
+    local sentinel = probe.sentinel()
+    widget.registerMemberCallback("list", "edit", function()
+      assert(sentinel ~= nil)
+      probe.called()
+    end)
+  )LUA";
+    ASSERT_TRUE(pane->evaluate(registerMember));
+    auto row = (*list)->addItem();
+    ASSERT_TRUE(row) << row.error().what();
+    auto oldEditor = (*row)->fetchChild<TextBoxWidget>("edit");
+    ASSERT_TRUE(oldEditor) << oldEditor.error().what();
+    ASSERT_TRUE(*oldEditor);
+    ASSERT_TRUE((*oldEditor)->setText("active"));
+    EXPECT_EQ(calls, 1);
+    ASSERT_TRUE(pane->dismissed());
+    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    EXPECT_TRUE(sentinel.expired());
+    ASSERT_TRUE((*oldEditor)->setText("retired"));
+    EXPECT_EQ(calls, 1);
+
+    ASSERT_TRUE(pane->displayed());
+    ASSERT_TRUE(pane->evaluate(registerMember));
+    auto freshRow = (*list)->addItem();
+    ASSERT_TRUE(freshRow) << freshRow.error().what();
+    auto freshEditor = (*freshRow)->fetchChild<TextBoxWidget>("edit");
+    ASSERT_TRUE(freshEditor) << freshEditor.error().what();
+    ASSERT_TRUE(*freshEditor);
+    ASSERT_TRUE((*freshEditor)->setText("fresh"));
+    EXPECT_EQ(calls, 2);
+    ASSERT_TRUE((*oldEditor)->setText("still retired"));
+    EXPECT_EQ(calls, 2);
+    ASSERT_TRUE(pane->evaluate(R"LUA(
+    widget.registerMemberCallback("list", "edit", function()
+      probe.called()
+      probe.retire()
+    end)
+  )LUA"));
+    auto retiringRow = (*list)->addItem();
+    ASSERT_TRUE(retiringRow) << retiringRow.error().what();
+    auto retiringEditor = (*retiringRow)->fetchChild<TextBoxWidget>("edit");
+    ASSERT_TRUE(retiringEditor) << retiringEditor.error().what();
+    ASSERT_TRUE(*retiringEditor);
+    ASSERT_TRUE((*retiringEditor)->setText("retire inside callback"));
+    EXPECT_EQ(calls, 3);
+    ASSERT_TRUE((*retiringEditor)->setText("retired inside callback"));
+    EXPECT_EQ(calls, 3);
+    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    EXPECT_TRUE(sentinel.expired());
+    ASSERT_TRUE(pane->dismissed());
+  });
 
 const GameTestRegistration componentCallbackOwnership("ScriptPane", "ComponentCallbacksReplaceInheritedTargetsWithoutRevivingRetiredOnes", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
@@ -1878,8 +2064,8 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   EXPECT_FALSE(oldPlay->invoke<LuaValue>(song, "retired"));
   EXPECT_FALSE(livePlay->invoke<LuaValue>(song, "retired live"));
   EXPECT_EQ((*first)->timeSource(), std::optional<String>("uninit band"));
-  ASSERT_TRUE(inheritedPlay->invoke<LuaValue>(song, "inherited"));
-  EXPECT_EQ((*first)->timeSource(), std::optional<String>("inherited"));
+  EXPECT_FALSE(inheritedPlay->invoke<LuaValue>(song, "inherited"));
+  EXPECT_EQ((*first)->timeSource(), std::optional<String>("uninit band"));
   ASSERT_TRUE(component.removeCallbacks("songbook"));
   ASSERT_TRUE(component.removeCallbacks("liveSongbook"));
   ASSERT_TRUE(component.addCallbacks("songbook", *secondCallbacks));
@@ -1890,7 +2076,7 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   EXPECT_EQ((*second)->song(), song);
   EXPECT_EQ((*second)->timeSource(), std::optional<String>("current"));
   EXPECT_FALSE(oldPlay->invoke<LuaValue>(song, "revived"));
-  EXPECT_EQ((*first)->timeSource(), std::optional<String>("inherited"));
+  EXPECT_EQ((*first)->timeSource(), std::optional<String>("uninit band"));
   ASSERT_TRUE(component.eval<LuaValue>("function failScope() error('scope regression') end"));
   testing::TestPartResultArray errors;
   {
