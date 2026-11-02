@@ -83,6 +83,9 @@ private:
   // edge of screen
   [[nodiscard]] std::expected<std::uint8_t, StarException> calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction) const;
 
+  // Wrap widths are stored in unscaled interface pixels for measurement and drawing.
+  TextPositioning scaledPositioning(TextPositioning positioning, float pixelRatio) const;
+
   [[nodiscard]] std::expected<RectF, StarException> bubbleImageRect(Vec2F screenPos, BubbleImage const& bubbleImage, float pixelRatio);
   [[nodiscard]] std::expected<void, StarException> drawBubbleImage(Vec2F screenPos, BubbleImage const& bubbleImage, float pixelRatio, int alpha);
   [[nodiscard]] std::expected<void, StarException> drawBubbleText(Vec2F screenPos, BubbleText const& bubbleText, float pixelRatio, int alpha, bool isPortrait);
@@ -97,7 +100,7 @@ private:
   Vec2F m_textPadding;
 
   BubbleSeparator<Bubble> m_bubbles;
-  int m_zoom;
+  float m_partSize;
   Map<EntityId, int> m_entityBubbleCounts;
   float m_cachedInterfaceScale;
   Vec2F m_bubbleOffset;

@@ -18,6 +18,7 @@ set (star_core_tests_SOURCES
       hash_test.cpp
       host_address_test.cpp
       image_processing_test.cpp
+      image_scaling_test.cpp
       ref_ptr_test.cpp
       json_test.cpp
       json_contract_test.cpp
@@ -95,6 +96,7 @@ set (star_game_tests_SOURCES
       lua_component_test.cpp
       material_types_test.cpp
       movement_controller_test.cpp
+      physics_object_test.cpp
       root_test.cpp
       server_test.cpp
       spawn_test.cpp

@@ -27,6 +27,41 @@ std::expected<Image, StarException> scaleNearest(Image const& srcImage, Vec2F co
 
   Image destImage(destSize, srcImage.pixelFormat());
 
+  // A newly allocated image is zeroed, matching clamp()'s transparent black
+  // for an empty source (with implicit opaque alpha in the 24-bit formats).
+  if (srcImage.empty())
+    return destImage;
+
+  auto bpp = srcImage.bytesPerPixel();
+  if (bpp == 3 || bpp == 4) {
+    // Keep actual division: fast-math can otherwise hoist a reciprocal out of
+    // the loop and move a source coordinate across a rounding half-boundary.
+    volatile float scaleX = scale[0], scaleY = scale[1];
+    int maxX = static_cast<int>(srcSize[0]) - 1;
+    int maxY = static_cast<int>(srcSize[1]) - 1;
+    std::vector<std::size_t> columns(destSize[0]);
+    for (unsigned x = 0; x < destSize[0]; ++x) {
+      int sourceX = scale[0] == 0.0f ? 0 : static_cast<int>(std::round(static_cast<float>(x) / scaleX));
+      columns[x] = static_cast<std::size_t>(std::clamp(sourceX, 0, maxX)) * bpp;
+    }
+
+    auto source = srcImage.data();
+    auto destination = destImage.data();
+    std::size_t sourceStride = static_cast<std::size_t>(srcSize[0]) * bpp;
+    std::size_t destinationStride = static_cast<std::size_t>(destSize[0]) * bpp;
+    for (unsigned y = 0; y < destSize[1]; ++y) {
+      int sourceY = scale[1] == 0.0f ? 0 : static_cast<int>(std::round(static_cast<float>(y) / scaleY));
+      auto sourceRow = source.data() + static_cast<std::size_t>(std::clamp(sourceY, 0, maxY)) * sourceStride;
+      auto destinationRow = destination.data() + static_cast<std::size_t>(y) * destinationStride;
+      for (unsigned x = 0; x < destSize[0]; ++x)
+        std::memcpy(destinationRow + static_cast<std::size_t>(x) * bpp, sourceRow + columns[x], bpp);
+    }
+    return destImage;
+  }
+
+  // Float formats do not have byte-equivalent clamp()/set() semantics.
+  // Preserve their existing scalar behavior rather than copying float pixels.
+
   for (unsigned y = 0; y < destSize[1]; ++y) {
     for (unsigned x = 0; x < destSize[0]; ++x) {
       auto assigned = destImage.set({x, y}, srcImage.clamp(Vec2I::round(vdiv(Vec2F(x, y), scale))));

@@ -213,11 +213,8 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
     return std::unexpected(std::move(initialized.error()));
   }
   m_metaBoundBox = Object::metaBoundBox();
-  for (auto const& pair : m_physicsForces) {
-    PhysicsForceRegion region = pair.second.forceRegion;
-    std::visit([pos = position()](auto& force) { force.translate(pos); }, region);
-    m_metaBoundBox.combine(std::visit([](auto& force) { return force.boundBox(); }, region));
-  }
+  for (auto const& pair : m_physicsForces)
+    m_metaBoundBox.combine(std::visit([](auto const& force) { return force.boundBox(); }, pair.second.forceRegion));
   return {};
 }
 

@@ -163,8 +163,11 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
   auto styled = context().setTextStyle(m_textStyle);
   if (!styled)
     return std::unexpected(std::move(styled.error()));
-  if (m_maxWidth != -1 && m_overfillMode)
-    pos[0] -= std::max(0.f, cursorOffset - m_maxWidth);
+  if (m_maxWidth != -1 && m_overfillMode) {
+    float shift = m_hAnchor == HorizontalAnchor::RightAnchor ? std::min(0.f, cursorOffset + m_maxWidth)
+                                                             : std::max(0.f, cursorOffset - m_maxWidth);
+    pos[0] -= shift;
+  }
   auto color = Color::rgba(m_textStyle.color);
   if (m_text.empty())
     color = color.mix(Color::rgbf(0.3f, 0.3f, 0.3f), 0.8f);

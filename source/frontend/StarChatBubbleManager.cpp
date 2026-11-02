@@ -227,9 +227,9 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
     m_portraitTextPosition = *value;
   }
   {
-    auto value = config->getInt("textZoom");
+    auto value = config->getFloat("partSize");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_zoom = std::move(*value);
+    m_partSize = *value;
   }
   {
     auto value = config->getFloat("maxAge");
@@ -283,8 +283,9 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
   }
   auto wrap = config->getUInt("textWrapWidth");
   if (!wrap) return std::unexpected(std::move(wrap.error()));
-  m_textTemplate = TextPositioning{Vec2F(), HorizontalAnchor::HMidAnchor, VerticalAnchor::TopAnchor, *wrap * m_zoom};
-  m_portraitTextTemplate = TextPositioning{Vec2F(m_portraitTextPosition), HorizontalAnchor::LeftAnchor, VerticalAnchor::TopAnchor, m_portraitTextWidth * m_zoom};
+  m_textTemplate = TextPositioning{Vec2F(), HorizontalAnchor::HMidAnchor, VerticalAnchor::TopAnchor, *wrap};
+  m_portraitTextTemplate = TextPositioning{Vec2F(m_portraitTextPosition), HorizontalAnchor::LeftAnchor,
+                                           VerticalAnchor::TopAnchor, m_portraitTextWidth};
   {
     auto value = config->getFloat("tweenFactor");
     if (!value) return std::unexpected(std::move(value.error()));
@@ -459,35 +460,44 @@ std::expected<void, StarException> ChatBubbleManager::render() {
 }
 
 std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAction> chatActions, bool silent) {
-  auto assets = m_guiContext.get().root().assets();
-  if (!assets) return std::unexpected(std::move(assets.error()));
-  auto baseConfig = (*assets)->json("/interface/windowconfig/chatbubbles.config");
-  if (!baseConfig) return std::unexpected(std::move(baseConfig.error()));
-  auto part = baseConfig->getFloat("partSize");
-  if (!part) return std::unexpected(std::move(part.error()));
-  float partSize = *part;
+  float partSize = m_partSize;
   float pixelRatio = m_guiContext.get().interfaceScale();
 
-  for (auto action : chatActions) {
+  for (auto const& action : chatActions) {
     Json config = JsonObject{};
     Vec2F position;
 
     if (std::holds_alternative<SayChatAction>(action)) {
-      auto sayAction = std::get<SayChatAction>(action);
+      auto const& sayAction = std::get<SayChatAction>(action);
       auto actionConfig = sayAction.config.optObject();
       if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
       config = actionConfig->value_or(JsonObject{});
       position = sayAction.position;
 
-      // TODO: Get rid of this stupid fucking bullshit, this is the ugliest
-      // fragilest pointlessest horseshit code in the codebase.  It wouldn't
-      // bother me so bad if it weren't so fucking easy to do right.
-
-      // yea I agree
-      auto styled = m_guiContext.get().setTextStyle(m_textStyle, pixelRatio);
+      TextStyle textStyle = m_textStyle;
+      auto fontSize = config.getUInt("fontSize", textStyle.fontSize);
+      if (!fontSize)
+        return std::unexpected(std::move(fontSize.error()));
+      textStyle.fontSize = *fontSize;
+      auto jColor = config.opt("color");
+      if (!jColor)
+        return std::unexpected(std::move(jColor.error()));
+      if (*jColor) {
+        auto color = jsonToColor(**jColor);
+        if (!color)
+          return std::unexpected(std::move(color.error()));
+        textStyle.color = color->toRgba();
+      }
+      auto styleJson = config.get("style", Json());
+      if (!styleJson)
+        return std::unexpected(std::move(styleJson.error()));
+      auto loadedStyle = textStyle.loadJson(*styleJson);
+      if (!loadedStyle)
+        return std::unexpected(std::move(loadedStyle.error()));
+      // Size the bubble using the same final style and wrap width as drawing.
+      auto styled = m_guiContext.get().setTextStyle(textStyle, pixelRatio);
       if (!styled) return std::unexpected(std::move(styled.error()));
-      TextPositioning tp = m_textTemplate;
-      tp.wrapWidth = tp.wrapWidth.transform([&](unsigned w) { return (unsigned)(w * pixelRatio / m_zoom); });
+      TextPositioning tp = scaledPositioning(m_textTemplate, pixelRatio);
       auto result = m_guiContext.get().determineTextSize(sayAction.text, tp);
       if (!result) return std::unexpected(std::move(result.error()));
       float textWidth = result->width() / pixelRatio + m_textPadding[0];
@@ -544,21 +554,6 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       float verticalShift = (partSize * innerTiles[1] - textMultiLineShift) * 0.5f + textMultiLineShift - 1.0f;
       Vec2F position = Vec2F(horizontalCenter, verticalShift);
       List<BubbleText> bubbleTexts;
-      TextStyle textStyle = m_textStyle;
-      auto fontSize = config.getUInt("fontSize", textStyle.fontSize);
-      if (!fontSize) return std::unexpected(std::move(fontSize.error()));
-      textStyle.fontSize = *fontSize;
-      auto jColor = config.opt("color");
-      if (!jColor) return std::unexpected(std::move(jColor.error()));
-      if (*jColor) {
-        auto color = jsonToColor(**jColor);
-        if (!color) return std::unexpected(std::move(color.error()));
-        textStyle.color = color->toRgba();
-      }
-      auto styleJson = config.get("style", Json());
-      if (!styleJson) return std::unexpected(std::move(styleJson.error()));
-      auto loadedStyle = textStyle.loadJson(*styleJson);
-      if (!loadedStyle) return std::unexpected(std::move(loadedStyle.error()));
 
       bubbleTexts.append(std::make_tuple(sayAction.text, textStyle, true, position));
 
@@ -585,7 +580,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         m_bubbles.addBubble(bubble.idealDestination, bubble.boundBox, bubble.contents, 0);
 
     } else if (std::holds_alternative<PortraitChatAction>(action)) {
-      auto portraitAction = std::get<PortraitChatAction>(action);
+      auto const& portraitAction = std::get<PortraitChatAction>(action);
       auto actionConfig = portraitAction.config.optObject();
       if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
       config = actionConfig->value_or(JsonObject{});
@@ -623,6 +618,9 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       auto sound = config.optString("sound");
       if (!sound) return std::unexpected(std::move(sound.error()));
       if (*sound) {
+        auto assets = m_guiContext.get().root().assets();
+        if (!assets)
+          return std::unexpected(std::move(assets.error()));
         auto audio = (*assets)->audio(**sound);
         if (!audio) return std::unexpected(std::move(audio.error()));
         auto instance = AudioInstance::create(**audio);
@@ -662,10 +660,15 @@ std::expected<void, StarException> ChatBubbleManager::drawBubbleText(Vec2F scree
   if (!styled) return std::unexpected(std::move(styled.error()));
   TextPositioning tp = isPortrait ? m_portraitTextTemplate : m_textTemplate;
   tp.pos = screenPos + std::get<3>(text) * pixelRatio;
-  tp.wrapWidth = tp.wrapWidth.transform([&](unsigned w) { return (unsigned)(w * pixelRatio / m_zoom); });
+  tp = scaledPositioning(tp, pixelRatio);
   auto rendered = m_guiContext.get().renderText(std::get<0>(text), tp);
   if (!rendered) return std::unexpected(std::move(rendered.error()));
   return {};
 }
 
+TextPositioning ChatBubbleManager::scaledPositioning(TextPositioning positioning, float pixelRatio) const {
+  positioning.wrapWidth =
+    positioning.wrapWidth.transform([pixelRatio](unsigned width) { return static_cast<unsigned>(width * pixelRatio); });
+  return positioning;
+}
 }
