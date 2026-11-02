@@ -122,9 +122,20 @@ Then use the `windows-cross` preset with the same vcpkg/bootstrap steps. Tests r
 
 ## Tests and benchmarks
 
-CTest presets run asset-free core tests.
+CTest presets select asset-free core tests. Native builds also register `game_tests` and, with `STAR_BUILD_GUI`, `frontend_tests`:
+
+```sh
+OPENSTARBOUND_ASSETS=/path/to/Starbound/assets \
+  ctest --test-dir build/linux-release -L '^Assets$' --output-on-failure
+```
+
+Use your configured build directory; `-L '^Frontend$'` selects only the frontend suite. Alternatively, configure `-DSTAR_TEST_ASSETS=/absolute/path/to/Starbound/assets`; this takes precedence over the environment. Without either asset setting, these suites are explicitly skipped; an invalid configured directory fails.
+
+Each native asset-backed CTest invocation runs one process per executable with a fresh boot configuration, storage and logs under `<build>/test/runtime/<executable>/<run-id>/`. `results.json` and the runtime are retained for diagnosis. These tests do not read your normal boot configuration or saves. The packaged Nix runner below instead isolates every case when invoked without arguments.
 
 `ImageProcessingTest.*` covers byte-preserving neutral directives, cached color conversions, replacement thresholds and ordered four-channel blends. Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState` cover catalog errors, sleeve lighting and blueprint state/error boundaries.
+
+Core timing tests use a short real-clock smoke and explicit worker synchronization rather than long per-task sleeps. Lua limit tests retain all three execution entry points and post-error recovery at reduced instruction/recursion scales. Image matrices retain byte-exact sequential oracles, with separate value-ownership checks for the List entry point; descriptor parsing formats are checked independently from matching semantics.
 
 For real-asset tests:
 

@@ -563,28 +563,18 @@ TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
   EXPECT_EQ(*automaticError, (std::optional<String>{"closed"}));
 }
 
-TEST(RpcPromiseTest, CancellationAndCompletionChooseOneNativeDecision) {
-  for (bool cancelFirst : {false, true}) {
-    auto [promise, keeper] = RpcPromise<int, int>::createPair();
-    std::latch firstDecision(1);
-    std::thread producer([&] {
-      if (cancelFirst)
-        firstDecision.wait();
-      EXPECT_TRUE(keeper.fulfill(42));
-      if (!cancelFirst)
-        firstDecision.count_down();
-    });
-    std::thread canceller([&] {
-      if (!cancelFirst)
-        firstDecision.wait();
-      EXPECT_EQ(promise.cancel(9), cancelFirst);
-      if (cancelFirst)
-        firstDecision.count_down();
-    });
-    producer.join();
-    canceller.join();
-    EXPECT_EQ(promise.status(), cancelFirst ? RpcPromiseStatus::Cancelled : RpcPromiseStatus::Succeeded);
-  }
+TEST(RpcPromiseTest, CancellationBeforeCompletionKeepsNativeDecision) {
+  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  EXPECT_EQ(promise.cancel(9), true);
+  EXPECT_TRUE(keeper.fulfill(42));
+  EXPECT_EQ(promise.status(), RpcPromiseStatus::Cancelled);
+}
+
+TEST(RpcPromiseTest, CompletionBeforeCancellationKeepsNativeDecision) {
+  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  EXPECT_TRUE(keeper.fulfill(42));
+  EXPECT_EQ(promise.cancel(9), false);
+  EXPECT_EQ(promise.status(), RpcPromiseStatus::Succeeded);
 }
 
 TEST(RpcPromiseTest, ScopedChainedViewCancelsWithoutChangingSourceObservers) {

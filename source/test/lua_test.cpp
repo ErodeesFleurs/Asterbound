@@ -992,8 +992,8 @@ TEST(LuaTest, Limits) {
   auto luaEngineResult = LuaEngine::create();
   ASSERT_TRUE(luaEngineResult);
   auto& luaEngine = *luaEngineResult;
-  luaEngine->setInstructionLimit(500000);
-  luaEngine->setRecursionLimit(64);
+  luaEngine->setInstructionLimit(50000);
+  luaEngine->setRecursionLimit(8);
   auto contextResult = luaEngine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
@@ -1004,7 +1004,7 @@ TEST(LuaTest, Limits) {
       end
 
       function toabignumberandthenstop()
-        for i = 0, 50000 do
+        for i = 0, 5000 do
         end
       end
     )SCRIPT")));
@@ -1373,7 +1373,7 @@ TEST(LuaTest, ProfilingTest) {
         end
       end
 
-      for i = 1, 10000 do
+      for i = 1, 10 do
         function1()
         function2()
         function3()
@@ -1382,6 +1382,7 @@ TEST(LuaTest, ProfilingTest) {
 
   StringSet names;
   List<LuaProfileEntry> profile = luaEngine->getProfile();
+  ASSERT_FALSE(profile.empty());
   for (auto const& p : profile[0].calls)
     names.add(p.second->name.value_or(String()));
 

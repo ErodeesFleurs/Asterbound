@@ -69,6 +69,18 @@ void expectResponse(std::expected<std::optional<ChainableJsonMessageResponse>, S
   EXPECT_EQ(std::get<Json>(**response), expected);
 }
 
+std::expected<RpcPromise<Json>, std::string>
+promiseResponse(std::expected<std::optional<ChainableJsonMessageResponse>, StarException> response) {
+  if (!response)
+    return std::unexpected(std::string(response.error().what()));
+  if (!*response)
+    return std::unexpected(std::string("Message returned no response"));
+  auto promise = std::get_if<RpcPromise<Json>>(&**response);
+  if (!promise)
+    return std::unexpected(std::string("Message response is not a promise"));
+  return std::move(*promise);
+}
+
 void expectPending(RpcPromise<Json> const& promise) {
   auto finished = promise.finished();
   ASSERT_TRUE(finished) << finished.error().what();
@@ -918,8 +930,11 @@ const GameTestRegistration
 const GameTestRegistration
   injectedReplyRetirement("LuaComponentLifecycle",
                           "InjectedRepliesRetireOnUninitReinitAndReloadWithoutCancellingSource", [](GameTest& fixture) {
-                            for (int retirement : {0, 1, 2}) {
-                              SCOPED_TRACE(retirement);
+                            enum class Retirement { Uninit, Reinit, Reload };
+                            for (auto [retirement, name] :
+                                 {std::pair{Retirement::Uninit, "uninit"}, std::pair{Retirement::Reinit, "reinit"},
+                                  std::pair{Retirement::Reload, "reload"}}) {
+                              SCOPED_TRACE(name);
                               auto luaRoot = LuaRoot::create(fixture.root());
                               ASSERT_TRUE(luaRoot);
                               LuaMessageScript component(fixture.root());
@@ -932,18 +947,16 @@ const GameTestRegistration
         message.setHandler("async", function() return injected end)
         threads.setMessageHandler("async", function() return injected end)
       )LUA"));
-                              auto ordinary = component.handleMessage("async", true);
-                              ASSERT_TRUE(ordinary);
-                              ASSERT_TRUE(*ordinary);
-                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**ordinary));
-                              auto reply = std::get<RpcPromise<Json>>(**ordinary);
+                              auto ordinary = promiseResponse(component.handleMessage("async", true));
+                              ASSERT_TRUE(ordinary) << ordinary.error();
+                              auto reply = std::move(*ordinary);
                               auto queued = component.threadPassMessage("worker", "async", {});
                               ASSERT_TRUE(component.update<LuaValue>());
-                              expectPending(reply);
-                              expectPending(queued);
-                              if (retirement == 0) {
+                              expectPromiseStatus(reply, RpcPromiseStatus::Pending);
+                              expectPromiseStatus(queued, RpcPromiseStatus::Pending);
+                              if (retirement == Retirement::Uninit) {
                                 ASSERT_TRUE(component.uninit());
-                              } else if (retirement == 1) {
+                              } else if (retirement == Retirement::Reinit) {
                                 ASSERT_TRUE(component.init());
                               } else {
                                 ASSERT_TRUE((*luaRoot)->restart());
@@ -973,7 +986,8 @@ const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
                                                 ASSERT_TRUE(component.setLuaRoot(*luaRoot));
                                                 ASSERT_TRUE(component.init());
                                                 for (bool completedBeforeDispatch : {true, false}) {
-                                                  SCOPED_TRACE(completedBeforeDispatch);
+                                                  SCOPED_TRACE(completedBeforeDispatch ? "completed before dispatch"
+                                                                                       : "completed after dispatch");
                                                   auto producer = RpcPromise<Json>::createPair();
                                                   if (completedBeforeDispatch)
                                                     ASSERT_TRUE(producer.second.fulfill(Json()));
@@ -981,11 +995,10 @@ const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
                                                   ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
         message.setHandler("async", function() return injected end)
       )LUA"));
-                                                  auto response = component.handleMessage("async", true);
-                                                  ASSERT_TRUE(response);
-                                                  ASSERT_TRUE(*response);
-                                                  ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**response));
-                                                  auto reply = std::get<RpcPromise<Json>>(**response);
+                                                  auto response =
+                                                    promiseResponse(component.handleMessage("async", true));
+                                                  ASSERT_TRUE(response) << response.error();
+                                                  auto reply = std::move(*response);
                                                   if (!completedBeforeDispatch)
                                                     ASSERT_TRUE(producer.second.fulfill(Json()));
                                                   expectPromiseStatus(reply, RpcPromiseStatus::Succeeded);
@@ -1021,16 +1034,12 @@ const GameTestRegistration
         message.setHandler("async", function() return injected end)
       )LUA"));
                               }
-                              auto firstResponse = first.handleMessage("async", true);
-                              auto secondResponse = second.handleMessage("async", true);
-                              ASSERT_TRUE(firstResponse);
-                              ASSERT_TRUE(secondResponse);
-                              ASSERT_TRUE(*firstResponse);
-                              ASSERT_TRUE(*secondResponse);
-                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**firstResponse));
-                              ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**secondResponse));
-                              auto firstReply = std::get<RpcPromise<Json>>(**firstResponse);
-                              auto secondReply = std::get<RpcPromise<Json>>(**secondResponse);
+                              auto firstResponse = promiseResponse(first.handleMessage("async", true));
+                              auto secondResponse = promiseResponse(second.handleMessage("async", true));
+                              ASSERT_TRUE(firstResponse) << firstResponse.error();
+                              ASSERT_TRUE(secondResponse) << secondResponse.error();
+                              auto firstReply = std::move(*firstResponse);
+                              auto secondReply = std::move(*secondResponse);
                               ASSERT_TRUE(first.uninit());
                               expectPromiseStatus(firstReply, RpcPromiseStatus::Cancelled);
                               expectPromiseStatus(secondReply, RpcPromiseStatus::Pending);
@@ -1062,7 +1071,7 @@ const GameTestRegistration
                           EXPECT_EQ(engine.promiseLifetime(), outer.get_token());
                           auto saved = component.context()->get<RpcPromise<Json>>("savedRequest");
                           ASSERT_TRUE(saved);
-                          expectPending(*saved);
+                          expectPromiseStatus(*saved, RpcPromiseStatus::Pending);
                           ASSERT_TRUE(component.uninit());
                           expectPromiseStatus(*saved, RpcPromiseStatus::Cancelled);
                           expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
@@ -1076,7 +1085,7 @@ const GameTestRegistration deferredReplyCancellation(
     auto luaRoot = LuaRoot::create(fixture.root());
     ASSERT_TRUE(luaRoot);
     for (bool completed : {false, true}) {
-      SCOPED_TRACE(completed);
+      SCOPED_TRACE(completed ? "completed before deferred close" : "pending at deferred close");
       LuaMessageScript component(fixture.root());
       auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
       ASSERT_TRUE(component.setLuaRoot(*luaRoot));
@@ -1094,11 +1103,9 @@ const GameTestRegistration deferredReplyCancellation(
           return injected
         end)
       )LUA"));
-      auto response = component.handleMessage("close", true);
-      ASSERT_TRUE(response);
-      ASSERT_TRUE(*response);
-      ASSERT_TRUE(std::holds_alternative<RpcPromise<Json>>(**response));
-      auto reply = std::get<RpcPromise<Json>>(**response);
+      auto response = promiseResponse(component.handleMessage("close", true));
+      ASSERT_TRUE(response) << response.error();
+      auto reply = std::move(*response);
       EXPECT_FALSE(component.initialized());
       expectPromiseStatus(reply, completed ? RpcPromiseStatus::Succeeded : RpcPromiseStatus::Cancelled);
       if (completed) {

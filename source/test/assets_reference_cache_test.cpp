@@ -29,8 +29,7 @@ Assets::Settings referenceCacheSettings(std::uint64_t budget = 8, float referenc
   return settings;
 }
 
-std::expected<std::shared_ptr<Assets>, StarException> referenceCacheAssets(GameTest& fixture, String const& directory,
-                                                                           Assets::Settings const& settings) {
+std::expected<void, StarException> writeReferenceCacheAssets(GameTest& fixture, String const& directory) {
   auto preload = File::writeFile(String("[]"), File::relativeTo(directory, "preload.config"));
   if (!preload)
     return std::unexpected(std::move(preload.error()));
@@ -51,6 +50,11 @@ std::expected<std::shared_ptr<Assets>, StarException> referenceCacheAssets(GameT
     if (!stored)
       return std::unexpected(std::move(stored.error()));
   }
+  return {};
+}
+
+std::expected<std::shared_ptr<Assets>, StarException> referenceCacheAssets(GameTest& fixture, String const& directory,
+                                                                           Assets::Settings const& settings) {
   return Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                         {directory});
 }
@@ -84,6 +88,7 @@ const GameTestRegistration
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings());
     ASSERT_TRUE(assets) << assets.error().what();
     std::weak_ptr<Image const> ordinary, base, blendReference, maskReference, blend, mask;
@@ -112,6 +117,7 @@ const GameTestRegistration assetsReferenceCacheExtensionCanBeDisabled(
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     for (auto const& settings :
          std::array{referenceCacheSettings(0), referenceCacheSettings(4, -1), referenceCacheSettings(4, -2)}) {
       SCOPED_TRACE(::testing::Message() << "budget=" << settings.referenceImagePixelBudget
@@ -133,6 +139,7 @@ const GameTestRegistration assetsReferenceCacheSkipsOversizedCandidates(
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
     std::weak_ptr<Image const> small, large, smallResult, largeResult;
@@ -155,6 +162,7 @@ const GameTestRegistration assetsReferenceCacheRecentReferenceHitWinsBudget(
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
     std::weak_ptr<Image const> red, green, first, second, recent;
@@ -181,6 +189,7 @@ const GameTestRegistration assetsReferenceCacheClearDisregardsExtendedTtl(
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
     std::weak_ptr<Image const> reference, result;
@@ -199,6 +208,7 @@ const GameTestRegistration assetsReferenceCacheExternalHandlesPersist(
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     for (std::uint64_t budget : {0u, 4u}) {
       SCOPED_TRACE(::testing::Message() << "budget=" << budget);
       auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(budget));

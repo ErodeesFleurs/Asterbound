@@ -79,6 +79,29 @@ target_link_libraries (core_tests PRIVATE star_base_modules star_build_config st
 set_target_properties (core_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAND core_tests)
 
+set(STAR_TEST_ASSETS "" CACHE PATH "Owned Starbound assets for isolated CTest runs")
+
+function(star_add_asset_test target)
+  set(emulator "")
+  if(CMAKE_CROSSCOMPILING)
+    get_target_property(emulator ${target} CROSSCOMPILING_EMULATOR)
+    if(NOT emulator)
+      set(emulator "")
+    endif()
+  endif()
+  add_test(NAME ${target}
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTEST_EXECUTABLE=$<TARGET_FILE:${target}>"
+      "-DTEST_EMULATOR=${emulator}"
+      "-DTEST_ASSETS=${STAR_TEST_ASSETS}"
+      "-DTEST_BUNDLED_ASSETS=${PROJECT_SOURCE_DIR}/../assets/opensb"
+      "-DTEST_RUNTIME_ROOT=${CMAKE_CURRENT_BINARY_DIR}/runtime/${target}"
+      -P "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/run_asset_tests.cmake")
+  set_tests_properties(${target} PROPERTIES
+    LABELS "Assets"
+    SKIP_REGULAR_EXPRESSION "SKIP: set STAR_TEST_ASSETS or OPENSTARBOUND_ASSETS")
+endfunction()
+
 set (star_game_tests_SOURCES
       gtest/gtest-all.cc
 
@@ -132,7 +155,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_options (game_tests PRIVATE "LINKER:--wrap=pthread_create")
 endif ()
 set_target_properties (game_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
-add_test (NAME game_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:game_tests> COMMAND game_tests)
+star_add_asset_test(game_tests)
 
 set_tests_properties(core_tests PROPERTIES
                      LABELS "NoAssets")
@@ -153,4 +176,6 @@ if(STAR_BUILD_GUI)
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
     $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
   set_target_properties(frontend_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+  star_add_asset_test(frontend_tests)
+  set_property(TEST frontend_tests APPEND PROPERTY LABELS "Frontend")
 endif()

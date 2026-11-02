@@ -333,26 +333,48 @@ TEST(StaticVectorTest, InitializerAssignmentChecksCapacityBeforeMutation) {
   EXPECT_EQ(values, (StaticVector<int, 2>::create({1})));
 }
 
-TEST(StaticVectorTest, ResizePreservesDefaultTemporaryCopyAndDestructionOrder) {
+TEST(StaticVectorTest, ResizePreservesValuesAndObjectLifetime) {
   struct Value {
-    static std::vector<char>& events() {
-      static std::vector<char> log;
-      return log;
+    static int& live() {
+      static int count = 0;
+      return count;
     }
-    Value() { events().push_back('D'); }
-    Value(Value const&) { events().push_back('C'); }
-    ~Value() { events().push_back('X'); }
+    int value = 7;
+    Value() { ++live(); }
+    Value(Value const& other) : value(other.value) { ++live(); }
+    ~Value() { --live(); }
   };
-  StaticVector<Value, 4> values;
-  Value::events().clear();
-  ASSERT_TRUE(values.resize(2));
-  EXPECT_EQ(Value::events(), (std::vector<char>{'D', 'C', 'C', 'X'}));
-  Value::events().clear();
-  ASSERT_TRUE(values.resize(2));
-  EXPECT_EQ(Value::events(), (std::vector<char>{'D', 'X'}));
-  Value::events().clear();
-  ASSERT_TRUE(values.resize(0));
-  EXPECT_EQ(Value::events(), (std::vector<char>{'D', 'X', 'X', 'X'}));
+  EXPECT_EQ(Value::live(), 0);
+  {
+    StaticVector<Value, 4> values;
+    ASSERT_TRUE(values.resize(2));
+    ASSERT_EQ(values.size(), 2u);
+    EXPECT_EQ(values[0].value, 7);
+    EXPECT_EQ(values[1].value, 7);
+    EXPECT_EQ(Value::live(), 2);
+    values[0].value = 11;
+    ASSERT_TRUE(values.resize(2));
+    EXPECT_EQ(values.size(), 2u);
+    EXPECT_EQ(values[0].value, 11);
+    EXPECT_EQ(values[1].value, 7);
+    EXPECT_EQ(Value::live(), 2);
+    ASSERT_TRUE(values.resize(3));
+    ASSERT_EQ(values.size(), 3u);
+    EXPECT_EQ(values[0].value, 11);
+    EXPECT_EQ(values[1].value, 7);
+    EXPECT_EQ(values[2].value, 7);
+    EXPECT_EQ(Value::live(), 3);
+    ASSERT_TRUE(values.resize(1));
+    ASSERT_EQ(values.size(), 1u);
+    EXPECT_EQ(values[0].value, 11);
+    EXPECT_EQ(Value::live(), 1);
+    ASSERT_TRUE(values.resize(0));
+    EXPECT_TRUE(values.empty());
+    EXPECT_EQ(Value::live(), 0);
+    ASSERT_TRUE(values.resize(1));
+    EXPECT_EQ(Value::live(), 1);
+  }
+  EXPECT_EQ(Value::live(), 0);
 }
 
 TEST(StaticVectorTest, AliasedEmplaceStagesValue) {

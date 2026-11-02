@@ -1,5 +1,4 @@
 import std;
-import star.thread;
 import star.list;
 import star.worker_pool;
 import star.unique_function;
@@ -12,9 +11,13 @@ using namespace Star;
 TEST(WorkerPoolTest, All) {
   int counter = 0;
   std::mutex counterMutex;
+  std::atomic<bool> started{false};
+  std::atomic<bool> released{false};
 
-  auto incCounter = [&counter, &counterMutex]() -> std::expected<void, StarException> {
-    Thread::sleep(100);
+  auto incCounter = [&]() -> std::expected<void, StarException> {
+    started.store(true);
+    started.notify_all();
+    released.wait(false);
     std::lock_guard locker(counterMutex);
     counter += 1;
     return {};
@@ -23,13 +26,28 @@ TEST(WorkerPoolTest, All) {
   Deque<WorkerPoolHandle> handles;
 
   WorkerPool workerPool("WorkerPoolTest");
+  // Keep the gate alive through pool teardown, but release it before any join
+  // even when a fatal assertion exits the test early.
+  struct ReleaseOnExit {
+    std::atomic<bool>& released;
+    void open() {
+      released.store(true);
+      released.notify_all();
+    }
+    ~ReleaseOnExit() { open(); }
+  } releaseOnExit{released};
+
   for (std::size_t i = 0; i < 10; ++i)
     handles.append(workerPool.addWork(incCounter));
 
   ASSERT_TRUE(workerPool.start(10));
+  started.wait(false);
+  EXPECT_EQ(counter, 0);
 
   for (std::size_t i = 0; i < 90; ++i)
     handles.append(workerPool.addWork(incCounter));
+
+  releaseOnExit.open();
 
   while (handles.size() > 20) {
     auto handle = handles.takeFirst();

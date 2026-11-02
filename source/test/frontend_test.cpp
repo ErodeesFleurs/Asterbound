@@ -78,6 +78,17 @@ using namespace Star;
 
 namespace {
 
+auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, String const& overlay,
+                              String runtimeConfig) {
+  settings.assetSources.append(overlay);
+  settings.storageDirectory = File::relativeTo(directory, "storage");
+  settings.runtimeConfigFile = std::move(runtimeConfig);
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  return Root::create(settings);
+}
+
 std::optional<RectF> separateAgainst(List<RectF> const& obstacles, RectF box) {
   BubbleSeparator<int> separator(1.0f);
   int id = 0;
@@ -1811,14 +1822,7 @@ const GameTestRegistration songbookPresentation("LuaSongbook", "NativeListLitera
   ASSERT_TRUE(File::writeFile(abc, File::relativeTo(overlay, "songs/zzsongbook[A].Café[A].abc")));
   ASSERT_TRUE(File::writeFile(String("X:2\nK:C\nC|\n"), File::relativeTo(overlay, "songs/Nested/zzsongbookB.abc")));
   ASSERT_TRUE(File::writeFile(String("X:3\nK:C\nD|\n"), File::relativeTo(overlay, "songs/zzsongbookZ.abc")));
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("songbook.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "songbook.config");
   ASSERT_TRUE(createdRoot) << createdRoot.error().what();
   auto& root = **createdRoot;
   auto configuration = root.configuration();
@@ -2439,14 +2443,7 @@ const GameTestRegistration codexPresentation("LuaCodex", "DomainIdentityReadReor
   ASSERT_TRUE(File::writeFile(String(R"JSON({
     "id":"zzcodex-empty","title":"Empty","contentPages":[]
   })JSON"), File::relativeTo(overlay, "interface/zzcodex-empty.codex")));
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("codex.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "codex.config");
   ASSERT_TRUE(createdRoot) << createdRoot.error().what();
   auto& root = **createdRoot;
   auto configuration = root.configuration();
@@ -2669,14 +2666,7 @@ const GameTestRegistration questTrackerPresentation("LuaQuestTracker", "Effectiv
       File::relativeTo(overlay, "visible.questtemplate")));
   ASSERT_TRUE(File::writeFile(String(R"JSON({"id":"zztracker-hidden","showInLog":false})JSON"),
       File::relativeTo(overlay, "hidden.questtemplate")));
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("tracker.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "tracker.config");
   ASSERT_TRUE(createdRoot) << createdRoot.error().what();
   auto& root = **createdRoot;
   auto configuration = root.configuration();
@@ -2997,14 +2987,7 @@ const GameTestRegistration questLogPresentation("LuaQuestLog", "StableSelectionR
     ASSERT_TRUE(printed) << printed.error().what();
     ASSERT_TRUE(File::writeFile(*printed, File::relativeTo(overlay, id + ".questtemplate")));
   }
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("questlog.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questlog.config");
   ASSERT_TRUE(createdRoot) << createdRoot.error().what();
   auto& root = **createdRoot;
   class Errors : public LogSink {
@@ -3402,14 +3385,7 @@ const GameTestRegistration questDialogs("QuestDialogs", "LuaModalDecisionsReload
     ASSERT_TRUE(writeJson(id + ".questtemplate", config));
   }
   ASSERT_TRUE(writeJson("zzdialog-malformed.cinematic", JsonObject{{"panels", 7}}));
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("questdialogs.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questdialogs.config");
   ASSERT_TRUE(createdRoot) << createdRoot.error().what();
   auto& root = **createdRoot;
   auto configuration = root.configuration();
@@ -3786,14 +3762,7 @@ const GameTestRegistration planetTextPresentation("LuaPlanetText", "NativeTimerD
     return File::writeFile(*json, patchPath);
   };
   ASSERT_TRUE(writeStyle(0.7f, 0.3f));
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(*directory, "storage");
-  settings.runtimeConfigFile = String("planettext.config");
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
+  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "planettext.config");
   ASSERT_TRUE(createdRoot);
   auto& root = **createdRoot;
   auto configuration = root.configuration();

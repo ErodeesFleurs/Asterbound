@@ -59,9 +59,14 @@ void expectCroppedMatchesFull(Image const& source, Vec2F const& scale) {
     ASSERT_TRUE(full);
     Vec2I end(full->size());
     Vec2I inset(end[0] / 3, end[1] / 3);
-    for (auto window :
-         {RectI(Vec2I(), end), RectI(inset, end), RectI(end - Vec2I(1, 1), end), RectI(Vec2I(), Vec2I(1, 1)),
-          RectI(end, end), RectI(Vec2I(end[0], 0), end), RectI(Vec2I(0, end[1]), end)}) {
+    std::array windows{RectI(Vec2I(), end),         RectI(inset, end), RectI(end - Vec2I(1, 1), end),
+                       RectI(Vec2I(), Vec2I(1, 1)), RectI(end, end),   RectI(Vec2I(end[0], 0), end),
+                       RectI(Vec2I(0, end[1]), end)};
+    for (size_t index = 0; index < windows.size(); ++index) {
+      auto const& window = windows[index];
+      auto earlier = std::span(windows).first(index);
+      if (std::ranges::find(earlier, window) != earlier.end())
+        continue;
       ASSERT_TRUE(scaledCropFits(source, scale, window));
       auto expected = full->subImage(Vec2U(window.min()), Vec2U(window.size()));
       auto actual = nearest ? scaleNearestCropped(source, scale, window) : scaleBilinearCropped(source, scale, window);

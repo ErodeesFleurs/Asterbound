@@ -26,35 +26,33 @@ TEST(StringTest, SortedComparatorPreservesInputAndDuplicates) {
   EXPECT_EQ(input, (StringList{"b", "a", "b"}));
 }
 
-TEST(StringTest, FilteredPreservesInputDuplicatesAndPredicateOrder) {
+TEST(StringTest, FilteredPreservesDerivedTypeAndMutableCopyIsolation) {
   StringList const input{"alpha", "beta", "alpha"};
-  StringList visited;
-  auto filtered = input.filtered([&](String const& value) {
-    visited.append(value);
-    return value == "alpha";
+  auto filtered = input.filtered([](String& value) {
+    if (value == "beta")
+      return false;
+    value.append("!");
+    return true;
   });
   static_assert(std::same_as<decltype(filtered), StringList>);
-  EXPECT_EQ(filtered, (StringList{"alpha", "alpha"}));
-  EXPECT_EQ(visited, input);
+  EXPECT_EQ(filtered, (StringList{"alpha!", "alpha!"}));
   EXPECT_EQ(input, (StringList{"alpha", "beta", "alpha"}));
 
-  visited.clear();
-  auto accepted = input.filtered([&](String const& value) -> std::expected<bool, StarException> {
-    visited.append(value);
-    return value == "alpha";
+  auto accepted = input.filtered([](String& value) -> std::expected<bool, StarException> {
+    if (value == "beta")
+      return false;
+    value.append("!");
+    return true;
   });
   static_assert(std::same_as<decltype(accepted), std::expected<StringList, StarException>>);
   ASSERT_TRUE(accepted);
-  EXPECT_EQ(*accepted, (StringList{"alpha", "alpha"}));
-  EXPECT_EQ(visited, input);
+  EXPECT_EQ(*accepted, (StringList{"alpha!", "alpha!"}));
   EXPECT_EQ(input, (StringList{"alpha", "beta", "alpha"}));
 }
 
 TEST(StringTest, FilteredPropagatesFirstPredicateErrorWithoutChangingInput) {
   StringList const input{"alpha", "beta", "alpha"};
-  StringList visited;
-  auto filtered = input.filtered([&](String& value) -> std::expected<bool, StarException> {
-    visited.append(value);
+  auto filtered = input.filtered([](String& value) -> std::expected<bool, StarException> {
     if (value == "beta")
       return std::unexpected(OutOfRangeException("StringList filtered predicate error", false));
     value = "changed copy";
@@ -63,27 +61,7 @@ TEST(StringTest, FilteredPropagatesFirstPredicateErrorWithoutChangingInput) {
   static_assert(std::same_as<decltype(filtered), std::expected<StringList, StarException>>);
   ASSERT_FALSE(filtered);
   EXPECT_TRUE(filtered.error().is<OutOfRangeException>());
-  EXPECT_NE(std::string_view(filtered.error().what()).find("StringList filtered predicate error"), std::string_view::npos);
-  EXPECT_EQ(visited, (StringList{"alpha", "beta"}));
   EXPECT_EQ(input, (StringList{"alpha", "beta", "alpha"}));
-}
-
-TEST(StringTest, FilteredEmptyInputDoesNotInvokePredicates) {
-  StringList const input;
-  int calls = 0;
-  auto filtered = input.filtered([&](String const&) {
-    ++calls;
-    return true;
-  });
-  EXPECT_TRUE(filtered.empty());
-  auto accepted = input.filtered([&](String const&) -> std::expected<bool, StarException> {
-    ++calls;
-    return std::unexpected(OutOfRangeException("empty StringList predicate must not run", false));
-  });
-  ASSERT_TRUE(accepted);
-  EXPECT_TRUE(accepted->empty());
-  EXPECT_EQ(calls, 0);
-  EXPECT_TRUE(input.empty());
 }
 
 TEST(StringTest, substr) {

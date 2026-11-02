@@ -67,17 +67,6 @@ using namespace Star;
 
 namespace {
 
-[[nodiscard]] std::expected<List<ItemDescriptor>, StarException> itemTestDescriptors(List<Json> const& values) {
-  List<ItemDescriptor> descriptors;
-  for (auto const& value : values) {
-    auto descriptor = ItemDescriptor::create(value);
-    if (!descriptor)
-      return std::unexpected(std::move(descriptor.error()));
-    descriptors.append(std::move(*descriptor));
-  }
-  return descriptors;
-}
-
 [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> inventoryTestItem(
     ItemDatabase const& database, String const& name, std::uint64_t count = 1, Json parameters = Json()) {
   auto descriptor = ItemDescriptor::create(name, count, std::move(parameters));
@@ -89,52 +78,56 @@ namespace {
 }
 
 const GameTestRegistration itemDescriptorConstruction("ItemTest", "ItemDescriptorConstruction", [](GameTest&) {
-  ItemDescriptor testItemDescriptor;
-
-  testItemDescriptor = ItemDescriptor();
-
-  auto nullDescriptor = ItemDescriptor::create(Json());
-  ASSERT_TRUE(nullDescriptor);
-  testItemDescriptor = std::move(*nullDescriptor);
-
-  String nameOnly = "perfectlygenericitem";
-  auto namedDescriptor = ItemDescriptor::create(nameOnly, 1);
-  ASSERT_TRUE(namedDescriptor);
-  testItemDescriptor = std::move(*namedDescriptor);
-
-  List<JsonArray> arrayFormats = List<JsonArray>{
-      JsonArray{"perfectlygenericitem"},
-      JsonArray{"perfectlygenericitem", 1},
-      JsonArray{"perfectlygenericitem", 1, JsonObject()},
-      JsonArray{"perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}}}
-    };
-
-  for (auto const& arrayFormat : arrayFormats) {
-    auto descriptor = ItemDescriptor::create(arrayFormat);
-    ASSERT_TRUE(descriptor);
-    testItemDescriptor = std::move(*descriptor);
+  struct ConstructionCase {
+    char const* label;
+    std::expected<ItemDescriptor, StarException> descriptor;
+    String name;
+    std::uint64_t count;
+    Json parameters;
+  };
+  Json const emptyParameters = JsonObject();
+  Json const customParameters = JsonObject{{"testParameter", "testValue"}};
+  ConstructionCase const cases[]{
+    {"default construction", ItemDescriptor(), "", 0, emptyParameters},
+    {"null JSON", ItemDescriptor::create(Json()), "", 0, emptyParameters},
+    {"name-only JSON", ItemDescriptor::create(Json("perfectlygenericitem")), "perfectlygenericitem", 1,
+     emptyParameters},
+    {"array: omitted count and parameters", ItemDescriptor::create(JsonArray{"perfectlygenericitem"}),
+     "perfectlygenericitem", 1, emptyParameters},
+    {"array: omitted parameters", ItemDescriptor::create(JsonArray{"perfectlygenericitem", 3}), "perfectlygenericitem",
+     3, emptyParameters},
+    {"array: empty parameters", ItemDescriptor::create(JsonArray{"perfectlygenericitem", 3, emptyParameters}),
+     "perfectlygenericitem", 3, emptyParameters},
+    {"array: custom parameters", ItemDescriptor::create(JsonArray{"perfectlygenericitem", 3, customParameters}),
+     "perfectlygenericitem", 3, customParameters},
+    {"object name: omitted count and parameters", ItemDescriptor::create(JsonObject{{"name", "perfectlygenericitem"}}),
+     "perfectlygenericitem", 1, emptyParameters},
+    {"object item: omitted count and parameters", ItemDescriptor::create(JsonObject{{"item", "perfectlygenericitem"}}),
+     "perfectlygenericitem", 1, emptyParameters},
+    {"object name: omitted parameters",
+     ItemDescriptor::create(JsonObject{{"name", "perfectlygenericitem"}, {"count", 3}}), "perfectlygenericitem", 3,
+     emptyParameters},
+    {"object name: empty parameters",
+     ItemDescriptor::create(
+       JsonObject{{"name", "perfectlygenericitem"}, {"count", 3}, {"parameters", emptyParameters}}),
+     "perfectlygenericitem", 3, emptyParameters},
+    {"object name: custom parameters",
+     ItemDescriptor::create(
+       JsonObject{{"name", "perfectlygenericitem"}, {"count", 3}, {"parameters", customParameters}}),
+     "perfectlygenericitem", 3, customParameters},
+    {"direct: omitted parameters", ItemDescriptor::create("perfectlygenericitem", 3), "perfectlygenericitem", 3,
+     emptyParameters},
+    {"direct: empty parameters", ItemDescriptor::create("perfectlygenericitem", 3, emptyParameters),
+     "perfectlygenericitem", 3, emptyParameters},
+    {"direct: custom parameters", ItemDescriptor::create("perfectlygenericitem", 3, customParameters),
+     "perfectlygenericitem", 3, customParameters}};
+  for (auto const& test : cases) {
+    SCOPED_TRACE(test.label);
+    ASSERT_TRUE(test.descriptor);
+    EXPECT_EQ(test.descriptor->name(), test.name);
+    EXPECT_EQ(test.descriptor->count(), test.count);
+    EXPECT_EQ(test.descriptor->parameters(), test.parameters);
   }
-
-  List<JsonObject> objectFormats = List<JsonObject>{
-      JsonObject{{"name", "perfectlygenericitem"}},
-      JsonObject{{"item", "perfectlygenericitem"}},
-      JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}},
-      JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", JsonObject()}},
-      JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", JsonObject{{"testParameter", "testValue"}}}}
-    };
-
-  for (auto const& objectFormat : objectFormats) {
-    auto descriptor = ItemDescriptor::create(objectFormat);
-    ASSERT_TRUE(descriptor);
-    testItemDescriptor = std::move(*descriptor);
-  }
-
-  auto countedDescriptor = ItemDescriptor::create("perfectlygenericitem", 1);
-  ASSERT_TRUE(countedDescriptor);
-  testItemDescriptor = std::move(*countedDescriptor);
-  auto parameterizedDescriptor = ItemDescriptor::create("perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}});
-  ASSERT_TRUE(parameterizedDescriptor);
-  testItemDescriptor = std::move(*parameterizedDescriptor);
 });
 
 const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameTest& fixture) {
@@ -150,26 +143,11 @@ const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameT
   auto testItemParams = std::move(*parameterizedItem);
   ASSERT_TRUE(testItemParams);
 
-  auto descriptors = itemTestDescriptors({
-    JsonArray{"perfectlygenericitem"},
-    JsonArray{"perfectlygenericitem", 1},
-    JsonArray{"perfectlygenericitem", 1, JsonObject()},
-    JsonObject{{"name", "perfectlygenericitem"}},
-    JsonObject{{"item", "perfectlygenericitem"}},
-    JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}},
-    JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", JsonObject()}}
-  });
-  ASSERT_TRUE(descriptors);
-  auto namedComparison = ItemDescriptor::create("perfectlygenericitem", 1);
-  ASSERT_TRUE(namedComparison);
-  descriptors->insertAt(0, std::move(*namedComparison));
-  auto const& testItemDescriptors = *descriptors;
-  auto parameterizedDescriptors = itemTestDescriptors({
-    JsonArray{"perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}}},
-    JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", JsonObject{{"testParameter", "testValue"}}}}
-  });
-  ASSERT_TRUE(parameterizedDescriptors);
-  auto const& testItemDescriptorsParams = *parameterizedDescriptors;
+  auto plainDescriptor = ItemDescriptor::create("perfectlygenericitem", 1);
+  ASSERT_TRUE(plainDescriptor);
+  auto parameterizedDescriptor =
+    ItemDescriptor::create("perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}});
+  ASSERT_TRUE(parameterizedDescriptor);
 
   // Creating an item can add parameters to it: the perfectly generic item is an
   // object item, and objects that retain their placement parameters start with
@@ -181,86 +159,51 @@ const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameT
   EXPECT_EQ(testItemParamsExact.parameters(),
       JsonObject({{"testParameter", "testValue"}, {"scriptStorage", JsonObject()}}));
 
-  // The same descriptor spellings again, carrying the items' own parameters.
-  auto exactDescriptors = itemTestDescriptors({
-    JsonArray{"perfectlygenericitem", 1, testItemExact.parameters()},
-    JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", testItemExact.parameters()}}
-  });
-  ASSERT_TRUE(exactDescriptors);
-  exactDescriptors->insertAt(0, testItemExact);
-  auto const& testItemExactDescriptors = *exactDescriptors;
-  auto exactParameterizedDescriptors = itemTestDescriptors({
-    JsonArray{"perfectlygenericitem", 1, testItemParamsExact.parameters()},
-    JsonObject{{"name", "perfectlygenericitem"}, {"count", 1}, {"parameters", testItemParamsExact.parameters()}}
-  });
-  ASSERT_TRUE(exactParameterizedDescriptors);
-  exactParameterizedDescriptors->insertAt(0, testItemParamsExact);
-  auto const& testItemParamsExactDescriptors = *exactParameterizedDescriptors;
+  // Parsing formats are checked independently above; matching needs only one
+  // representative of each distinct parameter set.
+  enum class ParameterClass { Empty, Custom, Storage, CustomStorage };
+  struct DescriptorCase {
+    char const* label;
+    ItemDescriptor descriptor;
+    ParameterClass parameters;
+  };
+  struct ItemCase {
+    char const* label;
+    Item const* item;
+    ParameterClass parameters;
+  };
+  DescriptorCase const descriptors[]{
+    {"empty parameters", std::move(*plainDescriptor), ParameterClass::Empty},
+    {"custom parameters", std::move(*parameterizedDescriptor), ParameterClass::Custom},
+    {"scriptStorage", std::move(testItemExact), ParameterClass::Storage},
+    {"custom parameters and scriptStorage", std::move(testItemParamsExact), ParameterClass::CustomStorage}};
+  ItemCase const items[]{{"plain item with scriptStorage", testItem.get(), ParameterClass::Storage},
+                         {"custom item with scriptStorage", testItemParams.get(), ParameterClass::CustomStorage}};
 
-  // comparisons WITHOUT exactMatch
-  for (ItemDescriptor const& id : testItemDescriptors) {
-    EXPECT_TRUE(testItem->matches(id));
-    EXPECT_TRUE(testItemParams->matches(id));
-    EXPECT_TRUE(id.matches(*testItem));
-    EXPECT_TRUE(id.matches(*testItemParams));
-    for (ItemDescriptor const& id2 : testItemDescriptors)
-      EXPECT_TRUE(id.matches(id2));
-    for (ItemDescriptor const& id2 : testItemDescriptorsParams)
-      EXPECT_TRUE(id.matches(id2));
+  for (bool exactMatch : {false, true}) {
+    SCOPED_TRACE(exactMatch ? "exact matching" : "non-exact matching");
+    for (auto const& left : descriptors) {
+      SCOPED_TRACE(left.label);
+      for (auto const& right : descriptors) {
+        SCOPED_TRACE(right.label);
+        EXPECT_EQ(left.descriptor.matches(right.descriptor, exactMatch),
+                  !exactMatch || left.parameters == right.parameters);
+      }
+      for (auto const& item : items) {
+        SCOPED_TRACE(item.label);
+        bool expectedMatch = !exactMatch || left.parameters == item.parameters;
+        EXPECT_EQ(left.descriptor.matches(*item.item, exactMatch), expectedMatch);
+        EXPECT_EQ(item.item->matches(left.descriptor, exactMatch), expectedMatch);
+      }
+    }
+    for (auto const& left : items) {
+      SCOPED_TRACE(left.label);
+      for (auto const& right : items) {
+        SCOPED_TRACE(right.label);
+        EXPECT_EQ(left.item->matches(*right.item, exactMatch), !exactMatch || left.parameters == right.parameters);
+      }
+    }
   }
-  for (ItemDescriptor const& id : testItemDescriptorsParams) {
-    EXPECT_TRUE(testItem->matches(id));
-    EXPECT_TRUE(testItemParams->matches(id));
-    EXPECT_TRUE(id.matches(*testItem));
-    EXPECT_TRUE(id.matches(*testItemParams));
-    for (ItemDescriptor const& id2 : testItemDescriptors)
-      EXPECT_TRUE(id.matches(id2));
-    for (ItemDescriptor const& id2 : testItemDescriptorsParams)
-      EXPECT_TRUE(id.matches(id2));
-  }
-  EXPECT_TRUE(testItem->matches(*testItemParams));
-  EXPECT_TRUE(testItemParams->matches(*testItem));
-
-  // comparisons WITH exactMatch: the parameterless descriptors match neither
-  // item, and the descriptors carrying an item's own parameters match exactly.
-  for (ItemDescriptor const& id : testItemDescriptors) {
-    EXPECT_FALSE(testItem->matches(id, true));
-    EXPECT_FALSE(testItemParams->matches(id, true));
-    EXPECT_FALSE(id.matches(*testItem, true));
-    EXPECT_FALSE(id.matches(*testItemParams, true));
-    for (ItemDescriptor const& id2 : testItemDescriptors)
-      EXPECT_TRUE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemExactDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemParamsExactDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-  }
-  for (ItemDescriptor const& id : testItemExactDescriptors) {
-    EXPECT_TRUE(testItem->matches(id, true));
-    EXPECT_FALSE(testItemParams->matches(id, true));
-    EXPECT_TRUE(id.matches(*testItem, true));
-    EXPECT_FALSE(id.matches(*testItemParams, true));
-    for (ItemDescriptor const& id2 : testItemDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemExactDescriptors)
-      EXPECT_TRUE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemParamsExactDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-  }
-  for (ItemDescriptor const& id : testItemParamsExactDescriptors) {
-    EXPECT_FALSE(testItem->matches(id, true));
-    EXPECT_TRUE(testItemParams->matches(id, true));
-    EXPECT_FALSE(id.matches(*testItem, true));
-    EXPECT_TRUE(id.matches(*testItemParams, true));
-    for (ItemDescriptor const& id2 : testItemDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemExactDescriptors)
-      EXPECT_FALSE(id.matches(id2, true));
-    for (ItemDescriptor const& id2 : testItemParamsExactDescriptors)
-      EXPECT_TRUE(id.matches(id2, true));
-  }
-  EXPECT_FALSE(testItem->matches(*testItemParams, true));
-  EXPECT_FALSE(testItemParams->matches(*testItem, true));
 });
 
 const GameTestRegistration itemStackingPreservesCountsAndNullSemantics("ItemTest", "ItemStackingPreservesCountsAndNullSemantics", [](GameTest& fixture) {

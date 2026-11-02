@@ -125,13 +125,13 @@ struct RemovalProbe {
 }
 
 TEST(ListTest, FilteredCopyPreservesContainerAndPredicateContract) {
-  expectFilteredCopyContract(List<int>{1, 2, 1, 3});
+  ASSERT_NO_FATAL_FAILURE(expectFilteredCopyContract(List<int>{1, 2, 1, 3}));
   auto bounded = StaticList<int, 4>::create({1, 2, 1, 3});
   ASSERT_TRUE(bounded);
-  expectFilteredCopyContract(*bounded);
-  expectFilteredCopyContract(SmallList<int, 2>{1, 2, 1, 3});
-  expectFilteredCopyContract(Deque<int>{1, 2, 1, 3});
-  expectFilteredCopyContract(LinkedList<int>{1, 2, 1, 3});
+  ASSERT_NO_FATAL_FAILURE(expectFilteredCopyContract(*bounded));
+  ASSERT_NO_FATAL_FAILURE(expectFilteredCopyContract(SmallList<int, 2>{1, 2, 1, 3}));
+  ASSERT_NO_FATAL_FAILURE(expectFilteredCopyContract(Deque<int>{1, 2, 1, 3}));
+  ASSERT_NO_FATAL_FAILURE(expectFilteredCopyContract(LinkedList<int>{1, 2, 1, 3}));
 }
 
 TEST(ListTest, FilteringRetainsMoveOnlyOwnershipAndStableOrder) {

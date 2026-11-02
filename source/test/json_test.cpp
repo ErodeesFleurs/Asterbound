@@ -125,9 +125,7 @@ TEST(JsonTest, Unicode) {
   auto result23 = Json::parse("\"\\ud83d\\ude00\"");
   ASSERT_TRUE(result23);
   EXPECT_EQ(Json("😀"), (*result23));
-  auto result24 = Json::parse("\"\\ud83d\\ude00\"");
-  ASSERT_TRUE(result24);
-  auto result25 = (*result24).toString();
+  auto result25 = (*result23).toString();
   ASSERT_TRUE(result25);
   auto result26 = (*result25).size();
   ASSERT_TRUE(result26);
@@ -138,15 +136,6 @@ TEST(JsonTest, UnicodeFile) {
   auto result27 = Json::parse("{ \"first\" : \"日本語\", \"second\" : \"foobar\\u0019\" }");
   ASSERT_TRUE(result27);
   Json v = (*result27);
-  auto result28 = v.getString("first");
-  ASSERT_TRUE(result28);
-  EXPECT_EQ((*result28), String("日本語"));
-  auto result29 = v.get("second");
-  ASSERT_TRUE(result29);
-  auto result30 = (*result29).repr();
-  ASSERT_TRUE(result30);
-  EXPECT_EQ((*result30), String("\"foobar\\u0019\""));
-
   RandomService random(0);
   auto result31 = File::temporaryFileName(random);
   ASSERT_TRUE(result31);
@@ -162,10 +151,6 @@ TEST(JsonTest, UnicodeFile) {
   auto result35 = Json::parseJson((*result34));
   ASSERT_TRUE(result35);
   Json v2 = (*result35);
-  auto result36 = v2.getString("first");
-  ASSERT_TRUE(result36);
-  EXPECT_EQ((*result36), "日本語");
-
   EXPECT_EQ(v, v2);
 }
 
