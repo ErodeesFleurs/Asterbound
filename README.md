@@ -32,7 +32,7 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 
 ## Building
 
-Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and [xclang](https://github.com/clice-io/xclang) **23.1.2.9** with bundled libc++/`std` modules. Dependencies must use the same C++ runtime; Windows uses MinGW. GCC, Apple Clang and MSVC builds are unsupported.
+Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and [xclang](https://github.com/clice-io/xclang/releases/tag/23.1.3.6) **23.1.3.6** (LLVM **23.1.3**) with bundled libc++/`std` modules. Dependencies must use the same C++ runtime; Windows uses MinGW. GCC, Apple Clang and MSVC builds are unsupported.
 
 All configurations use static mimalloc with `MI_OVERRIDE=OFF`; dependencies must not mix allocator heaps.
 

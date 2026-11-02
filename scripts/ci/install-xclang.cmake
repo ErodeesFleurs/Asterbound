@@ -1,7 +1,7 @@
 # Run with cmake -DXCLANG_INSTALL_DIR=<directory> -P scripts/ci/install-xclang.cmake.
 # XCLANG_ROOT is <directory>/xclang; GitHub Actions also receives it through GITHUB_ENV.
 cmake_minimum_required(VERSION 3.28)
-set(XCLANG_VERSION "23.1.2.9")
+set(XCLANG_VERSION "23.1.3.6")
 if(NOT XCLANG_INSTALL_DIR)
     message(FATAL_ERROR "Set XCLANG_INSTALL_DIR to the compiler installation directory")
 endif()
@@ -26,12 +26,12 @@ else()
     set(exe "")
 endif()
 
-# Official 23.1.2.9 SHA256SUMS, pinned here as well as checked against the release.
-set(sha_x86_64_unknown_linux_gnu a2496b3f4f5ff175928457ec73c8dfea9fa1a7bc4e4f5e2616425c9a863627ec)
-set(sha_aarch64_unknown_linux_gnu 2d573931ddb9319aeabf6c761ab78a33ecf2b03dc8573ff92e5f07b5090e5a61)
-set(sha_x86_64_w64_mingw32 bc20b77896354af7a2f9aa233565c3a7c1b63eb6512d452c233cf44e40add7fa)
-set(sha_aarch64_w64_mingw32 f84c9a6d16a45e1569a1191f811bfa14b3923b6eba0be7c84a2738e59cb37554)
-set(sha_aarch64_apple_darwin 15d77e05163abe8cf202434c04efa9e770902d5290ba243c152dc1ab962cae86)
+# Official 23.1.3.6 SHA256SUMS, pinned here as well as checked against the release.
+set(sha_x86_64_unknown_linux_gnu cdcb0975bfc7676f9d043c0fcee67ba00e700e6eed8bf2d9f6153def62c1316d)
+set(sha_aarch64_unknown_linux_gnu fe1f16849bebd95634722f3c296f0017f56fc1f14878689763424cc54a66118c)
+set(sha_x86_64_w64_mingw32 dbcd08d897cd5b9ae9d09f5f8c70b2156b3f46e31c735327f1776c9b26f9f632)
+set(sha_aarch64_w64_mingw32 58e244873bba2eecf71c0a65e27ceb2a4812e19a7c713cef89aa4f542cf2ea2b)
+set(sha_aarch64_apple_darwin 23c80ed7975bbdc94395ae82ed5dff0902439329b49763114b20a7e3c51044c2)
 string(REPLACE "-" "_" hash_key "${host}")
 set(expected_sha "${sha_${hash_key}}")
 set(archive "xclang-${XCLANG_VERSION}-${host}.tar.xz")
@@ -62,7 +62,7 @@ if(NOT EXISTS "${XCLANG_ROOT}/lib/cmake/xclang/toolchain.cmake")
 endif()
 execute_process(COMMAND "${XCLANG_ROOT}/bin/xclang${exe}" --version
     OUTPUT_VARIABLE installed_version ERROR_VARIABLE version_error RESULT_VARIABLE version_status)
-if(NOT version_status EQUAL 0 OR NOT installed_version MATCHES "23\\.1\\.2\\.9")
+if(NOT version_status EQUAL 0 OR NOT installed_version MATCHES "23\\.1\\.3\\.6")
     message(FATAL_ERROR "Unexpected xclang release: ${installed_version}${version_error}")
 endif()
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND "$ENV{OSB_NATIVE_COMPILER_ROOT}" STREQUAL "")

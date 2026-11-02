@@ -107,8 +107,8 @@ foreach(language C CXX)
   endif()
   execute_process(COMMAND "${CMAKE_${language}_COMPILER}" --version
     OUTPUT_VARIABLE compiler_version RESULT_VARIABLE compiler_version_result)
-  if(NOT compiler_version_result EQUAL 0 OR NOT compiler_version MATCHES "clice-io/xclang")
-    message(FATAL_ERROR "The ${language} compiler is not xclang; install the pinned toolchain or use nix develop.")
+  if(NOT compiler_version_result EQUAL 0 OR NOT compiler_version MATCHES "^clang version 23\\.1\\.3 [(]https://github[.]com/llvm/llvm-project 0d261d1ca552c95a8f007e061c787ac7132fbcbc[)]")
+    message(FATAL_ERROR "The ${language} compiler does not match the pinned xclang LLVM revision; install the pinned toolchain or use nix develop.")
   endif()
 endforeach()
 get_filename_component(compiler_directory "${CMAKE_CXX_COMPILER}" DIRECTORY)
@@ -116,8 +116,8 @@ find_program(STAR_XCLANG_COMMAND NAMES xclang
   HINTS "$ENV{XCLANG_ROOT}/bin" "${compiler_directory}" NO_DEFAULT_PATH REQUIRED)
 execute_process(COMMAND "${STAR_XCLANG_COMMAND}" --version
   OUTPUT_VARIABLE xclang_version RESULT_VARIABLE xclang_version_result)
-if(NOT xclang_version_result EQUAL 0 OR NOT xclang_version MATCHES "^xclang 23\\.1\\.2\\.9[\r\n]")
-  message(FATAL_ERROR "OpenStarbound requires the pinned xclang release 23.1.2.9.")
+if(NOT xclang_version_result EQUAL 0 OR NOT xclang_version MATCHES "^xclang 23\\.1\\.3\\.6[\r\n]")
+  message(FATAL_ERROR "OpenStarbound requires the pinned xclang release 23.1.3.6.")
 endif()
 set(STAR_COMPILER "clang")
 
