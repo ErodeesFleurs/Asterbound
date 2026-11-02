@@ -766,6 +766,15 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     original += object ? '}' : ']';
     changed += object ? '}' : ']';
     Json expected = object ? Json(std::move(entries)) : Json(std::move(array));
+    auto created = FormattedJson::create(expected);
+    ASSERT_TRUE(created);
+    EXPECT_EQ(created->toJson(), expected);
+    auto createdSnapshot = *created;
+    auto createdText = created->repr();
+    auto semanticText = expected.repr();
+    ASSERT_TRUE(createdText);
+    ASSERT_TRUE(semanticText);
+    EXPECT_EQ(*createdText, *semanticText);
     auto parsed = FormattedJson::parse(String(original));
     ASSERT_TRUE(parsed);
     EXPECT_EQ(parsed->toJson(), expected);
@@ -774,6 +783,12 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     auto replacement = FormattedJson::parse("-0.00e+0");
     ASSERT_TRUE(replacement);
     auto updated = object ? parsed->set("k002048", *replacement) : parsed->set(Count / 2, *replacement);
+    auto changedCreated = object ? created->set("k002048", *replacement) : created->set(Count / 2, *replacement);
+    ASSERT_TRUE(changedCreated);
+    auto createdOriginalText = createdSnapshot.repr();
+    ASSERT_TRUE(createdOriginalText);
+    EXPECT_EQ(*createdOriginalText, *semanticText);
+    EXPECT_EQ(created->toJson(), expected);
     ASSERT_TRUE(updated);
     auto size = updated->size();
     ASSERT_TRUE(size);
@@ -781,6 +796,11 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     for (std::size_t i : {std::size_t(0), Count / 2, Count - 1}) {
       auto key = String(std::format("k{:06}", i));
       auto value = object ? updated->get(key) : updated->get(i);
+      auto createdValue = object ? changedCreated->get(key) : changedCreated->get(i);
+      ASSERT_TRUE(createdValue);
+      auto createdInteger = createdValue->toJson().toInt();
+      ASSERT_TRUE(createdInteger);
+      EXPECT_EQ(*createdInteger, i == Count / 2 ? 0 : static_cast<std::int64_t>(i));
       ASSERT_TRUE(value);
       auto integer = value->toJson().toInt();
       ASSERT_TRUE(integer);
@@ -948,4 +968,64 @@ TEST(FormattedJsonTest, UnicodeAndOutputFailuresKeepTheirFirstError) {
   auto earlierFailure = Star::operator<<(failed, *invalidScalar);
   ASSERT_FALSE(earlierFailure);
   EXPECT_TRUE(earlierFailure.error().is<UnicodeException>());
+}
+
+TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
+  List<FormattedJson> values;
+  for (String const& text :
+       List<String>{"-0", "1.00", "6.25e2", "{ /* 日本語 🌟 */ \"dup\":1, \"dup\":2 }", "[\r\n  3,\r\n  4\r\n]"}) {
+    auto parsed = FormattedJson::parse(text);
+    ASSERT_TRUE(parsed);
+    values.append(std::move(*parsed));
+  }
+  auto empty = FormattedJson::createArray({});
+  ASSERT_TRUE(empty);
+  auto emptyText = empty->repr();
+  ASSERT_TRUE(emptyText);
+  EXPECT_EQ(*emptyText, "[]");
+  auto batch = FormattedJson::createArray(values);
+  ASSERT_TRUE(batch);
+  auto snapshot = *batch;
+  auto text = batch->repr();
+  ASSERT_TRUE(text);
+  String expected = "[-0,1.00,6.25e2,{ /* 日本語 🌟 */ \"dup\":1, \"dup\":2 },[\r\n  3,\r\n  4\r\n]]";
+  EXPECT_EQ(*text, expected);
+  auto count = batch->size();
+  ASSERT_TRUE(count);
+  EXPECT_EQ(*count, values.size());
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    auto value = batch->get(i);
+    ASSERT_TRUE(value);
+    auto output = value->repr();
+    auto original = values[i].repr();
+    ASSERT_TRUE(output);
+    ASSERT_TRUE(original);
+    EXPECT_EQ(*output, *original);
+  }
+  auto replacement = FormattedJson::create(Json(7));
+  ASSERT_TRUE(replacement);
+  auto changed = batch->set(std::size_t(0), *replacement);
+  ASSERT_TRUE(changed);
+  auto originalText = snapshot.repr();
+  ASSERT_TRUE(originalText);
+  EXPECT_EQ(*originalText, expected);
+  auto originalNumber = values[0].repr();
+  ASSERT_TRUE(originalNumber);
+  EXPECT_EQ(*originalNumber, "-0");
+}
+
+TEST(FormattedJsonTest, BatchArrayUnicodeFailureDoesNotWritePartialOutput) {
+  auto invalid = FormattedJson::create(Json(String(std::string(1, static_cast<char>(0xff)))));
+  auto valid = FormattedJson::parse("{ \"value\": 1.00 }");
+  ASSERT_TRUE(invalid);
+  ASSERT_TRUE(valid);
+  List<FormattedJson> values{*valid, *invalid};
+  auto batch = FormattedJson::createArray(values);
+  ASSERT_TRUE(batch);
+  std::ostringstream output;
+  output << "unchanged";
+  auto written = Star::operator<<(output, *batch);
+  ASSERT_FALSE(written);
+  EXPECT_TRUE(written.error().is<UnicodeException>());
+  EXPECT_EQ(output.str(), "unchanged");
 }

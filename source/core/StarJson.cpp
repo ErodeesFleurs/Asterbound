@@ -820,7 +820,7 @@ Json::operator bool() const {
 
 std::expected<String, StarException> Json::repr(int pretty, bool sort) const {
   std::string result;
-  auto written = outputUtf8Json(*this, std::back_inserter(result), pretty, sort);
+  auto written = outputUtf8Json(*this, JsonUtf8StringOutputIterator(result), pretty, sort);
   if (!written)
     return std::unexpected(std::move(written.error()));
   return String(std::move(result));
@@ -883,10 +883,10 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       break;
     }
     case Json::Type::String: {
-      auto converted = value.toString();
+      auto converted = value.stringPtr();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      auto written = ds.write<String>(*converted);
+      auto written = ds.write<String>(**converted);
       if (!written)
         return std::unexpected(std::move(written.error()));
       break;
@@ -1131,35 +1131,35 @@ Json jsonMergeNulling(Json const& base, Json const& merger) {
 }
 
 bool jsonPartialMatch(Json const& base, Json const& compare) {
-  if (base == compare) {
+  if (base.type() == Json::Type::Object && compare.type() == Json::Type::Object) {
+    auto const& object = *std::get<std::shared_ptr<JsonObject const>>(base.m_data);
+    auto const& pattern = *std::get<std::shared_ptr<JsonObject const>>(compare.m_data);
+    if (&object == &pattern)
+      return true;
+    for (auto const& [key, value] : pattern) {
+      auto entry = object.find(key);
+      if (entry == object.end() || !jsonPartialMatch(entry->second, value))
+        return false;
+    }
     return true;
-  } else {
-    if (base.type() == Json::Type::Object && compare.type() == Json::Type::Object) {
-      for (auto const& c : *std::get<std::shared_ptr<JsonObject const>>(compare.m_data)) {
-        auto const& object = *std::get<std::shared_ptr<JsonObject const>>(base.m_data);
-        auto entry = object.find(c.first);
-        if (entry == object.end() || !jsonPartialMatch(entry->second, c.second))
-          return false;
-      }
-      return true;
-    }
-    if (base.type() == Json::Type::Array && compare.type() == Json::Type::Array) {
-      for (auto const& c : *std::get<std::shared_ptr<JsonArray const>>(compare.m_data)) {
-        bool similar = false;
-        for (auto const& b : *std::get<std::shared_ptr<JsonArray const>>(base.m_data)) {
-          if (jsonPartialMatch(c, b)) {
-            similar = true;
-            break;
-          }
-        }
-        if (!similar)
-          return false;
-      }
-      return true;
-    }
-
-    return false;
   }
+  if (base == compare)
+    return true;
+  if (base.type() == Json::Type::Array && compare.type() == Json::Type::Array) {
+    for (auto const& c : *std::get<std::shared_ptr<JsonArray const>>(compare.m_data)) {
+      bool similar = false;
+      for (auto const& b : *std::get<std::shared_ptr<JsonArray const>>(base.m_data)) {
+        if (jsonPartialMatch(c, b)) {
+          similar = true;
+          break;
+        }
+      }
+      if (!similar)
+        return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 }

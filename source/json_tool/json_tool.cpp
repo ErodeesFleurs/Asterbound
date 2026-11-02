@@ -108,14 +108,10 @@ std::expected<void, StarException> ArrayOutput::out(FormattedJson const& json) {
 }
 
 std::expected<void, StarException> ArrayOutput::flush() {
-  FormattedJson array = FormattedJson::ofType(Json::Type::Array);
-  for (FormattedJson const& result : m_results) {
-    auto appended = array.append(result);
-    if (!appended)
-      return std::unexpected(std::move(appended.error()));
-    array = std::move(*appended);
-  }
-  auto repr = reprWithLineEnding(array);
+  auto array = FormattedJson::createArray(m_results);
+  if (!array)
+    return std::unexpected(std::move(array.error()));
+  auto repr = reprWithLineEnding(*array);
   if (!repr)
     return std::unexpected(std::move(repr.error()));
   coutf("{}", *repr);

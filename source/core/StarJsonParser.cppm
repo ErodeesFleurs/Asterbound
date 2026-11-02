@@ -17,8 +17,7 @@ struct JsonStream {
   virtual std::expected<void, StarException> endArray() = 0;
   virtual std::expected<void, StarException> putString(std::span<char32_t const>) = 0;
   // UTF-8 producers retain their borrowed storage through the synchronous call.
-  // UTF-32 consumers (including the parser's builders) still receive a complete,
-  // validated string before their callback is invoked.
+  // UTF-32 consumers receive a complete, validated string before their callback.
   virtual std::expected<void, StarException> objectKeyUtf8(std::string_view bytes) {
     auto text = decodeUtf8(bytes);
     if (!text) return std::unexpected(std::move(text.error()));
@@ -35,6 +34,12 @@ struct JsonStream {
   virtual std::expected<void, StarException> putBoolean(bool) = 0;
   virtual std::expected<void, StarException> putNull() = 0;
   virtual std::expected<void, StarException> putWhitespace(std::span<char32_t const>) = 0;
+  virtual std::expected<void, StarException> putWhitespaceUtf8(std::string_view bytes) {
+    auto text = decodeUtf8(bytes);
+    if (!text)
+      return std::unexpected(std::move(text.error()));
+    return putWhitespace(*text);
+  }
   virtual std::expected<void, StarException> putColon() = 0;
   virtual std::expected<void, StarException> putComma() = 0;
 private:
@@ -151,7 +156,7 @@ private:
     switch (m_char) {
       case '{': return object();
       case '[': return array();
-      case '"': return string();
+      case '"': return parseString();
       case '-': return number();
       case 0: return error("unexpected end of stream parsing value");
       default: return m_char >= '0' && m_char <= '9' ? number() : word();
@@ -175,10 +180,7 @@ private:
       return m_stream.endObject();
     }
     while (true) {
-      auto key = parseString();
-      if (!key)
-        return std::unexpected(std::move(key.error()));
-      auto written = m_stream.objectKey(*key);
+      auto written = parseString(true);
       if (!written)
         return std::unexpected(std::move(written.error()));
       whitespace = white();
@@ -320,18 +322,19 @@ private:
     return m_stream.endArray();
   }
 
-  std::expected<void, StarException> string() {
-    auto text = parseString();
-    if (!text)
-      return std::unexpected(std::move(text.error()));
-    return m_stream.putString(*text);
-  }
 
   std::expected<void, StarException> number(bool seq = false) {
     std::string buffer;
+    auto begin = [&] {
+      if constexpr (requires { m_current.utf8Position(); })
+        return m_current.utf8Position();
+      else
+        return static_cast<char const*>(nullptr);
+    }();
     bool isDouble = false;
     auto consume = [&]() -> std::expected<void, StarException> {
-      buffer += static_cast<char>(m_char);
+      if constexpr (!requires { m_current.utf8Position(); })
+        buffer += static_cast<char>(m_char);
       return next();
     };
     if (m_char == '-') {
@@ -383,7 +386,10 @@ private:
     }
     if (seq && m_char != 0 && !isSpace(m_char))
       return error("unexpected character after number");
-    return isDouble ? m_stream.putDouble(buffer) : m_stream.putInteger(buffer);
+    std::string_view token = buffer;
+    if constexpr (requires { m_current.utf8Position(); })
+      token = {begin, static_cast<std::size_t>(m_current.utf8Position() - begin)};
+    return isDouble ? m_stream.putDouble(token) : m_stream.putInteger(token);
   }
 
   std::expected<void, StarException> word(bool seq = false) {
@@ -410,13 +416,39 @@ private:
     return first == 'n' ? m_stream.putNull() : m_stream.putBoolean(first == 't');
   }
 
-  std::expected<CharArray, StarException> parseString() {
+  std::expected<void, StarException> parseString(bool key = false) {
     if (m_char != '"')
-      return std::unexpected(JsonParserException("bad string, should be '\"'"));
+      return error("bad string, should be '\"'");
     auto advanced = next();
     if (!advanced)
       return std::unexpected(std::move(advanced.error()));
     CharArray text;
+    if constexpr (requires { m_current.utf8Position(); }) {
+      // Decode only visited codepoints, retaining a borrowed byte token until
+      // an escape actually requires the existing UTF-32 assembly path.
+      auto begin = m_current.utf8Position();
+      while (m_char != '\\' && m_char != '"' && m_char != 0) {
+        advanced = next();
+        if (!advanced)
+          return std::unexpected(std::move(advanced.error()));
+      }
+      auto end = m_current.utf8Position();
+      if (m_char == '"') {
+        advanced = next();
+        if (!advanced)
+          return std::unexpected(std::move(advanced.error()));
+        std::string_view bytes(begin, static_cast<std::size_t>(end - begin));
+        return key ? m_stream.objectKeyUtf8(bytes) : m_stream.putStringUtf8(bytes);
+      }
+      while (begin != end) {
+        char32_t point;
+        auto width = utf8DecodeChar(begin, &point, static_cast<std::size_t>(end - begin));
+        if (!width)
+          return std::unexpected(std::move(width.error()));
+        text += point;
+        begin += *width;
+      }
+    }
     while (true) {
       if (m_char == '\\') {
         advanced = next();
@@ -464,7 +496,7 @@ private:
         advanced = next();
         if (!advanced)
           return std::unexpected(std::move(advanced.error()));
-        return text;
+        return key ? m_stream.objectKey(text) : m_stream.putString(text);
       } else if (m_char == 0) {
         return std::unexpected(JsonParserException("unexpected end of stream reading string!"));
       } else {
@@ -506,8 +538,11 @@ private:
 
   std::expected<void, StarException> white() {
     CharArray buffer;
+    char const* begin = nullptr;
+    if constexpr (RetainWhitespace && requires { m_current.utf8Position(); })
+      begin = m_current.utf8Position();
     auto consume = [&]() -> std::expected<void, StarException> {
-      if constexpr (RetainWhitespace)
+      if constexpr (RetainWhitespace && !requires { m_current.utf8Position(); })
         buffer += m_char;
       return next();
     };
@@ -552,8 +587,13 @@ private:
       }
     }
     if constexpr (RetainWhitespace) {
-      if (!buffer.empty())
+      if constexpr (requires { m_current.utf8Position(); }) {
+        auto end = m_current.utf8Position();
+        if (begin != end)
+          return m_stream.putWhitespaceUtf8(std::string_view(begin, static_cast<std::size_t>(end - begin)));
+      } else if (!buffer.empty()) {
         return m_stream.putWhitespace(buffer);
+      }
     }
     return {};
   }
@@ -669,6 +709,12 @@ public:
   std::expected<void, StarException> putBoolean(bool b) override { return putDouble(b ? "true" : "false"); }
   std::expected<void, StarException> putNull() override { return putDouble("null"); }
   std::expected<void, StarException> putWhitespace(std::span<char32_t const> s) override { return text(s); }
+  std::expected<void, StarException> putWhitespaceUtf8(std::string_view bytes) override {
+    auto valid = utf8Length(bytes.data(), bytes.size());
+    if (!valid)
+      return std::unexpected(std::move(valid.error()));
+    return utf8Text(bytes);
+  }
   std::expected<void, StarException> putColon() override {
     auto r = write(':');
     if (!r) return std::unexpected(std::move(r.error()));
@@ -730,6 +776,8 @@ private:
     return {};
   }
   std::expected<void, StarException> asciiText(std::string_view s) {
+    if constexpr (Utf8)
+      return utf8Text(s);
     for (unsigned char c : s) {
       auto r = write(c);
       if (!r)
@@ -740,9 +788,14 @@ private:
   // bytes have already passed complete-string UTF-8 validation.
   std::expected<void, StarException> utf8Text(std::string_view bytes) {
     if constexpr (Utf8) {
-      for (char c : bytes) {
-        auto r = writeByte(c);
-        if (!r) return std::unexpected(std::move(r.error()));
+      if constexpr (requires { m_out.append(bytes); }) {
+        return m_out.append(bytes);
+      } else {
+        for (char c : bytes) {
+          auto r = writeByte(c);
+          if (!r)
+            return std::unexpected(std::move(r.error()));
+        }
       }
     } else {
       while (!bytes.empty()) {
@@ -787,11 +840,7 @@ private:
       char bytes[4];
       auto width = utf8EncodeChar(bytes, c, sizeof(bytes));
       if (!width) return std::unexpected(std::move(width.error()));
-      for (std::size_t i = 0; i < *width; ++i) {
-        auto r = writeByte(bytes[i]);
-        if (!r) return std::unexpected(std::move(r.error()));
-      }
-      return {};
+      return utf8Text(std::string_view(bytes, *width));
     } else {
       if constexpr (requires { m_out.push(c); }) {
         return m_out.push(c);

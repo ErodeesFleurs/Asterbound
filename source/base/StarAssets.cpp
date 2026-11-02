@@ -1590,16 +1590,19 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
   return std::make_shared<Image>(std::move(resultImage->get()));
 }
 
-std::expected<Json, StarException> Assets::checkPatchArray(String const& path, std::shared_ptr<AssetSource> const& source, Json const result, JsonArray const patchData, std::optional<Json> const external) const {
+std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
+                                                           std::shared_ptr<AssetSource> const& source,
+                                                           Json const result, JsonArray const& patchData,
+                                                           std::optional<Json> const external) const {
   auto externalRef = external.value_or(Json{});
   auto newResult = result;
   for (auto const& patch : patchData) {
     switch (patch.type()) {
       case Json::Type::Array: { // Nested groups commit only if the whole group succeeds.
-        auto patchData = patch.toArray();
+        auto patchData = patch.arrayPtr();
         if (!patchData)
           return std::unexpected(std::move(patchData.error()));
-        auto patched = checkPatchArray(path, source, newResult, *patchData, externalRef);
+        auto patched = checkPatchArray(path, source, newResult, **patchData, externalRef);
         if (patched) {
           newResult = std::move(*patched);
         } else {
@@ -1710,10 +1713,10 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
           *patchJson = std::move(*selected);
         }
         if (patchJson->isType(Json::Type::Array)) {
-          auto patchData = patchJson->toArray();
+          auto patchData = patchJson->arrayPtr();
           if (!patchData)
             return std::unexpected(std::move(patchData.error()));
-          auto patched = checkPatchArray(pair.first, patchSource, result, *patchData, {});
+          auto patched = checkPatchArray(pair.first, patchSource, result, **patchData, {});
           if (patched) {
             result = std::move(*patched);
           } else {
@@ -1733,10 +1736,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
               return std::unexpected(std::move(logged.error()));
           }
         } else if (patchJson->isType(Json::Type::Object)) {
-          auto patchObject = patchJson->toObject();
-          if (!patchObject)
-            return std::unexpected(std::move(patchObject.error()));
-          result = jsonMergeNulling(result, *patchObject);
+          result = jsonMergeNulling(result, *patchJson);
         }
         return {};
       };

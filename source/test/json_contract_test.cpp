@@ -212,3 +212,40 @@ TEST(JsonContractTest, NumericHashNormalizationDoesNotNormalizeWireTypes) {
     EXPECT_EQ(restored, value);
   }
 }
+
+TEST(JsonContractTest, PartialMatchPreservesSharedObjectsAndArrayPatternDirection) {
+  Json shared = JsonObject{{"value", std::numeric_limits<double>::quiet_NaN()}};
+  Json snapshot = shared;
+  EXPECT_TRUE(jsonPartialMatch(shared, snapshot));
+  EXPECT_TRUE(jsonPartialMatch(shared, JsonObject{}));
+
+  Json subset = JsonObject{{"id", 1}};
+  Json superset = JsonObject{{"id", 1}, {"extra", 2}};
+  EXPECT_TRUE(jsonPartialMatch(superset, subset));
+  EXPECT_FALSE(jsonPartialMatch(subset, superset));
+  EXPECT_TRUE(jsonPartialMatch(JsonArray{subset}, JsonArray{superset}));
+  EXPECT_FALSE(jsonPartialMatch(JsonArray{superset}, JsonArray{subset}));
+  EXPECT_TRUE(jsonPartialMatch(JsonArray{1, 2, 1}, JsonArray{1, 2, 1}));
+}
+
+TEST(JsonContractTest, BinaryStringPreservesLongEmbeddedNullAndCommitsOnlyCompletePayload) {
+  std::string bytes(4096, 'x');
+  bytes[127] = '\0';
+  String text(std::move(bytes));
+  Json value(text);
+  auto encoded = DataStreamBuffer::serialize(value);
+  ASSERT_TRUE(encoded);
+  DataStreamBuffer expected;
+  ASSERT_TRUE(expected.write<std::uint8_t>(5));
+  ASSERT_TRUE(expected.write(text));
+  EXPECT_EQ(*encoded, expected.data());
+
+  Json decoded;
+  ASSERT_TRUE(DataStreamBuffer::deserialize(decoded, *encoded));
+  EXPECT_EQ(decoded, value);
+  encoded->resize(encoded->size() - 1);
+  Json retained = JsonObject{{"keep", 17}};
+  auto failed = DataStreamBuffer::deserialize(retained, *encoded);
+  ASSERT_FALSE(failed);
+  EXPECT_EQ(retained, Json(JsonObject{{"keep", 17}}));
+}

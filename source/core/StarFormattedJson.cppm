@@ -11,6 +11,8 @@ namespace Star {
 
 class FormattedJson;
 
+template <typename Jsonlike> class JsonStreamer;
+
 struct ObjectElement;
 struct ObjectKeyElement;
 struct ValueElement;
@@ -60,6 +62,8 @@ public:
   static std::expected<FormattedJson, StarException> parse(String const& string);
   static std::expected<FormattedJson, StarException> parseJson(String const& string);
   static std::expected<FormattedJson, StarException> create(Json const& json);
+  // Builds an unspaced array without discarding each value's original formatting.
+  static std::expected<FormattedJson, StarException> createArray(std::span<FormattedJson const> values);
 
   static FormattedJson ofType(Json::Type type);
 
@@ -113,6 +117,7 @@ public:
 
 private:
   friend class FormattedJsonBuilderStream;
+  friend class JsonStreamer<FormattedJson>;
 
   class Builder;
   static std::expected<FormattedJson, StarException> object(ElementList elements);
@@ -127,7 +132,12 @@ private:
   // Used to preserve the formatting of numbers, i.e. -0 vs 0, 1.0 vs 1:
   std::optional<String> m_formatting;
 
-  StringMap<std::pair<ElementLocation, ElementLocation>> m_objectEntryLocations;
+  // Only this token lookup index uses the standard byte hash. Semantic object
+  // enumeration and wire order continue to use JsonObject's original hash.
+  struct ObjectKeyHash {
+    std::size_t operator()(String const& key) const { return std::hash<std::string_view>{}(key.utf8()); }
+  };
+  StringMap<std::pair<ElementLocation, ElementLocation>, ObjectKeyHash> m_objectEntryLocations;
   List<ElementLocation> m_arrayElementLocations;
 };
 

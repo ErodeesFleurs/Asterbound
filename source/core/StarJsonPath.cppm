@@ -55,12 +55,10 @@ namespace JsonPath {
   template <typename Jsonlike>
   using JsonOp = std::function<std::expected<Jsonlike, StarException>(Jsonlike const&, std::optional<String> const&)>;
 
-  // Applies a function to the portion of the Json document referred to by the
-  // given path, returning the resulting new document.  If the end of the path
-  // doesn't exist, the JsonOp is called with None, and its result will be
-  // inserted into the document.  If the path already existed and the JsonOp
-  // returns None, it is erased.  This is not as well-optimized as pathGet, but
-  // also not on the critical path for anything.
+  // Applies a function to the parent of the location referred to by the path.
+  // The operation receives the final key, or no key for the document root, and
+  // returns the replacement parent. Ancestors are rebuilt without changing the
+  // retained immutable document.
   template <typename Jsonlike>
   std::expected<Jsonlike, StarException> pathApply(Jsonlike const& base, PathParser parser, String const& path, JsonOp<Jsonlike> op);
 
@@ -266,34 +264,61 @@ namespace JsonPath {
       auto i = maybeLexicalCast<std::size_t>(buffer);
       if (!i)
         return std::unexpected(TraversalException::format("Cannot parse '{}' as index in pathApply(\"{}\")", buffer, path));
-      auto size = value.size();
-      if (!size)
-        return std::unexpected(std::move(size.error()));
-      if (*i >= *size)
-        return std::unexpected(TraversalException::format("Index {} out of range in pathApply(\"{}\")", buffer, path));
-      auto child = value.get(*i);
-      if (!child)
-        return std::unexpected(std::move(child.error()));
-      auto changed = pathApply(buffer, *child, parser, path, cursor, op);
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      return value.set(*i, std::move(*changed));
+      if constexpr (std::same_as<Jsonlike, Json>) {
+        auto child = value.find(*i);
+        if (!child)
+          return std::unexpected(std::move(child.error()));
+        if (!*child)
+          return std::unexpected(
+            TraversalException::format("Index {} out of range in pathApply(\"{}\")", buffer, path));
+        auto changed = pathApply(buffer, (**child).get(), parser, path, cursor, op);
+        if (!changed)
+          return std::unexpected(std::move(changed.error()));
+        return value.set(*i, std::move(*changed));
+      } else {
+        auto size = value.size();
+        if (!size)
+          return std::unexpected(std::move(size.error()));
+        if (*i >= *size)
+          return std::unexpected(
+            TraversalException::format("Index {} out of range in pathApply(\"{}\")", buffer, path));
+        auto child = value.get(*i);
+        if (!child)
+          return std::unexpected(std::move(child.error()));
+        auto changed = pathApply(buffer, *child, parser, path, cursor, op);
+        if (!changed)
+          return std::unexpected(std::move(changed.error()));
+        return value.set(*i, std::move(*changed));
+      }
     } else if (value.type() == Json::Type::Object) {
       if (cursor.atEnd())
         return op(value, buffer);
-      auto contains = value.contains(buffer);
-      if (!contains)
-        return std::unexpected(std::move(contains.error()));
-      if (!*contains)
-        return std::unexpected(TraversalException::format("No such key '{}' in pathApply(\"{}\")", buffer, path));
-      auto child = value.get(buffer);
-      if (!child)
-        return std::unexpected(std::move(child.error()));
-      String key = std::move(buffer);
-      auto changed = pathApply(buffer, *child, parser, path, cursor, op);
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      return value.set(std::move(key), std::move(*changed));
+      if constexpr (std::same_as<Jsonlike, Json>) {
+        auto child = value.find(buffer);
+        if (!child)
+          return std::unexpected(std::move(child.error()));
+        if (!*child)
+          return std::unexpected(TraversalException::format("No such key '{}' in pathApply(\"{}\")", buffer, path));
+        String key = std::move(buffer);
+        auto changed = pathApply(buffer, (**child).get(), parser, path, cursor, op);
+        if (!changed)
+          return std::unexpected(std::move(changed.error()));
+        return value.set(std::move(key), std::move(*changed));
+      } else {
+        auto contains = value.contains(buffer);
+        if (!contains)
+          return std::unexpected(std::move(contains.error()));
+        if (!*contains)
+          return std::unexpected(TraversalException::format("No such key '{}' in pathApply(\"{}\")", buffer, path));
+        auto child = value.get(buffer);
+        if (!child)
+          return std::unexpected(std::move(child.error()));
+        String key = std::move(buffer);
+        auto changed = pathApply(buffer, *child, parser, path, cursor, op);
+        if (!changed)
+          return std::unexpected(std::move(changed.error()));
+        return value.set(std::move(key), std::move(*changed));
+      }
     }
     return std::unexpected(TraversalException::format("Tried to get key '{}' in non-object type in pathApply(\"{}\")", buffer, path));
   }
@@ -305,6 +330,7 @@ namespace JsonPath {
     if (!op)
       return std::unexpected(TraversalException("Cannot invoke an empty Json path operation"));
     String buffer;
+    buffer.reserve(path.utf8Size());
     return pathApply(buffer, base, parser, path, Utf8Cursor(path.utf8()), op);
   }
 

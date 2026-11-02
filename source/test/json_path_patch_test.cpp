@@ -140,3 +140,65 @@ TEST(JsonPathPatchTest, BorrowedLookupKeepsNullAndLazyErrorPrecedence) {
   EXPECT_EQ(changed->get(), Json(3));
   EXPECT_EQ(escaped->get(), Json(2));
 }
+
+TEST(JsonPathPatchTest, ApplyKeepsLazyErrorsAndBorrowedSnapshots) {
+  Json base = JsonObject{{"items", JsonArray{JsonObject{{"value", 1}}, Json()}}, {"scalar", 3}};
+  auto snapshot = JsonPath::pathGetRef(base, JsonPath::parsePointer, "/items/0");
+  ASSERT_TRUE(snapshot);
+  for (std::string_view path : std::array<std::string_view, 3>{"/missing/~2", "/items/2/~2", "/scalar/child/~2"}) {
+    auto changed = JsonPath::Pointer(String(path)).set(base, Json(7));
+    ASSERT_FALSE(changed);
+    EXPECT_TRUE(changed.error().is<JsonPath::TraversalException>());
+  }
+  auto malformed = JsonPath::Pointer("/~2/missing").set(base, Json(7));
+  ASSERT_FALSE(malformed);
+  EXPECT_TRUE(malformed.error().is<JsonPath::ParsingException>());
+  auto changed = JsonPath::QueryPath("items[0].value").set(base, Json(7));
+  ASSERT_TRUE(changed);
+  auto value = changed->queryInt("items[0].value");
+  ASSERT_TRUE(value);
+  EXPECT_EQ(*value, 7);
+  EXPECT_EQ(snapshot->get(), Json(JsonObject{{"value", 1}}));
+  auto originalValue = base.queryInt("items[0].value");
+  ASSERT_TRUE(originalValue);
+  EXPECT_EQ(*originalValue, 1);
+}
+
+TEST(JsonPathPatchTest, MergeChecksTargetBeforeValueAndKeepsUnreachableSuffixLazy) {
+  Json base = JsonObject{{"nested", JsonObject{{"value", 1}}}, {"items", JsonArray{Json()}}};
+  for (std::string_view path :
+       std::array<std::string_view, 5>{"/missing", "/items/1", "/items/-", "/missing/~2", "/items/1/~2"}) {
+    auto merged = JsonPatching::applyMergeOperation(base, JsonObject{{"path", Json(path)}});
+    ASSERT_FALSE(merged);
+    EXPECT_TRUE(merged.error().is<JsonPath::TraversalException>());
+  }
+  auto malformed = JsonPatching::applyMergeOperation(base, JsonObject{{"path", "/~2/missing"}});
+  ASSERT_FALSE(malformed);
+  EXPECT_TRUE(malformed.error().is<JsonPath::ParsingException>());
+  for (std::string_view path : std::array<std::string_view, 3>{"", "/nested", "/items/0"}) {
+    auto missingValue = JsonPatching::applyMergeOperation(base, JsonObject{{"path", Json(path)}});
+    ASSERT_FALSE(missingValue);
+    EXPECT_TRUE(missingValue.error().is<JsonException>());
+    EXPECT_FALSE(missingValue.error().is<JsonPath::TraversalException>());
+    EXPECT_FALSE(missingValue.error().is<JsonPath::ParsingException>());
+  }
+}
+
+TEST(JsonPathPatchTest, RepeatedMergeKeepsEarlierResultAndChildSnapshots) {
+  Json base = JsonObject{{"root", JsonObject{{"target", JsonObject{{"keep", 1}, {"value", 2}}}, {"sibling", 3}}}};
+  auto child = JsonPath::pathGetRef(base, JsonPath::parsePointer, "/root/target");
+  ASSERT_TRUE(child);
+  auto first = jsonPatch(
+    base, JsonArray{JsonObject{{"op", "merge"}, {"path", "/root/target"}, {"value", JsonObject{{"value", 4}}}}});
+  ASSERT_TRUE(first);
+  auto second = jsonPatch(
+    *first, JsonArray{JsonObject{{"op", "merge"}, {"path", "/root/target"}, {"value", JsonObject{{"added", 5}}}}});
+  ASSERT_TRUE(second);
+  EXPECT_EQ(child->get(), Json(JsonObject{{"keep", 1}, {"value", 2}}));
+  auto firstTarget = first->query("root.target");
+  ASSERT_TRUE(firstTarget);
+  EXPECT_EQ(*firstTarget, Json(JsonObject{{"keep", 1}, {"value", 4}}));
+  EXPECT_EQ(*second,
+            Json(JsonObject{
+              {"root", JsonObject{{"target", JsonObject{{"keep", 1}, {"value", 4}, {"added", 5}}}, {"sibling", 3}}}}));
+}

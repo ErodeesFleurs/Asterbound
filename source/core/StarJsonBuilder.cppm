@@ -13,10 +13,12 @@ class JsonBuilderStream : public JsonStream {
 public:
   std::expected<void, StarException> beginObject() override;
   std::expected<void, StarException> objectKey(std::span<char32_t const> s) override;
+  std::expected<void, StarException> objectKeyUtf8(std::string_view s) override;
   std::expected<void, StarException> endObject() override;
   std::expected<void, StarException> beginArray() override;
   std::expected<void, StarException> endArray() override;
   std::expected<void, StarException> putString(std::span<char32_t const> s) override;
+  std::expected<void, StarException> putStringUtf8(std::string_view s) override;
   std::expected<void, StarException> putDouble(std::string_view s) override;
   std::expected<void, StarException> putInteger(std::string_view s) override;
   std::expected<void, StarException> putBoolean(bool b) override;
@@ -56,6 +58,23 @@ private:
   String& m_string;
 };
 
+// UTF-8 output can append validated runs without an iterator assignment per byte.
+class JsonUtf8StringOutputIterator {
+public:
+  explicit JsonUtf8StringOutputIterator(std::string& string) : m_string(string) {}
+  std::expected<void, StarException> push(char c) {
+    m_string.push_back(c);
+    return {};
+  }
+  std::expected<void, StarException> append(std::string_view bytes) {
+    m_string.append(bytes);
+    return {};
+  }
+
+private:
+  std::string& m_string;
+};
+
 template <typename InputIterator, typename Stream = JsonBuilderStream, typename Jsonlike = Json>
 std::expected<Jsonlike, StarException> inputUtf32Json(InputIterator begin, InputIterator end, JsonParseType parseType) {
   Stream stream;
@@ -87,6 +106,13 @@ public:
       return std::unexpected(UnicodeException("Cannot read past end of UTF-8 range"));
     if (m_width != 0)
       return m_point;
+    if constexpr (std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>) {
+      auto decoded = utf8DecodeChar(std::to_address(m_current), &m_point, static_cast<std::size_t>(m_end - m_current));
+      if (!decoded)
+        return std::unexpected(std::move(decoded.error()));
+      m_width = *decoded;
+      return m_point;
+    }
     char bytes[4];
     auto lookahead = m_current;
     bytes[0] = *lookahead++;
@@ -115,6 +141,12 @@ public:
     std::advance(m_current, m_width);
     m_width = 0;
     return {};
+  }
+
+  char const* utf8Position() const
+    requires(std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>)
+  {
+    return std::to_address(m_current);
   }
 
   bool operator==(JsonUtf8InputIterator const& other) const {
@@ -149,11 +181,12 @@ std::expected<void, StarException> outputUtf32Json(Jsonlike const& val, OutputIt
 }
 export module star.json_builder;
 export namespace Star {
-  using ::Star::JsonBuilderStream;
-  using ::Star::JsonStreamer;
-  using ::Star::JsonStringOutputIterator;
-  using ::Star::inputUtf8Json;
-  using ::Star::outputUtf8Json;
-  using ::Star::inputUtf32Json;
-  using ::Star::outputUtf32Json;
+using ::Star::inputUtf32Json;
+using ::Star::inputUtf8Json;
+using ::Star::JsonBuilderStream;
+using ::Star::JsonStreamer;
+using ::Star::JsonStringOutputIterator;
+using ::Star::JsonUtf8StringOutputIterator;
+using ::Star::outputUtf32Json;
+using ::Star::outputUtf8Json;
 }

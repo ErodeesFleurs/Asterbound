@@ -361,7 +361,10 @@ private:
 
   [[nodiscard]] std::expected<Json, StarException> readJson(String const& basePath) const;
   [[nodiscard]] std::expected<Json, StarException> applyJsonPatches(Json const& input, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const;
-  [[nodiscard]] std::expected<Json, StarException> checkPatchArray(String const& path, std::shared_ptr<AssetSource> const& source, Json const result, JsonArray const patchData, std::optional<Json> const external) const;
+  [[nodiscard]] std::expected<Json, StarException> checkPatchArray(String const& path,
+                                                                   std::shared_ptr<AssetSource> const& source,
+                                                                   Json const result, JsonArray const& patchData,
+                                                                   std::optional<Json> const external) const;
 
   // Load / post process an asset and log any failure. Returns true if the
   // work was performed (whether successful or not), false if the work is

@@ -95,6 +95,33 @@ const GameTestRegistration assetsRemovedLooseJsonPatches(
     }
   });
 
+const GameTestRegistration
+  assetsNestedPatchGroups("AssetsPatchReadTest", "NestedGroupsCommitOnlySuccessfulGroups", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(writeJsonPatchFixture(*directory, ".patch", R"([
+      {"op":"add","path":"/before","value":true},
+      [
+        {"op":"add","path":"/discarded","value":true},
+        {"op":"test","path":"/base","value":false}
+      ],
+      [
+        {"op":"add","path":"/committed","value":true},
+        {"op":"test","path":"/base","value":true}
+      ],
+      {"op":"add","path":"/after","value":true}
+    ])"));
+    Logger logger;
+    auto assets = patchTestAssets(fixture, *directory, logger);
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto loaded = (*assets)->json("/target.json");
+    ASSERT_TRUE(loaded) << loaded.error().what();
+    EXPECT_EQ(
+      *loaded,
+      Json(JsonObject{{"base", true}, {"before", true}, {"committed", true}, {"after", true}, {"later", true}}));
+  });
+
 const GameTestRegistration assetsRemovedCachedLuaPatch(
   "AssetsPatchReadTest", "RemovedCachedLuaPatchIsNotInvokedForAnotherTarget", [](GameTest& fixture) {
     auto directory = File::temporaryDirectory(fixture.root().random());

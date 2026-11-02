@@ -268,10 +268,10 @@ String EffectSource::suggestedSpawnLocation() const {
 std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root, Json const& config, Vec2F const& position) {
   Json particles = config;
   if (config.type() == Json::Type::Array) {
-    auto options = config.toArray();
+    auto options = config.arrayPtr();
     if (!options)
       return std::unexpected(std::move(options.error()));
-    particles = root.random().randValueFrom(*options, Json());
+    particles = root.random().randValueFrom(**options, Json());
   }
   List<Particle> result;
   if (particles.isNull())
@@ -294,10 +294,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
         return std::unexpected(std::move(particle.error()));
       result.append(std::move(*particle));
     } else {
-      auto definition = entry.toObject();
-      if (!definition)
-        return std::unexpected(std::move(definition.error()));
-      auto particle = Particle::create(root, *definition);
+      auto particle = Particle::create(root, entry);
       if (!particle)
         return std::unexpected(std::move(particle.error()));
       auto varianceConfig = entry.getObject("variance", {});
@@ -317,10 +314,10 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
 std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDefinition(Root& root, Json const& config, Vec2F const& position) {
   Json sound = config;
   if (config.type() == Json::Type::Array) {
-    auto options = config.toArray();
+    auto options = config.arrayPtr();
     if (!options)
       return std::unexpected(std::move(options.error()));
-    sound = root.random().randValueFrom(*options, Json());
+    sound = root.random().randValueFrom(**options, Json());
   }
   List<std::shared_ptr<AudioInstance>> result;
   if (sound.isNull())

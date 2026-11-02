@@ -7,6 +7,7 @@ import star.file;
 import star.lexical_cast;
 import star.json_path;
 import star.json_builder;
+import star.json_parser;
 import star.random;
 
 #include "gtest/gtest.h"
@@ -200,14 +201,14 @@ TEST(JsonTest, CommentHeavyParsingRetainsValuesAndUnicodeValidation) {
   EXPECT_TRUE(invalid.error().is<UnicodeException>());
 }
 
-TEST(JsonTest, CommentAndNumberFailuresRetainCodepointPositions) {
+TEST(JsonTest, TokenFailuresRetainCodepointPositions) {
   struct Failure {
     std::string_view input;
     std::string_view position;
   };
-  for (auto const& failure :
-       std::array<Failure, 4>{Failure{"[\n /*水\n*/ 1,\n /x]", "4:3"}, Failure{"[\n /*水*/ 1,\n ]", "3:2"},
-                              Failure{"/*水\nabc", "2:4"}, Failure{"[\n 1e+,\n 2]", "2:5"}}) {
+  for (auto const& failure : std::array<Failure, 5>{
+         Failure{"[\n /*水\n*/ 1,\n /x]", "4:3"}, Failure{"[\n /*水*/ 1,\n ]", "3:2"}, Failure{"/*水\nabc", "2:4"},
+         Failure{"[\n 1e+,\n 2]", "2:5"}, Failure{"[\n \"水😀\", /x]", "2:9"}}) {
     auto parsed = Json::parse(String(failure.input));
     ASSERT_FALSE(parsed);
     EXPECT_TRUE(parsed.error().is<JsonParsingException>());
@@ -282,6 +283,53 @@ TEST(JsonTest, LazyUtf8PreservesFirstError) {
   auto valid = Json::parse(R"({"valid":true})");
   ASSERT_TRUE(valid);
   EXPECT_EQ(*valid, (Json{JsonObject{{"valid", true}}}));
+}
+
+TEST(JsonTest, Utf8TokensMatchGenericInputAcrossEscapesAndSequence) {
+  struct Input {
+    std::string_view text;
+    JsonParseType type;
+    Json expected;
+  };
+  for (auto const& input : std::array<Input, 3>{
+         Input{R"({"ASCII":"plain","水😀":"é水😀","escaped\u006b":"水\n\uD83D\uDE00"})", JsonParseType::Value,
+               JsonObject{{"ASCII", "plain"}, {"水😀", "é水😀"}, {"escapedk", "水\n😀"}}},
+         Input{R"(["","ASCII","é水😀","水\\尾","\u0000水"])", JsonParseType::Top,
+               JsonArray{"", "ASCII", "é水😀", "水\\尾", String(std::string_view("\0水", 4))}},
+         Input{R"("ASCII" "水😀" "水\n\uD83D\uDE00" tail)", JsonParseType::Sequence,
+               JsonArray{"ASCII", "水😀", "水\n😀", "tail"}}}) {
+    auto contiguous = inputUtf8Json(input.text.begin(), input.text.end(), input.type);
+    std::list<char> bytes(input.text.begin(), input.text.end());
+    auto generic = inputUtf8Json(bytes.begin(), bytes.end(), input.type);
+    ASSERT_TRUE(contiguous);
+    ASSERT_TRUE(generic);
+    EXPECT_EQ(*contiguous, input.expected);
+    EXPECT_EQ(*generic, input.expected);
+  }
+}
+
+TEST(JsonTest, Utf8StringBoundariesPreserveFirstError) {
+  struct RejectStrings : JsonBuilderStream {
+    std::expected<void, StarException> putString(std::span<char32_t const>) override {
+      return std::unexpected(JsonException("rejected string"));
+    }
+    std::expected<void, StarException> putStringUtf8(std::string_view bytes) override {
+      return JsonStream::putStringUtf8(bytes);
+    }
+  };
+  for (auto const& [text, unicode] : std::array<std::pair<std::string_view, bool>, 3>{
+         {{"\"水\"\xff", true}, {"[\"水\", \xff]", false}, {"[\"水\\n\", \xff]", false}}}) {
+    auto parsed =
+      inputUtf8Json<std::string_view::const_iterator, RejectStrings>(text.begin(), text.end(), JsonParseType::Value);
+    ASSERT_FALSE(parsed);
+    EXPECT_EQ(parsed.error().is<UnicodeException>(), unicode);
+    EXPECT_EQ(parsed.error().is<JsonException>(), !unicode);
+  }
+  // Invalid escape syntax wins before an unvisited malformed UTF-8 suffix.
+  auto escape = Json::parse(String(std::string_view("\"水\\q \xff\"")));
+  ASSERT_FALSE(escape);
+  EXPECT_TRUE(escape.error().is<JsonParsingException>());
+  EXPECT_FALSE(escape.error().is<UnicodeException>());
 }
 
 TEST(JsonTest, Types) {
@@ -427,6 +475,10 @@ TEST(JsonTest, Utf8OutputPreservesExactEscapesUnicodeAndFormatting) {
       auto bytes = outputUtf8Json(input, std::back_inserter(byteOutput), indentation, sort);
       ASSERT_TRUE(bytes);
       EXPECT_EQ(byteOutput, wideOutput.utf8());
+      std::string appendedOutput;
+      auto appended = outputUtf8Json(input, JsonUtf8StringOutputIterator(appendedOutput), indentation, sort);
+      ASSERT_TRUE(appended);
+      EXPECT_EQ(appendedOutput, wideOutput.utf8());
     }
   }
 }
@@ -457,6 +509,9 @@ TEST(JsonTest, Utf8OutputValidatesCurrentStringBeforeWriting) {
       std::expected<void, StarException> putString(std::span<char32_t const> text) override {
         ++strings;
         return JsonBuilderStream::putString(text);
+      }
+      std::expected<void, StarException> putStringUtf8(std::string_view bytes) override {
+        return JsonStream::putStringUtf8(bytes);
       }
     } builder;
     auto built = JsonStreamer<Json>::toJsonStream(Json(invalid), builder, false);
@@ -505,6 +560,34 @@ TEST(JsonTest, Utf8OutputPreservesFirstSinkErrorBeforeInvalidLaterValues) {
       EXPECT_EQ(prefix, validPrefix);
     }
   }
+}
+
+TEST(JsonTest, Utf8WhitespaceValidatesBeforeOutputAndPreservesBytes) {
+  std::string output = "prefix";
+  JsonWriter<JsonUtf8StringOutputIterator, true> writer{JsonUtf8StringOutputIterator(output)};
+  auto invalid = writer.putWhitespaceUtf8(std::string_view(" /*水*/\xff"));
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<UnicodeException>());
+  EXPECT_EQ(output, "prefix");
+  auto valid = writer.putWhitespaceUtf8(" /*水😀*/\n\t");
+  ASSERT_TRUE(valid);
+  EXPECT_EQ(output, "prefix /*水😀*/\n\t");
+
+  // The default UTF-32 adapter also validates completely before its callback.
+  struct Builder : JsonBuilderStream {
+    std::u32string whitespace;
+    std::expected<void, StarException> putWhitespace(std::span<char32_t const> text) override {
+      whitespace.append(text.data(), text.size());
+      return {};
+    }
+  } builder;
+  auto rejected = builder.putWhitespaceUtf8(std::string_view(" /*水*/\xff"));
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(rejected.error().is<UnicodeException>());
+  EXPECT_TRUE(builder.whitespace.empty());
+  auto accepted = builder.putWhitespaceUtf8(" /*水😀*/\n\t");
+  ASSERT_TRUE(accepted);
+  EXPECT_EQ(builder.whitespace, U" /*水😀*/\n\t");
 }
 
 TEST(JsonTest, Query) {

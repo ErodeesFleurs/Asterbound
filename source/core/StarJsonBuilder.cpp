@@ -2,6 +2,7 @@ import std;
 import star.string;
 import star.list;
 import star.format;
+import star.unicode;
 import star.json;
 import star.lexical_cast;
 import star.json_parser;
@@ -11,6 +12,7 @@ namespace Star {
 
 std::expected<void, StarException> JsonBuilderStream::beginObject() { pushSentry(); return {}; }
 std::expected<void, StarException> JsonBuilderStream::objectKey(std::span<char32_t const> s) { return putString(s); }
+std::expected<void, StarException> JsonBuilderStream::objectKeyUtf8(std::string_view s) { return putStringUtf8(s); }
 std::expected<void, StarException> JsonBuilderStream::endObject() {
   JsonObject object;
   while (!isSentry()) {
@@ -40,6 +42,13 @@ std::expected<void, StarException> JsonBuilderStream::putString(std::span<char32
   auto value = Json::create(s);
   if (!value) return std::unexpected(std::move(value.error()));
   push(std::move(*value));
+  return {};
+}
+std::expected<void, StarException> JsonBuilderStream::putStringUtf8(std::string_view s) {
+  auto valid = utf8Length(s.data(), s.size());
+  if (!valid)
+    return std::unexpected(std::move(valid.error()));
+  push(Json(String(s)));
   return {};
 }
 std::expected<void, StarException> JsonBuilderStream::putDouble(std::string_view s) {
