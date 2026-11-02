@@ -2905,6 +2905,9 @@ std::shared_ptr<PlayerBlueprints> Player::blueprints() const {
 std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& descriptor, bool showFailure) {
   if (descriptor.isNull())
     return false;
+  bool const known = m_blueprints->isKnown(descriptor);
+  if (known && !showFailure)
+    return false;
   auto databaseResult = root().itemDatabase();
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));
@@ -2917,7 +2920,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
   auto assets = std::move(*assetsResult);
-  if (!m_blueprints->isKnown(descriptor)) {
+  if (!known) {
     m_blueprints->add(descriptor);
     auto messageResult = assets->json("/player.config:blueprintUnlock");
     if (!messageResult)

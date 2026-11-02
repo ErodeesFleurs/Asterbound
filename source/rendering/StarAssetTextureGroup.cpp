@@ -59,6 +59,10 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
 
   } else {
     std::int64_t time = Time::monotonicMilliseconds();
+    auto interval = std::clamp<std::int64_t>(textureTimeout / 10, 0, 1000);
+    if (time - m_lastCleanup < interval)
+      return;
+    m_lastCleanup = time;
 
     List<std::reference_wrapper<Texture const>> liveTextures;
     filter(m_textureMap, [&](auto const& pair) {

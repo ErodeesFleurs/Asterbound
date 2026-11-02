@@ -73,7 +73,10 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
     auto name = config->getString("kind");
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (database->m_damageKinds.contains(*name))
+    auto key = CaseInsensitiveString::create(*name);
+    if (!key)
+      return std::unexpected(std::move(key.error()));
+    if (database->m_damageKinds.contains(*key))
       return std::unexpected(StarException(strf("Duplicate damage kind Name {}. configfile {}", *name, file.string())));
 
     DamageKind kind;
@@ -106,29 +109,26 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
     kind.elementalType = std::move(*elementalType);
     if (!database->m_elementalTypes.contains(kind.elementalType))
       return std::unexpected(StarException(strf("Undefined elemental type {} in damage kind {}", kind.elementalType, *name)));
-    database->m_damageKinds.set(*name, std::move(kind));
+    database->m_damageKinds.set(std::move(*key), std::move(kind));
   }
   return database;
 }
 
-std::expected<std::reference_wrapper<DamageKind const>, StarException> DamageDatabase::damageKind(String kind) const {
-  if (kind.empty()) {
-    kind = "default";
-  } else {
-    auto lower = kind.toLower();
-    if (!lower)
-      return std::unexpected(std::move(lower.error()));
-    kind = std::move(*lower);
-  }
-  if (!m_damageKinds.contains(kind))
-    return std::unexpected(StarException(strf("Unknown damage definition with kind '{}'.", kind)));
-  return m_damageKinds.get(kind);
+std::expected<std::reference_wrapper<DamageKind const>, StarException>
+DamageDatabase::damageKind(String const& kind) const {
+  auto name = kind.empty() ? std::string_view("default") : std::string_view(kind.utf8());
+  auto key = CaseInsensitiveStringView::create(name);
+  if (!key)
+    return std::unexpected(std::move(key.error()));
+  if (auto found = m_damageKinds.maybeRef(*key))
+    return *found;
+  return std::unexpected(StarException(strf("Unknown damage definition with kind '{}'.", name)));
 }
 
 std::expected<std::reference_wrapper<ElementalType const>, StarException> DamageDatabase::elementalType(String const& name) const {
-  if (!m_damageKinds.contains(name))
-    return std::unexpected(StarException(strf("Unknown elemental type with name '{}'.", name)));
-  return m_elementalTypes.get(name);
+  if (auto found = m_elementalTypes.maybeRef(name))
+    return *found;
+  return std::unexpected(StarException(strf("Unknown elemental type with name '{}'.", name)));
 }
 
 }

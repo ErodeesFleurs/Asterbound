@@ -17,6 +17,7 @@ set (star_core_tests_SOURCES
       file_test.cpp
       hash_test.cpp
       host_address_test.cpp
+      image_processing_test.cpp
       ref_ptr_test.cpp
       json_test.cpp
       json_contract_test.cpp
@@ -85,7 +86,9 @@ set (star_game_tests_SOURCES
       StarGameTest.cpp
       assets_test.cpp
       biome_placement_test.cpp
+      damage_database_test.cpp
       function_test.cpp
+      humanoid_render_test.cpp
       lighting_test.cpp
       item_test.cpp
       liquid_types_test.cpp

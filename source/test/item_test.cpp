@@ -49,6 +49,9 @@ import star.algorithm;
 import star.file;
 import star.random;
 import star.collection_database;
+import star.player;
+import star.player_blueprints;
+import star.player_factory;
 
 namespace Star {
 
@@ -1104,3 +1107,113 @@ end
   ASSERT_TRUE(marker);
   EXPECT_EQ(marker->toString(), "LeafOwner");
 });
+
+const GameTestRegistration blueprintLearning(
+  "ItemTest", "BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(File::makeDirectoryRecursive(overlay));
+    auto patchPath = File::relativeTo(overlay, "player.config.patch");
+    ASSERT_TRUE(File::writeFile(String(R"([
+    {"op":"replace","path":"/blueprintUnlock","value":"Learned: <ItemName>"},
+    {"op":"replace","path":"/blueprintAlreadyKnown","value":"Known: <ItemName>"}
+  ])"),
+                                patchPath));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.append(overlay);
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto factory = (*root)->playerFactory();
+    ASSERT_TRUE(factory) << factory.error().what();
+    auto created = (*factory)->create();
+    ASSERT_TRUE(created) << created.error().what();
+    auto& player = **created;
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    auto descriptor = ItemDescriptor::create(
+      "perfectlygenericitem", 1, JsonObject{{"shortdescription", "Blueprint Fixture"}, {"blueprintFixture", true}});
+    ASSERT_TRUE(descriptor);
+    ASSERT_FALSE(player.blueprintKnown(*descriptor));
+    auto learned = player.addBlueprint(*descriptor);
+    ASSERT_TRUE(learned) << learned.error().what();
+    EXPECT_TRUE(*learned);
+    EXPECT_TRUE(player.blueprintKnown(*descriptor));
+    EXPECT_TRUE(player.blueprints()->isNew(*descriptor));
+    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Learned: Blueprint Fixture"}));
+
+    player.blueprints()->markAsRead(*descriptor);
+    auto knownState = player.blueprints()->toJson();
+    auto repeated = player.addBlueprint(*descriptor);
+    ASSERT_TRUE(repeated) << repeated.error().what();
+    EXPECT_FALSE(*repeated);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_EQ(player.blueprints()->toJson(), knownState);
+    auto shown = player.addBlueprint(*descriptor, true);
+    ASSERT_TRUE(shown) << shown.error().what();
+    EXPECT_FALSE(*shown);
+    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Known: Blueprint Fixture"}));
+    EXPECT_EQ(player.blueprints()->toJson(), knownState);
+
+    // A registered item with invalid instance parameters cannot be constructed,
+    // including its perfectlygenericitem fallback. Failed new unlocks must not
+    // publish either known or unread blueprint state.
+    auto database = (*root)->itemDatabase();
+    ASSERT_TRUE(database);
+    ASSERT_TRUE((*database)->hasItem("perfectlygenericitem"));
+    auto broken = ItemDescriptor::create("perfectlygenericitem", 1,
+                                         JsonObject{{"maxStack", "not an integer"}, {"blueprintFixture", "broken"}});
+    ASSERT_TRUE(broken);
+    for (bool showFailure : {false, true}) {
+      auto before = player.blueprints()->toJson();
+      ASSERT_FALSE(player.blueprintKnown(*broken));
+      auto failed = player.addBlueprint(*broken, showFailure);
+      ASSERT_FALSE(failed);
+      EXPECT_EQ(player.blueprints()->toJson(), before);
+      EXPECT_TRUE(player.pullQueuedMessages().empty());
+    }
+
+    // A stored blueprint may outlive its item's ability to instantiate. The
+    // intentional behavior change is that silently relearning it now succeeds
+    // with false rather than surfacing an irrelevant item-factory error.
+    player.blueprints()->add(*broken);
+    player.blueprints()->markAsRead(*broken);
+    auto brokenKnownState = player.blueprints()->toJson();
+    auto silentBroken = player.addBlueprint(*broken);
+    ASSERT_TRUE(silentBroken) << silentBroken.error().what();
+    EXPECT_FALSE(*silentBroken);
+    EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    auto shownBroken = player.addBlueprint(*broken, true);
+    EXPECT_FALSE(shownBroken);
+    EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+
+    // Invalid notification values are real asset errors, not a counter around
+    // json(). The silent known path must not read either notification resource.
+    ASSERT_TRUE(File::writeFile(String(R"([
+    {"op":"replace","path":"/blueprintUnlock","value":false},
+    {"op":"replace","path":"/blueprintAlreadyKnown","value":false}
+  ])"),
+                                patchPath));
+    auto assets = (*root)->assets();
+    ASSERT_TRUE(assets);
+    (*assets)->hotReload();
+    auto silent = player.addBlueprint(*descriptor);
+    ASSERT_TRUE(silent) << silent.error().what();
+    EXPECT_FALSE(*silent);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+    EXPECT_FALSE(player.addBlueprint(*descriptor, true));
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+    auto nullBlueprint = player.addBlueprint(ItemDescriptor(), true);
+    ASSERT_TRUE(nullBlueprint);
+    EXPECT_FALSE(*nullBlueprint);
+    EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+  });

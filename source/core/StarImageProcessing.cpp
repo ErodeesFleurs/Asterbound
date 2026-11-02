@@ -341,12 +341,44 @@ StringList imageOperationReferences(List<ImageOperation> const& operations) {
   return references;
 }
 
+namespace {
+// Keys are internal-format bytes, including alpha. Transparent HSV pixels never
+// enter the cache, so zero is an unused key.
+struct RecentColors {
+  struct Entry {
+    std::uint32_t in = 0;
+    std::uint32_t out = 0;
+  };
+
+  static std::uint32_t pack(Vec4B const& pixel) {
+    return std::uint32_t(pixel[0]) | std::uint32_t(pixel[1]) << 8 | std::uint32_t(pixel[2]) << 16
+      | std::uint32_t(pixel[3]) << 24;
+  }
+
+  template <typename Function> void apply(Vec4B& pixel, Function&& compute) {
+    auto key = pack(pixel);
+    auto& entry = entries[(key * 2654435761u) >> 24];
+    if (entry.in != key) {
+      entry.out = pack(compute(pixel));
+      entry.in = key;
+    }
+    auto value = entry.out;
+    pixel = Vec4B(value & 255, (value >> 8) & 255, (value >> 16) & 255, value >> 24);
+  }
+
+  Entry entries[256];
+};
+}// namespace
+
 static void processSaturationShift(Image& image, SaturationShiftImageOperation const& op) {
-  image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+  RecentColors recent;
+  image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
     if (pixel[3] != 0) {
-      Color color = Color::rgba(pixel);
-      color.setSaturation(std::clamp(color.saturation() + op.saturationShiftAmount, 0.0f, 1.0f));
-      pixel = color.toRgba();
+      recent.apply(pixel, [&op](Vec4B const& input) {
+        Color color = Color::rgba(input);
+        color.setSaturation(std::clamp(color.saturation() + op.saturationShiftAmount, 0.0f, 1.0f));
+        return color.toRgba();
+      });
     }
   });
 }
@@ -361,18 +393,29 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     image = image.convert(image.pixelFormat() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
   }
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+    // Exact identities preserve the input bytes, rather than round-tripping HSV.
+    // Keep these after the 24-to-32-bit conversion above.
+    if (op->get().hueShiftAmount == 0.0f)
+      return {};
+    RecentColors recent;
+    image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0)
-        pixel = Color::hueShiftVec4B(pixel, op->get().hueShiftAmount);
+        recent.apply(pixel, [&](Vec4B const& input) { return Color::hueShiftVec4B(input, op->get().hueShiftAmount); });
     });
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
-    processSaturationShift(image, op->get());
+    if (op->get().saturationShiftAmount != 0.0f)
+      processSaturationShift(image, op->get());
   } else if (auto op = (std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<BrightnessMultiplyImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+    if (op->get().brightnessMultiply == 1.0f)
+      return {};
+    RecentColors recent;
+    image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0) {
-        Color color = Color::rgba(pixel);
-        color.setValue(std::clamp(color.value() * op->get().brightnessMultiply, 0.0f, 1.0f));
-        pixel = color.toRgba();
+        recent.apply(pixel, [&](Vec4B const& input) {
+          Color color = Color::rgba(input);
+          color.setValue(std::clamp(color.value() * op->get().brightnessMultiply, 0.0f, 1.0f));
+          return color.toRgba();
+        });
       }
     });
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
@@ -400,10 +443,61 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       pixel[2] = op->get().color[2];
     });
   } else if (auto op = (std::holds_alternative<ColorReplaceImageOperation>(operation) ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
-      if (auto m = op->get().colorReplaceMap.maybe(pixel))
-        pixel = *m;
-    });
+    auto const& replaceMap = op->get().colorReplaceMap;
+    if (replaceMap.empty())
+      return {};
+    if (std::size_t(image.width()) * image.height() < 1024 || image.bytesPerPixel() != 4) {
+      image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+        if (auto replacement = replaceMap.maybe(pixel))
+          pixel = *replacement;
+      });
+    } else {
+      // A small key bitmap rejects most non-keys before a map lookup.
+      unsigned bitCount = 4096;
+      while (replaceMap.size() > bitCount / 32 && bitCount < (1u << 20))
+        bitCount <<= 1;
+      unsigned shift = 32 - std::countr_zero(bitCount);
+      std::array<std::uint64_t, 64> smallBits{};
+      std::vector<std::uint64_t> largeBits;
+      std::span<std::uint64_t> bits = smallBits;
+      if (bitCount > 4096) {
+        largeBits.resize(bitCount / 64);
+        bits = largeBits;
+      }
+      auto bitFor = [shift](Vec4B const& pixel) { return (RecentColors::pack(pixel) * 2654435761u) >> shift; };
+      for (auto const& entry : replaceMap) {
+        auto bit = bitFor(entry.first);
+        bits[bit >> 6] |= std::uint64_t(1) << (bit & 63);
+      }
+
+      // Read original input words, not the preceding replacement: A->B->C
+      // must still replace each A with B exactly once.
+      static_assert(sizeof(Vec4B) == sizeof(std::uint32_t));
+      auto data = image.data();
+      std::uint32_t lastIn = 0, lastOut = 0;
+      bool haveLast = false;
+      for (std::size_t i = 0; i < data.size(); i += 4) {
+        std::uint32_t input;
+        std::memcpy(&input, data.data() + i, 4);
+        if (haveLast && input == lastIn) {
+          std::memcpy(data.data() + i, &lastOut, 4);
+          continue;
+        }
+        Vec4B pixel;
+        std::memcpy(pixel.ptr(), &input, 4);
+        auto output = input;
+        auto bit = bitFor(pixel);
+        if ((bits[bit >> 6] >> (bit & 63)) & 1) {
+          if (auto replacement = replaceMap.maybe(pixel)) {
+            std::memcpy(&output, replacement->ptr(), 4);
+            std::memcpy(data.data() + i, &output, 4);
+          }
+        }
+        lastIn = input;
+        lastOut = output;
+        haveLast = true;
+      }
+    }
 
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().maskImages.empty())
@@ -460,20 +554,43 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       blendImages.append(**blend);
     }
 
-    image.forEachPixel([&op, &blendImages](unsigned x, unsigned y, Vec4B& pixel) {
-      Vec2U pos = Vec2U(Vec2I(x, y) + op->get().offset);
+    // int64_t is deliberate: long is only 32 bits on Windows, and negating
+    // INT_MIN must happen after widening.
+    std::int64_t offsetX = op->get().offset[0], offsetY = op->get().offset[1];
+    std::int64_t minX = image.width(), minY = image.height(), maxX = 0, maxY = 0;
+    for (auto blend : blendImages) {
+      minX = std::min(minX, std::max<std::int64_t>(0, -offsetX));
+      minY = std::min(minY, std::max<std::int64_t>(0, -offsetY));
+      maxX = std::max(maxX, std::min<std::int64_t>(image.width(), std::int64_t(blend.get().width()) - offsetX));
+      maxY = std::max(maxY, std::min<std::int64_t>(image.height(), std::int64_t(blend.get().height()) - offsetY));
+    }
+    auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
+      std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
       Vec4F fpixel = Color::v4bToFloat(pixel);
       for (auto blend : blendImages) {
-        if (pos[0] < blend.get().width() && pos[1] < blend.get().height()) {
-          Vec4F blendPixel = Color::v4bToFloat(blend.get().clamp(Vec2I(pos)));
+        if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
+          // Preserve the existing internal-format interpretation of references.
+          Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
           if (op->get().mode == BlendImageOperation::Multiply)
-            fpixel = fpixel.piecewiseMultiply(blendPixel);
+            fpixel = fpixel.piecewiseMultiply(other);
           else if (op->get().mode == BlendImageOperation::Screen)
-            fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - blendPixel);
+            fpixel =
+              Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - other);
         }
       }
       pixel = Color::v4fToByte(fpixel);
-    });
+    };
+    if (image.bytesPerPixel() == 4) {
+      for (std::int64_t y = minY; y < maxY; ++y) {
+        for (std::int64_t x = minX; x < maxX; ++x) {
+          auto pixel = image.get32(x, y);
+          blendPixel(x, y, pixel);
+          image.set32(x, y, pixel);
+        }
+      }
+    } else {
+      image.forEachPixel(blendPixel);
+    }
 
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
     image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {

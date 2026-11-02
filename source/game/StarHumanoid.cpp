@@ -2188,7 +2188,7 @@ if (!checked358) return std::unexpected(std::move(checked358.error()));
           if (holdingItem) {
             auto checked359 = backArmDrawable(chest.backSleeveFrameset, chest.directives);
 if (!checked359) return std::unexpected(std::move(checked359.error()));
-addDrawable(std::move(*checked359));
+addDrawable(std::move(*checked359), chest.fullbright);
           } else {
             String image;
             Vec2F position;

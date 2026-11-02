@@ -34,12 +34,13 @@ class DamageDatabase {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<DamageDatabase>, StarException> create(std::shared_ptr<Assets const> assets);
 
-  [[nodiscard]] std::expected<std::reference_wrapper<DamageKind const>, StarException> damageKind(String name) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<DamageKind const>, StarException>
+  damageKind(String const& name) const;
   [[nodiscard]] std::expected<std::reference_wrapper<ElementalType const>, StarException> elementalType(String const& name) const;
 
 private:
   DamageDatabase() = default;
-  StringMap<DamageKind> m_damageKinds;
+  CaseInsensitiveStringMap<DamageKind> m_damageKinds;
   StringMap<ElementalType> m_elementalTypes;
 };
 
