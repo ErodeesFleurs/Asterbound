@@ -30,6 +30,18 @@ function player.description() end
 ---@param description string
 function player.setDescription(description) end
 
+--- Requests a presentation-only movement animation for this simulation frame.
+--- Refresh in generic update with updateDelta=1; nil revokes, last call wins.
+--- Native physics/state are unchanged. Anchors/lounge, dead, teleport and tech
+--- parent states take precedence. Existing dances and item poses/facing remain.
+--- Walk/run backwards direction uses velocity in the rotated body's local X.
+--- Repeated requests retain cycle progress; cycle speed is the humanoid default.
+--- Transient, not saved; uses existing vanilla/legacy player-state and moving-
+--- direction fields without changing local native state/direction or physics.
+--- Facing/velocity/rotation retain native replication; no custom animation key.
+---@param state? "idle"|"walk"|"run"|"jump"|"fall"
+function player.controlMovementState(state) end
+
 --- Refreshes the active humanoid parameters by re-building the current humanoid instance. This must be called when certain values in the humanoid config would be changed by a parameter, such as the animationConfig and movementParameters. This is implicitly called whenever the current humanoid identity's species or imagePath changes. This has to network the humanoid identity and humanoid parameters as intialization arguments for the new instance, so only use it when necessary. ---
 function player.refreshHumanoidParameters() end
 

@@ -1009,6 +1009,9 @@ ClientEntityMode Player::clientEntityMode() const {
 }
 
 std::expected<void, StarException> Player::init(World& world, EntityId entityId, EntityMode mode) {
+  m_controlMovementState.reset();
+  m_movementAnimationState.reset();
+  m_movementController->setNetworkMovingDirection({});
   if (auto result = Entity::init(world, entityId, mode); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_tools->init(*this); !result)
@@ -1153,6 +1156,9 @@ std::expected<void, StarException> Player::uninit() {
     remember(m_scriptedAnimator.removeCallbacks("animationConfig"));
     remember(m_scriptedAnimator.removeCallbacks("entity"));
   }
+  m_controlMovementState.reset();
+  m_movementAnimationState.reset();
+  m_movementController->setNetworkMovingDirection({});
   remember(Entity::uninit());
   if (error)
     return std::unexpected(std::move(*error));
@@ -1907,6 +1913,9 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   m_movementController->setTimestep(dt);
 
   if (isMaster()) {
+    // Requests from postUpdate, messages before this tick, or a prior world
+    // must not outlive the generic update that actually refreshes them.
+    m_controlMovementState.reset();
     if (m_emoteCooldownTimer.tick(dt))
       m_emoteState = HumanoidEmote::Idle;
     if (m_danceCooldownTimer.tick(dt))
@@ -2223,6 +2232,8 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     }
   }
 
+  updateMovementAnimationState();
+
   humanoid()->setRotation(m_movementController->rotation());
 
   bool suppressedItems = !canUseTool();
@@ -2266,7 +2277,16 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     m_movementController->controlFace(facingDirection = *overrideFacingDirection);
 
   humanoid()->setFacingDirection(facingDirection);
-  if (auto result = humanoid()->setMovingBackwards(facingDirection != m_movementController->movingDirection()); !result)
+  Direction movingDirection = m_movementController->movingDirection();
+  if (m_movementAnimationState) {
+    auto tangent = Vec2F::withAngle(m_movementController->rotation());
+    auto velocity = m_movementController->velocity();
+    float tangentVelocity = velocity.x() * tangent.x() + velocity.y() * tangent.y();
+    movingDirection = tangentVelocity == 0.f ? facingDirection : tangentVelocity < 0.f ? Direction::Left : Direction::Right;
+  }
+  if (isMaster())
+    m_movementController->setNetworkMovingDirection(m_movementAnimationState ? std::optional(movingDirection) : std::nullopt);
+  if (auto result = humanoid()->setMovingBackwards(facingDirection != movingDirection); !result)
     return std::unexpected(std::move(result.error()));
 
   {
@@ -3541,6 +3561,36 @@ std::expected<void, StarException> Player::processControls() {
   return {};
 }
 
+std::expected<void, StarException> Player::controlMovementState(std::optional<String> const& state) {
+  if (!state) {
+    m_controlMovementState.reset();
+    return {};
+  }
+  Humanoid::State parsed;
+  if (*state == "idle")
+    parsed = Humanoid::Idle;
+  else if (*state == "walk")
+    parsed = Humanoid::Walk;
+  else if (*state == "run")
+    parsed = Humanoid::Run;
+  else if (*state == "jump")
+    parsed = Humanoid::Jump;
+  else if (*state == "fall")
+    parsed = Humanoid::Fall;
+  else
+    return std::unexpected(PlayerException("Movement state must be idle, walk, run, jump, fall, or nil"));
+  if (inWorld() && isMaster())
+    m_controlMovementState = parsed;
+  return {};
+}
+
+void Player::updateMovementAnimationState() {
+  m_movementAnimationState = isMaster() ? m_controlMovementState : std::nullopt;
+  if (isDead() || isTeleporting() || m_state == State::Lounge
+      || m_movementController->entityAnchor() || m_techController->parentState())
+    m_movementAnimationState.reset();
+}
+
 std::expected<void, StarException> Player::processStateChanges(float dt) {
   auto currentWorldResult = world();
   if (!currentWorldResult)
@@ -3677,6 +3727,9 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
           return std::unexpected(std::move(result.error()));
       }
     }
+  } else if (m_movementAnimationState) {
+    if (auto result = humanoid()->setState(*m_movementAnimationState); !result)
+      return std::unexpected(std::move(result.error()));
   } else {
     auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
     if (m_state == State::Idle) {
@@ -3844,7 +3897,27 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
 }
 
 std::expected<void, StarException> Player::setNetStates() {
-  m_stateNetState.set((unsigned)m_state);
+  // The legacy player-state field controls remote presentation, not the local
+  // movement controller or native movement effects. Keep its type and slot.
+  // Teleport/lounge/death can start after update (for example in postUpdate).
+  // They must not be hidden by a presentation request already resolved above.
+  if (isDead() || isTeleporting() || m_state == State::Lounge
+      || m_movementController->entityAnchor() || m_techController->parentState()) {
+    m_movementAnimationState.reset();
+    m_movementController->setNetworkMovingDirection({});
+  }
+  State state = m_state;
+  if (m_movementAnimationState) {
+    switch (*m_movementAnimationState) {
+      case Humanoid::Idle: state = State::Idle; break;
+      case Humanoid::Walk: state = State::Walk; break;
+      case Humanoid::Run: state = State::Run; break;
+      case Humanoid::Jump: state = State::Jump; break;
+      case Humanoid::Fall: state = State::Fall; break;
+      default: break;
+    }
+  }
+  m_stateNetState.set((unsigned)state);
   m_shiftingNetState.set(m_shifting);
   m_xAimPositionNetState.set(m_aimPosition[0]);
   m_yAimPositionNetState.set(m_aimPosition[1]);

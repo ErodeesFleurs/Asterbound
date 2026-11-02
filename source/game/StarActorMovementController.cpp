@@ -756,7 +756,7 @@ void ActorMovementController::uninit() {
 
 std::expected<Json, StarException> ActorMovementController::storeState() const {
   if (!DirectionNames) return std::unexpected(DirectionNames.error());
-  auto movingName = DirectionNames->getRight(m_movingDirection.get());
+  auto movingName = DirectionNames->getRight(movingDirection());
   if (!movingName) return std::unexpected(std::move(movingName.error()));
   auto facingName = DirectionNames->getRight(m_facingDirection.get());
   if (!facingName) return std::unexpected(std::move(facingName.error()));
@@ -782,7 +782,7 @@ std::expected<void, StarException> ActorMovementController::loadState(Json const
   if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
   auto crouchingValue = state.getBool("crouching");
   if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));
-  m_movingDirection.set(movingDirection->get());
+  setMovingDirection(movingDirection->get());
   m_facingDirection.set(facingDirection->get());
   m_crouching.set(*crouchingValue);
   return {};
@@ -825,7 +825,25 @@ bool ActorMovementController::running() const {
 }
 
 Direction ActorMovementController::movingDirection() const {
-  return m_movingDirection.get();
+  return m_nativeMovingDirection.value_or(m_movingDirection.get());
+}
+
+void ActorMovementController::setMovingDirection(Direction direction) {
+  if (m_nativeMovingDirection)
+    m_nativeMovingDirection = direction;
+  else
+    m_movingDirection.set(direction);
+}
+
+void ActorMovementController::setNetworkMovingDirection(std::optional<Direction> direction) {
+  if (direction) {
+    if (!m_nativeMovingDirection)
+      m_nativeMovingDirection = m_movingDirection.get();
+    m_movingDirection.set(*direction);
+  } else if (m_nativeMovingDirection) {
+    m_movingDirection.set(*m_nativeMovingDirection);
+    m_nativeMovingDirection.reset();
+  }
 }
 
 Direction ActorMovementController::facingDirection() const {
@@ -1088,7 +1106,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
         auto pathFacing = m_pathController->facing();
         auto facing = (m_controlFace ? m_controlFace : pathFacing).value_or(m_facingDirection.get());
         m_facingDirection.set(facing);
-        m_movingDirection.set(m_pathController->facing().value_or(m_facingDirection.get()));
+        setMovingDirection(m_pathController->facing().value_or(m_facingDirection.get()));
 
         if (auto result = applyMCParameters(activeParameters); !result) return std::unexpected(std::move(result.error()));
 
@@ -1268,7 +1286,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     }
 
     if (updatedMovingDirection)
-      m_movingDirection.set(*updatedMovingDirection);
+      setMovingDirection(*updatedMovingDirection);
 
     if (!activeModifiers.facingSuppressed) {
       if (m_controlFace)

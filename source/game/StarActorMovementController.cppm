@@ -235,6 +235,9 @@ public:
   bool walking() const;
   bool running() const;
   Direction movingDirection() const;
+  // Override only the existing network presentation field; local movement
+  // direction, facing, velocity and physics remain unchanged.
+  void setNetworkMovingDirection(std::optional<Direction> direction);
   Direction facingDirection() const;
   bool crouching() const;
   bool flying() const;
@@ -305,6 +308,7 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> applyMCParameters(ActorMovementParameters const& parameters);
   [[nodiscard]] std::expected<void, StarException> doSetAnchorState(std::optional<EntityAnchorState> anchorState);
+  void setMovingDirection(Direction direction);
 
   ActorMovementParameters m_baseParameters;
   ActorMovementModifiers m_baseModifiers;
@@ -314,6 +318,7 @@ private:
   NetElementBool m_walking;
   NetElementBool m_running;
   NetElementEnum<Direction> m_movingDirection;
+  std::optional<Direction> m_nativeMovingDirection;
   NetElementEnum<Direction> m_facingDirection;
   NetElementBool m_crouching;
   NetElementBool m_flying;

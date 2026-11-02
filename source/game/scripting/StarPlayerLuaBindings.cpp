@@ -261,6 +261,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return player.humanoid()->humanoidConfig(withOverrides);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
+  if (auto registered = callbacks.registerCallback("controlMovementState", [&player](std::optional<String> const& state) -> std::expected<void, StarException> {
+    return player.controlMovementState(state);
+  }); !registered)
+    return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback(   "bodyDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().bodyDirectives.string();

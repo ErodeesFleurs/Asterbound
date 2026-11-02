@@ -246,6 +246,9 @@ public:
   void moveDown();
   void jump();
 
+  // Presentation-only request, refreshed during each generic script update.
+  [[nodiscard]] std::expected<void, StarException> controlMovementState(std::optional<String> const& state);
+
   [[nodiscard]] std::expected<void, StarException> dropItem();
 
   [[nodiscard]] std::expected<float, StarException> toolRadius() const;
@@ -619,6 +622,7 @@ private:
 
   // state changes and effect animations (master and slave) that happen AFTER movement/tech controller updates
   [[nodiscard]] std::expected<void, StarException> processStateChanges(float dt);
+  void updateMovementAnimationState();
 
   [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial);
   [[nodiscard]] std::expected<void, StarException> setNetStates();
@@ -663,6 +667,8 @@ private:
 
   State m_state;
   HumanoidEmote m_emoteState;
+  std::optional<Humanoid::State> m_controlMovementState;
+  std::optional<Humanoid::State> m_movementAnimationState;
 
   std::optional<String> m_dance;
   GameTimer m_danceCooldownTimer;

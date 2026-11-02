@@ -48,6 +48,51 @@ Sets the player's description. The new description will not be networked until t
 
 ---
 
+#### `void` player.controlMovementState(`Maybe<String>` state)
+
+Requests a presentation-only humanoid movement state: `"idle"`, `"walk"`, `"run"`,
+`"jump"` or `"fall"`. Other names are rejected. Passing `nil` revokes the current
+request. The last call in a frame wins; this is not a per-script ownership stack.
+
+Refresh the request in a generic player script's `update` on every simulation
+frame (`script.setUpdateDelta(1)`). Requests are cleared before the next player
+update; calls in `init`, `postUpdate`, or messages before that update do not carry
+over into it. Pausing freezes the current presentation with the simulation.
+World exit/uninitialization clears the request, and it is never saved.
+
+The request does not change velocity, collision, `onGround`, the movement
+controller's state, or the player's native movement state and movement effects.
+Lounge/anchored, dead and teleporting players ignore it; a tech's explicit parent
+animation state retains precedence. Existing dances, held-item arm poses and
+item-controlled facing retain their normal behavior.
+
+The requested state drives the actual humanoid animation, for both legacy and
+animator-based humanoids, at its configured normal cycle speed. Refreshing the
+same state does not restart its cycle. Facing still comes from the movement
+controller (use `mcontroller.controlFace` with a body-local left/right direction)
+and held items; the backwards walk/run cycle compares that facing with velocity
+projected onto the body's rotated local X axis, rather than world X. Body
+rotation still comes from `mcontroller.rotation()`.
+
+Outbound replication reuses the vanilla player movement-state field and the
+movement controller's existing moving-direction field, including legacy protocol
+0. Only their network presentation values are overridden: local native player
+state and `mcontroller.movingDirection()` remain unchanged. The moving-direction
+value is the same body-local projection used for local backwards playback;
+facing, position, velocity, body rotation and physics flags retain their normal
+network values. A tech's parent state is not changed and no tech is equipped.
+Stopping requests restores both fields to their native values on that update.
+
+These fields have no OpenStarbound compatibility-version gate; rotation already
+uses the native angle-interpolated, 0.01-radian fixed-point field. No fields,
+humanoid groups, custom animation parameters or persistent properties are added.
+This is a source-level legacy protocol contract, not proof of rendering in a
+vanilla executable. Remote cycles use their normal local animation clocks, not a
+synchronized cycle phase, and remote native effects may follow the transmitted
+presentation state rather than the controlling player's physical state.
+
+---
+
 #### `void` player.refreshHumanoidParameters()
 
 Refreshes the active humanoid parameters by re-building the current humanoid instance.
