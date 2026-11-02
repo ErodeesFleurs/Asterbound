@@ -573,6 +573,49 @@ const GameTestRegistration
                           EXPECT_EQ(*saved, (JsonObject{{"width", 2048}}));
                         });
 
+const GameTestRegistration deferredCallbackRemoval(
+  "LuaComponentLifecycle", "DeferredUninitKeepsHostServicesUntilShutdownHookReturns", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    LuaMessageScript component(fixture.root());
+    auto cleanup = finally([&] { EXPECT_TRUE(component.uninit()); });
+    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    int cleanups = 0;
+    LuaCallbacks capability;
+    ASSERT_TRUE(capability.registerCallback("cleanup", [&] { ++cleanups; }));
+    ASSERT_TRUE(component.addCallbacks("capability", capability));
+    LuaCallbacks host;
+    ASSERT_TRUE(host.registerCallback("close", [&]() -> std::expected<void, StarException> {
+      auto stopped = component.uninit();
+      if (!stopped)
+        return stopped;
+      auto removed = component.removeCallbacks("capability");
+      if (!removed)
+        return std::unexpected(std::move(removed.error()));
+      return {};
+    }));
+    ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+    ASSERT_TRUE(component.init());
+    ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
+      function uninit() capability.cleanup() end
+      message.setHandler("close", function()
+        host.close()
+        return "closed"
+      end)
+    )LUA"));
+    auto saved = component.context()->getPath<LuaFunction>("capability.cleanup");
+    ASSERT_TRUE(saved);
+    expectResponse(component.handleMessage("close", true), Json("closed"));
+    EXPECT_EQ(cleanups, 1);
+    EXPECT_FALSE(component.initialized());
+    EXPECT_FALSE(saved->invoke<LuaValue>());
+    ASSERT_TRUE(component.addCallbacks("capability", capability));
+    ASSERT_TRUE(component.init());
+    ASSERT_TRUE(component.eval<LuaValue>("function uninit() capability.cleanup() end"));
+    ASSERT_TRUE(component.uninit());
+    EXPECT_EQ(cleanups, 2);
+  });
+
 struct FailingLuaLogTag {
   static constexpr std::string_view name() { return "FailingLuaLog"; }
 };

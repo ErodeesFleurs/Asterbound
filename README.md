@@ -165,6 +165,7 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 - `LuaConverter<T>` converts directly through `LuaStack` / `LuaStackValue`, including coroutine callbacks. Stack and string views are borrowed; retain values with `own()` or owning Lua handle types.
 - Typed calls request zero, one, tuple-N or all results for `void`, scalar, tuple or `LuaVariadic` returns. Unused results are discarded before conversion.
 - `LuaBaseComponent` owns session execution, reload and shutdown. Context retirement waits for the outermost call; workers are joined before dependent bindings disappear. Evaluation errors retain the context; invocation/message errors disable it.
+- Callback removals requested after a reentrant `uninit` wait until its shutdown hooks return, so those hooks retain their host services.
 - Require callbacks take borrowed `(LuaStackValue environment, StringView module)` and execute through `environment.stack().load(environment, bytes)`.
 
 ### Lua module loading

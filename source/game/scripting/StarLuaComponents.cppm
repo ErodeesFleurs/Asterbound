@@ -119,6 +119,7 @@ private:
   bool m_shutdownPending = false;
   bool m_shuttingDown = false;
   std::optional<String> m_pendingUninit;
+  StringList m_pendingCallbackRemovals;
   std::optional<std::reference_wrapper<LuaScriptWorld>> m_pendingWorldUninit;
   std::optional<StarException> m_boundaryError;
   std::optional<String> m_error;

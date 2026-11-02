@@ -97,6 +97,13 @@ std::expected<bool, StarException> LuaBaseComponent::removeCallbacks(String cons
   auto group = m_callbacks.maybeRef(groupName);
   if (!group)
     return false;
+  if (m_pendingUninit) {
+    // A host may unregister its services immediately after requesting uninit
+    // from inside Lua. Keep them alive for the deferred shutdown hook.
+    if (std::ranges::find(m_pendingCallbackRemovals, groupName) == m_pendingCallbackRemovals.end())
+      m_pendingCallbackRemovals.append(groupName);
+    return true;
+  }
   auto scope = group->get().scope;
   if (m_context) {
     if (auto result = m_context->remove(groupName); !result)
@@ -371,6 +378,12 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
                         : std::unexpected(detached.error().withContext(
                             strf("Earlier Lua shutdown failure: {}", outputException(cleanup.error(), true))));
   }
+  for (auto const& group : m_pendingCallbackRemovals) {
+    auto removed = removeCallbacks(group);
+    if (!removed && cleanup)
+      cleanup = std::unexpected(std::move(removed.error()));
+  }
+  m_pendingCallbackRemovals.clear();
   if (!cleanup && !m_boundaryError)
     m_boundaryError = cleanup.error();
   auto error = std::move(m_boundaryError);
