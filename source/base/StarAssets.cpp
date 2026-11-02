@@ -13,6 +13,7 @@ import star.list;
 import star.image;
 import star.image_processing;
 import star.hash;
+import star.set;
 import star.data_stream;
 import star.string_view;
 import star.directives;
@@ -98,6 +99,32 @@ static std::optional<std::string_view> validateBasePath(std::string_view const& 
   if (!canContainDirectives && !components.directives.empty())
     return std::unexpected(AssetException::format("Path '{}' cannot contain directives", components));
   return {};
+}
+
+// Only a confirmed vanished directory entry is optional. A dangling symlink,
+// permission failure, corrupt package or unreadable existing file stays an error.
+static std::expected<std::optional<ByteArray>, StarException> readPatch(AssetSource& source, String const& path,
+                                                                        Logger& logger) {
+  auto bytes = source.read(path);
+  if (bytes)
+    return std::optional<ByteArray>(std::move(*bytes));
+  if (bytes.error().is<IOException>()) {
+    if (auto directory = asRef<DirectoryAssetSource>(source)) {
+      auto filesystem = directory->get().toFilesystem(path);
+      if (filesystem) {
+        std::error_code error;
+        auto status = std::filesystem::symlink_status(std::filesystem::path(filesystem->utf8()), error);
+        if (status.type() == std::filesystem::file_type::not_found
+            && (!error || error == std::errc::no_such_file_or_directory)) {
+          auto logged = logger.warn("Skipping vanished patch '{}' ({})", path, *filesystem);
+          if (!logged)
+            return std::unexpected(std::move(logged.error()));
+          return std::nullopt;
+        }
+      }
+    }
+  }
+  return std::unexpected(std::move(bytes.error()));
 }
 
 std::expected<std::optional<RectU>, StarException> FramesSpecification::getRect(String const& frame) const {
@@ -1052,13 +1079,36 @@ void Assets::cleanup() {
   std::lock_guard assetsLocker(m_assetsMutex);
 
   double time = Time::monotonicTime();
+  HashSet<AssetData const*> keepLonger;
+  if (m_settings.referenceImageTimeToLive > m_settings.assetTimeToLive && m_settings.referenceImagePixelBudget != 0) {
+    std::vector<ImageData const*> references;
+    for (auto const& entry : m_assetsCache) {
+      if (entry.first.type == AssetType::Image && entry.second) {
+        auto const& image = asRef<ImageData>(*entry.second)->get();
+        if (image.isReference && image.image)
+          references.push_back(&image);
+      }
+    }
+    std::sort(references.begin(), references.end(),
+              [](ImageData const* a, ImageData const* b) { return a->time > b->time; });
+    std::uint64_t pixels = 0;
+    for (auto image : references) {
+      auto size = std::uint64_t(image->image->width()) * image->image->height();
+      if (size > m_settings.referenceImagePixelBudget - pixels)
+        continue;
+      pixels += size;
+      keepLonger.add(image);
+    }
+  }
 
   for (auto it = m_assetsCache.begin(); it != m_assetsCache.end();) {
     auto const& pair = *it;
     // Don't clean up broken assets or queued assets.
     if (pair.second && !m_queue.contains(pair.first)) {
       double liveTime = time - pair.second->time;
-      if (liveTime > m_settings.assetTimeToLive) {
+      float timeToLive =
+        keepLonger.contains(pair.second.get()) ? m_settings.referenceImageTimeToLive : m_settings.assetTimeToLive;
+      if (liveTime > timeToLive) {
         // If the asset should persist, just refresh the access time.
         if (pair.second->shouldPersist())
           pair.second->time = time;
@@ -1484,9 +1534,11 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
   for (auto const& pair : patches) {
     auto& patchPath = pair.first;
     auto& patchSource = pair.second;
-    auto patchStream = patchSource->read(patchPath);
+    auto patchStream = readPatch(*patchSource, patchPath, m_logger);
     if (!patchStream)
       return std::unexpected(std::move(patchStream.error()));
+    if (!*patchStream)
+      continue;
     auto isLua = patchPath.endsWith(".lua");
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
@@ -1499,7 +1551,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
-        auto loaded = newContext->load(patchStream->span(), patchPath);
+        auto loaded = newContext->load((**patchStream).span(), patchPath);
         if (!loaded)
           return std::unexpected(std::move(loaded.error()));
         context = std::move(newContext);
@@ -1617,9 +1669,11 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
     auto patchAssetPath = AssetPath::split(pair.first);
     auto& patchBasePath = patchAssetPath.basePath;
     auto& patchSource = pair.second;
-    auto patchStream = patchSource->read(patchBasePath);
+    auto patchStream = readPatch(*patchSource, patchBasePath, m_logger);
     if (!patchStream)
       return std::unexpected(std::move(patchStream.error()));
+    if (!*patchStream)
+      continue;
     auto isLua = patchBasePath.endsWith(".lua");
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
@@ -1633,7 +1687,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
-        auto loaded = newContext->load(patchStream->span(), patchBasePath);
+        auto loaded = newContext->load((**patchStream).span(), patchBasePath);
         if (!loaded)
           return std::unexpected(std::move(loaded.error()));
         context = std::move(newContext);
@@ -1645,7 +1699,8 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
         result = std::move(*newResult);
     } else {
       auto applyPatch = [&]() -> std::expected<void, StarException> {
-        auto patchJson = inputUtf8Json(patchStream->begin(), patchStream->end(), JsonParseType::Top);
+        auto& bytes = **patchStream;
+        auto patchJson = inputUtf8Json(bytes.begin(), bytes.end(), JsonParseType::Top);
         if (!patchJson)
           return std::unexpected(std::move(patchJson.error()));
         if (patchAssetPath.subPath) {
@@ -1851,7 +1906,10 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
         return std::unexpected(std::move(reference.error()));
       if (!*reference)
         return std::shared_ptr<AssetData>{};
-      references[ref] = asRef<ImageData>(**reference)->get().image;
+      auto& image = asRef<ImageData>(**reference)->get();
+      image.isReference = true;
+      freshen(*reference);
+      references[ref] = image.image;
     }
     return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
       auto image = path.directives.applyNewImage(*source.image, [&](String const& ref) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {

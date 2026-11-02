@@ -87,6 +87,8 @@ set (star_game_tests_SOURCES
       StarTestUniverse.cpp
       StarGameTest.cpp
       assets_test.cpp
+      assets_patch_read_test.cpp
+      assets_reference_cache_test.cpp
       biome_placement_test.cpp
       damage_database_test.cpp
       function_test.cpp

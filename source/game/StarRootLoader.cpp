@@ -36,6 +36,8 @@ namespace Star {
 std::expected<Json, StarException> const BaseAssetsSettings = Json::parseJson(R"JSON(
     {
       "assetTimeToLive" : 30,
+      "referenceImageTimeToLive" : 300,
+      "referenceImagePixelBudget" : 16777216,
 
       // In seconds, audio less than this long will be decompressed in memory.
       "audioDecompressLimit" : 4.0,
@@ -224,6 +226,14 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     auto ttl = assetsSettings.getInt("assetTimeToLive");
     if (!ttl) return std::unexpected(std::move(ttl.error()));
     rootSettings.assetsSettings.assetTimeToLive = *ttl;
+    auto referenceTtl = assetsSettings.getFloat("referenceImageTimeToLive");
+    if (!referenceTtl)
+      return std::unexpected(std::move(referenceTtl.error()));
+    rootSettings.assetsSettings.referenceImageTimeToLive = *referenceTtl;
+    auto referenceBudget = assetsSettings.getUInt("referenceImagePixelBudget");
+    if (!referenceBudget)
+      return std::unexpected(std::move(referenceBudget.error()));
+    rootSettings.assetsSettings.referenceImagePixelBudget = *referenceBudget;
     auto decompress = assetsSettings.getFloat("audioDecompressLimit");
     if (!decompress) return std::unexpected(std::move(decompress.error()));
     rootSettings.assetsSettings.audioDecompressLimit = *decompress;

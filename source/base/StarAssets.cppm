@@ -89,6 +89,11 @@ public:
     // Same, but only ignores the file for the purposes of calculating the
     // digest.
     StringList digestIgnore;
+
+    // Longer lifetime for recently referenced blend/mask images. The pixel
+    // budget limits this extension, not total cache or externally held memory.
+    float referenceImageTimeToLive = 300;
+    std::uint64_t referenceImagePixelBudget = 16 * 1024 * 1024;
   };
 
   enum class QueuePriority {
@@ -174,6 +179,8 @@ public:
     // shouldPersist will never be true (to ensure that this alias and its
     // target can be removed from the cache).
     bool alias = false;
+
+    bool isReference = false;
   };
 
   struct AudioData : AssetData {
