@@ -361,19 +361,29 @@ std::expected<Image, StarException> DirectivesGroup::applyNewImage(Image const& 
 }
 
 std::expected<void, StarException> DirectivesGroup::applyExistingImage(Image& image, ImageReferenceCallback refCallback) const {
+  List<ImageOperation const*> operations;
   bool first = true;
-  return forEach([&](Directives::Entry const& entry, Directives const& directives) -> std::expected<void, StarException> {
+  auto collected = forEach([&](Directives::Entry const& entry,
+                               Directives const& directives) -> std::expected<void, StarException> {
     ImageOperation const& operation = entry.loadOperation(*directives.m_shared);
     if (std::holds_alternative<ErrorImageOperation>(operation))
       return std::unexpected(std::get<ErrorImageOperation>(operation).cause);
     if (!first && entry.begin != 0 && std::holds_alternative<NullImageOperation>(operation))
       return std::unexpected(DirectivesException::format("Invalid image operation: {}", entry.string(*directives.m_shared)));
-    auto processed = processImageOperation(operation, image, refCallback);
-    if (!processed)
-      return std::unexpected(std::move(processed.error()));
+    // Accepted group prefixes only promote 24-bit input, already done by any
+    // preceding executable operation. Omit redundant prefixes across groups.
+    if (!std::holds_alternative<NullImageOperation>(operation) || operations.empty())
+      operations.append(&operation);
     first = false;
     return {};
   });
+  // A later parse error must not hide an earlier execution error or discard
+  // the successfully applied prefix of an existing-image operation.
+  auto applied = processImageOperations(std::span<ImageOperation const* const>(operations.data(), operations.size()),
+                                        image, std::move(refCallback));
+  if (!applied)
+    return std::unexpected(std::move(applied.error()));
+  return collected;
 }
 
 std::size_t DirectivesGroup::hash() const {

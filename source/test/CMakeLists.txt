@@ -17,6 +17,7 @@ set (star_core_tests_SOURCES
       file_test.cpp
       hash_test.cpp
       host_address_test.cpp
+      image_directive_pipeline_test.cpp
       image_processing_test.cpp
       image_scaling_test.cpp
       ref_ptr_test.cpp

@@ -170,6 +170,11 @@ typedef std::function<std::expected<std::optional<std::reference_wrapper<Image c
 
 [[nodiscard]] std::expected<Image, StarException> processImageOperations(List<ImageOperation> const& operations, Image input, ImageReferenceCallback refCallback = {});
 
+// Applies the same optimizer in place to stable operation references. On failure,
+// successful prefix mutations and the failing operation's format promotion remain.
+[[nodiscard]] std::expected<void, StarException>
+processImageOperations(std::span<ImageOperation const* const> operations, Image& image,
+                       ImageReferenceCallback refCallback = {});
 }
 
 export module star.image_processing;

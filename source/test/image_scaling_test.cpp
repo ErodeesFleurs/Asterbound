@@ -1,6 +1,7 @@
 import std;
 import star.image_scaling;
 import star.image;
+import star.rect;
 import star.directives;
 import star.vector;
 import star.string;
@@ -50,6 +51,25 @@ void expectSameImage(Image const& actual, Image const& expected) {
   ASSERT_EQ(actual.pixelFormat(), expected.pixelFormat());
   ASSERT_EQ(actual.data().size(), expected.data().size());
   EXPECT_TRUE(std::equal(actual.data().begin(), actual.data().end(), expected.data().begin()));
+}
+
+void expectCroppedMatchesFull(Image const& source, Vec2F const& scale) {
+  for (bool nearest : {true, false}) {
+    auto full = nearest ? scaleNearest(source, scale) : scaleBilinear(source, scale);
+    ASSERT_TRUE(full);
+    Vec2I end(full->size());
+    Vec2I inset(end[0] / 3, end[1] / 3);
+    for (auto window :
+         {RectI(Vec2I(), end), RectI(inset, end), RectI(end - Vec2I(1, 1), end), RectI(Vec2I(), Vec2I(1, 1)),
+          RectI(end, end), RectI(Vec2I(end[0], 0), end), RectI(Vec2I(0, end[1]), end)}) {
+      ASSERT_TRUE(scaledCropFits(source, scale, window));
+      auto expected = full->subImage(Vec2U(window.min()), Vec2U(window.size()));
+      auto actual = nearest ? scaleNearestCropped(source, scale, window) : scaleBilinearCropped(source, scale, window);
+      ASSERT_TRUE(expected);
+      ASSERT_TRUE(actual);
+      expectSameImage(*actual, *expected);
+    }
+  }
 }
 }// namespace
 
@@ -183,5 +203,128 @@ TEST(ImageScalingTest, NearestFloatFormatsRetainLegacyByteSetterBehavior) {
       // raw float pixels here would silently introduce different semantics.
       EXPECT_TRUE(std::all_of(actual->data().begin(), actual->data().end(), [](auto byte) { return byte == 0; }));
     }
+  }
+}
+
+TEST(ImageScalingTest, CroppedScalesMatchFullScaleThenSubImageAcrossByteFormats) {
+  for (auto format : {PixelFormat::RGB24, PixelFormat::BGR24, PixelFormat::RGBA32, PixelFormat::BGRA32}) {
+    for (auto size : {Vec2U(1, 1), Vec2U(1, 7), Vec2U(7, 1), Vec2U(2, 3), Vec2U(27, 27)}) {
+      auto source = patternedImage(size, format);
+      for (auto scale : {Vec2F(1, 1), Vec2F(2, 2), Vec2F(0.5f, 0.75f), Vec2F(1.5f, 2.5f),
+                         Vec2F(0.15384616f, 0.15384616f), Vec2F(2.0f / 3.0f, 1.125f), Vec2F(0.01f, 3)})
+        expectCroppedMatchesFull(source, scale);
+    }
+  }
+}
+
+TEST(ImageScalingTest, CroppedNearestRetainsAbsoluteDivisionHalfBoundary) {
+  for (auto format : {PixelFormat::RGB24, PixelFormat::BGR24, PixelFormat::RGBA32, PixelFormat::BGRA32}) {
+    auto source = patternedImage(Vec2U(27, 27), format);
+    auto scale = Vec2F(0.15384616f, 0.15384616f);
+    auto full = scaleNearest(source, scale);
+    ASSERT_TRUE(full);
+    RectI window(Vec2I(2, 2), Vec2I(4, 4));
+    auto cropped = scaleNearestCropped(source, scale, window);
+    auto expected = full->subImage(Vec2U(2, 2), Vec2U(2, 2));
+    ASSERT_TRUE(cropped);
+    ASSERT_TRUE(expected);
+    expectSameImage(*cropped, *expected);
+    auto selected = source.get(20, 20);
+    auto pixel = cropped->get(1, 1);
+    ASSERT_TRUE(selected);
+    ASSERT_TRUE(pixel);
+    EXPECT_EQ(*pixel, *selected);
+  }
+}
+
+TEST(ImageScalingTest, CroppedScalesRetainEmptyZeroAndFloatBehavior) {
+  for (auto format : {PixelFormat::RGB24, PixelFormat::BGR24, PixelFormat::RGBA32, PixelFormat::BGRA32,
+                      PixelFormat::RGB_F, PixelFormat::RGBA_F}) {
+    for (auto size : {Vec2U(0, 0), Vec2U(0, 3), Vec2U(4, 0), Vec2U(3, 2)}) {
+      Image source(size, format);
+      if (source.bytesPerPixel() > 4) {
+        constexpr std::array<float, 4> pixel{0.125f, 0.25f, 0.75f, 0.5f};
+        for (std::size_t offset = 0; offset < source.data().size(); offset += source.bytesPerPixel())
+          std::memcpy(source.data().data() + offset, pixel.data(), source.bytesPerPixel());
+      } else {
+        source = patternedImage(size, format);
+      }
+      for (auto scale : {Vec2F(1, 1), Vec2F(2, 1.5f), Vec2F(0.5f, 0.75f), Vec2F(0, 2), Vec2F(2, 0), Vec2F(0, 0)})
+        expectCroppedMatchesFull(source, scale);
+    }
+  }
+}
+
+TEST(ImageScalingTest, CroppedBilinearPreservesUnpremultipliedAlphaAndHiddenRgb) {
+  for (auto format : {PixelFormat::RGBA32, PixelFormat::BGRA32}) {
+    Image source(2, 1, format);
+    ASSERT_TRUE(source.setrgb(0, 0, Vec4B(255, 0, 0, 0)));
+    ASSERT_TRUE(source.setrgb(1, 0, Vec4B(0, 0, 255, 255)));
+    auto full = scaleBilinear(source, Vec2F(2, 1));
+    auto cropped = scaleBilinearCropped(source, Vec2F(2, 1), RectI(Vec2I(), Vec2I(2, 1)));
+    ASSERT_TRUE(full);
+    ASSERT_TRUE(cropped);
+    auto expected = full->subImage(Vec2U(), Vec2U(2, 1));
+    ASSERT_TRUE(expected);
+    expectSameImage(*cropped, *expected);
+    auto hidden = cropped->getrgb(0, 0);
+    auto interpolated = cropped->getrgb(1, 0);
+    ASSERT_TRUE(hidden);
+    ASSERT_TRUE(interpolated);
+    EXPECT_EQ(*hidden, Vec4B(255, 0, 0, 0));
+    EXPECT_EQ(*interpolated, Vec4B(127, 0, 127, 127));
+  }
+}
+
+TEST(ImageScalingTest, CroppedScaleComputesSmallWindowOfLargeOutput) {
+  auto source = patternedImage(Vec2U(2, 2), PixelFormat::RGBA32);
+  auto scale = Vec2F(256, 256);
+  RectI window(Vec2I(101, 222), Vec2I(225, 227));
+  for (bool nearest : {true, false}) {
+    auto full = nearest ? scaleNearest(source, scale) : scaleBilinear(source, scale);
+    auto cropped = nearest ? scaleNearestCropped(source, scale, window) : scaleBilinearCropped(source, scale, window);
+    ASSERT_TRUE(full);
+    ASSERT_TRUE(cropped);
+    auto expected = full->subImage(Vec2U(window.min()), Vec2U(window.size()));
+    ASSERT_TRUE(expected);
+    expectSameImage(*cropped, *expected);
+  }
+
+  // The hypothetical full image here would occupy 160 petabytes. The cropped
+  // APIs must allocate only the requested pixels (and nearest's window columns).
+  source = Image::filled(Vec2U(2, 2), Vec4B(73, 129, 211, 0));
+  scale = Vec2F(100000000, 100000000);
+  window = RectI(Vec2I(100000000, 100000000), Vec2I(100000002, 100000003));
+  ASSERT_TRUE(scaledCropFits(source, scale, window));
+  for (bool nearest : {true, false}) {
+    auto cropped = nearest ? scaleNearestCropped(source, scale, window) : scaleBilinearCropped(source, scale, window);
+    ASSERT_TRUE(cropped);
+    expectSameImage(*cropped, Image::filled(Vec2U(2, 3), Vec4B(73, 129, 211, 0)));
+  }
+}
+
+TEST(ImageScalingTest, ScaledCropFitsRejectsInvalidBoundsWithoutOverflow) {
+  Image source(2, 3);
+  for (auto window :
+       {RectI(Vec2I(-1, 0), Vec2I(1, 1)), RectI(Vec2I(0, -1), Vec2I(1, 1)), RectI(Vec2I(2, 2), Vec2I(1, 3)),
+        RectI(Vec2I(), Vec2I(5, 6)), RectI(Vec2I(), Vec2I(4, 7)), RectI(Vec2I(5, 0), Vec2I(5, 0)),
+        RectI(Vec2I(std::numeric_limits<int>::min(), 0), Vec2I(std::numeric_limits<int>::max(), 1)),
+        RectI(Vec2I(std::numeric_limits<int>::max() - 1, 0), Vec2I(std::numeric_limits<int>::max(), 1))}) {
+    EXPECT_FALSE(scaledCropFits(source, Vec2F(2, 2), window));
+    EXPECT_FALSE(scaleNearestCropped(source, Vec2F(2, 2), window));
+    EXPECT_FALSE(scaleBilinearCropped(source, Vec2F(2, 2), window));
+  }
+  EXPECT_TRUE(scaledCropFits(source, Vec2F(2, 2), RectI(Vec2I(4, 6), Vec2I(4, 6))));
+  EXPECT_TRUE(scaledCropFits(source, Vec2F(0, 0), RectI(Vec2I(), Vec2I(1, 1))));
+  // No signed narrowing of a valid scaled size above INT_MAX.
+  EXPECT_TRUE(
+    scaledCropFits(source, Vec2F(1500000000, 1),
+                   RectI(Vec2I(std::numeric_limits<int>::max() - 1, 0), Vec2I(std::numeric_limits<int>::max(), 1))));
+  for (auto scale : {Vec2F(-1, 1), Vec2F(1, -1), Vec2F(std::bit_cast<float>(0x7f800000u), 1),
+                     Vec2F(1, std::bit_cast<float>(0x7fc00000u)), Vec2F(2147483648.0f, 1),
+                     Vec2F(std::numeric_limits<float>::max(), 1)}) {
+    EXPECT_FALSE(scaledCropFits(source, scale, RectI(Vec2I(), Vec2I(1, 1))));
+    EXPECT_FALSE(scaleNearestCropped(source, scale, RectI(Vec2I(), Vec2I(1, 1))));
+    EXPECT_FALSE(scaleBilinearCropped(source, scale, RectI(Vec2I(), Vec2I(1, 1))));
   }
 }

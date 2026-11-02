@@ -383,7 +383,143 @@ static void processSaturationShift(Image& image, SaturationShiftImageOperation c
   });
 }
 
+// Half-open pixel bounds. Widen before offset arithmetic: long is 32-bit on Windows.
+struct PixelRect {
+  std::int64_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+  bool empty() const { return x0 >= x1 || y0 >= y1; }
 
+  void include(PixelRect const& other) {
+    if (other.empty())
+      return;
+    if (empty()) {
+      *this = other;
+      return;
+    }
+    x0 = std::min(x0, other.x0);
+    y0 = std::min(y0, other.y0);
+    x1 = std::max(x1, other.x1);
+    y1 = std::max(y1, other.y1);
+  }
+};
+
+// Four-byte images only: keep the map's internal channel order and one-step replacements.
+static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, PixelRect rect) {
+  if (replaceMap.empty() || rect.empty())
+    return;
+  if (std::uint64_t(rect.x1 - rect.x0) * (rect.y1 - rect.y0) < 1024) {
+    for (auto y = rect.y0; y < rect.y1; ++y) {
+      for (auto x = rect.x0; x < rect.x1; ++x) {
+        auto pixel = image.get32(x, y);
+        if (auto replacement = replaceMap.maybe(pixel))
+          image.set32(x, y, *replacement);
+      }
+    }
+    return;
+  }
+
+  unsigned bitCount = 4096;
+  while (replaceMap.size() > bitCount / 32 && bitCount < (1u << 20))
+    bitCount <<= 1;
+  unsigned shift = 32 - std::countr_zero(bitCount);
+  std::array<std::uint64_t, 64> smallBits{};
+  std::vector<std::uint64_t> largeBits;
+  std::span<std::uint64_t> bits = smallBits;
+  if (bitCount > 4096) {
+    largeBits.resize(bitCount / 64);
+    bits = largeBits;
+  }
+  auto bitFor = [shift](Vec4B const& pixel) { return (RecentColors::pack(pixel) * 2654435761u) >> shift; };
+  for (auto const& entry : replaceMap) {
+    auto bit = bitFor(entry.first);
+    bits[bit >> 6] |= std::uint64_t(1) << (bit & 63);
+  }
+
+  static_assert(sizeof(Vec4B) == sizeof(std::uint32_t));
+  auto data = image.data();
+  std::uint32_t lastIn = 0, lastOut = 0;
+  bool haveLast = false;
+  for (auto y = rect.y0; y < rect.y1; ++y) {
+    auto row = data.data() + (std::size_t(y) * image.width() + rect.x0) * 4;
+    for (auto x = rect.x0; x < rect.x1; ++x) {
+      auto destination = row + std::size_t(x - rect.x0) * 4;
+      std::uint32_t input;
+      std::memcpy(&input, destination, 4);
+      if (haveLast && input == lastIn) {
+        std::memcpy(destination, &lastOut, 4);
+        continue;
+      }
+      Vec4B pixel;
+      std::memcpy(pixel.ptr(), &input, 4);
+      auto output = input;
+      auto bit = bitFor(pixel);
+      if ((bits[bit >> 6] >> (bit & 63)) & 1) {
+        if (auto replacement = replaceMap.maybe(pixel)) {
+          std::memcpy(&output, replacement->ptr(), 4);
+          std::memcpy(destination, &output, 4);
+        }
+      }
+      lastIn = input;
+      lastOut = output;
+      haveLast = true;
+    }
+  }
+}
+
+// Resolve only this operation's references, before changing any of its pixels.
+static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation const& op, Image& image,
+                                                          ImageReferenceCallback const& refCallback) {
+  if (op.blendImages.empty())
+    return PixelRect{};
+  if (!refCallback)
+    return std::unexpected(ImageOperationException("Missing image ref callback during BlendImageOperation"));
+
+  List<std::reference_wrapper<Image const>> blendImages;
+  for (auto const& reference : op.blendImages) {
+    auto blend = refCallback(reference);
+    if (!blend)
+      return std::unexpected(std::move(blend.error()));
+    if (!*blend)
+      return std::unexpected(ImageOperationException::format("Missing blend image '{}'", reference));
+    blendImages.append(**blend);
+  }
+
+  std::int64_t offsetX = op.offset[0], offsetY = op.offset[1];
+  PixelRect changed{image.width(), image.height(), 0, 0};
+  for (auto blend : blendImages) {
+    changed.x0 = std::min(changed.x0, std::max<std::int64_t>(0, -offsetX));
+    changed.y0 = std::min(changed.y0, std::max<std::int64_t>(0, -offsetY));
+    changed.x1 =
+      std::max(changed.x1, std::min<std::int64_t>(image.width(), std::int64_t(blend.get().width()) - offsetX));
+    changed.y1 =
+      std::max(changed.y1, std::min<std::int64_t>(image.height(), std::int64_t(blend.get().height()) - offsetY));
+  }
+  auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
+    std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
+    Vec4F fpixel = Color::v4bToFloat(pixel);
+    for (auto blend : blendImages) {
+      if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
+        Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
+        if (op.mode == BlendImageOperation::Multiply)
+          fpixel = fpixel.piecewiseMultiply(other);
+        else if (op.mode == BlendImageOperation::Screen)
+          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - other);
+      }
+    }
+    pixel = Color::v4fToByte(fpixel);
+  };
+  if (image.bytesPerPixel() == 4) {
+    for (auto y = changed.y0; y < changed.y1; ++y) {
+      for (auto x = changed.x0; x < changed.x1; ++x) {
+        auto pixel = image.get32(x, y);
+        blendPixel(x, y, pixel);
+        image.set32(x, y, pixel);
+      }
+    }
+  } else {
+    image.forEachPixel(blendPixel);
+  }
+  return changed;
+}
 
 std::expected<void, StarException> processImageOperation(ImageOperation const& operation, Image& image, ImageReferenceCallback refCallback) {
   if (auto error = (std::holds_alternative<ErrorImageOperation>(operation) ? std::optional{std::cref(std::get<ErrorImageOperation>(operation))} : std::nullopt))
@@ -446,58 +582,13 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     auto const& replaceMap = op->get().colorReplaceMap;
     if (replaceMap.empty())
       return {};
-    if (std::size_t(image.width()) * image.height() < 1024 || image.bytesPerPixel() != 4) {
+    if (image.bytesPerPixel() == 4)
+      replaceColors(replaceMap, image, {0, 0, image.width(), image.height()});
+    else
       image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
         if (auto replacement = replaceMap.maybe(pixel))
           pixel = *replacement;
       });
-    } else {
-      // A small key bitmap rejects most non-keys before a map lookup.
-      unsigned bitCount = 4096;
-      while (replaceMap.size() > bitCount / 32 && bitCount < (1u << 20))
-        bitCount <<= 1;
-      unsigned shift = 32 - std::countr_zero(bitCount);
-      std::array<std::uint64_t, 64> smallBits{};
-      std::vector<std::uint64_t> largeBits;
-      std::span<std::uint64_t> bits = smallBits;
-      if (bitCount > 4096) {
-        largeBits.resize(bitCount / 64);
-        bits = largeBits;
-      }
-      auto bitFor = [shift](Vec4B const& pixel) { return (RecentColors::pack(pixel) * 2654435761u) >> shift; };
-      for (auto const& entry : replaceMap) {
-        auto bit = bitFor(entry.first);
-        bits[bit >> 6] |= std::uint64_t(1) << (bit & 63);
-      }
-
-      // Read original input words, not the preceding replacement: A->B->C
-      // must still replace each A with B exactly once.
-      static_assert(sizeof(Vec4B) == sizeof(std::uint32_t));
-      auto data = image.data();
-      std::uint32_t lastIn = 0, lastOut = 0;
-      bool haveLast = false;
-      for (std::size_t i = 0; i < data.size(); i += 4) {
-        std::uint32_t input;
-        std::memcpy(&input, data.data() + i, 4);
-        if (haveLast && input == lastIn) {
-          std::memcpy(data.data() + i, &lastOut, 4);
-          continue;
-        }
-        Vec4B pixel;
-        std::memcpy(pixel.ptr(), &input, 4);
-        auto output = input;
-        auto bit = bitFor(pixel);
-        if ((bits[bit >> 6] >> (bit & 63)) & 1) {
-          if (auto replacement = replaceMap.maybe(pixel)) {
-            std::memcpy(&output, replacement->ptr(), 4);
-            std::memcpy(data.data() + i, &output, 4);
-          }
-        }
-        lastIn = input;
-        lastOut = output;
-        haveLast = true;
-      }
-    }
 
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().maskImages.empty())
@@ -538,59 +629,9 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     });
 
   } else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt)) {
-    if (op->get().blendImages.empty())
-      return {};
-
-    if (!refCallback)
-      return std::unexpected(ImageOperationException("Missing image ref callback during BlendImageOperation"));
-
-    List<std::reference_wrapper<Image const>> blendImages;
-    for (auto const& reference : op->get().blendImages) {
-      auto blend = refCallback(reference);
-      if (!blend)
-        return std::unexpected(std::move(blend.error()));
-      if (!*blend)
-        return std::unexpected(ImageOperationException::format("Missing blend image '{}'", reference));
-      blendImages.append(**blend);
-    }
-
-    // int64_t is deliberate: long is only 32 bits on Windows, and negating
-    // INT_MIN must happen after widening.
-    std::int64_t offsetX = op->get().offset[0], offsetY = op->get().offset[1];
-    std::int64_t minX = image.width(), minY = image.height(), maxX = 0, maxY = 0;
-    for (auto blend : blendImages) {
-      minX = std::min(minX, std::max<std::int64_t>(0, -offsetX));
-      minY = std::min(minY, std::max<std::int64_t>(0, -offsetY));
-      maxX = std::max(maxX, std::min<std::int64_t>(image.width(), std::int64_t(blend.get().width()) - offsetX));
-      maxY = std::max(maxY, std::min<std::int64_t>(image.height(), std::int64_t(blend.get().height()) - offsetY));
-    }
-    auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
-      std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
-      Vec4F fpixel = Color::v4bToFloat(pixel);
-      for (auto blend : blendImages) {
-        if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
-          // Preserve the existing internal-format interpretation of references.
-          Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
-          if (op->get().mode == BlendImageOperation::Multiply)
-            fpixel = fpixel.piecewiseMultiply(other);
-          else if (op->get().mode == BlendImageOperation::Screen)
-            fpixel =
-              Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - other);
-        }
-      }
-      pixel = Color::v4fToByte(fpixel);
-    };
-    if (image.bytesPerPixel() == 4) {
-      for (std::int64_t y = minY; y < maxY; ++y) {
-        for (std::int64_t x = minX; x < maxX; ++x) {
-          auto pixel = image.get32(x, y);
-          blendPixel(x, y, pixel);
-          image.set32(x, y, pixel);
-        }
-      }
-    } else {
-      image.forEachPixel(blendPixel);
-    }
+    auto blended = applyBlend(op->get(), image, refCallback);
+    if (!blended)
+      return std::unexpected(std::move(blended.error()));
 
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
     image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
@@ -704,13 +745,204 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
   return {};
 }
 
-std::expected<Image, StarException> processImageOperations(List<ImageOperation> const& operations, Image image, ImageReferenceCallback refCallback) {
-  for (auto const& operation : operations) {
-    auto processed = processImageOperation(operation, image, refCallback);
-    if (!processed)
-      return std::unexpected(std::move(processed.error()));
-  }
-  return image;
+static bool isPerPixelColorOperation(ImageOperation const* operation) {
+  return operation
+    && (std::holds_alternative<HueShiftImageOperation>(*operation)
+        || std::holds_alternative<SaturationShiftImageOperation>(*operation)
+        || std::holds_alternative<BrightnessMultiplyImageOperation>(*operation)
+        || std::holds_alternative<FadeToColorImageOperation>(*operation)
+        || std::holds_alternative<SetColorImageOperation>(*operation)
+        || std::holds_alternative<ColorReplaceImageOperation>(*operation)
+        || std::holds_alternative<MultiplyImageOperation>(*operation));
 }
 
+static bool hasBytePixels(Image const& image) { return image.bytesPerPixel() == 3 || image.bytesPerPixel() == 4; }
+
+static bool scaleEnlargesByCopying(ScaleImageOperation const& scale, Image const& image) {
+  // Empty scales synthesize black pixels, rather than copying source pixels.
+  // Float images also have different scalar byte-setter semantics.
+  if (image.empty() || !hasBytePixels(image) || scale.mode != ScaleImageOperation::Nearest
+      || !scaledCropFits(image, scale.scale, RectI(0, 0, 0, 0)))
+    return false;
+  auto size = Vec2U::round(vmult(Vec2F(image.size()), scale.scale));
+  size[0] = std::max(size[0], 1u);
+  size[1] = std::max(size[1], 1u);
+  return std::uint64_t(size[0]) * size[1] > std::uint64_t(image.width()) * image.height();
+}
+
+static bool cropShrinks(CropImageOperation const& crop, Image const& image) {
+  auto min = crop.subset.min(), max = crop.subset.max();
+  if (!hasBytePixels(image) || min[0] < 0 || min[1] < 0 || max[0] < min[0] || max[1] < min[1]
+      || std::uint64_t(max[0]) > image.width() || std::uint64_t(max[1]) > image.height())
+    return false;
+  return std::uint64_t(max[0] - min[0]) * (max[1] - min[1]) < std::uint64_t(image.width()) * image.height();
+}
+
+static std::expected<bool, StarException> processScaleCrop(ScaleImageOperation const& scale,
+                                                           CropImageOperation const& crop, Image& image) {
+  // Leave invalid crops/scales and float formats to the sequential error path.
+  if (!hasBytePixels(image) || scale.mode == ScaleImageOperation::Bicubic
+      || !scaledCropFits(image, scale.scale, crop.subset))
+    return false;
+  if (image.bytesPerPixel() == 3)
+    image = image.convert(image.pixelFormat() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
+  auto scaled = scale.mode == ScaleImageOperation::Nearest ? scaleNearestCropped(image, scale.scale, crop.subset)
+                                                           : scaleBilinearCropped(image, scale.scale, crop.subset);
+  if (!scaled)
+    return std::unexpected(std::move(scaled.error()));
+  image = std::move(*scaled);
+  return true;
+}
+
+static bool replaceSettles(ColorReplaceMap const& map) {
+  for (auto const& entry : map) {
+    if (map.contains(entry.second))
+      return false;
+  }
+  return true;
+}
+
+static bool replaceKeysAreKeysOf(ColorReplaceMap const& map, ColorReplaceMap const& other) {
+  for (auto const& entry : map) {
+    if (!other.contains(entry.first))
+      return false;
+  }
+  return true;
+}
+
+// An accessor keeps the contiguous List entrypoint allocation-free, while directives
+// can refer to stable, already loaded operations without copying their maps/tables.
+template <typename OperationAt>
+static std::expected<void, StarException> processImageOperationSequence(std::size_t count, OperationAt operationAt,
+                                                                        Image& image,
+                                                                        ImageReferenceCallback const& refCallback) {
+  ColorReplaceImageOperation const* settled = nullptr;
+  PixelRect changed;
+  bool sawBlend = false;
+  for (std::size_t i = 0; i < count;) {
+    auto operation = operationAt(i);
+    if (!operation)
+      return std::unexpected(ImageOperationException("Null image operation pointer"));
+
+    if (auto blend = std::get_if<BlendImageOperation>(operation); blend && settled) {
+      // Match processImageOperation's per-operation callback value semantics.
+      auto operationCallback = refCallback;
+      auto blended = applyBlend(*blend, image, operationCallback);
+      if (!blended)
+        return std::unexpected(std::move(blended.error()));
+      changed.include(*blended);
+      sawBlend = true;
+      ++i;
+      continue;
+    }
+    if (auto replace = std::get_if<ColorReplaceImageOperation>(operation); replace && settled && sawBlend
+        && replaceKeysAreKeysOf(replace->colorReplaceMap, settled->colorReplaceMap)
+        && replaceSettles(replace->colorReplaceMap)) {
+      // Outside the consecutive blends' union there are no keys left to replace.
+      replaceColors(replace->colorReplaceMap, image, changed);
+      settled = replace;
+      changed = {};
+      sawBlend = false;
+      ++i;
+      continue;
+    }
+    settled = nullptr;
+    changed = {};
+    sawBlend = false;
+
+    if (isPerPixelColorOperation(operation)) {
+      auto end = i + 1;
+      while (end < count && isPerPixelColorOperation(operationAt(end)))
+        ++end;
+      if (end < count && operationAt(end)) {
+        if (auto crop = std::get_if<CropImageOperation>(operationAt(end)); crop && cropShrinks(*crop, image)) {
+          auto cropped = processImageOperation(*operationAt(end), image, refCallback);
+          if (!cropped)
+            return std::unexpected(std::move(cropped.error()));
+          for (auto k = i; k < end; ++k) {
+            auto processed = processImageOperation(*operationAt(k), image, refCallback);
+            if (!processed)
+              return std::unexpected(std::move(processed.error()));
+          }
+          i = end + 1;
+          continue;
+        }
+      }
+      for (auto k = i; k < end; ++k) {
+        auto processed = processImageOperation(*operationAt(k), image, refCallback);
+        if (!processed)
+          return std::unexpected(std::move(processed.error()));
+      }
+      // Only a successfully applied final replace establishes the settled invariant.
+      if (image.bytesPerPixel() == 4 && end < count && operationAt(end)
+          && std::holds_alternative<BlendImageOperation>(*operationAt(end))) {
+        auto replace = std::get_if<ColorReplaceImageOperation>(operationAt(end - 1));
+        if (replace && replaceSettles(replace->colorReplaceMap))
+          settled = replace;
+      }
+      i = end;
+      continue;
+    }
+
+    if (auto scale = std::get_if<ScaleImageOperation>(operation)) {
+      auto end = i + 1;
+      while (end < count && isPerPixelColorOperation(operationAt(end)))
+        ++end;
+      if (end > i + 1 && scaleEnlargesByCopying(*scale, image)) {
+        for (auto k = i + 1; k < end; ++k) {
+          auto processed = processImageOperation(*operationAt(k), image, refCallback);
+          if (!processed)
+            return std::unexpected(std::move(processed.error()));
+        }
+        if (end < count && operationAt(end)) {
+          if (auto crop = std::get_if<CropImageOperation>(operationAt(end))) {
+            auto fused = processScaleCrop(*scale, *crop, image);
+            if (!fused)
+              return std::unexpected(std::move(fused.error()));
+            if (*fused) {
+              i = end + 1;
+              continue;
+            }
+          }
+        }
+        auto scaled = processImageOperation(*operation, image, refCallback);
+        if (!scaled)
+          return std::unexpected(std::move(scaled.error()));
+        i = end;
+        continue;
+      }
+      if (i + 1 < count && operationAt(i + 1)) {
+        if (auto crop = std::get_if<CropImageOperation>(operationAt(i + 1))) {
+          auto fused = processScaleCrop(*scale, *crop, image);
+          if (!fused)
+            return std::unexpected(std::move(fused.error()));
+          if (*fused) {
+            i += 2;
+            continue;
+          }
+        }
+      }
+    }
+    auto processed = processImageOperation(*operation, image, refCallback);
+    if (!processed)
+      return std::unexpected(std::move(processed.error()));
+    ++i;
+  }
+  return {};
+}
+
+std::expected<void, StarException> processImageOperations(std::span<ImageOperation const* const> operations,
+                                                          Image& image, ImageReferenceCallback refCallback) {
+  return processImageOperationSequence(
+    operations.size(), [&](std::size_t i) { return operations[i]; }, image, refCallback);
+}
+
+std::expected<Image, StarException> processImageOperations(List<ImageOperation> const& operations, Image image,
+                                                           ImageReferenceCallback refCallback) {
+  auto processed =
+    processImageOperationSequence(operations.size(), [&](std::size_t i) { return &operations[i]; }, image, refCallback);
+  if (!processed)
+    return std::unexpected(std::move(processed.error()));
+  return image;
+}
 }
