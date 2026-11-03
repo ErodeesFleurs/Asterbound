@@ -553,11 +553,11 @@ if (!result102) return std::unexpected(std::move(result102.error()));
 if (!result103) return std::unexpected(std::move(result103.error()));
 
 
-  return ds.data();
+  return ds.takeData();
 }
 
 std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariant(ByteArray const& data, NetCompatibilityRules rules) const {
-  DataStreamBuffer ds(data);
+  DataStreamExternalBuffer ds(data.span());
   ds.setStreamCompatibilityVersion(rules);
 
   NpcVariant variant;

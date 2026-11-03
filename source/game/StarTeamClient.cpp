@@ -266,10 +266,28 @@ std::expected<void, StarException> TeamClient::update() {
   if (!responses) return std::unexpected(std::move(responses.error()));
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
+  std::optional<Json> interfaceConfig;
+  auto readInterval = [&](String const& key) -> std::expected<float, StarException> {
+    if (!interfaceConfig) {
+      auto loaded = (*assets)->json("/interface.config");
+      if (!loaded)
+        return std::unexpected(std::move(loaded.error()));
+      interfaceConfig = std::move(*loaded);
+    }
+    auto value = interfaceConfig->get(key);
+    if (!value) {
+      auto path = strf("/interface.config:{}", key);
+      auto error = (*assets)->withAssetContext(
+          AssetException(strf("Could not read JSON value {}", path), value.error()), "/interface.config", "");
+      auto summary = *error.diagnosticSummary();
+      summary.kind = ExceptionSummaryKind::Resource;
+      summary.asset = std::move(path);
+      return std::unexpected(std::move(error).withSummary(std::move(summary)));
+    }
+    return value->toFloat();
+  };
   if (!m_hasPendingInvitation) {
-    auto intervalJson = (*assets)->json("/interface.config:invitationPollInterval");
-    if (!intervalJson) return std::unexpected(std::move(intervalJson.error()));
-    auto interval = intervalJson->toFloat();
+    auto interval = readInterval("invitationPollInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
     if (Time::monotonicTime() - m_pollInvitationsTimer > *interval) {
       m_pollInvitationsTimer = Time::monotonicTime();
@@ -291,9 +309,7 @@ std::expected<void, StarException> TeamClient::update() {
     }
   }
   if (!m_fullUpdateRunning) {
-    auto intervalJson = (*assets)->json("/interface.config:fullUpdateInterval");
-    if (!intervalJson) return std::unexpected(std::move(intervalJson.error()));
-    auto interval = intervalJson->toFloat();
+    auto interval = readInterval("fullUpdateInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
     if (Time::monotonicTime() - m_fullUpdateTimer > *interval) {
       m_fullUpdateTimer = Time::monotonicTime();
@@ -302,9 +318,7 @@ std::expected<void, StarException> TeamClient::update() {
     }
   }
   if (!m_statusUpdateRunning) {
-    auto intervalJson = (*assets)->json("/interface.config:statusUpdateInterval");
-    if (!intervalJson) return std::unexpected(std::move(intervalJson.error()));
-    auto interval = intervalJson->toFloat();
+    auto interval = readInterval("statusUpdateInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
     if (Time::monotonicTime() - m_statusUpdateTimer > *interval) {
       m_statusUpdateTimer = Time::monotonicTime();
@@ -327,12 +341,15 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
     self.m_teamManagerVersion = version->value_or(0);
     auto teamText = response.optString("teamUuid");
     if (!teamText) return std::unexpected(std::move(teamText.error()));
+    auto previousTeam = self.m_teamUuid;
     self.m_teamUuid.reset();
     if (*teamText) {
       auto team = Uuid::create(**teamText);
       if (!team) return std::unexpected(std::move(team.error()));
       self.m_teamUuid = *team;
     }
+    if (self.m_teamUuid != previousTeam)
+      self.m_fullStatusRequired = true;
     if (self.m_teamUuid) {
       auto leaderText = response.getString("leader");
       if (!leaderText) return std::unexpected(std::move(leaderText.error()));
@@ -404,18 +421,29 @@ std::expected<void, StarException> TeamClient::statusUpdate() {
     return {};
   if (!m_teamUuid)
     return {};
-  m_statusUpdateRunning = true;
+  auto now = Time::monotonicTime();
+  bool fullWrite = !m_lastFullStatusUpdate
+      || m_fullStatusRequired
+      || now - *m_lastFullStatusUpdate >= 10.0;
   JsonObject request;
-  auto player = m_mainPlayer;
-
-  // TODO: write full player data less often?
-  auto written = writePlayerData(request, player, true);
-  if (!written) return std::unexpected(std::move(written.error()));
-
-  return invokeRemote("team.updateStatus", request, [&self = *this](Json) -> std::expected<void, StarException> {
-      self.m_statusUpdateRunning = false;
-      return {};
-    });
+  auto written = writePlayerData(request, m_mainPlayer, fullWrite);
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  auto invoked = invokeRemote("team.updateStatus", request,
+      [&self = *this](Json const&) -> std::expected<void, StarException> {
+        self.m_statusUpdateRunning = false;
+        return {};
+      });
+  if (!invoked)
+    return std::unexpected(std::move(invoked.error()));
+  m_statusUpdateRunning = true;
+  if (fullWrite) {
+    // Legacy RPC maps remote failures to null too; only local submission is
+    // distinguishable. Do not advance this state on encoding/enqueue failure.
+    m_lastFullStatusUpdate = Time::monotonicTime();
+    m_fullStatusRequired = false;
+  }
+  return {};
 }
 
 List<TeamClient::Member> const& TeamClient::members() const {
@@ -464,9 +492,11 @@ void TeamClient::forceUpdate() {
   m_statusUpdateTimer = 0;
   m_fullUpdateTimer = 0;
   m_pollInvitationsTimer = 0;
+  m_fullStatusRequired = true;
 }
 
-std::expected<void, StarException> TeamClient::invokeRemote(String const& method, Json const& args, std::function<std::expected<void, StarException>(Json const&)> responseFunction) {
+std::expected<void, StarException> TeamClient::invokeRemote(String const& method, Json const& args,
+    std::function<std::expected<void, StarException>(Json const&)> responseFunction) {
   auto promise = m_clientContext->rpcInterface()->invokeRemote(method, args);
   if (!promise) return std::unexpected(std::move(promise.error()));
   m_pendingResponses.append({std::move(*promise), std::move(responseFunction)});

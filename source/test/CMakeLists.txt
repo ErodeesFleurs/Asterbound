@@ -165,6 +165,7 @@ set (star_game_tests_SOURCES
       species_test.cpp
       stat_test.cpp
       tile_array_test.cpp
+      team_client_test.cpp
       world_geometry_test.cpp
       world_snapshot_test.cpp
       universe_connection_test.cpp

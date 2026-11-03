@@ -426,6 +426,46 @@ TEST(JsonRpcTest, SuccessfulTransportPreservesStructuredResult) {
   EXPECT_EQ(*error, std::optional<String>{});
 }
 
+TEST(JsonRpcTest, TruncatedContainerDoesNotDispatchItsCompleteFirstRequest) {
+  Logger logger;
+  JsonRpc sender(logger);
+  JsonRpc receiver(logger);
+  int calls = 0;
+  ASSERT_TRUE(receiver.registerHandler("echo", [&calls](Json const& arguments) -> std::expected<Json, StarException> {
+    ++calls;
+    return arguments;
+  }));
+  Json firstArguments = JsonObject{{"message", "first"}, {"values", JsonArray{1, false, Json()}}};
+  Json secondArguments = JsonObject{{"message", "second"}};
+  auto firstResponse = sender.invokeRemote("echo", firstArguments);
+  ASSERT_TRUE(firstResponse);
+  auto secondResponse = sender.invokeRemote("echo", secondArguments);
+  ASSERT_TRUE(secondResponse);
+  auto request = sender.send();
+  ASSERT_TRUE(request);
+  ASSERT_FALSE(request->empty());
+  auto truncated = *request;
+  truncated.resize(truncated.size() - 1);
+
+  EXPECT_FALSE(receiver.receive(truncated));
+  EXPECT_EQ(calls, 0);
+  EXPECT_FALSE(receiver.sendPending());
+  EXPECT_EQ(firstResponse->finished(), false);
+  EXPECT_EQ(secondResponse->finished(), false);
+
+  ASSERT_TRUE(receiver.receive(*request));
+  EXPECT_EQ(calls, 2);
+  auto reply = receiver.send();
+  ASSERT_TRUE(reply);
+  ASSERT_TRUE(sender.receive(*reply));
+  auto firstResult = firstResponse->result();
+  ASSERT_TRUE(firstResult);
+  EXPECT_EQ(*firstResult, std::optional<Json>{firstArguments});
+  auto secondResult = secondResponse->result();
+  ASSERT_TRUE(secondResult);
+  EXPECT_EQ(*secondResult, std::optional<Json>{secondArguments});
+}
+
 TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
   Logger logger;
   JsonRpc sender(logger);

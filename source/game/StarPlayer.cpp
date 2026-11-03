@@ -4672,7 +4672,7 @@ std::expected<ByteArray, StarException> Player::netStore(NetCompatibilityRules r
     if (auto result = ds.write(m_humanoidParameters); !result)
       return std::unexpected(std::move(result.error()));
   }
-  return ds.data();
+  return ds.takeData();
 }
 
 std::expected<void, StarException> Player::finalizeCreation() {

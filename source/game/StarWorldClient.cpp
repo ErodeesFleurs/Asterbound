@@ -1187,8 +1187,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
             }
           }
         }
-        ed.layers[p.first] = std::move(p.second);
       }
+      ed.layers = std::move(renderCallback.drawables);
       
       if (self.m_interactiveHighlightMode || (!inspecting && entity->entityId() == playerAimInteractive)) {
         if (auto interactive = as<InteractiveEntity>(entity)) {

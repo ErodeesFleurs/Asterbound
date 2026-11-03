@@ -422,11 +422,11 @@ if (!result59) return std::unexpected(std::move(result59.error()));
 if (!result60) return std::unexpected(std::move(result60.error()));
 
 
-  return ds.data();
+  return ds.takeData();
 }
 
 std::expected<MonsterVariant, StarException> MonsterDatabase::readMonsterVariant(ByteArray const& data, NetCompatibilityRules rules) const {
-  DataStreamBuffer ds(data);
+  DataStreamExternalBuffer ds(data.span());
   ds.setStreamCompatibilityVersion(rules);
 
   auto result61 = ds.read<String>();

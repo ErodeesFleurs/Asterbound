@@ -79,7 +79,8 @@ public:
 private:
   typedef std::pair<RpcPromise<Json>, std::function<std::expected<void, StarException>(Json const&)>> RpcResponseHandler;
 
-  [[nodiscard]] std::expected<void, StarException> invokeRemote(String const& method, Json const& args, std::function<std::expected<void, StarException>(Json const&)> responseFunction = {});
+  [[nodiscard]] std::expected<void, StarException> invokeRemote(String const& method, Json const& args,
+      std::function<std::expected<void, StarException>(Json const&)> responseFunction = {});
   [[nodiscard]] std::expected<void, StarException> handleRpcResponses();
 
   [[nodiscard]] std::expected<void, StarException> writePlayerData(JsonObject& request, std::shared_ptr<Player> player, bool fullWrite = false) const;
@@ -106,6 +107,8 @@ private:
 
   bool m_statusUpdateRunning;
   double m_statusUpdateTimer;
+  std::optional<double> m_lastFullStatusUpdate;
+  bool m_fullStatusRequired = true;
 
   List<RpcResponseHandler> m_pendingResponses;
   

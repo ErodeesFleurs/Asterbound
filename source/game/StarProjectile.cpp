@@ -197,7 +197,7 @@ if (!result982) return std::unexpected(std::move(result982.error()));
   auto result983 = ds.write(getTeam());
 if (!result983) return std::unexpected(std::move(result983.error()));
 
-  return ds.data();
+  return ds.takeData();
 }
 
 EntityType Projectile::entityType() const {

@@ -165,11 +165,19 @@ std::shared_ptr<EntityT> EntityMap::getUnique(String const& uniqueId) const {
 
 template <typename EntityT>
 [[nodiscard]] std::expected<List<std::shared_ptr<EntityT>>, StarException> EntityMap::query(RectF const& boundBox, EntityFilterOf<EntityT> const& filter) const {
-  auto result = entityQuery(boundBox, entityTypeFilter(filter));
-  if (!result) return std::unexpected(std::move(result.error()));
   List<std::shared_ptr<EntityT>> entities;
-  for (auto const& entity : *result)
-    entities.append(as<EntityT>(entity));
+  auto result = forEachEntity(boundBox, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+    if (auto e = as<EntityT>(entity)) {
+      if (filter) {
+        auto accepted = filter(e);
+        if (!accepted) return std::unexpected(std::move(accepted.error()));
+        if (!*accepted) return {};
+      }
+      entities.append(std::move(e));
+    }
+    return {};
+  });
+  if (!result) return std::unexpected(std::move(result.error()));
   return entities;
 }
 

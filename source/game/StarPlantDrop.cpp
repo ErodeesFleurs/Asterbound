@@ -301,7 +301,7 @@ if (!stream347) return std::unexpected(std::move(stream347.error()));
   auto stream348 = (ds << m_saplingConfig);
 if (!stream348) return std::unexpected(std::move(stream348.error()));
 
-  return ds.data();
+  return ds.takeData();
 }
 
 EntityType PlantDrop::entityType() const {
