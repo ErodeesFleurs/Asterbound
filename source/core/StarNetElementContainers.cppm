@@ -103,6 +103,8 @@ private:
 
   typedef std::variant<SetChange, RemoveChange, ClearChange> ElementChange;
 
+  [[nodiscard]] static std::expected<void, StarException> writeSetChange(DataStream& ds, key_type const& key,
+                                                                         mapped_type const& value);
   [[nodiscard]] static std::expected<void, StarException> writeChange(DataStream& ds, ElementChange const& change);
   [[nodiscard]] static std::expected<ElementChange, StarException> readChange(DataStream& ds);
 
@@ -170,8 +172,11 @@ template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return {};
   { auto result = ds.writeVlqU(BaseMap::size() + m_pendingChangeData.size()); if (!result) return std::unexpected(std::move(result.error())); }
-  for (auto const& pair : *this)
-    { auto result = writeChange(ds, SetChange{pair.first, pair.second}); if (!result) return std::unexpected(std::move(result.error())); }
+  for (auto const& pair : *this) {
+    auto result = writeSetChange(ds, pair.first, pair.second);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
 
   for (auto const& p : m_pendingChangeData)
     { auto result = writeChange(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
@@ -430,11 +435,26 @@ std::uint64_t NetElementMapWrapper<BaseMap>::changeDataLastVersion() const {
 }
 
 template <typename BaseMap>
+[[nodiscard]] std::expected<void, StarException>
+NetElementMapWrapper<BaseMap>::writeSetChange(DataStream& ds, key_type const& key, mapped_type const& value) {
+  {
+    auto result = ds.write<std::uint8_t>(0);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
+  {
+    auto result = ds.write(key);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
+  return ds.write(value);
+}
+
+template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::writeChange(DataStream& ds, ElementChange const& change) {
   if (std::holds_alternative<SetChange>(change)) {
-    { auto result = ds.write<std::uint8_t>(0); if (!result) return std::unexpected(std::move(result.error())); }
-    { auto result = ds.write(std::get<SetChange>(change).key); if (!result) return std::unexpected(std::move(result.error())); }
-    { auto result = ds.write(std::get<SetChange>(change).value); if (!result) return std::unexpected(std::move(result.error())); }
+    auto const& set = std::get<SetChange>(change);
+    return writeSetChange(ds, set.key, set.value);
   } else if (std::holds_alternative<RemoveChange>(change)) {
     { auto result = ds.write<std::uint8_t>(1); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = ds.write(std::get<RemoveChange>(change).key); if (!result) return std::unexpected(std::move(result.error())); }

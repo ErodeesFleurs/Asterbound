@@ -29,11 +29,10 @@ namespace Star {
 
 // The entry point owns these services until the uploader and its callbacks stop.
 class ModUploader : public QMainWindow {
-  Q_OBJECT
 public:
   [[nodiscard]] static std::expected<std::unique_ptr<ModUploader>, StarException> create(Logger& logger, RandomService& random);
 
-private slots:
+private:
   void selectDirectory();
   void loadDirectory();
   void selectPreview();
@@ -41,7 +40,6 @@ private slots:
   void resetModId();
   void uploadToSteam();
 
-private:
   ModUploader(Logger& logger, RandomService& random);
   void showError(StarException const& error);
   [[nodiscard]] std::expected<void, StarException> loadDirectoryImpl();

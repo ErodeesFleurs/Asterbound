@@ -4,10 +4,13 @@ import std;
 import star.algorithm;
 import star.assets;
 import star.damage_database;
+import star.damage_types;
 import star.file;
 import star.format;
 import star.game_test;
+import star.json;
 import star.logging;
+import star.map;
 import star.root;
 import star.string;
 
@@ -117,4 +120,91 @@ const GameTestRegistration
     auto message = std::string_view(database.error().what());
     EXPECT_NE(message.find("Undefined elemental type MissingElement"), std::string_view::npos);
     EXPECT_NE(message.find("MissingElementKind"), std::string_view::npos);
+  });
+
+const GameTestRegistration
+  damageNestedEffects("DamageDatabaseTest", "NestedEffectsPreservePayloadsAndNullDefaults", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto database = damageFixture(fixture, *directory,
+                                  {{"damage/elementaltypes.config", R"({
+        "default":{"resistanceStat":"health","damageNumberParticles":{"hIt":"normal","kIlL":"finish"}}
+      })"},
+                                   {"damage/nested.damage", R"({
+        "kind":"Nested","effects":{
+          "flesh":{"hIt":{"sounds":["impact"],"particles":{"type":"spark"}},"kIlL":{}},
+          "metal":{"sTrOnGhIt":{"sounds":null,"particles":null}}
+        }
+      })"},
+                                   {"damage/missing.damage", R"({"kind":"Missing"})"},
+                                   {"damage/null.damage", R"({"kind":"Null","effects":null})"}});
+    ASSERT_TRUE(database) << database.error().what();
+    auto elemental = (*database)->elementalType("default");
+    ASSERT_TRUE(elemental);
+    auto numberParticle = elemental->get().damageNumberParticles.get(HitType::Kill);
+    ASSERT_TRUE(numberParticle);
+    EXPECT_EQ(numberParticle->get(), "finish");
+    auto nested = (*database)->damageKind("nested");
+    ASSERT_TRUE(nested);
+    auto flesh = nested->get().effects.get("flesh");
+    ASSERT_TRUE(flesh);
+    auto hit = flesh->get().get(HitType::Hit);
+    ASSERT_TRUE(hit);
+    EXPECT_EQ(hit->get().sounds, Json(JsonArray{"impact"}));
+    EXPECT_EQ(hit->get().particles, Json(JsonObject{{"type", "spark"}}));
+    auto kill = flesh->get().get(HitType::Kill);
+    ASSERT_TRUE(kill);
+    EXPECT_EQ(kill->get().sounds, Json(JsonArray{}));
+    EXPECT_EQ(kill->get().particles, Json(JsonArray{}));
+    auto metal = nested->get().effects.get("metal");
+    ASSERT_TRUE(metal);
+    auto strong = metal->get().get(HitType::StrongHit);
+    ASSERT_TRUE(strong);
+    EXPECT_TRUE(strong->get().sounds.isNull());
+    EXPECT_TRUE(strong->get().particles.isNull());
+    for (String const& name : {String("Missing"), String("Null")}) {
+      auto empty = (*database)->damageKind(name);
+      ASSERT_TRUE(empty);
+      EXPECT_TRUE(empty->get().effects.empty());
+    }
+  });
+
+const GameTestRegistration
+  damageNestedFailures("DamageDatabaseTest", "NestedTypesAndHitNamesRetainFirstErrorOrder", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    struct Failure {
+      String elements;
+      String damage;
+      bool mapError;
+    };
+    Failure const cases[] = {
+      // Resistance is read before the unknown particle name.
+      {R"({"default":{"resistanceStat":3,"damageNumberParticles":{"UnknownHit":3}}})", R"({"kind":"Invalid"})", false},
+      // Particle names are resolved before particle strings or damage files.
+      {R"({"default":{"resistanceStat":"health","damageNumberParticles":{"UnknownHit":3}}})", R"({"kind":3})", true},
+      {R"({"default":{"resistanceStat":"health","damageNumberParticles":[]}})",
+       R"({"kind":"Invalid","elementalType":"unknown"})", false},
+      // The effects object and each material's hit object precede elemental lookup.
+      {"", R"({"kind":"Invalid","effects":[],"elementalType":"unknown"})", false},
+      {"", R"({"kind":"Invalid","effects":{"flesh":[]},"elementalType":"unknown"})", false},
+      // A hit payload is queried for sounds/particles before resolving its name.
+      {"", R"({"kind":"Invalid","effects":{"flesh":{"UnknownHit":3}}})", false},
+      {"", R"({"kind":"Invalid","effects":{"flesh":{"Hit":null}}})", false},
+      {"", R"({"kind":"Invalid","effects":{"flesh":{"UnknownHit":{}}},"elementalType":"unknown"})", true}};
+    unsigned index = 0;
+    for (auto const& failure : cases) {
+      SCOPED_TRACE(index);
+      auto caseDirectory = File::relativeTo(*directory, strf("case{}", index++));
+      auto database = failure.elements.empty()
+        ? damageFixture(fixture, caseDirectory, {{"damage/invalid.damage", failure.damage}})
+        : damageFixture(
+            fixture, caseDirectory,
+            {{"damage/elementaltypes.config", failure.elements}, {"damage/invalid.damage", failure.damage}});
+      ASSERT_FALSE(database);
+      EXPECT_EQ(database.error().is<MapException>(), failure.mapError);
+      EXPECT_EQ(database.error().is<JsonException>(), !failure.mapError);
+    }
   });

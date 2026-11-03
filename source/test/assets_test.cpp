@@ -30,6 +30,9 @@ import star.root;
 import star.random;
 import star.logging;
 import star.effect_source_database;
+import star.lua;
+import star.lua_game_converters;
+import star.mixer;
 
 #include "gtest/gtest.h"
 
@@ -429,6 +432,53 @@ const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSi
   auto invalidData = Audio::create(*invalidDataInput, "invalid-data.wav");
   ASSERT_FALSE(invalidData);
   EXPECT_TRUE(invalidData.error().is<AudioException>());
+});
+
+const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGroupLuaContract", [](GameTest& fixture) {
+  auto assets = fixture.root().assets();
+  ASSERT_TRUE(assets);
+  auto input = (*assets)->openFile("/sfx/interface/voice_on.ogg");
+  ASSERT_TRUE(input);
+  auto audio = Audio::create(*input, "mixer-group.ogg");
+  ASSERT_TRUE(audio);
+  auto instance = AudioInstance::create(*audio);
+  ASSERT_TRUE(instance);
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->set("audio", *instance));
+  ASSERT_TRUE(context->load(R"LUA(
+    function selectGroup(group)
+      audio:setMixerGroup(group)
+      return audio:mixerGroup()
+    end
+  )LUA"));
+  struct GroupCase {
+    std::string_view input;
+    std::string_view canonical;
+    MixerGroup group;
+  };
+  for (auto const& [inputName, canonical, group] :
+       std::to_array<GroupCase>({{"eFfEcTs", "Effects", MixerGroup::Effects},
+                                 {"MUSIC", "Music", MixerGroup::Music},
+                                 {"cinematic", "Cinematic", MixerGroup::Cinematic},
+                                 {"Instruments", "Instruments", MixerGroup::Instruments}})) {
+    auto selected = context->invokePath<String>("selectGroup", String(inputName));
+    ASSERT_TRUE(selected);
+    EXPECT_EQ((*instance)->mixerGroup(), group);
+    EXPECT_EQ(selected->utf8(), canonical);
+  }
+  for (auto const& invalid : {String("unknown"), String("Músic"), String(std::string("Music\0Effects", 13)),
+                              String(std::string(1, static_cast<char>(0xff)))}) {
+    auto selected = context->invokePath<String>("selectGroup", invalid);
+    EXPECT_FALSE(selected);
+    EXPECT_EQ((*instance)->mixerGroup(), MixerGroup::Instruments);
+  }
+  auto recovered = context->invokePath<String>("selectGroup", String("effects"));
+  ASSERT_TRUE(recovered);
+  EXPECT_EQ(*recovered, "Effects");
+  EXPECT_EQ((*instance)->mixerGroup(), MixerGroup::Effects);
 });
 
 const GameTestRegistration assetsOggCloneLifetimes("AssetsTest", "OggCloneIndependentCursorsAndLifetime", [](GameTest& fixture) {

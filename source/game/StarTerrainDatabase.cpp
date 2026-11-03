@@ -130,17 +130,10 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
   return result;
 }
 
-std::expected<TerrainDatabase::Config, StarException> TerrainDatabase::selectorConfig(String const& name) const {
-  if (auto config = m_terrainSelectors.maybe(name))
-    return std::move(*config);
-  return std::unexpected(TerrainException(strf("No such terrain selector '{}'", name)));
-}
-
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::createNamedSelector(String const& name, TerrainSelectorParameters const& parameters) const {
-  auto config = selectorConfig(name);
-  if (!config)
-    return std::unexpected(std::move(config.error()));
-  return createSelectorType(config->type, config->parameters, parameters);
+  if (auto config = m_terrainSelectors.maybeRef(name))
+    return createSelectorType(config->get().type, config->get().parameters, parameters);
+  return std::unexpected(TerrainException(strf("No such terrain selector '{}'", name)));
 }
 
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::constantSelector(float value) {

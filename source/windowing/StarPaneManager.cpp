@@ -588,27 +588,7 @@ std::expected<Vec2I, StarException> PaneManager::calculatePaneOffset(std::shared
   auto bounds = windowSize();
   if (!bounds)
     return std::unexpected(std::move(bounds.error()));
-  Vec2I size = pane->size();
-  switch (anchor) {
-    case PaneAnchor::BottomRight:
-      return pane->anchorOffset() + Vec2I{(*bounds)[0] - size[0], 0};
-    case PaneAnchor::TopLeft:
-      return pane->anchorOffset() + Vec2I{0, (*bounds)[1] - size[1]};
-    case PaneAnchor::TopRight:
-      return pane->anchorOffset() + (*bounds - size);
-    case PaneAnchor::CenterTop:
-      return pane->anchorOffset() + Vec2I{((*bounds)[0] - size[0]) / 2, (*bounds)[1] - size[1]};
-    case PaneAnchor::CenterBottom:
-      return pane->anchorOffset() + Vec2I{((*bounds)[0] - size[0]) / 2, 0};
-    case PaneAnchor::CenterLeft:
-      return pane->anchorOffset() + Vec2I{0, ((*bounds)[1] - size[1]) / 2};
-    case PaneAnchor::CenterRight:
-      return pane->anchorOffset() + Vec2I{(*bounds)[0] - size[0], ((*bounds)[1] - size[1]) / 2};
-    case PaneAnchor::Center:
-      return pane->anchorOffset() + ((*bounds - size) / 2);
-    default:
-      return pane->anchorOffset();
-  }
+  return pane->anchorOffset() + paneAnchorBase(anchor, *bounds, pane->size());
 }
 
 std::expected<Vec2I, StarException> PaneManager::calculateNewInterfacePosition(std::shared_ptr<Pane> const& pane, float interfaceScaleRatio) const {

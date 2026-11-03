@@ -1,11 +1,17 @@
 import std;
+import star.algorithm;
+import star.assets;
 import star.cellular_liquid;
 import star.format;
+import star.file;
 import star.game_test;
 import star.liquids_database;
+import star.json;
+import star.logging;
 import star.rect;
 import star.root;
 import star.vector;
+import star.string;
 import star.liquid_types;
 #include "gtest/gtest.h"
 
@@ -28,6 +34,119 @@ TEST(LiquidStoreTest, OverfullLevelSaturatesNetworkUpdates) {
 }
 
 namespace {
+std::expected<std::shared_ptr<LiquidsDatabase>, StarException>
+liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
+  auto created = File::makeDirectoryRecursive(directory);
+  if (!created)
+    return std::unexpected(std::move(created.error()));
+  auto preload = File::writeFile(String("[]"), File::relativeTo(directory, "preload.config"));
+  if (!preload)
+    return std::unexpected(std::move(preload.error()));
+  auto contents = config.printJson();
+  if (!contents)
+    return std::unexpected(std::move(contents.error()));
+  auto written = File::writeFile(*contents, File::relativeTo(directory, "liquids.config"));
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  Assets::Settings settings{};
+  settings.workerPoolSize = 1;
+  settings.assetTimeToLive = 10;
+  Logger logger;
+  auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto materials = fixture.root().materialDatabase();
+  if (!materials)
+    return std::unexpected(std::move(materials.error()));
+  return LiquidsDatabase::create(*assets, *materials);
+}
+
+const GameTestRegistration liquidEngineConfig(
+  "LiquidsDatabaseTest", "RequiredFloatFieldsAndFirstErrorsUseAssetConfiguration", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    Json engine = JsonObject{{"lateralMoveFactor", 1},
+                             {"spreadOverfillUpFactor", 2},
+                             {"spreadOverfillLateralFactor", 3},
+                             {"spreadOverfillDownFactor", 4},
+                             {"pressureEqualizeFactor", 5},
+                             {"pressureMoveFactor", 6},
+                             {"maximumPressureLevelImbalance", 7},
+                             {"minimumLivenPressureChange", 8},
+                             {"minimumLivenLevelChange", 9},
+                             {"minimumLiquidLevel", 10},
+                             {"interactTransformationLevel", 11}};
+    auto valid = liquidsFixture(fixture, File::relativeTo(*directory, "valid"),
+                                JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", 12}});
+    ASSERT_TRUE(valid) << valid.error().what();
+    auto parameters = (*valid)->liquidEngineParameters();
+    EXPECT_FLOAT_EQ(parameters.lateralMoveFactor, 1);
+    EXPECT_FLOAT_EQ(parameters.spreadOverfillUpFactor, 2);
+    EXPECT_FLOAT_EQ(parameters.spreadOverfillLateralFactor, 3);
+    EXPECT_FLOAT_EQ(parameters.spreadOverfillDownFactor, 4);
+    EXPECT_FLOAT_EQ(parameters.pressureEqualizeFactor, 5);
+    EXPECT_FLOAT_EQ(parameters.pressureMoveFactor, 6);
+    EXPECT_FLOAT_EQ(parameters.maximumPressureLevelImbalance, 7);
+    EXPECT_FLOAT_EQ(parameters.minimumLivenPressureChange, 8);
+    EXPECT_FLOAT_EQ(parameters.minimumLivenLevelChange, 9);
+    EXPECT_FLOAT_EQ(parameters.minimumLiquidLevel, 10);
+    EXPECT_FLOAT_EQ(parameters.interactTransformationLevel, 11);
+    EXPECT_FLOAT_EQ((*valid)->backgroundDrain(), 12);
+
+    constexpr std::string_view fields[] = {"lateralMoveFactor",
+                                           "spreadOverfillUpFactor",
+                                           "spreadOverfillLateralFactor",
+                                           "spreadOverfillDownFactor",
+                                           "pressureEqualizeFactor",
+                                           "pressureMoveFactor",
+                                           "maximumPressureLevelImbalance",
+                                           "minimumLivenPressureChange",
+                                           "minimumLivenLevelChange",
+                                           "minimumLiquidLevel",
+                                           "interactTransformationLevel"};
+    unsigned index = 0;
+    for (auto name : fields) {
+      SCOPED_TRACE(name);
+      for (bool missing : {true, false}) {
+        SCOPED_TRACE(missing);
+        auto changed = missing ? engine.eraseKey(name) : engine.set(name, "not a float");
+        ASSERT_TRUE(changed);
+        auto expected = changed->getFloat(name);
+        ASSERT_FALSE(expected);
+        auto loaded = liquidsFixture(fixture, File::relativeTo(*directory, strf("case{}", index++)),
+                                     JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});
+        ASSERT_FALSE(loaded);
+        EXPECT_TRUE(loaded.error().is<JsonException>());
+        EXPECT_STREQ(loaded.error().what(), expected.error().what());
+      }
+    }
+
+    // An earlier missing field beats a later conversion error and the outer field.
+    auto lateError = engine.set("spreadOverfillUpFactor", "not a float");
+    ASSERT_TRUE(lateError);
+    auto firstError = lateError->eraseKey("lateralMoveFactor");
+    ASSERT_TRUE(firstError);
+    auto expected = firstError->getFloat("lateralMoveFactor");
+    ASSERT_FALSE(expected);
+    auto loaded = liquidsFixture(fixture, File::relativeTo(*directory, "first"),
+                                 JsonObject{{"liquidEngineParameters", *firstError}, {"backgroundDrain", false}});
+    ASSERT_FALSE(loaded);
+    EXPECT_TRUE(loaded.error().is<JsonException>());
+    EXPECT_STREQ(loaded.error().what(), expected.error().what());
+    for (bool missing : {true, false}) {
+      Json config = missing ? Json(JsonObject{{"liquidEngineParameters", engine}})
+                            : Json(JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", false}});
+      auto outerError = config.getFloat("backgroundDrain");
+      ASSERT_FALSE(outerError);
+      auto outer = liquidsFixture(
+        fixture, File::relativeTo(*directory, missing ? String("outerMissing") : String("outerType")), config);
+      ASSERT_FALSE(outer);
+      EXPECT_TRUE(outer.error().is<JsonException>());
+      EXPECT_STREQ(outer.error().what(), outerError.error().what());
+    }
+  });
+
 template <int BasinWidth, int BasinHeight>
 class SizedLiquidBasin : public CellularLiquidWorld<LiquidId> {
 public:

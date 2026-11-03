@@ -39,16 +39,17 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
   auto elementalEntries = elementalConfig->iterateObject();
   if (!elementalEntries)
     return std::unexpected(std::move(elementalEntries.error()));
-  for (auto p : *elementalEntries) {
+  for (auto const& p : *elementalEntries) {
     ElementalType type;
     auto resistance = p.second.getString("resistanceStat");
     if (!resistance)
       return std::unexpected(std::move(resistance.error()));
     type.resistanceStat = std::move(*resistance);
-    auto particles = p.second.getObject("damageNumberParticles");
+    auto particles =
+      p.second.get("damageNumberParticles").and_then([](Json const& value) { return value.iterateObject(); });
     if (!particles)
       return std::unexpected(std::move(particles.error()));
-    for (auto particle : *particles) {
+    for (auto const& particle : *particles) {
       auto hit = HitTypeNames->getLeft(particle.first);
       if (!hit)
         return std::unexpected(std::move(hit.error()));
@@ -66,7 +67,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
   auto queued = assets->queueJsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
-  for (auto& file : files->get()) {
+  for (auto const& file : files->get()) {
     auto config = assets->json(file.string());
     if (!config)
       return std::unexpected(std::move(config.error()));
@@ -81,27 +82,32 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
 
     DamageKind kind;
     kind.name = *name;
-    auto effects = config->getObject("effects", JsonObject());
+    auto effects = config->opt("effects");
     if (!effects)
       return std::unexpected(std::move(effects.error()));
-    for (auto effect : *effects) {
-      HashMap<HitType, DamageEffect> materialEffects;
-      auto hits = effect.second.toObject();
-      if (!hits)
-        return std::unexpected(std::move(hits.error()));
-      for (auto hit : *hits) {
-        auto sounds = hit.second.get("sounds", JsonArray());
-        if (!sounds)
-          return std::unexpected(std::move(sounds.error()));
-        auto particles = hit.second.get("particles", JsonArray());
-        if (!particles)
-          return std::unexpected(std::move(particles.error()));
-        auto hitType = HitTypeNames->getLeft(hit.first);
-        if (!hitType)
-          return std::unexpected(std::move(hitType.error()));
-        materialEffects.set(hitType->get(), DamageEffect{std::move(*sounds), std::move(*particles)});
+    if (*effects) {
+      auto effectEntries = (**effects).iterateObject();
+      if (!effectEntries)
+        return std::unexpected(std::move(effectEntries.error()));
+      for (auto const& effect : *effectEntries) {
+        HashMap<HitType, DamageEffect> materialEffects;
+        auto hits = effect.second.iterateObject();
+        if (!hits)
+          return std::unexpected(std::move(hits.error()));
+        for (auto const& hit : *hits) {
+          auto sounds = hit.second.get("sounds", JsonArray());
+          if (!sounds)
+            return std::unexpected(std::move(sounds.error()));
+          auto particles = hit.second.get("particles", JsonArray());
+          if (!particles)
+            return std::unexpected(std::move(particles.error()));
+          auto hitType = HitTypeNames->getLeft(hit.first);
+          if (!hitType)
+            return std::unexpected(std::move(hitType.error()));
+          materialEffects.set(hitType->get(), DamageEffect{std::move(*sounds), std::move(*particles)});
+        }
+        kind.effects.set(effect.first, std::move(materialEffects));
       }
-      kind.effects.set(effect.first, std::move(materialEffects));
     }
     auto elementalType = config->getString("elementalType", "default");
     if (!elementalType)

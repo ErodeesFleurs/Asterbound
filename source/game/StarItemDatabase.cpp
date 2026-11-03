@@ -126,6 +126,24 @@ import star.output_proxy;
 
 namespace Star {
 
+namespace {
+
+// Synchronous one-shot scripts settle shutdown while the caller still owns the
+// Lua lock. A shutdown error remains primary, with the earlier error as context.
+template <typename Ret, typename Invoke>
+std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseComponent& script, Invoke&& invoke) {
+  auto result = script.init().and_then([&](bool) { return std::forward<Invoke>(invoke)(); });
+  auto cleaned = script.uninit();
+  if (!cleaned) {
+    if (!result)
+      return std::unexpected(cleaned.error().withContext(printException(result.error(), true)));
+    return std::unexpected(std::move(cleaned.error()));
+  }
+  return result;
+}
+
+}// namespace
+
 extern std::expected<EnumMap<ItemType>, StarException> const ItemTypeNames = EnumMap<ItemType>::create({
   {ItemType::Generic, "generic"},
   {ItemType::LiquidItem, "liquid"},
@@ -654,23 +672,12 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
   }();
   if (!setup)
     return std::unexpected(std::move(setup.error()));
-  auto initialized = script.init();
-  if (!initialized) {
-    auto cleaned = script.uninit();
-    if (!cleaned)
-      return std::unexpected(cleaned.error().withContext(printException(initialized.error(), true)));
-    return std::unexpected(std::move(initialized.error()));
-  }
-  auto luaResult = script.invoke<LuaTupleReturn<Json, std::optional<std::uint64_t>>>("apply", item->descriptor().toJson());
-  auto cleaned = script.uninit();
+  auto luaResult = invokeItemScript<LuaTupleReturn<Json, std::optional<std::uint64_t>>>(script, [&] {
+    return script.invoke<LuaTupleReturn<Json, std::optional<std::uint64_t>>>("apply", item->descriptor().toJson());
+  });
   locker.unlock();
-  if (!luaResult) {
-    if (!cleaned)
-      return std::unexpected(cleaned.error().withContext(printException(luaResult.error(), true)));
+  if (!luaResult)
     return std::unexpected(std::move(luaResult.error()));
-  }
-  if (!cleaned)
-    return std::unexpected(std::move(cleaned.error()));
   if (*luaResult && !std::get<0>(**luaResult).isNull()) {
     auto taken = augment.take(std::get<1>(**luaResult).value_or(1));
     if (!taken)
@@ -707,23 +714,11 @@ std::expected<bool, StarException> ItemDatabase::ageItem(std::shared_ptr<Item>& 
     return std::unexpected(std::move(set.error()));
   if (auto set = script.setScripts(data->get().agingScripts); !set)
     return std::unexpected(std::move(set.error()));
-  auto initialized = script.init();
-  if (!initialized) {
-    auto cleaned = script.uninit();
-    if (!cleaned)
-      return std::unexpected(cleaned.error().withContext(printException(initialized.error(), true)));
-    return std::unexpected(std::move(initialized.error()));
-  }
-  auto agedJson = script.invoke<Json>("ageItem", original.toJson(), aging);
-  auto cleaned = script.uninit();
+  auto agedJson =
+    invokeItemScript<Json>(script, [&] { return script.invoke<Json>("ageItem", original.toJson(), aging); });
   locker.unlock();
-  if (!agedJson) {
-    if (!cleaned)
-      return std::unexpected(cleaned.error().withContext(printException(agedJson.error(), true)));
+  if (!agedJson)
     return std::unexpected(std::move(agedJson.error()));
-  }
-  if (!cleaned)
-    return std::unexpected(std::move(cleaned.error()));
   if (!*agedJson)
     return false;
   auto aged = ItemDescriptor::create(**agedJson);

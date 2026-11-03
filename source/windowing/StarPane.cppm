@@ -68,6 +68,9 @@ enum class PaneAnchor {
 };
 extern std::expected<EnumMap<PaneAnchor>, StarException> const PaneAnchorNames;
 
+// Interface-pixel origin of an anchored pane, before authored offsets.
+Vec2I paneAnchorBase(PaneAnchor anchor, Vec2I windowSize, Vec2I paneSize);
+
 class Pane : public Widget {
 public:
   void const* queryType(TypeKey key) const noexcept override {
@@ -203,11 +206,12 @@ std::expected<void, StarException> Pane::displayed() {
 export module star.pane;
 
 export namespace Star {
-  using ::Star::PaneAnchor;
-  using ::Star::Pane;
-  using ::Star::LuaCallbacks;
-  using ::Star::AudioInstance;
-  using ::Star::GuiReader;
-  using ::Star::Item;
-  using ::Star::PaneAnchorNames;
+using ::Star::AudioInstance;
+using ::Star::GuiReader;
+using ::Star::Item;
+using ::Star::LuaCallbacks;
+using ::Star::Pane;
+using ::Star::PaneAnchor;
+using ::Star::paneAnchorBase;
+using ::Star::PaneAnchorNames;
 }

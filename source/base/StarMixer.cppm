@@ -28,7 +28,11 @@ enum class MixerGroup : std::uint8_t {
   Cinematic,
   Instruments
 };
-extern std::expected<EnumMap<MixerGroup>, StarException> const MixerGroupNames;
+inline constexpr auto MixerGroupNames =
+  sortedEnumNames(std::to_array<std::pair<MixerGroup, std::string_view>>({{MixerGroup::Effects, "Effects"},
+                                                                          {MixerGroup::Music, "Music"},
+                                                                          {MixerGroup::Cinematic, "Cinematic"},
+                                                                          {MixerGroup::Instruments, "Instruments"}}));
 
 class AudioInstance {
 public:

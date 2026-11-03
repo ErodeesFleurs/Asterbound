@@ -189,25 +189,29 @@ void GuiContext::setInterfaceScale(float interfaceScale) {
   m_interfaceScale = interfaceScale;
 }
 
-std::optional<Vec2I> GuiContext::mousePosition(InputEvent const& event, float pixelRatio) const {
-  auto getInterfacePosition = [pixelRatio](Vec2F pos) {
-    return Vec2I(pos / pixelRatio);
-  };
+namespace {
+std::optional<Vec2F> eventMousePosition(InputEvent const& event) {
+  return std::visit(
+    [](auto const& input) -> std::optional<Vec2F> {
+      using Event = std::remove_cvref_t<decltype(input)>;
+      if constexpr (std::same_as<Event, MouseMoveEvent> || std::same_as<Event, MouseButtonDownEvent>
+                    || std::same_as<Event, MouseButtonUpEvent> || std::same_as<Event, MouseWheelEvent>)
+        return input.mousePosition;
+      else
+        return {};
+    },
+    event);
+}
+}// namespace
 
-  if (std::holds_alternative<MouseMoveEvent>(event))
-    return getInterfacePosition(std::get<MouseMoveEvent>(event).mousePosition);
-  else if (std::holds_alternative<MouseButtonDownEvent>(event))
-    return getInterfacePosition(std::get<MouseButtonDownEvent>(event).mousePosition);
-  else if (std::holds_alternative<MouseButtonUpEvent>(event))
-    return getInterfacePosition(std::get<MouseButtonUpEvent>(event).mousePosition);
-  else if (std::holds_alternative<MouseWheelEvent>(event))
-    return getInterfacePosition(std::get<MouseWheelEvent>(event).mousePosition);
-  else
-    return {};
+std::optional<Vec2I> GuiContext::mousePosition(InputEvent const& event, float pixelRatio) const {
+  return eventMousePosition(event).transform(
+    [pixelRatio](Vec2F const& position) { return Vec2I(position / pixelRatio); });
 }
 
 std::optional<Vec2I> GuiContext::mousePosition(InputEvent const& event) const {
-  return mousePosition(event, interfaceScale());
+  return eventMousePosition(event).transform(
+    [this](Vec2F const& position) { return Vec2I(position / interfaceScale()); });
 }
 
 Set<InterfaceAction> GuiContext::actions(InputEvent const& event) const {

@@ -12,6 +12,7 @@ import star.data_stream_extra;
 import star.bytes;
 import star.array;
 import star.vector;
+import star.static_vector;
 using namespace Star;
 
 TEST(ListPredicates, Any) {
@@ -223,6 +224,139 @@ TEST(ListAlgorithms, StatefulMoveOnlyCallbacksRemainBorrowed) {
   values.exec(accumulate);
   EXPECT_EQ(values, (List<int>{2, 6, 12}));
   EXPECT_EQ(*accumulate.total, 12);
+}
+
+TEST(ComputedSort, MoveOnlyNonDefaultKeysAndStableTies) {
+  struct Key {
+    explicit Key(int value) : value(std::make_unique<int>(value)) {}
+    Key(Key&&) = default;
+    Key& operator=(Key&&) = default;
+    bool operator<(Key const& other) const { return *value < *other.value; }
+    std::unique_ptr<int> value;
+  };
+  List<int> values{21, 10, 22, 11, 20};
+  List<int> visited;
+  stableSortByComputedValue(values, [&](int value) {
+    visited.append(value);
+    return Key(value / 10);
+  });
+  EXPECT_EQ(visited, (List<int>{21, 10, 22, 11, 20}));
+  EXPECT_EQ(values, (List<int>{10, 11, 21, 22, 20}));
+
+  auto result = sortByComputedValue(values, [](int value) -> std::expected<Key, StarException> { return Key(value); });
+  ASSERT_TRUE(result);
+  EXPECT_EQ(values, (List<int>{10, 11, 20, 21, 22}));
+}
+
+TEST(ComputedSort, FirstKeyFailureLeavesInputUnreordered) {
+  List<int> const original{4, 1, 3, 2};
+  for (std::size_t failure = 0; failure < original.size(); ++failure) {
+    auto values = original;
+    List<int> visited;
+    auto result = stableSortByComputedValue(values, [&](int value) -> std::expected<int, StarException> {
+      visited.append(value);
+      if (visited.size() == failure + 1)
+        return std::unexpected(OutOfRangeException("sort key boundary", false));
+      return value;
+    });
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<OutOfRangeException>());
+    EXPECT_EQ(values, original);
+    ASSERT_EQ(visited.size(), failure + 1);
+    for (std::size_t i = 0; i < visited.size(); ++i)
+      EXPECT_EQ(visited[i], original[i]);
+  }
+
+  std::function<std::expected<int, StarException>(int)> emptyGetter;
+  List<int> empty;
+  List<int> singleton{3};
+  EXPECT_TRUE(sortByComputedValue(empty, emptyGetter));
+  EXPECT_TRUE(sortByComputedValue(singleton, emptyGetter));
+  EXPECT_EQ(singleton, (List<int>{3}));
+}
+
+TEST(ListTransformed, MutableAndConstMoveOnlyCallbacksRemainBorrowed) {
+  struct Transform {
+    std::unique_ptr<int> next = std::make_unique<int>(1);
+    int operator()(int& value) { return value += (*next)++; }
+    int operator()(int const& value) { return value + (*next)++; }
+  } callback;
+  List<int> values{10, 20, 30};
+  auto mutableResult = values.transformed(callback);
+  EXPECT_EQ(mutableResult, (List<int>{11, 22, 33}));
+  EXPECT_EQ(values, mutableResult);
+  EXPECT_EQ(*callback.next, 4);
+  auto constResult = std::as_const(values).transformed(callback);
+  EXPECT_EQ(constResult, (List<int>{15, 27, 39}));
+  EXPECT_EQ(values, mutableResult);
+  EXPECT_EQ(*callback.next, 7);
+
+  auto temporaryResult = std::as_const(values).transformed(
+    [offset = std::make_unique<int>(2)](int value) mutable { return value + (*offset)++; });
+  EXPECT_EQ(temporaryResult, (List<int>{13, 25, 37}));
+}
+
+TEST(ListTransformed, FirstFailurePreservesCallbackAndInputPrefix) {
+  List<int> values{1, 2, 3, 4};
+  int calls = 0;
+  auto mutableResult = values.transformed([&](int& value) -> std::expected<int, StarException> {
+    if (++calls == 3)
+      return std::unexpected(OutOfRangeException("mutable transform boundary", false));
+    return value *= 10;
+  });
+  ASSERT_FALSE(mutableResult);
+  EXPECT_TRUE(mutableResult.error().is<OutOfRangeException>());
+  EXPECT_EQ(calls, 3);
+  EXPECT_EQ(values, (List<int>{10, 20, 3, 4}));
+
+  calls = 0;
+  auto constResult = std::as_const(values).transformed([&](int const& value) -> std::expected<int, StarException> {
+    if (++calls == 2)
+      return std::unexpected(OutOfRangeException("const transform boundary", false));
+    return value + 1;
+  });
+  ASSERT_FALSE(constResult);
+  EXPECT_TRUE(constResult.error().is<OutOfRangeException>());
+  EXPECT_EQ(calls, 2);
+  EXPECT_EQ(values, (List<int>{10, 20, 3, 4}));
+
+  auto success =
+    std::as_const(values).transformed([](int value) -> std::expected<int, StarException> { return value + 1; });
+  ASSERT_TRUE(success);
+  EXPECT_EQ(*success, (List<int>{11, 21, 4, 5}));
+}
+
+TEST(ContainerTransform, BoundedOutputStopsAtInsertionFailure) {
+  List<int> values{1, 2, 3, 4};
+  int calls = 0;
+  auto result = Star::transform<StaticList<int, 2>>(values, [&](int value) {
+    ++calls;
+    return value * 10;
+  });
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<StaticVectorSizeException>());
+  EXPECT_EQ(calls, 3);
+
+  StaticList<int, 2> output;
+  ASSERT_TRUE(output.append(99));
+  calls = 0;
+  auto appended = transformInto(output, values, [&](int value) {
+    ++calls;
+    return value * 10;
+  });
+  ASSERT_FALSE(appended);
+  EXPECT_TRUE(appended.error().is<StaticVectorSizeException>());
+  EXPECT_EQ(calls, 2);
+  ASSERT_EQ(output.size(), 2u);
+  EXPECT_EQ(output[0], 99);
+  EXPECT_EQ(output[1], 10);
+}
+
+TEST(ContainerTransform, UnsizedSinglePassInputIsNotPretraversed) {
+  std::istringstream input("3 1 4 2");
+  auto values = std::ranges::istream_view<int>(input);
+  auto result = Star::transform<std::vector<int>>(values, [](int value) { return value * 2; });
+  EXPECT_EQ(result, (std::vector<int>{6, 2, 8, 4}));
 }
 
 TEST(ByteOrder, FloatingPayloadAndIntegerRepresentations) {

@@ -46,12 +46,6 @@ struct TerrainSelector {
 
 class TerrainDatabase {
 public:
-  struct Config {
-    String type;
-    Json parameters;
-  };
-
-  [[nodiscard]] std::expected<Config, StarException> selectorConfig(String const& name) const;
   [[nodiscard]] std::expected<std::shared_ptr<TerrainSelector const>, StarException> createSelectorType(String const& type, Json const& config, TerrainSelectorParameters const& parameters) const;
 
   [[nodiscard]] static std::expected<std::shared_ptr<TerrainDatabase>, StarException> create(std::shared_ptr<Assets const> const& assets, RandomService& random);
@@ -67,6 +61,11 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<TerrainSelector const>, StarException> loadSelector(Json const& store) const;
 
 private:
+  struct Config {
+    String type;
+    Json parameters;
+  };
+
   RandomService& m_random;
   StringMap<Config> m_terrainSelectors;
 };

@@ -49,60 +49,22 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
   if (!config) return std::unexpected(std::move(config.error()));
   auto engine = config->get("liquidEngineParameters");
   if (!engine) return std::unexpected(std::move(engine.error()));
-  {
-    auto value = engine->getFloat("lateralMoveFactor");
+  constexpr std::pair<std::string_view, float LiquidCellEngineParameters::*> fields[] = {
+    {"lateralMoveFactor", &LiquidCellEngineParameters::lateralMoveFactor},
+    {"spreadOverfillUpFactor", &LiquidCellEngineParameters::spreadOverfillUpFactor},
+    {"spreadOverfillLateralFactor", &LiquidCellEngineParameters::spreadOverfillLateralFactor},
+    {"spreadOverfillDownFactor", &LiquidCellEngineParameters::spreadOverfillDownFactor},
+    {"pressureEqualizeFactor", &LiquidCellEngineParameters::pressureEqualizeFactor},
+    {"pressureMoveFactor", &LiquidCellEngineParameters::pressureMoveFactor},
+    {"maximumPressureLevelImbalance", &LiquidCellEngineParameters::maximumPressureLevelImbalance},
+    {"minimumLivenPressureChange", &LiquidCellEngineParameters::minimumLivenPressureChange},
+    {"minimumLivenLevelChange", &LiquidCellEngineParameters::minimumLivenLevelChange},
+    {"minimumLiquidLevel", &LiquidCellEngineParameters::minimumLiquidLevel},
+    {"interactTransformationLevel", &LiquidCellEngineParameters::interactTransformationLevel}};
+  for (auto const& [name, member] : fields) {
+    auto value = engine->getFloat(name);
     if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.lateralMoveFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("spreadOverfillUpFactor");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.spreadOverfillUpFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("spreadOverfillLateralFactor");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.spreadOverfillLateralFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("spreadOverfillDownFactor");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.spreadOverfillDownFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("pressureEqualizeFactor");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.pressureEqualizeFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("pressureMoveFactor");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.pressureMoveFactor = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("maximumPressureLevelImbalance");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.maximumPressureLevelImbalance = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("minimumLivenPressureChange");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.minimumLivenPressureChange = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("minimumLivenLevelChange");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.minimumLivenLevelChange = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("minimumLiquidLevel");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.minimumLiquidLevel = std::move(*value);
-  }
-  {
-    auto value = engine->getFloat("interactTransformationLevel");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.interactTransformationLevel = std::move(*value);
+    result->m_liquidEngineParameters.*member = *value;
   }
   {
     auto value = config->getFloat("backgroundDrain");

@@ -53,7 +53,7 @@ JsonEditor::JsonEditor(std::shared_ptr<::Star::JsonPath::Path> const& path, Opti
   m_backButton = std::make_unique<QPushButton>(&background);
   m_backButton->setText("« Back");
   layout.addWidget(m_backButton.get(), 2, 0);
-  connect(m_backButton.get(), SIGNAL(pressed()), this, SLOT(back()));
+  connect(m_backButton.get(), &QPushButton::pressed, this, &JsonEditor::back);
 
   m_pathLabel = std::make_unique<QLabel>(&background);
   layout.addWidget(m_pathLabel.get(), 2, 1);
@@ -68,14 +68,14 @@ JsonEditor::JsonEditor(std::shared_ptr<::Star::JsonPath::Path> const& path, Opti
   m_valueEditor = std::make_unique<QLineEdit>(&background);
   m_valueEditor->setFont(font);
   layout.addWidget(m_valueEditor.get(), 2, 2);
-  connect(m_valueEditor.get(), SIGNAL(returnPressed()), this, SLOT(next()));
-  connect(m_valueEditor.get(), SIGNAL(textChanged(QString const&)), this, SLOT(updatePreview(QString const&)));
+  connect(m_valueEditor.get(), &QLineEdit::returnPressed, this, &JsonEditor::next);
+  connect(m_valueEditor.get(), &QLineEdit::textChanged, this, &JsonEditor::updatePreview);
 
   m_nextButton = std::make_unique<QPushButton>(&background);
   m_nextButton->setText("Next »");
   m_nextButton->setDefault(true);
   layout.addWidget(m_nextButton.get(), 2, 3);
-  connect(m_nextButton.get(), SIGNAL(pressed()), this, SLOT(next()));
+  connect(m_nextButton.get(), &QPushButton::pressed, this, &JsonEditor::next);
 
   m_errorDialog = std::make_unique<QErrorMessage>(this);
   m_errorDialog->setModal(true);
@@ -277,5 +277,3 @@ std::expected<int, StarException> Star::edit(Logger& logger, int argc, char* arg
   return app.exec();
 }
 
-// Generate with moc -i from editor_gui.cppm; compile in this scanned owner.
-#include "moc_editor_gui.cpp"

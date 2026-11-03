@@ -233,6 +233,79 @@ std::expected<std::shared_ptr<GuiContext>, StarException> textEditorContext(Game
   return GuiContext::create(fixture.root(), {}, {});
 }
 
+TEST(PaneAnchorMath, OddDimensionsAndOversizedPanesKeepIntegerOrigins) {
+  struct AnchorCase {
+    PaneAnchor anchor;
+    Vec2I normal;
+    Vec2I oversized;
+  };
+  for (auto const& test : std::to_array<AnchorCase>({
+         {PaneAnchor::None, {0, 0}, {0, 0}},
+         {PaneAnchor::BottomLeft, {0, 0}, {0, 0}},
+         {PaneAnchor::BottomRight, {699, 0}, {-3, 0}},
+         {PaneAnchor::TopLeft, {0, 399}, {0, -5}},
+         {PaneAnchor::TopRight, {699, 399}, {-3, -5}},
+         {PaneAnchor::CenterBottom, {349, 0}, {-1, 0}},
+         {PaneAnchor::CenterTop, {349, 399}, {-1, -5}},
+         {PaneAnchor::CenterLeft, {0, 199}, {0, -2}},
+         {PaneAnchor::CenterRight, {699, 199}, {-3, -2}},
+         {PaneAnchor::Center, {349, 199}, {-1, -2}},
+       })) {
+    SCOPED_TRACE(std::to_underlying(test.anchor));
+    EXPECT_EQ(paneAnchorBase(test.anchor, {801, 603}, {102, 204}), test.normal);
+    EXPECT_EQ(paneAnchorBase(test.anchor, {801, 603}, {804, 608}), test.oversized);
+  }
+}
+
+const GameTestRegistration panePositionQueryFailure(
+  "PaneAnchor", "LuaPositionQueriesFailBeforeChangingAnyAnchorPosition", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    auto pane = Pane::create(**context);
+    ASSERT_TRUE(pane) << pane.error().what();
+    auto callbacks = (*pane)->makePaneCallbacks();
+    ASSERT_TRUE(callbacks) << callbacks.error().what();
+    auto engine = LuaEngine::create();
+    ASSERT_TRUE(engine) << engine.error().what();
+    auto lua = (*engine)->createContext();
+    ASSERT_TRUE(lua) << lua.error().what();
+    ASSERT_TRUE(lua->setCallbacks("pane", *callbacks));
+    for (auto anchor : {PaneAnchor::None, PaneAnchor::BottomLeft, PaneAnchor::BottomRight, PaneAnchor::TopLeft,
+                        PaneAnchor::TopRight, PaneAnchor::CenterBottom, PaneAnchor::CenterTop, PaneAnchor::CenterLeft,
+                        PaneAnchor::CenterRight, PaneAnchor::Center}) {
+      SCOPED_TRACE(std::to_underlying(anchor));
+      (*pane)->setAnchor(anchor);
+      (*pane)->setSize({102, 204});
+      (*pane)->setAnchorOffset({-23, -17});
+      (*pane)->setPosition({-7, 11});
+      // Even the zero-base Lua anchors require a live window query.
+      EXPECT_FALSE(lua->eval<Json>("return pane.getScreenPosition()"));
+      EXPECT_FALSE(lua->eval<Json>("pane.setScreenPosition({-111, -53})"));
+      EXPECT_EQ((*pane)->relativePosition(), (Vec2I{-7, 11}));
+      EXPECT_EQ((*pane)->anchorOffset(), (Vec2I{-23, -17}));
+      EXPECT_EQ((*pane)->anchor(), anchor);
+    }
+  });
+
+const GameTestRegistration
+  guiMousePosition("GuiContext", "OnlyFourMouseEventsConvertFractionalPixels", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    for (InputEvent const& event : {InputEvent{MouseMoveEvent{{999, -999}, {-12.9f, 8.9f}}},
+                                    InputEvent{MouseButtonDownEvent{MouseButton::Left, {-12.9f, 8.9f}}},
+                                    InputEvent{MouseButtonUpEvent{MouseButton::Right, {-12.9f, 8.9f}}},
+                                    InputEvent{MouseWheelEvent{MouseWheel::Down, {-12.9f, 8.9f}}}}) {
+      EXPECT_EQ((*context)->mousePosition(event, 1.25f), (Vec2I{-10, 7}));
+    }
+    for (InputEvent const& event :
+         {InputEvent{KeyDownEvent{Key::A, KeyMod::NoMod}}, InputEvent{KeyUpEvent{Key::A}},
+          InputEvent{TextInputEvent{"中"}}, InputEvent{ControllerAxisEvent{0, ControllerAxis::LeftX, 0.5f}},
+          InputEvent{ControllerButtonDownEvent{0, ControllerButton::A}},
+          InputEvent{ControllerButtonUpEvent{0, ControllerButton::A}}}) {
+      EXPECT_FALSE((*context)->mousePosition(event, 1.25f));
+    }
+  });
+
 std::expected<std::shared_ptr<TextBoxWidget>, StarException> textEditor(GuiContext& context, String const& text) {
   return TextBoxWidget::create(context, text, "", [](Widget&) -> std::expected<void, StarException> {
     return {};

@@ -98,19 +98,19 @@ ModUploader::ModUploader(Logger& logger, RandomService& random)
   m_modIdLabel->setOpenExternalLinks(true);
   userAgreementLabel.setOpenExternalLinks(true);
 
-  connect(&selectDirectoryButton, SIGNAL(clicked()), this, SLOT(selectDirectory()));
-  connect(m_reloadButton.get(), SIGNAL(clicked()), this, SLOT(loadDirectory()));
-  connect(&selectPreviewImageButton, SIGNAL(clicked()), this, SLOT(selectPreview()));
-  connect(m_nameEditor.get(), SIGNAL(editingFinished()), this, SLOT(writeMetadata()));
-  connect(m_titleEditor.get(), SIGNAL(editingFinished()), this, SLOT(writeMetadata()));
-  connect(m_authorEditor.get(), SIGNAL(editingFinished()), this, SLOT(writeMetadata()));
-  connect(m_versionEditor.get(), SIGNAL(editingFinished()), this, SLOT(writeMetadata()));
-  connect(m_descriptionEditor.get(), SIGNAL(editingFinished()), this, SLOT(writeMetadata()));
-  connect(&resetModIdButton, SIGNAL(clicked()), this, SLOT(resetModId()));
-  connect(&uploadButton, SIGNAL(clicked()), this, SLOT(uploadToSteam()));
+  connect(&selectDirectoryButton, &QPushButton::clicked, this, &ModUploader::selectDirectory);
+  connect(m_reloadButton.get(), &QPushButton::clicked, this, &ModUploader::loadDirectory);
+  connect(&selectPreviewImageButton, &QPushButton::clicked, this, &ModUploader::selectPreview);
+  connect(m_nameEditor.get(), &QLineEdit::editingFinished, this, &ModUploader::writeMetadata);
+  connect(m_titleEditor.get(), &QLineEdit::editingFinished, this, &ModUploader::writeMetadata);
+  connect(m_authorEditor.get(), &QLineEdit::editingFinished, this, &ModUploader::writeMetadata);
+  connect(m_versionEditor.get(), &QLineEdit::editingFinished, this, &ModUploader::writeMetadata);
+  connect(m_descriptionEditor.get(), &SPlainTextEdit::editingFinished, this, &ModUploader::writeMetadata);
+  connect(&resetModIdButton, &QPushButton::clicked, this, &ModUploader::resetModId);
+  connect(&uploadButton, &QPushButton::clicked, this, &ModUploader::uploadToSteam);
 
   for (auto const& pair : m_categorySelectors) {
-    connect(pair.second.get(), SIGNAL(clicked()), this, SLOT(writeMetadata()));
+    connect(pair.second.get(), &QCheckBox::clicked, this, &ModUploader::writeMetadata);
   }
 
   auto& loadDirectoryLayout = *new QHBoxLayout();
@@ -525,5 +525,3 @@ std::expected<void, StarException> ModUploader::onSteamSubmitItem(SubmitItemUpda
 
 }
 
-// Generate with moc -i from StarModUploader.cppm; compile in this scanned owner.
-#include "moc_StarModUploader.cpp"

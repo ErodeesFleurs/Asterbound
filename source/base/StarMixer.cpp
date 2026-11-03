@@ -26,12 +26,6 @@ namespace {
       return 1.0f / rampTime;
   }
 }
-extern std::expected<EnumMap<MixerGroup>, StarException> const MixerGroupNames = EnumMap<MixerGroup>::create({
-  {MixerGroup::Effects, "Effects"},
-  {MixerGroup::Music, "Music"},
-  {MixerGroup::Cinematic, "Cinematic"},
-  {MixerGroup::Instruments, "Instruments"}
-});
 
 std::expected<std::shared_ptr<AudioInstance>, StarException> AudioInstance::create(Audio const& audio) {
   auto copy = audio.clone();

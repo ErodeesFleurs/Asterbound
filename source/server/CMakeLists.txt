@@ -9,6 +9,10 @@ add_library (star_server_modules STATIC)
 target_sources (star_server_modules PUBLIC FILE_SET CXX_MODULES FILES
     StarServerQueryThread.cppm
     StarServerRconThread.cppm)
+target_sources(star_server_modules PRIVATE
+    StarServerQueryThread.cpp
+    StarServerRconThread.cpp)
+set_target_properties(star_server_modules PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_include_directories (star_server_modules PRIVATE
     ${STAR_EXTERN_INCLUDES}
     ${STAR_CORE_INCLUDES}

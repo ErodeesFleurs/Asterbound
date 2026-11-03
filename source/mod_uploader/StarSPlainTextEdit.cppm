@@ -15,12 +15,6 @@ signals:
 
 protected:
   void focusOutEvent(QFocusEvent* e);
-
-private slots:
-  void wasChanged();
-
-private:
-  bool m_changed;
 };
 
 }

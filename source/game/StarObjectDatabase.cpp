@@ -905,6 +905,109 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::createForP
   return std::move(*object);
 }
 
+namespace {
+
+std::expected<void, StarException> readObjectDamageTeam(Json const& config, EntityDamageTeam& team) {
+  auto present = config.contains("damageTeam");
+  if (!present)
+    return std::unexpected(std::move(present.error()));
+  if (!*present)
+    return {};
+  auto damageTeam = config.get("damageTeam");
+  if (!damageTeam)
+    return std::unexpected(std::move(damageTeam.error()));
+  auto type = damageTeam->getString("type", "environment")
+                .and_then([](String const& name) -> std::expected<TeamType, StarException> {
+                  if (!TeamTypeNames)
+                    return std::unexpected(TeamTypeNames.error());
+                  return TeamTypeNames->getLeft(name).transform([](auto value) { return value.get(); });
+                });
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  team.type = *type;
+  auto number = damageTeam->getUInt("team", 0);
+  if (!number)
+    return std::unexpected(std::move(number.error()));
+  team.team = *number;
+  return {};
+}
+
+std::expected<void, StarException> readObjectLighting(Root& root, Json const& config, ObjectConfig& object) {
+  auto singleColor = config.contains("lightColor");
+  if (!singleColor)
+    return std::unexpected(std::move(singleColor.error()));
+  if (*singleColor) {
+    auto color = config.get("lightColor").and_then(jsonToColor);
+    if (!color)
+      return std::unexpected(std::move(color.error()));
+    object.lightColors["default"] = *color;
+  } else {
+    auto multipleColors = config.contains("lightColors");
+    if (!multipleColors)
+      return std::unexpected(std::move(multipleColors.error()));
+    if (*multipleColors) {
+      auto colors = config.getObject("lightColors");
+      if (!colors)
+        return std::unexpected(std::move(colors.error()));
+      for (auto const& [name, value] : *colors) {
+        auto color = jsonToColor(value);
+        if (!color)
+          return std::unexpected(std::move(color.error()));
+        object.lightColors[name] = *color;
+      }
+    }
+  }
+  auto type = config.optString("lightType");
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  if (*type) {
+    if (!LightTypeNames)
+      return std::unexpected(LightTypeNames.error());
+    auto namedType = LightTypeNames->getLeft(**type);
+    if (!namedType)
+      return std::unexpected(std::move(namedType.error()));
+    object.lightType = namedType->get();
+  } else {
+    auto pointLight = config.getBool("pointLight", false);
+    if (!pointLight)
+      return std::unexpected(std::move(pointLight.error()));
+    object.lightType = (LightType)*pointLight;
+  }
+  auto pointBeam = config.getFloat("pointBeam", 0.0f);
+  if (!pointBeam)
+    return std::unexpected(std::move(pointBeam.error()));
+  object.pointBeam = *pointBeam;
+  auto ambience = config.getFloat("beamAmbience", 0.0f);
+  if (!ambience)
+    return std::unexpected(std::move(ambience.error()));
+  object.beamAmbience = *ambience;
+  auto flickering = config.contains("flickerPeriod");
+  if (!flickering)
+    return std::unexpected(std::move(flickering.error()));
+  if (*flickering) {
+    auto period = config.getFloat("flickerPeriod");
+    if (!period)
+      return std::unexpected(std::move(period.error()));
+    auto minimum = config.getFloat("flickerMinIntensity", 0.0);
+    if (!minimum)
+      return std::unexpected(std::move(minimum.error()));
+    auto maximum = config.getFloat("flickerMaxIntensity", 0.0);
+    if (!maximum)
+      return std::unexpected(std::move(maximum.error()));
+    auto periodVariance = config.getFloat("flickerPeriodVariance", 0.0);
+    if (!periodVariance)
+      return std::unexpected(std::move(periodVariance.error()));
+    auto intensityVariance = config.getFloat("flickerIntensityVariance", 0.0);
+    if (!intensityVariance)
+      return std::unexpected(std::move(intensityVariance.error()));
+    object.lightFlickering =
+      PeriodicFunction<float>(root.random(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
+  }
+  return {};
+}
+
+}// namespace
+
 std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::readConfig(String const& path) const {
   auto result = [&, &root = m_root]() -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
     auto assetsResult = root.assets();
@@ -938,35 +1041,20 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       return std::unexpected(std::move(categoryResult.error()));
     auto category = std::move(*categoryResult);
     objectConfig->category = std::move(category);
-    auto field1Result = config.get("colonyTags", JsonArray());
-    if (!field1Result)
-      return std::unexpected(std::move(field1Result.error()));
-    auto field1 = std::move(*field1Result);
-    auto colonyTagsResult = jsonToStringList(field1);
-    if (!colonyTagsResult)
-      return std::unexpected(std::move(colonyTagsResult.error()));
-    auto colonyTags = std::move(*colonyTagsResult);
-    objectConfig->colonyTags = std::move(colonyTags);
-    auto field2Result = config.get("scripts", JsonArray());
-    if (!field2Result)
-      return std::unexpected(std::move(field2Result.error()));
-    auto field2 = std::move(*field2Result);
-    auto field3Result = jsonToStringList(field2);
-    if (!field3Result)
-      return std::unexpected(std::move(field3Result.error()));
-    auto field3 = std::move(*field3Result);
-    std::ranges::for_each(field3, [&](String& script) { script = AssetPath::relativeTo(path, script); });
-    objectConfig->scripts = std::move(field3);
-    auto field4Result = config.get("animationScripts", JsonArray());
-    if (!field4Result)
-      return std::unexpected(std::move(field4Result.error()));
-    auto field4 = std::move(*field4Result);
-    auto field5Result = jsonToStringList(field4);
-    if (!field5Result)
-      return std::unexpected(std::move(field5Result.error()));
-    auto field5 = std::move(*field5Result);
-    std::ranges::for_each(field5, [&](String& script) { script = AssetPath::relativeTo(path, script); });
-    objectConfig->animationScripts = std::move(field5);
+    auto colonyTags = config.get("colonyTags", JsonArray()).and_then(jsonToStringList);
+    if (!colonyTags)
+      return std::unexpected(std::move(colonyTags.error()));
+    objectConfig->colonyTags = std::move(*colonyTags);
+    auto scripts = config.get("scripts", JsonArray()).and_then(jsonToStringList);
+    if (!scripts)
+      return std::unexpected(std::move(scripts.error()));
+    std::ranges::for_each(*scripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    objectConfig->scripts = std::move(*scripts);
+    auto animationScripts = config.get("animationScripts", JsonArray()).and_then(jsonToStringList);
+    if (!animationScripts)
+      return std::unexpected(std::move(animationScripts.error()));
+    std::ranges::for_each(*animationScripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    objectConfig->animationScripts = std::move(*animationScripts);
     auto priceResult = config.getInt("price", 0);
     if (!priceResult)
       return std::unexpected(std::move(priceResult.error()));
@@ -1113,27 +1201,22 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     objectConfig->unbreakable = std::move(unbreakable);
     if (objectConfig->unbreakable)
       objectConfig->smashable = false;
-    auto field14Result = config.get("damageTable", "/objects/defaultParameters.config:damageTable");
-    if (!field14Result)
-      return std::unexpected(std::move(field14Result.error()));
-    auto field14 = std::move(*field14Result);
-    auto field15Result = assets->fetchJson(field14);
-    if (!field15Result)
-      return std::unexpected(std::move(field15Result.error()));
-    auto field15 = std::move(*field15Result);
-    auto field16Result = config.optFloat("health");
-    if (!field16Result)
-      return std::unexpected(std::move(field16Result.error()));
-    auto field16 = std::move(*field16Result);
-    auto field17Result = config.optUInt("harvestLevel");
-    if (!field17Result)
-      return std::unexpected(std::move(field17Result.error()));
-    auto field17 = std::move(*field17Result);
-    auto tileDamageParametersResult = TileDamageParameters::create(*assets, field15, field16, field17);
-    if (!tileDamageParametersResult)
-      return std::unexpected(std::move(tileDamageParametersResult.error()));
-    auto tileDamageParameters = std::move(*tileDamageParametersResult);
-    objectConfig->tileDamageParameters = std::move(tileDamageParameters);
+    auto damageTable =
+      config.get("damageTable", "/objects/defaultParameters.config:damageTable").and_then([&](Json const& value) {
+        return assets->fetchJson(value);
+      });
+    if (!damageTable)
+      return std::unexpected(std::move(damageTable.error()));
+    auto damageHealth = config.optFloat("health");
+    if (!damageHealth)
+      return std::unexpected(std::move(damageHealth.error()));
+    auto harvestLevel = config.optUInt("harvestLevel");
+    if (!harvestLevel)
+      return std::unexpected(std::move(harvestLevel.error()));
+    auto tileDamage = TileDamageParameters::create(*assets, *damageTable, *damageHealth, *harvestLevel);
+    if (!tileDamage)
+      return std::unexpected(std::move(tileDamage.error()));
+    objectConfig->tileDamageParameters = std::move(*tileDamage);
     auto damageShakeMagnitudeResult = config.getFloat("damageShakeMagnitude", 0.2f);
     if (!damageShakeMagnitudeResult)
       return std::unexpected(std::move(damageShakeMagnitudeResult.error()));
@@ -1144,109 +1227,10 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       return std::unexpected(std::move(damageMaterialKindResult.error()));
     auto damageMaterialKind = std::move(*damageMaterialKindResult);
     objectConfig->damageMaterialKind = std::move(damageMaterialKind);
-    if (auto containsResult = config.contains("damageTeam"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field18Result = config.get("damageTeam");
-    if (!field18Result)
-      return std::unexpected(std::move(field18Result.error()));
-    auto field18 = std::move(*field18Result);
-    auto field19Result = field18.getString("type", "environment");
-    if (!field19Result)
-      return std::unexpected(std::move(field19Result.error()));
-    auto field19 = std::move(*field19Result);
-      if (!TeamTypeNames)
-        return std::unexpected(TeamTypeNames.error());
-    auto field20Result = TeamTypeNames->getLeft(field19);
-    if (!field20Result)
-      return std::unexpected(std::move(field20Result.error()));
-      objectConfig->damageTeam.type = field20Result->get();
-    auto field21Result = field18.getUInt("team", 0);
-    if (!field21Result)
-      return std::unexpected(std::move(field21Result.error()));
-    auto field21 = std::move(*field21Result);
-      objectConfig->damageTeam.team = field21;
-    }
-    if (auto containsResult = config.contains("lightColor"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field22Result = config.get("lightColor");
-    if (!field22Result)
-      return std::unexpected(std::move(field22Result.error()));
-    auto field22 = std::move(*field22Result);
-    auto field23Result = jsonToColor(field22);
-    if (!field23Result)
-      return std::unexpected(std::move(field23Result.error()));
-    auto field23 = std::move(*field23Result);
-      objectConfig->lightColors["default"] = field23;
-    } else if (auto containsResult = config.contains("lightColors"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field24Result = config.getObject("lightColors");
-    if (!field24Result)
-      return std::unexpected(std::move(field24Result.error()));
-    auto field24 = std::move(*field24Result);
-      for (auto const& pair : field24) {
-    auto field25Result = jsonToColor(pair.second);
-    if (!field25Result)
-      return std::unexpected(std::move(field25Result.error()));
-    auto field25 = std::move(*field25Result);
-        objectConfig->lightColors[pair.first] = field25;
-      }
-    }
-    auto field26Result = config.optString("lightType");
-    if (!field26Result)
-      return std::unexpected(std::move(field26Result.error()));
-    auto field26 = std::move(*field26Result);
-    if (field26) {
-      if (!LightTypeNames)
-        return std::unexpected(LightTypeNames.error());
-    auto field27Result = LightTypeNames->getLeft(*field26);
-    if (!field27Result)
-      return std::unexpected(std::move(field27Result.error()));
-      objectConfig->lightType = field27Result->get();
-    } else {
-    auto field28Result = config.getBool("pointLight", false);
-    if (!field28Result)
-      return std::unexpected(std::move(field28Result.error()));
-    auto field28 = std::move(*field28Result);
-      objectConfig->lightType = (LightType)field28;
-    }
-    auto pointBeamResult = config.getFloat("pointBeam", 0.0f);
-    if (!pointBeamResult)
-      return std::unexpected(std::move(pointBeamResult.error()));
-    auto pointBeam = std::move(*pointBeamResult);
-    objectConfig->pointBeam = std::move(pointBeam);
-    auto beamAmbienceResult = config.getFloat("beamAmbience", 0.0f);
-    if (!beamAmbienceResult)
-      return std::unexpected(std::move(beamAmbienceResult.error()));
-    auto beamAmbience = std::move(*beamAmbienceResult);
-    objectConfig->beamAmbience = std::move(beamAmbience);
-    if (auto containsResult = config.contains("flickerPeriod"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field29Result = config.getFloat("flickerPeriod");
-    if (!field29Result)
-      return std::unexpected(std::move(field29Result.error()));
-    auto field29 = std::move(*field29Result);
-    auto field30Result = config.getFloat("flickerMinIntensity", 0.0);
-    if (!field30Result)
-      return std::unexpected(std::move(field30Result.error()));
-    auto field30 = std::move(*field30Result);
-    auto field31Result = config.getFloat("flickerMaxIntensity", 0.0);
-    if (!field31Result)
-      return std::unexpected(std::move(field31Result.error()));
-    auto field31 = std::move(*field31Result);
-    auto field32Result = config.getFloat("flickerPeriodVariance", 0.0);
-    if (!field32Result)
-      return std::unexpected(std::move(field32Result.error()));
-    auto field32 = std::move(*field32Result);
-    auto field33Result = config.getFloat("flickerIntensityVariance", 0.0);
-    if (!field33Result)
-      return std::unexpected(std::move(field33Result.error()));
-    auto field33 = std::move(*field33Result);
-      objectConfig->lightFlickering = PeriodicFunction<float>(root.random(), field29, field30, field31, field32, field33);
-    }
+    if (auto damageTeam = readObjectDamageTeam(config, objectConfig->damageTeam); !damageTeam)
+      return std::unexpected(std::move(damageTeam.error()));
+    if (auto lighting = readObjectLighting(root, config, *objectConfig); !lighting)
+      return std::unexpected(std::move(lighting.error()));
     auto soundEffectResult = config.getString("soundEffect", "");
     if (!soundEffectResult)
       return std::unexpected(std::move(soundEffectResult.error()));

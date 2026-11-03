@@ -249,7 +249,8 @@ template <typename Container, typename Getter>
       return;
   }
 
-  std::vector<ComputedPair> work(containerSize);
+  std::vector<ComputedPair> work;
+  work.reserve(containerSize);
   for (std::size_t i = 0; i < containerSize; ++i) {
     if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
       if constexpr (requires { valueGetter == nullptr; }) {
@@ -259,9 +260,9 @@ template <typename Container, typename Getter>
       auto computed = std::invoke(valueGetter, container[i]);
       if (!computed)
         return std::unexpected(std::move(computed.error()));
-      work[i] = {std::move(*computed), i};
+      work.emplace_back(std::move(*computed), i);
     } else {
-      work[i] = {std::invoke(valueGetter, container[i]), i};
+      work.emplace_back(std::invoke(valueGetter, container[i]), i);
     }
   }
 
@@ -340,6 +341,12 @@ template <typename OutContainer, typename InContainer, typename Function>
 template <typename OutContainer, typename InContainer, typename Function>
 [[nodiscard]] auto transform(InContainer&& container, Function&& function) {
   OutContainer res;
+  if constexpr (std::ranges::sized_range<InContainer>) {
+    if constexpr (requires {
+                    { res.reserve(std::ranges::size(container)) } -> std::same_as<void>;
+                  })
+      res.reserve(std::ranges::size(container));
+  }
   using Status = decltype(transformInto(res, std::forward<InContainer>(container), std::forward<Function>(function)));
   if constexpr (std::is_void_v<Status>) {
     transformInto(res, std::forward<InContainer>(container), std::forward<Function>(function));

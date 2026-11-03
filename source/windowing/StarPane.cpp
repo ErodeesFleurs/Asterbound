@@ -88,6 +88,20 @@ extern std::expected<EnumMap<PaneAnchor>, StarException> const PaneAnchorNames =
     {PaneAnchor::Center, "center"},
 });
 
+Vec2I paneAnchorBase(PaneAnchor anchor, Vec2I windowSize, Vec2I paneSize) {
+  switch (anchor) {
+  case PaneAnchor::BottomRight: return {windowSize[0] - paneSize[0], 0};
+  case PaneAnchor::TopLeft: return {0, windowSize[1] - paneSize[1]};
+  case PaneAnchor::TopRight: return windowSize - paneSize;
+  case PaneAnchor::CenterTop: return {(windowSize[0] - paneSize[0]) / 2, windowSize[1] - paneSize[1]};
+  case PaneAnchor::CenterBottom: return {(windowSize[0] - paneSize[0]) / 2, 0};
+  case PaneAnchor::CenterLeft: return {0, (windowSize[1] - paneSize[1]) / 2};
+  case PaneAnchor::CenterRight: return {windowSize[0] - paneSize[0], (windowSize[1] - paneSize[1]) / 2};
+  case PaneAnchor::Center: return (windowSize - paneSize) / 2;
+  default: return {};
+  }
+}
+
 Pane::Pane(GuiContext& context) : Widget(context) {
   m_dragActive = m_lockPosition = false;
   m_dismissed = true;
@@ -217,9 +231,10 @@ bool Pane::isDisplayed() const {
 
 std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
   if (m_visible) {
-    if (std::holds_alternative<MouseButtonDownEvent>(event) || std::holds_alternative<MouseButtonUpEvent>(event) || std::holds_alternative<MouseMoveEvent>(event)
-        || std::holds_alternative<MouseWheelEvent>(event)) {
-      Vec2I mousePos = *m_context.mousePosition(event);
+    auto const mousePosition = m_context.mousePosition(event);
+    auto const buttonDown = std::get_if<MouseButtonDownEvent>(&event);
+    if (mousePosition) {
+      Vec2I mousePos = *mousePosition;
       // First, handle preliminary mouse out / click up events
       if (m_mouseOver) {
         if (!m_mouseOver->inMember(mousePos) || !m_mouseOver->active()) {
@@ -251,9 +266,8 @@ std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
         std::shared_ptr<Widget> topWidget = widget;
         std::shared_ptr<Widget> child = getChildAt(mousePos);
         if (child->active() && child->interactive()) {
-          if (std::holds_alternative<MouseButtonDownEvent>(event)
-              && (std::get<MouseButtonDownEvent>(event).mouseButton == MouseButton::Left
-                      || std::get<MouseButtonDownEvent>(event).mouseButton == MouseButton::Right)) {
+          if (buttonDown
+              && (buttonDown->mouseButton == MouseButton::Left || buttonDown->mouseButton == MouseButton::Right)) {
             if (!newClickDown)
               newClickDown = child;
 
@@ -306,7 +320,7 @@ std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
       }
     }
 
-    if (std::holds_alternative<MouseButtonDownEvent>(event)) {
+    if (buttonDown) {
       Vec2I mousePos = *m_context.mousePosition(event);
       if (inDragArea(mousePos) && !m_lockPosition) {
         setDragActive(true, mousePos);
@@ -730,41 +744,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
     auto window = pane.m_context.windowInterfaceSize();
     if (!window)
       return std::unexpected(std::move(window.error()));
-    Vec2I windowSize(*window);
-    Vec2I sz = pane.size();
-    Vec2I offset;
-    switch (pane.anchor()) {
-    case PaneAnchor::None:
-    case PaneAnchor::BottomLeft:
-      offset = pane.anchorOffset();
-      break;
-    case PaneAnchor::BottomRight:
-      offset = pane.anchorOffset() + Vec2I{windowSize[0] - sz[0], 0};
-      break;
-    case PaneAnchor::TopLeft:
-      offset = pane.anchorOffset() + Vec2I{0, windowSize[1] - sz[1]};
-      break;
-    case PaneAnchor::TopRight:
-      offset = pane.anchorOffset() + (windowSize - sz);
-      break;
-    case PaneAnchor::CenterTop:
-      offset = pane.anchorOffset() + Vec2I{(windowSize[0] - sz[0]) / 2, windowSize[1] - sz[1]};
-      break;
-    case PaneAnchor::CenterBottom:
-      offset = pane.anchorOffset() + Vec2I{(windowSize[0] - sz[0]) / 2, 0};
-      break;
-    case PaneAnchor::CenterLeft:
-      offset = pane.anchorOffset() + Vec2I{0, (windowSize[1] - sz[1]) / 2};
-      break;
-    case PaneAnchor::CenterRight:
-      offset = pane.anchorOffset() + Vec2I{windowSize[0] - sz[0], (windowSize[1] - sz[1]) / 2};
-      break;
-    case PaneAnchor::Center:
-      offset = pane.anchorOffset() + ((windowSize - sz) / 2);
-      break;
-    default:
-      offset = pane.anchorOffset();
-    }
+    Vec2I offset = pane.anchorOffset() + paneAnchorBase(pane.anchor(), Vec2I(*window), pane.size());
     return offset + pane.relativePosition();
   });
   if (!getScreenPosition)
@@ -774,41 +754,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
     auto window = pane.m_context.windowInterfaceSize();
     if (!window)
       return std::unexpected(std::move(window.error()));
-    Vec2I windowSize(*window);
-    Vec2I sz = pane.size();
-    Vec2I offset;
-    switch (pane.anchor()) {
-    case PaneAnchor::None:
-    case PaneAnchor::BottomLeft:
-      offset = pane.anchorOffset();
-      break;
-    case PaneAnchor::BottomRight:
-      offset = pane.anchorOffset() + Vec2I{windowSize[0] - sz[0], 0};
-      break;
-    case PaneAnchor::TopLeft:
-      offset = pane.anchorOffset() + Vec2I{0, windowSize[1] - sz[1]};
-      break;
-    case PaneAnchor::TopRight:
-      offset = pane.anchorOffset() + (windowSize - sz);
-      break;
-    case PaneAnchor::CenterTop:
-      offset = pane.anchorOffset() + Vec2I{(windowSize[0] - sz[0]) / 2, windowSize[1] - sz[1]};
-      break;
-    case PaneAnchor::CenterBottom:
-      offset = pane.anchorOffset() + Vec2I{(windowSize[0] - sz[0]) / 2, 0};
-      break;
-    case PaneAnchor::CenterLeft:
-      offset = pane.anchorOffset() + Vec2I{0, (windowSize[1] - sz[1]) / 2};
-      break;
-    case PaneAnchor::CenterRight:
-      offset = pane.anchorOffset() + Vec2I{windowSize[0] - sz[0], (windowSize[1] - sz[1]) / 2};
-      break;
-    case PaneAnchor::Center:
-      offset = pane.anchorOffset() + ((windowSize - sz) / 2);
-      break;
-    default:
-      offset = pane.anchorOffset();
-    }
+    Vec2I offset = pane.anchorOffset() + paneAnchorBase(pane.anchor(), Vec2I(*window), pane.size());
 
     pane.setPosition(screenPos - offset);
     return {};

@@ -20,17 +20,14 @@ import star.format;
 namespace Star {
 
 class JsonEditor : public QMainWindow {
-  Q_OBJECT
-
 public:
   explicit JsonEditor(std::shared_ptr<JsonPath::Path> const& path, Options const& options, List<String> const& files);
 
-private slots:
+private:
   void next();
   void back();
   void updatePreview(QString const& valueStr);
 
-private:
   // Returns false if the change can't be made or the edit is invalid Json
   bool saveChanges();
 

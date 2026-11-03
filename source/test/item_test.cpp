@@ -52,6 +52,10 @@ import star.collection_database;
 import star.player;
 import star.player_blueprints;
 import star.player_factory;
+import star.augment_item;
+import star.object_database;
+import star.damage_types;
+import star.light_source;
 
 namespace Star {
 
@@ -1159,4 +1163,294 @@ const GameTestRegistration blueprintLearning(
     ASSERT_TRUE(nullBlueprint);
     EXPECT_FALSE(*nullBlueprint);
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
+  });
+
+const GameTestRegistration
+  itemScriptLifecycle("ItemTest", "AugmentAndAgingSettleScriptLifecycleBeforeCommittingItems", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(File::makeDirectory(overlay));
+    ASSERT_TRUE(File::writeFile(String(R"({
+      "itemName":"lifecycletarget","inventoryIcon":"/assetmissing.png",
+      "shortdescription":"Lifecycle target","description":"Script lifecycle target",
+      "rarity":"common","maxStack":1000,"itemAgingScripts":["lifecycle.lua"]
+    })"),
+                                File::relativeTo(overlay, "target.item")));
+    ASSERT_TRUE(File::writeFile(String(R"(
+local function record(stage)
+  local key = "lifecycle" .. stage
+  root.setConfiguration(key, root.getConfiguration(key) + 1)
+end
+function init()
+  record("Init")
+  local options = root.getConfiguration("lifecycleOptions")
+  if item then
+    assert(item.name() == "lifecycleaugment")
+    assert(config.getParameter("lifecycleCallback") == "installed")
+  end
+  if options.failStage == "init" then error("item-init-marker") end
+end
+local function run(descriptor)
+  record("Invoke")
+  local options = root.getConfiguration("lifecycleOptions")
+  if options.failStage == "invoke" then error("item-invoke-marker") end
+  if options.malformed then return {name = false} end
+  if not options.unchanged then descriptor.parameters.lifecycleChanged = true end
+  return descriptor
+end
+function apply(descriptor)
+  local changed = run(descriptor)
+  if root.getConfiguration("lifecycleOptions").unchanged then return nil end
+  return changed, 2
+end
+function ageItem(descriptor, aging)
+  assert(aging == 7.25)
+  return run(descriptor)
+end
+function uninit()
+  record("Cleanup")
+  if root.getConfiguration("lifecycleOptions").failCleanup then error("item-cleanup-marker") end
+end
+    )"),
+                                File::relativeTo(overlay, "lifecycle.lua")));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.append(overlay);
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto database = (*root)->itemDatabase();
+    ASSERT_TRUE(database) << database.error().what();
+    auto configuration = (*root)->configuration();
+    ASSERT_TRUE(configuration);
+    struct Case {
+      std::string_view stage;
+      bool cleanup;
+      bool malformed;
+      bool unchanged;
+    };
+    Case const cases[]{{"", false, false, false}, {"init", false, false, false}, {"invoke", false, false, false},
+                       {"", true, false, false},  {"init", true, false, false},  {"invoke", true, false, false},
+                       {"", false, true, false},  {"", false, false, true}};
+    for (bool aging : {false, true}) {
+      SCOPED_TRACE(aging ? "aging" : "augment");
+      for (auto const& test : cases) {
+        SCOPED_TRACE(test.stage);
+        SCOPED_TRACE(test.cleanup);
+        SCOPED_TRACE(test.malformed);
+        SCOPED_TRACE(test.unchanged);
+        ASSERT_TRUE((*configuration)
+                      ->set("lifecycleOptions",
+                            JsonObject{{"failStage", test.stage},
+                                       {"failCleanup", test.cleanup},
+                                       {"malformed", test.malformed},
+                                       {"unchanged", test.unchanged}}));
+        for (std::string_view key : {"lifecycleInit", "lifecycleInvoke", "lifecycleCleanup"})
+          ASSERT_TRUE((*configuration)->set(key, 0));
+        auto target = inventoryTestItem(**database, "lifecycletarget", 4, JsonObject{{"original", true}});
+        ASSERT_TRUE(target) << target.error().what();
+        ASSERT_TRUE(*target);
+        auto original = *target;
+        auto originalDescriptor = original->descriptor();
+        auto augment = AugmentItem::create(**root,
+                                           JsonObject{{"itemName", "lifecycleaugment"},
+                                                      {"inventoryIcon", "/assetmissing.png"},
+                                                      {"shortdescription", "Lifecycle augment"},
+                                                      {"rarity", "common"},
+                                                      {"maxStack", 100},
+                                                      {"scripts", JsonArray{"lifecycle.lua"}},
+                                                      {"lifecycleCallback", "installed"}},
+                                           "/", JsonObject());
+        ASSERT_TRUE(augment) << augment.error().what();
+        ASSERT_EQ((*augment)->setCount(3), 0u);
+        bool scriptFailed = !test.stage.empty() || test.cleanup;
+        if (aging) {
+          auto result = (*database)->ageItem(*target, 7.25);
+          EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
+          if (result)
+            EXPECT_EQ(*result, !test.unchanged);
+          else if (scriptFailed)
+            EXPECT_TRUE(std::string_view(result.error().what())
+                          .contains(test.stage == "init"       ? "item-init-marker"
+                                      : test.stage == "invoke" ? "item-invoke-marker"
+                                                               : "item-cleanup-marker"));
+        } else {
+          auto result = (*database)->applyAugment(*target, **augment);
+          EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
+          if (result)
+            *target = *result;
+          else if (scriptFailed)
+            EXPECT_TRUE(std::string_view(result.error().what())
+                          .contains(test.stage == "init"       ? "item-init-marker"
+                                      : test.stage == "invoke" ? "item-invoke-marker"
+                                                               : "item-cleanup-marker"));
+          // Even a malformed returned descriptor consumes the requested augment
+          // count, but no Lua lifecycle failure can reach that consumption.
+          EXPECT_EQ((*augment)->count(), !scriptFailed && !test.unchanged ? 1u : 3u);
+        }
+        bool changed = !scriptFailed && !test.malformed && !test.unchanged;
+        ASSERT_TRUE(*target);
+        EXPECT_EQ(*target == original, !changed);
+        EXPECT_EQ(original->descriptor(), originalDescriptor);
+        EXPECT_EQ((*target)->count(), 4u);
+        EXPECT_EQ((*target)->parameters().getBool("lifecycleChanged", false), changed);
+        auto initCount = (*configuration)->get("lifecycleInit");
+        auto invokeCount = (*configuration)->get("lifecycleInvoke");
+        auto cleanupCount = (*configuration)->get("lifecycleCleanup");
+        ASSERT_TRUE(initCount);
+        ASSERT_TRUE(invokeCount);
+        ASSERT_TRUE(cleanupCount);
+        EXPECT_EQ(initCount->toInt(), 1);
+        EXPECT_EQ(invokeCount->toInt(), test.stage == "init" ? 0 : 1);
+        // DisableContext retires failed init/invoke sessions before explicit
+        // uninit. A configured second hook failure must not resurrect the hook.
+        EXPECT_EQ(cleanupCount->toInt(), test.stage.empty() ? 1 : 0);
+      }
+    }
+  });
+
+const GameTestRegistration
+  objectConfigDomains("ItemTest", "ObjectConfigPreservesDamageLightingPresenceAndErrorOrder", [](GameTest& fixture) {
+    auto originalDatabase = fixture.root().objectDatabase();
+    ASSERT_TRUE(originalDatabase);
+    auto original = (*originalDatabase)->getConfig("perfectlygenericitem");
+    ASSERT_TRUE(original) << original.error().what();
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto overlay = File::relativeTo(*directory, "assets");
+    auto relativeDirectory = AssetPath::directory((*original)->path).substr(1);
+    ASSERT_TRUE(relativeDirectory);
+    auto objectDirectory = File::relativeTo(overlay, *relativeDirectory);
+    ASSERT_TRUE(File::makeDirectoryRecursive(objectDirectory));
+    Json base = (*original)->config;
+    for (std::string_view key : {"damageTeam", "lightColor", "lightColors", "lightType", "pointLight", "pointBeam",
+                                 "beamAmbience", "flickerPeriod", "flickerMinIntensity", "flickerMaxIntensity",
+                                 "flickerPeriodVariance", "flickerIntensityVariance"}) {
+      auto erased = base.eraseKey(key);
+      ASSERT_TRUE(erased);
+      base = std::move(*erased);
+    }
+    struct Case {
+      std::string_view name;
+      JsonObject fields;
+      std::string_view firstError;
+      std::string_view laterError;
+    };
+    Case const cases[]{
+      {"domainmissing", {}, "", ""},
+      {"domaindefaults",
+       {{"damageTeam", JsonObject{}},
+        {"lightType", Json()},
+        {"pointLight", true},
+        {"flickerMinIntensity", "ignored without flickerPeriod"}},
+       "",
+       ""},
+      // Avoid the asset patch's non-point normalization while testing explicit type precedence.
+      {"domainlighting",
+       {{"damageTeam", JsonObject{{"type", "environment"}, {"team", 17}}},
+        {"lightColor", JsonArray{10, 20, 30}},
+        {"lightColors", false},
+        {"lightType", "Spread"},
+        {"pointLight", true},
+        {"pointBeam", 0.75},
+        {"beamAmbience", 0.25},
+        {"flickerPeriod", 2.0},
+        {"flickerMinIntensity", 0.3},
+        {"flickerMaxIntensity", 0.9},
+        {"flickerPeriodVariance", 0.1},
+        {"flickerIntensityVariance", 0.2}},
+       "",
+       ""},
+      {"domaincolors", {{"lightColors", JsonObject{{"warm", JsonArray{40, 50, 60}}}}}, "", ""},
+      {"domainteamfirst",
+       {{"damageTeam", JsonObject{{"type", "unknown-team-marker"}, {"team", false}}},
+        {"lightType", "later-light-marker"}},
+       "unknown-team-marker",
+       "later-light-marker"},
+      {"domainlightfirst",
+       {{"lightType", "unknown-light-marker"}, {"pointLight", false}, {"pointBeam", false}},
+       "unknown-light-marker",
+       ""},
+      {"domainbeamfirst", {{"pointBeam", false}, {"beamAmbience", "later numeric failure"}}, "bool", "string"},
+      {"domainflickerfirst",
+       {{"flickerPeriod", false}, {"flickerMinIntensity", "later numeric failure"}},
+       "bool",
+       "string"},
+      {"domainnullteam", {{"damageTeam", Json()}}, "null", ""},
+      {"domainnullcolor",
+       {{"lightColor", Json()}, {"lightColors", JsonObject{{"warm", JsonArray{1, 2, 3}}}}},
+       "null",
+       ""}};
+    for (auto const& test : cases) {
+      auto config =
+        base.setAll(test.fields).and_then([&](Json const& value) { return value.set("objectName", test.name); });
+      ASSERT_TRUE(config);
+      auto contents = config->repr();
+      ASSERT_TRUE(contents);
+      ASSERT_TRUE(File::writeFile(*contents, File::relativeTo(objectDirectory, String(test.name) + ".object")));
+    }
+    auto settings = fixture.rootSettings();
+    settings.assetSources.append(overlay);
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto database = (*root)->objectDatabase();
+    ASSERT_TRUE(database) << database.error().what();
+    for (auto const& test : cases) {
+      SCOPED_TRACE(test.name);
+      auto config = (*database)->getConfig(test.name);
+      if (!test.firstError.empty()) {
+        ASSERT_FALSE(config);
+        EXPECT_TRUE(config.error().is<ObjectException>());
+        EXPECT_TRUE(std::string_view(config.error().what()).contains(test.firstError));
+        if (!test.laterError.empty())
+          EXPECT_FALSE(std::string_view(config.error().what()).contains(test.laterError));
+        continue;
+      }
+      ASSERT_TRUE(config) << config.error().what();
+      EXPECT_EQ((*config)->name, test.name);
+      EXPECT_EQ((*config)->race, (*original)->race);
+      EXPECT_EQ((*config)->category, (*original)->category);
+      EXPECT_EQ((*config)->orientations.size(), (*original)->orientations.size());
+      EXPECT_EQ((*config)->rooting, (*original)->rooting);
+      EXPECT_EQ((*config)->biomePlaced, (*original)->biomePlaced);
+      if (test.name == "domaindefaults") {
+        EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
+        EXPECT_EQ((*config)->damageTeam.team, 0u);
+        EXPECT_EQ((*config)->lightType, LightType::Point);
+        EXPECT_FALSE((*config)->lightFlickering);
+      } else if (test.name == "domainlighting") {
+        EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
+        EXPECT_EQ((*config)->damageTeam.team, 17u);
+        ASSERT_EQ((*config)->lightColors.size(), 1u);
+        auto color = (*config)->lightColors.maybe("default");
+        ASSERT_TRUE(color);
+        EXPECT_EQ(*color, Color::rgb(10, 20, 30));
+        EXPECT_EQ((*config)->lightType, LightType::Spread);
+        EXPECT_FLOAT_EQ((*config)->pointBeam, 0.75f);
+        EXPECT_FLOAT_EQ((*config)->beamAmbience, 0.25f);
+        EXPECT_TRUE((*config)->lightFlickering);
+      } else if (test.name == "domaincolors") {
+        ASSERT_EQ((*config)->lightColors.size(), 1u);
+        auto color = (*config)->lightColors.maybe("warm");
+        ASSERT_TRUE(color);
+        EXPECT_EQ(*color, Color::rgb(40, 50, 60));
+      } else {
+        EXPECT_TRUE((*config)->lightColors.empty());
+        EXPECT_EQ((*config)->lightType, LightType::Spread);
+        EXPECT_FLOAT_EQ((*config)->pointBeam, 0.0f);
+        EXPECT_FLOAT_EQ((*config)->beamAmbience, 0.0f);
+        EXPECT_FALSE((*config)->lightFlickering);
+      }
+    }
   });

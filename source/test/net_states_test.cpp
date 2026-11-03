@@ -3,6 +3,7 @@ import std;
 import star.format;
 #include "gtest/gtest.h"
 
+import star.data_stream;
 import star.data_stream_devices;
 import star.list;
 import star.string;
@@ -1188,6 +1189,146 @@ TEST(NetElements, NetElementMap) {
     auto value = slaveMap.get("e");
     ASSERT_TRUE(value);
     EXPECT_EQ(value->get(), "f");
+  }
+}
+
+TEST(NetElements, MapFullStorePreservesPendingWireOrder) {
+  NetElementMap<std::uint8_t, std::uint8_t> map;
+  map.set(7, 0x17);
+  map.set(3, 0x13);
+  ASSERT_TRUE(map.enableNetInterpolation());
+
+  // Pending set, remove, clear, set must follow the live entries unchanged.
+  std::array<char, 14> const delta{2, 0, 3, 0x33, 2, 1, 7, 2, 2, 2, 0, 9, 0x19, 0};
+  DataStreamBuffer pending;
+  ASSERT_TRUE(pending.writeData(delta));
+  ASSERT_TRUE(pending.seek(0));
+  ASSERT_TRUE(map.readNetDelta(pending, 1.0f));
+  EXPECT_EQ(map.size(), 2u);
+
+  DataStreamBuffer stored;
+  ASSERT_TRUE(map.netStore(stored));
+  std::array<char, 16> const expected{6, 0, 3, 0x13, 0, 7, 0x17, 0, 3, 0x33, 1, 7, 2, 0, 9, 0x19};
+  ASSERT_EQ(stored.size(), expected.size());
+  EXPECT_TRUE(std::equal(stored.span().begin(), stored.span().end(), expected.begin()));
+
+  NetElementMap<std::uint8_t, std::uint8_t> restored;
+  ASSERT_TRUE(stored.seek(0));
+  ASSERT_TRUE(restored.netLoad(stored, {}));
+  ASSERT_EQ(restored.size(), 1u);
+  auto value = restored.get(9);
+  ASSERT_TRUE(value);
+  EXPECT_EQ(value->get(), 0x19);
+  ASSERT_TRUE(map.tickNetInterpolation(1.0f));
+  EXPECT_EQ(map.baseMap(), restored.baseMap());
+}
+
+TEST(NetElements, MapDeltaChangeTagsRoundTrip) {
+  NetElementMap<std::uint8_t, std::uint8_t> map;
+  map.set(3, 0x13);
+  map.set(7, 0x17);
+  EXPECT_TRUE(map.remove(3));
+  map.clear();
+  map.set(9, 0x19);
+  DataStreamBuffer stream;
+  auto written = map.writeNetDelta(stream, 0);
+  ASSERT_TRUE(written);
+  ASSERT_TRUE(*written);
+  std::array<char, 18> const expected{2, 0, 3, 0x13, 2, 0, 7, 0x17, 2, 1, 3, 2, 2, 2, 0, 9, 0x19, 0};
+  ASSERT_EQ(stream.size(), expected.size());
+  EXPECT_TRUE(std::equal(stream.span().begin(), stream.span().end(), expected.begin()));
+
+  NetElementMap<std::uint8_t, std::uint8_t> restored;
+  ASSERT_TRUE(stream.seek(0));
+  ASSERT_TRUE(restored.readNetDelta(stream, 0.0f));
+  EXPECT_EQ(restored.baseMap(), map.baseMap());
+}
+
+TEST(NetElements, MapFullStoreWriteFailuresRetainCommittedPrefix) {
+  NetElementMap<std::uint8_t, std::uint8_t> map;
+  map.set(3, 0x13);
+  map.set(7, 0x17);
+  std::array<char, 7> const expected{2, 0, 3, 0x13, 0, 7, 0x17};
+  // Includes count and each set's tag/key/value, including after a complete set.
+  for (std::size_t limit = 0; limit < expected.size(); ++limit) {
+    std::vector<char> prefix;
+    bool rejected = false;
+    bool wroteAfterError = false;
+    DataStreamFunctions stream({}, [&](std::span<char const> bytes) -> std::expected<std::size_t, StarException> {
+      wroteAfterError |= rejected;
+      if (bytes.size() > limit - prefix.size()) {
+        rejected = true;
+        return std::unexpected(OutOfRangeException("map write boundary", false));
+      }
+      prefix.insert(prefix.end(), bytes.begin(), bytes.end());
+      return bytes.size();
+    });
+    auto result = map.netStore(stream);
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<OutOfRangeException>());
+    EXPECT_FALSE(wroteAfterError);
+    ASSERT_EQ(prefix.size(), limit);
+    EXPECT_TRUE(std::equal(prefix.begin(), prefix.end(), expected.begin()));
+    EXPECT_EQ(map.size(), 2u);
+
+    // A real reader commits the first set only once its value is complete.
+    DataStreamBuffer input;
+    ASSERT_TRUE(input.writeData(prefix));
+    ASSERT_TRUE(input.seek(0));
+    NetElementMap<std::uint8_t, std::uint8_t> restored;
+    restored.set(99, 99);
+    EXPECT_FALSE(restored.netLoad(input, {}));
+    EXPECT_EQ(restored.size(), limit >= 4 ? 1u : 0u);
+    EXPECT_FALSE(restored.contains(99));
+    if (limit >= 4) {
+      auto value = restored.get(3);
+      ASSERT_TRUE(value);
+      EXPECT_EQ(value->get(), 0x13);
+    }
+  }
+}
+
+TEST(NetElements, MapDeltaWriteFailuresRetainCommittedPrefix) {
+  NetElementMap<std::uint8_t, std::uint8_t> map;
+  map.set(3, 0x13);
+  map.set(7, 0x17);
+  std::array<char, 9> const expected{2, 0, 3, 0x13, 2, 0, 7, 0x17, 0};
+  for (std::size_t limit = 0; limit < expected.size(); ++limit) {
+    std::vector<char> prefix;
+    bool rejected = false;
+    bool wroteAfterError = false;
+    DataStreamFunctions stream({}, [&](std::span<char const> bytes) -> std::expected<std::size_t, StarException> {
+      wroteAfterError |= rejected;
+      if (bytes.size() > limit - prefix.size()) {
+        rejected = true;
+        return std::unexpected(OutOfRangeException("map delta write boundary", false));
+      }
+      prefix.insert(prefix.end(), bytes.begin(), bytes.end());
+      return bytes.size();
+    });
+    auto result = map.writeNetDelta(stream, 0);
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<OutOfRangeException>());
+    EXPECT_FALSE(wroteAfterError);
+    ASSERT_EQ(prefix.size(), limit);
+    EXPECT_TRUE(std::equal(prefix.begin(), prefix.end(), expected.begin()));
+
+    DataStreamBuffer input;
+    ASSERT_TRUE(input.writeData(prefix));
+    ASSERT_TRUE(input.seek(0));
+    NetElementMap<std::uint8_t, std::uint8_t> restored;
+    EXPECT_FALSE(restored.readNetDelta(input, 0.0f));
+    EXPECT_EQ(restored.size(), static_cast<std::size_t>(limit >= 4) + static_cast<std::size_t>(limit >= 8));
+    if (limit >= 4) {
+      auto value = restored.get(3);
+      ASSERT_TRUE(value);
+      EXPECT_EQ(value->get(), 0x13);
+    }
+    if (limit >= 8) {
+      auto value = restored.get(7);
+      ASSERT_TRUE(value);
+      EXPECT_EQ(value->get(), 0x17);
+    }
   }
 }
 

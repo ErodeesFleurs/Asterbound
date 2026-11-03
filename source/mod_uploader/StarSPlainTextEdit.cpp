@@ -7,19 +7,11 @@ import star.s_plain_text_edit;
 namespace Star {
 
 SPlainTextEdit::SPlainTextEdit(std::optional<std::reference_wrapper<QWidget>> parent)
-  : QPlainTextEdit(parent ? &parent->get() : nullptr), m_changed(false) {
-
-  connect(this, SIGNAL(textChanged()), this, SLOT(wasChanged()));
-}
+    : QPlainTextEdit(parent ? &parent->get() : nullptr) {}
 
 void SPlainTextEdit::focusOutEvent(QFocusEvent* e) {
   QPlainTextEdit::focusOutEvent(e);
-  m_changed = false;
   emit editingFinished();
-}
-
-void SPlainTextEdit::wasChanged() {
-  m_changed = true;
 }
 
 }

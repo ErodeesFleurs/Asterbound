@@ -119,6 +119,7 @@ import star.projectile_database;
 import star.material_database;
 import star.world_structure;
 import star.world_template;
+import star.terrain_database;
 import star.entity_factory;
 
 #include "gtest/gtest.h"
@@ -167,6 +168,60 @@ namespace {
     return hash;
   }
 }
+
+const GameTestRegistration terrainNamedSelector(
+  "TerrainDatabaseTest", "UnknownNamesAndSeededNamedSelectorsPreserveSampling", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
+    ASSERT_TRUE(File::writeFile(String(R"({
+      "name":"seeded","type":"perlin","function":"perlin","octaves":3,"freq":0.03,"amp":5
+    })"),
+                                File::relativeTo(*directory, "seeded.terrain")));
+    ASSERT_TRUE(File::writeFile(String(R"({"name":"badType","type":"unknown-selector-type"})"),
+                                File::relativeTo(*directory, "bad.terrain")));
+    Assets::Settings settings{};
+    settings.workerPoolSize = 1;
+    settings.assetTimeToLive = 10;
+    Logger logger;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto database = TerrainDatabase::create(*assets, fixture.root().random());
+    ASSERT_TRUE(database) << database.error().what();
+    TerrainSelectorParameters parameters(fixture.root().random());
+    parameters.seed = 0x123456789abcdef0ull;
+    parameters.worldWidth = 2048;
+    parameters.baseHeight = 128;
+    auto unknown = (*database)->createNamedSelector("missing-selector", parameters);
+    ASSERT_FALSE(unknown);
+    EXPECT_TRUE(unknown.error().is<TerrainException>());
+    auto badType = (*database)->createNamedSelector("badType", parameters);
+    ASSERT_FALSE(badType);
+    EXPECT_TRUE(badType.error().is<TerrainException>());
+    auto first = (*database)->createNamedSelector("seeded", parameters);
+    ASSERT_TRUE(first) << first.error().what();
+    auto second = (*database)->createNamedSelector("seeded", parameters);
+    ASSERT_TRUE(second) << second.error().what();
+    auto config = (*assets)->json("/seeded.terrain");
+    ASSERT_TRUE(config);
+    auto direct = (*database)->createSelectorType("perlin", *config, parameters);
+    ASSERT_TRUE(direct);
+    EXPECT_EQ((*database)->storeSelector(*first), (*database)->storeSelector(*second));
+    EXPECT_EQ((*first)->parameters.seed, parameters.seed);
+    for (int x : {-128, 0, 37, 512, 2047}) {
+      for (int y : {-64, 0, 128, 999}) {
+        auto a = (*first)->get(x, y);
+        auto b = (*second)->get(x, y);
+        auto c = (*direct)->get(x, y);
+        ASSERT_TRUE(a);
+        ASSERT_TRUE(b);
+        ASSERT_TRUE(c);
+        EXPECT_EQ(*a, *b);
+        EXPECT_EQ(*a, *c);
+      }
+    }
+  });
 
 const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
   "WorldTimers", "PreserveOrderAndDeferReentrantActions", [](GameTest& fixture) {

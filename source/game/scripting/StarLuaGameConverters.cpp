@@ -986,21 +986,23 @@ std::expected<LuaMethods<std::shared_ptr<AudioInstance>>, StarException> LuaUser
   });
   if (!seekTime)
     return std::unexpected(std::move(seekTime.error()));
-  auto mixerGroup = methods.registerMethod("mixerGroup", [](std::shared_ptr<AudioInstance> const& audio) -> std::expected<String, StarException> {
-    auto name = enumName(MixerGroupNames, audio->mixerGroup());
-    if (!name)
-      return std::unexpected(std::move(name.error()));
-    return name->get();
-  });
+  auto mixerGroup = methods.registerMethod(
+    "mixerGroup", [](std::shared_ptr<AudioInstance> const& audio) -> std::expected<String, StarException> {
+      return enumName<MixerGroupNames>(audio->mixerGroup()).transform([](std::string_view name) {
+        return String(name);
+      });
+    });
   if (!mixerGroup)
     return std::unexpected(std::move(mixerGroup.error()));
-  auto setMixerGroup = methods.registerMethod("setMixerGroup", [](std::shared_ptr<AudioInstance> const& audio, String const& group) -> std::expected<void, StarException> {
-    auto converted = requiredEnum(MixerGroupNames, group);
-    if (!converted)
-      return std::unexpected(std::move(converted.error()));
-    audio->setMixerGroup(*converted);
-    return {};
-  });
+  auto setMixerGroup = methods.registerMethod(
+    "setMixerGroup",
+    [](std::shared_ptr<AudioInstance> const& audio, String const& group) -> std::expected<void, StarException> {
+      auto converted = enumValue<MixerGroupNames>(group);
+      if (!converted)
+        return std::unexpected(std::move(converted.error()));
+      audio->setMixerGroup(*converted);
+      return {};
+    });
   if (!setMixerGroup)
     return std::unexpected(std::move(setMixerGroup.error()));
   auto setClockStart = methods.registerMethod("setClockStart", [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time) {

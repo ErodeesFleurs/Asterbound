@@ -2453,17 +2453,7 @@ template <typename Function>
 auto List<Element, Allocator>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
   using Output = List<typename AlgorithmResultInfo<Invocation>::Value>;
-  Output res;
-  res.reserve(m_storage.size());
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
-    auto transformed = transformInto(res, *this, std::forward<Function>(function));
-    if (!transformed)
-      return std::expected<Output, StarException>(std::unexpected(std::move(transformed.error())));
-    return std::expected<Output, StarException>(std::move(res));
-  } else {
-    transformInto(res, *this, std::forward<Function>(function));
-    return res;
-  }
+  return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
 template <typename Element, typename Allocator>
@@ -2471,17 +2461,7 @@ template <typename Function>
 auto List<Element, Allocator>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
   using Output = List<typename AlgorithmResultInfo<Invocation>::Value>;
-  Output res;
-  res.reserve(m_storage.size());
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
-    auto transformed = transformInto(res, *this, std::forward<Function>(function));
-    if (!transformed)
-      return std::expected<Output, StarException>(std::unexpected(std::move(transformed.error())));
-    return std::expected<Output, StarException>(std::move(res));
-  } else {
-    transformInto(res, *this, std::forward<Function>(function));
-    return res;
-  }
+  return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
 template <typename Element, std::size_t MaxSize>
