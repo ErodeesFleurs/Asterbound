@@ -22,10 +22,29 @@ std::string strfChecked(std::basic_format_string<Char, T...> fmt, T const&... ar
 
 class StarException;
 
+enum class ExceptionSummaryKind { Native, ScriptRuntime, ScriptSyntax, PatchRuntime, PatchSyntax, Resource };
+
+struct ExceptionSummary {
+  struct Location {
+    std::string source;
+    int line = -1;
+    std::string provider;
+  };
+  ExceptionSummaryKind kind = ExceptionSummaryKind::Native;
+  std::string category;
+  std::string reason;
+  std::string operation;
+  std::vector<Location> locations;
+  std::string asset;
+  std::string patch;
+  std::string patchProvider;
+};
+
 // Owning diagnostics remain valid after the originating error value is gone.
 class ExceptionDiagnostic {
 public:
   ExceptionDiagnostic(StarException const& exception);
+  std::shared_ptr<ExceptionSummary const> const& diagnosticSummary() const noexcept { return m_summary; }
 
   friend void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace);
   friend OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
@@ -33,6 +52,7 @@ public:
 private:
   friend class StarException;
   std::function<void(std::ostream&, bool)> m_printException;
+  std::shared_ptr<ExceptionSummary const> m_summary;
 };
 
 class StarException {
@@ -62,13 +82,26 @@ public:
     return key == typeKey<StarException>();
   }
 
+  std::shared_ptr<ExceptionSummary const> const& diagnosticSummary() const noexcept { return m_summary; }
+
+  StarException withSummary(ExceptionSummary summary) const& {
+    auto result = *this;
+    result.m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
+    return result;
+  }
+
+  StarException withSummary(ExceptionSummary summary) && {
+    m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
+    return std::move(*this);
+  }
+
   StarException withContext(std::string context) const& {
     return StarException(
         [context = std::move(context), cause = m_printException](std::ostream& os, bool fullStacktrace) {
           os << context << "\nCaused by: ";
           cause(os, fullStacktrace);
         },
-        m_matchesErrorType);
+        m_matchesErrorType, m_summary);
   }
 
   StarException withContext(std::string context) && {
@@ -77,7 +110,7 @@ public:
           os << context << "\nCaused by: ";
           cause(os, fullStacktrace);
         },
-        m_matchesErrorType);
+        m_matchesErrorType, std::move(m_summary));
   }
 
   friend class ExceptionDiagnostic;
@@ -85,6 +118,8 @@ public:
 protected:
   StarException(std::string_view type, std::string message, bool genStackTrace = true) noexcept;
   StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept;
+  StarException(std::string_view type, std::string message, bool genStackTrace,
+      std::shared_ptr<ExceptionSummary const> summary) noexcept;
 
   template <typename Error>
   void setErrorType() noexcept {
@@ -94,12 +129,13 @@ protected:
 private:
   bool (*m_matchesErrorType)(TypeKey) noexcept = &StarException::matchesErrorType;
   StarException(std::function<void(std::ostream&, bool)> printer,
-      bool (*matcher)(TypeKey) noexcept) noexcept
-    : m_matchesErrorType(matcher), m_printException(std::move(printer)) {}
+      bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionSummary const> summary) noexcept
+    : m_matchesErrorType(matcher), m_printException(std::move(printer)), m_summary(std::move(summary)) {}
   // Takes the ostream to print to, whether to print the full stacktrace.  Must
   // not bind 'this', may outlive the exception in the case of chained
   // exception causes.
   std::function<void(std::ostream&, bool)> m_printException;
+  std::shared_ptr<ExceptionSummary const> m_summary;
 
   // m_printException will be called without the stack-trace to print
   // m_whatBuffer, if the what() method is invoked.
@@ -109,6 +145,51 @@ private:
 void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace);
 std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace);
 OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
+
+inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> const& summary) {
+  if (!summary)
+    return "Error";
+  std::string_view category = summary->category;
+  switch (summary->kind) {
+    case ExceptionSummaryKind::Native: break;
+    case ExceptionSummaryKind::ScriptRuntime: category = "Lua runtime error"; break;
+    case ExceptionSummaryKind::ScriptSyntax: category = "Lua syntax error"; break;
+    case ExceptionSummaryKind::PatchRuntime: category = "Lua patch runtime error"; break;
+    case ExceptionSummaryKind::PatchSyntax: category = "Lua patch syntax error"; break;
+    case ExceptionSummaryKind::Resource: category = "Resource error"; break;
+  }
+  std::ostringstream out;
+  out << category;
+  auto reason = std::string_view(summary->reason);
+  reason = reason.substr(0, reason.find_first_of("\r\n"));
+  if (!reason.empty())
+    out << ": " << reason;
+  if (!summary->operation.empty())
+    out << "\n  Operation: " << summary->operation;
+  if (!summary->asset.empty())
+    out << "\n  Asset: " << summary->asset;
+  if (!summary->patch.empty())
+    out << "\n  Patch: " << summary->patch;
+  if (!summary->patchProvider.empty())
+    out << "\n  Patch provider: " << summary->patchProvider;
+  for (std::size_t i = 0; i < summary->locations.size(); ++i) {
+    auto const& location = summary->locations[i];
+    out << (i == 0 ? "\n  Script: " : "\n  Called from: ") << location.source;
+    if (location.line > 0)
+      out << ":" << location.line;
+    if (!location.provider.empty() && location.provider != summary->patchProvider)
+      out << "\n    Provider: " << location.provider;
+  }
+  return out.str();
+}
+
+inline std::string exceptionSummary(StarException const& error) {
+  return exceptionSummary(error.diagnosticSummary());
+}
+
+inline std::string exceptionSummary(ExceptionDiagnostic const& error) {
+  return exceptionSummary(error.diagnosticSummary());
+}
 
 void printStack(std::string_view message);
 
@@ -308,6 +389,9 @@ export module star.format;
 export namespace Star {
 using ::Star::DebugEnabled;
 using ::Star::ExceptionDiagnostic;
+using ::Star::ExceptionSummaryKind;
+using ::Star::ExceptionSummary;
+using ::Star::exceptionSummary;
 using ::Star::StarException;
 using ::Star::StarError;
 using ::Star::OutOfRangeExceptionTag;

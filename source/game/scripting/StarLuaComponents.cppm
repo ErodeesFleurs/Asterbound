@@ -237,6 +237,11 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
   ++m_activeCalls;
   auto result = std::forward<Function>(function)();
   if (!result) {
+    if (result.error().diagnosticSummary()->operation.empty()) {
+      auto summary = *result.error().diagnosticSummary();
+      summary.operation = name.empty() ? std::string(operation) : strf("{} '{}'", operation, name);
+      result.error() = std::move(result.error()).withSummary(std::move(summary));
+    }
     result.error() = result.error().withContext(strf("{} '{}'", operation, name));
     if (!m_boundaryError)
       m_boundaryError = result.error();
@@ -248,8 +253,10 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
   if (--m_activeCalls == 0) {
     if (auto finished = finishExecution(); !finished) {
       auto error = std::move(finished.error());
-      if (!result)
-        error = error.withContext(strf("Original Lua failure: {}", outputException(result.error(), true)));
+      if (!result) {
+        error = std::move(error).withSummary(*result.error().diagnosticSummary()).withContext(
+            strf("Original Lua failure: {}", outputException(result.error(), true)));
+      }
       return std::unexpected(std::move(error));
     }
   }

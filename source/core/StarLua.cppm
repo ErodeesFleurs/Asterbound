@@ -632,6 +632,12 @@ public:
   [[nodiscard]] std::expected<ByteArray, StarException> compile(String const& contents, String const& name = String());
   [[nodiscard]] std::expected<ByteArray, StarException> compile(ByteArray const& contents, String const& name = String());
 
+  // Optional host diagnostics for full Lua chunk sources. The resolver must
+  // own its snapshots, not borrow a shorter-lived host or capture this engine.
+  // Failures are ignored so diagnostics cannot replace a script error.
+  using SourceResolver = std::function<std::expected<String, StarException>(String const&)>;
+  void setSourceResolver(SourceResolver resolver);
+
   // Returns the debug info of the state.
   lua_Debug const& debugInfo(int level = 1, String const& what = "nSlu");
 
@@ -745,9 +751,19 @@ private:
 
   // Pops a protected Lua error and preserves its diagnostic category.
   [[nodiscard]] std::expected<void, StarException> handleError(lua_State* state, int res);
+  [[nodiscard]] std::expected<void, StarException> handleSourceError(lua_State* state, int res, String const& source);
+  void pushCallbackError(lua_State* state, StarException const& error);
+  std::shared_ptr<ExceptionSummary const> findDiagnostic(lua_State* state, int index) const;
+  void rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary);
+  ExceptionSummary captureDiagnostic(lua_State* from, lua_State* state, int index,
+      ExceptionSummaryKind kind) const;
+  void beginDiagnosticScope();
+  void endDiagnosticScope();
 
   // lua_pcall with a better message handler that includes a traceback.
   int pcallWithTraceback(lua_State* state, int nargs, int nresults);
+  String sourceDiagnostic(String const& source) const noexcept;
+  void appendSourceDiagnostics(lua_State* from, lua_State* to, ExceptionSummary const& summary) const noexcept;
 
   // override for lua coroutine resume with traceback
   static int coresumeWithTraceback(lua_State* state);
@@ -827,7 +843,20 @@ private:
   lua_State* m_state;
   ImageResolver m_imageResolver;
   std::unique_ptr<LuaExecutionHost> m_executionHost;
+  SourceResolver m_sourceResolver;
   std::stop_token m_promiseLifetime;
+  // Bounded, registry-pinned error-string identities; no Lua reference owns the engine.
+  struct DiagnosticTransport {
+    void const* identity = nullptr;
+    int type = LUA_TNONE;
+    std::size_t length = 0;
+    std::shared_ptr<ExceptionSummary const> summary;
+  };
+  std::array<DiagnosticTransport, 64> m_diagnosticTransport;
+  std::size_t m_diagnosticCount = 0;
+  std::size_t m_nextDiagnostic = 0;
+  unsigned m_diagnosticDepth = 0;
+  int m_diagnosticStringsRegistryId = LUA_NOREF;
   int m_pcallTracebackMessageHandlerRegistryId;
   int m_scriptDefaultEnvRegistryId;
   int m_wrappedFunctionMetatableRegistryId;
@@ -2404,13 +2433,16 @@ template <typename Ret, typename... Args>
   if (auto entered = incrementRecursionLevel(); !entered)
     return std::unexpected(std::move(entered.error()));
   releaseHandles(state);
+  beginDiagnosticScope();
   int results = 0;
   int result = lua_resume(state, m_state, static_cast<int>(*count), &results);
   releaseHandles(state);
   decrementRecursionLevel();
   restoreThread.top = 0;
-  if (result != LUA_OK && result != LUA_YIELD) {
+  if (result != LUA_OK && result != LUA_YIELD)
     propagateErrorWithTraceback(state, m_state);
+  endDiagnosticScope();
+  if (result != LUA_OK && result != LUA_YIELD) {
     if (auto called = handleError(m_state, result); !called)
       return std::unexpected(std::move(called.error()));
   }

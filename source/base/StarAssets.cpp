@@ -127,6 +127,65 @@ static std::expected<std::optional<ByteArray>, StarException> readPatch(AssetSou
   return std::unexpected(std::move(bytes.error()));
 }
 
+std::string Assets::sourceDiagnostic(AssetSource const& source,
+    std::optional<std::reference_wrapper<String const>> sourcePath) {
+  auto result = sourcePath ? strf("asset source '{}'", sourcePath->get()) : std::string("unregistered asset source");
+  auto const& metadata = source.metadata();
+  for (String const& key : {String("friendlyName"), String("name")}) {
+    if (auto value = metadata.maybeRef(key)) {
+      // Invalid optional metadata must not hide the error being diagnosed.
+      auto text = value->get().stringPtr();
+      if (text && !(**text).empty())
+        result += strf(", {} '{}'", key, **text);
+    }
+  }
+  return result;
+}
+
+static void addSummarySource(ExceptionSummary& summary, std::string_view source, std::string_view provider) {
+  for (auto& location : summary.locations) {
+    if (location.source == source && (location.provider.empty() || location.provider == provider)) {
+      if (location.provider.empty())
+        location.provider = provider;
+      return;
+    }
+  }
+  summary.locations.push_back({std::string(source), -1, std::string(provider)});
+}
+
+static StarException resourceFailure(StarException error, String const& path) {
+  auto summary = *error.diagnosticSummary();
+  if (summary.kind == ExceptionSummaryKind::Native)
+    summary.kind = ExceptionSummaryKind::Resource;
+  if (summary.asset.empty())
+    summary.asset = path.utf8();
+  return std::move(error).withSummary(std::move(summary));
+}
+
+static StarException scriptSourceFailure(StarException error, String const& path, std::string const& provider) {
+  auto summary = *error.diagnosticSummary();
+  addSummarySource(summary, path.utf8(), provider);
+  return std::move(error).withSummary(std::move(summary));
+}
+
+static StarException luaPatchFailure(StarException error, String const& targetPath, String const& patchPath,
+    AssetSource const& source, std::optional<std::reference_wrapper<String const>> sourcePath) {
+  auto provider = Assets::sourceDiagnostic(source, sourcePath);
+  auto summary = *error.diagnosticSummary();
+  if (summary.kind != ExceptionSummaryKind::PatchSyntax && summary.kind != ExceptionSummaryKind::PatchRuntime)
+    summary.kind = summary.kind == ExceptionSummaryKind::ScriptSyntax
+      ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime;
+  // Nested asset callbacks may already identify the actual failing patch.
+  if (summary.patch.empty()) {
+    summary.asset = targetPath.utf8();
+    summary.patch = patchPath.utf8();
+    summary.patchProvider = provider;
+  }
+  addSummarySource(summary, AssetPath::removeSubPath(patchPath).utf8(), provider);
+  return std::move(error).withSummary(std::move(summary)).withContext(
+      strf("Lua patch provider: target '{}', patch '{}', {}", targetPath, patchPath, provider));
+}
+
 std::expected<std::optional<RectU>, StarException> FramesSpecification::getRect(String const& frame) const {
   if (auto alias = aliases.maybeRef(frame)) {
     if (auto rect = frames.maybeRef(alias->get()))
@@ -582,10 +641,12 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
               return std::unexpected(std::move(path.error()));
             auto script = source->read(*path);
             if (!script)
-              return std::unexpected(std::move(script.error()));
+              return std::unexpected(scriptSourceFailure(std::move(script.error()), *path,
+                  sourceDiagnostic(*source, std::cref(sourcePath))));
             auto loaded = context->load(script->span(), *path);
             if (!loaded)
-              return std::unexpected(std::move(loaded.error()));
+              return std::unexpected(scriptSourceFailure(std::move(loaded.error()), *path,
+                  sourceDiagnostic(*source, std::cref(sourcePath))));
           }
           return {};
         };
@@ -593,7 +654,12 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         if (!ran) {
           if (!ran.error().is<LuaException>())
             return std::unexpected(std::move(ran.error()));
-          logged = m_logger.error("Exception while running {} scripts from asset source '{}': {}", groupName, sourcePath, ran.error().what());
+          auto summary = *ran.error().diagnosticSummary();
+          if (summary.operation.empty())
+            summary.operation = strf("Running {} scripts", groupName);
+          ran.error() = std::move(ran.error()).withSummary(std::move(summary));
+          logged = m_logger.error("{}\nException while running {} scripts from {}\nDetails:\n{}",
+              exceptionSummary(ran.error()), groupName, sourceDiagnostic(*source, std::cref(sourcePath)), ran.error().what());
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -1553,12 +1619,14 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
         auto loaded = newContext->load((**patchStream).span(), patchPath);
         if (!loaded)
-          return std::unexpected(std::move(loaded.error()));
+          return std::unexpected(luaPatchFailure(std::move(loaded.error()), path, patchPath, *patchSource,
+              m_assetSourcePaths.maybeLeftRef(patchSource)));
         context = std::move(newContext);
       }
       auto newResult = context->invokePath<LuaValue>("patch", result, path);
       if (!newResult)
-        return std::unexpected(std::move(newResult.error()));
+        return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, patchPath, *patchSource,
+            m_assetSourcePaths.maybeLeftRef(patchSource)));
       if (!std::holds_alternative<LuaNilType>(*newResult)) {
         if (std::holds_alternative<LuaUserData>(*newResult)) {
           auto isImage = std::get<LuaUserData>(*newResult).is<Image>();
@@ -1692,12 +1760,14 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
         auto loaded = newContext->load((**patchStream).span(), patchBasePath);
         if (!loaded)
-          return std::unexpected(std::move(loaded.error()));
+          return std::unexpected(luaPatchFailure(std::move(loaded.error()), path, pair.first, *patchSource,
+              m_assetSourcePaths.maybeLeftRef(patchSource)));
         context = std::move(newContext);
       }
       auto newResult = context->invokePath<Json>("patch", result, path);
       if (!newResult)
-        return std::unexpected(std::move(newResult.error()));
+        return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, pair.first, *patchSource,
+            m_assetSourcePaths.maybeLeftRef(patchSource)));
       if (*newResult)
         result = std::move(*newResult);
     } else {
@@ -1760,7 +1830,8 @@ std::expected<bool, StarException> Assets::doLoad(AssetId const& id) const {
   m_assetErrors[id] = loaded.error();
   m_assetsDone.notify_all();
   m_queue.remove(id);
-  auto logged = m_logger.error("Error loading asset: {}, {}", id.path, outputException(ExceptionDiagnostic(loaded.error()), true));
+  auto logged = m_logger.error("{}\nError loading asset: {}\nDetails:\n{}", exceptionSummary(loaded.error()), id.path,
+      outputException(ExceptionDiagnostic(loaded.error()), true));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return true;
@@ -1773,8 +1844,11 @@ std::expected<bool, StarException> Assets::doPost(AssetId const& id) const {
     auto processed = postProcessAudio(asset);
     if (processed) {
       asset = std::move(*processed);
-    } else if (auto logged = m_logger.error("Error post-processing asset: {}, {}", id.path, outputException(ExceptionDiagnostic(processed.error()), true)); !logged) {
-      logError = std::move(logged.error());
+    } else {
+      processed.error() = resourceFailure(std::move(processed.error()), id.path.basePath);
+      if (auto logged = m_logger.error("{}\nError post-processing asset: {}\nDetails:\n{}",
+            exceptionSummary(processed.error()), id.path, outputException(ExceptionDiagnostic(processed.error()), true)); !logged)
+        logError = std::move(logged.error());
     }
   }
   // Optional decompression failure retains the original compressed audio.
@@ -1812,18 +1886,27 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
     return std::unexpected(AssetException("Unrecognized asset type"));
   }();
   if (!loaded) {
+    loaded.error() = resourceFailure(std::move(loaded.error()), id.path.basePath);
     if (id.type == AssetType::Image && m_settings.missingImage) {
-      auto logged = m_logger.error("Could not load image asset '{}', using placeholder default.\n{}", id.path, outputException(ExceptionDiagnostic(loaded.error()), false));
-      if (logged)
+      auto logged = m_logger.error("{}\nCould not load image asset '{}', using placeholder default.\nDetails:\n{}",
+          exceptionSummary(loaded.error()), id.path, outputException(ExceptionDiagnostic(loaded.error()), false));
+      if (logged) {
         loaded = loadImage({*m_settings.missingImage, {}, {}});
-      else
+        if (!loaded)
+          loaded.error() = resourceFailure(std::move(loaded.error()), *m_settings.missingImage);
+      } else {
         loaded = std::unexpected(std::move(logged.error()));
+      }
     } else if (id.type == AssetType::Audio && m_settings.missingAudio) {
-      auto logged = m_logger.error("Could not load audio asset '{}', using placeholder default.\n{}", id.path, outputException(ExceptionDiagnostic(loaded.error()), false));
-      if (logged)
+      auto logged = m_logger.error("{}\nCould not load audio asset '{}', using placeholder default.\nDetails:\n{}",
+          exceptionSummary(loaded.error()), id.path, outputException(ExceptionDiagnostic(loaded.error()), false));
+      if (logged) {
         loaded = loadAudio({*m_settings.missingAudio, {}, {}});
-      else
+        if (!loaded)
+          loaded.error() = resourceFailure(std::move(loaded.error()), *m_settings.missingAudio);
+      } else {
         loaded = std::unexpected(std::move(logged.error()));
+      }
     }
   }
   if (!loaded) {

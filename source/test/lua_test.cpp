@@ -851,6 +851,378 @@ TEST(LuaTest, Require) {
   EXPECT_TRUE(invalid.error().is<LuaException>());
 }
 
+TEST(LuaTest, SourceProvidersUseFullLiveStackAndDeduplicate) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  String helperPath("/scripts/" + std::string(240, 'x') + "/helper.lua");
+  int entryLookups = 0;
+  int helperLookups = 0;
+  engine->setSourceResolver([&](String const& source) -> std::expected<String, StarException> {
+    if (source == "/entry.lua") {
+      ++entryLookups;
+      return String("friendly-entry / internal-entry / /mods/entry");
+    }
+    if (source == helperPath) {
+      ++helperLookups;
+      return String("friendly-helper / internal-helper / /mods/override");
+    }
+    return String();
+  });
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  ASSERT_TRUE((context.setRequireFunction([&](LuaStackValue environment, StringView) {
+    return environment.stack().load(environment, std::span(
+      String("function helper(n) if n == 0 then error('original-provider-marker') end "
+             "local result = helper(n - 1); return result end").utf8()), helperPath);
+  })));
+  ASSERT_TRUE((context.load(
+    "require '/helper.lua'; function entry() local result = helper(2); return result end; "
+    "function normal() return 42 end", "/entry.lua")));
+  EXPECT_EQ(context.invokePath<int>("normal"), 42);
+  EXPECT_EQ(entryLookups, 0);
+  EXPECT_EQ(helperLookups, 0);
+  auto failure = context.invokePath<int>("entry");
+  ASSERT_FALSE(failure);
+  EXPECT_TRUE(failure.error().is<LuaException>());
+  std::string message = failure.error().what();
+  EXPECT_NE(message.find("original-provider-marker"), std::string::npos);
+  EXPECT_NE(message.find("friendly-entry"), std::string::npos);
+  EXPECT_NE(message.find("internal-entry"), std::string::npos);
+  EXPECT_NE(message.find("/mods/entry"), std::string::npos);
+  EXPECT_NE(message.find("friendly-helper"), std::string::npos);
+  EXPECT_NE(message.find("internal-helper"), std::string::npos);
+  EXPECT_NE(message.find("/mods/override"), std::string::npos);
+  EXPECT_NE(message.find(helperPath.utf8()), std::string::npos);
+  EXPECT_EQ(entryLookups, 1);
+  EXPECT_EQ(helperLookups, 1);
+  auto const& summary = failure.error().diagnosticSummary();
+  ASSERT_TRUE(summary);
+  EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(summary->reason.find("original-provider-marker"), std::string::npos);
+  EXPECT_EQ(summary->reason.find('\n'), std::string::npos);
+  ASSERT_EQ(summary->locations.size(), 2u);
+  EXPECT_EQ(summary->locations[0].source, helperPath.utf8());
+  EXPECT_EQ(summary->locations[0].line, 1);
+  EXPECT_EQ(summary->locations[0].provider, "friendly-helper / internal-helper / /mods/override");
+  EXPECT_EQ(summary->locations[1].source, "/entry.lua");
+  EXPECT_EQ(summary->locations[1].line, 1);
+  EXPECT_EQ(summary->locations[1].provider, "friendly-entry / internal-entry / /mods/entry");
+}
+
+TEST(LuaTest, SourceProviderFailuresPreserveOriginalError) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  ASSERT_TRUE((context.load("function broken() error('resolver-original-marker') end", "/broken.lua")));
+  ASSERT_TRUE((context.load("function entry() local result = broken(); return result end", "/entry.lua")));
+  engine->setSourceResolver([](String const& source) -> std::expected<String, StarException> {
+    if (source == "/entry.lua")
+      return String("surviving-provider");
+    return std::unexpected(LuaException("resolver-failure-marker"));
+  });
+  auto failure = context.invokePath<int>("entry");
+  ASSERT_FALSE(failure);
+  EXPECT_TRUE(failure.error().is<LuaException>());
+  std::string message = failure.error().what();
+  EXPECT_NE(message.find("resolver-original-marker"), std::string::npos);
+  EXPECT_NE(message.find("surviving-provider"), std::string::npos);
+  EXPECT_EQ(message.find("resolver-failure-marker"), std::string::npos);
+}
+
+TEST(LuaTest, SourceProvidersPreserveCompilationAndLimitCategories) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  engine->setSourceResolver([](String const& source) -> std::expected<String, StarException> {
+    if (source == "/syntax.lua")
+      return String("syntax-provider /mods/syntax");
+    return String();
+  });
+  auto compiled = engine->compile("function unfinished()", "/syntax.lua");
+  ASSERT_FALSE(compiled);
+  EXPECT_TRUE(compiled.error().is<LuaIncompleteStatementException>());
+  EXPECT_NE(std::string(compiled.error().what()).find("syntax-provider"), std::string::npos);
+  ASSERT_TRUE(compiled.error().diagnosticSummary());
+  EXPECT_EQ(compiled.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptSyntax);
+  EXPECT_NE(compiled.error().diagnosticSummary()->reason.find("<eof>"), std::string::npos);
+  ASSERT_FALSE(compiled.error().diagnosticSummary()->locations.empty());
+  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().source, "/syntax.lua");
+  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().line, -1);
+  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().provider, "syntax-provider /mods/syntax");
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto loaded = context.load("local = 'syntax-original-marker'", "/syntax.lua");
+  ASSERT_FALSE(loaded);
+  EXPECT_TRUE(loaded.error().is<LuaException>());
+  EXPECT_NE(std::string(loaded.error().what()).find("syntax-provider"), std::string::npos);
+  ASSERT_TRUE(loaded.error().diagnosticSummary());
+  EXPECT_EQ(loaded.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptSyntax);
+  engine->setInstructionMeasureInterval(1);
+  engine->setInstructionLimit(20);
+  auto limited = context.load("while true do end", "/syntax.lua");
+  ASSERT_FALSE(limited);
+  EXPECT_TRUE(limited.error().is<LuaInstructionLimitReached>());
+  ASSERT_TRUE(limited.error().diagnosticSummary());
+  EXPECT_EQ(limited.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(limited.error().diagnosticSummary()->category, "LuaInstructionLimitReached");
+  EXPECT_EQ(limited.error().diagnosticSummary()->reason, "Lua instruction limit reached");
+}
+
+TEST(LuaTest, SourceProviderFailureDoesNotReplaceSyntaxError) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  engine->setSourceResolver([](String const&) -> std::expected<String, StarException> {
+    return std::unexpected(LuaException("metadata-failure-marker"));
+  });
+  auto compiled = engine->compile("function unfinished()", "/syntax.lua");
+  ASSERT_FALSE(compiled);
+  EXPECT_TRUE(compiled.error().is<LuaIncompleteStatementException>());
+  std::string message = compiled.error().what();
+  EXPECT_EQ(message.find("metadata-failure-marker"), std::string::npos);
+}
+
+TEST(LuaTest, CoroutineSourceProvidersKeepFailedFrames) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  engine->setSourceResolver([](String const& source) -> std::expected<String, StarException> {
+    if (source == "/helper.lua")
+      return String("coroutine-helper-provider");
+    if (source == "/entry.lua")
+      return String("coroutine-entry-provider");
+    return String();
+  });
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  ASSERT_TRUE((context.load("function helper() error('coroutine-original-marker') end", "/helper.lua")));
+  ASSERT_TRUE((context.load(
+    "function entry() local result = helper(); return result end; "
+    "function run() local ok, message = coroutine.resume(coroutine.create(entry)); "
+    "if not ok then error(message) end end; co = coroutine.create(entry)", "/entry.lua")));
+  auto invoked = context.invokePath<int>("run");
+  ASSERT_FALSE(invoked);
+  std::string message = invoked.error().what();
+  EXPECT_NE(message.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_NE(message.find("coroutine-helper-provider"), std::string::npos);
+  EXPECT_NE(message.find("coroutine-entry-provider"), std::string::npos);
+  ASSERT_TRUE(invoked.error().diagnosticSummary());
+  EXPECT_EQ(invoked.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(invoked.error().diagnosticSummary()->reason.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_EQ(invoked.error().diagnosticSummary()->reason.find('\n'), std::string::npos);
+  ASSERT_FALSE(invoked.error().diagnosticSummary()->locations.empty());
+  EXPECT_EQ(invoked.error().diagnosticSummary()->locations.front().source, "/helper.lua");
+  EXPECT_EQ(invoked.error().diagnosticSummary()->locations.front().line, 1);
+  auto thread = context.get<LuaThread>("co");
+  ASSERT_TRUE(thread);
+  auto resumed = thread->resume<int>();
+  ASSERT_FALSE(resumed);
+  message = resumed.error().what();
+  EXPECT_NE(message.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_NE(message.find("coroutine-helper-provider"), std::string::npos);
+  EXPECT_NE(message.find("coroutine-entry-provider"), std::string::npos);
+  ASSERT_TRUE(resumed.error().diagnosticSummary());
+  EXPECT_EQ(resumed.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(resumed.error().diagnosticSummary()->reason.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_EQ(resumed.error().diagnosticSummary()->reason.find('\n'), std::string::npos);
+  ASSERT_FALSE(resumed.error().diagnosticSummary()->locations.empty());
+  EXPECT_EQ(resumed.error().diagnosticSummary()->locations.front().source, "/helper.lua");
+  EXPECT_EQ(resumed.error().diagnosticSummary()->locations.front().line, 1);
+}
+
+TEST(LuaTest, RuntimeSummaryUsesLiveFailureAndCallerLinesBeforeTraceback) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  ASSERT_TRUE(context.load(
+      "function fail()\n"
+      "  local unavailable\n"
+      "  return unavailable.field\n"
+      "end\n"
+      "function entry()\n"
+      "  local result = fail()\n"
+      "  return result\n"
+      "end", "/live-lines.lua"));
+  auto failure = context.invokePath("entry");
+  ASSERT_FALSE(failure);
+  auto const& summary = failure.error().diagnosticSummary();
+  ASSERT_TRUE(summary);
+  EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(summary->reason.find("unavailable"), std::string::npos);
+  EXPECT_EQ(summary->reason.find('\n'), std::string::npos);
+  ASSERT_EQ(summary->locations.size(), 2u);
+  EXPECT_EQ(summary->locations[0].source, "/live-lines.lua");
+  EXPECT_EQ(summary->locations[0].line, 3);
+  EXPECT_EQ(summary->locations[1].source, "/live-lines.lua");
+  EXPECT_EQ(summary->locations[1].line, 6);
+}
+
+TEST(LuaTest, SummaryPreservesTypedNativeCauseThroughNestedCaughtStringErrors) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine->createFunction([]() -> std::expected<void, StarException> {
+    return std::unexpected(StarException("outer-native-context",
+        ExceptionDiagnostic(LuaConversionException("deepest-native-marker", false))));
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("nativeFailure", *native));
+  auto nested = engine->createFunction([&]() -> std::expected<void, StarException> {
+    auto result = context.invokePath("inner");
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+    return {};
+  });
+  ASSERT_TRUE(nested);
+  ASSERT_TRUE(context.set("nativeNested", *nested));
+  ASSERT_TRUE(context.load(
+      "function inner() local result = nativeFailure(); return result end\n"
+      "function entry() local ok, message = pcall(nativeNested); "
+      "assert(not ok and type(message) == 'string'); error(message) end\n"
+      "function identityRethrow() local ok, message = pcall(nativeFailure); "
+      "assert(not ok and type(message) == 'string'); error(message, 0) end",
+      "/native-summary.lua"));
+  for (String const& entry : {String("entry"), String("identityRethrow")}) {
+    auto failure = context.invokePath(entry);
+    ASSERT_FALSE(failure);
+    EXPECT_TRUE(failure.error().is<LuaException>());
+    auto const& summary = failure.error().diagnosticSummary();
+    ASSERT_TRUE(summary);
+    EXPECT_EQ(summary->kind, ExceptionSummaryKind::Native);
+    EXPECT_EQ(summary->reason, "deepest-native-marker");
+    EXPECT_NE(std::string(failure.error().what()).find("outer-native-context"), std::string::npos);
+    EXPECT_NE(std::string(failure.error().what()).find("deepest-native-marker"), std::string::npos);
+    EXPECT_TRUE(std::ranges::any_of(summary->locations, [](auto const& location) {
+      return location.source == "/native-summary.lua" && location.line > 0;
+    }));
+  }
+}
+
+TEST(LuaTest, CaughtNativeSummariesDoNotLeakToOtherErrorsOrLaterCalls) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine->createFunction([]() -> std::expected<void, StarException> {
+    return std::unexpected(LuaConversionException("caught-native-marker", false));
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("nativeFailure", *native));
+  ASSERT_TRUE(context.load(
+      "function caughtSuccess() local ok, message = pcall(nativeFailure); "
+      "return not ok and type(message) == 'string' end\n"
+      "function unrelated() error('unrelated-lua-marker') end\n"
+      "function caughtThenUnrelated() for i = 1, 100 do pcall(nativeFailure) end; unrelated() end\n"
+      "function transformed() local ok, message = pcall(nativeFailure); "
+      "error('not-a-location-prefix:' .. message, 0) end",
+      "/caught-summary.lua"));
+  EXPECT_EQ(context.invokePath<bool>("caughtSuccess"), true);
+  for (String const& entry : {String("unrelated"), String("caughtThenUnrelated"), String("unrelated")}) {
+    auto failure = context.invokePath(entry);
+    ASSERT_FALSE(failure);
+    auto const& summary = failure.error().diagnosticSummary();
+    ASSERT_TRUE(summary);
+    EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
+    EXPECT_NE(summary->reason.find("unrelated-lua-marker"), std::string::npos);
+    EXPECT_EQ(summary->reason.find("caught-native-marker"), std::string::npos);
+    EXPECT_EQ(summary->reason.find('\n'), std::string::npos);
+    EXPECT_EQ(std::string(failure.error().what()).find("caught-native-marker"), std::string::npos);
+  }
+  auto transformed = context.invokePath("transformed");
+  ASSERT_FALSE(transformed);
+  ASSERT_TRUE(transformed.error().diagnosticSummary());
+  EXPECT_EQ(transformed.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_TRUE(transformed.error().diagnosticSummary()->reason.starts_with("not-a-location-prefix:"));
+  EXPECT_EQ(context.invokePath<bool>("caughtSuccess"), true);
+}
+
+TEST(LuaTest, CoroutineNativeSummariesRemainIdentityBoundAcrossResumeAndYield) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine->createFunction([]() -> std::expected<void, StarException> {
+    return std::unexpected(LuaConversionException("coroutine-native-marker", false));
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("nativeFailure", *native));
+  ASSERT_TRUE(context.load(
+      "function coEntry() nativeFailure() end\n"
+      "function rethrow() local ok, message = coroutine.resume(coroutine.create(coEntry)); "
+      "assert(not ok and type(message) == 'string'); error(message) end\n"
+      "function unrelated() local ok, message = coroutine.resume(coroutine.create(coEntry)); "
+      "assert(not ok and type(message) == 'string'); error('coroutine-unrelated-marker') end\n"
+      "co = coroutine.create(coEntry)\n"
+      "yielding = coroutine.create(function() pcall(nativeFailure); coroutine.yield('caught'); "
+      "error('after-yield-unrelated-marker') end)",
+      "/coroutine-native.lua"));
+  auto luaFailure = context.invokePath("rethrow");
+  ASSERT_FALSE(luaFailure);
+  ASSERT_TRUE(luaFailure.error().diagnosticSummary());
+  EXPECT_EQ(luaFailure.error().diagnosticSummary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(luaFailure.error().diagnosticSummary()->reason, "coroutine-native-marker");
+  auto thread = context.get<LuaThread>("co");
+  ASSERT_TRUE(thread);
+  auto hostFailure = thread->resume<LuaValue>();
+  ASSERT_FALSE(hostFailure);
+  ASSERT_TRUE(hostFailure.error().diagnosticSummary());
+  EXPECT_EQ(hostFailure.error().diagnosticSummary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(hostFailure.error().diagnosticSummary()->reason, "coroutine-native-marker");
+  ASSERT_FALSE(hostFailure.error().diagnosticSummary()->locations.empty());
+  EXPECT_EQ(hostFailure.error().diagnosticSummary()->locations.front().source, "/coroutine-native.lua");
+  EXPECT_EQ(hostFailure.error().diagnosticSummary()->locations.front().line, 1);
+  auto unrelated = context.invokePath("unrelated");
+  ASSERT_FALSE(unrelated);
+  ASSERT_TRUE(unrelated.error().diagnosticSummary());
+  EXPECT_EQ(unrelated.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(unrelated.error().diagnosticSummary()->reason.find("coroutine-unrelated-marker"), std::string::npos);
+  auto yielding = context.get<LuaThread>("yielding");
+  ASSERT_TRUE(yielding);
+  auto yielded = yielding->resume<String>();
+  ASSERT_TRUE(yielded);
+  ASSERT_TRUE(*yielded);
+  EXPECT_EQ(**yielded, "caught");
+  auto afterYield = yielding->resume<LuaValue>();
+  ASSERT_FALSE(afterYield);
+  ASSERT_TRUE(afterYield.error().diagnosticSummary());
+  EXPECT_EQ(afterYield.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(afterYield.error().diagnosticSummary()->reason.find("after-yield-unrelated-marker"), std::string::npos);
+  EXPECT_EQ(afterYield.error().diagnosticSummary()->reason.find("coroutine-native-marker"), std::string::npos);
+}
+
+TEST(LuaTest, CoroutineNumericErrorsKeepTheirOriginalReason) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto context = (*created)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load("numericError = coroutine.create(function() error(42, 0) end)"));
+  auto coroutine = context->get<LuaThread>("numericError");
+  ASSERT_TRUE(coroutine);
+  auto result = coroutine->resume<LuaValue>();
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<LuaException>());
+  ASSERT_TRUE(result.error().diagnosticSummary());
+  EXPECT_EQ(result.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(result.error().diagnosticSummary()->reason, "42");
+}
+
 TEST(LuaTest, Eval) {
   auto luaEngineResult = LuaEngine::create();
   ASSERT_TRUE(luaEngineResult);
@@ -1054,6 +1426,10 @@ TEST(LuaTest, Limits) {
     auto failure = context.invokePath("call1");
     ASSERT_FALSE(failure);
     EXPECT_TRUE(failure.error().is<LuaRecursionLimitReached>());
+    ASSERT_TRUE(failure.error().diagnosticSummary());
+    EXPECT_EQ(failure.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+    EXPECT_EQ(failure.error().diagnosticSummary()->category, "LuaRecursionLimitReached");
+    EXPECT_EQ(failure.error().diagnosticSummary()->reason, "Lua recursion limit reached");
   };
 
   // Make sure the context still functions properly after these previous

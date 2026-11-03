@@ -77,7 +77,18 @@ const char* StarException::what() const noexcept {
   return m_whatBuffer.c_str();
 }
 
-StarException::StarException(std::string_view type, std::string message, bool genStackTrace) noexcept {
+StarException::StarException(std::string_view type, std::string message, bool genStackTrace) noexcept
+  : StarException(type, std::move(message), genStackTrace, {}) {}
+
+StarException::StarException(std::string_view type, std::string message, bool genStackTrace,
+    std::shared_ptr<ExceptionSummary const> inheritedSummary) noexcept
+  : m_summary(std::move(inheritedSummary)) {
+  if (!m_summary) {
+    ExceptionSummary summary;
+    summary.category = type;
+    summary.reason = message;
+    m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
+  }
 #ifdef STAR_USE_CPPTRACE
   auto printException = [](std::ostream& os, bool fullStacktrace, std::string_view type, std::string const& message, std::string const& stack) {
 #else
@@ -107,7 +118,7 @@ StarException::StarException(std::string_view type, std::string message, bool ge
 }
 
 StarException::StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept
-  : StarException(type, std::move(message), true) {
+  : StarException(type, std::move(message), true, std::move(cause.m_summary)) {
   auto printException = [](std::ostream& os, bool fullStacktrace, std::function<void(std::ostream&, bool)> const& self, std::function<void(std::ostream&, bool)> const& cause) {
     self(os, fullStacktrace);
     os << std::endl << "Caused by: ";
@@ -118,7 +129,7 @@ StarException::StarException(std::string_view type, std::string message, Excepti
 }
 
 ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
-  : m_printException(exception.m_printException) {}
+  : m_printException(exception.m_printException), m_summary(exception.m_summary) {}
 
 
 std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace) {

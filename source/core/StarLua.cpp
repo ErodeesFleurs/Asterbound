@@ -33,28 +33,6 @@ struct LuaStackRestore {
 };
 
 
-// Only called inside an ownership scope which ends before lua_error.
-void pushCallbackError(lua_State* state, StarException const& error, void* instructionKey, void* recursionKey) {
-  if (error.is<LuaInstructionLimitReached>()) {
-    lua_pushlightuserdata(state, instructionKey);
-  } else if (error.is<LuaRecursionLimitReached>()) {
-    lua_pushlightuserdata(state, recursionKey);
-  } else {
-    auto diagnostic = printException(ExceptionDiagnostic(error), true);
-    lua_pushcfunction(state, [](lua_State* state) {
-      auto diagnostic = static_cast<char const*>(lua_touserdata(state, 1));
-      luaL_where(state, 2);
-      lua_pushstring(state, diagnostic);
-      lua_concat(state, 2);
-      return 1;
-    });
-    lua_pushlightuserdata(state, const_cast<char*>(diagnostic.c_str()));
-    // Either the diagnostic or a finalizer failure remains as the Lua error
-    // payload. Both must reach lua_error, after diagnostic ownership ends.
-    (void)lua_pcall(state, 1, 1, 0);
-  }
-}
-
 std::expected<void, StarException> validateNativeLuaValue(lua_State* state, int index) {
   int type = lua_type(state, index);
   if (type == LUA_TLIGHTUSERDATA)
@@ -158,8 +136,8 @@ std::expected<void, StarException> LuaStack::load(LuaStackValue environment, std
   LuaStackRestore restore(m_state);
   if (!lua_checkstack(m_state, 2))
     return std::unexpected(LuaException("Exhausted the Lua stack while loading a script"));
-  auto loaded = m_engine.handleError(
-    m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()));
+  auto loaded = m_engine.handleSourceError(
+    m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()), name);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
   lua_pushvalue(m_state, environment.index());
@@ -548,18 +526,44 @@ std::expected<LuaEnginePtr, StarException> LuaEngine::create(bool safe) {
     auto& self = luaEngine(state);
     bool safe = lua_toboolean(state, 1);
     lua_settop(state, 0);
+    lua_createtable(state, 64, 0);
+    self.m_diagnosticStringsRegistryId = luaL_ref(state, LUA_REGISTRYINDEX);
 
   // Create the common message handler function for pcall to print a better
   // message with a traceback
   lua_pushcfunction(state, [](lua_State* state) {
-      // Don't modify the error if it is one of the special limit errrors
+      auto& self = luaEngine(state);
+      if (lua_type(state, 1) == LUA_TNUMBER) {
+        // Match traceback's numeric coercion before owning host metadata.
+        lua_pushcfunction(state, [](lua_State* state) {
+          lua_tolstring(state, 1, nullptr);
+          return 1;
+        });
+        lua_pushvalue(state, 1);
+        if (lua_pcall(state, 1, 1, 0) != LUA_OK)
+          return lua_error(state);
+        lua_replace(state, 1);
+      }
+      {
+        auto summary = std::make_shared<ExceptionSummary const>(
+            self.captureDiagnostic(state, state, 1, ExceptionSummaryKind::ScriptRuntime));
+        self.rememberDiagnostic(state, 1, std::move(summary));
+      }
+      // Keep limit sentinels untouched, including their native error types.
       if (lua_islightuserdata(state, 1)) {
-        void* error = lua_touserdata(state, -1);
+        void* error = lua_touserdata(state, 1);
         if (error == &s_luaInstructionLimitExceptionKey || error == &s_luaRecursionLimitExceptionKey)
           return 1;
       }
 
       luaL_traceback(state, state, lua_tostring(state, 1), 0);
+      {
+        auto summary = self.findDiagnostic(state, 1);
+        if (summary) {
+          self.appendSourceDiagnostics(state, state, *summary);
+          self.rememberDiagnostic(state, -1, std::move(summary));
+        }
+      }
       lua_remove(state, 1);
       return 1;
     });
@@ -794,7 +798,7 @@ std::expected<ByteArray, StarException> LuaEngine::compile(std::span<char const>
   LuaStackRestore stack(m_state);
   if (!lua_checkstack(m_state, 2))
     return std::unexpected(LuaException("Exhausted the Lua stack while compiling a script"));
-  auto loaded = handleError(m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()));
+  auto loaded = handleSourceError(m_state, luaL_loadbuffer(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str()), name);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
 
@@ -816,6 +820,10 @@ std::expected<ByteArray, StarException> LuaEngine::compile(String const& content
 
 std::expected<ByteArray, StarException> LuaEngine::compile(ByteArray const& contents, String const& name) {
   return compile(contents.span(), name);
+}
+
+void LuaEngine::setSourceResolver(SourceResolver resolver) {
+  m_sourceResolver = std::move(resolver);
 }
 
 lua_Debug const& LuaEngine::debugInfo(int level, String const& what) {
@@ -1110,18 +1118,183 @@ void* LuaEngine::allocate(void*, void* ptr, std::size_t oldSize, std::size_t new
   }
 }
 
+void LuaEngine::pushCallbackError(lua_State* state, StarException const& error) {
+  if (error.is<LuaInstructionLimitReached>()) {
+    lua_pushlightuserdata(state, &s_luaInstructionLimitExceptionKey);
+  } else if (error.is<LuaRecursionLimitReached>()) {
+    lua_pushlightuserdata(state, &s_luaRecursionLimitExceptionKey);
+  } else {
+    auto diagnostic = printException(ExceptionDiagnostic(error), true);
+    lua_pushcfunction(state, [](lua_State* state) {
+      auto diagnostic = static_cast<char const*>(lua_touserdata(state, 1));
+      luaL_where(state, 2);
+      lua_pushstring(state, diagnostic);
+      lua_concat(state, 2);
+      return 1;
+    });
+    lua_pushlightuserdata(state, const_cast<char*>(diagnostic.c_str()));
+    // A finalizer/allocation failure must not inherit the callback's cause.
+    if (lua_pcall(state, 1, 1, 0) != LUA_OK)
+      return;
+  }
+  rememberDiagnostic(state, -1, error.diagnosticSummary());
+}
+
+std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* state, int index) const {
+  int type = lua_type(state, index);
+  std::size_t length = 0;
+  void const* identity = type == LUA_TSTRING ? lua_tolstring(state, index, &length)
+      : type == LUA_TLIGHTUSERDATA ? lua_touserdata(state, index) : nullptr;
+  if (!identity)
+    return {};
+  for (std::size_t i = 0; i < m_diagnosticCount; ++i) {
+    auto const& entry = m_diagnosticTransport[(m_nextDiagnostic + m_diagnosticTransport.size() - i - 1)
+        % m_diagnosticTransport.size()];
+    if (entry.type == type && entry.identity == identity)
+      return entry.summary;
+  }
+  if (type != LUA_TSTRING)
+    return {};
+  // Lua's error(message) can prepend a location to a caught native string.
+  // Accept only a prefix verified against a live frame and the complete pinned
+  // payload, never a guessed suffix or a parsed flattened exception/traceback.
+  std::string_view message(static_cast<char const*>(identity), length);
+  lua_Debug frame;
+  for (int level = 0; lua_getstack(state, level, &frame); ++level) {
+    if (!lua_getinfo(state, "Sl", &frame) || frame.currentline <= 0)
+      continue;
+    auto prefix = std::format("{}:{}: ", frame.short_src, frame.currentline);
+    if (!message.starts_with(prefix))
+      continue;
+    auto payload = message.substr(prefix.size());
+    for (std::size_t i = 0; i < m_diagnosticCount; ++i) {
+      auto const& entry = m_diagnosticTransport[(m_nextDiagnostic + m_diagnosticTransport.size() - i - 1)
+          % m_diagnosticTransport.size()];
+      if (entry.type == LUA_TSTRING && entry.length == payload.size()
+          && payload == std::string_view(static_cast<char const*>(entry.identity), entry.length))
+        return entry.summary;
+    }
+  }
+  return {};
+}
+
+void LuaEngine::rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary) {
+  if (!summary || m_diagnosticStringsRegistryId == LUA_NOREF || !lua_checkstack(state, 4))
+    return;
+  int type = lua_type(state, index);
+  std::size_t length = 0;
+  void const* identity = type == LUA_TSTRING ? lua_tolstring(state, index, &length)
+      : type == LUA_TLIGHTUSERDATA ? lua_touserdata(state, index) : nullptr;
+  if (!identity)
+    return;
+  index = lua_absindex(state, index);
+  struct Input {
+    int registry;
+    std::size_t slot;
+  } input{m_diagnosticStringsRegistryId, m_nextDiagnostic};
+  lua_pushcfunction(state, [](lua_State* state) {
+    auto& input = *static_cast<Input*>(lua_touserdata(state, 2));
+    lua_rawgeti(state, LUA_REGISTRYINDEX, input.registry);
+    lua_pushvalue(state, 1);
+    lua_rawseti(state, -2, static_cast<lua_Integer>(input.slot + 1));
+    return 0;
+  });
+  lua_pushvalue(state, index);
+  lua_pushlightuserdata(state, &input);
+  int result = lua_pcall(state, 2, 0, 0);
+  if (result != LUA_OK) {
+    lua_pop(state, 1);
+    return;
+  }
+  m_diagnosticTransport[m_nextDiagnostic] = {identity, type, length, std::move(summary)};
+  m_nextDiagnostic = (m_nextDiagnostic + 1) % m_diagnosticTransport.size();
+  m_diagnosticCount = std::min(m_diagnosticCount + 1, m_diagnosticTransport.size());
+}
+
+ExceptionSummary LuaEngine::captureDiagnostic(lua_State* from, lua_State* state, int index,
+    ExceptionSummaryKind kind) const {
+  auto inherited = kind == ExceptionSummaryKind::ScriptRuntime ? findDiagnostic(state, index) : nullptr;
+  ExceptionSummary summary;
+  if (inherited) {
+    summary = *inherited;
+  } else {
+    summary.kind = kind;
+    summary.category = kind == ExceptionSummaryKind::ScriptSyntax ? "Lua syntax error" : "Lua runtime error";
+    if (lua_type(state, index) == LUA_TSTRING) {
+      std::size_t length = 0;
+      auto reason = lua_tolstring(state, index, &length);
+      summary.reason.assign(reason, length);
+    } else {
+      summary.reason = "<unknown error>";
+    }
+  }
+  if (lua_islightuserdata(state, index)) {
+    auto sentinel = lua_touserdata(state, index);
+    if (sentinel == &s_luaInstructionLimitExceptionKey || sentinel == &s_luaRecursionLimitExceptionKey) {
+      summary.kind = ExceptionSummaryKind::ScriptRuntime;
+      summary.category = sentinel == &s_luaInstructionLimitExceptionKey
+          ? "LuaInstructionLimitReached" : "LuaRecursionLimitReached";
+      summary.reason = sentinel == &s_luaInstructionLimitExceptionKey
+          ? "Lua instruction limit reached" : "Lua recursion limit reached";
+    }
+  }
+  lua_Debug frame;
+  for (int level = 0; lua_getstack(from, level, &frame); ++level) {
+    if (!lua_getinfo(from, "Sl", &frame) || !frame.source || std::string_view(frame.what) == "C")
+      continue;
+    std::string source(frame.source, frame.srclen);
+    auto existing = std::ranges::find_if(summary.locations, [&](auto const& location) {
+      return location.source == source;
+    });
+    if (std::ranges::any_of(summary.locations, [&](auto const& location) {
+          return location.source == source && location.line == frame.currentline;
+        }))
+      continue;
+    auto provider = existing != summary.locations.end() ? existing->provider : sourceDiagnostic(String(source)).takeUtf8();
+    summary.locations.push_back({std::move(source), frame.currentline, std::move(provider)});
+  }
+  return summary;
+}
+
+void LuaEngine::beginDiagnosticScope() {
+  if (m_diagnosticDepth++ != 0 || m_diagnosticCount == 0)
+    return;
+  // Only a previous failure makes this loop run. Successful calls allocate no
+  // summary metadata and do not scan an empty transport.
+  bool clearRoots = lua_checkstack(m_state, 2);
+  if (clearRoots)
+    lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_diagnosticStringsRegistryId);
+  for (std::size_t i = 0; i < m_diagnosticCount; ++i) {
+    m_diagnosticTransport[i] = {};
+    if (clearRoots) {
+      lua_pushnil(m_state);
+      lua_rawseti(m_state, -2, static_cast<lua_Integer>(i + 1));
+    }
+  }
+  if (clearRoots)
+    lua_pop(m_state, 1);
+  m_diagnosticCount = 0;
+  m_nextDiagnostic = 0;
+}
+
+void LuaEngine::endDiagnosticScope() {
+  --m_diagnosticDepth;
+}
+
 std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int res) {
   if (res == LUA_OK)
     return {};
+  auto summary = captureDiagnostic(state, state, -1, res == LUA_ERRSYNTAX
+      ? ExceptionSummaryKind::ScriptSyntax : ExceptionSummaryKind::ScriptRuntime);
   if (lua_islightuserdata(state, -1)) {
     void* error = lua_touserdata(state, -1);
     if (error == &s_luaInstructionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaInstructionLimitReached());
+      return std::unexpected(LuaInstructionLimitReached().withSummary(std::move(summary)));
     }
     if (error == &s_luaRecursionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaRecursionLimitReached());
+      return std::unexpected(LuaRecursionLimitReached().withSummary(std::move(summary)));
     }
   }
   if (lua_type(state, -1) == LUA_TNUMBER) {
@@ -1136,25 +1309,97 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
     int converted = lua_pcall(state, 1, 1, 0);
     if (converted != LUA_OK)
       res = converted;
+    summary = captureDiagnostic(state, state, -1, ExceptionSummaryKind::ScriptRuntime);
   }
   String error = lua_type(state, -1) == LUA_TSTRING
       ? strf("Error code {}, {}", res, lua_tostring(state, -1))
       : strf("Error code {}, <unknown error>", res);
   lua_pop(state, 1);
   if (error.utf8().ends_with("<eof>"))
-    return std::unexpected(LuaIncompleteStatementException(error.takeUtf8()));
-  return std::unexpected(LuaException(error.takeUtf8()));
+    return std::unexpected(LuaIncompleteStatementException(error.takeUtf8()).withSummary(std::move(summary)));
+  return std::unexpected(LuaException(error.takeUtf8()).withSummary(std::move(summary)));
+}
+
+std::expected<void, StarException> LuaEngine::handleSourceError(lua_State* state, int res, String const& source) {
+  auto result = handleError(state, res);
+  if (!result) {
+    auto summary = *result.error().diagnosticSummary();
+    auto diagnostic = sourceDiagnostic(source);
+    if (std::ranges::none_of(summary.locations, [&](auto const& location) { return location.source == source.utf8(); }))
+      summary.locations.insert(summary.locations.begin(), {source.utf8(), -1, diagnostic.utf8()});
+    auto error = std::move(result.error()).withSummary(std::move(summary));
+    if (!diagnostic.empty())
+      error = std::move(error).withContext(strf("Lua source '{}': {}", source, diagnostic));
+    return std::unexpected(std::move(error));
+  }
+  return result;
 }
 
 int LuaEngine::pcallWithTraceback(lua_State* state, int nargs, int nresults) {
   releaseHandles(state);
+  beginDiagnosticScope();
   int msghPosition = lua_gettop(state) - nargs;
   lua_rawgeti(state, LUA_REGISTRYINDEX, m_pcallTracebackMessageHandlerRegistryId);
   lua_insert(state, msghPosition);
   int ret = lua_pcall(state, nargs, nresults, msghPosition);
   lua_remove(state, msghPosition);
   releaseHandles(state);
+  endDiagnosticScope();
   return ret;
+}
+
+String LuaEngine::sourceDiagnostic(String const& source) const noexcept {
+  if (!m_sourceResolver || source.empty())
+    return {};
+  auto diagnostic = m_sourceResolver(source);
+  if (diagnostic)
+    return std::move(*diagnostic);
+  return {};
+}
+
+void LuaEngine::appendSourceDiagnostics(lua_State* from, lua_State* to, ExceptionSummary const& summary) const noexcept {
+  if (!m_sourceResolver)
+    return;
+  String diagnostics;
+  StringSet sources;
+  lua_Debug frame;
+  for (int level = 0; lua_getstack(from, level, &frame); ++level) {
+    // "S" only reads the live frame, without pushing a function or invoking Lua.
+    if (!lua_getinfo(from, "S", &frame) || !frame.source)
+      continue;
+    String source(std::string_view(frame.source, frame.srclen));
+    if (!sources.insert(source).second)
+      continue;
+    auto location = std::ranges::find_if(summary.locations, [&](auto const& location) {
+      return location.source == source.utf8();
+    });
+    auto provider = location == summary.locations.end() ? sourceDiagnostic(source) : String(location->provider);
+    if (provider.empty())
+      continue;
+    diagnostics += "\n  ";
+    diagnostics += source;
+    diagnostics += ": ";
+    diagnostics += provider;
+  }
+  if (diagnostics.empty() || !lua_checkstack(to, 3))
+    return;
+  diagnostics = "\nLua source providers:" + diagnostics;
+  // Keep host ownership outside the protected C callback. Any Lua allocation
+  // or finalizer error during the push/concat returns through pcall, not through
+  // C++ destructors. Keep the original traceback if enrichment fails.
+  lua_pushcfunction(to, [](lua_State* state) {
+    auto diagnostic = static_cast<String const*>(lua_touserdata(state, 2));
+    lua_pushvalue(state, 1);
+    lua_pushlstring(state, diagnostic->utf8().data(), diagnostic->utf8().size());
+    lua_concat(state, 2);
+    return 1;
+  });
+  lua_pushvalue(to, -2);
+  lua_pushlightuserdata(to, &diagnostics);
+  if (lua_pcall(to, 2, 1, 0) == LUA_OK)
+    lua_replace(to, -2);
+  else
+    lua_pop(to, 1);
 }
 
 int LuaEngine::coresumeWithTraceback(lua_State* state) {
@@ -1196,10 +1441,24 @@ void LuaEngine::propagateErrorWithTraceback(lua_State* from, lua_State* to) {
   lua_xmove(from, to, 1);
   lua_pushcfunction(to, [](lua_State* state) {
     auto from = static_cast<lua_State*>(lua_touserdata(state, 2));
-    if (auto error = lua_tostring(state, 1))
+    auto& self = luaEngine(state);
+    if (lua_type(state, 1) == LUA_TNUMBER)
+      lua_tolstring(state, 1, nullptr);
+    {
+      auto summary = std::make_shared<ExceptionSummary const>(
+          self.captureDiagnostic(from, state, 1, ExceptionSummaryKind::ScriptRuntime));
+      self.rememberDiagnostic(state, 1, std::move(summary));
+    }
+    if (auto error = lua_tostring(state, 1)) {
       luaL_traceback(state, from, error, 0);
-    else
+      auto summary = self.findDiagnostic(state, 1);
+      if (summary) {
+        self.appendSourceDiagnostics(from, state, *summary);
+        self.rememberDiagnostic(state, -1, std::move(summary));
+      }
+    } else {
       lua_pushvalue(state, 1);
+    }
     return 1;
   });
   lua_insert(to, -2);
@@ -1286,7 +1545,7 @@ std::expected<void, StarException> LuaEngine::setContextRequire(int handleIndex,
       if (result)
         return 0;
       lua_settop(state, 0);
-      pushCallbackError(state, result.error(), &s_luaInstructionLimitExceptionKey, &s_luaRecursionLimitExceptionKey);
+      luaEngine(state).pushCallbackError(state, result.error());
     }
     // Every context, value and diagnostic has been released before longjmp.
     return lua_error(state);
@@ -1467,7 +1726,7 @@ std::expected<LuaFunction, StarException> LuaEngine::createWrappedFunction(LuaDe
       if (result)
         return *result;
       lua_settop(state, 0);
-      pushCallbackError(state, result.error(), &s_luaInstructionLimitExceptionKey, &s_luaRecursionLimitExceptionKey);
+      self.pushCallbackError(state, result.error());
     }
     return lua_error(state);
   };
@@ -1515,7 +1774,7 @@ std::expected<LuaFunction, StarException> LuaEngine::createFunctionFromSource(in
   LuaStackRestore stack(m_state);
   if (!lua_checkstack(m_state, 2))
     return std::unexpected(LuaException("Exhausted the Lua stack while loading a function"));
-  auto loaded = handleError(m_state, luaL_loadbufferx(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str(), "t"));
+  auto loaded = handleSourceError(m_state, luaL_loadbufferx(m_state, contents.data(), contents.size(), name.empty() ? nullptr : name.utf8().c_str(), "t"), name);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
 

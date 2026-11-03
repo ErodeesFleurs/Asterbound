@@ -73,7 +73,7 @@ private:
   public:
     explicit ScriptCache(Root& root) : m_root(root) {}
     [[nodiscard]] std::expected<std::shared_ptr<ByteArray const>, StarException>
-    script(LuaEngine& engine, String const& path, std::uint64_t revision);
+    script(LuaEngine& engine, String const& path, std::uint64_t revision, StringMap<String>& sourceDiagnostics);
     bool scriptLoaded(String const& path) const;
     void clear();
     std::uint64_t revision() const;
@@ -91,6 +91,7 @@ private:
   std::uint64_t m_generation = 0;
   StringMap<LuaCallbacks> m_luaCallbacks;
   std::shared_ptr<ScriptCache> m_scriptCache;
+  std::shared_ptr<StringMap<String>> m_sourceDiagnostics;
 
   std::shared_ptr<Listener> m_rootReloadListener;
   ListenerSubscription m_rootReloadSubscription;

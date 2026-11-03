@@ -92,6 +92,12 @@ std::expected<void, StarException> LuaRoot::restart() {
   if (!engine)
     return std::unexpected(std::move(engine.error()));
   (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(m_root));
+  auto sourceDiagnostics = std::make_shared<StringMap<String>>();
+  (*engine)->setSourceResolver([sourceDiagnostics](String const& source) -> std::expected<String, StarException> {
+    if (auto diagnostic = sourceDiagnostics->maybeRef(source))
+      return diagnostic->get();
+    return String();
+  });
   (*engine)->setImageResolver([&root = m_root](String const& path) -> std::expected<std::shared_ptr<Image const>, StarException> {
     auto assets = root.assets();
     if (!assets)
@@ -128,6 +134,7 @@ std::expected<void, StarException> LuaRoot::restart() {
   (*engine)->setProfilingEnabled(*profilingEnabled);
   (*engine)->setInstructionMeasureInterval(*measureInterval);
   m_luaEngine = std::move(*engine);
+  m_sourceDiagnostics = std::move(sourceDiagnostics);
   ++m_generation;
   return {};
 }
@@ -199,8 +206,9 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
     return std::unexpected(std::move(created.error()));
   auto context = std::move(*created);
   auto cache = m_scriptCache;
+  auto sourceDiagnostics = m_sourceDiagnostics;
   if (auto required = context.setRequireFunction(
-        [cache, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
+        [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
          loading = std::vector<String>{}](LuaStackValue environment,
                                           StringView module) mutable -> std::expected<void, StarException> {
           if (loaded.contains(module))
@@ -215,12 +223,12 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
             }
             return std::unexpected(LuaException::format("Cyclic Lua require: {} -> {}", chain, path));
           }
-          auto script = cache->script(environment.stack().engine(), path, revision);
+          auto script = cache->script(environment.stack().engine(), path, revision, *sourceDiagnostics);
           if (!script)
             return std::unexpected(std::move(script.error()));
           loading.push_back(path);
           auto popped = finally([&] { loading.pop_back(); });
-          if (auto result = environment.stack().load(environment, (*script)->span()); !result)
+          if (auto result = environment.stack().load(environment, (*script)->span(), path); !result)
             return std::unexpected(std::move(result.error()));
           if (cache->revision() != revision)
             return std::unexpected(
@@ -294,7 +302,8 @@ LuaEngine& LuaRoot::luaEngine() const {
 }
 
 std::expected<std::shared_ptr<ByteArray const>, StarException>
-LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_t revision) {
+LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_t revision,
+                            StringMap<String>& sourceDiagnostics) {
   auto stale = [&] {
     return LuaException::format("Lua script cache changed before loading '{}'; recreate the context", path);
   };
@@ -308,9 +317,38 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
+  // Capture the indexed provider before reading or compiling can fail.
+  // Hot reload keeps the asset index stable; snapshots survive cache clearing
+  // and are owned separately from Root by the engine's resolver.
+  if (!sourceDiagnostics.contains(path)) {
+    auto descriptor = (*assets)->assetDescriptor(path);
+    if (descriptor && *descriptor) {
+      auto sourcePath = (*assets)->assetSourcePath((*descriptor)->source);
+      auto pathRef = sourcePath
+        ? std::optional<std::reference_wrapper<String const>>(std::cref(*sourcePath))
+        : std::nullopt;
+      sourceDiagnostics.set(path, String(Assets::sourceDiagnostic(*(*descriptor)->source, pathRef)));
+    }
+  }
   auto bytes = (*assets)->bytes(path);
-  if (!bytes)
+  if (!bytes) {
+    if (auto diagnostic = sourceDiagnostics.maybeRef(path)) {
+      auto summary = *bytes.error().diagnosticSummary();
+      bool found = false;
+      for (auto& location : summary.locations) {
+        if (location.source == path.utf8()) {
+          found = true;
+          if (location.provider.empty())
+            location.provider = diagnostic->get().utf8();
+        }
+      }
+      if (!found)
+        summary.locations.push_back({path.utf8(), -1, diagnostic->get().utf8()});
+      return std::unexpected(std::move(bytes.error()).withSummary(std::move(summary)).withContext(
+          strf("Lua source '{}': {}", path, diagnostic->get())));
+    }
     return std::unexpected(std::move(bytes.error()));
+  }
   auto compiled = engine.compile((*bytes)->span(), path);
   if (!compiled)
     return std::unexpected(std::move(compiled.error()));

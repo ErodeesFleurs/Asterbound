@@ -261,6 +261,11 @@ public:
 
   std::optional<String> assetSourcePath(std::shared_ptr<AssetSource> const& source) const;
 
+  // Describe a held provider without resolving a possibly overridden virtual path.
+  // Missing or invalid optional metadata falls back to the physical source path.
+  static std::string sourceDiagnostic(AssetSource const& source,
+      std::optional<std::reference_wrapper<String const>> sourcePath);
+
   // Scans for all assets with the given suffix in any directory.
   [[nodiscard]] std::expected<StringList, StarException> scan(String const& suffix) const;
   // Scans for all assets matching both prefix and suffix (prefix may be, for

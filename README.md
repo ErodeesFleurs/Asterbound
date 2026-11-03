@@ -48,6 +48,16 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 - Rebuild Lua 5.3 bytecode. Finalizer errors become warnings; `math.random` sequences may change.
 - Text templates use `<name>` and `<<` for a literal `<`, not brace-format placeholders.
 
+### Mod error diagnostics
+
+Lua runtime errors retain their original traceback and append a deduplicated `Lua source providers` summary identifying the scripts on the failed stack, including coroutine failures. Engine-loaded scripts use their actual loaded asset provider: the mod's `friendlyName`, internal `name`, and directory or `.pak` path. Syntax and indexed-script read failures also include provider context. Missing or invalid optional metadata falls back to the source path. Chunk names remain unchanged; provider snapshots are recorded during loading, not by scanning mods every frame.
+
+JSON and image Lua patch errors identify the target asset, patch path, and the exact executing patch provider, even when another mod overrides the same virtual patch path. Asset `onLoad`/`postLoad` failures also include provider metadata. These diagnostics identify code and patch providers, not necessarily the mod that caused a conflict; they do not track configuration changes field by field. Dynamically generated code without a registered asset provider retains its original error information.
+
+Error logs present a concise, reason-first summary before `Details:`: Lua syntax/runtime failures, Lua patch syntax/runtime failures, and resource failures have separate categories, with execution phase, live script locations, and providers where available. Typed causes are retained through native callbacks and ordinary Lua rethrows; repeated wrapper contexts do not obscure the original reason. Distinct call sites remain visible. The complete original exception chain, Lua traceback and native stacks follow in the details rather than being suppressed.
+
+Native callback errors keep their string-valued Lua representation, and built-in `error`/`pcall` behavior is unchanged. Summary transport is identity-bound and bounded; errors deliberately rewritten by a script are treated as new errors unless a complete known payload with a verified live Lua location prefix is preserved. This avoids guessing a mod or reusing a previous failure's attribution.
+
 ## Building
 
 Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and [xclang](https://github.com/clice-io/xclang/releases/tag/23.1.3.6) **23.1.3.6** (LLVM **23.1.3**) with bundled libc++/`std` modules. Dependencies must use the same C++ runtime; Windows uses MinGW. GCC, Apple Clang and MSVC builds are unsupported.

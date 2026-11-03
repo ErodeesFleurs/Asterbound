@@ -95,3 +95,46 @@ TEST(ExceptionTest, ExpectedRetainsProjectErrorClassificationAndOwnership) {
   EXPECT_TRUE(retained.error().is<OutOfRangeException>());
   EXPECT_NE(std::string_view(retained.error().what()).find("stored project error"), std::string_view::npos);
 }
+
+TEST(ExceptionTest, SummaryKeepsDeepestCauseAcrossOwnedWrappersAndContexts) {
+  auto captured = [] {
+    OutOfRangeException inner("deepest-cause-marker", false);
+    IOException outer("outer-wrapper-marker", ExceptionDiagnostic(inner));
+    return ExceptionDiagnostic(std::move(outer).withContext("execution-context-marker"));
+  }();
+  ASSERT_TRUE(captured.diagnosticSummary());
+  EXPECT_EQ(captured.diagnosticSummary()->reason, "deepest-cause-marker");
+  auto brief = exceptionSummary(captured);
+  EXPECT_NE(brief.find("deepest-cause-marker"), std::string::npos);
+  EXPECT_EQ(brief.find("outer-wrapper-marker"), std::string::npos);
+  auto details = printException(captured, true);
+  EXPECT_NE(details.find("execution-context-marker"), std::string::npos);
+  EXPECT_NE(details.find("outer-wrapper-marker"), std::string::npos);
+  EXPECT_NE(details.find("deepest-cause-marker"), std::string::npos);
+}
+
+TEST(ExceptionTest, StructuredSummaryDoesNotReplaceTypedOriginalDiagnostic) {
+  OutOfRangeException original("original-detail-marker\nsecond-detail-marker", false);
+  auto originalText = printException(original, true);
+  ExceptionSummary summary;
+  summary.kind = ExceptionSummaryKind::ScriptRuntime;
+  summary.reason = "brief-reason-marker\nretained-multiline-reason";
+  summary.operation = "init";
+  summary.locations.push_back({"/scripts/failure.lua", 42, "actual-provider"});
+  auto enriched = original.withSummary(std::move(summary));
+  EXPECT_TRUE(enriched.is<OutOfRangeException>());
+  EXPECT_EQ(printException(enriched, true), originalText);
+  ASSERT_TRUE(enriched.diagnosticSummary());
+  EXPECT_EQ(enriched.diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(enriched.diagnosticSummary()->locations.front().line, 42);
+  auto brief = exceptionSummary(enriched);
+  EXPECT_NE(brief.find("brief-reason-marker"), std::string::npos);
+  EXPECT_NE(brief.find("/scripts/failure.lua:42"), std::string::npos);
+  EXPECT_NE(brief.find("actual-provider"), std::string::npos);
+  EXPECT_EQ(brief.find("retained-multiline-reason"), std::string::npos);
+  EXPECT_EQ(original.diagnosticSummary()->reason, "original-detail-marker\nsecond-detail-marker");
+  auto owned = ExceptionDiagnostic(enriched);
+  enriched = StarException("replacement-marker", false);
+  EXPECT_EQ(owned.diagnosticSummary()->operation, "init");
+  EXPECT_EQ(printException(owned, true), originalText);
+}

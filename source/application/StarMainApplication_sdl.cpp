@@ -955,7 +955,8 @@ public:
     if (imguiFrameActive)
       ImGui::EndFrame();
     if (!result)
-      if (auto logged = m_application->logger().error("Application: failed: {}", outputException(ExceptionDiagnostic(result.error()), true)); !logged)
+      if (auto logged = m_application->logger().error("Application: failed: {}\nDetails:\n{}",
+            exceptionSummary(result.error()), outputException(ExceptionDiagnostic(result.error()), true)); !logged)
         EmergencyLog::error("Application: failure logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
 
     closeAudioOutputDevice();
@@ -1673,7 +1674,8 @@ private:
 
 int runMainApplication(std::unique_ptr<Application> application, StringList cmdLineArgs) {
   auto reportError = [](StarException const& error) {
-    auto diagnostic = printException(ExceptionDiagnostic(error), true);
+    auto diagnostic = strf("{}\nDetails:\n{}", exceptionSummary(error),
+        outputException(ExceptionDiagnostic(error), true));
     EmergencyLog::error("{}", diagnostic);
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", diagnostic.c_str(), nullptr);
     return 1;
