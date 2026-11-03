@@ -177,7 +177,8 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
   std::lock_guard serviceLocker(m_mutex);
 
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
-  if (m_state->discordAvailable && m_state->discordCurrentUser) {
+  // Presence-only RPC clients can accept activities without exposing a user.
+  if (m_state->discordAvailable) {
     if (m_discordUpdatingActivity)
       return {};
 
@@ -203,7 +204,7 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
         activity.GetParty().SetId(toString(lobby->first).c_str());
 
       if (std::holds_alternative<JoinLocal>(m_joinLocation)) {
-        if (auto lobby = m_discordServerLobby) {
+        if (auto lobby = m_discordServerLobby; lobby && m_state->discordCurrentUser) {
           String joinSecret = strf("connect:discord_{}_{}_{}", m_state->discordCurrentUser->GetId(), lobby->first, lobby->second);
           if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
             return std::unexpected(std::move(logged.error()));
