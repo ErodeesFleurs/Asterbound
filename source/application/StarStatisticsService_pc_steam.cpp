@@ -29,7 +29,6 @@ namespace Star {
 
 SteamStatisticsService::SteamStatisticsService(std::shared_ptr<PcPlatformServicesState> state)
 : m_state(std::move(state)),
-  m_callbackUserStatsReceived(m_state->steamDispatch, *this, &SteamStatisticsService::onUserStatsReceived),
   m_callbackUserStatsStored(m_state->steamDispatch, *this, &SteamStatisticsService::onUserStatsStored),
   m_callbackAchievementStored(m_state->steamDispatch, *this, &SteamStatisticsService::onAchievementStored) {
   m_appId = SteamAPI_ISteamUtils_GetAppID(SteamAPI_SteamUtils());
@@ -111,7 +110,7 @@ StringSet SteamStatisticsService::achievementsUnlocked() const {
       achievements.add(achievement);
     }
   }
-  return {};
+  return achievements;
 }
 
 std::expected<void, StarException> SteamStatisticsService::refresh() {
@@ -119,10 +118,9 @@ std::expected<void, StarException> SteamStatisticsService::refresh() {
     m_error = ApplicationException("Not logged in");
     return std::unexpected(*m_error);
   }
-  if (!SteamAPI_ISteamUserStats_RequestCurrentStats(SteamAPI_SteamUserStats())) {
-    m_error = ApplicationException("Steam RequestCurrentStats was rejected");
-    return std::unexpected(*m_error);
-  }
+  // Steamworks 1.61+ preloads local stats and achievements before launch.
+  m_initialized = true;
+  m_error.reset();
   return {};
 }
 
@@ -138,22 +136,6 @@ bool SteamStatisticsService::reset() {
   return SteamAPI_ISteamUserStats_ResetAllStats(SteamAPI_SteamUserStats(), true);
 }
 
-std::expected<void, StarException> SteamStatisticsService::onUserStatsReceived(UserStatsReceived_t& callback) {
-  if (callback.m_nGameID != m_appId)
-    return {};
-
-  if (callback.m_eResult != k_EResultOK) {
-    m_error = ApplicationException::format("Steam RequestCurrentStats failed with code {}", (int)callback.m_eResult);
-    return {};
-  }
-
-  auto logged = m_state->logger.debug("Steam RequestCurrentStats successful");
-  if (!logged)
-    return std::unexpected(std::move(logged.error()));
-  m_initialized = true;
-  m_error.reset();
-  return {};
-}
 
 std::expected<void, StarException> SteamStatisticsService::onUserStatsStored(UserStatsStored_t& callback) {
   if (callback.m_nGameID != m_appId)

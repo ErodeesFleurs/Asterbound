@@ -27,8 +27,8 @@
   # title); normally the git revision the tree was built from.
   sourceIdentifier ? "unknown",
   guiSupport ? true,
-  steamSupport ? false,
-  discordSupport ? false,
+  steamSupport ? guiSupport && stdenv.hostPlatform.isx86_64,
+  discordSupport ? guiSupport && stdenv.hostPlatform.isx86_64,
   qtSupport ? false,
   withTests ? true,
   withBenchmarks ? false,

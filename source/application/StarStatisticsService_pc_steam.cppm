@@ -48,12 +48,10 @@ public:
 
 private:
   SteamStatisticsService(std::shared_ptr<PcPlatformServicesState> state);
-  std::expected<void, StarException> onUserStatsReceived(UserStatsReceived_t& callback);
   std::expected<void, StarException> onUserStatsStored(UserStatsStored_t& callback);
   std::expected<void, StarException> onAchievementStored(UserAchievementStored_t& callback);
 
   std::shared_ptr<PcPlatformServicesState> m_state;
-  SteamCallback<SteamStatisticsService, UserStatsReceived_t> m_callbackUserStatsReceived;
   SteamCallback<SteamStatisticsService, UserStatsStored_t> m_callbackUserStatsStored;
   SteamCallback<SteamStatisticsService, UserAchievementStored_t> m_callbackAchievementStored;
 

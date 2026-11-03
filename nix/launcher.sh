@@ -22,6 +22,11 @@ mods_dir="${OPENSTARBOUND_MODS:-$runtime_dir/mods}"
 storage_dir="${OPENSTARBOUND_STORAGE:-$runtime_dir/storage}"
 logs_dir="${OPENSTARBOUND_LOGS:-$runtime_dir/logs}"
 
+# Standalone launches do not inherit Steam's application identity.
+case "@binary@" in
+  */starbound) export SteamAppId="${SteamAppId:-211820}" ;;
+esac
+
 for arg in "$@"; do
   case "$arg" in
   -bootconfig | -bootconfig=* | --bootconfig | --bootconfig=*)
