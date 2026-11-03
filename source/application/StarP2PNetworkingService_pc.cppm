@@ -228,6 +228,7 @@ private:
 
   std::shared_ptr<DiscordCallbackLifetime> m_discordLifetime = std::make_shared<DiscordCallbackLifetime>();
   std::uint64_t m_discordLobbyGeneration = 0;
+  bool m_discordLobbiesAvailable = true;
   std::uint64_t m_discordConnectionGeneration = 0;
   
   List<std::pair<discord::UserId, String>> m_discordJoinRequests;

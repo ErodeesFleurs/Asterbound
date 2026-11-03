@@ -79,6 +79,42 @@ target_link_libraries (core_tests PRIVATE star_base_modules star_build_config st
 set_target_properties (core_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAND core_tests)
 
+if (STAR_BUILD_GUI AND STAR_ENABLE_DISCORD_INTEGRATION)
+  # Compile the real PC services in isolation: no Steam initialization, GUI,
+  # assets, or native Discord library. The SDK wrappers call our DiscordCreate
+  # C-ABI fixture instead. Do not link the production PC module providers here.
+  add_executable (discord_lobby_tests
+    $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
+    $<TARGET_OBJECTS:star_application>
+    gtest/gtest-all.cc core_tests_main.cpp discord_lobby_test.cpp
+    ${PROJECT_SOURCE_DIR}/application/StarP2PNetworkingService_pc.cpp
+    ${PROJECT_SOURCE_DIR}/application/StarPlatformServices_pc.cpp)
+  target_sources (discord_lobby_tests PRIVATE FILE_SET CXX_MODULES
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/application FILES
+    ${PROJECT_SOURCE_DIR}/application/StarApplication.cppm
+    ${PROJECT_SOURCE_DIR}/application/StarP2PNetworkingService_pc.cppm
+    ${PROJECT_SOURCE_DIR}/application/StarPlatformServices_pc.cppm)
+  target_include_directories (discord_lobby_tests PRIVATE
+    ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
+    ${STAR_PLATFORM_INCLUDES} ${PROJECT_SOURCE_DIR}/application
+    ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries (discord_lobby_tests PRIVATE
+    star_base_modules star_platform_modules star_build_config
+    star_vorbis_dependencies star_lua
+    $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
+  # Apply to the whole executable, including all three module interfaces.
+  if (MSVC)
+    target_compile_options (discord_lobby_tests PRIVATE /USTAR_ENABLE_STEAM_INTEGRATION)
+  else ()
+    target_compile_options (discord_lobby_tests PRIVATE -USTAR_ENABLE_STEAM_INTEGRATION)
+  endif ()
+  set_target_properties (discord_lobby_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+  add_test (NAME discord_lobby_tests
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:discord_lobby_tests>
+    COMMAND discord_lobby_tests)
+  set_tests_properties (discord_lobby_tests PROPERTIES LABELS "NoAssets;Discord")
+endif ()
+
 set(STAR_TEST_ASSETS "" CACHE PATH "Owned Starbound assets for isolated CTest runs")
 
 function(star_add_asset_test target)

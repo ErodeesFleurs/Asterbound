@@ -345,6 +345,8 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   if (m_state->discordAvailable) {
     if (type == "discord") {
+      if (!m_discordLobbiesAvailable)
+        return std::unexpected(ApplicationException("Discord lobby networking is not supported by this Discord client"));
       auto userPart = peerId.extract("_");
       if (!userPart)
         return std::unexpected(std::move(userPart.error()));
@@ -753,7 +755,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
     return {};
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   std::optional<discord::LobbyTransaction> createLobby;
-  if (m_state->discordAvailable && m_state->discordCurrentUser) {
+  if (m_state->discordAvailable && m_state->discordCurrentUser && m_discordLobbiesAvailable) {
     if (std::holds_alternative<JoinLocal>(location)) {
       createLobby.emplace();
       auto result = m_state->discordCore->LobbyManager().GetLobbyCreateTransaction(&*createLobby);
@@ -799,7 +801,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
 
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   ++m_discordLobbyGeneration;
-  if (m_state->discordAvailable && m_state->discordCurrentUser) {
+  if (m_state->discordAvailable && m_state->discordCurrentUser && m_discordLobbiesAvailable) {
     if (m_discordServerLobby) {
       auto lobby = take(m_discordServerLobby);
       auto res = m_state->discordCore->LobbyManager().DisconnectNetwork(lobby->first);
@@ -816,21 +818,30 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
       m_state->discordCore->LobbyManager().CreateLobby(*createLobby,
         [lifetime = m_discordLifetime, &state = *m_state, generation = m_discordLobbyGeneration]
         (discord::Result res, discord::Lobby const& lobby) {
+          auto service = lifetime->service;
+          if (!service) {
+            if (res == discord::Result::Ok)
+              deleteDiscordLobby(state, lobby.GetId());
+            return;
+          }
+          std::lock_guard serviceLocker(service->get().m_mutex);
+          if (generation != service->get().m_discordLobbyGeneration) {
+            if (res == discord::Result::Ok)
+              deleteDiscordLobby(state, lobby.GetId());
+            return;
+          }
+          if (res == discord::Result::InvalidCommand) {
+            service->get().m_discordLobbiesAvailable = false;
+            service->get().m_discordForceUpdateActivity = true;
+            if (auto logged = state.logger.warn("Discord client does not support lobby networking; disabling Discord lobbies for this session (Rich Presence and other networking remain available)"); !logged)
+              state.discordError = std::move(logged.error());
+            return;
+          }
           if (res != discord::Result::Ok) {
             recordDiscordCallbackError(state, ApplicationException::format("Failed to create Discord lobby (err {})", (int)res));
             return;
           }
           auto lobbyId = lobby.GetId();
-          auto service = lifetime->service;
-          if (!service) {
-            deleteDiscordLobby(state, lobbyId);
-            return;
-          }
-          std::lock_guard serviceLocker(service->get().m_mutex);
-          if (generation != service->get().m_discordLobbyGeneration) {
-            deleteDiscordLobby(state, lobbyId);
-            return;
-          }
           res = state.discordCore->LobbyManager().ConnectNetwork(lobbyId);
           if (res == discord::Result::Ok) {
             res = state.discordCore->LobbyManager().OpenNetworkChannel(lobbyId, DiscordMainNetworkChannel, true);
