@@ -54,6 +54,8 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 - Rebuild Lua 5.3 bytecode. Finalizer errors become warnings; `math.random` sequences may change.
 - Text templates use `<name>` and `<<` for a literal `<`, not brace-format placeholders.
 
+Starbound-style `require` executes successful modules once per Lua context. Requiring a module already being initialized returns without executing it again, preserving compatibility with reentrant and cyclic utility dependencies. Failed loads remove their marker so they can be retried; syntax/runtime errors and cache-invalidation errors still propagate. Accessing a global before its defining module finishes initialization can still fail.
+
 ### Mod error diagnostics
 
 Lua runtime errors retain their original traceback and append a deduplicated `Lua source providers` summary identifying the scripts on the failed stack, including coroutine failures. Engine-loaded scripts use their actual loaded asset provider: the mod's `friendlyName`, internal `name`, and directory or `.pak` path. Syntax and indexed-script read failures also include provider context. Missing or invalid optional metadata falls back to the source path. Chunk names remain unchanged; provider snapshots are recorded during loading, not by scanning mods every frame.
