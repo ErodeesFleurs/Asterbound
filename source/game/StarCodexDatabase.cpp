@@ -35,7 +35,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
     return std::unexpected(std::move(files.error()));
   auto codexConfig = assets->json("/codex.config");
   if (!codexConfig)
-    return std::unexpected(std::move(codexConfig.error()));
+    return std::unexpected(assets->withAssetContext(std::move(codexConfig.error()), "/codex.config", "Loading codex defaults"));
   auto queued = assets->queueJsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
@@ -47,7 +47,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
         return std::unexpected(std::move(codexJson.error()));
       auto defaultIcon = codexConfig->getString("defaultIcon");
       if (!defaultIcon)
-        return std::unexpected(std::move(defaultIcon.error()));
+        return std::unexpected(assets->withAssetContext(std::move(defaultIcon.error()), "/codex.config", "Loading codex defaults"));
       auto icon = codexJson->getString("icon", *defaultIcon);
       if (!icon)
         return std::unexpected(std::move(icon.error()));
@@ -62,7 +62,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       return codex;
     }();
     if (!loaded)
-      return std::unexpected(CodexDatabaseException(strf("Error reading codex config {}", file), loaded.error()));
+      return std::unexpected(CodexDatabaseException(strf("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
     result->m_codexes[(*loaded)->id()] = std::move(*loaded);
   }
   return result;

@@ -205,28 +205,38 @@ std::expected<void, StarException> VersioningDatabase::init() {
   m_luaRoot = std::move(*luaRoot);
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto versions = (*assets)->json("/versioning.config");
-  if (!versions) return std::unexpected(std::move(versions.error()));
-  auto entries = versions->iterateObject();
-  if (!entries) return std::unexpected(std::move(entries.error()));
-  for (auto const& pair : *entries) {
-    auto version = pair.second.toUInt();
-    if (!version) return std::unexpected(std::move(version.error()));
-    m_currentVersions[pair.first] = *version;
-  }
-  auto subVersions = (*assets)->json("/versioning/subVersioning.config");
-  if (!subVersions) return std::unexpected(std::move(subVersions.error()));
-  auto subEntries = subVersions->iterateObject();
-  if (!subEntries) return std::unexpected(std::move(subEntries.error()));
-  for (auto const& pair : *subEntries) {
-    auto identifiers = pair.second.iterateObject();
-    if (!identifiers) return std::unexpected(std::move(identifiers.error()));
-    for (auto const& entry : *identifiers) {
-      auto version = entry.second.toUInt();
+  auto configured = [&]() -> std::expected<void, StarException> {
+    auto versions = (*assets)->json("/versioning.config");
+    if (!versions) return std::unexpected(std::move(versions.error()));
+    auto entries = versions->iterateObject();
+    if (!entries) return std::unexpected(std::move(entries.error()));
+    for (auto const& pair : *entries) {
+      auto version = pair.second.toUInt();
       if (!version) return std::unexpected(std::move(version.error()));
-      m_currentSubVersions[pair.first][entry.first] = *version;
+      m_currentVersions[pair.first] = *version;
     }
-  }
+    return {};
+  }();
+  if (!configured)
+    return std::unexpected((*assets)->withAssetContext(std::move(configured.error()), "/versioning.config", "Loading versioning configuration"));
+  auto subConfigured = [&]() -> std::expected<void, StarException> {
+    auto subVersions = (*assets)->json("/versioning/subVersioning.config");
+    if (!subVersions) return std::unexpected(std::move(subVersions.error()));
+    auto subEntries = subVersions->iterateObject();
+    if (!subEntries) return std::unexpected(std::move(subEntries.error()));
+    for (auto const& pair : *subEntries) {
+      auto identifiers = pair.second.iterateObject();
+      if (!identifiers) return std::unexpected(std::move(identifiers.error()));
+      for (auto const& entry : *identifiers) {
+        auto version = entry.second.toUInt();
+        if (!version) return std::unexpected(std::move(version.error()));
+        m_currentSubVersions[pair.first][entry.first] = *version;
+      }
+    }
+    return {};
+  }();
+  if (!subConfigured)
+    return std::unexpected((*assets)->withAssetContext(std::move(subConfigured.error()), "/versioning/subVersioning.config", "Loading sub-versioning configuration"));
   auto scripts = (*assets)->scan("/versioning/", ".lua");
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   for (auto const& script : *scripts) {
@@ -255,7 +265,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
       return {};
     }();
     if (!parse)
-      return std::unexpected(VersioningDatabaseException(strf("Error parsing version information from versioning script '{}'", script), std::move(parse.error())));
+      return std::unexpected(VersioningDatabaseException(strf("Error parsing version information from versioning script '{}'", script), (*assets)->withAssetContext(std::move(parse.error()), script, "Parsing versioning script filename")));
   }
   // Preserve the existing stable selection order for matching upgrades.
   auto order = [](VersionUpdateScript const& lhs, VersionUpdateScript const& rhs) {

@@ -62,7 +62,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     }();
     if (!loggingResult) return std::unexpected(std::move(loggingResult.error()));
     if (!loaded) {
-      if (auto result = m_root.logger().error("Error loading event file {}: {}", file, outputException(ExceptionDiagnostic(loaded.error()), true)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = m_root.logger().error("Error loading event file {}: {}", file, outputException(ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading statistics event")), true)); !result) return std::unexpected(std::move(result.error()));
     }
   }
   for (auto const& path : achievementFiles->get()) {
@@ -88,7 +88,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     }();
     if (!loggingResult) return std::unexpected(std::move(loggingResult.error()));
     if (!loaded) {
-      if (auto result = m_root.logger().error("Error loading achievement file {}: {}", file, outputException(ExceptionDiagnostic(loaded.error()), true)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = m_root.logger().error("Error loading achievement file {}: {}", file, outputException(ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading achievement")), true)); !result) return std::unexpected(std::move(result.error()));
     }
   }
   return {};
@@ -131,31 +131,41 @@ StringList StatisticsDatabase::achievementsForStat(String const& statName) const
 }
 
 std::expected<std::shared_ptr<StatEvent>, StarException> StatisticsDatabase::readEvent(Assets const& assets, String const& path) {
-  auto config = assets.json(path);
-  if (!config) return std::unexpected(std::move(config.error()));
-  auto name = config->getString("eventName");
-  if (!name) return std::unexpected(std::move(name.error()));
-  auto scriptsJson = config->get("scripts");
-  if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
-  auto scripts = jsonToStringList(*scriptsJson);
-  if (!scripts) return std::unexpected(std::move(scripts.error()));
-  return std::make_shared<StatEvent>(StatEvent{std::move(*name), std::move(*scripts), std::move(*config)});
+  auto parsed = [&]() -> std::expected<std::shared_ptr<StatEvent>, StarException> {
+    auto config = assets.json(path);
+    if (!config) return std::unexpected(std::move(config.error()));
+    auto name = config->getString("eventName");
+    if (!name) return std::unexpected(std::move(name.error()));
+    auto scriptsJson = config->get("scripts");
+    if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
+    auto scripts = jsonToStringList(*scriptsJson);
+    if (!scripts) return std::unexpected(std::move(scripts.error()));
+    return std::make_shared<StatEvent>(StatEvent{std::move(*name), std::move(*scripts), std::move(*config)});
+  }();
+  if (!parsed)
+    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), path, "Loading statistics event"));
+  return parsed;
 }
 
 std::expected<std::shared_ptr<Achievement>, StarException> StatisticsDatabase::readAchievement(Assets const& assets, String const& path) {
-  auto config = assets.json(path);
-  if (!config) return std::unexpected(std::move(config.error()));
-  auto name = config->getString("name");
-  if (!name) return std::unexpected(std::move(name.error()));
-  auto triggersJson = config->get("triggers");
-  if (!triggersJson) return std::unexpected(std::move(triggersJson.error()));
-  auto triggers = jsonToStringList(*triggersJson);
-  if (!triggers) return std::unexpected(std::move(triggers.error()));
-  auto scriptsJson = config->get("scripts");
-  if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
-  auto scripts = jsonToStringList(*scriptsJson);
-  if (!scripts) return std::unexpected(std::move(scripts.error()));
-  return std::make_shared<Achievement>(Achievement{std::move(*name), std::move(*triggers), std::move(*scripts), std::move(*config)});
+  auto parsed = [&]() -> std::expected<std::shared_ptr<Achievement>, StarException> {
+    auto config = assets.json(path);
+    if (!config) return std::unexpected(std::move(config.error()));
+    auto name = config->getString("name");
+    if (!name) return std::unexpected(std::move(name.error()));
+    auto triggersJson = config->get("triggers");
+    if (!triggersJson) return std::unexpected(std::move(triggersJson.error()));
+    auto triggers = jsonToStringList(*triggersJson);
+    if (!triggers) return std::unexpected(std::move(triggers.error()));
+    auto scriptsJson = config->get("scripts");
+    if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
+    auto scripts = jsonToStringList(*scriptsJson);
+    if (!scripts) return std::unexpected(std::move(scripts.error()));
+    return std::make_shared<Achievement>(Achievement{std::move(*name), std::move(*triggers), std::move(*scripts), std::move(*config)});
+  }();
+  if (!parsed)
+    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), path, "Loading achievement"));
+  return parsed;
 }
 
 }

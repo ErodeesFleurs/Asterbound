@@ -22,6 +22,34 @@ std::string strfChecked(std::basic_format_string<Char, T...> fmt, T const&... ar
 
 class StarException;
 
+// A diagnostic is an immutable graph. Only its lazily rendered views mutate;
+// child emission deliberately bypasses whole-chain caches so rendering a deep
+// chain does not materialize and retain every suffix of that chain.
+class ExceptionPayload {
+public:
+  explicit ExceptionPayload(std::function<void(std::ostream&, bool)> printer)
+    : m_printer(std::move(printer)) {}
+
+  void emit(std::ostream& os, bool fullStacktrace) const {
+    m_printer(os, fullStacktrace);
+  }
+
+  std::string const& rendered(bool fullStacktrace) const {
+    auto index = fullStacktrace ? 1u : 0u;
+    std::call_once(m_renderOnce[index], [this, index, fullStacktrace] {
+      std::ostringstream os;
+      emit(os, fullStacktrace);
+      m_rendered[index] = os.str();
+    });
+    return m_rendered[index];
+  }
+
+private:
+  std::function<void(std::ostream&, bool)> const m_printer;
+  mutable std::array<std::once_flag, 2> m_renderOnce;
+  mutable std::array<std::string, 2> m_rendered;
+};
+
 enum class ExceptionSummaryKind { Native, ScriptRuntime, ScriptSyntax, PatchRuntime, PatchSyntax, Resource };
 
 struct ExceptionSummary {
@@ -36,6 +64,7 @@ struct ExceptionSummary {
   std::string operation;
   std::vector<Location> locations;
   std::string asset;
+  std::string assetProvider;
   std::string patch;
   std::string patchProvider;
 };
@@ -47,11 +76,12 @@ public:
   std::shared_ptr<ExceptionSummary const> const& diagnosticSummary() const noexcept { return m_summary; }
 
   friend void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace);
+  friend std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace);
   friend OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
 
 private:
   friend class StarException;
-  std::function<void(std::ostream&, bool)> m_printException;
+  std::shared_ptr<ExceptionPayload const> m_payload;
   std::shared_ptr<ExceptionSummary const> m_summary;
 };
 
@@ -60,18 +90,21 @@ public:
   template <typename... Args>
   static StarException format(std::format_string<Args...> fmt, Args const&... args);
 
-  StarException() noexcept;
-  ~StarException() noexcept;
+  StarException() noexcept : StarException(std::string("StarException")) {}
+  ~StarException() noexcept = default;
   StarException(StarException const&) = default;
   StarException& operator=(StarException const&) = default;
   StarException(StarException&&) noexcept = default;
   StarException& operator=(StarException&&) noexcept = default;
 
-  explicit StarException(std::string message, bool genStackTrace = true) noexcept;
-  explicit StarException(ExceptionDiagnostic cause) noexcept;
-  StarException(std::string message, ExceptionDiagnostic cause) noexcept;
+  explicit StarException(std::string message, bool genStackTrace = true) noexcept
+    : StarException("StarException", std::move(message), genStackTrace) {}
+  explicit StarException(ExceptionDiagnostic cause) noexcept
+    : StarException("StarException", std::string(), std::move(cause)) {}
+  StarException(std::string message, ExceptionDiagnostic cause) noexcept
+    : StarException("StarException", std::move(message), std::move(cause)) {}
 
-  char const* what() const noexcept;
+  char const* what() const noexcept { return m_payload->rendered(false).c_str(); }
 
   template <typename Error>
   bool is() const noexcept {
@@ -97,18 +130,42 @@ public:
 
   StarException withContext(std::string context) const& {
     return StarException(
-        [context = std::move(context), cause = m_printException](std::ostream& os, bool fullStacktrace) {
+        [context = std::move(context), cause = m_payload](std::ostream& os, bool fullStacktrace) {
           os << context << "\nCaused by: ";
-          cause(os, fullStacktrace);
+          cause->emit(os, fullStacktrace);
         },
         m_matchesErrorType, m_summary);
   }
 
   StarException withContext(std::string context) && {
     return StarException(
-        [context = std::move(context), cause = std::move(m_printException)](std::ostream& os, bool fullStacktrace) {
+        [context = std::move(context), cause = std::move(m_payload)](std::ostream& os, bool fullStacktrace) {
           os << context << "\nCaused by: ";
-          cause(os, fullStacktrace);
+          cause->emit(os, fullStacktrace);
+        },
+        m_matchesErrorType, std::move(m_summary));
+  }
+
+  StarException withRelated(StarException const& secondary, std::string context) const& {
+    return StarException(
+        [primary = m_payload, secondary = secondary.m_payload, context = std::move(context)](
+            std::ostream& os, bool fullStacktrace) {
+          primary->emit(os, fullStacktrace);
+          os << "\n" << context << "\nRelated error: ";
+          secondary->emit(os, fullStacktrace);
+        },
+        m_matchesErrorType, m_summary);
+  }
+
+  StarException withRelated(StarException const& secondary, std::string context) && {
+    // Copy the secondary handle first: secondary may alias this value.
+    auto related = secondary.m_payload;
+    return StarException(
+        [primary = std::move(m_payload), secondary = std::move(related), context = std::move(context)](
+            std::ostream& os, bool fullStacktrace) {
+          primary->emit(os, fullStacktrace);
+          os << "\n" << context << "\nRelated error: ";
+          secondary->emit(os, fullStacktrace);
         },
         m_matchesErrorType, std::move(m_summary));
   }
@@ -116,10 +173,37 @@ public:
   friend class ExceptionDiagnostic;
 
 protected:
-  StarException(std::string_view type, std::string message, bool genStackTrace = true) noexcept;
-  StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept;
+  StarException(std::string_view type, std::string message, bool genStackTrace = true) noexcept
+    : StarException(type, std::move(message), genStackTrace, {}) {}
+  StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept
+    : StarException(type, std::move(message), true, std::move(cause.m_summary)) {
+    m_payload = std::make_shared<ExceptionPayload const>(
+        [self = std::move(m_payload), cause = std::move(cause.m_payload)](std::ostream& os, bool fullStacktrace) {
+          self->emit(os, fullStacktrace);
+          os << "\nCaused by: ";
+          cause->emit(os, fullStacktrace);
+        });
+  }
   StarException(std::string_view type, std::string message, bool genStackTrace,
-      std::shared_ptr<ExceptionSummary const> summary) noexcept;
+      std::shared_ptr<ExceptionSummary const> inheritedSummary) noexcept
+    : m_summary(std::move(inheritedSummary)) {
+    if (!m_summary) {
+      ExceptionSummary summary;
+      summary.category = type;
+      summary.reason = message;
+      m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
+    }
+    auto stack = genStackTrace ? std::make_shared<ExceptionPayload const>(captureOriginStack()) : nullptr;
+    m_payload = std::make_shared<ExceptionPayload const>(
+        [type = std::string(type), message = std::move(message), stack = std::move(stack)](
+            std::ostream& os, bool fullStacktrace) {
+          os << "(" << type << ")";
+          if (!message.empty())
+            os << " " << message;
+          if (fullStacktrace && stack)
+            os << '\n' << stack->rendered(true);
+        });
+  }
 
   template <typename Error>
   void setErrorType() noexcept {
@@ -127,23 +211,26 @@ protected:
   }
 
 private:
+  static std::function<void(std::ostream&, bool)> captureOriginStack();
   bool (*m_matchesErrorType)(TypeKey) noexcept = &StarException::matchesErrorType;
   StarException(std::function<void(std::ostream&, bool)> printer,
       bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionSummary const> summary) noexcept
-    : m_matchesErrorType(matcher), m_printException(std::move(printer)), m_summary(std::move(summary)) {}
-  // Takes the ostream to print to, whether to print the full stacktrace.  Must
-  // not bind 'this', may outlive the exception in the case of chained
-  // exception causes.
-  std::function<void(std::ostream&, bool)> m_printException;
+    : m_matchesErrorType(matcher), m_payload(std::make_shared<ExceptionPayload const>(std::move(printer))),
+      m_summary(std::move(summary)) {}
+  std::shared_ptr<ExceptionPayload const> m_payload;
   std::shared_ptr<ExceptionSummary const> m_summary;
-
-  // m_printException will be called without the stack-trace to print
-  // m_whatBuffer, if the what() method is invoked.
-  mutable std::string m_whatBuffer;
 };
 
-void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace);
-std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace);
+inline ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
+  : m_payload(exception.m_payload), m_summary(exception.m_summary) {}
+
+inline void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace) {
+  os << e.m_payload->rendered(fullStacktrace);
+}
+
+inline std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace) {
+  return e.m_payload->rendered(fullStacktrace);
+}
 OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
 
 inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> const& summary) {
@@ -168,6 +255,8 @@ inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> cons
     out << "\n  Operation: " << summary->operation;
   if (!summary->asset.empty())
     out << "\n  Asset: " << summary->asset;
+  if (!summary->assetProvider.empty() && summary->assetProvider != summary->patchProvider)
+    out << "\n  Asset provider: " << summary->assetProvider;
   if (!summary->patch.empty())
     out << "\n  Patch: " << summary->patch;
   if (!summary->patchProvider.empty())
@@ -190,6 +279,13 @@ inline std::string exceptionSummary(StarException const& error) {
 inline std::string exceptionSummary(ExceptionDiagnostic const& error) {
   return exceptionSummary(error.diagnosticSummary());
 }
+inline std::string exceptionReport(ExceptionDiagnostic const& error) {
+  std::ostringstream out;
+  out << exceptionSummary(error) << "\nDetails:\n";
+  printException(out, error, true);
+  return std::move(out).str();
+}
+
 
 void printStack(std::string_view message);
 
@@ -392,6 +488,7 @@ using ::Star::ExceptionDiagnostic;
 using ::Star::ExceptionSummaryKind;
 using ::Star::ExceptionSummary;
 using ::Star::exceptionSummary;
+using ::Star::exceptionReport;
 using ::Star::StarException;
 using ::Star::StarError;
 using ::Star::OutOfRangeExceptionTag;

@@ -144,12 +144,17 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
   auto queued = assets->queueJsons(files->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
+    auto loaded = [&]() -> std::expected<void, StarException> {
     auto config = assets->json(file.string());
     if (!config) return std::unexpected(std::move(config.error()));
     auto quest = QuestTemplate::create(*config);
     if (!quest) return std::unexpected(std::move(quest.error()));
     if (!database->m_templates.insert((*quest)->templateId, *quest).second)
       return std::unexpected(StarException(strf("Duplicate quest template '{}'", (*quest)->templateId)));
+    return {};
+    }();
+    if (!loaded)
+      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file.string(), "Loading quest template"));
   }
   return database;
 }

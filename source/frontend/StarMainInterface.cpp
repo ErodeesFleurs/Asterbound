@@ -1373,14 +1373,14 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     if (!containerPane) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
-        return std::unexpected(containerPane.error().withContext(strf("Closing container after pane construction failure also failed: {}", outputException(ExceptionDiagnostic(closed.error()), true))));
+        return std::unexpected(containerPane.error().withRelated(closed.error(), "Closing container after pane construction failure also failed"));
       return std::unexpected(std::move(containerPane.error()));
     }
     auto inventory = m_paneManager.displayRegisteredPane(MainInterfacePanes::Inventory);
     if (!inventory) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
-        return std::unexpected(inventory.error().withContext(strf("Closing container after inventory display failure also failed: {}", outputException(ExceptionDiagnostic(closed.error()), true))));
+        return std::unexpected(inventory.error().withRelated(closed.error(), "Closing container after inventory display failure also failed"));
       return std::unexpected(std::move(inventory.error()));
     }
     m_containerPane = std::move(*containerPane);
@@ -1401,7 +1401,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       auto closed = m_containerInteractor->closeContainer();
       m_containerPane.reset();
       if (!closed)
-        return std::unexpected(displayed.error().withContext(strf("Closing container after pane display failure also failed: {}", outputException(ExceptionDiagnostic(closed.error()), true))));
+        return std::unexpected(displayed.error().withRelated(closed.error(), "Closing container after pane display failure also failed"));
       return std::unexpected(std::move(displayed.error()));
     }
     auto inventoryPane = m_paneManager.registeredPane(MainInterfacePanes::Inventory);
@@ -2147,7 +2147,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
   auto drawn = drawDebug();
   auto cleared = context().clearTextStyle();
   if (!drawn && !cleared)
-    return std::unexpected(drawn.error().withContext(strf("Debug text cleanup failed: {}", printException(ExceptionDiagnostic(cleared.error()), true))));
+    return std::unexpected(drawn.error().withRelated(cleared.error(), "Debug text cleanup failed"));
   if (!drawn) return std::unexpected(std::move(drawn.error()));
   return cleared;
 }
@@ -2224,7 +2224,7 @@ std::expected<void, StarException> MainInterface::renderCursor() {
   auto drawn = drawItem();
   auto reset = context().resetInterfaceScissorRect();
   if (!drawn && !reset)
-    return std::unexpected(drawn.error().withContext(strf("Cursor item scissor cleanup failed: {}", printException(ExceptionDiagnostic(reset.error()), true))));
+    return std::unexpected(drawn.error().withRelated(reset.error(), "Cursor item scissor cleanup failed"));
   if (!drawn) return std::unexpected(std::move(drawn.error()));
   return reset;
 }

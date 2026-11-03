@@ -43,15 +43,20 @@ std::expected<std::shared_ptr<TechDatabase>, StarException> TechDatabase::create
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
     auto const& file = assetFile.string();
-    auto config = assets->json(file);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    auto tech = result->parseTech(*config, file);
-    if (!tech)
-      return std::unexpected(std::move(tech.error()));
-    if (result->m_tech.contains(tech->name))
-      return std::unexpected(TechDatabaseException::format("Duplicate tech named '{}', config file '{}'", tech->name, file));
-    result->m_tech[tech->name] = std::move(*tech);
+    auto loaded = [&]() -> std::expected<void, StarException> {
+      auto config = assets->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      auto tech = result->parseTech(*config, file);
+      if (!tech)
+        return std::unexpected(std::move(tech.error()));
+      if (result->m_tech.contains(tech->name))
+        return std::unexpected(TechDatabaseException::format("Duplicate tech named '{}', config file '{}'", tech->name, file));
+      result->m_tech[tech->name] = std::move(*tech);
+      return {};
+    }();
+    if (!loaded)
+      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file, "Loading tech"));
   }
   return result;
 }

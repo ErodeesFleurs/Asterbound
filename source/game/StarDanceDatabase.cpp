@@ -58,6 +58,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::getDance(Str
 }
 
 std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(Assets const& assets, String const& path) {
+  auto loaded = [&]() -> std::expected<std::shared_ptr<Dance>, StarException> {
   auto config = assets.json(path);
   if (!config)
     return std::unexpected(std::move(config.error()));
@@ -150,6 +151,10 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
     dance->steps.append(std::move(result));
   }
   return dance;
+  }();
+  if (!loaded)
+    return std::unexpected(assets.withAssetContext(std::move(loaded.error()), path, "Loading dance"));
+  return loaded;
 }
 
 }

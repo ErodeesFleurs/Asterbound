@@ -254,8 +254,8 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
     if (auto finished = finishExecution(); !finished) {
       auto error = std::move(finished.error());
       if (!result) {
-        error = std::move(error).withSummary(*result.error().diagnosticSummary()).withContext(
-            strf("Original Lua failure: {}", outputException(result.error(), true)));
+        error = std::move(error).withSummary(*result.error().diagnosticSummary()).withRelated(
+            result.error(), "Original Lua failure");
       }
       return std::unexpected(std::move(error));
     }
@@ -310,7 +310,7 @@ template <typename Ret, typename... V>
         if (!settled) {
           if (error)
             error =
-              error->withContext(strf("Error settling Lua thread message: {}", outputException(settled.error(), true)));
+              error->withRelated(settled.error(), "Error settling Lua thread message");
           else
             error = std::move(settled.error());
         }

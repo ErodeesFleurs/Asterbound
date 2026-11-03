@@ -141,6 +141,8 @@ public:
 
 private:
   BehaviorDatabase() = default;
+  std::shared_ptr<Assets const> m_assets;
+  StringMap<String> m_configPaths;
   StringMap<Json> m_configs;
   StringMap<std::shared_ptr<BehaviorTree const>> m_behaviors;
   StringMap<StringMap<NodeParameter>> m_nodeParameters;

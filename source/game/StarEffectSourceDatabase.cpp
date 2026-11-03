@@ -52,18 +52,23 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
-    auto json = (*assets)->json(file.string());
-    if (!json)
-      return std::unexpected(std::move(json.error()));
-    auto config = EffectSourceConfig::create(root, *json);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    if (result->m_sourceConfigs.contains((*config)->kind()))
-      return std::unexpected(StarException(strf("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
-    auto key = (*config)->kind().toLower();
-    if (!key)
-      return std::unexpected(std::move(key.error()));
-    result->m_sourceConfigs[*key] = std::move(*config);
+    auto loaded = [&]() -> std::expected<void, StarException> {
+      auto json = (*assets)->json(file.string());
+      if (!json)
+        return std::unexpected(std::move(json.error()));
+      auto config = EffectSourceConfig::create(root, *json);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      if (result->m_sourceConfigs.contains((*config)->kind()))
+        return std::unexpected(StarException(strf("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
+      auto key = (*config)->kind().toLower();
+      if (!key)
+        return std::unexpected(std::move(key.error()));
+      result->m_sourceConfigs[*key] = std::move(*config);
+      return {};
+    }();
+    if (!loaded)
+      return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file.string(), "Loading effect source"));
   }
   return result;
 }

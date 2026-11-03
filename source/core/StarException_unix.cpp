@@ -4,6 +4,7 @@
 #include "cpptrace/formatting.hpp"
 #else
 #include <execinfo.h>
+#include <dlfcn.h>
 #endif
 import star.format;
 import star.logging;
@@ -11,161 +12,92 @@ import star.logging;
 import std;
 
 import star.output_proxy;
-import star.array;
 namespace Star {
 
+// Capture object identity before a module can be unloaded, but leave symbol
+// resolution to the origin payload's independently cached full rendering.
+static std::function<void(std::ostream&, bool)> captureStack() {
 #ifdef STAR_USE_CPPTRACE
-
-static inline std::string captureBacktrace() {
-  auto formatter = cpptrace::formatter{}
-    .paths(cpptrace::formatter::path_mode::basename);
-  std::ostringstream out;
-  formatter.print(out, cpptrace::generate_trace());
-  return out.str();
-}
-
+  return [stack = cpptrace::generate_object_trace(1)](std::ostream& os, bool) {
+        auto formatter = cpptrace::formatter{}
+          .paths(cpptrace::formatter::path_mode::basename);
+        formatter.print(os, stack.resolve());
+        // The resolver may have lost access to an unloaded or removed object.
+        // Keep every captured address and module-relative address regardless of
+        // how many frames (including inlined frames) it can resolve later.
+        os << "\nCaptured objects:";
+        for (std::size_t i = 0; i < stack.frames.size(); ++i) {
+          auto const& frame = stack.frames[i];
+          os << strf("\n[{}] 0x{:x} {} +0x{:x}", i, frame.raw_address, frame.object_path, frame.object_address);
+        }
+      };
 #else
-
-static std::size_t const StackLimit = 256;
-
-typedef std::pair<Array<void*, StackLimit>, std::size_t> StackCapture;
-
-inline StackCapture captureStack() {
-  StackCapture stackCapture;
-  stackCapture.second = backtrace(stackCapture.first.ptr(), StackLimit);
-  return stackCapture;
-}
-
-OutputProxy outputStack(StackCapture stack) {
-  return OutputProxy([stack = std::move(stack)](std::ostream & os) {
-      char** symbols = backtrace_symbols(stack.first.ptr(), stack.second);
-      for (std::size_t i = 0; i < stack.second; ++i) {
-        os << symbols[i];
-        if (i + 1 < stack.second)
-          os << std::endl;
-      }
-
-      if (stack.second == StackLimit)
-        os << std::endl << "[Stack Output Limit Reached]";
-
-      std::free(symbols);
-    });
-}
-  
-#endif
-
-StarException::StarException() noexcept
-  : StarException(std::string("StarException")) {}
-
-StarException::~StarException() noexcept {}
-
-StarException::StarException(std::string message, bool genStackTrace) noexcept
-  : StarException("StarException", std::move(message), genStackTrace) {}
-
-StarException::StarException(ExceptionDiagnostic cause) noexcept
-  : StarException("StarException", std::string(), std::move(cause)) {}
-
-StarException::StarException(std::string message, ExceptionDiagnostic cause) noexcept
-  : StarException("StarException", std::move(message), std::move(cause)) {}
-
-const char* StarException::what() const noexcept {
-  if (m_whatBuffer.empty()) {
-    std::ostringstream os;
-    m_printException(os, false);
-    m_whatBuffer = os.str();
-  }
-  return m_whatBuffer.c_str();
-}
-
-StarException::StarException(std::string_view type, std::string message, bool genStackTrace) noexcept
-  : StarException(type, std::move(message), genStackTrace, {}) {}
-
-StarException::StarException(std::string_view type, std::string message, bool genStackTrace,
-    std::shared_ptr<ExceptionSummary const> inheritedSummary) noexcept
-  : m_summary(std::move(inheritedSummary)) {
-  if (!m_summary) {
-    ExceptionSummary summary;
-    summary.category = type;
-    summary.reason = message;
-    m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
-  }
-#ifdef STAR_USE_CPPTRACE
-  auto printException = [](std::ostream& os, bool fullStacktrace, std::string_view type, std::string const& message, std::string const& stack) {
-#else
-  auto printException = [](std::ostream& os, bool fullStacktrace, std::string_view type, std::string const& message, std::optional<StackCapture> const& stack) {
-#endif
-    os << "(" << type << ")";
-    if (!message.empty())
-      os << " " << message;
-
-#ifdef STAR_USE_CPPTRACE
-    if (fullStacktrace && !stack.empty()) {
-      os << std::endl;
-      os << stack;
-    }
-#else
-    if (fullStacktrace && stack) {
-      os << std::endl;
-      os << outputStack(*stack);
-    }
-#endif
+  static constexpr std::size_t StackLimit = 256;
+  struct Frame {
+    void* address;
+    std::string module;
+    void* base = nullptr;
   };
-#ifdef STAR_USE_CPPTRACE
-  m_printException = std::bind(printException, std::placeholders::_1, std::placeholders::_2, type, std::move(message), genStackTrace ? captureBacktrace() : std::string());
-#else
-  m_printException = std::bind(printException, std::placeholders::_1, std::placeholders::_2, type, std::move(message), genStackTrace ? captureStack() : std::optional<StackCapture>());
+  std::array<void*, StackLimit> addresses;
+  auto count = backtrace(addresses.data(), addresses.size());
+  std::vector<Frame> frames;
+  frames.reserve(count);
+  for (int i = 0; i < count; ++i) {
+    Dl_info info{};
+    auto& frame = frames.emplace_back(addresses[i], std::string());
+    if (dladdr(addresses[i], &info)) {
+      if (info.dli_fname)
+        frame.module = info.dli_fname;
+      frame.base = info.dli_fbase;
+    }
+  }
+  return [frames = std::move(frames)](std::ostream& os, bool) {
+        for (std::size_t i = 0; i < frames.size(); ++i) {
+          auto const& frame = frames[i];
+          if (i)
+            os << '\n';
+          os << strf("[{}] {}", i, frame.address);
+          if (!frame.module.empty())
+            os << strf(" {} +0x{:x}", frame.module,
+                reinterpret_cast<std::uintptr_t>(frame.address) - reinterpret_cast<std::uintptr_t>(frame.base));
+          Dl_info current{};
+          if (dladdr(frame.address, &current) && current.dli_fbase == frame.base
+              && current.dli_fname && frame.module == current.dli_fname && current.dli_sname)
+            os << " " << current.dli_sname;
+        }
+        if (frames.size() == StackLimit)
+          os << "\n[Stack Output Limit Reached]";
+      };
 #endif
 }
 
-StarException::StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept
-  : StarException(type, std::move(message), true, std::move(cause.m_summary)) {
-  auto printException = [](std::ostream& os, bool fullStacktrace, std::function<void(std::ostream&, bool)> const& self, std::function<void(std::ostream&, bool)> const& cause) {
-    self(os, fullStacktrace);
-    os << std::endl << "Caused by: ";
-    cause(os, fullStacktrace);
-  };
-
-  m_printException = std::bind(printException, std::placeholders::_1, std::placeholders::_2, m_printException, std::move(cause.m_printException));
-}
-
-ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
-  : m_printException(exception.m_printException), m_summary(exception.m_summary) {}
-
-
-std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace) {
+static std::string captureBacktrace() {
   std::ostringstream os;
-  printException(os, e, fullStacktrace);
+  captureStack()(os, true);
   return os.str();
 }
 
-void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace) {
-  e.m_printException(os, fullStacktrace);
+std::function<void(std::ostream&, bool)> StarException::captureOriginStack() {
+  return captureStack();
 }
 
 OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return OutputProxy(std::bind(e.m_printException, std::placeholders::_1, fullStacktrace));
+  return OutputProxy([payload = e.m_payload, fullStacktrace](std::ostream& os) {
+    os << payload->rendered(fullStacktrace);
+  });
 }
 
 void printStack(std::string_view message) {
-#ifdef STAR_USE_CPPTRACE
   EmergencyLog::info("Stack Trace ({})...\n{}", message, captureBacktrace());
-#else
-  EmergencyLog::info("Stack Trace ({})...\n{}", message, outputStack(captureStack()));
-#endif
 }
 
 void fatalError(std::string_view message, bool showStackTrace) {
   if (showStackTrace)
-#ifdef STAR_USE_CPPTRACE
     EmergencyLog::error("Fatal Error: {}\n{}", message, captureBacktrace());
-#else
-    EmergencyLog::error("Fatal Error: {}\n{}", message, outputStack(captureStack()));
-#endif
   else
     EmergencyLog::error("Fatal Error: {}", message);
 
   std::abort();
 }
-
 
 }

@@ -11,8 +11,6 @@ import star.version;
 import star.native_runtime;
 
 
-import star.array;
-import star.math_common;
 namespace Star {
 
 // DbgHelp is process-native and not thread-safe. Its lock must remain usable
@@ -73,194 +71,178 @@ NativeRuntime::~NativeRuntime() {
     WSACleanup();
 }
 
-static std::size_t const StackLimit = 256;
+static constexpr std::size_t StackLimit = 256;
 
-typedef std::pair<Array<DWORD64, StackLimit>, std::size_t> StackCapture;
+struct CapturedModule {
+  HMODULE base;
+  DWORD imageSize;
+  DWORD timestamp;
+  std::wstring path;
+};
 
-inline StackCapture captureStack() {
-  HANDLE process = GetCurrentProcess();
-  HANDLE thread = GetCurrentThread();
-
-  CONTEXT context;
-  DWORD image;
-  STACKFRAME64 stackFrame;
-
-  std::memset(&context, 0, sizeof(CONTEXT));
-  context.ContextFlags = CONTEXT_FULL;
-
-  ZeroMemory(&stackFrame, sizeof(STACKFRAME64));
-  stackFrame.AddrPC.Mode = AddrModeFlat;
-  stackFrame.AddrReturn.Mode = AddrModeFlat;
-  stackFrame.AddrFrame.Mode = AddrModeFlat;
-  stackFrame.AddrStack.Mode = AddrModeFlat;
-
-#ifdef STAR_ARCHITECTURE_I386
-
-  DWORD eip_val = 0;
-  DWORD esp_val = 0;
-  DWORD ebp_val = 0;
-
-  __asm__ __volatile__("call 1f\n1: pop %0" : "=g"(eip_val));
-  __asm__ __volatile__("movl %%esp, %0" : "=g"(esp_val));
-  __asm__ __volatile__("movl %%ebp, %0" : "=g"(ebp_val));
-
-  context.Eip = eip_val;
-  context.Esp = esp_val;
-  context.Ebp = ebp_val;
-
-  image = IMAGE_FILE_MACHINE_I386;
-
-  stackFrame.AddrPC.Offset = context.Eip;
-  stackFrame.AddrReturn.Offset = context.Eip;
-  stackFrame.AddrFrame.Offset = context.Ebp;
-  stackFrame.AddrStack.Offset = context.Esp;
-
-#elif defined STAR_ARCHITECTURE_X86_64
-
-  RtlCaptureContext(&context);
-
-  image = IMAGE_FILE_MACHINE_AMD64;
-
-  stackFrame.AddrPC.Offset = context.Rip;
-  stackFrame.AddrReturn.Offset = context.Rip;
-  stackFrame.AddrFrame.Offset = context.Rbp;
-  stackFrame.AddrStack.Offset = context.Rsp;
-
-#endif
-
-  std::lock_guard lock(g_dbgHelpLock);
-
-  Array<DWORD64, StackLimit> addresses;
-  std::size_t count = 0;
-  for (std::size_t i = 0; i < StackLimit; i++) {
-    if (!StackWalk64(image, process, thread, &stackFrame, &context, NULL, SymFunctionTableAccess64, SymGetModuleBase64, NULL))
-      break;
-    if (stackFrame.AddrPC.Offset == 0)
-      break;
-    addresses[i] = stackFrame.AddrPC.Offset;
-    ++count;
+// A temporary, balanced reference protects only the module containing this
+// address while its identity is read. Diagnostics never pin a DLL for their
+// lifetime and never release a borrowed module handle.
+class ModuleReference {
+public:
+  explicit ModuleReference(void const* address) {
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+        reinterpret_cast<LPCWSTR>(address), &m_module);
   }
+  ~ModuleReference() {
+    if (m_module)
+      FreeLibrary(m_module);
+  }
+  ModuleReference(ModuleReference const&) = delete;
+  ModuleReference& operator=(ModuleReference const&) = delete;
+  ModuleReference(ModuleReference&& other) noexcept : m_module(std::exchange(other.m_module, nullptr)) {}
+  HMODULE get() const { return m_module; }
 
-  return {addresses, count};
+private:
+  HMODULE m_module = nullptr;
+};
+
+static CapturedModule describeModule(HMODULE module) {
+  auto const* dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(module);
+  auto const* headers = reinterpret_cast<IMAGE_NT_HEADERS const*>(
+      reinterpret_cast<std::byte const*>(module) + dos->e_lfanew);
+  std::array<wchar_t, 32768> path;
+  auto length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
+  return {module, headers->OptionalHeader.SizeOfImage, headers->FileHeader.TimeDateStamp,
+      length && length < path.size() ? std::wstring(path.data(), length) : std::wstring()};
 }
 
-OutputProxy outputStack(StackCapture stack) {
-  return OutputProxy([stack = std::move(stack)](std::ostream & os) {
+static bool sameModule(CapturedModule const& left, CapturedModule const& right) {
+  return !left.path.empty() && left.base == right.base && left.imageSize == right.imageSize
+      && left.timestamp == right.timestamp && left.path == right.path;
+}
+
+static std::string modulePathUtf8(std::wstring const& path) {
+  if (path.empty())
+    return {};
+  auto length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
+      nullptr, 0, nullptr, nullptr);
+  if (!length) {
+    // Windows paths may contain unpaired UTF-16 units. Retain those units
+    // explicitly instead of replacing or dropping the captured module name.
+    std::string escaped;
+    for (wchar_t unit : path)
+      escaped += strf("\\u{:04x}", static_cast<unsigned int>(unit));
+    return escaped;
+  }
+  std::string result(length, '\0');
+  WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
+      result.data(), length, nullptr, nullptr);
+  return result;
+}
+
+static std::function<void(std::ostream&, bool)> captureStack() {
+  struct Frame {
+    void* address;
+    std::size_t module;
+  };
+  std::array<void*, StackLimit> addresses;
+  auto count = CaptureStackBackTrace(1, static_cast<DWORD>(addresses.size()), addresses.data(), nullptr);
+  std::vector<Frame> frames;
+  std::vector<CapturedModule> modules;
+  frames.reserve(count);
+  for (USHORT i = 0; i < count; ++i) {
+    auto moduleIndex = std::numeric_limits<std::size_t>::max();
+    ModuleReference module(addresses[i]);
+    if (module.get()) {
+      auto found = std::find_if(modules.begin(), modules.end(),
+          [&](auto const& captured) { return captured.base == module.get(); });
+      if (found == modules.end()) {
+        moduleIndex = modules.size();
+        modules.push_back(describeModule(module.get()));
+      } else {
+        moduleIndex = static_cast<std::size_t>(found - modules.begin());
+      }
+    }
+    frames.push_back({addresses[i], moduleIndex});
+  }
+  return [frames = std::move(frames), modules = std::move(modules)](std::ostream& os, bool) {
+    struct CurrentModule {
+      ModuleReference reference;
+      std::string path;
+      bool matches;
+    };
+    std::vector<CurrentModule> current;
+    current.reserve(modules.size());
+    for (auto const& captured : modules) {
+      auto& module = current.emplace_back(ModuleReference(captured.base), modulePathUtf8(captured.path), false);
+      module.matches = module.reference.get() && sameModule(captured, describeModule(module.reference.get()));
+    }
     HANDLE process = GetCurrentProcess();
+    // Release the symbol lock before dropping module references: a last
+    // reference can run DLL teardown code, which must not inherit this lock.
     std::lock_guard lock(g_dbgHelpLock);
-    for (std::size_t i = 0; i < stack.second; ++i) {
-      char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
-      PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+    for (std::size_t i = 0; i < modules.size(); ++i) {
+      if (!current[i].matches || g_diagnosticsOwners == 0) {
+        current[i].matches = false;
+        continue;
+      }
+      auto const& captured = modules[i];
+      IMAGEHLP_MODULE64 symbolModule{};
+      symbolModule.SizeOfStruct = sizeof(symbolModule);
+      current[i].matches = SymGetModuleInfo64(process, reinterpret_cast<DWORD64>(captured.base), &symbolModule)
+          && symbolModule.BaseOfImage == reinterpret_cast<DWORD64>(captured.base)
+          && symbolModule.ImageSize == captured.imageSize && symbolModule.TimeDateStamp == captured.timestamp;
+    }
+    for (std::size_t i = 0; i < frames.size(); ++i) {
+      auto const& frame = frames[i];
+      if (i)
+        os << '\n';
+      format(os, "[{}] {}", i, frame.address);
+      if (frame.module == std::numeric_limits<std::size_t>::max())
+        continue;
+      auto const& captured = modules[frame.module];
+      format(os, " {} +0x{:x} (image size 0x{:x}, timestamp 0x{:x})", current[frame.module].path,
+          reinterpret_cast<std::uintptr_t>(frame.address) - reinterpret_cast<std::uintptr_t>(captured.base),
+          captured.imageSize, captured.timestamp);
+      if (!current[frame.module].matches)
+        continue;
+      auto address = reinterpret_cast<DWORD64>(frame.address);
+      IMAGEHLP_LINE64 line{};
+      line.SizeOfStruct = sizeof(line);
+      DWORD displacement = 0;
+      if (SymGetLineFromAddr64(process, address, &displacement, &line) && line.FileName && *line.FileName) {
+        std::string_view file(line.FileName);
+        auto slash = file.find_last_of("\\/");
+        if (slash != std::string_view::npos)
+          file.remove_prefix(slash + 1);
+        format(os, " ({}:{})", file, line.LineNumber);
+      }
+      alignas(SYMBOL_INFO) std::array<std::byte, sizeof(SYMBOL_INFO) + MAX_SYM_NAME> buffer{};
+      auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer.data());
       symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
       symbol->MaxNameLen = MAX_SYM_NAME;
-
-      format(os, "[{:0{}}] {}", i, (int)std::log10(stack.second) + 1, (void*)stack.first[i]);
-      IMAGEHLP_LINE64 line{};
-      DWORD displacement = 0;
-      line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-      if (SymGetLineFromAddr64(process, stack.first[i], &displacement, &line) && *line.FileName) {
-        char* file = line.FileName;
-        for (char* i = file; *i; ++i) {
-          if (*i == '\\' || *i == '/')
-            file = i;
-        }
-        format(os, " ({}:{})", ++file, line.LineNumber);
-      }
-      if (SymFromAddr(process, stack.first[i], NULL, symbol))
+      if (SymFromAddr(process, address, nullptr, symbol))
         format(os, " {}", std::string_view(symbol->Name, symbol->NameLen));
-
-      if (i + 1 < stack.second)
-        os << std::endl;
     }
-
-    if (stack.second == StackLimit)
-      os << std::endl << "[Stack Output Limit Reached]";
-
-  });
-}
-
-StarException::StarException() noexcept : StarException(std::string("StarException")) {}
-
-StarException::~StarException() noexcept {}
-
-StarException::StarException(std::string message, bool genStackTrace) noexcept : StarException("StarException", std::move(message), genStackTrace) {}
-
-StarException::StarException(ExceptionDiagnostic cause) noexcept
-    : StarException("StarException", std::string(), std::move(cause)) {}
-
-StarException::StarException(std::string message, ExceptionDiagnostic cause) noexcept
-    : StarException("StarException", std::move(message), std::move(cause)) {}
-
-const char* StarException::what() const noexcept {
-  if (m_whatBuffer.empty()) {
-    std::ostringstream os;
-    m_printException(os, false);
-    m_whatBuffer = os.str();
-  }
-  return m_whatBuffer.c_str();
-}
-
-StarException::StarException(std::string_view type, std::string message, bool genStackTrace) noexcept
-  : StarException(type, std::move(message), genStackTrace, {}) {}
-
-StarException::StarException(std::string_view type, std::string message, bool genStackTrace,
-    std::shared_ptr<ExceptionSummary const> inheritedSummary) noexcept
-  : m_summary(std::move(inheritedSummary)) {
-  if (!m_summary) {
-    ExceptionSummary summary;
-    summary.category = type;
-    summary.reason = message;
-    m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
-  }
-  auto printException = [](
-      std::ostream& os, bool fullStacktrace, std::string_view type, std::string const& message, std::optional<StackCapture> const& stack) {
-    os << "(" << type << ")";
-    if (!message.empty())
-      os << " " << message;
-
-    if (fullStacktrace && stack) {
-      os << std::endl;
-      os << outputStack(*stack);
-    }
+    if (frames.size() == StackLimit)
+      os << "\n[Stack Output Limit Reached]";
   };
-
-  m_printException = std::bind(printException, std::placeholders::_1, std::placeholders::_2, type, std::move(message), genStackTrace ? captureStack() : std::optional<StackCapture>());
 }
 
-StarException::StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept
-    : StarException(type, std::move(message), true, std::move(cause.m_summary)) {
-  auto printException = [](std::ostream& os,
-      bool fullStacktrace,
-      std::function<void(std::ostream&, bool)> const& self,
-      std::function<void(std::ostream&, bool)> const& cause) {
-    self(os, fullStacktrace);
-    os << std::endl << "Caused by: ";
-    cause(os, fullStacktrace);
-  };
-
-  m_printException = std::bind(printException, std::placeholders::_1, std::placeholders::_2, m_printException, std::move(cause.m_printException));
-}
-
-ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
-  : m_printException(exception.m_printException), m_summary(exception.m_summary) {}
-
-
-std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace) {
+static std::string captureBacktrace() {
   std::ostringstream os;
-  printException(os, e, fullStacktrace);
+  captureStack()(os, true);
   return os.str();
 }
 
-void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace) {
-  e.m_printException(os, fullStacktrace);
+std::function<void(std::ostream&, bool)> StarException::captureOriginStack() {
+  return captureStack();
 }
 
 OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return OutputProxy(std::bind(e.m_printException, std::placeholders::_1, fullStacktrace));
+  return OutputProxy([payload = e.m_payload, fullStacktrace](std::ostream& os) {
+    os << payload->rendered(fullStacktrace);
+  });
 }
 
 void printStack(std::string_view message) {
-  EmergencyLog::info("Stack Trace ({})...\n{}", message, outputStack(captureStack()));
+  EmergencyLog::info("Stack Trace ({})...\n{}", message, captureBacktrace());
 }
 
 void fatalError(std::string_view message, bool showStackTrace) {
@@ -268,7 +250,7 @@ void fatalError(std::string_view message, bool showStackTrace) {
   ss << "v" << OpenStarVersionString << " (" << StarSourceIdentifierString << ")\n"
      << "Fatal Error: " << message << std::endl;
   if (showStackTrace)
-    ss << outputStack(captureStack());
+    ss << captureBacktrace();
 
   EmergencyLog::log(LogLevel::Error, ss.str());
   auto text = stringToUtf16(ss.str());

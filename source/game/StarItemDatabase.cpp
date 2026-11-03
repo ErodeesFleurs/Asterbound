@@ -360,12 +360,17 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
   auto data = itemData(itemName);
   if (!data)
     return std::unexpected(std::move(data.error()));
+  std::shared_ptr<Assets const> assets;
+  if (data->get().assetsConfig) {
+    auto sourceAssets = m_root.assets();
+    if (!sourceAssets)
+      return std::unexpected(std::move(sourceAssets.error()));
+    assets = std::move(*sourceAssets);
+  }
+  auto loaded = [&]() -> std::expected<ItemConfig, StarException> {
   ItemConfig itemConfig;
   if (data->get().assetsConfig) {
-    auto assets = m_root.assets();
-    if (!assets)
-      return std::unexpected(std::move(assets.error()));
-    auto config = (*assets)->json(*data->get().assetsConfig);
+    auto config = assets->json(*data->get().assetsConfig);
     if (!config)
       return std::unexpected(std::move(config.error()));
     itemConfig.config = std::move(*config);
@@ -402,6 +407,10 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
     itemConfig.parameters = std::move(std::get<1>(*built));
   }
   return itemConfig;
+  }();
+  if (!loaded && assets)
+    return std::unexpected(assets->withAssetContext(std::move(loaded.error()), *data->get().assetsConfig, "Loading item configuration"));
+  return loaded;
 }
 
 std::expected<std::optional<String>, StarException> ItemDatabase::itemFile(String const& itemName) const {
@@ -589,7 +598,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
       return std::unexpected(std::move(assets.error()));
     auto defaultDuration = (*assets)->json("/items/defaultParameters.config:defaultCraftDuration").and_then([](Json const& value) { return value.toFloat(); });
     if (!defaultDuration)
-      return std::unexpected(std::move(defaultDuration.error()));
+      return std::unexpected((*assets)->withAssetContext(std::move(defaultDuration.error()), "/items/defaultParameters.config", "Loading recipe defaults"));
     auto duration = config.getFloat("duration", *defaultDuration);
     if (!duration)
       return std::unexpected(std::move(duration.error()));
@@ -774,10 +783,16 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
     auto data = m_items.get(current.name());
     if (!data)
       return std::unexpected(std::move(data.error()));
-    auto config = itemConfig(current.name(), current.parameters(), level, seed);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    return createItem(data->get().type, *config);
+    auto item = itemConfig(current.name(), current.parameters(), level, seed).and_then([&](ItemConfig const& config) {
+      return createItem(data->get().type, config);
+    });
+    if (!item && !data->get().filename.empty()) {
+      auto assets = m_root.assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      return std::unexpected((*assets)->withAssetContext(std::move(item.error()), data->get().directory + data->get().filename, "Constructing item"));
+    }
+    return item;
   };
   auto initial = [&]() -> std::expected<std::shared_ptr<Item>, StarException> {
     ItemDescriptor current = descriptor;
@@ -919,9 +934,9 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       return data;
     }();
     if (!loaded)
-      return std::unexpected(ItemException(strf("Could not load item asset {}", file), ExceptionDiagnostic(loaded.error())));
+      return std::unexpected(ItemException(strf("Could not load item asset {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading item asset"))));
     if (m_items.contains(loaded->name))
-      return std::unexpected(ItemException::format("Duplicate item name '{}' found", loaded->name));
+      return std::unexpected((*assets)->withAssetContext(ItemException::format("Duplicate item name '{}' found", loaded->name), file, "Loading item asset"));
     m_items[loaded->name] = std::move(*loaded);
   }
   return {};
@@ -958,7 +973,7 @@ std::expected<void, StarException> ItemDatabase::addObjectDropItem(String const&
       return std::unexpected(std::move(assets.error()));
     auto icon = (*assets)->json("/objects/defaultParameters.config:missingIcon");
     if (!icon)
-      return std::unexpected(std::move(icon.error()));
+      return std::unexpected((*assets)->withAssetContext(std::move(icon.error()), "/objects/defaultParameters.config", "Loading object item defaults"));
     customConfig["inventoryIcon"] = std::move(*icon);
     auto logged = m_root.logger().warn("Missing inventoryIcon for {}, using default", data.name);
     if (!logged)
@@ -1027,6 +1042,9 @@ std::expected<void, StarException> ItemDatabase::addObjectItems() {
   auto objects = m_root.objectDatabase();
   if (!objects)
     return std::unexpected(std::move(objects.error()));
+  auto assets = m_root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
   for (auto const& objectName : (*objects)->allObjects()) {
     auto config = (*objects)->getConfig(objectName);
     if (!config)
@@ -1034,7 +1052,7 @@ std::expected<void, StarException> ItemDatabase::addObjectItems() {
     if ((*config)->hasObjectItem) {
       auto added = addObjectDropItem((*config)->path, (*config)->config);
       if (!added)
-        return std::unexpected(std::move(added.error()));
+        return std::unexpected((*assets)->withAssetContext(std::move(added.error()), (*config)->path, "Loading object drop item"));
     }
   }
   return {};
@@ -1056,7 +1074,7 @@ std::expected<void, StarException> ItemDatabase::scanRecipes() {
     if (recipe) {
       m_recipes.add(std::move(*recipe));
     } else {
-      auto logged = m_root.logger().error("Could not load recipe {}: {}", file, outputException(recipe.error(), false));
+      auto logged = m_root.logger().error("Could not load recipe {}: {}", file, outputException((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe"), false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1076,21 +1094,27 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
     String blueprintName = strf("{}-recipe", (*baseItem)->name());
     if (m_items.contains(blueprintName))
       continue;
+    String sourcePath;
     auto created = [&]() -> std::expected<void, StarException> {
+      auto baseData = itemData(baseDesc.name());
+      if (!baseData)
+        return std::unexpected(std::move(baseData.error()));
+      if (!baseData->get().filename.empty())
+        sourcePath = baseData->get().directory + baseData->get().filename;
       ItemData data;
       data.type = ItemType::Blueprint;
       JsonObject config;
       config["recipe"] = baseDesc.singular().toJson();
       auto description = (*assets)->json("/blueprint.config:description").and_then([](Json const& value) { return value.toString(); });
       if (!description)
-        return std::unexpected(std::move(description.error()));
+        return std::unexpected((*assets)->withAssetContext(std::move(description.error()), "/blueprint.config", "Loading blueprint defaults"));
       auto replacedDescription = description->replace("<item>", (*baseItem)->friendlyName());
       if (!replacedDescription)
         return std::unexpected(std::move(replacedDescription.error()));
       config["description"] = std::move(*replacedDescription);
       auto shortDescription = (*assets)->json("/blueprint.config:shortdescription").and_then([](Json const& value) { return value.toString(); });
       if (!shortDescription)
-        return std::unexpected(std::move(shortDescription.error()));
+        return std::unexpected((*assets)->withAssetContext(std::move(shortDescription.error()), "/blueprint.config", "Loading blueprint defaults"));
       auto replacedShortDescription = shortDescription->replace("<item>", (*baseItem)->friendlyName());
       if (!replacedShortDescription)
         return std::unexpected(std::move(replacedShortDescription.error()));
@@ -1098,7 +1122,7 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       config["shortdescription"] = data.friendlyName;
       auto category = (*assets)->json("/blueprint.config:category").and_then([](Json const& value) { return value.toString(); });
       if (!category)
-        return std::unexpected(std::move(category.error()));
+        return std::unexpected((*assets)->withAssetContext(std::move(category.error()), "/blueprint.config", "Loading blueprint defaults"));
       config["category"] = std::move(*category);
       data.name = blueprintName;
       config["itemName"] = data.name;
@@ -1119,15 +1143,15 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       config["rarity"] = rarity->get();
       config["price"] = (*baseItem)->price();
       data.customConfig = std::move(config);
-      auto baseData = itemData(baseDesc.name());
-      if (!baseData)
-        return std::unexpected(std::move(baseData.error()));
       data.directory = baseData->get().directory;
       m_items[data.name] = std::move(data);
       return {};
     }();
     if (!created) {
-      auto logged = m_root.logger().error("Could not create blueprint item from recipe: {}", outputException(created.error(), false));
+      auto error = std::move(created.error());
+      if (!sourcePath.empty())
+        error = (*assets)->withAssetContext(std::move(error), sourcePath, "Creating blueprint item");
+      auto logged = m_root.logger().error("Could not create blueprint item from recipe: {}", outputException(error, false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1141,7 +1165,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
     return std::unexpected(std::move(assets.error()));
   auto codexConfig = (*assets)->json("/codex.config");
   if (!codexConfig)
-    return std::unexpected(std::move(codexConfig.error()));
+    return std::unexpected((*assets)->withAssetContext(std::move(codexConfig.error()), "/codex.config", "Loading codex item defaults"));
   auto codexDatabase = m_root.codexDatabase();
   if (!codexDatabase)
     return std::unexpected(std::move(codexDatabase.error()));
@@ -1162,7 +1186,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       data.filename = codexPair.second->filename();
       auto defaults = codexConfig->get("defaultItemConfig");
       if (!defaults)
-        return std::unexpected(std::move(defaults.error()));
+        return std::unexpected((*assets)->withAssetContext(std::move(defaults.error()), "/codex.config", "Loading codex item defaults"));
       auto merged = jsonMerge(*defaults, codexPair.second->itemConfig()).toObject();
       if (!merged)
         return std::unexpected(std::move(merged.error()));
@@ -1177,7 +1201,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       return {};
     }();
     if (!created) {
-      auto logged = m_root.logger().error("Could not create item for codex {}: {}", codexPair.second->id(), outputException(created.error(), false));
+      auto logged = m_root.logger().error("Could not create item for codex {}: {}", codexPair.second->id(), outputException((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item"), false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }

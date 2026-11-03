@@ -169,6 +169,55 @@ namespace {
   }
 }
 
+const GameTestRegistration worldMessageBatchDrainsAfterFailure(
+    "WorldSnapshot", "WorldMessageBatchDrainsAfterFailure", [](GameTest&) {
+  for (bool handlerFailure : {true, false}) {
+    List<WorldServerThread::Message> messages;
+    List<RpcPromise<Json>> promises;
+    for (unsigned i = 0; i != 5; ++i) {
+      auto [promise, keeper] = RpcPromise<Json>::createPair();
+      promises.append(std::move(promise));
+      messages.append({"batchRegression", {}, std::move(keeper)});
+    }
+    // Exercise an already-settled keeper both at the failure boundary and
+    // during draining: neither error may leave the final request pending.
+    if (!handlerFailure)
+      ASSERT_TRUE(messages[1].promise.fulfill(Json(9)));
+    ASSERT_TRUE(messages[3].promise.fail("Already settled"));
+    unsigned handled = 0;
+    auto settled = settleWorldMessageBatch(messages,
+        [&](String const&, JsonArray const&)
+            -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+          ++handled;
+          if (handlerFailure && handled == 2)
+            return std::unexpected(StarException("Injected world handler failure"));
+          return std::optional<ChainableJsonMessageResponse>(Json(17));
+        });
+    ASSERT_FALSE(settled);
+    EXPECT_EQ(handled, 2u);
+    if (handlerFailure)
+      EXPECT_NE(std::string_view(settled.error().what()).find("Injected world handler failure"), std::string_view::npos);
+    else
+      EXPECT_TRUE(settled.error().is<RpcPromiseException>());
+    for (auto const& promise : promises)
+      EXPECT_TRUE(promise.finished());
+    auto first = promises[0].result();
+    ASSERT_TRUE(first);
+    EXPECT_EQ(*first, std::optional<Json>(Json(17)));
+    auto failed = promises[1].error();
+    ASSERT_TRUE(failed);
+    EXPECT_EQ(*failed, handlerFailure ? std::optional<String>("World message handling failed") : std::nullopt);
+    for (unsigned i : {2u, 4u}) {
+      auto drained = promises[i].error();
+      ASSERT_TRUE(drained);
+      EXPECT_EQ(*drained, std::optional<String>("World message handling stopped"));
+    }
+    auto alreadySettled = promises[3].error();
+    ASSERT_TRUE(alreadySettled);
+    EXPECT_EQ(*alreadySettled, std::optional<String>("Already settled"));
+  }
+});
+
 const GameTestRegistration terrainNamedSelector(
   "TerrainDatabaseTest", "UnknownNamesAndSeededNamedSelectorsPreserveSampling", [](GameTest& fixture) {
     auto directory = File::temporaryDirectory(fixture.root().random());

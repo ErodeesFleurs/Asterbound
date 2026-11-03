@@ -33,6 +33,7 @@ import star.effect_source_database;
 import star.lua;
 import star.lua_game_converters;
 import star.mixer;
+import star.dance_database;
 
 #include "gtest/gtest.h"
 
@@ -803,3 +804,78 @@ const GameTestRegistration invalidPngWriteThrows("ImageTest", "InvalidPngWriteTh
   ASSERT_FALSE(written);
   EXPECT_TRUE(written.error().is<ImageException>());
 });
+
+const GameTestRegistration assetsFailureCacheReload(
+  "AssetsTest", "QueuedFailureSurvivesCacheClearAndRecoversAfterReload", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
+    auto path = File::relativeTo(*directory, "failure.json");
+    ASSERT_TRUE(File::writeFile(String("{ invalid json"), path));
+    Assets::Settings settings{};
+    settings.workerPoolSize = 2;
+    settings.assetTimeToLive = 600;
+    Logger logger;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets);
+    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json"}));
+    ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
+    auto first = (*assets)->json("/failure.json");
+    ASSERT_FALSE(first);
+    EXPECT_TRUE(first.error().is<AssetException>());
+    EXPECT_EQ(first.error().diagnosticSummary()->asset, "/failure.json");
+    auto reason = first.error().diagnosticSummary()->reason;
+    ASSERT_TRUE(File::writeFile(String(R"({"recovered":42})"), path));
+    (*assets)->clearCache();
+    auto cached = (*assets)->json("/failure.json");
+    ASSERT_FALSE(cached);
+    EXPECT_EQ(cached.error().diagnosticSummary()->reason, reason);
+    (*assets)->hotReload();
+    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json"}));
+    ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
+    auto recovered = (*assets)->json("/failure.json");
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ(recovered->getInt("recovered"), 42);
+  });
+
+const GameTestRegistration recoverableDatabaseProvider(
+  "AssetsTest", "RecoverableDatabaseFailureReportsProviderAndKeepsFallback", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
+    ASSERT_TRUE(File::writeFile(
+        String(R"({"name":"dance_recovery","friendlyName":"Dance Recovery Provider"})"),
+        File::relativeTo(*directory, "_metadata")));
+    ASSERT_TRUE(File::writeFile(String("{}"), File::relativeTo(*directory, "broken.dance")));
+    ASSERT_TRUE(File::writeFile(
+        String(R"({"name":"assetmissing","states":[],"cycle":1,"cyclic":true,"duration":1,"steps":[]})"),
+        File::relativeTo(*directory, "fallback.dance")));
+    class Errors : public LogSink {
+    public:
+      Errors() { setLevel(LogLevel::Error); }
+      std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+        messages.append(message);
+        return {};
+      }
+      std::string messages;
+    };
+    Logger logger;
+    logger.removeStdoutSink();
+    auto errors = std::make_shared<Errors>();
+    logger.addSink(errors);
+    Assets::Settings settings{};
+    settings.workerPoolSize = 1;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets);
+    auto database = DanceDatabase::create(*assets, logger);
+    ASSERT_TRUE(database);
+    EXPECT_NE(errors->messages.find("/broken.dance"), std::string::npos);
+    EXPECT_NE(errors->messages.find("JsonException"), std::string::npos);
+    EXPECT_NE(errors->messages.find("Dance Recovery Provider"), std::string::npos);
+    EXPECT_NE(errors->messages.find(directory->utf8()), std::string::npos);
+    auto recovered = (*database)->getDance("broken");
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ((*recovered)->name, "assetmissing");
+  });

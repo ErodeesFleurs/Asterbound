@@ -333,6 +333,42 @@ template <typename EntityT>
     return std::unexpected(std::move(scanned.error()));
   return list;
 }
+
+// The caller owns queue extraction and the world lock. A native failure stops
+// dispatch, but every keeper in this extracted batch must still be settled.
+template <typename Message, typename Receiver>
+[[nodiscard]] std::expected<void, StarException> settleWorldMessageBatch(
+    List<Message>& messages, Receiver&& receiveMessage) {
+  std::optional<StarException> error;
+  for (auto& message : messages) {
+    if (error) {
+      if (auto failed = message.promise.fail("World message handling stopped"); !failed)
+        *error = error->withRelated(failed.error(), "World message drain also failed");
+      continue;
+    }
+    auto response = receiveMessage(message.message, message.args);
+    std::expected<void, StarException> completion;
+    if (!response) {
+      error = std::move(response.error());
+      completion = message.promise.fail("World message handling failed");
+    } else if (!*response) {
+      completion = message.promise.fail("Message not handled by world");
+    } else if (std::holds_alternative<RpcPromise<Json>>(**response)) {
+      completion = message.promise.chain(std::get<RpcPromise<Json>>(**response));
+    } else {
+      completion = message.promise.fulfill(std::get<Json>(**response));
+    }
+    if (!completion) {
+      if (error)
+        *error = error->withRelated(completion.error(), "World message settlement also failed");
+      else
+        error = std::move(completion.error());
+    }
+  }
+  if (error)
+    return std::unexpected(std::move(*error));
+  return {};
+}
 } // namespace Star
 
 export module star.world;
@@ -342,4 +378,5 @@ export namespace Star {
   using ::Star::TileEntity;
   using ::Star::ScriptedEntity;
   using ::Star::WorldAction;
+  using ::Star::settleWorldMessageBatch;
 }

@@ -138,3 +138,139 @@ TEST(ExceptionTest, StructuredSummaryDoesNotReplaceTypedOriginalDiagnostic) {
   EXPECT_EQ(owned.diagnosticSummary()->operation, "init");
   EXPECT_EQ(printException(owned, true), originalText);
 }
+
+TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {
+  auto retained = [] {
+    StarException source = OutOfRangeException("copy-lifetime-root", false);
+    for (int i = 0; i < 128; ++i)
+      source = std::move(source).withContext(strf("typed-context-{}", i));
+    auto expected = printException(source, false);
+    auto copied = source;
+    StarException assigned("replaced-before-copy", false);
+    assigned = copied;
+    auto moved = std::move(copied);
+    StarException moveAssigned("replaced-before-move", false);
+    moveAssigned = std::move(assigned);
+    source = IOException("replacement-after-copy", false);
+    EXPECT_TRUE(moved.is<OutOfRangeException>());
+    EXPECT_TRUE(moveAssigned.is<OutOfRangeException>());
+    EXPECT_EQ(printException(moved, false), expected);
+    EXPECT_EQ(printException(moveAssigned, false), expected);
+    EXPECT_EQ(std::string(moveAssigned.what()), expected);
+    return std::move(moveAssigned).withContext("retained-final-context");
+  }();
+  EXPECT_TRUE(retained.is<OutOfRangeException>());
+  EXPECT_TRUE(retained.is<StarException>());
+  EXPECT_FALSE(retained.is<IOException>());
+  EXPECT_EQ(retained.diagnosticSummary()->reason, "copy-lifetime-root");
+  auto text = printException(retained, true);
+  EXPECT_NE(text.find("copy-lifetime-root"), std::string::npos);
+  EXPECT_NE(text.find("typed-context-0"), std::string::npos);
+  EXPECT_NE(text.find("typed-context-127"), std::string::npos);
+  EXPECT_NE(text.find("retained-final-context"), std::string::npos);
+  EXPECT_EQ(text.find("replacement-after-copy"), std::string::npos);
+}
+
+TEST(ExceptionTest, OriginOwnsItsTypeNameAndMessage) {
+  struct NamedError : StarException {
+    NamedError(std::string_view type, std::string message)
+      : StarException(type, std::move(message), false) {}
+  };
+  auto owned = [] {
+    std::string name = "dynamic-error-kind";
+    NamedError source(name, "dynamic-error-message");
+    return ExceptionDiagnostic(source);
+  }();
+  auto text = printException(owned, true);
+  EXPECT_NE(text.find("dynamic-error-kind"), std::string::npos);
+  EXPECT_NE(text.find("dynamic-error-message"), std::string::npos);
+}
+
+TEST(ExceptionTest, RelatedDiagnosticsRetainPrimaryClassificationAndBothTraceModes) {
+  OutOfRangeException primary("primary-related-marker");
+  IOException secondary("secondary-related-marker");
+  auto primaryShort = printException(primary, false);
+  auto secondaryShort = printException(secondary, false);
+  auto primaryFull = printException(primary, true);
+  auto secondaryFull = printException(secondary, true);
+  auto related = primary.withRelated(secondary, "related-operation-marker");
+  auto shortText = printException(related, false);
+  auto fullText = printException(related, true);
+  EXPECT_TRUE(related.is<OutOfRangeException>());
+  EXPECT_TRUE(related.is<StarException>());
+  EXPECT_FALSE(related.is<IOException>());
+  ASSERT_TRUE(related.diagnosticSummary());
+  EXPECT_EQ(related.diagnosticSummary()->reason, "primary-related-marker");
+  EXPECT_NE(shortText.find(primaryShort), std::string::npos);
+  EXPECT_NE(shortText.find(secondaryShort), std::string::npos);
+  EXPECT_NE(shortText.find("related-operation-marker"), std::string::npos);
+  EXPECT_NE(fullText.find(primaryFull), std::string::npos);
+  EXPECT_NE(fullText.find(secondaryFull), std::string::npos);
+  EXPECT_NE(fullText.find("0x"), std::string::npos);
+  EXPECT_EQ(std::string(related.what()), shortText);
+  auto owned = ExceptionDiagnostic(std::move(related).withRelated(
+      StarException("third-related-marker", false), "second-related-operation"));
+  primary = OutOfRangeException("replaced-primary", false);
+  secondary = IOException("replaced-secondary", false);
+  auto ownedFull = printException(owned, true);
+  EXPECT_NE(ownedFull.find(primaryFull), std::string::npos);
+  EXPECT_NE(ownedFull.find(secondaryFull), std::string::npos);
+  EXPECT_NE(ownedFull.find("third-related-marker"), std::string::npos);
+}
+
+TEST(ExceptionTest, RelatedDiagnosticCanOwnItsRvaluePrimaryAsSecondary) {
+  StarException primary = OutOfRangeException("self-related-marker", false);
+  auto related = std::move(primary).withRelated(primary, "self-related-context");
+  EXPECT_TRUE(related.is<OutOfRangeException>());
+  auto text = printException(related, true);
+  auto first = text.find("self-related-marker");
+  ASSERT_NE(first, std::string::npos);
+  EXPECT_NE(text.find("self-related-marker", first + 1), std::string::npos);
+  EXPECT_EQ(printException(related, false), text);
+}
+
+TEST(ExceptionTest, ConcurrentFirstRenderingAndCopiesAreDeterministic) {
+  auto shared = OutOfRangeException("concurrent-origin-marker")
+      .withContext("concurrent-context-marker")
+      .withRelated(IOException("concurrent-secondary-marker"), "concurrent-related-marker");
+  constexpr std::size_t ThreadCount = 8;
+  std::array<std::string, ThreadCount> shorts;
+  std::array<std::string, ThreadCount> fulls;
+  std::array<std::string, ThreadCount> whats;
+  std::array<bool, ThreadCount> stable{};
+  std::barrier start(static_cast<std::ptrdiff_t>(ThreadCount));
+  std::vector<std::thread> threads;
+  threads.reserve(ThreadCount);
+  for (std::size_t i = 0; i < ThreadCount; ++i) {
+    threads.emplace_back([&, i, copy = shared] {
+      start.arrive_and_wait();
+      // Race both cold modes rather than warming either cache on the owner.
+      if (i % 2 == 0) {
+        shorts[i] = printException(copy, false);
+        fulls[i] = printException(copy, true);
+      } else {
+        fulls[i] = printException(copy, true);
+        shorts[i] = printException(copy, false);
+      }
+      whats[i] = copy.what();
+      stable[i] = true;
+      for (int repeat = 0; repeat < 8; ++repeat) {
+        auto diagnostic = ExceptionDiagnostic(copy);
+        stable[i] = stable[i] && printException(diagnostic, true) == fulls[i]
+            && printException(diagnostic, false) == shorts[i] && copy.what() == whats[i]
+            && diagnostic.diagnosticSummary()->reason == "concurrent-origin-marker";
+      }
+    });
+  }
+  for (auto& thread : threads)
+    thread.join();
+  for (std::size_t i = 0; i < ThreadCount; ++i) {
+    EXPECT_TRUE(stable[i]);
+    EXPECT_EQ(shorts[i], shorts[0]);
+    EXPECT_EQ(fulls[i], fulls[0]);
+    EXPECT_EQ(whats[i], shorts[0]);
+  }
+  EXPECT_NE(fulls[0].find("concurrent-origin-marker"), std::string::npos);
+  EXPECT_NE(fulls[0].find("concurrent-secondary-marker"), std::string::npos);
+  EXPECT_NE(fulls[0].find("0x"), std::string::npos);
+}

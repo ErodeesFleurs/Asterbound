@@ -77,15 +77,20 @@ std::expected<std::shared_ptr<ParticleDatabase>, StarException> ParticleDatabase
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
-    auto json = (*assets)->json(file.string());
-    if (!json)
-      return std::unexpected(std::move(json.error()));
-    auto config = ParticleConfig::create(root, *json);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    if (result->m_configs.contains((*config)->kind()))
-      return std::unexpected(StarException(strf("Duplicate particle asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
-    result->m_configs[(*config)->kind()] = std::move(*config);
+    auto loaded = [&]() -> std::expected<void, StarException> {
+      auto json = (*assets)->json(file.string());
+      if (!json)
+        return std::unexpected(std::move(json.error()));
+      auto config = ParticleConfig::create(root, *json);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      if (result->m_configs.contains((*config)->kind()))
+        return std::unexpected(StarException(strf("Duplicate particle asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
+      result->m_configs[(*config)->kind()] = std::move(*config);
+      return {};
+    }();
+    if (!loaded)
+      return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file.string(), "Loading particle"));
   }
   return result;
 }

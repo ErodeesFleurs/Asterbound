@@ -324,8 +324,7 @@ int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   auto result = nativeRuntime ? runServer(argc, argv) : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
   if (!result) {
-    auto text = strf("{}\nDetails:\n{}", exceptionSummary(result.error()),
-        outputException(ExceptionDiagnostic(result.error()), true));
+    auto text = exceptionReport(result.error());
     EmergencyLog::error("Fatal server error: {}", text);
     #if defined STAR_SYSTEM_WINDOWS
     auto wideText = stringToUtf16(text);

@@ -115,7 +115,7 @@ std::expected<std::shared_ptr<VehicleDatabase>, StarException> VehicleDatabase::
       return {};
     }();
     if (!load)
-      return std::unexpected(VehicleDatabaseException(strf("Error loading vehicle '{}'", file), load.error()));
+      return std::unexpected(VehicleDatabaseException(strf("Error loading vehicle '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading vehicle")));
   }
   return database;
 }

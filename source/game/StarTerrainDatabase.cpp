@@ -100,22 +100,27 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
     if (!queued)
       return std::unexpected(std::move(queued.error()));
     for (auto const& path : files->get()) {
-      auto parameters = assets->json(path.string());
-      if (!parameters)
-        return std::unexpected(std::move(parameters.error()));
-      auto name = parameters->getString("name");
-      if (!name)
-        return std::unexpected(std::move(name.error()));
-      auto selectorType = type;
-      if (composed) {
-        auto configuredType = parameters->getString("type");
-        if (!configuredType)
-          return std::unexpected(std::move(configuredType.error()));
-        selectorType = std::move(*configuredType);
-      }
-      if (result->m_terrainSelectors.contains(*name))
-        return std::unexpected(TerrainException(strf("Duplicate {}terrain generator name '{}'", composed ? "composed " : "", *name)));
-      result->m_terrainSelectors[*name] = {std::move(selectorType), std::move(*parameters)};
+      auto loaded = [&]() -> std::expected<void, StarException> {
+        auto parameters = assets->json(path.string());
+        if (!parameters)
+          return std::unexpected(std::move(parameters.error()));
+        auto name = parameters->getString("name");
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        auto selectorType = type;
+        if (composed) {
+          auto configuredType = parameters->getString("type");
+          if (!configuredType)
+            return std::unexpected(std::move(configuredType.error()));
+          selectorType = std::move(*configuredType);
+        }
+        if (result->m_terrainSelectors.contains(*name))
+          return std::unexpected(TerrainException(strf("Duplicate {}terrain generator name '{}'", composed ? "composed " : "", *name)));
+        result->m_terrainSelectors[*name] = {std::move(selectorType), std::move(*parameters)};
+        return {};
+      }();
+      if (!loaded)
+        return std::unexpected(assets->withAssetContext(std::move(loaded.error()), path.string(), "Loading terrain configuration"));
     }
     return {};
   };

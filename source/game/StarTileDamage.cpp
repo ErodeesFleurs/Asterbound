@@ -94,11 +94,14 @@ TileDamageParameters::TileDamageParameters()
   : m_damageRecoveryPerSecond(0.0f), m_maximumEffectTime(0.0f), m_totalHealth(0), m_requiredHarvestLevel(0) {}
 
 std::expected<TileDamageParameters, StarException> TileDamageParameters::create(Assets const& assets, Json config, std::optional<float> healthOverride, std::optional<unsigned> harvestLevelOverride) {
+  std::optional<String> sourcePath;
+  auto parsed = [&]() -> std::expected<TileDamageParameters, StarException> {
   TileDamageParameters result;
   if (config.type() == Json::Type::String) {
     auto path = config.toString();
     if (!path) return std::unexpected(std::move(path.error()));
-    auto loaded = assets.json(*path);
+    sourcePath = std::move(*path);
+    auto loaded = assets.json(*sourcePath);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     config = std::move(*loaded);
   }
@@ -127,6 +130,10 @@ std::expected<TileDamageParameters, StarException> TileDamageParameters::create(
   if (healthOverride) result.m_totalHealth = *healthOverride;
   if (harvestLevelOverride) result.m_requiredHarvestLevel = *harvestLevelOverride;
   return result;
+  }();
+  if (!parsed && sourcePath)
+    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), *sourcePath, "Loading tile damage parameters"));
+  return parsed;
 }
 
 std::expected<float, StarException> TileDamageParameters::damageDone(TileDamage const& damage) const {

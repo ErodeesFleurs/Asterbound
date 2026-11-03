@@ -193,7 +193,7 @@ std::expected<void, StarException> WorldClientThread::stop() {
   auto cleared = clearMessages();
   if (!joined) {
     if (!cleared)
-      return std::unexpected(joined.error().withContext(strf("Client world message drain also failed: {}", cleared.error().what())));
+      return std::unexpected(joined.error().withRelated(cleared.error(), "Client world message drain also failed"));
     return std::unexpected(std::move(joined.error()));
   }
   if (!cleared)
@@ -269,7 +269,7 @@ std::expected<void, StarException> WorldClientThread::run() {
     auto logged = m_worldClient->root().logger().error("WorldClientThread error: {}",
         outputException(ExceptionDiagnostic(result.error()), true));
     if (!logged)
-      result = std::unexpected(result.error().withContext(strf("World error logging also failed: {}", logged.error().what())));
+      result = std::unexpected(result.error().withRelated(logged.error(), "World error logging also failed"));
     m_errorOccurred = true;
   }
   auto cleared = clearMessages();
@@ -277,7 +277,7 @@ std::expected<void, StarException> WorldClientThread::run() {
     auto logged = m_worldClient->root().logger().error("WorldClientThread message drain failed: {}",
         outputException(ExceptionDiagnostic(cleared.error()), true));
     if (!logged)
-      cleared = std::unexpected(cleared.error().withContext(strf("World message drain logging also failed: {}", logged.error().what())));
+      cleared = std::unexpected(cleared.error().withRelated(logged.error(), "World message drain logging also failed"));
     m_errorOccurred = true;
     if (result)
       return std::unexpected(std::move(cleared.error()));
@@ -328,7 +328,7 @@ std::expected<void, StarException> WorldClientThread::update() {
     queueLocker.unlock();
     m_errorOccurred = true;
     if (!logged)
-      return std::unexpected(incoming.error().withContext(strf("World packet error logging also failed: {}", logged.error().what())));
+      return std::unexpected(incoming.error().withRelated(logged.error(), "World packet error logging also failed"));
   }
 
   float dt = m_worldClient->root().timing().timestep * m_worldClient->root().timing().timescale;
@@ -345,32 +345,11 @@ std::expected<void, StarException> WorldClientThread::update() {
       lockWithDiagnostics(messageLocker);
       messages = std::move(m_messages);
     }
-    std::optional<StarException> error;
-    for (auto& message : messages) {
-      if (error) {
-        auto failed = message.promise.fail("World message handling stopped");
-        if (!failed)
-          *error = error->withContext(strf("World message drain also failed: {}", failed.error().what()));
-        continue;
-      }
-      auto response = m_worldClient->receiveMessage(ServerConnectionId, message.message, message.args);
-      std::expected<void, StarException> completion;
-      if (!response) {
-        if (!error)
-          error = std::move(response.error());
-        completion = message.promise.fail("World message handling failed");
-      } else if (!*response) {
-        completion = message.promise.fail("Message not handled by world");
-      } else if (std::holds_alternative<RpcPromise<Json>>(**response)) {
-        completion = message.promise.chain(std::get<RpcPromise<Json>>(**response));
-      } else {
-        completion = message.promise.fulfill(std::get<Json>(**response));
-      }
-      if (!completion && !error)
-        error = std::move(completion.error());
-    }
-    if (error)
-      return std::unexpected(std::move(*error));
+    auto settled = settleWorldMessageBatch(messages, [&](String const& message, JsonArray const& args) {
+      return m_worldClient->receiveMessage(ServerConnectionId, message, args);
+    });
+    if (!settled)
+      return std::unexpected(std::move(settled.error()));
   }
 
   auto outgoingPackets = m_worldClient->getOutgoingPackets();

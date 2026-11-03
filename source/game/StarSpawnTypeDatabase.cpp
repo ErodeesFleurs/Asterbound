@@ -167,21 +167,27 @@ Json SpawnProfile::toJson() const {
 std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& assets, Json const& config, std::uint64_t seed) {
   SpawnProfile result;
   auto commonGroups = assets.json("/spawning.config:spawnGroups");
-  if (!commonGroups) return std::unexpected(std::move(commonGroups.error()));
+  if (!commonGroups) return std::unexpected(assets.withAssetContext(std::move(commonGroups.error()), "/spawning.config:spawnGroups", "Loading common spawn groups"));
   auto groups = config.getArray("groups", JsonArray());
   if (!groups) return std::unexpected(std::move(groups.error()));
   for (auto const& group : *groups) {
     auto poolConfig = group.get("pool");
     if (!poolConfig) return std::unexpected(std::move(poolConfig.error()));
+    bool commonPool = false;
     if (poolConfig->canConvert(Json::Type::String)) {
       auto name = poolConfig->toString();
       if (!name) return std::unexpected(std::move(name.error()));
       auto common = commonGroups->get(*name);
-      if (!common) return std::unexpected(std::move(common.error()));
+      if (!common) return std::unexpected(assets.withAssetContext(std::move(common.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
       poolConfig = std::move(common);
+      commonPool = true;
     }
     auto pool = jsonToWeightedPool<String>(*poolConfig);
-    if (!pool) return std::unexpected(std::move(pool.error()));
+    if (!pool) {
+      if (commonPool)
+        return std::unexpected(assets.withAssetContext(std::move(pool.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
+      return std::unexpected(std::move(pool.error()));
+    }
     auto count = group.getUInt("select");
     if (!count) return std::unexpected(std::move(count.error()));
     result.spawnTypes.addAll(pool->selectUniques(*count, ++seed));
@@ -221,7 +227,7 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
     };
     auto loaded = readFile();
     if (!loaded)
-      return std::unexpected(SpawnTypeDatabaseException(strf("Error reading spawnType config file {}", file), loaded.error()));
+      return std::unexpected(SpawnTypeDatabaseException(strf("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
   }
   return result;
 }

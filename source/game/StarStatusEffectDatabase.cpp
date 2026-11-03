@@ -38,14 +38,19 @@ std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> StatusEffect
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& asset : files->get()) {
     auto const& file = asset.string();
-    auto config = assets->json(file);
-    if (!config) return std::unexpected(std::move(config.error()));
-    auto effect = database->parseUniqueEffect(*config, file);
-    if (!effect) return std::unexpected(std::move(effect.error()));
-    if (database->m_uniqueEffects.contains(effect->name))
-      return std::unexpected(StatusEffectDatabaseException::format(
-          "Duplicate stat effect named '{}', config file '{}'", effect->name, file));
-    database->m_uniqueEffects[effect->name] = std::move(*effect);
+    auto loaded = [&]() -> std::expected<void, StarException> {
+      auto config = assets->json(file);
+      if (!config) return std::unexpected(std::move(config.error()));
+      auto effect = database->parseUniqueEffect(*config, file);
+      if (!effect) return std::unexpected(std::move(effect.error()));
+      if (database->m_uniqueEffects.contains(effect->name))
+        return std::unexpected(StatusEffectDatabaseException::format(
+            "Duplicate stat effect named '{}', config file '{}'", effect->name, file));
+      database->m_uniqueEffects[effect->name] = std::move(*effect);
+      return {};
+    }();
+    if (!loaded)
+      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file, "Loading status effect"));
   }
   return database;
 }

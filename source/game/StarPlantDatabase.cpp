@@ -256,13 +256,18 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
     auto read = [&](auto const& files, auto& configs) -> std::expected<void, StarException> {
       for (auto const& scannedFile : files) {
         String file = scannedFile.string();
-        auto config = (*assets)->json(file);
-        if (!config) return std::unexpected(std::move(config.error()));
-        auto name = config->getString("name");
-        if (!name) return std::unexpected(std::move(name.error()));
-        auto settings = config->toObject();
-        if (!settings) return std::unexpected(std::move(settings.error()));
-        configs.insert(std::move(*name), Config{AssetPath::directory(file), std::move(*settings)});
+        auto loaded = [&]() -> std::expected<void, StarException> {
+          auto config = (*assets)->json(file);
+          if (!config) return std::unexpected(std::move(config.error()));
+          auto name = config->getString("name");
+          if (!name) return std::unexpected(std::move(name.error()));
+          auto settings = config->toObject();
+          if (!settings) return std::unexpected(std::move(settings.error()));
+          configs.insert(std::move(*name), Config{AssetPath::directory(file), std::move(*settings)});
+          return {};
+        }();
+        if (!loaded)
+          return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading plant configuration"));
       }
       return {};
     };

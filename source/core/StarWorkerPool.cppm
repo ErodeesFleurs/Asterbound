@@ -101,7 +101,9 @@ private:
     std::thread::id id;
   };
 
-  using QueuedWork = UniqueFunction<std::expected<void, StarException>(std::optional<StarException>)>;
+  // Task failures belong to their completion state; only checked invocation of
+  // the adapter itself can fail at the queue boundary.
+  using QueuedWork = UniqueFunction<void(std::optional<StarException>)>;
   void queueWork(QueuedWork work);
   template <typename Callable>
   static auto invokeTask(Callable& callable) -> std::invoke_result_t<Callable&> {
@@ -176,7 +178,7 @@ template <typename Callable>
       && std::same_as<std::invoke_result_t<std::decay_t<Callable>&>, std::expected<void, StarException>>)
 WorkerPoolHandle WorkerPool::addWork(Callable&& work) {
   auto state = std::make_shared<WorkerPoolHandle::Impl>();
-  queueWork([state, work = std::forward<Callable>(work)](std::optional<StarException> cancelled) mutable -> std::expected<void, StarException> {
+  queueWork([state, work = std::forward<Callable>(work)](std::optional<StarException> cancelled) mutable {
     auto result = cancelled ? std::expected<void, StarException>(std::unexpected(std::move(*cancelled))) : invokeTask(work);
     std::lock_guard lock(state->mutex);
     if (!result)
@@ -184,7 +186,6 @@ WorkerPoolHandle WorkerPool::addWork(Callable&& work) {
     state->done.store(true, std::memory_order_release);
     state->done.notify_all();
     state->condition.notify_all();
-    return {};
   });
   return state;
 }
@@ -195,7 +196,7 @@ template <typename ResultType, typename Callable>
       && std::same_as<std::invoke_result_t<std::decay_t<Callable>&>, std::expected<ResultType, StarException>>)
 WorkerPoolPromise<ResultType> WorkerPool::addProducer(Callable&& producer) {
   auto state = std::make_shared<typename WorkerPoolPromise<ResultType>::Impl>();
-  queueWork([state, producer = std::forward<Callable>(producer)](std::optional<StarException> cancelled) mutable -> std::expected<void, StarException> {
+  queueWork([state, producer = std::forward<Callable>(producer)](std::optional<StarException> cancelled) mutable {
     auto result = cancelled ? std::expected<ResultType, StarException>(std::unexpected(std::move(*cancelled))) : invokeTask(producer);
     std::lock_guard lock(state->mutex);
     if (result)
@@ -205,7 +206,6 @@ WorkerPoolPromise<ResultType> WorkerPool::addProducer(Callable&& producer) {
     state->done.store(true, std::memory_order_release);
     state->done.notify_all();
     state->condition.notify_all();
-    return {};
   });
   return state;
 }

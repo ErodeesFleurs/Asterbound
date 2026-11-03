@@ -142,6 +142,40 @@ std::string Assets::sourceDiagnostic(AssetSource const& source,
   return result;
 }
 
+StarException Assets::withAssetContext(StarException error, String const& path, std::string_view operation) const {
+  auto const& current = *error.diagnosticSummary();
+  bool addAsset = current.asset.empty();
+  bool addOperation = current.operation.empty() && !operation.empty();
+  bool addProvider = current.assetProvider.empty() && (addAsset || current.asset == path.utf8());
+  if (!addAsset && !addOperation && !addProvider)
+    return error;
+  std::string provider;
+  if (addProvider) {
+    auto descriptor = assetDescriptor(path);
+    if (descriptor && *descriptor) {
+      auto sourcePath = assetSourcePath((*descriptor)->source);
+      provider = sourceDiagnostic(*(*descriptor)->source,
+          sourcePath ? std::optional<std::reference_wrapper<String const>>(std::cref(*sourcePath)) : std::nullopt);
+    }
+  }
+  if (!addAsset && !addOperation && provider.empty())
+    return error;
+  auto summary = current;
+  if (addAsset)
+    summary.asset = path.utf8();
+  if (addOperation)
+    summary.operation = operation;
+  if (addAsset || !provider.empty()) {
+    auto context = provider.empty() ? strf("{} '{}'", operation, path)
+        : strf("{} '{}' from {}", operation, path, provider);
+    error = std::move(error).withContext(std::move(context));
+  }
+  if (!provider.empty())
+    summary.assetProvider = std::move(provider);
+  return std::move(error).withSummary(std::move(summary));
+}
+
+
 static void addSummarySource(ExceptionSummary& summary, std::string_view source, std::string_view provider) {
   for (auto& location : summary.locations) {
     if (location.source == source && (location.provider.empty() || location.provider == provider)) {
@@ -154,6 +188,9 @@ static void addSummarySource(ExceptionSummary& summary, std::string_view source,
 }
 
 static StarException resourceFailure(StarException error, String const& path) {
+  auto const& current = *error.diagnosticSummary();
+  if (current.kind != ExceptionSummaryKind::Native && !current.asset.empty())
+    return error;
   auto summary = *error.diagnosticSummary();
   if (summary.kind == ExceptionSummaryKind::Native)
     summary.kind = ExceptionSummaryKind::Resource;
@@ -163,6 +200,10 @@ static StarException resourceFailure(StarException error, String const& path) {
 }
 
 static StarException scriptSourceFailure(StarException error, String const& path, std::string const& provider) {
+  if (std::ranges::any_of(error.diagnosticSummary()->locations, [&](auto const& location) {
+        return location.source == path.utf8() && location.provider == provider;
+      }))
+    return error;
   auto summary = *error.diagnosticSummary();
   addSummarySource(summary, path.utf8(), provider);
   return std::move(error).withSummary(std::move(summary));
@@ -171,18 +212,28 @@ static StarException scriptSourceFailure(StarException error, String const& path
 static StarException luaPatchFailure(StarException error, String const& targetPath, String const& patchPath,
     AssetSource const& source, std::optional<std::reference_wrapper<String const>> sourcePath) {
   auto provider = Assets::sourceDiagnostic(source, sourcePath);
-  auto summary = *error.diagnosticSummary();
-  if (summary.kind != ExceptionSummaryKind::PatchSyntax && summary.kind != ExceptionSummaryKind::PatchRuntime)
-    summary.kind = summary.kind == ExceptionSummaryKind::ScriptSyntax
-      ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime;
-  // Nested asset callbacks may already identify the actual failing patch.
-  if (summary.patch.empty()) {
-    summary.asset = targetPath.utf8();
-    summary.patch = patchPath.utf8();
-    summary.patchProvider = provider;
+  auto const& current = *error.diagnosticSummary();
+  auto patchBasePath = AssetPath::removeSubPath(patchPath);
+  bool changeKind = current.kind != ExceptionSummaryKind::PatchSyntax && current.kind != ExceptionSummaryKind::PatchRuntime;
+  bool changePatch = current.patch.empty();
+  bool changeSource = std::ranges::none_of(current.locations, [&](auto const& location) {
+    return location.source == patchBasePath.utf8() && location.provider == provider;
+  });
+  if (changeKind || changePatch || changeSource) {
+    auto summary = current;
+    if (changeKind)
+      summary.kind = current.kind == ExceptionSummaryKind::ScriptSyntax
+        ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime;
+    if (changePatch) {
+      summary.asset = targetPath.utf8();
+      summary.patch = patchPath.utf8();
+      summary.patchProvider = provider;
+    }
+    if (changeSource)
+      addSummarySource(summary, patchBasePath.utf8(), provider);
+    error = std::move(error).withSummary(std::move(summary));
   }
-  addSummarySource(summary, AssetPath::removeSubPath(patchPath).utf8(), provider);
-  return std::move(error).withSummary(std::move(summary)).withContext(
+  return std::move(error).withContext(
       strf("Lua patch provider: target '{}', patch '{}', {}", targetPath, patchPath, provider));
 }
 
@@ -1658,6 +1709,14 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
   return std::make_shared<Image>(std::move(resultImage->get()));
 }
 
+std::expected<void, StarException> Assets::reportPatchRejection(String const& path,
+    std::shared_ptr<AssetSource> const& source, StarException const& error) const {
+  auto provider = sourceDiagnostic(*source, m_assetSourcePaths.maybeLeftRef(source));
+  if (error.is<JsonPatchTestFail>())
+    return m_logger.debug("Patch test failure from file {} in {}. Caused by: {}", path, provider, error.what());
+  return m_logger.error("Could not apply patch from file {} in {}. Caused by: {}", path, provider, error.what());
+}
+
 std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
                                                            std::shared_ptr<AssetSource> const& source,
                                                            Json const result, JsonArray const& patchData,
@@ -1677,15 +1736,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
           auto const& error = patched.error();
           if (!error.is<JsonPatchTestFail>() && !error.is<JsonPatchException>())
             return std::unexpected(std::move(patched.error()));
-          auto sourceName = source->metadata().value("name", "").repr();
-          if (!sourceName)
-            return std::unexpected(std::move(sourceName.error()));
-          auto sourcePath = m_assetSourcePaths.getLeft(source);
-          if (!sourcePath)
-            return std::unexpected(std::move(sourcePath.error()));
-          auto logged = error.is<JsonPatchTestFail>()
-            ? m_logger.debug("Patch test failure from file {} in source: '{}' at '{}'. Caused by: {}", path, *sourceName, sourcePath->get(), error.what())
-            : m_logger.error("Could not apply patch from file {} in source: '{}' at '{}'.  Caused by: {}", path, *sourceName, sourcePath->get(), error.what());
+          auto logged = reportPatchRejection(path, source, error);
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -1793,15 +1844,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
             auto const& error = patched.error();
             if (!error.is<JsonPatchTestFail>() && !error.is<JsonPatchException>())
               return std::unexpected(std::move(patched.error()));
-            auto sourceName = patchSource->metadata().value("name", "").repr();
-            if (!sourceName)
-              return std::unexpected(std::move(sourceName.error()));
-            auto sourcePath = m_assetSourcePaths.getLeft(patchSource);
-            if (!sourcePath)
-              return std::unexpected(std::move(sourcePath.error()));
-            auto logged = error.is<JsonPatchTestFail>()
-              ? m_logger.debug("Patch test failure from file {} in source: '{}' at '{}'. Caused by: {}", pair.first, *sourceName, sourcePath->get(), error.what())
-              : m_logger.error("Could not apply patch from file {} in source: '{}' at '{}'.  Caused by: {}", pair.first, *sourceName, sourcePath->get(), error.what());
+            auto logged = reportPatchRejection(pair.first, patchSource, error);
             if (!logged)
               return std::unexpected(std::move(logged.error()));
           }
@@ -1812,10 +1855,9 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       };
       auto applied = applyPatch();
       if (!applied) {
-        auto sourceName = patchSource->metadata().value("name", "").repr();
-        if (!sourceName)
-          return std::unexpected(JsonParsingException(strf("Cannot serialize source metadata for json patch file: {}", patchBasePath), sourceName.error()));
-        return std::unexpected(JsonParsingException(strf("Cannot parse json patch file: {} in source {}", patchBasePath, *sourceName), applied.error()));
+        return std::unexpected(JsonParsingException(
+            strf("Cannot parse json patch file '{}' from {}", patchBasePath,
+                sourceDiagnostic(*patchSource, m_assetSourcePaths.maybeLeftRef(patchSource))), applied.error()));
       }
     }
   }
@@ -1826,10 +1868,6 @@ std::expected<bool, StarException> Assets::doLoad(AssetId const& id) const {
   auto loaded = loadAsset(id);
   if (loaded)
     return static_cast<bool>(*loaded);
-  m_assetsCache[id] = {};
-  m_assetErrors[id] = loaded.error();
-  m_assetsDone.notify_all();
-  m_queue.remove(id);
   auto logged = m_logger.error("{}\nError loading asset: {}\nDetails:\n{}", exceptionSummary(loaded.error()), id.path,
       outputException(ExceptionDiagnostic(loaded.error()), true));
   if (!logged)
@@ -1864,6 +1902,15 @@ std::expected<bool, StarException> Assets::doPost(AssetId const& id) const {
   if (logError)
     return std::unexpected(std::move(*logError));
   return true;
+}
+
+void Assets::publishAssetFailure(AssetId const& id, StarException const& error) const {
+  m_queue.remove(id);
+  m_assetsCache[id] = {};
+  m_assetErrors.set(id, error);
+  m_assetsDone.notify_all();
+  if (m_queue.empty() && m_luaGcPending)
+    m_assetsQueued.notify_one();
 }
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAsset(AssetId const& id) const {
@@ -1910,12 +1957,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
     }
   }
   if (!loaded) {
-    m_queue.remove(id);
-    m_assetsCache[id] = {};
-    m_assetErrors[id] = loaded.error();
-    m_assetsDone.notify_all();
-    if (m_queue.empty() && m_luaGcPending)
-      m_assetsQueued.notify_one();
+    publishAssetFailure(id, loaded.error());
     return std::unexpected(std::move(loaded.error()));
   }
   auto asset = std::move(*loaded);
@@ -1932,8 +1974,10 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
   } else {
     m_queue[id] = QueuePriority::Load;
     m_assetsQueued.notify_one();
-    if (auto moved = m_queue.toBack(id); !moved)
+    if (auto moved = m_queue.toBack(id); !moved) {
+      publishAssetFailure(id, moved.error());
       return std::unexpected(std::move(moved.error()));
+    }
   }
   return asset;
 }

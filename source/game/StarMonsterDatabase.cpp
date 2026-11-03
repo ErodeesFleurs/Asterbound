@@ -209,15 +209,20 @@ monsterType.baseParameters = std::move(*result23);
   if (std::move(*result24)) {
           auto result25 = config.getString("partParameters");
   if (!result25) return std::unexpected(std::move(result25.error()));
-  auto result26 = assets->json(AssetPath::relativeTo(file, std::move(*result25)));
-  if (!result26) return std::unexpected(std::move(result26.error()));
-  Json partParameterSource = std::move(*result26);
-          auto result27 = partParameterSource.getObject("partParameterDescription");
-  if (!result27) return std::unexpected(std::move(result27.error()));
-  monsterType.partParameterDescription = std::move(*result27);
-          auto result28 = partParameterSource.getObject("partParameters");
-  if (!result28) return std::unexpected(std::move(result28.error()));
-  monsterType.partParameterOverrides = std::move(*result28);
+          auto partParametersPath = AssetPath::relativeTo(file, std::move(*result25));
+          auto partParameters = [&]() -> std::expected<void, StarException> {
+            auto source = assets->json(partParametersPath);
+            if (!source) return std::unexpected(std::move(source.error()));
+            auto description = source->getObject("partParameterDescription");
+            if (!description) return std::unexpected(std::move(description.error()));
+            monsterType.partParameterDescription = std::move(*description);
+            auto overrides = source->getObject("partParameters");
+            if (!overrides) return std::unexpected(std::move(overrides.error()));
+            monsterType.partParameterOverrides = std::move(*overrides);
+            return {};
+          }();
+          if (!partParameters)
+            return std::unexpected(assets->withAssetContext(std::move(partParameters.error()), partParametersPath, "Loading monster part parameters"));
         } else {
           // outdated monsters still have partParameterDescription defined
           // directly in the
@@ -231,7 +236,7 @@ monsterType.baseParameters = std::move(*result23);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster type '{}'", file), std::move(loaded.error())));
+      return std::unexpected(MonsterException(strf("Error loading monster type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster type")));
   }
 
   for (auto const& assetFile : monsterParts) {
@@ -270,7 +275,7 @@ part.partParameters = std::move(*result35);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster part '{}'", file), std::move(loaded.error())));
+      return std::unexpected(MonsterException(strf("Error loading monster part '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster part")));
   }
 
   for (auto const& assetFile : monsterSkills) {
@@ -310,7 +315,7 @@ skill.animationParameters = std::move(*result42);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster skill '{}'", file), std::move(loaded.error())));
+      return std::unexpected(MonsterException(strf("Error loading monster skill '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster skill")));
   }
 
   for (auto const& assetFile : monsterColors) {
@@ -353,7 +358,7 @@ auto paletteName = std::move(*result44);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster colors '{}'", file), std::move(loaded.error())));
+      return std::unexpected(MonsterException(strf("Error loading monster colors '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster colors")));
   }
   return {};
 }
@@ -871,8 +876,8 @@ auto const& monsterType = result144->get();
 
   auto result145 = m_root.assets();
 if (!result145) return std::unexpected(std::move(result145.error()));
-auto result146 = std::move(*result145)->fetchJson(monsterType.animationConfigPath);
-if (!result146) return std::unexpected(std::move(result146.error()));
+auto result146 = (*result145)->fetchJson(monsterType.animationConfigPath);
+if (!result146) return std::unexpected((*result145)->withAssetContext(std::move(result146.error()), monsterType.animationConfigPath, "Loading monster animation"));
 monsterVariant.animatorConfig = std::move(*result146);
   monsterVariant.reversed = monsterType.reversed;
 

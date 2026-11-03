@@ -71,7 +71,7 @@ std::expected<std::shared_ptr<StagehandDatabase>, StarException> StagehandDataba
       return {};
     }();
     if (!load)
-      return std::unexpected(StagehandDatabaseException(strf("Error loading stagehand type '{}'", file), load.error()));
+      return std::unexpected(StagehandDatabaseException(strf("Error loading stagehand type '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading stagehand type")));
   }
   return database;
 }

@@ -56,6 +56,10 @@ JSON and image Lua patch errors identify the target asset, patch path, and the e
 
 Error logs present a concise, reason-first summary before `Details:`: Lua syntax/runtime failures, Lua patch syntax/runtime failures, and resource failures have separate categories, with execution phase, live script locations, and providers where available. Typed causes are retained through native callbacks and ordinary Lua rethrows; repeated wrapper contexts do not obscure the original reason. Distinct call sites remain visible. The complete original exception chain, Lua traceback and native stacks follow in the details rather than being suppressed.
 
+Database per-file validation also adds the concrete asset path and provider where available, including valid JSON with missing or invalid fields. More specific nested asset and patch attribution takes precedence. Recoverable entries still log and skip or use their existing fallback; adding diagnostic context does not make those failures fatal.
+
+Native errors capture stack locations at their origin, but defer symbol resolution until full details are requested. Error copies share immutable diagnostic payloads; short and full renderings are cached independently and support concurrent readers. Captured addresses and module-relative locations remain in full details when symbols or a loaded module are no longer available. Related cleanup failures retain both diagnostics without changing the primary error's classification.
+
 Native callback errors keep their string-valued Lua representation, and built-in `error`/`pcall` behavior is unchanged. Summary transport is identity-bound and bounded; errors deliberately rewritten by a script are treated as new errors unless a complete known payload with a verified live Lua location prefix is preserved. This avoids guessing a mod or reusing a previous failure's attribution.
 
 ## Building

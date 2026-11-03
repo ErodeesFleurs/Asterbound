@@ -45,32 +45,38 @@ LiquidSettings::LiquidSettings() : id(EmptyLiquidId) {}
 
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase) {
   auto result = std::shared_ptr<LiquidsDatabase>(new LiquidsDatabase());
-  auto config = assets->json("/liquids.config");
-  if (!config) return std::unexpected(std::move(config.error()));
-  auto engine = config->get("liquidEngineParameters");
-  if (!engine) return std::unexpected(std::move(engine.error()));
-  constexpr std::pair<std::string_view, float LiquidCellEngineParameters::*> fields[] = {
-    {"lateralMoveFactor", &LiquidCellEngineParameters::lateralMoveFactor},
-    {"spreadOverfillUpFactor", &LiquidCellEngineParameters::spreadOverfillUpFactor},
-    {"spreadOverfillLateralFactor", &LiquidCellEngineParameters::spreadOverfillLateralFactor},
-    {"spreadOverfillDownFactor", &LiquidCellEngineParameters::spreadOverfillDownFactor},
-    {"pressureEqualizeFactor", &LiquidCellEngineParameters::pressureEqualizeFactor},
-    {"pressureMoveFactor", &LiquidCellEngineParameters::pressureMoveFactor},
-    {"maximumPressureLevelImbalance", &LiquidCellEngineParameters::maximumPressureLevelImbalance},
-    {"minimumLivenPressureChange", &LiquidCellEngineParameters::minimumLivenPressureChange},
-    {"minimumLivenLevelChange", &LiquidCellEngineParameters::minimumLivenLevelChange},
-    {"minimumLiquidLevel", &LiquidCellEngineParameters::minimumLiquidLevel},
-    {"interactTransformationLevel", &LiquidCellEngineParameters::interactTransformationLevel}};
-  for (auto const& [name, member] : fields) {
-    auto value = engine->getFloat(name);
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_liquidEngineParameters.*member = *value;
-  }
-  {
-    auto value = config->getFloat("backgroundDrain");
-    if (!value) return std::unexpected(std::move(value.error()));
-    result->m_backgroundDrain = std::move(*value);
-  }
+  auto loadEngineParameters = [&]() -> std::expected<void, StarException> {
+    auto config = assets->json("/liquids.config");
+    if (!config) return std::unexpected(std::move(config.error()));
+    auto engine = config->get("liquidEngineParameters");
+    if (!engine) return std::unexpected(std::move(engine.error()));
+    constexpr std::pair<std::string_view, float LiquidCellEngineParameters::*> fields[] = {
+      {"lateralMoveFactor", &LiquidCellEngineParameters::lateralMoveFactor},
+      {"spreadOverfillUpFactor", &LiquidCellEngineParameters::spreadOverfillUpFactor},
+      {"spreadOverfillLateralFactor", &LiquidCellEngineParameters::spreadOverfillLateralFactor},
+      {"spreadOverfillDownFactor", &LiquidCellEngineParameters::spreadOverfillDownFactor},
+      {"pressureEqualizeFactor", &LiquidCellEngineParameters::pressureEqualizeFactor},
+      {"pressureMoveFactor", &LiquidCellEngineParameters::pressureMoveFactor},
+      {"maximumPressureLevelImbalance", &LiquidCellEngineParameters::maximumPressureLevelImbalance},
+      {"minimumLivenPressureChange", &LiquidCellEngineParameters::minimumLivenPressureChange},
+      {"minimumLivenLevelChange", &LiquidCellEngineParameters::minimumLivenLevelChange},
+      {"minimumLiquidLevel", &LiquidCellEngineParameters::minimumLiquidLevel},
+      {"interactTransformationLevel", &LiquidCellEngineParameters::interactTransformationLevel}};
+    for (auto const& [name, member] : fields) {
+      auto value = engine->getFloat(name);
+      if (!value) return std::unexpected(std::move(value.error()));
+      result->m_liquidEngineParameters.*member = *value;
+    }
+    {
+      auto value = config->getFloat("backgroundDrain");
+      if (!value) return std::unexpected(std::move(value.error()));
+      result->m_backgroundDrain = std::move(*value);
+    }
+    return {};
+  };
+  auto engineParameters = loadEngineParameters();
+  if (!engineParameters)
+    return std::unexpected(assets->withAssetContext(std::move(engineParameters.error()), "/liquids.config", "Loading liquid engine parameters"));
   result->m_liquidNames["empty"] = EmptyLiquidId;
   auto liquids = assets->scanExtension("liquid");
   if (!liquids) return std::unexpected(std::move(liquids.error()));
@@ -166,7 +172,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       return {};
     };
     auto loaded = readFile();
-    if (!loaded) return std::unexpected(LiquidException(strf("Error loading liquid file {}", file), loaded.error()));
+    if (!loaded) return std::unexpected(assets->withAssetContext(LiquidException(strf("Error loading liquid file {}", file), loaded.error()), file, "Loading liquid"));
   }
   return result;
 }

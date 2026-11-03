@@ -135,6 +135,7 @@ BehaviorTree::BehaviorTree(String const& name, StringSet scripts, JsonObject con
 
 std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase::create(std::shared_ptr<Assets const> assets) {
   auto database = std::shared_ptr<BehaviorDatabase>(new BehaviorDatabase());
+  database->m_assets = assets;
   auto files = assets->scanExtension("nodes");
   if (!files) return std::unexpected(std::move(files.error()));
   auto queuedNodes = assets->queueJsons(files->get());
@@ -168,7 +169,7 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       }
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load nodes file '{}'", file), load.error()));
+    if (!load) return std::unexpected(StarException(strf("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
   }
   auto behaviors = assets->scanExtension("behavior");
   if (!behaviors) return std::unexpected(std::move(behaviors.error()));
@@ -183,9 +184,10 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       if (!name) return std::unexpected(std::move(name.error()));
       if (database->m_configs.contains(*name)) return std::unexpected(StarException(strf("Duplicate behavior tree '{}'", *name)));
       database->m_configs[*name] = std::move(*config);
+      database->m_configPaths[*name] = file;
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load behavior file '{}'", file), load.error()));
+    if (!load) return std::unexpected(StarException(strf("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
   }
   for (auto const& pair : database->m_configs) {
     if (!database->m_behaviors.contains(pair.first)) {
@@ -207,7 +209,11 @@ std::expected<void, StarException> BehaviorDatabase::loadTree(String const& name
   auto config = behaviorConfig(name);
   if (!config) return std::unexpected(std::move(config.error()));
   auto tree = buildTree(*config, {});
-  if (!tree) return std::unexpected(std::move(tree.error()));
+  if (!tree) {
+    if (auto path = m_configPaths.maybeRef(name))
+      return std::unexpected(m_assets->withAssetContext(std::move(tree.error()), path->get(), "Building behavior tree"));
+    return std::unexpected(std::move(tree.error()));
+  }
   m_behaviors.set(name, *tree);
   return {};
 }
@@ -293,7 +299,11 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     auto moduleConfig = behaviorConfig(*name);
     if (!moduleConfig) return std::unexpected(std::move(moduleConfig.error()));
     auto module = buildTree(*moduleConfig, parameters);
-    if (!module) return std::unexpected(std::move(module.error()));
+    if (!module) {
+      if (auto path = m_configPaths.maybeRef(*name))
+        return std::unexpected(m_assets->withAssetContext(std::move(module.error()), path->get(), "Building behavior tree"));
+      return std::unexpected(std::move(module.error()));
+    }
     tree.scripts.addAll((*module)->scripts);
     tree.functions.addAll((*module)->functions);
     return (*module)->root;

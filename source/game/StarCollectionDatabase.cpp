@@ -75,39 +75,45 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
     auto const& file = assetFile.string();
-    auto config = (*assets)->json(file);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    auto name = config->getString("name");
-    if (!name)
-      return std::unexpected(std::move(name.error()));
-    auto title = config->getString("title", *name);
-    if (!title)
-      return std::unexpected(std::move(title.error()));
-    auto typeName = config->getString("type", "generic");
-    if (!typeName)
-      return std::unexpected(std::move(typeName.error()));
-    auto type = CollectionTypeNames->maybeLeftRef(*typeName);
-    if (!type)
-      return std::unexpected(std::move(type.error()));
-    if (!*type)
-      return std::unexpected(CollectionDatabaseException(strf("Unknown collection type '{}'", *typeName)));
-    Collection collection(*name, (*type)->get(), *title);
-    auto configs = config->get("collectables").and_then([](Json const& value) { return value.iterateObject(); });
-    if (!configs)
-      return std::unexpected(std::move(configs.error()));
-    result->m_collectables[collection.name] = {};
-    result->m_collectableConfigs[collection.name] = {};
-    for (auto const& pair : *configs) {
-      result->m_collectableConfigs[collection.name][pair.first] = pair.second;
-      if (collection.type == CollectionType::Generic) {
-        auto collectable = result->parseGenericCollectable(pair.first, pair.second);
-        if (!collectable)
-          return std::unexpected(std::move(collectable.error()));
-        result->m_collectables[collection.name][pair.first] = std::move(*collectable);
+    auto readFile = [&]() -> std::expected<void, StarException> {
+      auto config = (*assets)->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      auto name = config->getString("name");
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      auto title = config->getString("title", *name);
+      if (!title)
+        return std::unexpected(std::move(title.error()));
+      auto typeName = config->getString("type", "generic");
+      if (!typeName)
+        return std::unexpected(std::move(typeName.error()));
+      auto type = CollectionTypeNames->maybeLeftRef(*typeName);
+      if (!type)
+        return std::unexpected(std::move(type.error()));
+      if (!*type)
+        return std::unexpected(CollectionDatabaseException(strf("Unknown collection type '{}'", *typeName)));
+      Collection collection(*name, (*type)->get(), *title);
+      auto configs = config->get("collectables").and_then([](Json const& value) { return value.iterateObject(); });
+      if (!configs)
+        return std::unexpected(std::move(configs.error()));
+      result->m_collectables[collection.name] = {};
+      result->m_collectableConfigs[collection.name] = {};
+      for (auto const& pair : *configs) {
+        result->m_collectableConfigs[collection.name][pair.first] = pair.second;
+        if (collection.type == CollectionType::Generic) {
+          auto collectable = result->parseGenericCollectable(pair.first, pair.second);
+          if (!collectable)
+            return std::unexpected(std::move(collectable.error()));
+          result->m_collectables[collection.name][pair.first] = std::move(*collectable);
+        }
       }
-    }
-    result->m_collections[collection.name] = std::move(collection);
+      result->m_collections[collection.name] = std::move(collection);
+      return {};
+    };
+    auto loaded = readFile();
+    if (!loaded)
+      return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading collection"));
   }
   return result;
 }

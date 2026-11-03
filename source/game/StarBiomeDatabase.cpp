@@ -83,13 +83,18 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
     if (!queued) return std::unexpected(std::move(queued.error()));
     for (auto const& file : files->get()) {
       auto const& path = file.string();
-      auto parameters = (*assets)->json(path);
-      if (!parameters) return std::unexpected(std::move(parameters.error()));
-      if (parameters->isNull()) continue;
-      auto name = parameters->getString("name");
-      if (!name) return std::unexpected(std::move(name.error()));
-      if (map.contains(*name)) return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
-      map[*name] = {path, *name, std::move(*parameters)};
+      auto readFile = [&]() -> std::expected<void, StarException> {
+        auto parameters = (*assets)->json(path);
+        if (!parameters) return std::unexpected(std::move(parameters.error()));
+        if (parameters->isNull()) return {};
+        auto name = parameters->getString("name");
+        if (!name) return std::unexpected(std::move(name.error()));
+        if (map.contains(*name)) return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
+        map[*name] = {path, *name, std::move(*parameters)};
+        return {};
+      };
+      auto loaded = readFile();
+      if (!loaded) return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), path, "Loading biome or weather"));
     }
     return {};
   };

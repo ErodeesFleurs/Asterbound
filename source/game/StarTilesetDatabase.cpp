@@ -423,7 +423,7 @@ namespace Tiled {
     auto parsed = Json::parseJson(value);
     if (!parsed) {
       if (parsed.error().is<JsonParsingException>())
-        return std::unexpected(StarException::format("Error parsing Tiled property as Json: {}", outputException(ExceptionDiagnostic(parsed.error()), false)));
+        return std::unexpected(parsed.error().withContext("Error parsing Tiled property as Json"));
       return std::unexpected(std::move(parsed.error()));
     }
     return std::move(*parsed);
@@ -446,9 +446,9 @@ std::expected<std::shared_ptr<Tiled::Tileset const>, StarException> TilesetDatab
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto json = (*assets)->json(path);
-  if (!json) return std::unexpected(std::move(json.error()));
+  if (!json) return std::unexpected((*assets)->withAssetContext(std::move(json.error()), path, "Loading tileset"));
   auto result = Tiled::Tileset::create(m_root, *json);
-  if (!result) return std::unexpected(std::move(result.error()));
+  if (!result) return std::unexpected((*assets)->withAssetContext(std::move(result.error()), path, "Loading tileset"));
   return std::move(*result);
 }
 }

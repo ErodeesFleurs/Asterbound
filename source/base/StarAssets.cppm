@@ -265,6 +265,7 @@ public:
   // Missing or invalid optional metadata falls back to the physical source path.
   static std::string sourceDiagnostic(AssetSource const& source,
       std::optional<std::reference_wrapper<String const>> sourcePath);
+  StarException withAssetContext(StarException error, String const& path, std::string_view operation) const;
 
   // Scans for all assets with the given suffix in any directory.
   [[nodiscard]] std::expected<StringList, StarException> scan(String const& suffix) const;
@@ -366,6 +367,8 @@ private:
 
   [[nodiscard]] std::expected<Json, StarException> readJson(String const& basePath) const;
   [[nodiscard]] std::expected<Json, StarException> applyJsonPatches(Json const& input, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const;
+  [[nodiscard]] std::expected<void, StarException> reportPatchRejection(String const& path,
+      std::shared_ptr<AssetSource> const& source, StarException const& error) const;
   [[nodiscard]] std::expected<Json, StarException> checkPatchArray(String const& path,
                                                                    std::shared_ptr<AssetSource> const& source,
                                                                    Json const result, JsonArray const& patchData,
@@ -379,6 +382,7 @@ private:
 
   // A successful null result means loading is blocked by another busy asset.
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> loadAsset(AssetId const& id) const;
+  void publishAssetFailure(AssetId const& id, StarException const& error) const;
 
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> loadJson(AssetPath const& path) const;
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> loadImage(AssetPath const& path) const;

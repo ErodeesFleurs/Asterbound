@@ -124,293 +124,303 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   auto const& assets = *assetsResult;
   auto configResult = assets->json("/celestial.config");
   if (!configResult)
-    return std::unexpected(std::move(configResult.error()));
+    return std::unexpected(assets->withAssetContext(std::move(configResult.error()), "/celestial.config", "Loading celestial configuration"));
   auto const& config = *configResult;
-  {
-    auto value = config.getBool("saveAllChunks", false);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_chunksAlwaysPersistent = std::move(*value);
-  }
-  {
-    auto value = config.getInt("planetOrbitalLevels");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.planetOrbitalLevels = std::move(*value);
-  }
-  {
-    auto value = config.getInt("satelliteOrbitalLevels");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.satelliteOrbitalLevels = std::move(*value);
-  }
-  {
-    auto value = config.getInt("chunkSize");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.chunkSize = std::move(*value);
-  }
-  {
-    auto value = config.get("xyCoordRange").and_then([](Json const& value) { return jsonToVec2I(value); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.xyCoordRange = std::move(*value);
-  }
-  {
-    auto value = config.get("zCoordRange").and_then([](Json const& value) { return jsonToVec2I(value); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.zCoordRange = std::move(*value);
-  }
-  {
-    auto value = config.getBool("enforceCoordRange", false);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_baseInformation.enforceCoordRange = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("systemProbability");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.systemProbability = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("constellationProbability");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.constellationProbability = std::move(*value);
-  }
-  {
-    auto value = config.get("constellationLineCountRange").and_then([](Json const& value) { return jsonToVec2U(value); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.constellationLineCountRange = std::move(*value);
-  }
-  {
-    auto value = config.getUInt("constellationMaxTries");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.constellationMaxTries = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("maximumConstellationLineLength");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.maximumConstellationLineLength = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("minimumConstellationLineLength");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.minimumConstellationLineLength = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("minimumConstellationMagnitude");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.minimumConstellationMagnitude = std::move(*value);
-  }
-  {
-    auto value = config.getFloat("minimumConstellationLineCloseness");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.minimumConstellationLineCloseness = std::move(*value);
-  }
+  auto configured = [&]() -> std::expected<void, StarException> {
+    {
+      auto value = config.getBool("saveAllChunks", false);
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_chunksAlwaysPersistent = std::move(*value);
+    }
+    {
+      auto value = config.getInt("planetOrbitalLevels");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.planetOrbitalLevels = std::move(*value);
+    }
+    {
+      auto value = config.getInt("satelliteOrbitalLevels");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.satelliteOrbitalLevels = std::move(*value);
+    }
+    {
+      auto value = config.getInt("chunkSize");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.chunkSize = std::move(*value);
+    }
+    {
+      auto value = config.get("xyCoordRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.xyCoordRange = std::move(*value);
+    }
+    {
+      auto value = config.get("zCoordRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.zCoordRange = std::move(*value);
+    }
+    {
+      auto value = config.getBool("enforceCoordRange", false);
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_baseInformation.enforceCoordRange = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("systemProbability");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.systemProbability = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("constellationProbability");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.constellationProbability = std::move(*value);
+    }
+    {
+      auto value = config.get("constellationLineCountRange").and_then([](Json const& value) { return jsonToVec2U(value); });
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.constellationLineCountRange = std::move(*value);
+    }
+    {
+      auto value = config.getUInt("constellationMaxTries");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.constellationMaxTries = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("maximumConstellationLineLength");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.maximumConstellationLineLength = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("minimumConstellationLineLength");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.minimumConstellationLineLength = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("minimumConstellationMagnitude");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.minimumConstellationMagnitude = std::move(*value);
+    }
+    {
+      auto value = config.getFloat("minimumConstellationLineCloseness");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.minimumConstellationLineCloseness = std::move(*value);
+    }
 
-  // Sorted maps preserve weighted-pool population order and deterministic generation.
-  auto systemTypes = config.getObject("systemTypes");
-  if (!systemTypes)
-    return std::unexpected(std::move(systemTypes.error()));
-  for (auto const& pair : Map<String, Json>::from(*systemTypes)) {
-    SystemType type;
-    type.typeName = pair.first;
-    {
-      auto value = pair.second.get("baseParameters");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.baseParameters = std::move(*value);
-    }
-    {
-      auto value = pair.second.getArray("variationParameters", JsonArray());
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.variationParameters = std::move(*value);
-    }
-    auto regions = pair.second.getArray("orbitRegions", JsonArray());
-    if (!regions)
-      return std::unexpected(std::move(regions.error()));
-    for (auto const& regionJson : *regions) {
-      CelestialOrbitRegion region;
+    // Sorted maps preserve weighted-pool population order and deterministic generation.
+    auto systemTypes = config.getObject("systemTypes");
+    if (!systemTypes)
+      return std::unexpected(std::move(systemTypes.error()));
+    for (auto const& pair : Map<String, Json>::from(*systemTypes)) {
+      SystemType type;
+      type.typeName = pair.first;
       {
-        auto value = regionJson.getString("regionName");
+        auto value = pair.second.get("baseParameters");
         if (!value)
           return std::unexpected(std::move(value.error()));
-        region.regionName = std::move(*value);
+        type.baseParameters = std::move(*value);
       }
       {
-        auto value = regionJson.get("orbitRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+        auto value = pair.second.getArray("variationParameters", JsonArray());
         if (!value)
           return std::unexpected(std::move(value.error()));
-        region.orbitRange = std::move(*value);
+        type.variationParameters = std::move(*value);
+      }
+      auto regions = pair.second.getArray("orbitRegions", JsonArray());
+      if (!regions)
+        return std::unexpected(std::move(regions.error()));
+      for (auto const& regionJson : *regions) {
+        CelestialOrbitRegion region;
+        {
+          auto value = regionJson.getString("regionName");
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          region.regionName = std::move(*value);
+        }
+        {
+          auto value = regionJson.get("orbitRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          region.orbitRange = std::move(*value);
+        }
+        {
+          auto value = regionJson.getFloat("bodyProbability");
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          region.bodyProbability = std::move(*value);
+        }
+        {
+          auto value = regionJson.get("planetaryTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          region.planetaryTypes = std::move(*value);
+        }
+        {
+          auto value = regionJson.get("satelliteTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          region.satelliteTypes = std::move(*value);
+        }
+        type.orbitRegions.append(std::move(region));
+      }
+      auto added = m_generationInformation.systemTypes.add(pair.first, std::move(type));
+      if (!added)
+        return std::unexpected(std::move(added.error()));
+    }
+    {
+      auto value = config.get("systemTypePerlin").and_then([](Json const& value) { return PerlinD::create(value, staticRandomU64("SystemTypePerlin")); });
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.systemTypePerlin = std::move(*value);
+    }
+    {
+      auto value = config.get("systemTypeBins");
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      m_generationInformation.systemTypeBins = std::move(*value);
+    }
+    auto planetaryTypes = config.getObject("planetaryTypes");
+    if (!planetaryTypes)
+      return std::unexpected(std::move(planetaryTypes.error()));
+    for (auto const& pair : Map<String, Json>::from(*planetaryTypes)) {
+      PlanetaryType type;
+      type.typeName = pair.first;
+      {
+        auto value = pair.second.getFloat("satelliteProbability");
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        type.satelliteProbability = std::move(*value);
       }
       {
-        auto value = regionJson.getFloat("bodyProbability");
+        auto value = pair.second.getUInt("maxSatelliteCount", m_baseInformation.satelliteOrbitalLevels);
         if (!value)
           return std::unexpected(std::move(value.error()));
-        region.bodyProbability = std::move(*value);
+        type.maxSatelliteCount = std::move(*value);
       }
       {
-        auto value = regionJson.get("planetaryTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+        auto value = pair.second.get("baseParameters");
         if (!value)
           return std::unexpected(std::move(value.error()));
-        region.planetaryTypes = std::move(*value);
+        type.baseParameters = std::move(*value);
       }
       {
-        auto value = regionJson.get("satelliteTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+        auto value = pair.second.getArray("variationParameters", JsonArray());
         if (!value)
           return std::unexpected(std::move(value.error()));
-        region.satelliteTypes = std::move(*value);
+        type.variationParameters = std::move(*value);
       }
-      type.orbitRegions.append(std::move(region));
+      {
+        auto value = pair.second.getObject("orbitParameters", JsonObject());
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        type.orbitParameters = std::move(*value);
+      }
+      m_generationInformation.planetaryTypes[type.typeName] = std::move(type);
     }
-    auto added = m_generationInformation.systemTypes.add(pair.first, std::move(type));
-    if (!added)
-      return std::unexpected(std::move(added.error()));
-  }
-  {
-    auto value = config.get("systemTypePerlin").and_then([](Json const& value) { return PerlinD::create(value, staticRandomU64("SystemTypePerlin")); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.systemTypePerlin = std::move(*value);
-  }
-  {
-    auto value = config.get("systemTypeBins");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.systemTypeBins = std::move(*value);
-  }
-  auto planetaryTypes = config.getObject("planetaryTypes");
-  if (!planetaryTypes)
-    return std::unexpected(std::move(planetaryTypes.error()));
-  for (auto const& pair : Map<String, Json>::from(*planetaryTypes)) {
-    PlanetaryType type;
-    type.typeName = pair.first;
+    auto satelliteTypes = config.getObject("satelliteTypes");
+    if (!satelliteTypes)
+      return std::unexpected(std::move(satelliteTypes.error()));
+    for (auto const& pair : Map<String, Json>::from(*satelliteTypes)) {
+      SatelliteType type;
+      type.typeName = pair.first;
+      {
+        auto value = pair.second.get("baseParameters");
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        type.baseParameters = std::move(*value);
+      }
+      {
+        auto value = pair.second.getArray("variationParameters", JsonArray());
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        type.variationParameters = std::move(*value);
+      }
+      {
+        auto value = pair.second.getObject("orbitParameters", JsonObject());
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        type.orbitParameters = std::move(*value);
+      }
+      m_generationInformation.satelliteTypes[type.typeName] = std::move(type);
+    }
+    return {};
+  }();
+  if (!configured)
+    return std::unexpected(assets->withAssetContext(std::move(configured.error()), "/celestial.config", "Loading celestial configuration"));
+  auto named = [&]() -> std::expected<void, StarException> {
+    auto namesResult = assets->json("/celestial/names.config");
+    if (!namesResult)
+      return std::unexpected(std::move(namesResult.error()));
+    auto const& names = *namesResult;
     {
-      auto value = pair.second.getFloat("satelliteProbability");
+      auto value = names.get("planetarySuffixes").and_then([](Json const& value) { return jsonToStringList(value); });
       if (!value)
         return std::unexpected(std::move(value.error()));
-      type.satelliteProbability = std::move(*value);
+      m_generationInformation.planetarySuffixes = std::move(*value);
     }
     {
-      auto value = pair.second.getUInt("maxSatelliteCount", m_baseInformation.satelliteOrbitalLevels);
+      auto value = names.get("satelliteSuffixes").and_then([](Json const& value) { return jsonToStringList(value); });
       if (!value)
         return std::unexpected(std::move(value.error()));
-      type.maxSatelliteCount = std::move(*value);
+      m_generationInformation.satelliteSuffixes = std::move(*value);
     }
     {
-      auto value = pair.second.get("baseParameters");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.baseParameters = std::move(*value);
+      auto entries = names.getArray("systemPrefixNames");
+      if (!entries)
+        return std::unexpected(std::move(entries.error()));
+      for (auto const& entry : *entries) {
+        auto weight = entry.getFloat(0);
+        if (!weight)
+          return std::unexpected(std::move(weight.error()));
+        auto name = entry.getString(1);
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        m_generationInformation.systemPrefixNames.add(*weight, std::move(*name));
+      }
     }
     {
-      auto value = pair.second.getArray("variationParameters", JsonArray());
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.variationParameters = std::move(*value);
+      auto entries = names.getArray("systemNames");
+      if (!entries)
+        return std::unexpected(std::move(entries.error()));
+      for (auto const& entry : *entries) {
+        auto weight = entry.getFloat(0);
+        if (!weight)
+          return std::unexpected(std::move(weight.error()));
+        auto name = entry.getString(1);
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        m_generationInformation.systemNames.add(*weight, std::move(*name));
+      }
     }
     {
-      auto value = pair.second.getObject("orbitParameters", JsonObject());
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.orbitParameters = std::move(*value);
+      auto entries = names.getArray("systemSuffixNames");
+      if (!entries)
+        return std::unexpected(std::move(entries.error()));
+      for (auto const& entry : *entries) {
+        auto weight = entry.getFloat(0);
+        if (!weight)
+          return std::unexpected(std::move(weight.error()));
+        auto name = entry.getString(1);
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        m_generationInformation.systemSuffixNames.add(*weight, std::move(*name));
+      }
     }
-    m_generationInformation.planetaryTypes[type.typeName] = std::move(type);
-  }
-  auto satelliteTypes = config.getObject("satelliteTypes");
-  if (!satelliteTypes)
-    return std::unexpected(std::move(satelliteTypes.error()));
-  for (auto const& pair : Map<String, Json>::from(*satelliteTypes)) {
-    SatelliteType type;
-    type.typeName = pair.first;
-    {
-      auto value = pair.second.get("baseParameters");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.baseParameters = std::move(*value);
-    }
-    {
-      auto value = pair.second.getArray("variationParameters", JsonArray());
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.variationParameters = std::move(*value);
-    }
-    {
-      auto value = pair.second.getObject("orbitParameters", JsonObject());
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      type.orbitParameters = std::move(*value);
-    }
-    m_generationInformation.satelliteTypes[type.typeName] = std::move(type);
-  }
-  auto namesResult = assets->json("/celestial/names.config");
-  if (!namesResult)
-    return std::unexpected(std::move(namesResult.error()));
-  auto const& names = *namesResult;
-  {
-    auto value = names.get("planetarySuffixes").and_then([](Json const& value) { return jsonToStringList(value); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.planetarySuffixes = std::move(*value);
-  }
-  {
-    auto value = names.get("satelliteSuffixes").and_then([](Json const& value) { return jsonToStringList(value); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    m_generationInformation.satelliteSuffixes = std::move(*value);
-  }
-  {
-    auto entries = names.getArray("systemPrefixNames");
-    if (!entries)
-      return std::unexpected(std::move(entries.error()));
-    for (auto const& entry : *entries) {
-      auto weight = entry.getFloat(0);
-      if (!weight)
-        return std::unexpected(std::move(weight.error()));
-      auto name = entry.getString(1);
-      if (!name)
-        return std::unexpected(std::move(name.error()));
-      m_generationInformation.systemPrefixNames.add(*weight, std::move(*name));
-    }
-  }
-  {
-    auto entries = names.getArray("systemNames");
-    if (!entries)
-      return std::unexpected(std::move(entries.error()));
-    for (auto const& entry : *entries) {
-      auto weight = entry.getFloat(0);
-      if (!weight)
-        return std::unexpected(std::move(weight.error()));
-      auto name = entry.getString(1);
-      if (!name)
-        return std::unexpected(std::move(name.error()));
-      m_generationInformation.systemNames.add(*weight, std::move(*name));
-    }
-  }
-  {
-    auto entries = names.getArray("systemSuffixNames");
-    if (!entries)
-      return std::unexpected(std::move(entries.error()));
-    for (auto const& entry : *entries) {
-      auto weight = entry.getFloat(0);
-      if (!weight)
-        return std::unexpected(std::move(weight.error()));
-      auto name = entry.getString(1);
-      if (!name)
-        return std::unexpected(std::move(name.error()));
-      m_generationInformation.systemSuffixNames.add(*weight, std::move(*name));
-    }
-  }
+    return {};
+  }();
+  if (!named)
+    return std::unexpected(assets->withAssetContext(std::move(named.error()), "/celestial/names.config", "Loading celestial names"));
   if (databaseFile) {
     auto identified = m_database.setContentIdentifier("Celestial2");
     if (!identified)
@@ -451,7 +461,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   {
     auto value = config.getFloat("commitInterval");
     if (!value)
-      return std::unexpected(std::move(value.error()));
+      return std::unexpected(assets->withAssetContext(std::move(value.error()), "/celestial.config", "Loading celestial configuration"));
     m_commitInterval = std::move(*value);
   }
   m_commitTimer.restart(m_commitInterval);
@@ -1158,10 +1168,10 @@ std::expected<std::shared_ptr<CelestialSlaveDatabase>, StarException> CelestialS
     std::shared_ptr<Assets const> const& assets, RandomService& random, CelestialBaseInformation baseInformation) {
   auto config = assets->json("/celestial.config");
   if (!config)
-    return std::unexpected(std::move(config.error()));
+    return std::unexpected(assets->withAssetContext(std::move(config.error()), "/celestial.config", "Loading celestial configuration"));
   auto timeout = config->getFloat("requestTimeout");
   if (!timeout)
-    return std::unexpected(std::move(timeout.error()));
+    return std::unexpected(assets->withAssetContext(std::move(timeout.error()), "/celestial.config", "Loading celestial configuration"));
   auto database = std::shared_ptr<CelestialSlaveDatabase>(new CelestialSlaveDatabase(random));
   database->m_baseInformation = std::move(baseInformation);
   database->m_requestTimeout = *timeout;

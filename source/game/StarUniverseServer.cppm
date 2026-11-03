@@ -352,6 +352,9 @@ private:
   // read lock must be held when calling.
   [[nodiscard]] std::expected<std::optional<std::shared_ptr<WorldServerThread>>, StarException> triggerWorldCreation(WorldId const& worldId);
 
+  [[nodiscard]] std::expected<void, StarException> retireFailedWorldCreation(
+      WorldId const& worldId, std::optional<WorldServerPromise>& promise, StarException const& error);
+
   // Main lock and clients read lock must be held when calling world promise
   // generators
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> makeWorldPromise(WorldId const& worldId);

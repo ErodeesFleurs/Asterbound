@@ -56,7 +56,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/ai/ai.config");
   if (!config)
-    return std::unexpected(std::move(config.error()));
+    return std::unexpected((*assets)->withAssetContext(std::move(config.error()), "/ai/ai.config", "Loading AI configuration"));
   auto missions = (*assets)->scanExtension("aimission");
   if (!missions)
     return std::unexpected(std::move(missions.error()));
@@ -67,92 +67,97 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     auto const& file = assetFile.string();
     auto missionConfig = (*assets)->json(file);
     if (!missionConfig)
-      return std::unexpected(std::move(missionConfig.error()));
+      return std::unexpected((*assets)->withAssetContext(std::move(missionConfig.error()), file, "Loading AI mission"));
     if (!*missionConfig)
       continue;
     auto mission = parseMission(*missionConfig);
     if (!mission)
-      return std::unexpected(std::move(mission.error()));
+      return std::unexpected((*assets)->withAssetContext(std::move(mission.error()), file, "Loading AI mission"));
     result->m_missions[mission->missionName] = std::move(*mission);
   }
-  auto species = config->get("species").and_then([](Json const& value) { return value.iterateObject(); });
-  if (!species)
-    return std::unexpected(std::move(species.error()));
-  for (auto const& pair : *species) {
-    auto parameters = parseSpeciesParameters(pair.second);
-    if (!parameters)
-      return std::unexpected(std::move(parameters.error()));
-    result->m_speciesParameters[pair.first] = std::move(*parameters);
-  }
-  auto statuses = config->get("shipStatus").and_then([](Json const& value) { return value.iterateObject(); });
-  if (!statuses)
-    return std::unexpected(std::move(statuses.error()));
-  for (auto const& pair : *statuses) {
-    auto level = lexicalCast<unsigned>(pair.first);
-    if (!level)
-      return std::unexpected(std::move(level.error()));
-    auto speech = parseSpeech(pair.second);
-    if (!speech)
-      return std::unexpected(std::move(speech.error()));
-    result->m_shipStatus[*level] = std::move(*speech);
-  }
-  auto noMissionsConfig = config->get("noMissionsSpeech");
-  if (!noMissionsConfig)
-    return std::unexpected(std::move(noMissionsConfig.error()));
-  auto noMissions = parseSpeech(*noMissionsConfig);
-  if (!noMissions)
-    return std::unexpected(std::move(noMissions.error()));
-  result->m_noMissionsSpeech = std::move(*noMissions);
-  auto noCrewConfig = config->get("noCrewSpeech");
-  if (!noCrewConfig)
-    return std::unexpected(std::move(noCrewConfig.error()));
-  auto noCrew = parseSpeech(*noCrewConfig);
-  if (!noCrew)
-    return std::unexpected(std::move(noCrew.error()));
-  result->m_noCrewSpeech = std::move(*noCrew);
-  auto charactersPerSecond = config->getFloat("charactersPerSecond");
-  if (!charactersPerSecond)
-    return std::unexpected(std::move(charactersPerSecond.error()));
-  result->m_animationConfig.charactersPerSecond = *charactersPerSecond;
-  auto defaultAnimation = config->getString("defaultAnimation");
-  if (!defaultAnimation)
-    return std::unexpected(std::move(defaultAnimation.error()));
-  result->m_animationConfig.defaultAnimation = std::move(*defaultAnimation);
-  auto staticAnimation = Animation::create(root, "/ai/ai.config:staticAnimation");
-  if (!staticAnimation)
-    return std::unexpected(std::move(staticAnimation.error()));
-  result->m_animationConfig.staticAnimation = std::move(*staticAnimation);
-  auto staticOpacity = config->getFloat("staticOpacity");
-  if (!staticOpacity)
-    return std::unexpected(std::move(staticOpacity.error()));
-  result->m_animationConfig.staticOpacity = *staticOpacity;
-  auto scanlineAnimation = Animation::create(root, "/ai/ai.config:scanlineAnimation");
-  if (!scanlineAnimation)
-    return std::unexpected(std::move(scanlineAnimation.error()));
-  result->m_animationConfig.scanlineAnimation = std::move(*scanlineAnimation);
-  auto scanlineOpacity = config->getFloat("scanlineOpacity");
-  if (!scanlineOpacity)
-    return std::unexpected(std::move(scanlineOpacity.error()));
-  result->m_animationConfig.scanlineOpacity = *scanlineOpacity;
-  auto animations = config->get("aiAnimations").and_then([](Json const& value) { return value.iterateObject(); });
-  if (!animations)
-    return std::unexpected(std::move(animations.error()));
-  for (auto const& pair : *animations) {
-    // Preserve the old default construction's RNG draw before replacement.
-    if (!result->m_animationConfig.aiAnimations.contains(pair.first)) {
-      auto initial = Animation::create(root);
-      if (!initial)
-        return std::unexpected(std::move(initial.error()));
-      result->m_animationConfig.aiAnimations.try_emplace(pair.first, std::move(*initial));
+  auto configured = [&]() -> std::expected<void, StarException> {
+    auto species = config->get("species").and_then([](Json const& value) { return value.iterateObject(); });
+    if (!species)
+      return std::unexpected(std::move(species.error()));
+    for (auto const& pair : *species) {
+      auto parameters = parseSpeciesParameters(pair.second);
+      if (!parameters)
+        return std::unexpected(std::move(parameters.error()));
+      result->m_speciesParameters[pair.first] = std::move(*parameters);
     }
-    auto animation = Animation::create(root, pair.second, "/ai/");
-    if (!animation)
-      return std::unexpected(std::move(animation.error()));
-    auto existing = result->m_animationConfig.aiAnimations.maybeRef(pair.first);
-    if (!existing)
-      return std::unexpected(AiException("AI animation publication failed"));
-    existing->get() = std::move(*animation);
-  }
+    auto statuses = config->get("shipStatus").and_then([](Json const& value) { return value.iterateObject(); });
+    if (!statuses)
+      return std::unexpected(std::move(statuses.error()));
+    for (auto const& pair : *statuses) {
+      auto level = lexicalCast<unsigned>(pair.first);
+      if (!level)
+        return std::unexpected(std::move(level.error()));
+      auto speech = parseSpeech(pair.second);
+      if (!speech)
+        return std::unexpected(std::move(speech.error()));
+      result->m_shipStatus[*level] = std::move(*speech);
+    }
+    auto noMissionsConfig = config->get("noMissionsSpeech");
+    if (!noMissionsConfig)
+      return std::unexpected(std::move(noMissionsConfig.error()));
+    auto noMissions = parseSpeech(*noMissionsConfig);
+    if (!noMissions)
+      return std::unexpected(std::move(noMissions.error()));
+    result->m_noMissionsSpeech = std::move(*noMissions);
+    auto noCrewConfig = config->get("noCrewSpeech");
+    if (!noCrewConfig)
+      return std::unexpected(std::move(noCrewConfig.error()));
+    auto noCrew = parseSpeech(*noCrewConfig);
+    if (!noCrew)
+      return std::unexpected(std::move(noCrew.error()));
+    result->m_noCrewSpeech = std::move(*noCrew);
+    auto charactersPerSecond = config->getFloat("charactersPerSecond");
+    if (!charactersPerSecond)
+      return std::unexpected(std::move(charactersPerSecond.error()));
+    result->m_animationConfig.charactersPerSecond = *charactersPerSecond;
+    auto defaultAnimation = config->getString("defaultAnimation");
+    if (!defaultAnimation)
+      return std::unexpected(std::move(defaultAnimation.error()));
+    result->m_animationConfig.defaultAnimation = std::move(*defaultAnimation);
+    auto staticAnimation = Animation::create(root, "/ai/ai.config:staticAnimation");
+    if (!staticAnimation)
+      return std::unexpected(std::move(staticAnimation.error()));
+    result->m_animationConfig.staticAnimation = std::move(*staticAnimation);
+    auto staticOpacity = config->getFloat("staticOpacity");
+    if (!staticOpacity)
+      return std::unexpected(std::move(staticOpacity.error()));
+    result->m_animationConfig.staticOpacity = *staticOpacity;
+    auto scanlineAnimation = Animation::create(root, "/ai/ai.config:scanlineAnimation");
+    if (!scanlineAnimation)
+      return std::unexpected(std::move(scanlineAnimation.error()));
+    result->m_animationConfig.scanlineAnimation = std::move(*scanlineAnimation);
+    auto scanlineOpacity = config->getFloat("scanlineOpacity");
+    if (!scanlineOpacity)
+      return std::unexpected(std::move(scanlineOpacity.error()));
+    result->m_animationConfig.scanlineOpacity = *scanlineOpacity;
+    auto animations = config->get("aiAnimations").and_then([](Json const& value) { return value.iterateObject(); });
+    if (!animations)
+      return std::unexpected(std::move(animations.error()));
+    for (auto const& pair : *animations) {
+      // Preserve the old default construction's RNG draw before replacement.
+      if (!result->m_animationConfig.aiAnimations.contains(pair.first)) {
+        auto initial = Animation::create(root);
+        if (!initial)
+          return std::unexpected(std::move(initial.error()));
+        result->m_animationConfig.aiAnimations.try_emplace(pair.first, std::move(*initial));
+      }
+      auto animation = Animation::create(root, pair.second, "/ai/");
+      if (!animation)
+        return std::unexpected(std::move(animation.error()));
+      auto existing = result->m_animationConfig.aiAnimations.maybeRef(pair.first);
+      if (!existing)
+        return std::unexpected(AiException("AI animation publication failed"));
+      existing->get() = std::move(*animation);
+    }
+    return {};
+  }();
+  if (!configured)
+    return std::unexpected((*assets)->withAssetContext(std::move(configured.error()), "/ai/ai.config", "Loading AI configuration"));
   return result;
 }
 

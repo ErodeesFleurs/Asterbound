@@ -64,40 +64,46 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
   setMetaMaterial(BoundaryMaterialId, MetaMaterialInfo{"metamaterial:boundary", BoundaryMaterialId, CollisionKind::Slippery, true});
   setMetaMaterial(ObjectSolidMaterialId, MetaMaterialInfo{"metamaterial:objectsolid", ObjectSolidMaterialId, CollisionKind::Block, true});
   setMetaMaterial(ObjectPlatformMaterialId, MetaMaterialInfo{"metamaterial:objectplatform", ObjectPlatformMaterialId, CollisionKind::Platform, false});
-  auto metaConfig = assets->json("/metamaterials.config");
-  if (!metaConfig) return std::unexpected(std::move(metaConfig.error()));
-  auto metas = metaConfig->iterateArray();
-  if (!metas) return std::unexpected(std::move(metas.error()));
-  for (auto const& meta : *metas) {
-    auto name = meta.getString("name");
-    if (!name) return std::unexpected(std::move(name.error()));
-    auto matName = "metamaterial:" + *name;
-    if (isMaterialName(matName)) {
-      auto logged = logger.info("Metamaterial '{}' has duplicate material name!", matName);
-      if (!logged) return std::unexpected(std::move(logged.error()));
-      continue;
+  auto loadMetaMaterials = [&]() -> std::expected<void, StarException> {
+    auto metaConfig = assets->json("/metamaterials.config");
+    if (!metaConfig) return std::unexpected(std::move(metaConfig.error()));
+    auto metas = metaConfig->iterateArray();
+    if (!metas) return std::unexpected(std::move(metas.error()));
+    for (auto const& meta : *metas) {
+      auto name = meta.getString("name");
+      if (!name) return std::unexpected(std::move(name.error()));
+      auto matName = "metamaterial:" + *name;
+      if (isMaterialName(matName)) {
+        auto logged = logger.info("Metamaterial '{}' has duplicate material name!", matName);
+        if (!logged) return std::unexpected(std::move(logged.error()));
+        continue;
+      }
+      auto id = meta.getUInt("materialId");
+      if (!id) return std::unexpected(std::move(id.error()));
+      MaterialId matId = *id;
+      if (isRealMaterial(matId) || matId >= FirstEngineMetaMaterialId) {
+        auto logged = logger.info("Material id {} for metamaterial '{}' does not fall within the valid range!", matId, matName);
+        if (!logged) return std::unexpected(std::move(logged.error()));
+        continue;
+      } else if (containsMetaMaterial(matId)) {
+        auto logged = logger.info("Material id {} for metamaterial '{}' conflicts with another metamaterial id!", matId, matName);
+        if (!logged) return std::unexpected(std::move(logged.error()));
+        continue;
+      }
+      if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
+      auto collisionName = meta.getString("collisionKind");
+      if (!collisionName) return std::unexpected(std::move(collisionName.error()));
+      auto collision = CollisionKindNames->getLeft(*collisionName);
+      if (!collision) return std::unexpected(std::move(collision.error()));
+      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(collision->get()));
+      if (!blocks) return std::unexpected(std::move(blocks.error()));
+      setMetaMaterial(matId, MetaMaterialInfo{matName, matId, collision->get(), *blocks});
     }
-    auto id = meta.getUInt("materialId");
-    if (!id) return std::unexpected(std::move(id.error()));
-    MaterialId matId = *id;
-    if (isRealMaterial(matId) || matId >= FirstEngineMetaMaterialId) {
-      auto logged = logger.info("Material id {} for metamaterial '{}' does not fall within the valid range!", matId, matName);
-      if (!logged) return std::unexpected(std::move(logged.error()));
-      continue;
-    } else if (containsMetaMaterial(matId)) {
-      auto logged = logger.info("Material id {} for metamaterial '{}' conflicts with another metamaterial id!", matId, matName);
-      if (!logged) return std::unexpected(std::move(logged.error()));
-      continue;
-    }
-    if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
-    auto collisionName = meta.getString("collisionKind");
-    if (!collisionName) return std::unexpected(std::move(collisionName.error()));
-    auto collision = CollisionKindNames->getLeft(*collisionName);
-    if (!collision) return std::unexpected(std::move(collision.error()));
-    auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(collision->get()));
-    if (!blocks) return std::unexpected(std::move(blocks.error()));
-    setMetaMaterial(matId, MetaMaterialInfo{matName, matId, collision->get(), *blocks});
-  }
+    return {};
+  };
+  auto metaMaterials = loadMetaMaterials();
+  if (!metaMaterials)
+    return std::unexpected(assets->withAssetContext(std::move(metaMaterials.error()), "/metamaterials.config", "Loading metamaterials"));
   auto materials = assets->scanExtension("material");
   if (!materials) return std::unexpected(std::move(materials.error()));
   auto mods = assets->scanExtension("matmod");
@@ -279,7 +285,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = readFile();
-    if (!loaded) return std::unexpected(MaterialException(strf("Error loading material file {}", file), loaded.error()));
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading material file {}", file), loaded.error()), file, "Loading material"));
   }
   for (auto const& path : mods->get()) {
     auto const& file = path.string();
@@ -416,13 +422,13 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = readFile();
-    if (!loaded) return std::unexpected(MaterialException(strf("Error loading mod file {}", file), loaded.error()));
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
   }
   auto footstepConfig = assets->json("/client.config:defaultFootstepSound");
-  if (!footstepConfig) return std::unexpected(std::move(footstepConfig.error()));
+  if (!footstepConfig) return std::unexpected(assets->withAssetContext(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
   {
     auto value = footstepConfig->toString();
-    if (!value) return std::unexpected(std::move(value.error()));
+    if (!value) return std::unexpected(assets->withAssetContext(std::move(value.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
     m_defaultFootstepSound = std::move(*value);
   }
   return {};
