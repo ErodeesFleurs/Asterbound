@@ -470,41 +470,59 @@ private:
   explicit ScriptTestPane(GuiContext& context) : BaseScriptPane(context) {}
 };
 
-const GameTestRegistration scriptStorage("ScriptPane", "StorageSurvivesLifecycleReloadAndEngineReplacement", [](GameTest& fixture) {
-  auto context = textEditorContext(fixture);
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(fixture.root());
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto created = ScriptTestPane::create(**context);
-  ASSERT_TRUE(created) << created.error().what();
-  auto& pane = **created;
-  ASSERT_TRUE(pane.setLuaRoot(*luaRoot));
-  ASSERT_TRUE(pane.displayed());
-  ASSERT_TRUE(pane.evaluate("storage.count = 17; storage.events = jarray(); table.insert(storage.events, false)"));
-  ASSERT_TRUE(pane.dismissed());
-  ASSERT_TRUE(pane.displayed());
-  auto saved = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
-  ASSERT_TRUE(saved) << saved.error().what();
-  ASSERT_TRUE(*saved);
-  EXPECT_EQ(**saved, (Json(JsonArray{17, 1, false})));
+struct ScriptPaneContext {
+  std::shared_ptr<GuiContext> context;
+  std::shared_ptr<LuaRoot> luaRoot;
+  std::shared_ptr<ScriptTestPane> pane;
+};
 
-  ASSERT_TRUE(fixture.root().reload());
-  auto reloaded = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
-  ASSERT_TRUE(reloaded) << reloaded.error().what();
-  ASSERT_TRUE(*reloaded);
-  EXPECT_EQ(**reloaded, **saved);
-  auto previousGeneration = (*luaRoot)->generation();
-  ASSERT_TRUE((*luaRoot)->restart());
-  EXPECT_GT((*luaRoot)->generation(), previousGeneration);
-  auto restarted = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
-  ASSERT_TRUE(restarted) << restarted.error().what();
-  ASSERT_TRUE(*restarted);
-  EXPECT_EQ(**restarted, **saved);
-  ASSERT_TRUE(pane.dismissed());
-  auto stopped = pane.call("missing", {});
-  ASSERT_TRUE(stopped) << stopped.error().what();
-  EXPECT_FALSE(*stopped);
-});
+std::expected<ScriptPaneContext, StarException> scriptPaneContext(GameTest& fixture, bool interactive = true) {
+  auto context = textEditorContext(fixture);
+  if (!context)
+    return std::unexpected(std::move(context.error()));
+  auto luaRoot = LuaRoot::create(fixture.root());
+  if (!luaRoot)
+    return std::unexpected(std::move(luaRoot.error()));
+  auto pane = ScriptTestPane::create(**context, interactive);
+  if (!pane)
+    return std::unexpected(std::move(pane.error()));
+  auto bound = (*pane)->setLuaRoot(*luaRoot);
+  if (!bound)
+    return std::unexpected(std::move(bound.error()));
+  return ScriptPaneContext{std::move(*context), std::move(*luaRoot), std::move(*pane)};
+}
+
+const GameTestRegistration
+  scriptStorage("ScriptPane", "StorageSurvivesLifecycleReloadAndEngineReplacement", [](GameTest& fixture) {
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& pane = *setup->pane;
+    ASSERT_TRUE(pane.displayed());
+    ASSERT_TRUE(pane.evaluate("storage.count = 17; storage.events = jarray(); table.insert(storage.events, false)"));
+    ASSERT_TRUE(pane.dismissed());
+    ASSERT_TRUE(pane.displayed());
+    auto saved = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
+    ASSERT_TRUE(saved) << saved.error().what();
+    ASSERT_TRUE(*saved);
+    EXPECT_EQ(**saved, (Json(JsonArray{17, 1, false})));
+
+    ASSERT_TRUE(fixture.root().reload());
+    auto reloaded = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
+    ASSERT_TRUE(reloaded) << reloaded.error().what();
+    ASSERT_TRUE(*reloaded);
+    EXPECT_EQ(**reloaded, **saved);
+    auto previousGeneration = setup->luaRoot->generation();
+    ASSERT_TRUE(setup->luaRoot->restart());
+    EXPECT_GT(setup->luaRoot->generation(), previousGeneration);
+    auto restarted = pane.evaluate("return {storage.count, #storage.events, storage.events[1]}");
+    ASSERT_TRUE(restarted) << restarted.error().what();
+    ASSERT_TRUE(*restarted);
+    EXPECT_EQ(**restarted, **saved);
+    ASSERT_TRUE(pane.dismissed());
+    auto stopped = pane.call("missing", {});
+    ASSERT_TRUE(stopped) << stopped.error().what();
+    EXPECT_FALSE(*stopped);
+  });
 
 const GameTestRegistration
   canvasSessionLifetime("ScriptPane", "CanvasCapabilitiesRetireWithoutChangingSurfaceOwnership", [](GameTest& fixture) {
@@ -910,121 +928,111 @@ const GameTestRegistration scriptShutdownFailure("ScriptPane", "ReentrantOwnerHo
   EXPECT_EQ(uninitReached, 0u);
 });
 
-const GameTestRegistration scriptHiddenInput("ScriptPane", "HiddenDisplayedPaneRejectsInputBeforeScriptHook", [](GameTest& fixture) {
-  auto context = textEditorContext(fixture);
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(fixture.root());
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto created = ScriptTestPane::create(**context);
-  ASSERT_TRUE(created) << created.error().what();
-  auto& pane = **created;
-  ASSERT_TRUE(pane.setLuaRoot(*luaRoot));
-  ASSERT_TRUE(pane.displayed());
-  auto editor = textEditor(**context, "A中");
-  ASSERT_TRUE(editor) << editor.error().what();
-  (*editor)->setEditorRendering(false);
-  ASSERT_TRUE(pane.addChild("editor", *editor));
-  ASSERT_TRUE((*editor)->focus());
-  ASSERT_TRUE(pane.evaluate(R"LUA(
+const GameTestRegistration
+  scriptHiddenInput("ScriptPane", "HiddenDisplayedPaneRejectsInputBeforeScriptHook", [](GameTest& fixture) {
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& pane = *setup->pane;
+    ASSERT_TRUE(pane.displayed());
+    auto editor = textEditor(*setup->context, "A中");
+    ASSERT_TRUE(editor) << editor.error().what();
+    (*editor)->setEditorRendering(false);
+    ASSERT_TRUE(pane.addChild("editor", *editor));
+    ASSERT_TRUE((*editor)->focus());
+    ASSERT_TRUE(pane.evaluate(R"LUA(
     storage.inputs = 0
     function onInput(event)
       storage.inputs = storage.inputs + 1
       return true
     end
   )LUA"));
-  ASSERT_TRUE(pane.hide());
-  EXPECT_TRUE(pane.isDisplayed());
-  for (InputEvent const& event : {
-      InputEvent{MouseButtonDownEvent{MouseButton::Left, {1, 1}}},
-      InputEvent{KeyDownEvent{Key::A, KeyMod::NoMod}},
-      InputEvent{TextInputEvent{"🙂"}}}) {
-    auto consumed = pane.sendEvent(event);
-    ASSERT_TRUE(consumed) << consumed.error().what();
-    EXPECT_FALSE(*consumed);
-  }
-  auto inputs = pane.evaluate("return storage.inputs");
-  ASSERT_TRUE(inputs) << inputs.error().what();
-  ASSERT_TRUE(*inputs);
-  EXPECT_EQ(**inputs, Json(0));
-  EXPECT_EQ((*editor)->getText(), String("A中"));
-  ASSERT_TRUE(pane.dismissed());
-});
+    ASSERT_TRUE(pane.hide());
+    EXPECT_TRUE(pane.isDisplayed());
+    for (InputEvent const& event :
+         {InputEvent{MouseButtonDownEvent{MouseButton::Left, {1, 1}}}, InputEvent{KeyDownEvent{Key::A, KeyMod::NoMod}},
+          InputEvent{TextInputEvent{"🙂"}}}) {
+      auto consumed = pane.sendEvent(event);
+      ASSERT_TRUE(consumed) << consumed.error().what();
+      EXPECT_FALSE(*consumed);
+    }
+    auto inputs = pane.evaluate("return storage.inputs");
+    ASSERT_TRUE(inputs) << inputs.error().what();
+    ASSERT_TRUE(*inputs);
+    EXPECT_EQ(**inputs, Json(0));
+    EXPECT_EQ((*editor)->getText(), String("A中"));
+    ASSERT_TRUE(pane.dismissed());
+  });
 
-const GameTestRegistration scriptTransparentInput("ScriptPane", "NoninteractivePaneRejectsInputAndHitTests", [](GameTest& fixture) {
-  auto context = textEditorContext(fixture);
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(fixture.root());
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto created = ScriptTestPane::create(**context, false);
-  ASSERT_TRUE(created) << created.error().what();
-  auto& pane = **created;
-  pane.setAnchor(PaneAnchor::BottomLeft);
-  pane.setSize({100, 100});
-  ASSERT_TRUE(pane.setLuaRoot(*luaRoot));
-  PaneManager manager(**context);
-  ASSERT_TRUE(manager.displayPane(PaneLayer::Background, *created));
-  ASSERT_TRUE(pane.evaluate(R"LUA(
+const GameTestRegistration
+  scriptTransparentInput("ScriptPane", "NoninteractivePaneRejectsInputAndHitTests", [](GameTest& fixture) {
+    auto setup = scriptPaneContext(fixture, false);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& pane = *setup->pane;
+    pane.setAnchor(PaneAnchor::BottomLeft);
+    pane.setSize({100, 100});
+    PaneManager manager(*setup->context);
+    ASSERT_TRUE(manager.displayPane(PaneLayer::Background, setup->pane));
+    ASSERT_TRUE(pane.evaluate(R"LUA(
     storage.inputs = 0
     function onInput(event)
       storage.inputs = storage.inputs + 1
       return true
     end
   )LUA"));
-  EXPECT_TRUE(pane.isDisplayed());
-  EXPECT_FALSE(manager.getPaneAt({1, 1}));
-  EXPECT_FALSE(manager.getPaneAt({PaneLayer::Background}, {1, 1}));
-  auto editor = textEditor(**context, "A中");
-  ASSERT_TRUE(editor) << editor.error().what();
-  ASSERT_TRUE(pane.addChild("editor", *editor));
-  ASSERT_TRUE((*editor)->focus());
-  auto captured = manager.keyboardCapturedPane();
-  ASSERT_TRUE(captured) << captured.error().what();
-  EXPECT_FALSE(*captured);
-  auto capturedWidget = manager.keyboardCapturedWidget();
-  ASSERT_TRUE(capturedWidget) << capturedWidget.error().what();
-  EXPECT_FALSE(*capturedWidget);
-  auto targets = manager.inputTargetPanes();
-  ASSERT_TRUE(targets) << targets.error().what();
-  EXPECT_TRUE(targets->empty());
-  pane.setDragActive(true, {1, 1});
-  for (InputEvent const& event : {
-      InputEvent{MouseButtonDownEvent{MouseButton::Left, {1, 1}}},
-      InputEvent{MouseButtonUpEvent{MouseButton::Left, {1, 1}}},
-      InputEvent{KeyDownEvent{Key::A, KeyMod::NoMod}},
-      InputEvent{TextInputEvent{"🙂"}}}) {
-    auto directlyConsumed = pane.sendEvent(event);
-    ASSERT_TRUE(directlyConsumed) << directlyConsumed.error().what();
-    EXPECT_FALSE(*directlyConsumed);
-    auto consumed = manager.sendInputEvent(event);
-    ASSERT_TRUE(consumed) << consumed.error().what();
-    EXPECT_FALSE(*consumed);
-  }
-  auto inputs = pane.evaluate("return storage.inputs");
-  ASSERT_TRUE(inputs) << inputs.error().what();
-  ASSERT_TRUE(*inputs);
-  EXPECT_EQ(**inputs, Json(0));
-  EXPECT_EQ((*editor)->getText(), String("A中"));
+    EXPECT_TRUE(pane.isDisplayed());
+    EXPECT_FALSE(manager.getPaneAt({1, 1}));
+    EXPECT_FALSE(manager.getPaneAt({PaneLayer::Background}, {1, 1}));
+    auto editor = textEditor(*setup->context, "A中");
+    ASSERT_TRUE(editor) << editor.error().what();
+    ASSERT_TRUE(pane.addChild("editor", *editor));
+    ASSERT_TRUE((*editor)->focus());
+    auto captured = manager.keyboardCapturedPane();
+    ASSERT_TRUE(captured) << captured.error().what();
+    EXPECT_FALSE(*captured);
+    auto capturedWidget = manager.keyboardCapturedWidget();
+    ASSERT_TRUE(capturedWidget) << capturedWidget.error().what();
+    EXPECT_FALSE(*capturedWidget);
+    auto targets = manager.inputTargetPanes();
+    ASSERT_TRUE(targets) << targets.error().what();
+    EXPECT_TRUE(targets->empty());
+    pane.setDragActive(true, {1, 1});
+    for (InputEvent const& event :
+         {InputEvent{MouseButtonDownEvent{MouseButton::Left, {1, 1}}},
+          InputEvent{MouseButtonUpEvent{MouseButton::Left, {1, 1}}}, InputEvent{KeyDownEvent{Key::A, KeyMod::NoMod}},
+          InputEvent{TextInputEvent{"🙂"}}}) {
+      auto directlyConsumed = pane.sendEvent(event);
+      ASSERT_TRUE(directlyConsumed) << directlyConsumed.error().what();
+      EXPECT_FALSE(*directlyConsumed);
+      auto consumed = manager.sendInputEvent(event);
+      ASSERT_TRUE(consumed) << consumed.error().what();
+      EXPECT_FALSE(*consumed);
+    }
+    auto inputs = pane.evaluate("return storage.inputs");
+    ASSERT_TRUE(inputs) << inputs.error().what();
+    ASSERT_TRUE(*inputs);
+    EXPECT_EQ(**inputs, Json(0));
+    EXPECT_EQ((*editor)->getText(), String("A中"));
 
-  // A normal pane still participates in hit testing and real keyboard capture.
-  auto back = Pane::create(**context);
-  ASSERT_TRUE(back) << back.error().what();
-  (*back)->setAnchor(PaneAnchor::BottomLeft);
-  (*back)->setSize({100, 100});
-  auto backEditor = textEditor(**context, "B");
-  ASSERT_TRUE(backEditor) << backEditor.error().what();
-  ASSERT_TRUE((*back)->addChild("editor", *backEditor));
-  ASSERT_TRUE(manager.displayPane(PaneLayer::Hud, *back));
-  ASSERT_TRUE((*backEditor)->focus());
-  EXPECT_EQ(manager.getPaneAt({1, 1}), *back);
-  captured = manager.keyboardCapturedPane();
-  ASSERT_TRUE(captured) << captured.error().what();
-  EXPECT_EQ(*captured, *back);
-  auto committed = manager.sendInputEvent(TextInputEvent{"界"});
-  ASSERT_TRUE(committed) << committed.error().what();
-  EXPECT_TRUE(*committed);
-  EXPECT_EQ((*backEditor)->getText(), String("B界"));
-  ASSERT_TRUE(manager.dismissAllPanes());
-});
+    // A normal pane still participates in hit testing and real keyboard capture.
+    auto back = Pane::create(*setup->context);
+    ASSERT_TRUE(back) << back.error().what();
+    (*back)->setAnchor(PaneAnchor::BottomLeft);
+    (*back)->setSize({100, 100});
+    auto backEditor = textEditor(*setup->context, "B");
+    ASSERT_TRUE(backEditor) << backEditor.error().what();
+    ASSERT_TRUE((*back)->addChild("editor", *backEditor));
+    ASSERT_TRUE(manager.displayPane(PaneLayer::Hud, *back));
+    ASSERT_TRUE((*backEditor)->focus());
+    EXPECT_EQ(manager.getPaneAt({1, 1}), *back);
+    captured = manager.keyboardCapturedPane();
+    ASSERT_TRUE(captured) << captured.error().what();
+    EXPECT_EQ(*captured, *back);
+    auto committed = manager.sendInputEvent(TextInputEvent{"界"});
+    ASSERT_TRUE(committed) << committed.error().what();
+    EXPECT_TRUE(*committed);
+    EXPECT_EQ((*backEditor)->getText(), String("B界"));
+    ASSERT_TRUE(manager.dismissAllPanes());
+  });
 
 const GameTestRegistration scriptInputEditor("ScriptPane", "ConsumingInputPrecedesFocusedNativeEditor", [](GameTest& fixture) {
   auto configuration = fixture.root().configuration();
@@ -2919,8 +2927,17 @@ const GameTestRegistration questTrackerPresentation("LuaQuestTracker", "Effectiv
         speed -= speed * *friction;
         direction += speed;
       }
-      if (step == 6)
+      // One in-motion reload covers continuity; the other directions exercise
+      // the same spring without repeating asset/engine reconstruction.
+      if (target == 3.2f && step == 6) {
+        auto beforeReload =
+          pane->evaluate("assert(storage.compassSpeed ~= 0); return {storage.compassDirection, storage.compassSpeed}");
+        ASSERT_TRUE(beforeReload && *beforeReload);
         ASSERT_TRUE(root.reload());
+        auto afterReload = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
+        ASSERT_TRUE(afterReload && *afterReload);
+        EXPECT_EQ(**afterReload, **beforeReload);
+      }
       ASSERT_TRUE(pane->tick(step % 2 ? 0.001f : 0.1f));
       auto state = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
       ASSERT_TRUE(state && *state);
@@ -3953,59 +3970,72 @@ const GameTestRegistration planetTextPresentation("LuaPlanetText", "NativeTimerD
   GameTimer expected(0.7f);
   float fade = 0.3f;
   auto activePlayer = *player;
-  auto step = [&](float dt) {
+  auto checkStep = [&](ScriptTestPane& subject, GameTimer& expected, float fade, float dt) -> testing::AssertionResult {
     bool ready = false;
     if ((*cinematic)->completed())
       ready = expected.tick(dt);
     else if (!hasPlayer || !activePlayer->inWorld())
       expected.reset();
-    auto ticked = pane->tick(dt);
-    ASSERT_TRUE(ticked) << ticked.error().what();
-    auto timer = pane->evaluate("return storage.timer");
-    ASSERT_TRUE(timer && *timer);
+    auto ticked = subject.tick(dt);
+    if (!ticked)
+      return testing::AssertionFailure() << ticked.error().what();
+    auto timer = subject.evaluate("return storage.timer");
+    if (!timer)
+      return testing::AssertionFailure() << timer.error().what();
+    if (!*timer)
+      return testing::AssertionFailure() << "Missing planet countdown";
     auto timerValue = (**timer).toFloat();
-    ASSERT_TRUE(timerValue);
-    EXPECT_EQ(*timerValue, expected.timer);
+    if (!timerValue)
+      return testing::AssertionFailure() << timerValue.error().what();
+    if (*timerValue != expected.timer)
+      return testing::AssertionFailure() << "Countdown: " << *timerValue << " != " << expected.timer;
     if ((*cinematic)->completed() && !ready) {
       float alpha = expected.timer < fade ? expected.timer / fade : 1.0f;
-      auto actual = pane->evaluate("return storage.alpha");
-      ASSERT_TRUE(actual && *actual);
+      auto actual = subject.evaluate("return storage.alpha");
+      if (!actual)
+        return testing::AssertionFailure() << actual.error().what();
+      if (!*actual)
+        return testing::AssertionFailure() << "Missing planet alpha";
       auto actualAlpha = (**actual).toFloat();
-      ASSERT_TRUE(actualAlpha);
-      EXPECT_EQ(*actualAlpha, alpha);
+      if (!actualAlpha)
+        return testing::AssertionFailure() << actualAlpha.error().what();
+      if (*actualAlpha != alpha)
+        return testing::AssertionFailure() << "Alpha: " << *actualAlpha << " != " << alpha;
     }
+    return testing::AssertionSuccess();
   };
+  auto step = [&](float dt) { return checkStep(*pane, expected, fade, dt); };
   ASSERT_TRUE(startCinema());
-  step(0.4f); // Off-world cinematic resets, without advancing.
+  ASSERT_TRUE(step(0.4f));// Off-world cinematic resets, without advancing.
   EXPECT_FALSE(pane->visibility());
   ASSERT_TRUE((*player)->init(**worldA, 1, EntityMode::Slave));
-  step(0.2f); // In-world cinematic pauses; no show or color change.
+  ASSERT_TRUE(step(0.2f));// In-world cinematic pauses; no show or color change.
   EXPECT_FALSE(pane->visibility());
   (*cinematic)->stop();
-  step(0.1f);
+  ASSERT_TRUE(step(0.1f));
   EXPECT_TRUE(pane->visibility());
   EXPECT_EQ((*text)->getText(), String("[A <worldName> 中] A <worldName> 中"));
   EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
   ASSERT_TRUE(startCinema());
-  step(2.0f); // An in-world cinematic does not expire an already visible name.
+  ASSERT_TRUE(step(2.0f));// An in-world cinematic does not expire an already visible name.
   EXPECT_TRUE(pane->visibility());
   (*cinematic)->stop();
   ASSERT_TRUE(bindWorld(**worldB)); // Animation-free world change does not reset.
   scale = 3.0f;
-  step(0.1f);
+  ASSERT_TRUE(step(0.1f));
   EXPECT_EQ((*text)->getText(), String("[B] B"));
   EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
   ASSERT_TRUE(bindWorld(**emptyWorld));
-  step(0.1f); // Empty name retains old displayed text.
+  ASSERT_TRUE(step(0.1f));// Empty name retains old displayed text.
   EXPECT_TRUE(pane->visibility());
   EXPECT_EQ((*text)->getText(), String("[B] B"));
   worldAvailable = false; // No world capability/template, actor still present.
   ASSERT_TRUE(pane->removeCallbacks("world"));
   ASSERT_TRUE(pane->addCallbacks("world", LuaCallbacks{}));
-  step(0.1f);
+  ASSERT_TRUE(step(0.1f));
   EXPECT_TRUE(pane->visibility());
   ASSERT_TRUE(root.reload());
-  step(0.01f); // Reload preserves timer/text/handle, no init-time tick.
+  ASSERT_TRUE(step(0.01f));// Reload preserves timer/text/handle, no init-time tick.
   EXPECT_EQ((*text)->getText(), String("[B] B"));
   ASSERT_TRUE(pane->stopScripts());
   auto replacement = (*factory)->create();
@@ -4016,12 +4046,12 @@ const GameTestRegistration planetTextPresentation("LuaPlanetText", "NativeTimerD
   ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
   activePlayer = *replacement;
   ASSERT_TRUE(pane->resumeScripts());
-  step(0.01f); // Off-world without a cinematic continues, never resets.
+  ASSERT_TRUE(step(0.01f));// Off-world without a cinematic continues, never resets.
   EXPECT_TRUE(pane->visibility());
-  step(1.0f);
+  ASSERT_TRUE(step(1.0f));
   EXPECT_FALSE(pane->visibility());
   ASSERT_TRUE(startCinema());
-  step(0.1f); // Replacement actor is off-world: reset and hide.
+  ASSERT_TRUE(step(0.1f));// Replacement actor is off-world: reset and hide.
   ASSERT_TRUE(pane->stopScripts());
   ASSERT_TRUE(pane->removeCallbacks("player"));
   ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
@@ -4030,28 +4060,61 @@ const GameTestRegistration planetTextPresentation("LuaPlanetText", "NativeTimerD
   worldAvailable = true;
   ASSERT_TRUE(bindWorld(**worldA));
   (*cinematic)->stop();
-  step(0.1f);
+  ASSERT_TRUE(step(0.1f));
   EXPECT_TRUE(pane->visibility());
   auto retained = probe->eval<Json>("return {planet.isDisplayed(), cached.getText('planetText')}");
   ASSERT_TRUE(retained);
   EXPECT_EQ(*retained, (Json(JsonArray{true, "[A <worldName> 中] A <worldName> 中"})));
   EXPECT_EQ(pane->fetchChild<TextBoxWidget>("planetText")->get(), text->get());
 
-  // Native approach handles signed duration/dt, and a zero/nonpositive fade
-  // never divides when timer >= fade. Exercise these asset values via reload.
+  // Cover all signed duration/dt and fade boundaries in fresh consumers of the
+  // real asset script. Only duration/fade configuration inputs are injected;
+  // countdown/alpha are computed by Lua and applied to native pane/widgets.
   ASSERT_TRUE((*player)->uninit());
   for (auto [duration, fadeTime] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f},
       std::pair{0.7f, 0.0f}, std::pair{0.7f, -0.2f}, std::pair{0.7f, 1.3f}}) {
-    ASSERT_TRUE(writeStyle(duration, fadeTime));
-    ASSERT_TRUE(root.reload());
-    expected = GameTimer(duration);
-    fade = fadeTime;
+    SCOPED_TRACE(strf("duration={}, fade={}", duration, fadeTime));
+    auto boundaryPane = ScriptTestPane::create(**context, Json(*paneConfig));
+    ASSERT_TRUE(boundaryPane) << boundaryPane.error().what();
+    auto boundaryText = textEditor(**context, "");
+    ASSERT_TRUE(boundaryText) << boundaryText.error().what();
+    ASSERT_TRUE((*boundaryPane)->addChild("planetText", *boundaryText));
+    ASSERT_TRUE((*boundaryPane)->setLuaRoot(*luaRoot));
+    LuaCallbacks styleInputs;
+    ASSERT_TRUE(
+      styleInputs.registerCallback("assetJson", [&](String const& path) -> std::expected<Json, StarException> {
+        if (path == "/interface.config:planetNameTime")
+          return Json(duration);
+        if (path == "/interface.config:planetNameFadeTime")
+          return Json(fadeTime);
+        return (*assets)->json(path);
+      }));
+    ASSERT_TRUE((*boundaryPane)->addCallbacks("root", std::move(styleInputs)));
+    ASSERT_TRUE((*boundaryPane)->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE((*boundaryPane)->addCallbacks("interface", interface));
+    ASSERT_TRUE((*boundaryPane)->displayed());
+    GameTimer boundaryTimer(duration);
     ASSERT_TRUE(startCinema());
-    step(0.0f);
+    ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, 0.0f));
     (*cinematic)->stop();
-    for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f})
-      step(dt);
+    for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f}) {
+      SCOPED_TRACE(dt);
+      ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, dt));
+    }
+    ASSERT_TRUE((*boundaryPane)->dismissed());
   }
+
+  // One representative still exercises changed assets through Root reload and
+  // the original retained pane; the earlier in-motion reload remains separate.
+  ASSERT_TRUE(writeStyle(0.7f, 0.0f));
+  ASSERT_TRUE(root.reload());
+  expected = GameTimer(0.7f);
+  fade = 0.0f;
+  ASSERT_TRUE(startCinema());
+  ASSERT_TRUE(step(0.0f));
+  (*cinematic)->stop();
+  for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f})
+    ASSERT_TRUE(step(dt));
   ASSERT_TRUE(panes.dismissAllPanes());
 });
 

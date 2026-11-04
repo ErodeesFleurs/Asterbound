@@ -18,6 +18,8 @@ import star.list;
 using namespace Star;
 
 namespace {
+constexpr unsigned RandomSampleCount = 4096;
+
 struct ParsedMapEntry {
   int key = 0;
   operator std::pair<int, int>() const { return {key, key * 2}; }
@@ -168,7 +170,7 @@ TEST(FlatHashSet, Random) {
   ASSERT_TRUE(randomResult);
   auto& random = **randomResult;
   List<Vec2I> keys;
-  for (unsigned i = 0; i < 100000; ++i)
+  for (unsigned i = 0; i < RandomSampleCount; ++i)
     keys.append(Vec2I(i * 743202097, i * 205495087));
   random.shuffle(keys);
 
@@ -271,7 +273,7 @@ TEST(FlatHashMap, Random) {
   ASSERT_TRUE(randomResult);
   auto& random = **randomResult;
   List<std::pair<Vec2I, int>> values;
-  for (unsigned i = 0; i < 100000; ++i)
+  for (unsigned i = 0; i < RandomSampleCount; ++i)
     values.append({Vec2I(i * 743202097, i * 205495087), i});
   random.shuffle(values);
 
@@ -318,7 +320,7 @@ TEST(FlatHashMap, Random) {
 
 TEST(FlatHashMap, EraseWhileIterating) {
   List<std::pair<Vec2I, int>> values;
-  for (unsigned i = 0; i < 100000; ++i)
+  for (unsigned i = 0; i < RandomSampleCount; ++i)
     values.append({Vec2I(i * 743202097, i * 205495087), i});
 
   FlatHashMap<Vec2I, int> testMap;

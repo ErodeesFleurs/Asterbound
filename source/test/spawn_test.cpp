@@ -51,32 +51,27 @@ import star.game_test;
 
 using namespace Star;
 
-[[nodiscard]] std::expected<void, StarException> validateWorld(Root& root, TestUniverse& testUniverse) {
-  auto update = testUniverse.update(100);
-  if (!update)
-    return std::unexpected(std::move(update.error()));
-
-  // Just make sure the test world draws something for now, this will grow to
-  // include more than this.
-  auto drawables = testUniverse.currentClientDrawables();
-  if (!drawables)
-    return std::unexpected(std::move(drawables.error()));
-  auto world = printWorldId(testUniverse.currentPlayerWorld());
-  if (!world)
-    return std::unexpected(std::move(world.error()));
-  EXPECT_GE(drawables->size(), 1u) << strf("world: {}", *world);
+[[nodiscard]] std::expected<TestUniverse::ReadyWorld, StarException>
+validateWorld(Root& root, TestUniverse& testUniverse, std::int64_t timeoutMilliseconds = 60000) {
+  auto ready = testUniverse.waitForWorldReady(timeoutMilliseconds);
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
 
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  for (auto const& drawable : *drawables) {
+  for (auto const& drawable : ready->drawables) {
     if (drawable.isImage()) {
       auto image = (*assets)->image(drawable.imagePart().image);
       if (!image)
         return std::unexpected(std::move(image.error()));
     }
   }
-  return {};
+  ::testing::Test::RecordProperty("firstServerStep", std::to_string(ready->firstServerStep));
+  ::testing::Test::RecordProperty("readyServerStep", std::to_string(ready->readyServerStep));
+  ::testing::Test::RecordProperty("observedScriptedNpcs", std::to_string(ready->observedScriptedNpcs));
+  ::testing::Test::RecordProperty("observedCoordinators", std::to_string(ready->observedCoordinators));
+  return ready;
 }
 
 const GameTestRegistration randomCelestialWorld("SpawnTest", "RandomCelestialWorld", [](GameTest& fixture) {
@@ -97,7 +92,10 @@ const GameTestRegistration randomCelestialWorld("SpawnTest", "RandomCelestialWor
   WorldId worldId = CelestialWorldId(**celestialWorld);
   ASSERT_TRUE((*testUniverse)->warpPlayer(worldId));
   EXPECT_EQ((*testUniverse)->currentPlayerWorld(), worldId);
-  ASSERT_TRUE(validateWorld(fixture.root(), **testUniverse));
+  auto ready = validateWorld(fixture.root(), **testUniverse);
+  ASSERT_TRUE(ready) << ready.error().what();
+  EXPECT_GT(ready->readyServerStep, ready->firstServerStep);
+  EXPECT_FALSE(ready->drawables.empty());
   ASSERT_TRUE((*testUniverse)->close());
 });
 
@@ -109,7 +107,11 @@ const GameTestRegistration celestialCoordinatorMigration("SpawnTest", "Celestial
   ASSERT_TRUE(testUniverse);
   ASSERT_TRUE((*testUniverse)->warpPlayer(*worldId));
   EXPECT_EQ((*testUniverse)->currentPlayerWorld(), *worldId);
-  ASSERT_TRUE(validateWorld(fixture.root(), **testUniverse));
+  auto ready = validateWorld(fixture.root(), **testUniverse);
+  ASSERT_TRUE(ready) << ready.error().what();
+  EXPECT_GT(ready->readyServerStep, ready->firstServerStep);
+  EXPECT_GT(ready->observedScriptedNpcs, 0u);
+  EXPECT_FALSE(ready->drawables.empty());
   ASSERT_TRUE((*testUniverse)->close());
 
   // Compile that same asset explicitly even if NPC scheduling changes.
@@ -137,6 +139,18 @@ const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld
   ASSERT_TRUE(testUniverse);
   ASSERT_TRUE((*testUniverse)->warpPlayer(instanceWorld));
   EXPECT_EQ((*testUniverse)->currentPlayerWorld(), instanceWorld);
-  ASSERT_TRUE(validateWorld(root, **testUniverse));
+  // A bounded failure must leave the same real universe usable for a retry.
+  auto timedOut = validateWorld(root, **testUniverse, 0);
+  ASSERT_FALSE(timedOut);
+  EXPECT_TRUE(timedOut.error().is<TestUniverseTimeoutException>());
+  EXPECT_EQ((*testUniverse)->currentPlayerWorld(), instanceWorld);
+  auto ready = validateWorld(root, **testUniverse);
+  ASSERT_TRUE(ready) << ready.error().what();
+  EXPECT_GT(ready->readyServerStep, ready->firstServerStep);
+  EXPECT_FALSE(ready->drawables.empty());
+  ASSERT_TRUE((*testUniverse)->close());
+  auto closed = (*testUniverse)->waitForWorldReady();
+  ASSERT_FALSE(closed);
+  EXPECT_TRUE(closed.error().is<TestUniverseException>());
   ASSERT_TRUE((*testUniverse)->close());
 });

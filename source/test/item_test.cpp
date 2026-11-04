@@ -1318,17 +1318,6 @@ end
         ASSERT_TRUE(*target);
         auto original = *target;
         auto originalDescriptor = original->descriptor();
-        auto augment = AugmentItem::create(**root,
-                                           JsonObject{{"itemName", "lifecycleaugment"},
-                                                      {"inventoryIcon", "/assetmissing.png"},
-                                                      {"shortdescription", "Lifecycle augment"},
-                                                      {"rarity", "common"},
-                                                      {"maxStack", 100},
-                                                      {"scripts", JsonArray{"lifecycle.lua"}},
-                                                      {"lifecycleCallback", "installed"}},
-                                           "/", JsonObject());
-        ASSERT_TRUE(augment) << augment.error().what();
-        ASSERT_EQ((*augment)->setCount(3), 0u);
         bool scriptFailed = !test.stage.empty() || test.cleanup;
         if (aging) {
           auto result = (*database)->ageItem(*target, 7.25);
@@ -1341,6 +1330,17 @@ end
                                       : test.stage == "invoke" ? "item-invoke-marker"
                                                                : "item-cleanup-marker"));
         } else {
+          auto augment = AugmentItem::create(**root,
+                                             JsonObject{{"itemName", "lifecycleaugment"},
+                                                        {"inventoryIcon", "/assetmissing.png"},
+                                                        {"shortdescription", "Lifecycle augment"},
+                                                        {"rarity", "common"},
+                                                        {"maxStack", 100},
+                                                        {"scripts", JsonArray{"lifecycle.lua"}},
+                                                        {"lifecycleCallback", "installed"}},
+                                             "/", JsonObject());
+          ASSERT_TRUE(augment) << augment.error().what();
+          ASSERT_EQ((*augment)->setCount(3), 0u);
           auto result = (*database)->applyAugment(*target, **augment);
           EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
           if (result)

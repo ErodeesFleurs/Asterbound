@@ -23,6 +23,7 @@ import star.rpc_promise;
 import star.strong_typedef;
 import star.game_types;
 import star.vector;
+import star.rect;
 import star.a_star;
 import star.ordered_set;
 import star.audio;
@@ -143,6 +144,9 @@ import star.interpolation_tracker;
 import star.ambient;
 import star.weather;
 import star.world_client;
+import star.world_server;
+import star.scripted_entity;
+import star.stagehand;
 
 import star.player_storage;
 import star.statistics;
@@ -328,7 +332,8 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    Thread::sleep(16);
+    if (!m_client->clientContext())
+      Thread::sleep(16);
   }
 
   if (!m_client->clientContext())
@@ -347,9 +352,11 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    Thread::sleep(16);
+    if (!m_mainPlayer->isTeleporting() && !std::holds_alternative<std::monostate>(m_client->playerWorld()))
+      break;
     if (Time::monotonicMilliseconds() - startTime > 300000)
       return std::unexpected(StarException("Timed out waiting for the test player to finish warping"));
+    Thread::sleep(16);
   }
   return {};
 }
@@ -390,4 +397,158 @@ std::expected<List<Drawable>, StarException> TestUniverse::currentClientDrawable
   return drawables;
 }
 
+std::expected<TestUniverse::ReadyWorld, StarException>
+TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
+  if (!m_client || !m_server || !m_client->clientContext())
+    return std::unexpected(TestUniverseException("Cannot wait for a closed or disconnected test universe"));
+
+  struct Observation {
+    std::uint64_t firstStep;
+    bool present = false;
+  };
+  std::unordered_map<EntityId, Observation> observedEntities;
+  std::unordered_map<std::string, Observation> observedWorldScripts;
+  ReadyWorld ready{{}, 0, 0, 0, 0};
+  std::optional<RpcPromise<Json>> barrier;
+  auto worldId = currentPlayerWorld();
+  auto connectionId = m_client->clientContext()->connectionId();
+  auto start = Time::monotonicMilliseconds();
+  bool sampled = false;
+  auto assets = m_mainPlayer->root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto contexts = (*assets)->json("/worldserver.config:scriptContexts");
+  if (!contexts)
+    return std::unexpected(std::move(contexts.error()));
+  auto configuredContexts = contexts->toObject();
+  if (!configuredContexts)
+    return std::unexpected(std::move(configuredContexts.error()));
+
+  while (true) {
+    // Preserve update()'s real client cadence; the independent server/world
+    // threads continue advancing throughout this bounded wait.
+    auto updated = update(1);
+    if (!updated)
+      return std::unexpected(std::move(updated.error()));
+    if (Time::monotonicMilliseconds() - start >= timeoutMilliseconds)
+      return std::unexpected(TestUniverseTimeoutException(
+        strf("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
+             ready.firstServerStep, ready.readyServerStep, ready.observedScriptedNpcs, ready.observedCoordinators)));
+    if (currentPlayerWorld() != worldId)
+      return std::unexpected(StarException("Test player left the world while waiting for readiness"));
+
+    if (barrier) {
+      auto result = barrier->result();
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      if (!*result) {
+        auto error = barrier->error();
+        if (!error)
+          return std::unexpected(std::move(error.error()));
+        if (*error)
+          return std::unexpected(StarException(strf("Test world readiness message failed: {}", **error)));
+        continue;
+      }
+      // WorldServerThread settles messages only after WorldServer::update
+      // succeeds, including spawner, all entities and world-script updates.
+      auto drawables = currentClientDrawables();
+      if (!drawables)
+        return std::unexpected(std::move(drawables.error()));
+      if (drawables->empty())
+        continue;
+      ready.drawables = std::move(*drawables);
+      return ready;
+    }
+
+    bool schedulesReady = true;
+    float expiryTime = 0;
+    for (auto& [id, observation] : observedEntities)
+      observation.present = false;
+    auto executed = m_server->executeForClient(
+      connectionId, [&](WorldServer& world, std::shared_ptr<Player> player) -> std::expected<void, StarException> {
+        auto step = world.currentStep();
+        ready.readyServerStep = step;
+        if (!sampled) {
+          ready.firstServerStep = step;
+          sampled = true;
+        }
+        // A rendered player does not imply its surrounding sectors have
+        // finished activation/generation (and thus instantiated their NPCs).
+        auto active =
+          world.regionActive(RectI::withCenter(Vec2I::floor(player->position()), Vec2I(m_clientWindowSize)));
+        if (!active)
+          return std::unexpected(std::move(active.error()));
+        schedulesReady = *active && step > ready.firstServerStep;
+        expiryTime = world.expiryTime();
+        float dt = world.root().timing().serverTimestep * world.root().timing().timescale;
+
+        auto settled = [&](Observation& observation, double period) {
+          observation.present = true;
+          // LuaScriptUpdate::updateDt() is stepCount * lastDt, not elapsed
+          // wall time. Periodic(0) deliberately disables updates; otherwise
+          // wait a full observed scheduling period after first seeing it.
+          if (dt <= 0 || step == observation.firstStep
+              || (period > 0 && step - observation.firstStep < std::ceil(period / dt)))
+            schedulesReady = false;
+        };
+        for (auto const& [name, scripts] : *configuredContexts) {
+          auto context = world.scriptContext(name);
+          if (!context || context->error() || !context->context())
+            return std::unexpected(StarException(strf("Test world script context is not healthy: {}", name)));
+          auto& observation = observedWorldScripts.try_emplace(name.utf8(), Observation{step}).first->second;
+          settled(observation, context->updateDt());
+        }
+        for (auto id : world.entityIds()) {
+          auto entity = world.entity(id);
+          if (!entity || (entity->entityType() != EntityType::Npc && entity->entityType() != EntityType::Stagehand))
+            continue;
+          auto scripted = as<ScriptedEntity>(entity);
+          if (!scripted)
+            continue;
+          auto period = scripted->evalScript("return script.updateDt()");
+          if (!period)
+            return std::unexpected(std::move(period.error()));
+          if (!*period)
+            continue;// A stagehand may legitimately have no scripts.
+          double seconds;
+          if (auto value = std::get_if<LuaFloat>(&**period))
+            seconds = *value;
+          else if (auto value = std::get_if<LuaInt>(&**period))
+            seconds = *value;
+          else
+            return std::unexpected(StarException("Test entity script did not report its scheduling period"));
+          auto [entry, inserted] = observedEntities.try_emplace(id, Observation{step});
+          if (inserted) {
+            if (entity->entityType() == EntityType::Npc) {
+              ++ready.observedScriptedNpcs;
+            } else {
+              auto type = as<Stagehand>(entity)->typeName();
+              if (!type)
+                return std::unexpected(std::move(type.error()));
+              if (*type == "coordinator")
+                ++ready.observedCoordinators;
+            }
+          }
+          settled(entry->second, seconds);
+        }
+        return {};
+      });
+    if (!executed)
+      return std::unexpected(std::move(executed.error()));
+    if (!*executed)
+      return std::unexpected(StarException("Test server no longer has the player in a world"));
+    // Retired entities must not hold the wait open; their absence is observed
+    // under the same server-world lock as the scheduling samples.
+    std::erase_if(observedEntities, [](auto const& pair) { return !pair.second.present; });
+    if (!schedulesReady)
+      continue;
+    // Reuse a real handler without altering its expiry setting. Its response
+    // proves a *successful* later world update, not merely currentStep++, which
+    // happens before entity/script execution and can precede a failure.
+    auto message = m_server->sendWorldMessage(worldId, "keepAlive", JsonArray{expiryTime});
+    if (!message)
+      return std::unexpected(std::move(message.error()));
+    barrier = std::move(*message);
+  }
+}
 }

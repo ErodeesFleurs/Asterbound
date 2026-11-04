@@ -34,6 +34,15 @@ TEST(LiquidStoreTest, OverfullLevelSaturatesNetworkUpdates) {
 }
 
 namespace {
+struct LiquidCallbackFailureTag {
+  static constexpr std::string_view name() { return "LiquidCallbackFailure"; }
+};
+using LiquidCallbackFailure = StarError<LiquidCallbackFailureTag, StarException>;
+struct LiquidReadbackFailureTag {
+  static constexpr std::string_view name() { return "LiquidReadbackFailure"; }
+};
+using LiquidReadbackFailure = StarError<LiquidReadbackFailureTag, StarException>;
+
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException>
 liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
   auto created = File::makeDirectoryRecursive(directory);
@@ -223,7 +232,7 @@ public:
   std::expected<void, StarException> record(char kind) {
     calls.push_back(kind);
     if (failure == kind && (kind != 'w' || !committedWrites.empty()))
-      return std::unexpected(StarException(strf("Injected liquid callback {}", kind)));
+      return std::unexpected(LiquidCallbackFailure(strf("Injected liquid callback {}", kind)));
     return {};
   }
 
@@ -270,8 +279,7 @@ const GameTestRegistration liquidCallbackRecovery(
     basin->failure = failure;
     auto failed = engine.update();
     ASSERT_FALSE(failed);
-    auto expectedError = StarException(strf("Injected liquid callback {}", failure));
-    EXPECT_STREQ(failed.error().what(), expectedError.what());
+    EXPECT_TRUE(failed.error().is<LiquidCallbackFailure>());
     ASSERT_FALSE(basin->calls.empty());
     EXPECT_EQ(basin->calls.back(), failure);
     if (failure == 'w') {
@@ -559,7 +567,7 @@ const GameTestRegistration liquidReadbackScales(
           if (readsBeforeFailure) {
             if (*readsBeforeFailure == 0) {
               readsBeforeFailure.reset();
-              return std::unexpected(StarException("Late scalable readback failure"));
+              return std::unexpected(LiquidReadbackFailure("Late scalable readback failure"));
             }
             --*readsBeforeFailure;
           }
@@ -586,8 +594,7 @@ const GameTestRegistration liquidReadbackScales(
           basin->readsBeforeFailure = 20;
           auto failed = engine.update();
           ASSERT_FALSE(failed);
-          auto expectedError = StarException("Late scalable readback failure");
-          EXPECT_STREQ(failed.error().what(), expectedError.what());
+          EXPECT_TRUE(failed.error().is<LiquidReadbackFailure>());
           engine.visitRegion(RectI(0, 0, visits, 1));
         }
         ASSERT_TRUE(engine.update());

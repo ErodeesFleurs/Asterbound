@@ -15,6 +15,16 @@ import star.rect;
 using namespace Star;
 
 namespace {
+struct InjectedOperationFailureTag {
+  static constexpr std::string_view name() { return "InjectedOperationFailure"; }
+};
+using InjectedOperationFailure = StarError<InjectedOperationFailureTag, StarException>;
+
+struct InjectedReferenceFailureTag {
+  static constexpr std::string_view name() { return "InjectedReferenceFailure"; }
+};
+using InjectedReferenceFailure = StarError<InjectedReferenceFailureTag, StarException>;
+
 Vec4B scalarHsv(Vec4B pixel, ImageOperation const& operation) {
   if (pixel[3] == 0)
     return pixel;
@@ -68,8 +78,15 @@ void expectOptimizedOperations(List<ImageOperation> const& operations, Image con
   EXPECT_EQ(bool(optimized), bool(sequential));
   if (bool(optimized) != bool(sequential))
     return;
-  if (!sequential)
-    EXPECT_EQ(std::string(optimized.error().what()), std::string(sequential.error().what()));
+  if (!sequential) {
+    EXPECT_TRUE(sequential.error().is<ImageException>() || sequential.error().is<ImageOperationException>()
+                || sequential.error().is<InjectedOperationFailure>()
+                || sequential.error().is<InjectedReferenceFailure>());
+    EXPECT_EQ(optimized.error().is<ImageException>(), sequential.error().is<ImageException>());
+    EXPECT_EQ(optimized.error().is<ImageOperationException>(), sequential.error().is<ImageOperationException>());
+    EXPECT_EQ(optimized.error().is<InjectedOperationFailure>(), sequential.error().is<InjectedOperationFailure>());
+    EXPECT_EQ(optimized.error().is<InjectedReferenceFailure>(), sequential.error().is<InjectedReferenceFailure>());
+  }
   expectPixels(actual, expected);
 }
 }// namespace
@@ -332,7 +349,7 @@ TEST(ImageProcessingTest, OptimizedInvalidCropsAndErrorsRetainSequentialPrefixMu
     Image original = Image::filled(Vec2U(3, 2), Vec4B(91, 47, 213, 0), format);
     for (auto crop : {RectI(0, 0, 100, 2), RectI(4, 0, 5, 1)}) {
       expectOptimizedOperations({SetColorImageOperation{Vec3B(17, 31, 71)}, CropImageOperation{crop},
-                                 ErrorImageOperation{ImageOperationException("later parse failure")}},
+                                 ErrorImageOperation{InjectedOperationFailure("later parse failure")}},
                                 original);
       expectOptimizedOperations({ScaleImageOperation{ScaleImageOperation::Nearest, Vec2F(2, 2)},
                                  SetColorImageOperation{Vec3B(17, 31, 71)}, CropImageOperation{crop}},
@@ -341,11 +358,11 @@ TEST(ImageProcessingTest, OptimizedInvalidCropsAndErrorsRetainSequentialPrefixMu
         {ScaleImageOperation{ScaleImageOperation::Bilinear, Vec2F(2, 2)}, CropImageOperation{crop}}, original);
     }
     expectOptimizedOperations(
-      {ErrorImageOperation{ImageOperationException("first parse failure")}, SetColorImageOperation{Vec3B(17, 31, 71)}},
+      {ErrorImageOperation{InjectedOperationFailure("first parse failure")}, SetColorImageOperation{Vec3B(17, 31, 71)}},
       original);
     expectOptimizedOperations({ScaleImageOperation{ScaleImageOperation::Nearest, Vec2F(2, 2)},
                                SetColorImageOperation{Vec3B(17, 31, 71)}, CropImageOperation{RectI(1, 1, 4, 3)},
-                               ErrorImageOperation{ImageOperationException("after fused prefix")}},
+                               ErrorImageOperation{InjectedOperationFailure("after fused prefix")}},
                               original);
     expectOptimizedOperations(
       {ScaleImageOperation{ScaleImageOperation::Bicubic, Vec2F(2, 2)}, CropImageOperation{RectI(1, 1, 4, 3)}},
@@ -414,19 +431,22 @@ TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
   replace.colorReplaceMap[Vec4B(0, 0, 0, 0)] = Vec4B(17, 31, 71, 0);
   Image reference = Image::filled(Vec2U(2, 2), Vec4B(0, 0, 0, 0));
   std::array<List<ImageOperation>, 5> chains{
-    List<ImageOperation>{ErrorImageOperation{ImageOperationException("first parse failure")},
+    List<ImageOperation>{ErrorImageOperation{InjectedOperationFailure("first parse failure")},
                          BlendImageOperation{BlendImageOperation::Multiply, {"unreachable"}, Vec2I()}},
     List<ImageOperation>{CropImageOperation{RectI(0, 0, 100, 100)},
                          BlendImageOperation{BlendImageOperation::Multiply, {"unreachable"}, Vec2I()}},
     List<ImageOperation>{replace, BlendImageOperation{BlendImageOperation::Multiply, {"good"}, Vec2I()},
                          BlendImageOperation{BlendImageOperation::Screen, {"missing", "unreachable"}, Vec2I()}, replace,
-                         ErrorImageOperation{ImageOperationException("later parse failure")}},
+                         ErrorImageOperation{InjectedOperationFailure("later parse failure")}},
     List<ImageOperation>{replace, BlendImageOperation{BlendImageOperation::Multiply, {"good", "failure"}, Vec2I()},
                          replace, BlendImageOperation{BlendImageOperation::Multiply, {"unreachable"}, Vec2I()}},
     List<ImageOperation>{replace, BlendImageOperation{BlendImageOperation::Multiply, {"good"}, Vec2I()},
-                         ErrorImageOperation{ImageOperationException("between blends")},
+                         ErrorImageOperation{InjectedOperationFailure("between blends")},
                          BlendImageOperation{BlendImageOperation::Multiply, {"unreachable"}, Vec2I()}}};
-  for (auto const& operations : chains) {
+  std::array callsAtStop{std::vector<String>{}, std::vector<String>{}, std::vector<String>{"good", "missing"},
+                         std::vector<String>{"good", "failure"}, std::vector<String>{"good"}};
+  for (size_t index = 0; index < chains.size(); ++index) {
+    auto const& operations = chains[index];
     std::vector<String> expectedCalls, actualCalls;
     auto callback = [&](std::vector<String>& calls) -> ImageReferenceCallback {
       return [&calls, &reference](
@@ -435,7 +455,7 @@ TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
         if (name == "good")
           return std::cref(reference);
         if (name == "failure")
-          return std::unexpected(ImageOperationException("reference failure"));
+          return std::unexpected(InjectedReferenceFailure());
         return std::nullopt;
       };
     };
@@ -449,8 +469,12 @@ TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
       processImageOperations(std::span<ImageOperation const* const>(pointers), actual, callback(actualCalls));
     ASSERT_FALSE(sequential);
     ASSERT_FALSE(optimized);
-    EXPECT_EQ(std::string(optimized.error().what()), std::string(sequential.error().what()));
-    EXPECT_EQ(actualCalls, expectedCalls);
+    EXPECT_EQ(optimized.error().is<InjectedOperationFailure>(), index == 0 || index == 4);
+    EXPECT_EQ(optimized.error().is<ImageException>(), index == 1);
+    EXPECT_EQ(optimized.error().is<ImageOperationException>(), index == 2);
+    EXPECT_EQ(optimized.error().is<InjectedReferenceFailure>(), index == 3);
+    EXPECT_EQ(expectedCalls, callsAtStop[index]);
+    EXPECT_EQ(actualCalls, callsAtStop[index]);
     expectPixels(actual, expected);
   }
 }
@@ -460,7 +484,7 @@ TEST(ImageProcessingTest, OptimizedMissingCallbacksAndFailedDirtyBlendKeepPromot
   replace.colorReplaceMap[Vec4B(0, 0, 0, 255)] = Vec4B(17, 31, 71, 113);
   Image original = Image::filled(Vec2U(8, 5), Vec4B(0, 0, 0, 255), PixelFormat::RGB24);
   expectOptimizedOperations({BlendImageOperation{BlendImageOperation::Multiply, {"missing"}, Vec2I()},
-                             ErrorImageOperation{ImageOperationException("later parse failure")}},
+                             ErrorImageOperation{InjectedOperationFailure("later parse failure")}},
                             original);
   expectOptimizedOperations({replace, BlendImageOperation{BlendImageOperation::Screen, {"missing"}, Vec2I()}, replace},
                             original);
@@ -478,7 +502,7 @@ TEST(ImageProcessingTest, OptimizedScaleCropPreservesFloatFormatScalarByteSetter
       expectOptimizedOperations({ScaleImageOperation{mode, Vec2F(2, 2)}, CropImageOperation{RectI(1, 1, 4, 3)}},
                                 original);
       expectOptimizedOperations({ScaleImageOperation{mode, Vec2F(2, 2)}, CropImageOperation{RectI(0, 0, 20, 20)},
-                                 ErrorImageOperation{ImageOperationException("later error")}},
+                                 ErrorImageOperation{InjectedOperationFailure("later error")}},
                                 original);
     }
   }
@@ -492,7 +516,7 @@ TEST(ImageProcessingTest, DirtyBlendRetainsPerOperationCallbackValueSemantics) {
     [calls = 0u, &reference](
       String const& name) mutable -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
     if (name != std::string_view(calls++ == 0 ? "first" : "second"))
-      return std::unexpected(ImageOperationException("callback state leaked across operations"));
+      return std::unexpected(InjectedReferenceFailure("callback state leaked across operations"));
     return std::cref(reference);
   };
   BlendImageOperation blend{BlendImageOperation::Multiply, {"first", "second"}, Vec2I()};
@@ -525,15 +549,16 @@ TEST(ImageProcessingTest, ListOperationsPreserveInputOnSuccessAndReferenceFailur
   ImageReferenceCallback callback =
     [&](String const& name) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
     calls.push_back(name);
-    return std::unexpected(ImageOperationException("reference failure"));
+    return std::unexpected(InjectedReferenceFailure());
   };
   expected = original;
   auto sequential = sequentialOperations(operations, expected, callback);
   ASSERT_FALSE(sequential);
+  EXPECT_TRUE(sequential.error().is<InjectedReferenceFailure>());
   calls.clear();
   auto failed = processImageOperations(operations, original, callback);
   ASSERT_FALSE(failed);
-  EXPECT_EQ(std::string(failed.error().what()), std::string(sequential.error().what()));
+  EXPECT_TRUE(failed.error().is<InjectedReferenceFailure>());
   EXPECT_EQ(calls, (std::vector<String>{"failure"}));
   ASSERT_NO_FATAL_FAILURE(expectPixels(original, before));
 }

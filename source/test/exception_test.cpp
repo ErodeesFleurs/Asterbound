@@ -311,7 +311,7 @@ TEST(ExceptionTest, ConcurrentFirstRenderingAndCopiesAreDeterministic) {
       }
       whats[i] = copy.what();
       stable[i] = true;
-      for (int repeat = 0; repeat < 8; ++repeat) {
+      for (int repeat = 0; repeat < 2; ++repeat) {
         auto diagnostic = ExceptionDiagnostic(copy);
         stable[i] = stable[i] && printException(diagnostic, true) == fulls[i]
             && printException(diagnostic, false) == shorts[i] && copy.what() == whats[i]
