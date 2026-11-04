@@ -117,6 +117,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& dr) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
+  std::uint64_t presentationEpoch() const override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
 
@@ -191,7 +193,8 @@ private:
 
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeProjectileCallbacks();
 
-  [[nodiscard]] std::expected<void, StarException> renderPendingRenderables(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectPendingRenderEvents(RenderCallback& renderCallback);
+  int frameAt(float animationTimer, float timeToLive) const;
 
   std::shared_ptr<ProjectileConfig> m_config;
   Json m_parameters;
@@ -239,6 +242,8 @@ private:
   int m_frame;
   float m_animationTimer;
   float m_animationCycle;
+  float m_previousAnimationTimer = 0.0f;
+  float m_previousTimeToLive = 0.0f;
 
   // not quite the same thing as m_collision, used for triggering actionOnCollide
   bool m_wasColliding = false;
@@ -254,6 +259,7 @@ private:
   OrderedHashMap<String, PhysicsCollisionConfig> m_physicsCollisions;
 
   List<std::variant<std::shared_ptr<AudioInstance>, Particle, LightSource>> m_pendingRenderables;
+  List<LightSource> m_renderLights;
 };
 
 }

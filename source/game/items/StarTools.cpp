@@ -615,10 +615,8 @@ std::expected<List<Drawable>, StarException> WireTool::drawables() const {
   return BeamItem::drawables();
 }
 
-std::expected<List<Drawable>, StarException> WireTool::nonRotatedDrawables() const {
-  if (m_wireConnector && m_wireConnector->get().connecting())
-    return BeamItem::nonRotatedDrawables();
-  return {};
+bool WireTool::beamActive() const {
+  return m_wireConnector && m_wireConnector->get().connecting();
 }
 
 void WireTool::setEnd(EndType) {
@@ -827,10 +825,8 @@ std::expected<List<PersistentStatusEffect>, StarException> BeamMiningTool::statu
   return m_inhandStatusEffects;
 }
 
-std::expected<List<Drawable>, StarException> BeamMiningTool::nonRotatedDrawables() const {
-  if (!ready() && !coolingDown())
-    return BeamItem::nonRotatedDrawables();
-  return {};
+bool BeamMiningTool::beamActive() const {
+  return !ready() && !coolingDown();
 }
 
 std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shifting, bool edgeTriggered) {
@@ -1138,10 +1134,8 @@ std::expected<void, StarException> PaintingBeamTool::init(ToolUserEntity& owner,
   return {};
 }
 
-std::expected<List<Drawable>, StarException> PaintingBeamTool::nonRotatedDrawables() const {
-  if (!coolingDown())
-    return BeamItem::nonRotatedDrawables();
-  return {};
+bool PaintingBeamTool::beamActive() const {
+  return !coolingDown();
 }
 
 std::expected<void, StarException> PaintingBeamTool::fire(FireMode mode, bool shifting, bool edgeTriggered) {

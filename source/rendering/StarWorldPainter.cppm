@@ -115,10 +115,10 @@ private:
   [[nodiscard]] std::expected<void, StarException> renderParticles(WorldRenderData& renderData, Particle::Layer layer);
   [[nodiscard]] std::expected<void, StarException> renderBars(WorldRenderData& renderData);
 
-  [[nodiscard]] std::expected<void, StarException> drawEntityLayer(List<Drawable> drawables, EntityHighlightEffect highlightEffect = EntityHighlightEffect());
+  [[nodiscard]] std::expected<void, StarException> drawEntityLayer(List<Drawable> const& drawables, EntityHighlightEffect highlightEffect = EntityHighlightEffect());
 
-  [[nodiscard]] std::expected<void, StarException> drawDrawable(Drawable drawable);
-  [[nodiscard]] std::expected<void, StarException> drawDrawableSet(List<Drawable>& drawable);
+  [[nodiscard]] std::expected<void, StarException> drawDrawable(Drawable const& drawable);
+  [[nodiscard]] std::expected<void, StarException> drawDrawableSet(List<Drawable> const& drawable);
 
   Root& m_root;
   WorldCamera m_camera;
@@ -132,6 +132,7 @@ private:
 
   Json m_highlightConfig;
   Map<EntityHighlightEffectType, std::pair<Directives, Directives>> m_highlightDirectives;
+  Map<EntityRenderLayer, List<std::pair<EntityHighlightEffect, std::reference_wrapper<List<Drawable> const>>>> m_entityDrawableLayers;
 
   Vec2F m_entityBarOffset;
   Vec2F m_entityBarSpacing;
@@ -147,6 +148,7 @@ private:
   Vec2F m_previousCameraCenter;
   Vec2F m_parallaxWorldPosition;
 
+  RandomSource m_preloadRandom{0};
   float m_preloadTextureChance;
 };
 

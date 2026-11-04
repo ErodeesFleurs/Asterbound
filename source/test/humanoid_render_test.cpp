@@ -2,6 +2,8 @@
 
 import std;
 import star.actor_movement_controller;
+import star.animated_part_set;
+import star.color;
 import star.algorithm;
 import star.armors;
 import star.asset_path;
@@ -10,6 +12,15 @@ import star.casting;
 import star.client_context;
 import star.drawable;
 import star.file;
+import star.entity_rendering;
+import star.format;
+import star.list;
+import star.light_source;
+import star.mixer;
+import star.movement_controller_lua_bindings;
+import star.particle;
+import star.status_controller;
+import star.status_types;
 import star.game_test;
 import star.game_types;
 import star.humanoid;
@@ -17,12 +28,16 @@ import star.item;
 import star.item_database;
 import star.item_descriptor;
 import star.json;
+import star.line;
+import star.matrix3;
+import star.networked_animator;
 import star.lua_root;
 import star.net_compatibility;
 import star.player;
 import star.player_factory;
 import star.player_lua_bindings;
 import star.root;
+import star.random;
 import star.string;
 import star.uuid;
 import star.vector;
@@ -367,5 +382,497 @@ const GameTestRegistration refreshedMovementCycles(
           }
         }
       }
+    }
+  });
+
+const GameTestRegistration semanticPartSampling(
+  "HumanoidRenderTest", "PartSamplingWrapsAndResetsWithoutChangingLogicalFrames", [](GameTest&) {
+    auto config = Json::parse(R"({
+      "stateTypes":{"movement":{"default":"walk","states":{
+        "walk":{"frames":2,"cycle":1,"mode":"loop"},
+        "stop":{"frames":1,"cycle":1,"mode":"end"},
+        "change":{"frames":2,"cycle":0.1,"mode":"transition","transition":"stop"}
+      }}},
+      "parts":{"body":{"partStates":{"movement":{"walk":{
+        "properties":{"interpolated":true},
+        "frameProperties":{"transforms":[[["reset"],["translate",[0,0]]],[["reset"],["translate",[8,0]]]]}
+      }}}}}
+    })");
+    ASSERT_TRUE(config);
+    auto parts = AnimatedPartSet::create(*config, 1);
+    ASSERT_TRUE(parts);
+    ASSERT_TRUE(parts->update(.4f));
+    auto logical = parts->activeState("movement");
+    ASSERT_TRUE(logical);
+    EXPECT_FLOAT_EQ(logical->get().timer, .4f);
+    parts->setPresentationInterpolation(.5f);
+    auto sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_FLOAT_EQ(sampled->get().timer, .2f);
+    auto body = parts->activePart("body");
+    ASSERT_TRUE(body);
+    EXPECT_NEAR(body->get().animationAffineTransform().transformVec2(Vec2F{})[0], 3.2f, 1e-5f);
+    parts->setPresentationInterpolation(-1);
+    logical = parts->activeState("movement");
+    ASSERT_TRUE(logical);
+    EXPECT_FLOAT_EQ(logical->get().timer, .4f);
+    ASSERT_TRUE(parts->update(.5f));
+    ASSERT_TRUE(parts->update(.2f));
+    parts->setPresentationInterpolation(.25f);
+    sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_NEAR(sampled->get().timer, .95f, 1e-5f);
+    parts->setPresentationInterpolation(.75f);
+    sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_NEAR(sampled->get().timer, .05f, 1e-5f);
+    parts->setPresentationInterpolation(-1);
+    ASSERT_TRUE(parts->restartState("movement"));
+    parts->setPresentationInterpolation(0);
+    sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_FLOAT_EQ(sampled->get().timer, 0);
+    parts->setPresentationInterpolation(-1);
+    ASSERT_TRUE(parts->setActiveState("movement", "change"));
+    ASSERT_TRUE(parts->update(.2f));
+    parts->setPresentationInterpolation(.5f);
+    sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_EQ(sampled->get().stateName, "stop");
+    EXPECT_FLOAT_EQ(sampled->get().timer, 0);
+    parts->setPresentationInterpolation(-1);
+    ASSERT_TRUE(parts->setActiveState("movement", "walk", true, true));
+    ASSERT_TRUE(parts->update(.4f));
+    parts->setPresentationInterpolation(.5f);
+    sampled = parts->activeState("movement");
+    ASSERT_TRUE(sampled);
+    EXPECT_EQ(sampled->get().frame, 1u);
+    EXPECT_EQ(sampled->get().nextFrame, 0u);
+    EXPECT_NEAR(sampled->get().frameProgress, .4f, 1e-5f);
+    parts->setPresentationInterpolation(-1);
+  });
+
+const GameTestRegistration animatorSemanticSampling(
+  "HumanoidRenderTest", "AnimatorSampleDrivesGeometryLightsAndScopedOverrides", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "version":1,
+      "transformationGroups":{"moving":{}},
+      "rotationGroups":{"aim":{"angularVelocity":2}},
+      "animatedParts":{
+        "stateTypes":{"movement":{"default":"walk","states":{
+          "walk":{"frames":2,"cycle":1,"mode":"loop"},
+          "stop":{"frames":1,"cycle":1}
+        }}},
+        "parts":{"body":{
+          "properties":{"transformationGroups":["moving"],"testPoint":[0,0]},
+          "partStates":{"movement":{"walk":{
+            "properties":{"interpolated":true},
+            "frameProperties":{"transforms":[[["reset"],["translate",[0,0]]],[["reset"],["translate",[4,0]]]]}
+          }}}
+        }}
+      },
+      "lights":{"glow":{"active":true,"position":[0,0],"color":[255,255,255],"anchorPart":"body"}}
+    })");
+    ASSERT_TRUE(config);
+    auto made = NetworkedAnimator::create(fixture.root(), *config);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& animator = **made;
+    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::White);
+    animator.setPartDrawables("body", {line});
+    NetworkedAnimator::DynamicTarget events;
+    ASSERT_TRUE(animator.update(.1f, std::ref(events)));
+    ASSERT_TRUE(animator.translateTransformationGroup("moving", {2, 0}));
+    ASSERT_TRUE(animator.rotateGroup("aim", 1.f));
+    ASSERT_TRUE(animator.update(.25f, std::ref(events)));
+    auto logicalTimer = animator.stateTimer("movement");
+    ASSERT_TRUE(logicalTimer);
+    for (int repeat = 0; repeat != 3; ++repeat) {
+      auto sample = animator.sample(.5f);
+      auto timer = animator.stateTimer("movement");
+      ASSERT_TRUE(timer);
+      EXPECT_NEAR(*timer, .225f, 1e-5f);
+      auto angle = animator.currentRotationAngle("aim");
+      ASSERT_TRUE(angle);
+      EXPECT_NEAR(*angle, .25f, 1e-5f);
+      auto point = animator.partPoint("body", "testPoint");
+      ASSERT_TRUE(point);
+      ASSERT_TRUE(*point);
+      EXPECT_NEAR((**point)[0], 2.8f, 1e-5f);
+      auto drawables = animator.drawables();
+      ASSERT_TRUE(drawables) << drawables.error().what();
+      ASSERT_EQ(drawables->size(), 1u);
+      auto expected = line;
+      expected.transform(Mat3F::translation({2.8f, 0}));
+      EXPECT_NEAR((*drawables)[0].position[0], expected.position[0], 1e-5f);
+      auto lights = animator.lightSources();
+      ASSERT_TRUE(lights);
+      ASSERT_EQ(lights->size(), 1u);
+      EXPECT_NEAR((*lights)[0].position[0], 2.8f, 1e-5f);
+      ASSERT_TRUE(animator.setLocalState("movement", "stop"));
+      ASSERT_TRUE(animator.translateLocalTransformationGroup("moving", {10, 0}));
+      auto state = animator.state("movement");
+      ASSERT_TRUE(state);
+      EXPECT_EQ(*state, "stop");
+      {
+        auto nested = animator.sample(.1f);
+        auto inherited = animator.state("movement");
+        ASSERT_TRUE(inherited);
+        EXPECT_EQ(*inherited, "stop");
+      }
+    }
+    auto timer = animator.stateTimer("movement");
+    ASSERT_TRUE(timer);
+    EXPECT_FLOAT_EQ(*timer, *logicalTimer);
+    auto state = animator.state("movement");
+    ASSERT_TRUE(state);
+    EXPECT_EQ(*state, "walk");
+    auto local = animator.getLocalTransformationGroup("moving");
+    ASSERT_TRUE(local);
+    EXPECT_FLOAT_EQ(local->transformVec2(Vec2F{})[0], 0);
+    EXPECT_TRUE(events.pullNewAudios().empty());
+    EXPECT_TRUE(events.pullNewParticles().empty());
+    ASSERT_TRUE(animator.rotateGroup("aim", -2.f, true));
+    auto sample = animator.sample(0);
+    auto angle = animator.currentRotationAngle("aim");
+    ASSERT_TRUE(angle);
+    EXPECT_FLOAT_EQ(*angle, -2.f);
+  });
+
+const GameTestRegistration humanoidSemanticSampling(
+  "HumanoidRenderTest", "LegacyAndAnimatorHumanoidsSamplePoseWithoutAdvancing", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto config = (*assets)->json("/humanoid.config");
+    ASSERT_TRUE(config);
+    auto legacy = config->eraseKey("animation");
+    ASSERT_TRUE(legacy);
+    for (auto const& mode : {*legacy, *config}) {
+      auto made = Humanoid::create(fixture.root(), mode);
+      ASSERT_TRUE(made);
+      auto& humanoid = **made;
+      ASSERT_TRUE(humanoid.setIdentity(HumanoidIdentity{}));
+      ASSERT_TRUE(humanoid.animate(1.f / 60, {}));
+      humanoid.setRotation(1.f);
+      ASSERT_TRUE(humanoid.animate(1.f / 60, {}));
+      auto previous = humanoid.render(false, true, 0);
+      auto middle = humanoid.render(false, true, .5f);
+      auto current = humanoid.render(false, true, 1);
+      auto repeated = humanoid.render(false, true, .5f);
+      ASSERT_TRUE(previous);
+      ASSERT_TRUE(middle);
+      ASSERT_TRUE(current);
+      ASSERT_TRUE(repeated);
+      EXPECT_EQ(*middle, *repeated);
+      EXPECT_NE(*previous, *current);
+      // Compare with a semantic rotation of the same fixed idle pose, not a
+      // drawable-by-index blend. Sprite identity remains authored by the pose.
+      Drawable::rotateAll(*previous, .5f);
+      Drawable::rebaseAll(*previous);
+      ASSERT_EQ(previous->size(), middle->size());
+      for (std::size_t i = 0; i != previous->size(); ++i) {
+        if ((*previous)[i].isImage() && (*middle)[i].isImage()) {
+          EXPECT_EQ((*previous)[i].imagePart().image, (*middle)[i].imagePart().image);
+          EXPECT_NEAR((*previous)[i].position[0], (*middle)[i].position[0], 1e-5f);
+          EXPECT_NEAR((*previous)[i].position[1], (*middle)[i].position[1], 1e-5f);
+        }
+      }
+      EXPECT_EQ(humanoid.state(), Humanoid::Idle);
+      EXPECT_EQ(humanoid.emoteState(), HumanoidEmote::Idle);
+    }
+  });
+
+const GameTestRegistration playerPresentationEvents(
+  "HumanoidRenderTest", "PlayerEventsAreTickOwnedAndInvisibleEventsAreDiscarded", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto storage = File::ephemeralFile(root.random());
+    ASSERT_TRUE(storage);
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world) << world.error().what();
+    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    (*world)->setSpawningEnabled(false);
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto made = (*factory)->create();
+    ASSERT_TRUE(made) << made.error().what();
+    auto& player = **made;
+    ASSERT_TRUE(player.finalizeCreation());
+    auto uuid = player.uuid();
+    ASSERT_TRUE(uuid);
+    auto client = ClientContext::create(root, Uuid(root.random()), *uuid);
+    ASSERT_TRUE(client);
+    player.setClientContext(*client);
+    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
+    auto uninit = finally([&] { EXPECT_TRUE(player.uninit()); });
+    ASSERT_TRUE(player.refreshHumanoid());
+    ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
+
+    struct Events : NullRenderCallback {
+      unsigned particles = 0;
+      unsigned audios = 0;
+      float alpha = 1.0f;
+      float interpolation() const override { return alpha; }
+      std::expected<void, StarException> addParticle(Particle particle) override {
+        if (particle.string == "presentation-event-fixture")
+          ++particles;
+        return {};
+      }
+      std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance>) override {
+        ++audios;
+        return {};
+      }
+    } events;
+    NullRenderCallback discard;
+    ASSERT_TRUE(player.collectRenderEvents(discard));
+    Particle particle;
+    particle.string = "presentation-event-fixture";
+    auto assets = root.assets();
+    ASSERT_TRUE(assets);
+    auto sounds = (*assets)->scan("/sfx/", ".ogg");
+    ASSERT_TRUE(sounds);
+    ASSERT_FALSE(sounds->empty());
+    std::sort(sounds->begin(), sounds->end());
+    ASSERT_TRUE(player.addParticles({particle}));
+    ASSERT_TRUE(player.addSound(sounds->front()));
+    constexpr std::uint64_t gameplaySeed = 0x50524553454e54;
+    root.random().init(gameplaySeed);
+    RandomSource untouchedGameplay(gameplaySeed);
+    for (float alpha : {0.0f, 0.25f, 0.75f, 1.0f, 0.5f}) {
+      events.alpha = alpha;
+      auto geometry = player.render(events);
+      ASSERT_TRUE(geometry) << geometry.error().what();
+      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "geometry alpha=" << alpha;
+      auto lighting = player.renderLightSources(events);
+      ASSERT_TRUE(lighting) << lighting.error().what();
+      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "lighting alpha=" << alpha;
+    }
+    EXPECT_EQ(events.particles, 0u);
+    EXPECT_EQ(events.audios, 0u);
+    ASSERT_TRUE(player.collectRenderEvents(events));
+    EXPECT_EQ(events.particles, 1u);
+    EXPECT_EQ(events.audios, 1u);
+    ASSERT_TRUE(player.render(events));
+    ASSERT_TRUE(player.collectRenderEvents(events));
+    EXPECT_EQ(events.particles, 1u);
+    EXPECT_EQ(events.audios, 1u);
+
+    // A tick with no display render still delivers its effects exactly once.
+    ASSERT_TRUE(player.addParticles({particle}));
+    ASSERT_TRUE(player.addSound(sounds->front()));
+    ASSERT_TRUE(player.collectRenderEvents(events));
+    EXPECT_EQ(events.particles, 2u);
+    EXPECT_EQ(events.audios, 2u);
+    ASSERT_TRUE(player.statusController().setPersistentEffects(
+      "presentationFixture", {StatModifier{StatValueModifier{"invisible", 1.0f}}}));
+    ASSERT_TRUE(player.invisible());
+    ASSERT_TRUE(player.addParticles({particle}));
+    ASSERT_TRUE(player.addSound(sounds->front()));
+    ASSERT_TRUE(player.collectRenderEvents(events));
+    EXPECT_EQ(events.particles, 2u);
+    EXPECT_EQ(events.audios, 2u);
+    ASSERT_TRUE(player.statusController().clearPersistentEffects("presentationFixture"));
+    ASSERT_FALSE(player.invisible());
+    ASSERT_TRUE(player.render(events));
+    ASSERT_TRUE(player.collectRenderEvents(events));
+    EXPECT_EQ(events.particles, 2u);
+    EXPECT_EQ(events.audios, 2u);
+
+    auto lua = LuaRoot::create(root);
+    ASSERT_TRUE(lua);
+    auto context = (*lua)->createContext(StringList{});
+    ASSERT_TRUE(context);
+    auto callbacks = LuaBindings::makeMovementControllerCallbacks(player.movementController());
+    ASSERT_TRUE(callbacks);
+    ASSERT_TRUE(context->setCallbacks("mcontroller", *callbacks));
+    auto epoch = player.presentationEpoch();
+    auto moved = context->eval<bool>(R"LUA(
+      mcontroller.translate({0.1, 0})
+      mcontroller.setXPosition(mcontroller.xPosition() + 0.1)
+      return true
+    )LUA");
+    ASSERT_TRUE(moved);
+    EXPECT_TRUE(*moved);
+    EXPECT_EQ(player.presentationEpoch(), epoch);
+    auto reset = context->eval<bool>("mcontroller.resetPresentation(); return true");
+    ASSERT_TRUE(reset);
+    EXPECT_TRUE(*reset);
+    EXPECT_GT(player.presentationEpoch(), epoch);
+    epoch = player.presentationEpoch();
+    ASSERT_TRUE(player.moveTo(Vec2F(1200, 1100)));
+    EXPECT_GT(player.presentationEpoch(), epoch);
+  });
+
+const GameTestRegistration hiddenLoopingPresentationAudio(
+  "HumanoidRenderTest", "HiddenPresentationDiscardsOneShotsButRetainsLoops", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto sounds = (*assets)->scan("/sfx/", ".ogg");
+    ASSERT_TRUE(sounds);
+    ASSERT_FALSE(sounds->empty());
+    std::sort(sounds->begin(), sounds->end());
+    auto sample = (*assets)->audio(sounds->front());
+    ASSERT_TRUE(sample);
+    auto oneShot = AudioInstance::create(**sample);
+    auto loop = AudioInstance::create(**sample);
+    ASSERT_TRUE(oneShot);
+    ASSERT_TRUE(loop);
+    (*loop)->setLoops(-1);
+    List<std::shared_ptr<AudioInstance>> retained;
+    NullRenderCallback hidden(&retained);
+    ASSERT_TRUE(hidden.addAudio(*oneShot));
+    EXPECT_TRUE(retained.empty());
+    ASSERT_TRUE(hidden.addAudio(*loop));
+    ASSERT_EQ(retained.size(), 1u);
+    EXPECT_EQ(retained[0], *loop);
+    // The original instance survives so animator position/volume/stop updates
+    // while hidden still affect the instance eventually submitted on reveal.
+    (*loop)->setPosition(Vec2F(7, 9));
+    EXPECT_EQ(*retained[0]->position(), Vec2F(7, 9));
+    (*loop)->stop();
+  });
+
+const GameTestRegistration authoredAnimationGroupSampling(
+  "HumanoidRenderTest", "SampledGroupCurvesRespectDiscreteAndInterpolatedFrames", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "version":1,
+      "transformationGroups":{"discrete":{"interpolated":false},"smooth":{"interpolated":true}},
+      "animatedParts":{
+        "stateTypes":{"body":{"default":"walk","states":{
+          "walk":{"frames":2,"cycle":1,"mode":"loop","frameProperties":{
+            "discrete":[[["reset"],["translate",[0,0]]],[["reset"],["translate",[8,0]]]],
+            "smooth":[[["reset"],["translate",[0,0]]],[["reset"],["translate",[8,0]]]]
+          }}
+        }}},
+        "parts":{"body":{"properties":{"transformationGroups":["discrete"],"point":[0,0]},
+          "partStates":{"body":{"walk":{}}}}}
+      }
+    })");
+    ASSERT_TRUE(config);
+    auto made = NetworkedAnimator::create(fixture.root(), *config);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& animator = **made;
+    ASSERT_TRUE(animator.update(.4f, {}));
+    ASSERT_TRUE(animator.update(.2f, {}));
+    for (float alpha : {.25f, .75f, .25f}) {
+      auto sample = animator.sample(alpha);
+      auto frame = animator.stateFrame("body");
+      ASSERT_TRUE(frame);
+      EXPECT_EQ(*frame, alpha < .5f ? 0 : 1);
+      auto discrete = animator.partPoint("body", "point");
+      ASSERT_TRUE(discrete);
+      ASSERT_TRUE(*discrete);
+      EXPECT_FLOAT_EQ((**discrete)[0], alpha < .5f ? 0 : 8);
+      auto smooth = animator.groupTransformation({"smooth"});
+      ASSERT_TRUE(smooth);
+      EXPECT_NEAR(smooth->transformVec2(Vec2F{})[0], 7.2f, 1e-5f);
+    }
+    auto logical = animator.groupTransformation({"discrete"});
+    ASSERT_TRUE(logical);
+    EXPECT_FLOAT_EQ(logical->transformVec2(Vec2F{})[0], 8);
+    auto timer = animator.stateTimer("body");
+    ASSERT_TRUE(timer);
+    EXPECT_NEAR(*timer, .6f, 1e-5f);
+  });
+
+const GameTestRegistration humanoidTickOwnedPose(
+  "HumanoidRenderTest", "TickPoseAndFreshLightSamplesDoNotDependOnPreviousRender", [](GameTest& fixture) {
+    // Vanilla species are legacy by default. Exercise the actual authored
+    // builder rather than using its incomplete base animation by itself.
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto overlay = File::relativeTo(*directory, "assets");
+    ASSERT_TRUE(File::makeDirectoryRecursive(File::relativeTo(overlay, "species")));
+    ASSERT_TRUE(File::writeFile(String(R"([
+      {"op":"add","path":"/buildScripts","value":["/humanoid/opensb/build.lua"]}
+    ])"), File::relativeTo(overlay, "species/human.species.patch")));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.append(overlay);
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto createdRoot = Root::create(std::move(settings));
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto baseHumanoid = Humanoid::create(root, HumanoidIdentity{}, JsonObject{{"useAnimation", true}});
+    ASSERT_TRUE(baseHumanoid) << baseHumanoid.error().what();
+    auto config = (*baseHumanoid)->humanoidConfig(false);
+    ASSERT_TRUE(config) << config.error().what();
+    auto animation = config->get("animation");
+    ASSERT_TRUE(animation) << animation.error().what();
+    auto lights = Json::parse(R"({
+      "headProbe":{"position":[1,0],"anchorPart":"head","color":[255,255,255]},
+      "armProbe":{"position":[1,0],"anchorPart":"frontArm","color":[255,255,255]}
+    })");
+    ASSERT_TRUE(lights);
+    auto augmentedAnimation = animation->set("lights", *lights);
+    ASSERT_TRUE(augmentedAnimation);
+    auto augmentedConfig = config->set("animation", *augmentedAnimation);
+    ASSERT_TRUE(augmentedConfig);
+    auto made = Humanoid::create(root, *augmentedConfig);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& humanoid = **made;
+    ASSERT_TRUE(humanoid.setIdentity(HumanoidIdentity{}));
+    humanoid.setFacingDirection(Direction::Right);
+    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "rotation");
+    humanoid.setHandParameters(ToolHand::Primary, true, 0, 0, true, false, false);
+    auto firstTick = humanoid.animate(1.f / 60, {});
+    ASSERT_TRUE(firstTick) << firstTick.error().what();
+    auto beforeMouth = humanoid.mouthOffset();
+    auto beforeArmor = humanoid.headArmorOffset();
+    ASSERT_TRUE(beforeMouth);
+    ASSERT_TRUE(beforeArmor);
+    humanoid.setHeadRotation(1.f);
+    humanoid.setHandParameters(ToolHand::Primary, true, 1.f, 1.f, true, false, false);
+    auto secondTick = humanoid.animate(1.f / 60, {});
+    ASSERT_TRUE(secondTick) << secondTick.error().what();
+    auto mouth = humanoid.mouthOffset();
+    auto armor = humanoid.headArmorOffset();
+    ASSERT_TRUE(mouth);
+    ASSERT_TRUE(armor);
+    EXPECT_NE(*mouth, *beforeMouth);
+    EXPECT_NE(*armor, *beforeArmor);
+    auto animatorRef = humanoid.networkedAnimator();
+    ASSERT_TRUE(animatorRef);
+    auto& animator = animatorRef->get();
+    auto logicalHead = animator.getLocalTransformationGroup("headRotation");
+    auto logicalArm = animator.getLocalTransformationGroup("frontArmRotation");
+    ASSERT_TRUE(logicalHead);
+    ASSERT_TRUE(logicalArm);
+    for (float alpha : {0.f, .5f, 1.f, .5f}) {
+      List<LightSource> sampledLights;
+      {
+        auto sample = animator.sample(alpha);
+        ASSERT_TRUE(humanoid.prepareAnimatorPose(alpha));
+        auto freshLights = animator.lightSources();
+        ASSERT_TRUE(freshLights);
+        ASSERT_EQ(freshLights->size(), 2u);
+        sampledLights = *freshLights;
+      }
+      {
+        auto sample = animator.sample(alpha);
+        auto drawables = humanoid.render(true, true, alpha);
+        ASSERT_TRUE(drawables) << drawables.error().what();
+        auto afterGeometry = animator.lightSources();
+        ASSERT_TRUE(afterGeometry);
+        ASSERT_EQ(afterGeometry->size(), sampledLights.size());
+        for (std::size_t i = 0; i != sampledLights.size(); ++i) {
+          EXPECT_NEAR((*afterGeometry)[i].position[0], sampledLights[i].position[0], 1e-5f);
+          EXPECT_NEAR((*afterGeometry)[i].position[1], sampledLights[i].position[1], 1e-5f);
+        }
+      }
+      auto preservedMouth = humanoid.mouthOffset();
+      auto preservedArmor = humanoid.headArmorOffset();
+      auto preservedHead = animator.getLocalTransformationGroup("headRotation");
+      auto preservedArm = animator.getLocalTransformationGroup("frontArmRotation");
+      ASSERT_TRUE(preservedMouth);
+      ASSERT_TRUE(preservedArmor);
+      ASSERT_TRUE(preservedHead);
+      ASSERT_TRUE(preservedArm);
+      EXPECT_EQ(*preservedMouth, *mouth);
+      EXPECT_EQ(*preservedArmor, *armor);
+      EXPECT_EQ(*preservedHead, *logicalHead);
+      EXPECT_EQ(*preservedArm, *logicalArm);
     }
   });

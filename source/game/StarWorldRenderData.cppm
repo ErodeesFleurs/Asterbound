@@ -70,7 +70,9 @@ struct EntityDrawables {
 
 
 struct WorldRenderData {
-  void clear();
+  // Reset transient frame data while retaining entity and particle sample slots.
+  // WorldClient refills/truncates those slots before publishing the frame.
+  void prepareFrame();
 
   WorldGeometry geometry;
 
@@ -80,7 +82,7 @@ struct WorldRenderData {
   Lightmap lightMap;
 
   List<EntityDrawables> entityDrawables;
-  std::optional<std::reference_wrapper<List<Particle> const>> particles;
+  List<Particle> particles;
 
   List<OverheadBar> overheadBars;
   List<Drawable> nametags;
@@ -97,11 +99,16 @@ struct WorldRenderData {
   Vec3B dimColor;
 };
 
-inline void WorldRenderData::clear() {
+inline void WorldRenderData::prepareFrame() {
   tiles.resize({0, 0}); // keep reserved
 
-  entityDrawables.clear();
-  particles.reset();
+  for (auto& entity : entityDrawables) {
+    entity.highlightEffect = {};
+    for (auto& layer : entity.layers)
+      layer.second.clear();
+  }
+  // ParticleManager overwrites numeric presentation state in retained slots;
+  // destroying them here would discard cached immutable payload every frame.
   overheadBars.clear();
   nametags.clear();
   backgroundOverlays.clear();

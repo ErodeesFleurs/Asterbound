@@ -53,6 +53,107 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
+namespace {
+Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
+  if (alpha <= 0)
+    return previous;
+  if (alpha >= 1)
+    return current;
+  float xs = lerp(alpha, std::hypot(previous[0][0], previous[0][1]), std::hypot(current[0][0], current[0][1]));
+  float ys = lerp(alpha, std::hypot(previous[1][0], previous[1][1]), std::hypot(current[1][0], current[1][1]));
+  float xa = angleLerp(alpha, std::atan2(previous[0][1], previous[0][0]), std::atan2(current[0][1], current[0][0]));
+  float ya = angleLerp(alpha, std::atan2(previous[1][0], previous[1][1]), std::atan2(current[1][0], current[1][1]));
+  return Mat3F(xs * std::cos(xa), xs * std::sin(xa), lerp(alpha, previous[0][2], current[0][2]),
+      ys * std::sin(ya), ys * std::cos(ya), lerp(alpha, previous[1][2], current[1][2]), 0, 0, 1);
+}
+    auto processTransforms = [](Mat3F mat, Json const& transforms, JsonObject const& properties) -> std::expected<Mat3F, StarException> {
+      auto entries = transforms.iterateArray();
+      if (!entries) return std::unexpected(std::move(entries.error()));
+      for (auto const& v : *entries) {
+        auto action = v.getString(0);
+        if (!action) return std::unexpected(std::move(action.error()));
+        if (*action == "reset") {
+          mat = Mat3F::identity();
+        } else if (*action == "translate") {
+          auto offsetJson = v.getArray(1);
+          if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
+          auto offset = jsonToVec2F(*offsetJson);
+          if (!offset) return std::unexpected(std::move(offset.error()));
+          mat.translate(*offset);
+        } else if (*action == "rotate" || *action == "rotateDegrees") {
+          auto angle = v.getFloat(1);
+          if (!angle) return std::unexpected(std::move(angle.error()));
+          auto defaultCenter = properties.maybe("rotationCenter").value_or(JsonArray{0, 0}).toArray();
+          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
+          auto centerJson = v.getArray(2, *defaultCenter);
+          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
+          auto center = jsonToVec2F(*centerJson);
+          if (!center) return std::unexpected(std::move(center.error()));
+          mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
+        } else if (*action == "scale") {
+          auto scaleJson = v.getArray(1);
+          if (!scaleJson) return std::unexpected(std::move(scaleJson.error()));
+          auto scale = jsonToVec2F(*scaleJson);
+          if (!scale) return std::unexpected(std::move(scale.error()));
+          auto defaultCenter = properties.maybe("scalingCenter").value_or(JsonArray{0, 0}).toArray();
+          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
+          auto centerJson = v.getArray(2, *defaultCenter);
+          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
+          auto center = jsonToVec2F(*centerJson);
+          if (!center) return std::unexpected(std::move(center.error()));
+          mat.scale(*scale, *center);
+        } else if (*action == "transform") {
+          auto v1 = v.getFloat(1);
+          if (!v1) return std::unexpected(std::move(v1.error()));
+          auto v2 = v.getFloat(2);
+          if (!v2) return std::unexpected(std::move(v2.error()));
+          auto v3 = v.getFloat(3);
+          if (!v3) return std::unexpected(std::move(v3.error()));
+          auto v4 = v.getFloat(4);
+          if (!v4) return std::unexpected(std::move(v4.error()));
+          auto v5 = v.getFloat(5);
+          if (!v5) return std::unexpected(std::move(v5.error()));
+          auto v6 = v.getFloat(6);
+          if (!v6) return std::unexpected(std::move(v6.error()));
+          mat = Mat3F(*v1, *v2, *v3, *v4, *v5, *v6, 0, 0, 1) * mat;
+        }
+      }
+      return mat;
+    };
+}
+
+NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float interpolation)
+  : m_animator(animator) {
+  if (m_animator.m_sampleDepth++ == 0) {
+    m_animator.m_interpolation = std::clamp(interpolation, 0.f, 1.f);
+    m_animator.m_animatedParts.setPresentationInterpolation(m_animator.m_interpolation);
+    for (auto const& pair : m_animator.m_transformationGroups) {
+      pair.second.sampling = true;
+      pair.second.presentationLocalTransform = pair.second.localTransform;
+      auto& group = pair.second;
+      group.presentationTransform = group.affineTransform();
+      group.presentationAnimationTransform = group.animationAffineTransform();
+      group.presentationAnimationDirty = true;
+      if (group.presentationHistory) {
+        group.presentationTransform = sampleAffine(m_animator.m_interpolation, group.previousTransform, group.presentationTransform);
+        group.presentationLocalTransform = sampleAffine(m_animator.m_interpolation, group.previousLocalTransform, group.localTransform);
+      }
+    }
+  }
+}
+
+NetworkedAnimator::Sample::~Sample() {
+  if (--m_animator.m_sampleDepth == 0) {
+    m_animator.m_animatedParts.setPresentationInterpolation(-1);
+    for (auto const& pair : m_animator.m_transformationGroups)
+      pair.second.sampling = false;
+  }
+}
+
+NetworkedAnimator::Sample NetworkedAnimator::sample(float interpolation) const {
+  return Sample(*this, interpolation);
+}
+
 NetworkedAnimator::DynamicTarget::~DynamicTarget() {
   stopAudio();
 }
@@ -156,6 +257,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   auto parts = AnimatedPartSet::create(*partsConfig, version());
   if (!parts) return std::unexpected(std::move(parts.error()));
   m_animatedParts = std::move(*parts);
+  m_animationStateTypes = m_animatedParts.stateTypes();
   m_relativePath = AssetPath::directory(relativePath);
   auto globalTagDefaultsConfig = config.get("globalTagDefaults", JsonObject());
   if (!globalTagDefaultsConfig) return std::unexpected(std::move(globalTagDefaultsConfig.error()));
@@ -441,6 +543,7 @@ std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimat
   auto result = std::shared_ptr<NetworkedAnimator>(new NetworkedAnimator(animator.m_root.get()));
   result->m_relativePath = animator.m_relativePath;
   result->m_animatedParts = animator.m_animatedParts;
+  result->m_animationStateTypes = animator.m_animationStateTypes;
   result->m_stateInfo = animator.m_stateInfo;
   result->m_transformationGroups = animator.m_transformationGroups;
   result->m_rotationGroups = animator.m_rotationGroups;
@@ -485,6 +588,13 @@ std::expected<bool, StarException> NetworkedAnimator::setState(String const& sta
 }
 
 std::expected<bool, StarException> NetworkedAnimator::setLocalState(String const& stateType, String const& state, bool startNew, bool reverse) {
+  if (m_sampleDepth) {
+    auto changed = m_animatedParts.setPresentationState(stateType, state, startNew, reverse);
+    if (changed && *changed)
+      for (auto const& pair : m_transformationGroups)
+        pair.second.presentationAnimationDirty = true;
+    return changed;
+  }
   return m_animatedParts.setActiveState(stateType, state, startNew, reverse);
 }
 
@@ -595,12 +705,42 @@ Mat3F NetworkedAnimator::globalTransformation() const {
   return transformation;
 }
 
+std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base) const {
+  for (auto const& stateType : m_animationStateTypes) {
+    auto state = m_animatedParts.activeState(stateType);
+    if (!state) return std::unexpected(std::move(state.error()));
+    auto const& active = state->get();
+    if (auto transforms = active.properties.maybeRef(name)) {
+      auto matrix = processTransforms(base, transforms->get(), active.properties);
+      if (!matrix) return std::unexpected(std::move(matrix.error()));
+      if (group.interpolated) {
+        if (auto next = active.nextProperties.maybeRef(name)) {
+          auto nextMatrix = processTransforms(base, next->get(), active.nextProperties);
+          if (!nextMatrix) return std::unexpected(std::move(nextMatrix.error()));
+          return sampleAffine(active.frameProgress, *matrix, *nextMatrix);
+        }
+      }
+      return matrix;
+    }
+  }
+  return base;
+}
+
 std::expected<Mat3F, StarException> NetworkedAnimator::groupTransformation(StringList const& transformationGroups) const {
   auto mat = Mat3F::identity();
   for (auto const& tg : transformationGroups) {
     auto group = m_transformationGroups.get(tg);
     if (!group) return std::unexpected(std::move(group.error()));
-    mat = group->get().affineTransform() * group->get().localAffineTransform() * group->get().animationAffineTransform() * mat;
+    auto const& value = group->get();
+    if (m_sampleDepth && value.presentationAnimationDirty) {
+      auto sampled = animationGroupTransformation(tg, value, value.animationBaseTransform);
+      if (!sampled) return std::unexpected(std::move(sampled.error()));
+      value.presentationAnimationTransform = *sampled;
+      value.presentationAnimationDirty = false;
+    }
+    auto base = m_sampleDepth ? value.presentationTransform : value.affineTransform();
+    auto animation = m_sampleDepth ? value.presentationAnimationTransform : value.animationAffineTransform();
+    mat = base * value.localAffineTransform() * animation * mat;
   }
   return mat;
 }
@@ -632,7 +772,9 @@ std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String
       if (!configuredCenter) return std::unexpected(std::move(configuredCenter.error()));
       center = *configuredCenter;
     }
-    transformation = Mat3F::rotation(rotation->get().currentAngle, center) * transformation;
+    auto const& value = rotation->get();
+    float angle = m_sampleDepth ? angleLerp(m_interpolation, value.previousAngle, value.currentAngle) : value.currentAngle;
+    transformation = Mat3F::rotation(angle, center) * transformation;
   }
   if (auto anchorJson = part.properties.maybeRef("anchorPart")) {
     auto anchorName = anchorJson->get().toString();
@@ -825,6 +967,7 @@ std::expected<void, StarException> NetworkedAnimator::rotateGroup(String const& 
 
   if (immediate) {
     group.currentAngle = targetAngle;
+    group.previousAngle = targetAngle;
     group.netImmediateEvent.trigger();
   }
   return {};
@@ -833,7 +976,8 @@ std::expected<void, StarException> NetworkedAnimator::rotateGroup(String const& 
 std::expected<float, StarException> NetworkedAnimator::currentRotationAngle(String const& rotationGroup) const {
   auto entry = m_rotationGroups.get(rotationGroup);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  return entry->get().currentAngle;
+  auto const& group = entry->get();
+  return m_sampleDepth ? angleLerp(m_interpolation, group.previousAngle, group.currentAngle) : group.currentAngle;
 }
 
 bool NetworkedAnimator::hasTransformationGroup(String const& transformationGroup) const {
@@ -1381,9 +1525,10 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(
       auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
       if (!rotation) return std::unexpected(std::move(rotation.error()));
       auto const& rg = rotation->get();
-      position = (position - pair.second.rotationCenter.value_or(rg.rotationCenter)).rotate(rg.currentAngle)
+      float angle = m_sampleDepth ? angleLerp(m_interpolation, rg.previousAngle, rg.currentAngle) : rg.currentAngle;
+      position = (position - pair.second.rotationCenter.value_or(rg.rotationCenter)).rotate(angle)
           + pair.second.rotationCenter.value_or(rg.rotationCenter);
-      pointAngle += rg.currentAngle;
+      pointAngle += angle;
     }
     position = globalTransformation().transformVec2(position);
     if (m_flipped.get()) {
@@ -1557,87 +1702,18 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
     });
   if (!statesUpdated) return std::unexpected(std::move(statesUpdated.error()));
   if (version() > 0) {
-    auto processTransforms = [](Mat3F mat, Json const& transforms, JsonObject const& properties) -> std::expected<Mat3F, StarException> {
-      auto entries = transforms.iterateArray();
-      if (!entries) return std::unexpected(std::move(entries.error()));
-      for (auto const& v : *entries) {
-        auto action = v.getString(0);
-        if (!action) return std::unexpected(std::move(action.error()));
-        if (*action == "reset") {
-          mat = Mat3F::identity();
-        } else if (*action == "translate") {
-          auto offsetJson = v.getArray(1);
-          if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
-          auto offset = jsonToVec2F(*offsetJson);
-          if (!offset) return std::unexpected(std::move(offset.error()));
-          mat.translate(*offset);
-        } else if (*action == "rotate" || *action == "rotateDegrees") {
-          auto angle = v.getFloat(1);
-          if (!angle) return std::unexpected(std::move(angle.error()));
-          auto defaultCenter = properties.maybe("rotationCenter").value_or(JsonArray{0, 0}).toArray();
-          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
-          auto centerJson = v.getArray(2, *defaultCenter);
-          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-          auto center = jsonToVec2F(*centerJson);
-          if (!center) return std::unexpected(std::move(center.error()));
-          mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
-        } else if (*action == "scale") {
-          auto scaleJson = v.getArray(1);
-          if (!scaleJson) return std::unexpected(std::move(scaleJson.error()));
-          auto scale = jsonToVec2F(*scaleJson);
-          if (!scale) return std::unexpected(std::move(scale.error()));
-          auto defaultCenter = properties.maybe("scalingCenter").value_or(JsonArray{0, 0}).toArray();
-          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
-          auto centerJson = v.getArray(2, *defaultCenter);
-          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-          auto center = jsonToVec2F(*centerJson);
-          if (!center) return std::unexpected(std::move(center.error()));
-          mat.scale(*scale, *center);
-        } else if (*action == "transform") {
-          auto v1 = v.getFloat(1);
-          if (!v1) return std::unexpected(std::move(v1.error()));
-          auto v2 = v.getFloat(2);
-          if (!v2) return std::unexpected(std::move(v2.error()));
-          auto v3 = v.getFloat(3);
-          if (!v3) return std::unexpected(std::move(v3.error()));
-          auto v4 = v.getFloat(4);
-          if (!v4) return std::unexpected(std::move(v4.error()));
-          auto v5 = v.getFloat(5);
-          if (!v5) return std::unexpected(std::move(v5.error()));
-          auto v6 = v.getFloat(6);
-          if (!v6) return std::unexpected(std::move(v6.error()));
-          mat = Mat3F(*v1, *v2, *v3, *v4, *v5, *v6, 0, 0, 1) * mat;
-        }
-      }
-      return mat;
-    };
     for (auto& pair : m_transformationGroups) {
-      for (auto& stateTypeName : m_animatedParts.stateTypes()) {
-        auto activeStateResult = m_animatedParts.activeState(stateTypeName);
-      if (!activeStateResult) return std::unexpected(std::move(activeStateResult.error()));
-      auto const& activeState = activeStateResult->get();
-        if (auto transforms = activeState.properties.maybeRef(pair.first)) {
-          auto mat = processTransforms(pair.second.animationAffineTransform(), transforms->get(), activeState.properties);
-          if (!mat) return std::unexpected(std::move(mat.error()));
-          if (pair.second.interpolated) {
-            if (auto nextTransforms = activeState.nextProperties.maybeRef(pair.first)) {
-              auto nextMat = processTransforms(pair.second.animationAffineTransform(), nextTransforms->get(), activeState.nextProperties);
-              if (!nextMat) return std::unexpected(std::move(nextMat.error()));
-              pair.second.setAnimationAffineTransform(*mat, *nextMat, activeState.frameProgress);
-            } else {
-              pair.second.setAnimationAffineTransform(*mat);
-            }
-          } else {
-            pair.second.setAnimationAffineTransform(*mat);
-          }
-          break;//we got one with the highest priority so break the loop
-        }
-      }
+      auto& group = pair.second;
+      group.animationBaseTransform = group.animationAffineTransform();
+      auto transform = animationGroupTransformation(pair.first, group, group.animationBaseTransform);
+      if (!transform) return std::unexpected(std::move(transform.error()));
+      group.setAnimationAffineTransform(*transform);
     }
   }
 
   for (auto& pair : m_rotationGroups) {
     auto& rotationGroup = pair.second;
+    rotationGroup.previousAngle = rotationGroup.currentAngle;
     if (rotationGroup.angularVelocity == 0.0f)
       rotationGroup.currentAngle = rotationGroup.targetAngle.get();
     else
@@ -1786,6 +1862,15 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         effect.timer -= dt;
     }
   }
+  for (auto& pair : m_transformationGroups) {
+    auto& group = pair.second;
+    auto transform = group.affineTransform();
+    group.previousTransform = group.presentationHistory ? group.currentTransform : transform;
+    group.previousLocalTransform = group.presentationHistory ? group.currentLocalTransform : group.localTransform;
+    group.currentLocalTransform = group.localTransform;
+    group.currentTransform = transform;
+    group.presentationHistory = true;
+  }
   return {};
 }
 
@@ -1811,11 +1896,11 @@ void NetworkedAnimator::TransformationGroup::setAffineTransform(Mat3F const& mat
 }
 
 void NetworkedAnimator::TransformationGroup::setLocalAffineTransform(Mat3F const& matrix) {
-  localTransform = matrix;
+  (sampling ? presentationLocalTransform : localTransform) = matrix;
 }
 
 Mat3F NetworkedAnimator::TransformationGroup::localAffineTransform() const {
-  return localTransform;
+  return sampling ? presentationLocalTransform : localTransform;
 }
 
 void NetworkedAnimator::TransformationGroup::setAnimationAffineTransform(Mat3F const& matrix) {
@@ -1825,14 +1910,6 @@ void NetworkedAnimator::TransformationGroup::setAnimationAffineTransform(Mat3F c
   yScaleAnimation = std::sqrt(square(matrix[1][0]) + square(matrix[1][1]));
   xShearAnimation = std::atan2(matrix[0][1], matrix[0][0]);
   yShearAnimation = std::atan2(matrix[1][0], matrix[1][1]);
-}
-void NetworkedAnimator::TransformationGroup::setAnimationAffineTransform(Mat3F const& mat1, Mat3F const& mat2, float progress) {
-  xTranslationAnimation = lerp(progress, mat1[0][2], mat2[0][2]);
-  yTranslationAnimation = lerp(progress, mat1[1][2], mat2[1][2]);
-  xScaleAnimation = lerp(progress, std::sqrt(square(mat1[0][0]) + square(mat1[0][1])), std::sqrt(square(mat2[0][0]) + square(mat2[0][1])));
-  yScaleAnimation = lerp(progress, std::sqrt(square(mat1[1][0]) + square(mat1[1][1])), std::sqrt(square(mat2[1][0]) + square(mat2[1][1])));
-  xShearAnimation = angleLerp(progress, std::atan2(mat1[0][1], mat1[0][0]), std::atan2(mat2[0][1], mat2[0][0]));
-  yShearAnimation = angleLerp(progress, std::atan2(mat1[1][0], mat1[1][1]), std::atan2(mat2[1][0], mat2[1][1]));
 }
 
 Mat3F NetworkedAnimator::TransformationGroup::animationAffineTransform() const {
@@ -1949,8 +2026,10 @@ std::expected<void, StarException> NetworkedAnimator::netElementsNeedLoad(bool i
   }
 
   for (auto& pair : m_rotationGroups) {
-    if (pair.second.netImmediateEvent.pullOccurred() || initial)
+    if (pair.second.netImmediateEvent.pullOccurred() || initial) {
       pair.second.currentAngle = pair.second.targetAngle.get();
+      pair.second.previousAngle = pair.second.currentAngle;
+    }
   }
   return {};
 }

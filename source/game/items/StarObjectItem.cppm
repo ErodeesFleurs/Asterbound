@@ -125,7 +125,7 @@ public:
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
 
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  std::expected<bool, StarException> beamCanPlace() const override;
 
   float cooldownTime() const override;
   [[nodiscard]]
@@ -198,19 +198,16 @@ std::expected<void, StarException> ObjectItem::update(float dt, FireMode fireMod
   auto fireable = FireableItem::update(dt, fireMode, shifting, moves);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
+  setEnd(BeamItem::EndType::Object);
+  m_shifting = shifting;
   auto beam = BeamItem::update(dt, fireMode, shifting, moves);
   if (!beam)
     return std::unexpected(std::move(beam.error()));
-  setEnd(BeamItem::EndType::Object);
-  m_shifting = shifting;
   return {};
 }
 
-std::expected<List<Drawable>, StarException> ObjectItem::nonRotatedDrawables() const {
-  auto placeable = canPlace(m_shifting);
-  if (!placeable)
-    return std::unexpected(std::move(placeable.error()));
-  return beamDrawables(*placeable);
+std::expected<bool, StarException> ObjectItem::beamCanPlace() const {
+  return canPlace(m_shifting);
 }
 
 float ObjectItem::cooldownTime() const {

@@ -30,13 +30,13 @@ public:
   [[nodiscard]] std::expected<void, StarException> tick(float dt, EntityMode mode);
   void reset();
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback);
 
   [[nodiscard]] std::expected<Json, StarException> toJson() const;
   [[nodiscard]] std::expected<void, StarException> fromJson(Json const& diskStore);
 
 private:
-  explicit EffectEmitter(Root& root) : m_root(root), m_direction(Direction::Right), m_renders(false) {}
+  explicit EffectEmitter(Root& root) : m_root(root), m_direction(Direction::Right), m_collectsEvents(false) {}
   Root& m_root;
   Set<std::pair<String, String>> m_newSources;
   List<std::shared_ptr<EffectSource>> m_sources;
@@ -46,7 +46,7 @@ private:
   Direction m_direction;
   Vec2F m_baseVelocity;
 
-  bool m_renders;
+  bool m_collectsEvents;
 };
 
 }

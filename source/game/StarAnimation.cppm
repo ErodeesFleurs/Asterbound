@@ -22,6 +22,16 @@ class Root;
 
 class Animation {
 public:
+  // A clock snapshot contains no assets, tags, or other animation payload.
+  struct PlaybackState {
+    float timer;
+    bool completed;
+  };
+
+  PlaybackState playbackState() const;
+  // Samples an owned display animation without advancing the source animation.
+  void samplePlayback(PlaybackState const& previous, float elapsed);
+
   // config can be either a path to a config or a literal config.
   [[nodiscard]] static std::expected<Animation, StarException> create(Root& root, Json config = {}, String const& directory = {});
 

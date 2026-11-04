@@ -296,21 +296,25 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
 
   // Main world layers
 
-  Map<EntityRenderLayer, List<std::pair<EntityHighlightEffect, List<Drawable>>>> entityDrawables;
-  for (auto& ed : renderData.entityDrawables) {
-    for (auto& p : ed.layers)
-      entityDrawables[p.first].append({ed.highlightEffect, std::move(p.second)});
+  // Route references, not moved drawable lists. Display data remains reusable
+  // for another presentation of the same logical tick.
+  for (auto& layer : m_entityDrawableLayers)
+    layer.second.clear();
+  for (auto const& ed : renderData.entityDrawables) {
+    for (auto const& p : ed.layers)
+      if (!p.second.empty())
+        m_entityDrawableLayers[p.first].append({ed.highlightEffect, std::cref(p.second)});
   }
 
-  auto entityDrawableIterator = entityDrawables.begin();
-  auto renderEntitiesUntil = [this, &entityDrawables, &entityDrawableIterator](std::optional<EntityRenderLayer> until) -> std::expected<void, StarException> {
+  auto entityDrawableIterator = m_entityDrawableLayers.begin();
+  auto renderEntitiesUntil = [this, &entityDrawableIterator](std::optional<EntityRenderLayer> until) -> std::expected<void, StarException> {
     while (true) {
-      if (entityDrawableIterator == entityDrawables.end())
+      if (entityDrawableIterator == m_entityDrawableLayers.end())
         break;
       if (until && entityDrawableIterator->first >= *until)
         break;
       for (auto& edl : entityDrawableIterator->second) {
-        if (auto result = drawEntityLayer(std::move(edl.second), edl.first); !result)
+        if (auto result = drawEntityLayer(edl.second.get(), edl.first); !result)
           return std::unexpected(std::move(result.error()));
       }
       ++entityDrawableIterator;
@@ -374,10 +378,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
   if (!padding) return std::unexpected(std::move(padding.error()));
   const RectF particleRenderWindow = RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).padded(*padding);
 
-  if (!renderData.particles)
-    return {};
-
-  for (Particle const& particle : renderData.particles->get()) {
+  for (Particle const& particle : renderData.particles) {
     if (layer != particle.layer)
       continue;
 
@@ -473,7 +474,7 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
   return m_renderer->flush();
 }
 
-std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> drawables, EntityHighlightEffect highlightEffect) {
+std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> const& drawables, EntityHighlightEffect highlightEffect) {
   auto maxLevel = m_highlightConfig.getFloat("maxHighlightLevel", 1.0);
   if (!maxLevel) return std::unexpected(std::move(maxLevel.error()));
   highlightEffect.level *= *maxLevel;
@@ -510,37 +511,36 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
       }
     }
   } else {
-    for (auto& d : drawables) {
-      if (auto result = drawDrawable(std::move(d)); !result) return std::unexpected(std::move(result.error()));
+    for (auto const& d : drawables) {
+      if (auto result = drawDrawable(d); !result) return std::unexpected(std::move(result.error()));
     }
   }
   return {};
 }
 
-std::expected<void, StarException> WorldPainter::drawDrawable(Drawable drawable) {
-  drawable.position = m_camera.worldToScreen(drawable.position);
-  drawable.scale(m_camera.pixelRatio() * TilePixels, drawable.position);
-
-  if (drawable.isLine())
-    drawable.linePart().width *= m_camera.pixelRatio();
+std::expected<void, StarException> WorldPainter::drawDrawable(Drawable const& drawable) {
+  Vec2F position = m_camera.worldToScreen(drawable.position);
+  float scale = m_camera.pixelRatio() * TilePixels;
 
   // draw the drawable if it's on screen
   // if it's not on screen, there's a random chance to pre-load
   // pre-load is not done on every tick because it's expensive to look up images with long paths
   auto bounds = drawable.boundBox(*m_imageMetadata, false);
   if (!bounds) return std::unexpected(std::move(bounds.error()));
-  if (RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).intersects(*bounds))
-    return m_drawablePainter->drawDrawable(drawable);
-  if (drawable.isImage() && m_root.random().randf() < m_preloadTextureChance) {
+  RectF screenBounds((bounds->min() - drawable.position) * scale + position,
+      (bounds->max() - drawable.position) * scale + position);
+  if (RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).intersects(screenBounds))
+    return m_drawablePainter->drawDrawableProjected(drawable, position, scale, m_camera.pixelRatio());
+  if (drawable.isImage() && m_preloadRandom.randf() < m_preloadTextureChance) {
     auto image = m_assets->tryImage(drawable.imagePart().image);
     if (!image) return std::unexpected(std::move(image.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> WorldPainter::drawDrawableSet(List<Drawable>& drawables) {
-  for (Drawable& drawable : drawables) {
-    if (auto result = drawDrawable(std::move(drawable)); !result) return std::unexpected(std::move(result.error()));
+std::expected<void, StarException> WorldPainter::drawDrawableSet(List<Drawable> const& drawables) {
+  for (Drawable const& drawable : drawables) {
+    if (auto result = drawDrawable(drawable); !result) return std::unexpected(std::move(result.error()));
   }
   return m_renderer->flush();
 }

@@ -350,6 +350,7 @@ RectF PlantDrop::collisionRect() const {
 }
 
 std::expected<void, StarException> PlantDrop::update(float dt, std::uint64_t) {
+  capturePresentationRotation(m_movementController->rotation());
   m_time -= dt;
 
   m_movementController->setTimestep(dt);
@@ -371,6 +372,7 @@ auto rotationAcceleration = 0.01f * std::move(*result308) * std::copysign(1.0f, 
     else if (std::fabs(m_movementController->rotation()) < m_rotationFallThreshold)
       m_rotationRate += rotationAcceleration;
 
+    m_presentationRotationTravel = m_rotationRate * dt;
     m_movementController->rotate(m_rotationRate);
 
     PolyF collisionPoly = PolyF(RectF::withCenter(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
@@ -487,7 +489,7 @@ if (!result335) return std::unexpected(std::move(result335.error()));
 std::expected<void, StarException> PlantDrop::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
   if (renderCallback)
     {
-auto result306 = render(renderCallback->get());
+auto result306 = collectRenderEvents(renderCallback->get());
 if (!result306) return std::unexpected(std::move(result306.error()));
 }
   return {};
@@ -553,7 +555,11 @@ if (!result305) return std::unexpected(std::move(result305.error()));
   return {};
 }
 
-std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallback) {
+std::uint64_t PlantDrop::presentationEpoch() const {
+  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+}
+
+std::expected<void, StarException> PlantDrop::collectRenderEvents(RenderCallback& renderCallback) {
   auto result284 = this->root().assets();
 if (!result284) return std::unexpected(std::move(result284.error()));
 auto assets = std::move(*result284);
@@ -658,6 +664,14 @@ if (!result292) return std::unexpected(std::move(result292.error()));
     }
   }
 
+  return {};
+}
+
+std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallback) {
+  float alpha = std::clamp(renderCallback.interpolation(), 0.0f, 1.0f);
+  float rotation = isMaster()
+    ? m_movementController->rotation() - m_presentationRotationTravel * (1.0f - alpha)
+    : samplePresentationRotation(m_movementController->rotation(), alpha);
   if (m_time > 0 && !m_spawnedDrops.get()) {
     for (auto const& plantPiece : m_pieces) {
       auto result293 = this->root().imageMetadataDatabase();
@@ -667,7 +681,7 @@ if (!result1284) return std::unexpected(std::move(result1284.error()));
 auto drawable = std::move(*result1284);
       if (plantPiece.flip)
         drawable.scale(Vec2F(-1, 1));
-      drawable.rotate(m_movementController->rotation());
+      drawable.rotate(rotation);
       drawable.translate(position());
       auto result294 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlantDrop);
 if (!result294) return std::unexpected(std::move(result294.error()));

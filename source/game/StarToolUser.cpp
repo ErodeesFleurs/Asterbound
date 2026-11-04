@@ -255,14 +255,14 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   return uninitItem(m_altHandItem.get());
 }
 
-[[nodiscard]] std::expected<List<LightSource>, StarException> ToolUser::lightSources() const {
+[[nodiscard]] std::expected<List<LightSource>, StarException> ToolUser::lightSources(float interpolation) const {
   if (m_suppress.get() || !m_user)
     return {};
 
   List<LightSource> lights;
   for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
-      auto sources = active->lights();
+      auto sources = active->lights(interpolation);
       if (!sources) return std::unexpected(std::move(sources.error()));
       lights.appendAll(*sources);
     }
@@ -389,7 +389,34 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   return {};
 }
 
+void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
+  humanoid.setHandFrameOverrides(ToolHand::Primary, "", "");
+  humanoid.setHandFrameOverrides(ToolHand::Alt, "", "");
+  if (m_suppress.get() || !m_user)
+    return;
+  auto setupHand = [&](bool primary) {
+    auto const& item = primary ? m_primaryHandItem.get() : m_altHandItem.get();
+    auto setFrames = [&](String const& backFrame, String const& frontFrame, bool twoHanded) {
+      ToolHand hand = primary || twoHanded ? ToolHand::Primary : ToolHand::Alt;
+      humanoid.setHandFrameOverrides(hand, backFrame, frontFrame);
+    };
+    if (auto swing = as<SwingableItem>(item)) {
+      setFrames(swing->getArmFrame(), swing->getArmFrame(), item->twoHanded());
+    } else if (as<PointableItem>(item)) {
+      setFrames("", "", item->twoHanded());
+    } else if (auto active = as<ActiveItem>(item)) {
+      setFrames(active->backArmFrame().value_or(String{}), active->frontArmFrame().value_or(String{}), active->twoHandedGrip());
+    } else {
+      setFrames("", "", false);
+    }
+  };
+  setupHand(true);
+  if (!itemSafeTwoHanded(m_primaryHandItem.get()))
+    setupHand(false);
+}
+
 [[nodiscard]] std::expected<std::optional<Direction>, StarException> ToolUser::setupHumanoidHandItems(Humanoid& humanoid, Vec2F position, Vec2F aimPosition) const {
+  setupHumanoidHandItemPose(humanoid);
   if (m_suppress.get() || !m_user) {
     humanoid.setHandParameters(ToolHand::Primary, false, 0.0f, 0.0f, false, false, false);
     humanoid.setHandParameters(ToolHand::Alt, false, 0.0f, 0.0f, false, false, false);
@@ -457,10 +484,8 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   return overrideFacingDirection;
 }
 
-[[nodiscard]] std::expected<void, StarException> ToolUser::setupHumanoidHandItemDrawables(Humanoid& humanoid) const {
+[[nodiscard]] std::expected<void, StarException> ToolUser::setupHumanoidHandItemDrawables(Humanoid& humanoid, float interpolation) const {
   if (m_suppress.get() || !m_user) {
-    humanoid.setHandFrameOverrides(ToolHand::Primary, "", "");
-    humanoid.setHandFrameOverrides(ToolHand::Alt, "", "");
     humanoid.setHandDrawables(ToolHand::Primary, {});
     humanoid.setHandDrawables(ToolHand::Alt, {});
     humanoid.setHandNonRotatedDrawables(ToolHand::Primary, {});
@@ -469,12 +494,10 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   }
 
   auto inner = [&](bool primary) -> std::expected<void, StarException> {
-    auto setRotated = [&](String const& backFrame, String const& frontFrame, List<Drawable> drawables, bool twoHanded) {
+    auto setRotated = [&](List<Drawable> drawables, bool twoHanded) {
       if (primary || twoHanded) {
-        humanoid.setHandFrameOverrides(ToolHand::Primary, backFrame, frontFrame);
         humanoid.setHandDrawables(ToolHand::Primary, std::move(drawables));
       } else {
-        humanoid.setHandFrameOverrides(ToolHand::Alt, backFrame, frontFrame);
         humanoid.setHandDrawables(ToolHand::Alt, std::move(drawables));
       }
     };
@@ -491,26 +514,25 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     if (auto swingItem = as<SwingableItem>(handItem)) {
       auto drawables = swingItem->drawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated(swingItem->getArmFrame(), swingItem->getArmFrame(), std::move(*drawables), handItem->twoHanded());
+      setRotated(std::move(*drawables), handItem->twoHanded());
 
     } else if (auto pointableItem = as<PointableItem>(handItem)) {
       auto drawables = pointableItem->drawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated("", "", std::move(*drawables), handItem->twoHanded());
+      setRotated(std::move(*drawables), handItem->twoHanded());
 
     } else if (auto activeItem = as<ActiveItem>(handItem)) {
-      auto drawables = activeItem->handDrawables();
+      auto drawables = activeItem->handDrawables(interpolation);
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated(activeItem->backArmFrame().value_or(String{}), activeItem->frontArmFrame().value_or(String{}),
-          std::move(*drawables), activeItem->twoHandedGrip());
+      setRotated(std::move(*drawables), activeItem->twoHandedGrip());
 
     } else if (auto beamItem = as<BeamItem>(handItem)) {
       auto drawables = beamItem->drawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated("", "", std::move(*drawables), false);
+      setRotated(std::move(*drawables), false);
 
     } else {
-      setRotated("", "", {}, false);
+      setRotated({}, false);
     }
 
     if (auto drawItem = as<NonRotatedDrawablesItem>(handItem)) {
@@ -524,7 +546,6 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   auto primary = inner(true);
   if (!primary) return std::unexpected(std::move(primary.error()));
   if (itemSafeTwoHanded(m_primaryHandItem.get())) {
-    humanoid.setHandFrameOverrides(ToolHand::Alt, "", "");
     humanoid.setHandDrawables(ToolHand::Alt, {});
     humanoid.setHandNonRotatedDrawables(ToolHand::Alt, {});
   } else {
@@ -693,6 +714,14 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
       }
     }
   }
+  if (auto beam = as<BeamItem>(m_primaryHandItem.get().get())) {
+    auto updated = beam->updateBeamEffects(!m_suppress.get());
+    if (!updated) return std::unexpected(std::move(updated.error()));
+  }
+  if (auto beam = as<BeamItem>(m_altHandItem.get().get())) {
+    auto updated = beam->updateBeamEffects(!m_suppress.get() && !itemSafeTwoHanded(m_primaryHandItem.get()));
+    if (!updated) return std::unexpected(std::move(updated.error()));
+  }
   return {};
 }
 
@@ -758,18 +787,27 @@ bool ToolUser::firingAlt() const {
   return ds;
 }
 
-[[nodiscard]] std::expected<void, StarException> ToolUser::render(RenderCallback& renderCallback, bool, bool shifting, EntityRenderLayer renderLayer) {
-  if (m_suppress.get()) {
-    for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
-      if (auto active = as<ActiveItem>(item)) {
-        auto audio = active->pullNewAudios();
-        if (!audio) return std::unexpected(std::move(audio.error()));
-        auto particles = active->pullNewParticles();
-        if (!particles) return std::unexpected(std::move(particles.error()));
+[[nodiscard]] std::expected<void, StarException> ToolUser::collectRenderEvents(RenderCallback& renderCallback) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+    if (auto active = as<ActiveItem>(item)) {
+      auto audio = active->pullNewAudios();
+      if (!audio) return std::unexpected(std::move(audio.error()));
+      auto particles = active->pullNewParticles();
+      if (!particles) return std::unexpected(std::move(particles.error()));
+      if (!m_suppress.get()) {
+        auto audioAdded = renderCallback.addAudios(std::move(*audio));
+        if (!audioAdded) return std::unexpected(std::move(audioAdded.error()));
+        auto particlesAdded = renderCallback.addParticles(std::move(*particles));
+        if (!particlesAdded) return std::unexpected(std::move(particlesAdded.error()));
       }
     }
-    return {};
   }
+  return {};
+}
+
+[[nodiscard]] std::expected<void, StarException> ToolUser::render(RenderCallback& renderCallback, bool, bool shifting, EntityRenderLayer renderLayer) {
+  if (m_suppress.get())
+    return {};
   auto preview = as<PreviewTileTool>(m_primaryHandItem.get());
   if (!preview) preview = as<PreviewTileTool>(m_altHandItem.get());
   if (preview) {
@@ -792,14 +830,6 @@ bool ToolUser::firingAlt() const {
         auto added = renderCallback.addDrawable(drawable.first, drawable.second.value_or(renderLayer));
         if (!added) return std::unexpected(std::move(added.error()));
       }
-      auto audio = active->pullNewAudios();
-      if (!audio) return std::unexpected(std::move(audio.error()));
-      auto audioAdded = renderCallback.addAudios(*audio);
-      if (!audioAdded) return std::unexpected(std::move(audioAdded.error()));
-      auto particles = active->pullNewParticles();
-      if (!particles) return std::unexpected(std::move(particles.error()));
-      auto particlesAdded = renderCallback.addParticles(*particles);
-      if (!particlesAdded) return std::unexpected(std::move(particlesAdded.error()));
     }
   }
   return {};

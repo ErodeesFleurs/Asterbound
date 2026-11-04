@@ -19,6 +19,8 @@ import star.asset_path;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
+import star.algorithm;
+import star.file;
 import star.listener;
 import std;
 import star.format;
@@ -43,6 +45,15 @@ import star.lua;
 import star.lua_root;
 
 import star.test_universe;
+import star.entity;
+import star.entity_rendering;
+import star.rect;
+import star.net_packets;
+import star.world_client;
+import star.world;
+import star.byte_array;
+import star.world_render_data;
+import star.world_geometry;
 #include "gtest/gtest.h"
 
 
@@ -154,3 +165,166 @@ const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld
   EXPECT_TRUE(closed.error().is<TestUniverseException>());
   ASSERT_TRUE((*testUniverse)->close());
 });
+
+namespace {
+
+class PresentationLifecycleEntity : public Entity {
+public:
+  explicit PresentationLifecycleEntity(Root& root) : Entity(root) {}
+  EntityType entityType() const override { return EntityType::Stagehand; }
+  Vec2F position() const override { return {1024, 1024}; }
+  RectF metaBoundBox() const override { return RectF::withSize({}, {1, 1}); }
+  ClientEntityMode clientEntityMode() const override { return ClientEntityMode::ClientMasterAllowed; }
+  std::expected<void, StarException> init(World& world, EntityId id, EntityMode) override {
+    // Insert as a local slave so this behavioral fixture is not serialized to
+    // the real server. Promotion below tests the client-master death path.
+    return Entity::init(world, id, EntityMode::Slave);
+  }
+  std::expected<void, StarException> promote(World& world) {
+    auto id = entityId();
+    auto cleared = Entity::uninit();
+    if (!cleared)
+      return std::unexpected(std::move(cleared.error()));
+    return Entity::init(world, id, EntityMode::Master);
+  }
+  std::expected<bool, StarException> shouldDestroy() const override { return dying; }
+  std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override {
+    ++collections;
+    if (failCollection)
+      return std::unexpected(StarException("Deliberate presentation lifecycle test failure"));
+    if (nextParticle) {
+      auto emitted = renderer.addParticle(std::move(*nextParticle));
+      nextParticle.reset();
+      return emitted;
+    }
+    return {};
+  }
+  std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>>) override {
+    ++destructions;
+    return {};
+  }
+  std::expected<void, StarException> uninit() override {
+    ++uninitializations;
+    return Entity::uninit();
+  }
+  bool dying = false;
+  bool failCollection = false;
+  std::optional<Particle> nextParticle;
+  unsigned collections = 0;
+  unsigned destructions = 0;
+  unsigned uninitializations = 0;
+};
+
+}
+
+const GameTestRegistration presentationRemovalLifecycle(
+  "SpawnTest", "PresentationRemovalCollectsOnceAndIsolatesSlaveFailures", [](GameTest& fixture) {
+    // Failure isolation is the subject here; use a private Root rather than
+    // the shared fixture's sink that fails on every expected Error record.
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = fixture.rootSettings();
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto createdRoot = Root::create(std::move(settings));
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto universe = TestUniverse::create(root, Vec2U(100, 100));
+    ASSERT_TRUE(universe) << universe.error().what();
+    ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+    auto ready = (*universe)->waitForWorldReady();
+    ASSERT_TRUE(ready) << ready.error().what();
+    auto world = (*universe)->worldClient();
+    ASSERT_TRUE(world);
+    constexpr float dt = 1.0f / 60.0f;
+
+    auto dying = std::make_shared<PresentationLifecycleEntity>(root);
+    ASSERT_TRUE(world->addEntity(dying));
+    ASSERT_TRUE(dying->inWorld());
+    ASSERT_TRUE(dying->promote(*world));
+    auto dyingId = dying->entityId();
+    dying->dying = true;
+    ASSERT_TRUE(world->update(dt));
+    EXPECT_EQ(dying->collections, 1u);
+    EXPECT_EQ(dying->destructions, 1u);
+    EXPECT_EQ(dying->uninitializations, 1u);
+    EXPECT_FALSE(world->entity(dyingId));
+    auto emitter = std::make_shared<PresentationLifecycleEntity>(root);
+    ASSERT_TRUE(world->addEntity(emitter));
+    Particle newborn;
+    newborn.type = Particle::Type::Text;
+    newborn.size = newborn.baseSize = 1;
+    newborn.string = "presentation-birth-fixture";
+    newborn.position = Vec2F(world->clientWindow().center());
+    newborn.velocity = newborn.finalVelocity = {60, 0};
+    newborn.approach = {};
+    newborn.ignoreWind = true;
+    newborn.collidesForeground = false;
+    newborn.collidesLiquid = false;
+    newborn.timeToLive = 2.0f;
+    emitter->nextParticle = newborn;
+    ASSERT_TRUE(world->update(dt));
+    WorldRenderData display;
+    auto findNewborn = [&]() -> Particle const* {
+      for (auto const& particle : display.particles)
+        if (particle.string == newborn.string)
+          return &particle;
+      return nullptr;
+    };
+    for (float alpha : {0.0f, 0.5f, 1.0f, 0.25f}) {
+      ASSERT_TRUE(world->render(display, 0, std::nullopt, alpha));
+      auto sampled = findNewborn();
+      ASSERT_TRUE(sampled);
+      EXPECT_EQ(sampled->position, newborn.position);
+      EXPECT_FLOAT_EQ(sampled->timeToLive, 2.0f);
+    }
+    ASSERT_TRUE(world->update(dt));
+    ASSERT_TRUE(world->render(display, 0, std::nullopt, 1.0f));
+    auto advanced = findNewborn();
+    ASSERT_TRUE(advanced);
+    auto travel = world->geometry().diff(advanced->position, newborn.position);
+    EXPECT_NEAR(travel[0], 1.0f, 1e-4f);
+    EXPECT_NEAR(travel[1], 0.0f, 1e-4f);
+    EXPECT_NEAR(advanced->timeToLive, 2.0f - dt, 1e-6f);
+    ASSERT_TRUE(world->removeEntity(emitter->entityId(), false));
+
+    // Exercise the real incoming death-packet path, including its optional
+    // interpolation timer. Every intervening live tick and the final removal
+    // may collect once, never both regular and teardown passes in one tick.
+    for (bool failCollection : {false, true}) {
+      auto slave = std::make_shared<PresentationLifecycleEntity>(root);
+      slave->failCollection = failCollection;
+      ASSERT_TRUE(world->addEntity(slave));
+      ASSERT_TRUE(slave->inWorld());
+      auto id = slave->entityId();
+      auto packet = std::make_shared<EntityDestroyPacket>(id, ByteArray{}, true);
+      ASSERT_TRUE(world->handleIncomingPackets({packet}));
+      EXPECT_LE(slave->collections, 1u);
+      for (unsigned tick = 0; tick != 120 && world->entity(id); ++tick) {
+        auto before = slave->collections;
+        ASSERT_TRUE(world->update(dt));
+        EXPECT_LE(slave->collections - before, 1u);
+      }
+      EXPECT_FALSE(world->entity(id));
+      EXPECT_FALSE(slave->inWorld());
+      EXPECT_EQ(slave->destructions, 1u);
+      EXPECT_EQ(slave->uninitializations, 1u);
+      EXPECT_GT(slave->collections, 0u);
+    }
+
+    auto master = std::make_shared<PresentationLifecycleEntity>(root);
+    master->failCollection = true;
+    ASSERT_TRUE(world->addEntity(master));
+    ASSERT_TRUE(master->promote(*world));
+    auto masterId = master->entityId();
+    EXPECT_FALSE(world->removeEntity(masterId, true));
+    EXPECT_TRUE(world->entity(masterId));
+    EXPECT_EQ(master->destructions, 0u);
+    EXPECT_EQ(master->uninitializations, 0u);
+    ASSERT_TRUE(world->removeEntity(masterId, false));
+    ASSERT_TRUE((*universe)->close());
+  });

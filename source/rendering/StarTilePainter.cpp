@@ -99,9 +99,9 @@ namespace Star {
 TilePainter::TilePainter(Root& root, std::shared_ptr<Renderer> renderer)
   : TileDrawer(root),
     m_renderer(std::move(renderer)),
-    m_textureCache(root.random()),
-    m_terrainChunkCache(root.random()),
-    m_liquidChunkCache(root.random()) {
+    m_textureCache(root.presentationRandom()),
+    m_terrainChunkCache(root.presentationRandom()),
+    m_liquidChunkCache(root.presentationRandom()) {
   constexpr std::size_t hashWidth = RenderChunkSize + 2 * MaterialRenderProfileMaxNeighborDistance;
   m_terrainHashBuffer.resize(hashWidth * hashWidth * offsetof(RenderTile, liquidId));
   m_liquidHashBuffer.resize(hashWidth * hashWidth

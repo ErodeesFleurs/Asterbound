@@ -49,7 +49,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> addChatActions(List<ChatAction> chatActions, bool silent = false);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> world);
-  [[nodiscard]] std::expected<void, StarException> render();
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
 
 private:
   explicit ChatBubbleManager(GuiContext& context);
@@ -81,7 +81,7 @@ private:
 
   // Calculate the alpha for a speech bubble based on distance from player to
   // edge of screen
-  [[nodiscard]] std::expected<std::uint8_t, StarException> calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction) const;
+  [[nodiscard]] std::expected<std::uint8_t, StarException> calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction, WorldCamera const& camera) const;
 
   // Wrap widths are stored in unscaled interface pixels for measurement and drawing.
   TextPositioning scaledPositioning(TextPositioning positioning, float pixelRatio) const;

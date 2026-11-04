@@ -176,6 +176,10 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentVersion) override;
 
+  std::uint64_t presentationEpoch() const override;
+
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
 
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
@@ -304,6 +308,9 @@ public:
 
 private:
   explicit Npc(Root& rootContext);
+  [[nodiscard]] std::expected<List<LightSource>, StarException> presentationLightSources(float interpolation) const;
+  [[nodiscard]] std::expected<void, StarException> updateHumanoidDirectives();
+  DirectivesGroup m_presentationHumanoidDirectives;
   [[nodiscard]] std::expected<void, StarException> initialize(NpcVariant const& npcVariant);
   [[nodiscard]] std::expected<void, StarException> loadState(Json const& diskStore);
 

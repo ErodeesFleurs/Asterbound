@@ -523,7 +523,8 @@ std::optional<Direction> ActiveItem::facingDirection() const {
   return m_facingDirection.get();
 }
 
-std::expected<List<Drawable>, StarException> ActiveItem::handDrawables() const {
+std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float interpolation) const {
+  auto sample = m_itemAnimator->sample(interpolation);
   if (m_itemAnimator->constParts().empty()) {
     auto drawables = Item::iconDrawables();
     if (!drawables)
@@ -539,7 +540,8 @@ std::expected<List<std::pair<Drawable, std::optional<EntityRenderLayer>>>, StarE
   return m_scriptedAnimator.drawables();
 }
 
-std::expected<List<LightSource>, StarException> ActiveItem::lights() const {
+std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpolation) const {
+  auto sample = m_itemAnimator->sample(interpolation);
   // Same as pullNewAudios, we translate and flip ourselves.
   List<LightSource> result;
   auto lights = m_itemAnimator->lightSources();

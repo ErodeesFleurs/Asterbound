@@ -593,6 +593,10 @@ std::expected<bool, StarException> ItemDrop::shouldDestroy() const {
   return m_mode.get() == Mode::Dead || (m_item->empty() && m_owningEntity.get() == NullEntityId);
 }
 
+std::uint64_t ItemDrop::presentationEpoch() const {
+  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+}
+
 std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallback) {
   if (m_mode.get() != Mode::Taken && m_drawRarityBeam) {
     Color beamColor;
@@ -735,6 +739,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDrop::take() {
 }
 
 void ItemDrop::setPosition(Vec2F const& position) {
+  resetPresentation();
   m_movementController->setPosition(position);
 }
 

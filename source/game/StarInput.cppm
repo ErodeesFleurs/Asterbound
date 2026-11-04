@@ -153,7 +153,7 @@ public:
 
   List<std::pair<InputEvent, bool>> const& inputEventsThisFrame() const;
 
-  // Clears input state. Should be done at the very start or end of the client loop.
+  // Retire transients once per logic tick, never for a render-only iteration.
   void reset(bool clear = false);
 
   void update();

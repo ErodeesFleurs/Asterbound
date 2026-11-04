@@ -200,7 +200,7 @@ public:
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> dropDrawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const override;
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  std::expected<bool, StarException> beamCanPlace() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
@@ -406,15 +406,15 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
   auto fireable = FireableItem::update(dt, fireMode, shifting, moves);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
-  auto beam = BeamItem::update(dt, fireMode, shifting, moves);
-  if (!beam)
-    return std::unexpected(std::move(beam.error()));
   float radius = calcRadius(shifting);
   if (radius == 1)
     setEnd(BeamItem::EndType::Tile);
   else
     setEnd(BeamItem::EndType::TileGroup);
   m_shifting = shifting;
+  auto beam = BeamItem::update(dt, fireMode, shifting, moves);
+  if (!beam)
+    return std::unexpected(std::move(beam.error()));
 
   auto itemOwner = owner();
   if (!itemOwner)
@@ -553,11 +553,8 @@ std::expected<List<Drawable>, StarException> MaterialItem::dropDrawables(std::op
   return generatedPreview(tileDrawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
-std::expected<List<Drawable>, StarException> MaterialItem::nonRotatedDrawables() const {
-  auto placeable = canPlace(m_shifting);
-  if (!placeable)
-    return std::unexpected(std::move(placeable.error()));
-  return beamDrawables(*placeable);
+std::expected<bool, StarException> MaterialItem::beamCanPlace() const {
+  return canPlace(m_shifting);
 }
 
 std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifting, bool edgeTriggered) {

@@ -80,7 +80,7 @@ std::expected<void, StarException> EffectEmitter::tick(float dt, EntityMode mode
     if (!m_newSources.empty())
       return std::unexpected(StarException("EffectEmitters can only be added to the master entity."));
   }
-  if (m_renders) {
+  if (m_collectsEvents) {
     m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(),
         [](std::shared_ptr<EffectSource> const& source) { return source->expired(); }), m_sources.end());
 
@@ -119,8 +119,8 @@ void EffectEmitter::reset() {
   m_activeSources.set({});
 }
 
-std::expected<void, StarException> EffectEmitter::render(RenderCallback& renderCallback) {
-  m_renders = true;
+std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCallback& renderCallback) {
+  m_collectsEvents = true;
   if (m_sources.empty())
     return {};
   for (auto& source : m_sources) {

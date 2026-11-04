@@ -149,9 +149,9 @@ public:
   std::optional<Direction> facingDirection() const;
 
   // Hand drawables are in hand-space, everything else is in world space.
-  [[nodiscard]] std::expected<List<Drawable>, StarException> handDrawables() const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> handDrawables(float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<List<std::pair<Drawable, std::optional<EntityRenderLayer>>>, StarException> entityDrawables() const;
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lights() const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lights(float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<List<std::shared_ptr<AudioInstance>>, StarException> pullNewAudios();
   [[nodiscard]] std::expected<List<Particle>, StarException> pullNewParticles();
 

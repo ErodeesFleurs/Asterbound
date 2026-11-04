@@ -102,6 +102,10 @@ public:
   [[nodiscard]]
   virtual std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
 
+  // Called once after the owner's fixed-tick item control/fire work.
+  [[nodiscard]]
+  std::expected<void, StarException> updateBeamEffects(bool visible);
+
   [[nodiscard]]
   virtual std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
 
@@ -121,7 +125,10 @@ protected:
   [[nodiscard]]
   std::expected<void, StarException> initializeBeam(Json config);
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> beamDrawables(bool canPlace = true) const;
+  std::expected<List<Drawable>, StarException> beamDrawables() const;
+  virtual bool beamActive() const;
+  [[nodiscard]]
+  virtual std::expected<bool, StarException> beamCanPlace() const;
 
   String m_image;
   StringList m_endImages;
@@ -152,9 +159,10 @@ protected:
   float m_secondStripeThickness;
   Color m_color;
 
-  mutable bool m_inRangeLastUpdate;
-  mutable Color m_lastUpdateColor;
-  mutable float m_particleGenerateCooldown;
+  bool m_inRangeLastUpdate = false;
+  bool m_beamInRange = false;
+  bool m_beamCanPlace = true;
+  Color m_lastUpdateColor;
 
   CSplineF m_beamCurve;
 

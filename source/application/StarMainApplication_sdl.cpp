@@ -14,6 +14,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_lua_bindings.hpp"
 import std;
 import star.optional;
 import star.format;
@@ -45,7 +46,6 @@ import star.texture_atlas;
 import star.renderer_opengl;
 import star.ordered_map;
 import star.lru_cache;
-import star.thread;
 import star.time;
 import star.random;
 import star.ttl_cache;
@@ -60,6 +60,7 @@ import star.platform_services_pc;
 
 import star.signal_handler;
 import star.tick_rate_monitor;
+import star.fixed_scheduler;
 
 import star.byte_array;
 import star.math_common;
@@ -871,6 +872,7 @@ public:
         return std::unexpected(std::move(result.error()));
       m_updateTicker.reset();
       m_renderTicker.reset();
+      m_scheduler.reset(Time::monotonicMicroseconds() / 1000000.0);
       bool quit = false;
       while (true) {
         auto frameStart = Time::monotonicMicroseconds();
@@ -894,40 +896,51 @@ public:
         else
           SDL_HideCursor();
 
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-
         auto updateStart = Time::monotonicMicroseconds();
-        int updatesBehind = std::max<int>(std::round(m_updateTicker.ticksBehind()), 1);
-        updatesBehind = std::min<int>(updatesBehind, m_maxFrameSkip + 1);
-        for (int i = 0; i < updatesBehind; ++i) {
-          //since frame-skipping is a thing, we have to begin a new ImGui frame here to prevent duplicate elements made by updates
-          if (i != 0)
-            ImGui::EndFrame();
-          ImGui::NewFrame();
-          imguiFrameActive = true;
+        unsigned updatesDue = m_scheduler.updatesDue(updateStart / 1000000.0, m_maxFrameSkip);
+        auto updateEpoch = m_scheduler.updateEpoch();
+        unsigned updateCount = 0;
+        for (; updateCount < updatesDue; ++updateCount) {
           if (auto result = m_application->update(); !result)
             return std::unexpected(std::move(result.error()));
           m_updateRate = m_updateTicker.tick();
+          // An update-rate change replaces the reserved batch's deadlines.
+          if (m_scheduler.updateEpoch() != updateEpoch) {
+            ++updateCount;
+            break;
+          }
         }
 
         auto renderStart = Time::monotonicMicroseconds();
-        if (auto result = m_renderer->startFrame(); !result)
-          return std::unexpected(std::move(result.error()));
-        if (auto result = m_application->render(); !result)
-          return std::unexpected(std::move(result.error()));
-        auto finishStart = Time::monotonicMicroseconds();
-        if (auto result = m_renderer->finishFrame(); !result)
-          return std::unexpected(std::move(result.error()));
+        auto finishStart = renderStart;
+        auto guiStart = renderStart;
+        auto presentStart = renderStart;
+        bool rendered = m_scheduler.beginRender(renderStart / 1000000.0);
+        if (rendered) {
+          m_renderInterpolation = m_scheduler.interpolation(renderStart / 1000000.0);
+          ImGui_ImplOpenGL3_NewFrame();
+          ImGui_ImplSDL3_NewFrame();
+          ImGui::NewFrame();
+          imguiFrameActive = true;
+          if (auto result = m_renderer->startFrame(); !result)
+            return std::unexpected(std::move(result.error()));
+          setImguiPresentationActive(true);
+          auto applicationRendered = m_application->render();
+          setImguiPresentationActive(false);
+          if (!applicationRendered)
+            return std::unexpected(std::move(applicationRendered.error()));
+          finishStart = Time::monotonicMicroseconds();
+          if (auto result = m_renderer->finishFrame(); !result)
+            return std::unexpected(std::move(result.error()));
 
-        auto guiStart = Time::monotonicMicroseconds();
-        ImGui::Render();
-        imguiFrameActive = false;
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        auto presentStart = Time::monotonicMicroseconds();
-        SDL_GL_SwapWindow(m_sdlWindow.get());
-        m_renderRate = m_renderTicker.tick();
+          guiStart = Time::monotonicMicroseconds();
+          ImGui::Render();
+          imguiFrameActive = false;
+          ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+          presentStart = Time::monotonicMicroseconds();
+          SDL_GL_SwapWindow(m_sdlWindow.get());
+          m_renderRate = m_renderTicker.tick();
+        }
         auto presentEnd = Time::monotonicMicroseconds();
 
         if (m_quitRequested) {
@@ -949,15 +962,16 @@ public:
 
         auto throttleStart = Time::monotonicMicroseconds();
         if (!quit) {
-          std::int64_t spareMilliseconds = std::round(m_updateTicker.spareTime() * 1000);
-          if (spareMilliseconds > 0)
-            Thread::sleepPrecise(spareMilliseconds);
+          auto spareNanoseconds = static_cast<Uint64>(m_scheduler.sleepTime(throttleStart / 1000000.0) * 1000000000.0);
+          if (spareNanoseconds > 0)
+            SDL_DelayPrecise(spareNanoseconds);
         }
         auto frameEnd = Time::monotonicMicroseconds();
         m_application->recordFrameTimings({updateStart - frameStart, renderStart - updateStart,
                                            finishStart - renderStart, guiStart - finishStart, presentStart - guiStart,
-                                           presentEnd - presentStart, quit ? 0 : frameEnd - throttleStart,
-                                           frameEnd - frameStart, static_cast<unsigned>(updatesBehind)});
+                                           rendered ? presentEnd - presentStart : 0,
+                                           quit ? 0 : frameEnd - throttleStart,
+                                           frameEnd - frameStart, updateCount});
         if (quit)
           break;
       }
@@ -1127,11 +1141,19 @@ private:
     }
 
     void setTargetUpdateRate(float targetUpdateRate) override {
-      parent.m_updateTicker.setTargetTickRate(targetUpdateRate);
+      parent.m_scheduler.setUpdateRate(targetUpdateRate, Time::monotonicMicroseconds() / 1000000.0);
     }
 
-    void setUpdateTrackWindow(float updateTrackWindow) override {
-      parent.m_updateTicker.setWindow(updateTrackWindow);
+    void setTargetRenderRate(float rate) override {
+      parent.m_scheduler.setRenderRate(rate, Time::monotonicMicroseconds() / 1000000.0);
+    }
+
+    float renderInterpolation() const override {
+      return parent.m_renderInterpolation;
+    }
+
+    std::uint64_t renderEpoch() const override {
+      return parent.m_scheduler.epoch();
     }
 
     void setApplicationTitle(String title) override {
@@ -1638,7 +1660,9 @@ private:
 
   SignalHandler m_signalHandler;
 
-  TickRateApproacher m_updateTicker = TickRateApproacher(60.0f, 1.0f);
+  FixedScheduler m_scheduler;
+  float m_renderInterpolation = 1.0f;
+  TickRateMonitor m_updateTicker = TickRateMonitor(1.0f);
   float m_updateRate = 0.0f;
   TickRateMonitor m_renderTicker = TickRateMonitor(1.0f);
   float m_renderRate = 0.0f;

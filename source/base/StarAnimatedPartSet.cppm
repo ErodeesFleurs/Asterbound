@@ -51,12 +51,12 @@ public:
   struct ActiveStateInformation {
     String stateTypeName;
     String stateName;
-    float timer;
-    unsigned frame;
-    float frameProgress;
+    float timer = 0;
+    unsigned frame = 0;
+    float frameProgress = 0;
     JsonObject properties;
-    bool reverse;
-    unsigned nextFrame;
+    bool reverse = false;
+    unsigned nextFrame = 0;
     JsonObject nextProperties;
   };
 
@@ -71,12 +71,12 @@ public:
     void setAnimationAffineTransform(Mat3F const& matrix);
     void setAnimationAffineTransform(Mat3F const& mat1, Mat3F const& mat2, float progress);
 
-    float xTranslationAnimation;
-    float yTranslationAnimation;
-    float xScaleAnimation;
-    float yScaleAnimation;
-    float xShearAnimation;
-    float yShearAnimation;
+    float xTranslationAnimation = 0;
+    float yTranslationAnimation = 0;
+    float xScaleAnimation = 1;
+    float yScaleAnimation = 1;
+    float xShearAnimation = 0;
+    float yShearAnimation = 0;
   };
 
     enum AnimationMode {
@@ -105,6 +105,11 @@ public:
     mutable ActiveStateInformation activeState;
     std::optional<std::reference_wrapper<State const>> activeStateReference;
     mutable bool activeStateDirty;
+    float previousTimer = 0;
+    float timerAdvance = 0;
+    mutable ActiveStateInformation presentationState;
+    mutable bool presentationStateDirty = true;
+    mutable bool presentationStateInitialized = false;
   };
 
   struct PartState {
@@ -119,10 +124,18 @@ public:
     // Derived from part properties and the currently active state.
     mutable ActivePartInformation activePart;
     mutable bool activePartDirty;
+    mutable ActivePartInformation presentationPart;
+    mutable bool presentationPartDirty = true;
+    mutable Mat3F activePartBaseTransform = Mat3F::identity();
   };
 
   AnimatedPartSet();
   [[nodiscard]] static std::expected<AnimatedPartSet, StarException> create(Json config, std::uint8_t animatorVersion);
+
+  // Selects reusable presentation caches, leaving the logical state and frame
+  // caches untouched. A negative value disables presentation sampling.
+  float setPresentationInterpolation(float interpolation) const;
+  [[nodiscard]] std::expected<bool, StarException> setPresentationState(String const& stateTypeName, String const& stateName, bool alwaysStart, bool reverse);
 
   // Returns the available state types.
   StringList stateTypes() const;
@@ -192,6 +205,7 @@ private:
   StringMap<Part> m_parts;
 
   std::uint8_t m_animatorVersion = 0;
+  mutable float m_presentationInterpolation = -1;
 };
 
 }

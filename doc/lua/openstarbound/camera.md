@@ -2,6 +2,12 @@
 
 The `camera` table provides functions to interact with the world camera in clientside scripts.
 
+Camera queries and coordinate conversions describe the displayed camera,
+including presentation interpolation, zoom and pixel snapping. During rendering
+they match the current display sample; input between presentations uses the last
+actually displayed transform. Logical entity positions remain simulation state:
+do not write sampled camera or display positions back into movement controllers.
+
 ---
 
 #### `Vec2F` camera.position()

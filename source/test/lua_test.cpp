@@ -57,6 +57,19 @@ void expectLuaNil(std::expected<LuaValue, StarException> result) {
 }
 }
 
+TEST(LuaTest, ImGuiRejectsSimulationCallsWithoutAbortingOrPoisoningLua) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  ASSERT_TRUE((*engine)->addImGui());
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto rejected = context->eval("imgui.Begin('simulation must not draw')");
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(rejected.error().is<LuaException>());
+  ASSERT_TRUE(context->load("afterRejectedDrawing = 6 * 7"));
+  EXPECT_EQ(context->get<int>("afterRejectedDrawing"), 42);
+}
+
 TEST(LuaTest, BasicGetSet) {
   auto luaEngineResult = LuaEngine::create();
   ASSERT_TRUE(luaEngineResult);

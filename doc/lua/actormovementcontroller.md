@@ -176,6 +176,17 @@ Moves the movement controller by the vector provided.
 
 ---
 
+#### `void` mcontroller.resetPresentation()
+
+Discards the owning entity's previous presentation sample. Call once after an
+authored teleport or other abrupt pose discontinuity to prevent blending from
+the old pose. Position setters and `translate` remain continuous and do not
+automatically reset interpolation; large corrections and native teleports
+already reset it. Do not call this every tick for ordinary continuous movement.
+This changes presentation history, not physics or the logical position.
+
+---
+
 #### `void` mcontroller.setVelocity(`Vec2F` velocity)
 
 Sets the velocity of the movement controller.

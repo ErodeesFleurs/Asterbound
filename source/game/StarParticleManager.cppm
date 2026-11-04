@@ -53,7 +53,8 @@ public:
   ParticleManager(Root& root, WorldGeometry const& worldGeometry, std::shared_ptr<ClientTileSectorArray> const& tileSectorArray);
 
   void add(Particle particle);
-  void addParticles(List<Particle> particles);
+  // Consumes elements but retains the caller's allocation for the next tick.
+  void addParticles(List<Particle>&& particles);
 
   std::size_t count() const;
   void clear();
@@ -64,15 +65,27 @@ public:
   [[nodiscard]] std::expected<void, StarException> update(float dt, RectF const& cullRegion, float wind);
 
   List<Particle> const& particles() const;
-  List<std::pair<Vec2F, Vec3F>> lightSources() const;
+  // Fill a reusable owned display list. Births and deaths are discrete fixed-
+  // tick events; only surviving particle state is sampled between endpoints.
+  void sampleParticles(float interpolation, List<Particle>& samples) const;
+  void resetPresentation();
 
 private:
   enum class TileType { Colliding, Water, Empty };
+
+  struct PresentationHistory {
+    Particle::PresentationState previous;
+    float timestep;
+    std::uint64_t identity;
+  };
 
   Root& m_root;
 
   List<Particle> m_particles;
   List<Particle> m_nextParticles;
+  List<PresentationHistory> m_presentationHistory;
+  List<PresentationHistory> m_nextPresentationHistory;
+  inline static std::atomic_uint64_t s_nextPresentationIdentity{1};
 
   WorldGeometry m_worldGeometry;
   float m_undergroundLevel;

@@ -40,9 +40,23 @@ Use `/help` for commands. See the [command reference](assets/opensb/help.config.
 
 ### Network and frame preparation
 
-Entity creation encoders transfer completed buffers instead of copying them. Read-only RPC and monster/NPC variant decoders borrow their input only during decoding; decoded fields remain owned. Network formats and compatibility versions are unchanged. Rendering transfers complete entity layer collections, while typed spatial queries collect a single owned result list without changing traversal order, wrapping, deduplication or insertion-safe candidate snapshots.
+Entity creation encoders transfer completed buffers instead of copying them. Read-only RPC and monster/NPC variant decoders borrow their input only during decoding; decoded fields remain owned. Network formats and compatibility versions are unchanged. Frame data owns reusable entity collections and particle snapshots; painters borrow them only during submission. Typed spatial queries collect a single owned result list without changing traversal order, wrapping, deduplication or insertion-safe candidate snapshots.
 
 Team updates share one configuration snapshot within each update, without caching it across updates. Health, energy, position and travel state retain the configured status frequency. Names and portraits are included on the next eligible status update after ten seconds, or immediately on the next eligible update after first joining, changing teams or `forceUpdate`. Appearance changes can therefore reach other teammates later than dynamic status. The full-update timer advances only after successful local submission; encoding or enqueue failures do not consume it. Legacy RPC still maps remote failures to `null`, so submission is not a remote-delivery acknowledgment.
+
+### Independent simulation and rendering
+
+The client runs fixed simulation ticks independently of display frames on its existing main thread; this does not introduce a render thread. `updateRate` and `serverUpdateRate` remain simulation settings, not display FPS controls. Input is polled between deadlines, and queued actions are consumed by simulation updates.
+
+`renderFpsLimit` defaults to `0` (unlimited). A finite positive value caps display submissions, including fractional limits such as `117.5`; negative, non-finite and out-of-range values are rejected. The graphics menu stages the FPS limit and VSync until **Apply**. **Back** discards them, and the fullscreen shortcut does not commit pending settings. Existing custom limits are preserved without rounding to a slider preset. VSync can impose a lower effective display rate; unlimited does not override the display driver.
+
+Each scheduler pass performs at most `maxFrameSkip + 1` due simulation ticks. Backward clock changes or more than 250 ms of accumulated debt resynchronize deadlines with one immediately due tick, avoiding both unbounded catch-up and simulation starvation during repeatedly slow presents. Sleep deadlines are evaluated after presenting, so blocking presentation time is not charged twice.
+
+World presentation samples the previous and current fixed-tick states, normally adding one simulation tick of visual latency without extrapolating gameplay. Entity positions, supported native animation transforms, particles and the camera share the display sample. Pausing displays the current state. World/player replacement, reloads, native teleports and large corrections invalidate presentation history; authored small teleports can call [`mcontroller.resetPresentation()`](doc/lua/movementcontroller.md). Continuous movement must not reset it each tick.
+
+Timers, one-shot audio/particle collection and beam transitions belong to ticks, including offscreen entities. Resource-cache jitter and native cosmetic noise use a separate presentation random service rather than consuming gameplay randomness. Display sampling does not write interpolated coordinates back to movement controllers. Camera conversions and overlay anchors use the displayed transform; input between frames retains the last displayed camera.
+
+Lua pane `render()` may run several times without an intervening `update(dt)`, or less often than updates. Keep gameplay changes, timers, effect drains and unseeded gameplay-backed random draws out of render hooks. Rebuild ImGui widgets in the render hook only; the engine owns ImGui frame begin/end. See the [script pane lifecycle](doc/lua/openstarbound/scriptpane.md#shared-script-pane-runtime) and [camera API](doc/lua/openstarbound/camera.md). Arbitrary mod render hooks are not made read-only automatically.
 
 
 ### Lua 5.5.1 migration
@@ -177,6 +191,8 @@ Each native asset-backed CTest invocation runs one process per executable with a
 
 Core timing tests use a short real-clock smoke and explicit worker synchronization rather than long per-task sleeps. Lua limit tests retain all three execution entry points and post-error recovery at reduced instruction/recursion scales. Exception tests retain synchronized cold-cache contention while limiting repeated hot-cache reads; FlatHash randomized tests use bounded samples and retain insert, erase, reinsert and lifetime checks.
 
+`fixed_scheduler_tests` exercises deadline pacing, bounded catch-up, clock discontinuities, invalid rates and repeated slow presents without game assets. Asset-backed presentation regressions cover wrapped camera sampling, repeatable entity/animation sampling, tick-owned spawn/removal effects and beam transitions, and cold/warm visual-cache isolation from gameplay randomness.
+
 Image kernels retain the full format/scaler matrix and byte-exact sequential oracles. Pipeline entry points use representative format/scaler combinations, separate ownership checks and ordered failure-prefix assertions rather than repeating the kernel matrix. Ordinary consumers check error types and state/recovery boundaries; exact diagnostic comparisons remain where wording or first-error selection is the contract.
 
 Frontend numeric boundary matrices run against fresh real panes without reloading all assets for each row; dedicated reload scenarios retain live-state continuity coverage. Spawn tests advance the real client until world sectors and observed entity/world-script schedules are ready, then acknowledge a post-update world message and validate rendered images. Readiness has a bounded timeout instead of a fixed frame count; fixed-world coordinator script compilation remains explicit even when no coordinator entity is spawned.
@@ -238,7 +254,7 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 
 - Options callbacks share volume and boolean writers, retaining local changes before live configuration writes and label updates. Capture configuration keys once when registering callbacks; head rotation also updates the running Root cache.
 - Text measurement and wrapping share only the `font=`, `set` and `reset` command subset. Full rendering commands also change colors, shadows and other saved state.
-- Entity highlights draw all underlays before main drawables and overlays. Keep the original drawables available for overlays and preserve offscreen preload random draws.
+- Entity highlights draw all underlays before main drawables and overlays. Keep the original drawables available for overlays; offscreen texture-preload jitter must use presentation randomness, not the gameplay random stream.
 - Horizon rendering queues every layer's textures before testing readiness. Load both halves before submitting either; shared geometry preparation retains rotation, vertex/UV order and floating-point operation order.
 
 ### Lua embedding

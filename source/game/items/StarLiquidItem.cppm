@@ -112,7 +112,7 @@ public:
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
 
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  std::expected<bool, StarException> beamCanPlace() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
@@ -206,22 +206,19 @@ std::expected<void, StarException> LiquidItem::update(float dt, FireMode fireMod
   auto fireable = FireableItem::update(dt, fireMode, shifting, moves);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
-  auto beam = BeamItem::update(dt, fireMode, shifting, moves);
-  if (!beam)
-    return std::unexpected(std::move(beam.error()));
   if (shifting || !multiplaceEnabled())
     setEnd(BeamItem::EndType::Tile);
   else
     setEnd(BeamItem::EndType::TileGroup);
   m_shifting = shifting;
+  auto beam = BeamItem::update(dt, fireMode, shifting, moves);
+  if (!beam)
+    return std::unexpected(std::move(beam.error()));
   return {};
 }
 
-std::expected<List<Drawable>, StarException> LiquidItem::nonRotatedDrawables() const {
-  auto placeable = canPlace(m_shifting);
-  if (!placeable)
-    return std::unexpected(std::move(placeable.error()));
-  return beamDrawables(*placeable);
+std::expected<bool, StarException> LiquidItem::beamCanPlace() const {
+  return canPlace(m_shifting);
 }
 
 std::expected<void, StarException> LiquidItem::fire(FireMode mode, bool shifting, bool edgeTriggered) {

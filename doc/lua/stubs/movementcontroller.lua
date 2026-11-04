@@ -100,6 +100,9 @@ function mcontroller.zeroG() end
 ---@return boolean
 function mcontroller.atWorldLimit(bottomOnly) end
 
+--- Discards display interpolation history after an explicit teleport or other discontinuity. Ordinary position setters remain continuous for scripted movement. ---
+function mcontroller.resetPresentation() end
+
 --- Sets the position of the movement controller. ---
 ---@param position Vec2F
 function mcontroller.setPosition(position) end

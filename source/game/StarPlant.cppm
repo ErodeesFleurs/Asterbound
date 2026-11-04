@@ -146,6 +146,8 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
 
   [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
@@ -173,7 +175,10 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> scanSpacesAndRoots();
   List<PlantPiece> spawnFolliage(String const& key, String const& type);
-  float branchRotation(float xPos, float rotoffset) const;
+  float branchRotation(float xPos, float rotoffset, float interpolation) const;
+  float m_previousWindTime = 0.0f;
+  float m_previousWindLevel = 0.0f;
+  float m_presentationDamageXOffset = 0.0f;
   void calcBoundBox();
 
   [[nodiscard]] std::expected<void, StarException> readPieces(ByteArray pieces);

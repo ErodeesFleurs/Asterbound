@@ -30,21 +30,20 @@ public:
   QuestIndicatorPainter(GuiContext& context, std::shared_ptr<UniverseClient> const& client);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> const& world, WorldCamera const& camera);
-  [[nodiscard]] std::expected<void, StarException> render();
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
 
 private:
   struct Indicator {
     [[nodiscard]] std::expected<Drawable, StarException> render(float pixelRatio) const;
 
     EntityId entityId;
-    Vec2F screenPos;
+    Vec2F worldPosition;
     String indicatorName;
     std::shared_ptr<Animation> animation;
   };
 
   std::reference_wrapper<GuiContext> m_guiContext;
   std::shared_ptr<UniverseClient> m_client;
-  WorldCamera m_camera;
   Map<EntityId, Indicator> m_indicators;
   Set<EntityId> m_foundIndicators;
 };

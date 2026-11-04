@@ -294,6 +294,10 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
+  std::uint64_t presentationEpoch() const override;
+
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
 
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
@@ -630,8 +634,9 @@ private:
   [[nodiscard]] std::expected<void, StarException> setNetArmorSecret(EquipmentSlot slot, std::shared_ptr<ArmorItem> const& armor, bool visible = true);
   [[nodiscard]] std::expected<void, StarException> setNetArmorSecrets(bool includeEmpty = false);
 
-  [[nodiscard]] std::expected<List<Drawable>, StarException> drawables() const;
-  [[nodiscard]] std::expected<List<OverheadBar>, StarException> bars() const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(float interpolation = 1.0f) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> presentationLightSources(float interpolation) const;
+  [[nodiscard]] std::expected<void, StarException> updateHumanoidDirectives();
   [[nodiscard]] std::expected<List<Particle>, StarException> particles();
   [[nodiscard]] std::expected<String, StarException> getFootstepSound(Vec2I const& sensor) const;
 
@@ -741,6 +746,9 @@ private:
 
   List<Particle> m_callbackParticles;
   List<std::tuple<String, float, float>> m_callbackSounds;
+  List<std::shared_ptr<AudioInstance>> m_hiddenLoopAudios;
+  List<OverheadBar> m_presentationBars;
+  DirectivesGroup m_presentationHumanoidDirectives;
 
   List<String> m_queuedMessages;
   List<std::shared_ptr<Item>> m_queuedItemPickups;

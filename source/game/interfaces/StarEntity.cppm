@@ -184,6 +184,13 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> update(float dt, std::uint64_t currentStep);
 
+  // Once-only client presentation effects, collected after each fixed tick even
+  // when the entity is outside the display window.
+  [[nodiscard]] virtual std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer);
+
+  virtual std::uint64_t presentationEpoch() const;
+  void resetPresentation();
+
   [[nodiscard]] virtual std::expected<void, StarException> render(RenderCallback& renderer);
 
   [[nodiscard]] virtual std::expected<void, StarException> renderLightSources(RenderCallback& renderer);
@@ -222,6 +229,8 @@ public:
 
 protected:
   explicit Entity(Root& root);
+  void capturePresentationRotation(float rotation);
+  float samplePresentationRotation(float rotation, float interpolation) const;
 
   void setPersistent(bool persistent);
   void setKeepAlive(bool keepAlive);
@@ -237,6 +246,8 @@ private:
   std::optional<String> m_uniqueId;
   std::optional<std::reference_wrapper<World>> m_world;
   EntityDamageTeam m_team;
+  std::uint64_t m_presentationEpoch = 0;
+  std::optional<float> m_previousPresentationRotation;
 };
 
 template <typename EntityT>

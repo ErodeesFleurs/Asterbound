@@ -2,6 +2,7 @@ add_library (star_application_module_interfaces OBJECT)
 target_sources (star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES FILES
     StarApplication.cppm
     StarApplicationController.cppm
+    StarFixedScheduler.cppm
     StarMainApplication.cppm
     StarNativeUiContext.cppm
     StarRenderer.cppm

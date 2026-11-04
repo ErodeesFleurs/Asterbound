@@ -35,6 +35,8 @@ class MainInterface;
 class UniverseServer;
 class LuaHttpSession;
 class LuaCallbacks;
+class Configuration;
+class WorldClient;
 
 class ClientApplication : public Application {
 public:
@@ -94,6 +96,7 @@ private:
   };
 
   [[nodiscard]] std::expected<void, StarException> renderReload();
+  [[nodiscard]] std::expected<void, StarException> applyRenderSettings(Configuration const& configuration);
 
   [[nodiscard]] std::expected<void, StarException> changeState(MainAppState newState);
   [[nodiscard]] std::expected<void, StarException> prepareStateCinematic(MainAppState newState);
@@ -171,6 +174,12 @@ private:
   Vec2F m_cameraPositionSmoother;
   Vec2F m_cameraSmoothDelta;
   int m_cameraZoomDirection = 0;
+  std::weak_ptr<WorldClient> m_presentedWorld;
+  std::weak_ptr<Player> m_presentedPlayer;
+  std::uint64_t m_presentedPlayerEpoch = 0;
+  std::uint64_t m_presentedRenderEpoch = 0;
+  float m_appliedRenderFpsLimit = -1.0f;
+  bool m_appliedVSync = true;
 
   unsigned m_framesSkipped = 0;
   float m_minInterfaceScale = 2;

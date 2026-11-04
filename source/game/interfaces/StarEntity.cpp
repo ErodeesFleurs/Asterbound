@@ -52,6 +52,7 @@ std::expected<void, StarException> Entity::init(World& world, EntityId entityId,
   if (m_world)
     return std::unexpected(EntityException("Entity::init called when already initialized"));
 
+  resetPresentation();
   m_world = std::ref(world);
   m_entityMode = mode;
   m_entityId = entityId;
@@ -59,6 +60,7 @@ std::expected<void, StarException> Entity::init(World& world, EntityId entityId,
 }
 
 std::expected<void, StarException> Entity::uninit() {
+  resetPresentation();
   m_world.reset();
   m_entityMode = {};
   m_entityId = NullEntityId;
@@ -138,6 +140,26 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Entity
 }
 
 std::expected<void, StarException> Entity::update(float, std::uint64_t) { return {}; }
+
+std::expected<void, StarException> Entity::collectRenderEvents(RenderCallback&) { return {}; }
+
+std::uint64_t Entity::presentationEpoch() const { return m_presentationEpoch; }
+
+void Entity::resetPresentation() {
+  ++m_presentationEpoch;
+  m_previousPresentationRotation.reset();
+}
+
+void Entity::capturePresentationRotation(float rotation) {
+  m_previousPresentationRotation = rotation;
+}
+
+float Entity::samplePresentationRotation(float rotation, float interpolation) const {
+  if (!m_previousPresentationRotation)
+    return rotation;
+  float difference = std::remainder(*m_previousPresentationRotation - rotation, 2.0f * std::numbers::pi_v<float>);
+  return rotation + difference * (1.0f - std::clamp(interpolation, 0.0f, 1.0f));
+}
 
 std::expected<void, StarException> Entity::render(RenderCallback&) { return {}; }
 

@@ -86,7 +86,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
 
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;

@@ -113,10 +113,10 @@ public:
 
   bool parentHidden() const;
 
-  [[nodiscard]] std::expected<List<Drawable>, StarException> backDrawables();
-  [[nodiscard]] std::expected<List<Drawable>, StarException> frontDrawables();
+  [[nodiscard]] std::expected<List<Drawable>, StarException> backDrawables(float interpolation = 1.0f);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> frontDrawables(float interpolation = 1.0f);
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
 
   List<std::shared_ptr<AudioInstance>> pullNewAudios();
   List<Particle> pullNewParticles();

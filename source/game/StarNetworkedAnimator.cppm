@@ -106,6 +106,19 @@ public:
   NetworkedAnimator& operator=(NetworkedAnimator&&) = delete;
   NetworkedAnimator& operator=(NetworkedAnimator const&) = delete;
 
+
+  // Read-only semantic sampling for a visual pass. Local render overrides are
+  // isolated from logical state. Nested scopes inherit the outer sample.
+  class Sample {
+  public:
+    Sample(NetworkedAnimator const& animator, float interpolation);
+    ~Sample();
+    Sample(Sample const&) = delete;
+    Sample& operator=(Sample const&) = delete;
+  private:
+    NetworkedAnimator const& m_animator;
+  };
+  [[nodiscard]] Sample sample(float interpolation) const;
   StringList stateTypes() const;
   [[nodiscard]] std::expected<StringList, StarException> states(String const& stateType) const;
 
@@ -274,7 +287,8 @@ private:
     Vec2F rotationCenter;
 
     NetElementFloat targetAngle;
-    float currentAngle;
+    float currentAngle = 0;
+    float previousAngle = 0;
 
     NetElementEvent netImmediateEvent;
   };
@@ -288,11 +302,21 @@ private:
 
     Mat3F animationAffineTransform() const;
     void setAnimationAffineTransform(Mat3F const& matrix);
-    void setAnimationAffineTransform(Mat3F const& mat1, Mat3F const& mat2, float progress);
 
     bool interpolated;
 
     Mat3F localTransform;
+    mutable Mat3F presentationLocalTransform;
+    mutable Mat3F presentationTransform;
+    mutable Mat3F presentationAnimationTransform;
+    mutable bool presentationAnimationDirty = true;
+    mutable bool sampling = false;
+    Mat3F previousTransform;
+    Mat3F currentTransform;
+    Mat3F previousLocalTransform;
+    Mat3F currentLocalTransform;
+    Mat3F animationBaseTransform = Mat3F::identity();
+    bool presentationHistory = false;
 
     NetElementFloat xTranslation;
     NetElementFloat yTranslation;
@@ -394,12 +418,14 @@ private:
   [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
 
   [[nodiscard]] std::expected<Json, StarException> mergeIncludes(Root& root, Json config, Json includes, String relativePath);
+  [[nodiscard]] std::expected<Mat3F, StarException> animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base) const;
 
   std::reference_wrapper<Root> m_root;
   String m_relativePath;
   std::uint8_t m_animatorVersion;
 
   AnimatedPartSet m_animatedParts;
+  StringList m_animationStateTypes;
   OrderedHashMap<String, StateInfo> m_stateInfo;
   OrderedHashMap<String, RotationGroup> m_rotationGroups;
   OrderedHashMap<String, TransformationGroup> m_transformationGroups;
@@ -423,6 +449,8 @@ private:
   HashMap<String,List<Drawable>> m_partDrawables;
 
   mutable StringMap<std::pair<std::size_t, Drawable>> m_cachedPartDrawables;
+  mutable unsigned m_sampleDepth = 0;
+  mutable float m_interpolation = 1;
 };
 
 }

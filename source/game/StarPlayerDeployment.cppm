@@ -61,6 +61,8 @@ public:
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback, Vec2F const& position);
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback, Vec2F const& position);
 
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback);

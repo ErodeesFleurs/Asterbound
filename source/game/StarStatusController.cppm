@@ -165,8 +165,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> tickSlave(float dt);
 
   const DirectivesGroup& parentDirectives() const;
-  [[nodiscard]] std::expected<List<Drawable>, StarException> drawables() const;
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(float interpolation = 1.0f) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<List<OverheadBar>, StarException> overheadBars();
   bool toolUsageSuppressed() const;
 

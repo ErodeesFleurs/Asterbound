@@ -395,10 +395,10 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
   return {};
 }
 
-std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction) const {
+std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction, WorldCamera const& camera) const {
   // first calculate bubble position as a factor, distance from center to edge
   // of screen (0.0-1.0)
-  float halfScreenwidth = m_camera.screenSize()[0] * 0.5f;
+  float halfScreenwidth = camera.screenSize()[0] * 0.5f;
   float distanceFactor = (std::fabsf(bubbleScreenPosition[0] - halfScreenwidth)) / halfScreenwidth;
 
   // that distance factor is divided by the max allowable distance
@@ -409,7 +409,7 @@ std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAl
   if (!evaluated) return std::unexpected(std::move(evaluated.error()));
   return std::clamp((int)*evaluated, 0, 255);
 }
-std::expected<void, StarException> ChatBubbleManager::render() {
+std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, float interpolation) {
   if (m_bubbles.empty() && m_portraitBubbles.empty())
     return {};
   auto configuration = m_guiContext.get().root().configuration();
@@ -422,16 +422,22 @@ std::expected<void, StarException> ChatBubbleManager::render() {
 
   float pixelRatio = m_guiContext.get().interfaceScale();
 
-  auto rendered = m_bubbles.forEach([this, pixelRatio](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
+  auto rendered = m_bubbles.forEach([this, &world, &camera, interpolation, pixelRatio](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
       if (bubble.onscreen) {
-        auto fade = calcDistanceFadeAlpha(state.currentPosition, m_bubbleFadeFunction);
+        auto entity = world.entity(bubble.entity);
+        auto origin = m_camera.screenToWorld(state.idealDestination);
+        if (entity)
+          origin += world.geometry().diff(world.renderPosition(bubble.entity, interpolation), entity->position());
+        auto screenPosition = camera.worldToScreen(origin)
+            + (state.currentPosition - state.idealDestination);
+        auto fade = calcDistanceFadeAlpha(screenPosition, m_bubbleFadeFunction, camera);
         if (!fade) return std::unexpected(std::move(fade.error()));
         int alpha = *fade;
         if (alpha) {
           for (auto const& bubbleImage : bubble.backgroundImages)
-            { auto drawn = drawBubbleImage(state.currentPosition, bubbleImage, pixelRatio, alpha); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+            { auto drawn = drawBubbleImage(screenPosition, bubbleImage, pixelRatio, alpha); if (!drawn) return std::unexpected(std::move(drawn.error())); }
           for (auto const& bubbleText : bubble.bubbleText)
-            { auto drawn = drawBubbleText(state.currentPosition, bubbleText, pixelRatio, alpha, false); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+            { auto drawn = drawBubbleText(screenPosition, bubbleText, pixelRatio, alpha, false); if (!drawn) return std::unexpected(std::move(drawn.error())); }
         }
       }
       return {};
@@ -440,7 +446,10 @@ std::expected<void, StarException> ChatBubbleManager::render() {
 
   for (auto portraitBubble : m_portraitBubbles) {
     if (portraitBubble.onscreen) {
-      Vec2F screenPos = m_camera.worldToScreen(portraitBubble.position + m_bubbleOffset);
+      auto position = portraitBubble.position;
+      if (auto entity = world.entity(portraitBubble.entity))
+        position += world.geometry().diff(world.renderPosition(portraitBubble.entity, interpolation), entity->position());
+      Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
       int frame = 0;
       if (portraitBubble.age <= m_portraitChatterDuration)
         frame = int((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;

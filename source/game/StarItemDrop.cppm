@@ -130,6 +130,8 @@ public:
   [[nodiscard]]
   std::expected<bool, StarException> shouldDestroy() const override;
 
+  std::uint64_t presentationEpoch() const override;
+
   [[nodiscard]]
   std::expected<void, StarException> render(RenderCallback& renderCallback) override;
   [[nodiscard]]

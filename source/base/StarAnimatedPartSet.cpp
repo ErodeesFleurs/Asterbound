@@ -116,6 +116,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
     }
     newPart.activePart.partName = partName;
     newPart.activePart.setAnimationAffineTransform(Mat3F::identity());
+    newPart.presentationPart = newPart.activePart;
     newPart.activePartDirty = true;
     result.m_parts[partName] = std::move(newPart);
   }
@@ -170,6 +171,40 @@ StringList AnimatedPartSet::partNames() const {
   return m_parts.keys();
 }
 
+float AnimatedPartSet::setPresentationInterpolation(float interpolation) const {
+  auto previous = m_presentationInterpolation;
+  m_presentationInterpolation = interpolation < 0 ? -1 : std::clamp(interpolation, 0.f, 1.f);
+  if (m_presentationInterpolation < 0)
+    return previous;
+  for (auto const& pair : m_stateTypes) {
+    pair.second.presentationStateDirty = true;
+    pair.second.presentationStateInitialized = false;
+  }
+  for (auto const& pair : m_parts)
+    pair.second.presentationPartDirty = true;
+  return previous;
+}
+
+std::expected<bool, StarException> AnimatedPartSet::setPresentationState(String const& type, String const& name, bool alwaysStart, bool reverse) {
+  auto entry = m_stateTypes.get(type);
+  if (!entry) return std::unexpected(std::move(entry.error()));
+  auto& stateType = entry->get();
+  auto fresh = freshenActiveState(stateType);
+  if (!fresh) return std::unexpected(std::move(fresh.error()));
+  auto& active = stateType.presentationState;
+  if (active.stateName == name && active.reverse == reverse && !alwaysStart)
+    return false;
+  auto state = stateType.states.get(name);
+  if (!state) return std::unexpected(std::move(state.error()));
+  active.stateName = name;
+  active.timer = 0;
+  active.reverse = reverse;
+  stateType.presentationStateDirty = true;
+  for (auto const& pair : m_parts)
+    pair.second.presentationPartDirty = true;
+  return true;
+}
+
 std::expected<bool, StarException> AnimatedPartSet::setActiveState(String const& stateTypeName, String const& stateName, bool alwaysStart, bool reverse) {
   auto found = m_stateTypes.get(stateTypeName);
   if (!found) return std::unexpected(std::move(found.error()));
@@ -179,6 +214,7 @@ std::expected<bool, StarException> AnimatedPartSet::setActiveState(String const&
     if (!state) return std::unexpected(std::move(state.error()));
     stateType.activeState.stateName = stateName;
     stateType.activeState.timer = 0.0f;
+    stateType.previousTimer = stateType.timerAdvance = 0;
     stateType.activeState.frameProgress = 0.0f;
     stateType.activeState.reverse = reverse;
     stateType.activeStateReference = std::cref(*state->get());
@@ -194,6 +230,7 @@ std::expected<void, StarException> AnimatedPartSet::restartState(String const& n
   auto stateType = m_stateTypes.get(name);
   if (!stateType) return std::unexpected(std::move(stateType.error()));
   stateType->get().activeState.timer = 0.0f;
+  stateType->get().previousTimer = stateType->get().timerAdvance = 0;
   stateType->get().activeStateDirty = true;
   for (auto& pair : m_parts)
     pair.second.activePartDirty = true;
@@ -205,7 +242,7 @@ std::expected<std::reference_wrapper<AnimatedPartSet::ActiveStateInformation con
   if (!stateType) return std::unexpected(std::move(stateType.error()));
   auto fresh = freshenActiveState(stateType->get());
   if (!fresh) return std::unexpected(std::move(fresh.error()));
-  return std::cref(stateType->get().activeState);
+  return std::cref(m_presentationInterpolation >= 0 ? stateType->get().presentationState : stateType->get().activeState);
 }
 
 std::expected<std::reference_wrapper<AnimatedPartSet::ActivePartInformation const>, StarException> AnimatedPartSet::activePart(String const& name) const {
@@ -213,7 +250,7 @@ std::expected<std::reference_wrapper<AnimatedPartSet::ActivePartInformation cons
   if (!part) return std::unexpected(std::move(part.error()));
   auto fresh = freshenActivePart(part->get());
   if (!fresh) return std::unexpected(std::move(fresh.error()));
-  return std::cref(part->get().activePart);
+  return std::cref(m_presentationInterpolation >= 0 ? part->get().presentationPart : part->get().activePart);
 }
 
 std::expected<std::reference_wrapper<AnimatedPartSet::State const>, StarException> AnimatedPartSet::getState(String const& type, String const& name) const {
@@ -237,7 +274,7 @@ std::expected<void, StarException> AnimatedPartSet::forEachActiveState(std::func
   for (auto const& p : m_stateTypes) {
     auto fresh = freshenActiveState(p.second);
     if (!fresh) return std::unexpected(std::move(fresh.error()));
-    auto called = callback(p.first, p.second.activeState);
+    auto called = callback(p.first, m_presentationInterpolation >= 0 ? p.second.presentationState : p.second.activeState);
     if (!called) return std::unexpected(std::move(called.error()));
   }
   return {};
@@ -248,7 +285,7 @@ std::expected<void, StarException> AnimatedPartSet::forEachActivePart(std::funct
   for (auto const& p : m_parts) {
     auto fresh = freshenActivePart(p.second);
     if (!fresh) return std::unexpected(std::move(fresh.error()));
-    auto called = callback(p.first, p.second.activePart);
+    auto called = callback(p.first, m_presentationInterpolation >= 0 ? p.second.presentationPart : p.second.activePart);
     if (!called) return std::unexpected(std::move(called.error()));
   }
   return {};
@@ -281,6 +318,8 @@ std::expected<void, StarException> AnimatedPartSet::update(float dt) {
     auto& stateType = pair.second;
     auto const& state = stateType.activeStateReference->get();
 
+    stateType.previousTimer = stateType.activeState.timer;
+    stateType.timerAdvance = dt;
     stateType.activeState.timer += dt;
     if (stateType.activeState.timer > state.cycle) {
       if (state.animationMode == End) {
@@ -293,6 +332,7 @@ std::expected<void, StarException> AnimatedPartSet::update(float dt) {
         stateType.activeState.stateName = state.transitionState;
         stateType.activeState.timer = 0.0f;
         stateType.activeStateReference = std::cref(*next->get());
+        stateType.previousTimer = stateType.timerAdvance = 0;
       }
     }
 
@@ -324,6 +364,8 @@ std::expected<void, StarException> AnimatedPartSet::finishAnimations() {
       break;
     }
 
+    stateType.previousTimer = stateType.activeState.timer;
+    stateType.timerAdvance = 0;
     stateType.activeStateDirty = true;
   }
 
@@ -346,10 +388,28 @@ std::expected<AnimatedPartSet::AnimationMode, StarException> AnimatedPartSet::st
 }
 
 std::expected<void, StarException> AnimatedPartSet::freshenActiveState(StateType const& stateType) const {
-  if (stateType.activeStateDirty) {
+  bool presentation = m_presentationInterpolation >= 0;
+  auto& dirty = presentation ? stateType.presentationStateDirty : stateType.activeStateDirty;
+  auto& activeState = presentation ? stateType.presentationState : stateType.activeState;
+  if (presentation && !stateType.presentationStateInitialized) {
+    activeState.stateTypeName = stateType.activeState.stateTypeName;
+    activeState.stateName = stateType.activeState.stateName;
+    activeState.reverse = stateType.activeState.reverse;
     auto const& state = stateType.activeStateReference->get();
-    auto& activeState = stateType.activeState;
-
+    activeState.timer = stateType.activeState.timer;
+    if (m_presentationInterpolation < 1) {
+      activeState.timer = stateType.previousTimer + stateType.timerAdvance * m_presentationInterpolation;
+      if (state.animationMode == Loop && state.cycle > 0 && activeState.timer > state.cycle)
+        activeState.timer = std::fmod(activeState.timer, state.cycle);
+      else
+        activeState.timer = std::min(activeState.timer, state.cycle);
+    }
+    stateType.presentationStateInitialized = true;
+  }
+  if (dirty) {
+    auto stateEntry = stateType.states.get(activeState.stateName);
+    if (!stateEntry) return std::unexpected(std::move(stateEntry.error()));
+    auto const& state = *stateEntry->get();
     double progress = (activeState.timer / state.cycle * state.frames);
     activeState.frameProgress = std::fmod(progress, 1);
     activeState.frame = clamp<int>(progress, 0, state.frames - 1);
@@ -389,16 +449,21 @@ std::expected<void, StarException> AnimatedPartSet::freshenActiveState(StateType
       }
     }
 
-    stateType.activeStateDirty = false;
+    dirty = false;
   }
   return {};
 }
 
 std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const& part) const {
-  if (part.activePartDirty) {
-    // First reset all the active part information assuming that no state type
-    // x state match exists.
-    auto& activePart = part.activePart;
+  bool presentation = m_presentationInterpolation >= 0;
+  auto& dirty = presentation ? part.presentationPartDirty : part.activePartDirty;
+  if (dirty) {
+    // Reuse a separate derived cache; never overwrite logical frame data.
+    auto& activePart = presentation ? part.presentationPart : part.activePart;
+    if (presentation)
+      activePart.setAnimationAffineTransform(part.activePartDirty ? part.activePart.animationAffineTransform() : part.activePartBaseTransform);
+    else
+      part.activePartBaseTransform = activePart.animationAffineTransform();
     activePart.activeState = {};
     activePart.properties = part.partProperties;
     activePart.nextProperties = part.partProperties;
@@ -417,17 +482,18 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       if (!partStateType)
         continue;
 
-      auto const& stateName = stateType.activeState.stateName;
+      auto stateResult = activeState(stateTypeName);
+      if (!stateResult) return std::unexpected(std::move(stateResult.error()));
+      auto const& sampledState = stateResult->get();
+      auto const& stateName = sampledState.stateName;
       auto partState = partStateType->get().maybeRef(stateName);
       if (!partState)
         continue;
 
       // If we have a partState match, then set the active state information.
-      auto fresh = freshenActiveState(stateType);
-      if (!fresh) return std::unexpected(std::move(fresh.error()));
-      activePart.activeState = stateType.activeState;
-      unsigned frame = stateType.activeState.frame;
-      unsigned nextFrame = stateType.activeState.nextFrame;
+      activePart.activeState = sampledState;
+      unsigned frame = sampledState.frame;
+      unsigned nextFrame = sampledState.nextFrame;
 
       // Then set the part state data, as well as any part state frame data if
       // the current frame is within the list size.
@@ -526,7 +592,7 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       }
     }
 
-    part.activePartDirty = false;
+    dirty = false;
   }
   return {};
 }

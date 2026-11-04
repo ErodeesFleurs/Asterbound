@@ -615,7 +615,24 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
 
   if (andDie) {
     ClientRenderCallback renderCallback(std::nullopt);
-    auto destroyed = entity->destroy(std::ref(renderCallback));
+    NullRenderCallback hiddenEvents;
+    RenderCallback& events = m_startupHiddenEntities.contains(entityId)
+        ? static_cast<RenderCallback&>(hiddenEvents)
+        : static_cast<RenderCallback&>(renderCallback);
+    // Removal packets can arrive before the next tick's event pass. Drain
+    // pending live events before destroy() contributes its final death effects.
+    auto collected = entity->collectRenderEvents(events);
+    if (!collected) {
+      if (entity->isMaster())
+        return std::unexpected(std::move(collected.error()));
+      auto issue = printException(collected.error(), true);
+      if (!m_entityExceptionsLogged.insert(hashOf(issue)).second)
+        issue = collected.error().what();
+      auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events during removal: {}", entityId, issue);
+      if (!logged)
+        return std::unexpected(std::move(logged.error()));
+    }
+    auto destroyed = entity->destroy(std::ref(events));
     if (!destroyed)
       return std::unexpected(std::move(destroyed.error()));
 
@@ -645,6 +662,8 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
   }
 
   m_entityMap->removeEntity(entityId);
+  m_entityPresentation.remove(entityId);
+  m_hiddenEntityAudio.remove(entityId);
   return entity->uninit();
 }
 
@@ -962,7 +981,35 @@ WorldClientState& WorldClient::clientState() {
   return *m_clientState;
 }
 
-std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) {
+Vec2F WorldClient::renderPosition(EntityId entityId, float interpolation) const {
+  auto entity = this->entity(entityId);
+  if (!entity)
+    return {};
+  if (auto entry = m_entityPresentation.maybeRef(entityId)) {
+    auto const& state = entry->get();
+    if (state.continuous && state.instance.lock() == entity && state.epoch == entity->presentationEpoch())
+      return state.position.sample(m_geometry, interpolation);
+  }
+  return entity->position();
+}
+
+float WorldClient::presentationInterpolation(Entity const& entity, float interpolation) const {
+  if (auto entry = m_entityPresentation.maybeRef(entity.entityId())) {
+    auto const& state = entry->get();
+    if (state.continuous && state.instance.lock().get() == &entity && state.epoch == entity.presentationEpoch())
+      return interpolation;
+  }
+  // A replacement, teleport, or explicit reset has no previous display pose.
+  return 1.0f;
+}
+
+void WorldClient::resetPresentation() {
+  m_entityPresentation.clear();
+  if (m_particles)
+    m_particles->resetPresentation();
+}
+
+std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, float interpolation) {
   if (m_headless) {
     return {};
   }
@@ -982,13 +1029,15 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     m_lightingThreadStarted = true;
   }
   
-  renderData.clear();
+  renderData.prepareFrame();
+  interpolation = std::clamp(interpolation, 0.0f, 1.0f);
   if (!inWorld()) {
+    renderData.entityDrawables.clear();
+    renderData.particles.clear();
     return {};
   }
   
   // If we're dimming the world, then that takes priority
-  m_worldDimTimer.tick(this->root().timing().timestep);
   float dimRatio = m_worldDimTimer.percent();
   
   // Spends 80% of the time at pitch black with 10% ramp up and down
@@ -1009,13 +1058,16 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   m_previewTiles.clear();
   
   renderData.geometry = m_geometry;
+  m_particles->sampleParticles(interpolation, renderData.particles);
   
-  ClientRenderCallback lightingRenderCallback(tileDrawer);
+  ClientRenderCallback lightingRenderCallback(tileDrawer, interpolation, m_presentationTimestep);
   auto result47 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
       
+      lightingRenderCallback.m_offset = self.m_geometry.diff(self.renderPosition(entity->entityId(), interpolation), entity->position());
+      lightingRenderCallback.m_interpolation = self.presentationInterpolation(*entity, interpolation);
       auto result46 = entity->renderLightSources(lightingRenderCallback);
       if (!result46)
         return std::unexpected(std::move(result46.error()));
@@ -1034,7 +1086,10 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     {
       std::lock_guard m_prepLocker(m_lightMapPrepMutex);
       m_pendingLights = std::move(renderLightSources);
-      m_pendingParticleLights = m_particles->lightSources();
+      m_pendingParticleLights.clear();
+      for (auto const& particle : renderData.particles)
+        if (particle.light != Color::Clear)
+          m_pendingParticleLights.append({particle.position, particle.light.toRgbF()});
       m_pendingLightRange = window.padded(1);
       m_pendingLightReady = true;
     }
@@ -1072,19 +1127,6 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   float pulseLevel = 1 - pulseAmount * 0.5 * (std::sin(2 * std::numbers::pi * pulseRate * Time::monotonicMilliseconds() / 1000.0) + 1);
   
   bool inspecting = m_mainPlayer->inspecting();
-  auto result55 = this->root().assets();
-  if (!result55)
-    return std::unexpected(std::move(result55.error()));
-  auto result56 = (std::move(*result55))->json("/highlights.config:inspectionFlickerAmount");
-  if (!result56)
-    return std::unexpected(std::move(result56.error()));
-  auto result57 = (std::move(*result56)).toFloat();
-  if (!result57)
-    return std::unexpected(std::move(result57.error()));
-  auto result58 = this->root().random().randf(1 - (std::move(*result57)), 1);
-  if (!result58)
-    return std::unexpected(std::move(result58.error()));
-  float inspectionFlickerMultiplier = (std::move(*result58));
   
   EntityId playerAimInteractive = NullEntityId;
   {
@@ -1117,12 +1159,18 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       }
     }
   }
+  std::size_t drawableIndex = 0;
   auto result72 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
       
-      ClientRenderCallback renderCallback(tileDrawer);
+      if (drawableIndex == renderData.entityDrawables.size())
+        renderData.entityDrawables.append({});
+      auto& ed = renderData.entityDrawables[drawableIndex++];
+      ClientRenderCallback renderCallback(tileDrawer, self.presentationInterpolation(*entity, interpolation), self.m_presentationTimestep,
+          self.m_geometry.diff(self.renderPosition(entity->entityId(), interpolation), entity->position()));
+      renderCallback.drawableTarget = &ed.layers;
       
       auto rendered = entity->render(renderCallback);
       if (!rendered) {
@@ -1170,8 +1218,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         }
       }
       
-      EntityDrawables ed;
-      for (auto& p : renderCallback.drawables) {
+      for (auto& p : ed.layers) {
         if (directives) {
           int directiveIndex = unsigned(entity->entityId()) % directives->get().size();
           for (auto& d : p.second) {
@@ -1186,7 +1233,6 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           }
         }
       }
-      ed.layers = std::move(renderCallback.drawables);
       
       if (self.m_interactiveHighlightMode || (!inspecting && entity->entityId() == playerAimInteractive)) {
         if (auto interactive = as<InteractiveEntity>(entity)) {
@@ -1201,19 +1247,10 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           if (!result71)
             return std::unexpected(std::move(result71.error()));
           ed.highlightEffect = (std::move(*result71));
-          ed.highlightEffect.level *= inspectionFlickerMultiplier;
+          ed.highlightEffect.level *= self.m_inspectionFlickerMultiplier;
         }
       }
-      renderData.entityDrawables.append(std::move(ed));
       
-      if (directives) {
-        int directiveIndex = unsigned(entity->entityId()) % directives->get().size();
-        for (auto& p : renderCallback.particles) {
-          p.directives.append(directives->get()[directiveIndex]);
-        }
-      }
-      self.m_particles->addParticles(std::move(renderCallback.particles));
-      self.m_samples.appendAll(std::move(renderCallback.audios));
       self.m_previewTiles.appendAll(std::move(renderCallback.previewTiles));
       renderData.overheadBars.appendAll(std::move(renderCallback.overheadBars));
       return {};
@@ -1222,6 +1259,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     });
   if (!result72)
     return std::unexpected(std::move(result72.error()));
+  renderData.entityDrawables.resize(drawableIndex);
   
   auto result73 = this->root().workers();
   if (!result73)
@@ -1299,8 +1337,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     }
   }
   
-  renderData.particles = std::cref(m_particles->particles());
-  this->root().logMap().set("client_render_particle_count", renderData.particles->get().size());
+  this->root().logMap().set("client_render_particle_count", renderData.particles.size());
   
   auto result75 = m_sky->renderData();
   if (!result75)
@@ -1312,11 +1349,6 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     return std::unexpected(std::move(result76.error()));
   auto environmentBiome = (std::move(*result76));
   
-  m_parallaxFadeTimer.tick(this->root().timing().timestep);
-  if (m_parallaxFadeTimer.ready() && m_nextParallax) {
-    m_currentParallax = m_nextParallax;
-    m_nextParallax.reset();
-  }
   
   if (environmentBiome) {
     setParallax(environmentBiome->parallax);
@@ -1393,18 +1425,6 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     }
   }
   
-  double parallaxEpoch = m_sky->epochTime();
-  auto result84 = currentWeatherDomain();
-  if (!result84)
-    return std::unexpected(std::move(result84.error()));
-  float parallaxWind = (std::move(*result84)) == m_weatherDomain ? m_weather->wind() : 0.0f;
-  if (m_lastParallaxWindEpoch && parallaxEpoch >= *m_lastParallaxWindEpoch) {
-    double elapsed = parallaxEpoch - *m_lastParallaxWindEpoch;
-    m_parallaxWindDirectionTime += elapsed * (parallaxWind > 0.0f ? 1.0 : -1.0);
-    m_parallaxWindMagnitudeTime += elapsed * std::abs(parallaxWind);
-    m_parallaxSignedWindTime += elapsed * parallaxWind;
-  }
-  m_lastParallaxWindEpoch = parallaxEpoch;
   
   auto result85 = this->root().functionDatabase();
   if (!result85)
@@ -2069,6 +2089,28 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   if (!inWorld()) {
     return {};
   }
+  m_presentationTimestep = dt;
+  m_worldDimTimer.tick(dt);
+  m_parallaxFadeTimer.tick(dt);
+  if (m_parallaxFadeTimer.ready() && m_nextParallax) {
+    m_currentParallax = m_nextParallax;
+    m_nextParallax.reset();
+  }
+  auto beginPresentation = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+    auto& state = m_entityPresentation[entity->entityId()];
+    if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
+      state.instance = entity;
+      state.epoch = entity->presentationEpoch();
+      state.position.reset(entity->position());
+      state.continuous = false;
+    } else {
+      state.position.advance(entity->position());
+      state.continuous = true;
+    }
+    return {};
+  });
+  if (!beginPresentation)
+    return std::unexpected(std::move(beginPresentation.error()));
   
   auto result153 = this->root().assets();
   if (!result153)
@@ -2237,6 +2279,28 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return std::unexpected(std::move(result167.error()));
   
   if (!m_headless) {
+    auto flickerAmount = assets->json("/highlights.config:inspectionFlickerAmount");
+    if (!flickerAmount)
+      return std::unexpected(std::move(flickerAmount.error()));
+    auto flicker = flickerAmount->toFloat();
+    if (!flicker)
+      return std::unexpected(std::move(flicker.error()));
+    auto flickerSample = this->root().random().randf(1 - *flicker, 1);
+    if (!flickerSample)
+      return std::unexpected(std::move(flickerSample.error()));
+    m_inspectionFlickerMultiplier = *flickerSample;
+    double parallaxEpoch = m_sky->epochTime();
+    auto weatherDomain = currentWeatherDomain();
+    if (!weatherDomain)
+      return std::unexpected(std::move(weatherDomain.error()));
+    float parallaxWind = *weatherDomain == m_weatherDomain ? m_weather->wind() : 0.0f;
+    if (m_lastParallaxWindEpoch && parallaxEpoch >= *m_lastParallaxWindEpoch) {
+      double elapsed = parallaxEpoch - *m_lastParallaxWindEpoch;
+      m_parallaxWindDirectionTime += elapsed * (parallaxWind > 0.0f ? 1.0 : -1.0);
+      m_parallaxWindMagnitudeTime += elapsed * std::abs(parallaxWind);
+      m_parallaxSignedWindTime += elapsed * parallaxWind;
+    }
+    m_lastParallaxWindEpoch = parallaxEpoch;
     if (!m_mainPlayer->isDead()) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
       // desyncs etc
@@ -2291,6 +2355,61 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto result177 = m_particles->update(dt, RectF(particleRegion), m_weather->wind());
     if (!result177)
       return std::unexpected(std::move(result177.error()));
+    // Entity events are born at this completed tick's state. Unlike weather,
+    // they must not integrate/age for the timestep that produced their birth.
+    auto events = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      // The removal path performs the final live-event drain before destroy().
+      // Collectors may synthesize effects, so a queued death must not run both.
+      if (toRemove.contains(entity->entityId()))
+        return {};
+      // Offscreen entities still emit once per tick. Startup-hidden entities
+      // consume their queues without exposing effects before their spawn.
+      bool hidden = m_startupHiddenEntities.contains(entity->entityId());
+      List<std::shared_ptr<AudioInstance>>* deferredLoops = nullptr;
+      if (hidden) {
+        auto& pending = m_hiddenEntityAudio[entity->entityId()];
+        if (pending.instance.lock() != entity) {
+          pending.instance = entity;
+          pending.loops.clear();
+        }
+        deferredLoops = &pending.loops;
+      }
+      NullRenderCallback hiddenEvents(deferredLoops);
+      m_eventRenderCallback.clear();
+      auto collected = entity->collectRenderEvents(hidden
+          ? static_cast<RenderCallback&>(hiddenEvents)
+          : static_cast<RenderCallback&>(m_eventRenderCallback));
+      if (!collected) {
+        if (entity->isMaster())
+          return std::unexpected(std::move(collected.error()));
+        auto issue = printException(collected.error(), true);
+        if (!m_entityExceptionsLogged.insert(hashOf(issue)).second)
+          issue = collected.error().what();
+        auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events: {}", entity->entityId(), issue);
+        if (!logged)
+          return std::unexpected(std::move(logged.error()));
+      }
+      if (hidden)
+        return {};
+      if (auto pending = m_hiddenEntityAudio.maybeTake(entity->entityId())) {
+        if (pending->instance.lock() == entity)
+          for (auto& audio : pending->loops)
+            if (!audio->finished())
+              m_samples.append(std::move(audio));
+      }
+      if (auto const& parameters = m_worldTemplate->worldParameters()) {
+        if (auto const& directives = parameters->globalDirectives; directives && !directives->empty()) {
+          auto index = unsigned(entity->entityId()) % directives->size();
+          for (auto& particle : m_eventRenderCallback.particles)
+            particle.directives.append((*directives)[index]);
+        }
+      }
+      m_particles->addParticles(std::move(m_eventRenderCallback.particles));
+      m_samples.appendAll(std::move(m_eventRenderCallback.audios));
+      return {};
+    });
+    if (!events)
+      return std::unexpected(std::move(events.error()));
     
     {
       auto result178 = currentAmbientNoises();
@@ -2454,6 +2573,30 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   this->root().logMap().set(strf("client_{}_entities",m_subWorldId), m_entityMap->size());
   this->root().logMap().set(strf("client_{}_sectors",m_subWorldId), toString(loadedSectors.size()));
   this->root().logMap().set(strf("client_{}_lua_mem",m_subWorldId), m_luaRoot->luaMemoryUsage());
+  auto endPresentation = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+    auto& state = m_entityPresentation[entity->entityId()];
+    if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
+      state.instance = entity;
+      state.epoch = entity->presentationEpoch();
+      state.position.reset(entity->position());
+      state.continuous = false;
+    } else {
+      // Script-authored setPosition/translate may be continuous movement.
+      // Only unusually large unmarked corrections snap; high-speed entities
+      // retain an allowance derived from their actual velocity.
+      float continuityDistance = 8.0f;
+      if (auto mobile = as<MobileEntity>(entity))
+        continuityDistance = std::max(continuityDistance, 4.0f * dt * mobile->movementController().velocity().magnitude());
+      if (!state.position.finish(entity->position(), m_geometry, continuityDistance)) {
+        entity->resetPresentation();
+        state.epoch = entity->presentationEpoch();
+        state.continuous = false;
+      }
+    }
+    return {};
+  });
+  if (!endPresentation)
+    return std::unexpected(std::move(endPresentation.error()));
   return {};
 }
 
@@ -2882,7 +3025,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
           p.directives.append(directives->get()[directiveIndex]);
         }
       }
-      m_particles->addParticles(hitParticles);
+      m_particles->addParticles(std::move(hitParticles));
     }
   }
   return {};
@@ -3424,6 +3567,8 @@ std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const
 }
 
 std::expected<void, StarException> WorldClient::clearWorld() {
+  resetPresentation();
+  m_hiddenEntityAudio.clear();
   std::optional<StarException> error;
   auto remember = [&](auto result) {
     if (!result) {
@@ -3998,12 +4143,24 @@ std::expected<bool, StarException> WorldClient::handleSecretBroadcast(std::share
 }
 
 
+void WorldClient::ClientRenderCallback::clear() {
+  for (auto& layer : drawables)
+    layer.second.clear();
+  lightSources.clear();
+  particles.clear();
+  audios.clear();
+  previewTiles.clear();
+  overheadBars.clear();
+}
+
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addDrawable(Drawable drawable, EntityRenderLayer renderLayer) {
-  drawables[renderLayer].append(std::move(drawable));
+  drawable.translate(m_offset);
+  (drawableTarget ? *drawableTarget : drawables)[renderLayer].append(std::move(drawable));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addLightSource(LightSource lightSource) {
+  lightSource.translate(m_offset);
   lightSources.append(std::move(lightSource));
   return {};
 }
@@ -4024,6 +4181,7 @@ std::expected<void, StarException> WorldClient::ClientRenderCallback::addTilePre
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addOverheadBar(OverheadBar bar) {
+  bar.entityPosition += m_offset;
   overheadBars.append(std::move(bar));
   return {};
 }

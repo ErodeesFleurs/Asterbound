@@ -130,6 +130,10 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
+  std::uint64_t presentationEpoch() const override;
+
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override;
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderer) override;
 
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderer) override;

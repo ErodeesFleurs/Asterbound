@@ -18,6 +18,7 @@ import star.image;
 import star.bi_map;
 import star.ref_ptr;
 import star.renderer;
+import star.vector;
 import star.listener;
 import star.asset_texture_group;
 
@@ -28,6 +29,8 @@ public:
   DrawablePainter(std::shared_ptr<Renderer> renderer, std::shared_ptr<AssetTextureGroup> textureGroup);
 
   [[nodiscard]] std::expected<void, StarException> drawDrawable(Drawable const& drawable);
+  // Project a borrowed drawable without copying its asset or directive payload.
+  [[nodiscard]] std::expected<void, StarException> drawDrawableProjected(Drawable const& drawable, Vec2F position, float scale, float lineWidthScale);
 
   void cleanup(std::int64_t textureTimeout);
 

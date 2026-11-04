@@ -26,12 +26,34 @@ import star.animation;
 import star.particle;
 import star.drawable;
 import star.game_types;
+import star.world_geometry;
 
 import star.light_source;
 
 namespace Star {
 
 class TileDrawer;
+
+// The two logical endpoints of one display interval. Identity and explicit
+// discontinuities are supplied by the owning world.
+struct PresentationPosition {
+  Vec2F previous;
+  Vec2F current;
+
+  void reset(Vec2F position) { previous = current = position; }
+  void advance(Vec2F position) { previous = current; current = position; }
+  bool finish(Vec2F position, WorldGeometry const& geometry, float maximumContinuousDistance) {
+    if (geometry.diff(position, previous).magnitudeSquared() > maximumContinuousDistance * maximumContinuousDistance) {
+      reset(position);
+      return false;
+    }
+    current = position;
+    return true;
+  }
+  Vec2F sample(WorldGeometry const& geometry, float interpolation) const {
+    return current + geometry.diff(previous, current) * (1.0f - std::clamp(interpolation, 0.0f, 1.0f));
+  }
+};
 
 // Callback interface for entities to produce light sources, particles,
 // drawables, and sounds on render.  Everything added is expected to already be
@@ -41,6 +63,9 @@ public:
   virtual ~RenderCallback();
 
   virtual std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const;
+  virtual float interpolation() const { return 1.0f; }
+  virtual float timestep() const { return 0.0f; }
+
 
   [[nodiscard]] virtual std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> addLightSource(LightSource lightSource) = 0;
@@ -59,10 +84,31 @@ public:
   [[nodiscard]] std::expected<void, StarException> addOverheadBars(List<OverheadBar> bars, Vec2F translate = Vec2F());
 };
 
+// Consume hidden entity events on the same tick as visible entities without
+// replaying an accumulated audio/particle burst when they become visible.
+class NullRenderCallback : public RenderCallback {
+public:
+  explicit NullRenderCallback(List<std::shared_ptr<AudioInstance>>* deferredLoops = nullptr) : m_deferredLoops(deferredLoops) {}
+  std::expected<void, StarException> addDrawable(Drawable, EntityRenderLayer) override { return {}; }
+  std::expected<void, StarException> addLightSource(LightSource) override { return {}; }
+  std::expected<void, StarException> addParticle(Particle) override { return {}; }
+  std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
+    if (m_deferredLoops && audio->loops() != 0)
+      m_deferredLoops->append(std::move(audio));
+    return {};
+  }
+  std::expected<void, StarException> addTilePreview(PreviewTile) override { return {}; }
+  std::expected<void, StarException> addOverheadBar(OverheadBar) override { return {}; }
+private:
+  List<std::shared_ptr<AudioInstance>>* m_deferredLoops;
+};
+
 }
 
 export module star.entity_rendering;
 
 export namespace Star {
   using ::Star::RenderCallback;
+  using ::Star::PresentationPosition;
+  using ::Star::NullRenderCallback;
 }

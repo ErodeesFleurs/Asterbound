@@ -1,6 +1,7 @@
 import std;
 import star.poly;
 import star.world_geometry;
+import star.entity_rendering;
 
 #include "gtest/gtest.h"
 
@@ -48,4 +49,54 @@ TEST(WorldGeometryTest, All) {
   auto overlapArea = geom.polyOverlapArea(shapeC, shapeC2);
   ASSERT_TRUE(overlapArea);
   EXPECT_TRUE(std::fabs(*overlapArea - 4) < 0.0001f);
+}
+
+TEST(WorldGeometryTest, PresentationUsesShortestGeometryWithoutAdvancingState) {
+  WorldGeometry geometry(Vec2U{100, 100});
+  PresentationPosition position;
+  position.reset({99, 5});
+  position.advance({1, 9});
+  EXPECT_EQ(position.sample(geometry, 0.0f), Vec2F(-1, 5));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(0, 7));
+  EXPECT_EQ(position.sample(geometry, 1.0f), Vec2F(1, 9));
+  // Display count and ordering cannot advance either simulation endpoint.
+  EXPECT_EQ(position.sample(geometry, 0.25f), Vec2F(-0.5f, 6));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(0, 7));
+  EXPECT_EQ(position.current, Vec2F(1, 9));
+  EXPECT_EQ(position.previous, Vec2F(99, 5));
+}
+
+TEST(WorldGeometryTest, PresentationDiscontinuitiesCollapseBothEndpoints) {
+  WorldGeometry geometry(Vec2U{100, 100});
+  PresentationPosition position;
+  position.reset({10, 5});
+  position.advance({11, 6});
+  position.reset({60, 40});
+  EXPECT_EQ(position.sample(geometry, 0.0f), Vec2F(60, 40));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(60, 40));
+  EXPECT_EQ(position.sample(geometry, 1.0f), Vec2F(60, 40));
+  position.advance({62, 42});
+  EXPECT_EQ(position.sample(geometry, -1.0f), Vec2F(60, 40));
+  EXPECT_EQ(position.sample(geometry, 2.0f), Vec2F(62, 42));
+}
+
+TEST(WorldGeometryTest, PresentationCorrectionPolicyPreservesContinuousMovement) {
+  WorldGeometry geometry(Vec2U{1000, 100});
+  PresentationPosition position;
+  position.reset({99, 5});
+  position.advance({99, 5});
+  EXPECT_TRUE(position.finish({101, 5}, geometry, 8.0f));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(100, 5));
+  position.advance({101, 5});
+  EXPECT_FALSE(position.finish({301, 5}, geometry, 8.0f));
+  EXPECT_EQ(position.sample(geometry, 0.0f), Vec2F(301, 5));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(301, 5));
+  // The world supplies a larger speed-derived allowance to fast projectiles.
+  position.advance({301, 5});
+  EXPECT_TRUE(position.finish({321, 5}, geometry, 80.0f));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(311, 5));
+  position.reset({999, 5});
+  position.advance({999, 5});
+  EXPECT_TRUE(position.finish({1, 5}, geometry, 8.0f));
+  EXPECT_EQ(position.sample(geometry, 0.5f), Vec2F(0, 5));
 }

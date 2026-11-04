@@ -43,11 +43,19 @@ function patch(config)
   for i = 1, 50 do config.cameraSpeedList[i] = i / 10 end
 
   -- Create the interface scale widgets
-  shift(clone(layout, "zoomLabel", "interfaceScaleLabel"), 0, 28).value = "INTERFACE SCALE"
-  shift(clone(layout, "zoomSlider", "interfaceScaleSlider"), 0, 28)
-  shift(clone(layout, "zoomValueLabel", "interfaceScaleValueLabel"), 0, 28)
+  shift(clone(layout, "zoomLabel", "interfaceScaleLabel"), 0, 56).value = "INTERFACE SCALE"
+  shift(clone(layout, "zoomSlider", "interfaceScaleSlider"), 0, 56)
+  shift(clone(layout, "zoomValueLabel", "interfaceScaleValueLabel"), 0, 56)
   config.interfaceScaleList = {0} -- 0 = AUTO!
   for i = 1, 17 do config.interfaceScaleList[i + 1] = 0.75 + i / 4 end
+
+  -- One native slider row for presentation-only FPS limits.
+  local fpsLabel = shift(clone(layout, "zoomLabel", "renderFpsLabel"), 49, 28)
+  fpsLabel.value = "RENDER FPS LIMIT"
+  local fpsSlider = shift(clone(layout, "zoomSlider", "renderFpsSlider"), 0, 28)
+  fpsSlider.gridImage = layout.resSlider.gridImage
+  shift(clone(layout, "zoomValueLabel", "renderFpsValueLabel"), 82, 28)
+  config.renderFpsList = {0, 30, 60, 75, 90, 120, 144, 165, 180, 240, 360}
 
   -- shift up all checkboxes
   for _,k in next, {"fullscreen","borderless","monochrome","interactiveHighlight","speechBubble","textureLimit","multiTexture"} do
@@ -67,14 +75,17 @@ function patch(config)
   -- Create HDR toggle
   shift(clone(layout, "multiTextureLabel", "hdrLabel"), 0, -22).value = "HDR"
   shift(clone(layout, "multiTextureCheckbox", "hdrCheckbox"), 0, -22)
+  -- VSync is staged alongside the render limit; existing live toggles stay live.
+  shift(clone(layout, "hdrLabel", "vsyncLabel"), 98).value = "VSYNC"
+  shift(clone(layout, "hdrCheckbox", "vsyncCheckbox"), 99)
 
   -- Create shader menu button
   shift(moveto(clone(layout, "accept", "showShadersMenu"), layout.interfaceScaleSlider), 112, -2).caption = "Shaders"
 
 
-  shift(layout.title, 0, 24+upshift)
-  shift(layout.resLabel, 0, 28+upshift)
-  shift(layout.resSlider, 0, 28+upshift)
-  shift(layout.resValueLabel, 0, 28+upshift)
+  shift(layout.title, 0, 52+upshift)
+  shift(layout.resLabel, 0, 56+upshift)
+  shift(layout.resSlider, 0, 56+upshift)
+  shift(layout.resValueLabel, 0, 56+upshift)
   return config
 end

@@ -768,7 +768,28 @@ if (result1225->get().isClient())
   return {};
 }
 
+std::uint64_t Vehicle::presentationEpoch() const {
+  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+}
+
+std::expected<void, StarException> Vehicle::collectRenderEvents(RenderCallback& renderer) {
+  auto&& result1190 = m_networkedAnimatorDynamicTarget.pullNewAudios();
+auto result1191 = renderer.addAudios(result1190);
+if (!result1191) return std::unexpected(std::move(result1191.error()));
+  auto&& result1192 = m_networkedAnimatorDynamicTarget.pullNewParticles();
+auto result1193 = renderer.addParticles(result1192);
+if (!result1193) return std::unexpected(std::move(result1193.error()));
+  auto&& result1196 = m_scriptedAnimator.pullNewAudios();
+auto result1197 = renderer.addAudios(result1196);
+if (!result1197) return std::unexpected(std::move(result1197.error()));
+  auto&& result1198 = m_scriptedAnimator.pullNewParticles();
+auto result1199 = renderer.addParticles(result1198);
+if (!result1199) return std::unexpected(std::move(result1199.error()));
+  return {};
+}
+
 std::expected<void, StarException> Vehicle::render(RenderCallback& renderer) {
+  auto sample = m_networkedAnimator->sample(renderer.interpolation());
   auto result1187 = m_networkedAnimator->drawablesWithZLevel(position());
 if (!result1187) return std::unexpected(std::move(result1187.error()));
 for (auto& drawable : std::move(*result1187)) {
@@ -784,12 +805,6 @@ if (!result1189) return std::unexpected(std::move(result1189.error()));
 }
   }
 
-  auto&& result1190 = m_networkedAnimatorDynamicTarget.pullNewAudios();
-auto result1191 = renderer.addAudios(result1190);
-if (!result1191) return std::unexpected(std::move(result1191.error()));
-  auto&& result1192 = m_networkedAnimatorDynamicTarget.pullNewParticles();
-auto result1193 = renderer.addParticles(result1192);
-if (!result1193) return std::unexpected(std::move(result1193.error()));
 
   auto&& result1194 = m_scriptedAnimator.drawables();
 for (auto drawablePair : result1194)
@@ -797,16 +812,11 @@ for (auto drawablePair : result1194)
 auto result1195 = renderer.addDrawable(drawablePair.first, drawablePair.second.value_or(renderLayer(VehicleLayer::Front)));
 if (!result1195) return std::unexpected(std::move(result1195.error()));
 }
-  auto&& result1196 = m_scriptedAnimator.pullNewAudios();
-auto result1197 = renderer.addAudios(result1196);
-if (!result1197) return std::unexpected(std::move(result1197.error()));
-  auto&& result1198 = m_scriptedAnimator.pullNewParticles();
-auto result1199 = renderer.addParticles(result1198);
-if (!result1199) return std::unexpected(std::move(result1199.error()));
   return {};
 }
 
 std::expected<void, StarException> Vehicle::renderLightSources(RenderCallback& renderer) {
+  auto sample = m_networkedAnimator->sample(renderer.interpolation());
   auto result1183 = m_networkedAnimator->lightSources(position());
 if (!result1183) return std::unexpected(std::move(result1183.error()));
 auto result1184 = renderer.addLightSources(std::move(*result1183));
@@ -1180,6 +1190,7 @@ MovementController& Vehicle::movementController() {
 }
 
 void Vehicle::setPosition(Vec2F const& position) {
+  resetPresentation();
   m_movementController->setPosition(position);
 }
 

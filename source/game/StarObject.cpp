@@ -880,21 +880,36 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   return {};
 }
 
-std::expected<void, StarException> Object::render(RenderCallback& renderCallback) {
-  auto operation1 = renderParticles(renderCallback);
-  if (!operation1)
-    return std::unexpected(std::move(operation1.error()));
-  auto operation2 = renderSounds(renderCallback);
-  if (!operation2)
-    return std::unexpected(std::move(operation2.error()));
+std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& renderCallback) {
   for (auto const& pair : m_imageKeys)
     m_networkedAnimator->setGlobalTag(pair.first, pair.second);
+  auto shake = computeDamageShake();
+  if (!shake)
+    return std::unexpected(std::move(shake.error()));
+  m_presentationDamageShake = *shake;
+  auto operation1 = collectParticles(renderCallback);
+  if (!operation1)
+    return std::unexpected(std::move(operation1.error()));
+  auto operation2 = collectSounds(renderCallback);
+  if (!operation2)
+    return std::unexpected(std::move(operation2.error()));
   auto operation3 = renderCallback.addAudios(m_networkedAnimatorDynamicTarget.pullNewAudios());
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
   auto operation4 = renderCallback.addParticles(m_networkedAnimatorDynamicTarget.pullNewParticles());
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
+  auto operation8 = renderCallback.addParticles(m_scriptedAnimator.pullNewParticles());
+  if (!operation8)
+    return std::unexpected(std::move(operation8.error()));
+  auto operation9 = renderCallback.addAudios(m_scriptedAnimator.pullNewAudios());
+  if (!operation9)
+    return std::unexpected(std::move(operation9.error()));
+  return {};
+}
+
+std::expected<void, StarException> Object::render(RenderCallback& renderCallback) {
+  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
   if (!m_networkedAnimator->constParts().empty()) {
     auto shakeResult = damageShake();
     if (!shakeResult)
@@ -922,16 +937,11 @@ std::expected<void, StarException> Object::render(RenderCallback& renderCallback
     if (!operation7)
       return std::unexpected(std::move(operation7.error()));
   }
-  auto operation8 = renderCallback.addParticles(m_scriptedAnimator.pullNewParticles());
-  if (!operation8)
-    return std::unexpected(std::move(operation8.error()));
-  auto operation9 = renderCallback.addAudios(m_scriptedAnimator.pullNewAudios());
-  if (!operation9)
-    return std::unexpected(std::move(operation9.error()));
   return {};
 }
 
 std::expected<void, StarException> Object::renderLightSources(RenderCallback& renderCallback) {
+  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
   auto operation1 = renderLights(renderCallback);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
@@ -2435,7 +2445,7 @@ std::expected<void, StarException> Object::renderLights(RenderCallback& renderCa
   return renderCallback.addLightSources(lights);
 }
 
-std::expected<void, StarException> Object::renderParticles(RenderCallback& renderCallback) {
+std::expected<void, StarException> Object::collectParticles(RenderCallback& renderCallback) {
   if (!inWorld())
     return {};
   if (auto orientation = currentOrientation()) {
@@ -2471,7 +2481,7 @@ std::expected<void, StarException> Object::renderParticles(RenderCallback& rende
   return {};
 }
 
-std::expected<void, StarException> Object::renderSounds(RenderCallback& renderCallback) {
+std::expected<void, StarException> Object::collectSounds(RenderCallback& renderCallback) {
   if (m_soundEffectEnabled.get()) {
     if (!m_config->soundEffect.empty() && (!m_soundEffect || m_soundEffect->finished())) {
       auto assetsResult = root().assets();
@@ -2514,6 +2524,10 @@ List<std::shared_ptr<ObjectOrientation>> const& Object::getOrientations() const 
 }
 
 std::expected<Vec2F, StarException> Object::damageShake() const {
+  return m_presentationDamageShake;
+}
+
+std::expected<Vec2F, StarException> Object::computeDamageShake() const {
   if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damageProtected()) {
     auto xResult = root().random().randf(-1, 1);
     if (!xResult)

@@ -131,6 +131,8 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+
   [[nodiscard]] virtual std::expected<void, StarException> render(RenderCallback& renderCallback) override;
 
   [[nodiscard]] virtual std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
@@ -276,14 +278,16 @@ private:
 
   EntityRenderLayer renderLayer() const;
 
-  // Base class render() simply calls all of these in turn.
+  // Lights are sampled for display; emissions are collected once per logic tick.
   [[nodiscard]] std::expected<void, StarException> renderLights(RenderCallback& renderCallback) const;
-  [[nodiscard]] std::expected<void, StarException> renderParticles(RenderCallback& renderCallback);
-  [[nodiscard]] std::expected<void, StarException> renderSounds(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectParticles(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectSounds(RenderCallback& renderCallback);
 
   List<std::shared_ptr<ObjectOrientation>> const& getOrientations() const;
 
   [[nodiscard]] std::expected<Vec2F, StarException> damageShake() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> computeDamageShake() const;
+  Vec2F m_presentationDamageShake;
 
   [[nodiscard]] std::expected<void, StarException> checkLiquidBroken();
   GameTimer m_liquidCheckTimer;

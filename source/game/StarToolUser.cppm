@@ -66,7 +66,7 @@ public:
   ItemDescriptor primaryHandItemDescriptor() const;
   ItemDescriptor altHandItemDescriptor() const;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<void, StarException> effects(EffectEmitter& emitter) const;
   [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const;
 
@@ -78,7 +78,7 @@ public:
   [[nodiscard]] std::expected<List<Drawable>, StarException> renderObjectPreviews(Vec2F aimPosition, Direction walkingDirection, bool inToolRange, Color favoriteColor);
   // Returns the facing override direction if there is one.
   [[nodiscard]] std::expected<std::optional<Direction>, StarException> setupHumanoidHandItems(Humanoid& humanoid, Vec2F position, Vec2F aimPosition) const;
-  [[nodiscard]] std::expected<void, StarException> setupHumanoidHandItemDrawables(Humanoid& humanoid) const;
+  [[nodiscard]] std::expected<void, StarException> setupHumanoidHandItemDrawables(Humanoid& humanoid, float interpolation = 1.0f) const;
 
   [[nodiscard]] std::expected<Vec2F, StarException> armPosition(Humanoid const& humanoid, ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset) const;
   [[nodiscard]] std::expected<Vec2F, StarException> handOffset(Humanoid const& humanoid, ToolHand hand, Direction facingDirection) const;
@@ -98,6 +98,8 @@ public:
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const;
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const;
 
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback);
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback, bool inToolRange, bool shifting, EntityRenderLayer renderLayer);
 
   [[nodiscard]] std::expected<void, StarException> setItems(std::shared_ptr<Item> primaryHandItem, std::shared_ptr<Item> altHandItem);
@@ -112,6 +114,7 @@ private:
   template <typename> friend class NetElementTop;
   explicit ToolUser(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();
+  void setupHumanoidHandItemPose(Humanoid& humanoid) const;
 
   class NetItem : public NetElement {
   public:

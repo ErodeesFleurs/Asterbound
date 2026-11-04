@@ -15,6 +15,7 @@ import star.thread;
 import star.directives;
 import star.asset_path;
 import star.animation;
+import star.world_geometry;
 
 import star.vector;
 namespace Star {
@@ -70,6 +71,25 @@ struct Particle {
   [[nodiscard]] std::expected<void, StarException> update(Root& root, float dt, Vec2F const& wind = Vec2F());
 
   bool dead() const;
+
+  struct PresentationState {
+    Vec2F position;
+    Vec2F velocity;
+    float rotation;
+    float size;
+    Color color;
+    Color light;
+    float timeToLive;
+    Type type;
+    bool destructionSet;
+    std::optional<Animation::PlaybackState> animation;
+  };
+
+  PresentationState presentationState() const;
+  // Writes only display state. Payload is copied once per particle identity,
+  // not once per display frame; simulation and animation events are untouched.
+  void samplePresentation(Particle const& current, PresentationState const& previous,
+      WorldGeometry const& geometry, float interpolation, float timestep, std::uint64_t identity);
 
   // Apply random variance to this particle based on a "variance" particle that
   // contains the maximum amount of variance for each field.
@@ -133,6 +153,8 @@ struct Particle {
   bool trail = false;
 
   std::optional<Animation> animation;
+  private:
+    std::uint64_t m_presentationIdentity = 0;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Particle const& particle);

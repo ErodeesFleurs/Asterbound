@@ -93,6 +93,8 @@ private:
   List<float> m_interfaceScaleList;
   List<float> m_zoomList;
   List<float> m_cameraSpeedList;
+  List<double> m_renderFpsPresets;
+  List<double> m_renderFpsList;
 
   JsonObject m_localChanges;
   

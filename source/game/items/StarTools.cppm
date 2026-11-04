@@ -201,8 +201,7 @@ public:
 
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> drawables() const override;
-  [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  bool beamActive() const override;
 
   void setEnd(EndType type) override;
 
@@ -247,8 +246,7 @@ public:
   virtual void setEnd(EndType type) override;
   [[nodiscard]]
   std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
-  [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  bool beamActive() const override;
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
 
@@ -310,8 +308,7 @@ public:
   std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
   [[nodiscard]]
   std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
-  [[nodiscard]]
-  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  bool beamActive() const override;
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
 

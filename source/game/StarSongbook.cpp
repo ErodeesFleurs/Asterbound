@@ -292,7 +292,7 @@ std::expected<void, StarException> Songbook::playback() {
   return {};
 }
 
-std::expected<void, StarException> Songbook::render(RenderCallback& renderCallback) {
+std::expected<void, StarException> Songbook::collectRenderEvents(RenderCallback& renderCallback) {
   for (auto& audio : m_pendingAudio) {
     auto added = renderCallback.addAudio(audio);
     if (!added)

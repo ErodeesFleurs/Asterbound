@@ -122,6 +122,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeMovementControllerCa
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<bool, bool>("atWorldLimit", std::bind(&MovementController::atWorldLimit, std::ref(movementController), std::placeholders::_1)); !registration)
     return std::unexpected(std::move(registration.error()));
+  if (auto registration = callbacks.registerCallbackWithSignature<void>(
+      "resetPresentation", std::bind(&MovementController::resetPresentation, std::ref(movementController))); !registration)
+    return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<void, Vec2F>(
       "setPosition", std::bind(&MovementController::setPosition, std::ref(movementController), std::placeholders::_1)); !registration)
     return std::unexpected(std::move(registration.error()));

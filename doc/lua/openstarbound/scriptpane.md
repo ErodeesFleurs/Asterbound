@@ -154,6 +154,20 @@ cleared. The usual `init`, `update(dt)`, `uninit`, `displayed`, and `dismissed`
 hooks remain available. Define functions at script top level and use bindings in
 `init`, after callback tables have been installed.
 
+Simulation updates and display frames are scheduled independently. `render()` can
+run repeatedly without an intervening `update(dt)`, and several updates can
+precede one render. Advance timers, mutate gameplay state and consume one-shot
+effects in `update`, not in `render`. Render hooks should sample retained state
+and rebuild drawing commands. For cosmetic randomness, use a separately seeded
+private generator; unseeded gameplay-backed `sb` random calls still advance the
+gameplay stream.
+
+ImGui widgets must be rebuilt inside the display `render()` hook, even on frames
+with no simulation update. Native ImGui bindings reject calls outside the render
+scope. The engine owns frame begin/end; scripts must not end the frame.
+Queue gameplay intents from ImGui interactions for the next `update` rather than
+making gameplay progress depend on how often the window is drawn.
+
 `dismissed()` is a true presentation-removal hook. Asset/engine reload and
 centralized capability replacement run `uninit()` without issuing a false
 `dismissed()` or removing surviving panes from the native display stack.

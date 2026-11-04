@@ -378,13 +378,17 @@ std::expected<void, StarException> TestUniverse::update(unsigned times) {
   return {};
 }
 
+std::shared_ptr<WorldClient> TestUniverse::worldClient() const {
+  return m_client ? m_client->worldClient() : nullptr;
+}
+
 std::expected<List<Drawable>, StarException> TestUniverse::currentClientDrawables() {
   WorldRenderData renderData;
   auto worldClient = m_client->worldClient();
   if (!worldClient)
     return std::unexpected(StarException("Test player has no world to render"));
   worldClient->centerClientWindowOnPlayer(m_clientWindowSize);
-  auto rendered = worldClient->render(renderData, 0, std::nullopt);
+  auto rendered = worldClient->render(renderData, 0, std::nullopt, 1.0f);
   if (!rendered)
     return std::unexpected(std::move(rendered.error()));
 

@@ -759,9 +759,10 @@ const DirectivesGroup& StatusController::parentDirectives() const {
   return m_parentDirectives.get();
 }
 
-std::expected<List<Drawable>, StarException> StatusController::drawables() const {
+std::expected<List<Drawable>, StarException> StatusController::drawables(float interpolation) const {
   List<Drawable> output;
   for (auto const& animator : m_effectAnimators.netElements()) {
+    auto sample = animator->animator->sample(interpolation);
     auto values = animator->animator->drawables(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.appendAll(std::move(*values));
@@ -769,9 +770,10 @@ std::expected<List<Drawable>, StarException> StatusController::drawables() const
   return output;
 }
 
-std::expected<List<LightSource>, StarException> StatusController::lightSources() const {
+std::expected<List<LightSource>, StarException> StatusController::lightSources(float interpolation) const {
   List<LightSource> output;
   for (auto const& animator : m_effectAnimators.netElements()) {
+    auto sample = animator->animator->sample(interpolation);
     auto values = animator->animator->lightSources(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.appendAll(std::move(*values));

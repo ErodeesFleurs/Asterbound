@@ -289,7 +289,7 @@ std::expected<void, StarException> WirePane::renderWire(Vec2F from, Vec2F to, Co
   to = m_worldPainter->camera().worldToScreen(to);
 
   auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(context().root().random().nrandf(dev, max), min, max);
+    return clamp<float>(context().root().presentationRandom().nrandf(dev, max), min, max);
   };
 
   float lineThickness = m_worldPainter->camera().pixelRatio() * rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);

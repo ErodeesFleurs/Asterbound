@@ -95,6 +95,10 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
+  std::uint64_t presentationEpoch() const override;
+
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
   
   MovementController& movementController() override;
@@ -123,6 +127,8 @@ private:
   RectF m_collisionRect;
   RectF m_boundingBox;
   float m_rotationRate;
+  // Actual unwrapped angular travel preserves fast authored falling spins.
+  float m_presentationRotationTravel = 0.0f;
   float m_rotationFallThreshold;
   float m_rotationCap;
   List<PlantDropPiece> m_pieces;

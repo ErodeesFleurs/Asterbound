@@ -175,7 +175,7 @@ public:
 
   // Render things e.g. quest indicators that should be drawn in the world
   // behind interface e.g. chat bubbles
-  [[nodiscard]] std::expected<void, StarException> renderInWorldElements();
+  [[nodiscard]] std::expected<void, StarException> renderInWorldElements(float interpolation);
   [[nodiscard]] std::expected<void, StarException> render();
 
   Vec2F cursorWorldPosition() const;
@@ -304,6 +304,8 @@ private:
 
   GameTimer m_debugSpatialClearTimer;
   GameTimer m_debugMapClearTimer;
+  bool m_debugSpatialClearDue = false;
+  bool m_debugMapClearDue = false;
   RectF m_debugTextRect{RectF::null()};
 
   std::unique_ptr<NameplatePainter> m_nameplatePainter;

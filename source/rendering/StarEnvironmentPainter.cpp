@@ -99,7 +99,7 @@ Vec3B const EnvironmentPainter::RayColor = Vec3B(255, 255, 200);
 
 EnvironmentPainter::EnvironmentPainter(Root& root, std::shared_ptr<Renderer> renderer)
   : m_root(root), m_renderer(std::move(renderer)), m_timer(0),
-    m_rayPerlin(1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2.0f, 2.0f, root.random().randu64()) {}
+    m_rayPerlin(1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2.0f, 2.0f, root.presentationRandom().randu64()) {}
 
 std::expected<std::shared_ptr<EnvironmentPainter>, StarException> EnvironmentPainter::create(Root& root, std::shared_ptr<Renderer> renderer) {
   auto textureGroup = renderer->createTextureGroup(TextureGroupSize::Large);
@@ -618,7 +618,7 @@ std::expected<void, StarException> EnvironmentPainter::setupStars(SkyRenderData 
   if (!starCountJson) return std::unexpected(std::move(starCountJson.error()));
   auto starCount = jsonToVec2I(*starCountJson);
   if (!starCount) return std::unexpected(std::move(starCount.error()));
-  auto starGenerator = std::make_shared<Random2dPointGenerator<std::pair<std::size_t, float>>>(m_root.random(), sky.skyParameters.seed, *starCellSize, *starCount);
+  auto starGenerator = std::make_shared<Random2dPointGenerator<std::pair<std::size_t, float>>>(m_root.presentationRandom(), sky.skyParameters.seed, *starCellSize, *starCount);
   auto debrisFields = sky.settings.queryArray("spaceDebrisFields");
   if (!debrisFields) return std::unexpected(std::move(debrisFields.error()));
   decltype(m_debrisGenerators) debrisGenerators;
@@ -631,7 +631,7 @@ std::expected<void, StarException> EnvironmentPainter::setupStars(SkyRenderData 
     auto count = jsonToVec2I(*countJson);
     if (!count) return std::unexpected(std::move(count.error()));
     std::uint64_t seed = staticRandomU64(sky.skyParameters.seed, i, "DebrisFieldSeed");
-    debrisGenerators[i] = std::make_shared<Random2dPointGenerator<std::pair<String, float>, double>>(m_root.random(), seed, *cellSize, *count);
+    debrisGenerators[i] = std::make_shared<Random2dPointGenerator<std::pair<String, float>, double>>(m_root.presentationRandom(), seed, *cellSize, *count);
   }
   m_starTextures = std::move(textures);
   m_starGenerator = std::move(starGenerator);

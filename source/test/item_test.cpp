@@ -56,6 +56,17 @@ import star.object_database;
 import star.damage_types;
 import star.light_source;
 
+import star.beam_item;
+import star.casting;
+import star.client_context;
+import star.entity_rendering;
+import star.fireable_item;
+import star.game_types;
+import star.particle;
+import star.tool_user;
+import star.uuid;
+import star.vector;
+import star.world_server;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
@@ -1115,6 +1126,149 @@ end
   ASSERT_TRUE(marker);
   EXPECT_EQ(marker->toString(), "LeafOwner");
 });
+
+const GameTestRegistration beamPresentationBoundary(
+  "ItemTest", "BeamTransitionsBelongToTicksNotDisplaySampling", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = fixture.rootSettings();
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto createdRoot = Root::create(std::move(settings));
+    ASSERT_TRUE(createdRoot);
+    auto& root = **createdRoot;
+    auto storage = File::ephemeralFile(root.random());
+    ASSERT_TRUE(storage);
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world) << world.error().what();
+    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    (*world)->setSpawningEnabled(false);
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto made = (*factory)->create();
+    ASSERT_TRUE(made);
+    auto& player = **made;
+    ASSERT_TRUE(player.finalizeCreation());
+    auto uuid = player.uuid();
+    ASSERT_TRUE(uuid);
+    auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
+    ASSERT_TRUE(context);
+    player.setClientContext(*context);
+    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
+    auto uninitPlayer = finally([&] { EXPECT_TRUE(player.uninit()); });
+    ASSERT_TRUE(player.refreshHumanoid());
+    Vec2F const origin(1024, 1024);
+    ASSERT_TRUE(player.moveTo(origin));
+    auto tools = ToolUser::create(root);
+    ASSERT_TRUE(tools);
+    ASSERT_TRUE((*tools)->init(player));
+    auto uninitTools = finally([&] { EXPECT_TRUE((*tools)->uninit()); });
+    auto database = root.itemDatabase();
+    ASSERT_TRUE(database);
+    auto item = inventoryTestItem(**database, "painttool");
+    ASSERT_TRUE(item);
+    auto beam = as<BeamItem>(item->get());
+    ASSERT_TRUE(beam);
+    auto fireable = as<FireableItem>(item->get());
+    ASSERT_TRUE(fireable);
+
+    struct Events : NullRenderCallback {
+      std::vector<std::tuple<Vec2F, Vec2F, Color>> particles;
+      std::expected<void, StarException> addParticle(Particle particle) override {
+        if (particle.type == Particle::Type::Ember && particle.timeToLive == 0.25f)
+          particles.emplace_back(particle.position, particle.velocity, particle.color);
+        return {};
+      }
+    };
+    NullRenderCallback discard;
+    std::vector<std::tuple<Vec2F, Vec2F, Color>> baseline;
+    std::uint64_t baselineRandom = 0;
+    constexpr float dt = 1.f / 60;
+    for (unsigned displayCalls : {0u, 1u, 7u}) {
+      SCOPED_TRACE(displayCalls);
+      ASSERT_TRUE((*tools)->setItems({}, {}));
+      ASSERT_TRUE((*tools)->setItems(*item, {}));
+      beam->setRange(8);
+      player.aim(origin + Vec2F(2, 0));
+      // Equipping deliberately triggers the real item's cooldown. Advance
+      // fixed ticks through it before requiring a visible painting beam.
+      unsigned equipTicks = (unsigned)std::ceil(fireable->cooldownTime() / dt) + 1;
+      for (unsigned i = 0; i != equipTicks; ++i)
+        ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      auto warm = beam->nonRotatedDrawables();
+      ASSERT_TRUE(warm);
+      ASSERT_FALSE(warm->empty());
+      ASSERT_TRUE(player.collectRenderEvents(discard));
+
+      // This private Root has no UniverseServer/background simulation threads.
+      constexpr std::uint64_t seed = 0x4245414d5449434b;
+      root.random().init(seed);
+      RandomSource untouched(seed);
+      for (unsigned i = 0; i != displayCalls; ++i) {
+        auto sampled = beam->nonRotatedDrawables();
+        ASSERT_TRUE(sampled);
+        EXPECT_FALSE(sampled->empty());
+      }
+      EXPECT_EQ(root.random().randu64(), untouched.randu64());
+
+      // Changing input is not itself a beam tick. Display sampling must neither
+      // observe the future transition nor enqueue its leftovers.
+      player.aim(origin + Vec2F(20, 0));
+      for (unsigned i = 0; i != displayCalls; ++i) {
+        auto sampled = beam->nonRotatedDrawables();
+        ASSERT_TRUE(sampled);
+        EXPECT_FALSE(sampled->empty());
+      }
+      Events events;
+      ASSERT_TRUE(player.collectRenderEvents(events));
+      EXPECT_TRUE(events.particles.empty());
+      EXPECT_EQ(root.random().randu64(), untouched.randu64());
+
+      ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      for (unsigned i = 0; i != displayCalls; ++i) {
+        auto sampled = beam->nonRotatedDrawables();
+        ASSERT_TRUE(sampled);
+        EXPECT_TRUE(sampled->empty());
+      }
+      ASSERT_TRUE(player.collectRenderEvents(events));
+      ASSERT_FALSE(events.particles.empty());
+      for (auto const& particle : events.particles) {
+        EXPECT_GT(std::get<0>(particle)[0], origin[0] - 8);
+        EXPECT_GT(std::get<0>(particle)[1], origin[1] - 8);
+      }
+      auto count = events.particles.size();
+      ASSERT_TRUE(player.collectRenderEvents(events));
+      EXPECT_EQ(events.particles.size(), count);
+      ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      ASSERT_TRUE(player.collectRenderEvents(events));
+      EXPECT_EQ(events.particles.size(), count);
+      auto nextRandom = root.random().randu64();
+      if (displayCalls == 0) {
+        baseline = events.particles;
+        baselineRandom = nextRandom;
+      } else {
+        EXPECT_EQ(events.particles, baseline);
+        EXPECT_EQ(nextRandom, baselineRandom);
+      }
+
+      // A hidden tick clears the prior visible range state, not a deferred
+      // transition waiting for a later display/reveal.
+      player.aim(origin + Vec2F(2, 0));
+      ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      (*tools)->suppressItems(true);
+      player.aim(origin + Vec2F(20, 0));
+      ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      (*tools)->suppressItems(false);
+      ASSERT_TRUE((*tools)->tick(dt, false, {}));
+      Events revealed;
+      ASSERT_TRUE(player.collectRenderEvents(revealed));
+      EXPECT_TRUE(revealed.particles.empty());
+    }
+  });
 
 const GameTestRegistration blueprintLearning(
   "ItemTest", "BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState", [](GameTest& fixture) {

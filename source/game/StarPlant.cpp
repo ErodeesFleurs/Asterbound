@@ -1244,16 +1244,20 @@ void Plant::calcBoundBox() {
   m_metaBoundBox = RectF(boundBox.min() - Vec2F(1, 1), boundBox.max() + Vec2F(2, 2));
 }
 
-float Plant::branchRotation(float xPos, float rotoffset) const {
-  if (!inWorld() || m_windLevel == 0.0f)
+float Plant::branchRotation(float xPos, float rotoffset, float interpolation) const {
+  if (!inWorld() || (m_windLevel == 0.0f && m_previousWindLevel == 0.0f))
     return 0.0f;
 
-  float intensity = std::fabs(m_windLevel);
+  float windLevel = std::lerp(m_previousWindLevel, m_windLevel, std::clamp(interpolation, 0.0f, 1.0f));
+  float intensity = std::fabs(windLevel);
 
-  return std::copysign(0.00117f, m_windLevel) * (std::sin(m_windTime + rotoffset + xPos / 10.0f) * intensity - intensity / 300.0f);
+  float windTime = m_windTime + std::remainder(m_previousWindTime - m_windTime, 628.32f) * (1.0f - std::clamp(interpolation, 0.0f, 1.0f));
+  return std::copysign(0.00117f, windLevel) * (std::sin(windTime + rotoffset + xPos / 10.0f) * intensity - intensity / 300.0f);
 }
 
 std::expected<void, StarException> Plant::update(float dt, std::uint64_t) {
+  m_previousWindTime = m_windTime;
+  m_previousWindLevel = m_windLevel;
   m_windTime += dt;
   m_windTime = std::fmod(m_windTime, 628.32f);
   auto result621 = world();
@@ -1278,37 +1282,11 @@ if (!result623) return std::unexpected(std::move(result623.error()));
   return {};
 }
 
-std::expected<void, StarException> Plant::render(RenderCallback& renderCallback) {
-  auto result602 = this->root().random().randf(-0.1f, 0.1f);
-if (!result602) return std::unexpected(std::move(result602.error()));
-float damageXOffset = std::move(*result602) * m_tileDamageStatus->damageEffectPercentage();
-
-  for (auto const& plantPiece : m_pieces) {
-    auto size = Vec2F(plantPiece.imageSize) / TilePixels;
-
-    Vec2F offset = plantPiece.offset;
-    if ((m_ceiling && offset[1] <= m_tileDamageY) || (!m_ceiling && offset[1] + size[1] >= m_tileDamageY))
-      offset[0] += damageXOffset;
-
-    auto result603 = this->root().imageMetadataDatabase();
-if (!result603) return std::unexpected(std::move(result603.error()));
-auto result1283 = Drawable::makeImage(*std::move(*result603), plantPiece.imagePath, 1.0f / TilePixels, false, offset);
-if (!result1283) return std::unexpected(std::move(result1283.error()));
-auto drawable = std::move(*result1283);
-    if (plantPiece.flip)
-      drawable.scale(Vec2F(-1, 1));
-
-    if (plantPiece.rotationType == RotateCrownBranch || plantPiece.rotationType == RotateCrownLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
-      drawable.translate(Vec2F(0, -0.40f));
-    } else if (plantPiece.rotationType == RotateBranch || plantPiece.rotationType == RotateLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f), plantPiece.offset + Vec2F(size) / 2.0f);
-    }
-    drawable.translate(position());
-    auto result604 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlant);
-if (!result604) return std::unexpected(std::move(result604.error()));
-  }
-
+std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& renderCallback) {
+  auto damageOffset = this->root().random().randf(-0.1f, 0.1f);
+  if (!damageOffset)
+    return std::unexpected(std::move(damageOffset.error()));
+  m_presentationDamageXOffset = *damageOffset * m_tileDamageStatus->damageEffectPercentage();
   if (m_tileDamageEvent) {
     m_tileDamageEvent = false;
     if (m_stemDropConfig.type() == Json::Type::Object) {
@@ -1380,6 +1358,38 @@ if (!result620) return std::unexpected(std::move(result620.error()));
       }
     }
   }
+  return {};
+}
+
+std::expected<void, StarException> Plant::render(RenderCallback& renderCallback) {
+  float damageXOffset = m_presentationDamageXOffset;
+
+  for (auto const& plantPiece : m_pieces) {
+    auto size = Vec2F(plantPiece.imageSize) / TilePixels;
+
+    Vec2F offset = plantPiece.offset;
+    if ((m_ceiling && offset[1] <= m_tileDamageY) || (!m_ceiling && offset[1] + size[1] >= m_tileDamageY))
+      offset[0] += damageXOffset;
+
+    auto result603 = this->root().imageMetadataDatabase();
+if (!result603) return std::unexpected(std::move(result603.error()));
+auto result1283 = Drawable::makeImage(*std::move(*result603), plantPiece.imagePath, 1.0f / TilePixels, false, offset);
+if (!result1283) return std::unexpected(std::move(result1283.error()));
+auto drawable = std::move(*result1283);
+    if (plantPiece.flip)
+      drawable.scale(Vec2F(-1, 1));
+
+    if (plantPiece.rotationType == RotateCrownBranch || plantPiece.rotationType == RotateCrownLeaves) {
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
+      drawable.translate(Vec2F(0, -0.40f));
+    } else if (plantPiece.rotationType == RotateBranch || plantPiece.rotationType == RotateLeaves) {
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
+    }
+    drawable.translate(position());
+    auto result604 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlant);
+if (!result604) return std::unexpected(std::move(result604.error()));
+  }
+
   return {};
 }
 

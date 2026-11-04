@@ -282,6 +282,7 @@ constexpr char AdditionalDefaultConfiguration[] = R"JSON(
 
       "allowAssetsMismatch" : false,
       "vsync" : true,
+      "renderFpsLimit" : 0,
       "limitTextureAtlasSize" : false,
       "useMultiTexturing" : true,
       "audioChannelSeparation" : [-25, 25],
@@ -474,9 +475,6 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto configuration = *configResult;
-  auto vsync = configuration->get("vsync").and_then([](Json j) { return j.toBool(); });
-  if (!vsync)
-    return std::unexpected(std::move(vsync.error()));
   auto windowedSize = configuration->get("windowedResolution").and_then([](Json j) { return jsonToVec2U(j); });
   if (!windowedSize)
     return std::unexpected(std::move(windowedSize.error()));
@@ -523,6 +521,8 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     auto rate = jUpdateRate->toFloat();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
+    if (!isFinite(*rate) || *rate <= 0.0f)
+      return std::unexpected(StarException("updateRate must be finite and positive"));
     updateRate = *rate;
     m_root->timing().timestep = 1.0f / updateRate;
   }
@@ -533,11 +533,13 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     auto rate = jServerRate->toFloat();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
+    if (!isFinite(*rate) || *rate <= 0.0f)
+      return std::unexpected(StarException("serverUpdateRate must be finite and positive"));
     m_root->timing().serverTimestep = 1.0f / *rate;
   }
   appController->setTargetUpdateRate(updateRate);
-  if (auto sync = appController->setVSyncEnabled(*vsync); !sync)
-    return std::unexpected(std::move(sync.error()));
+  if (auto applied = applyRenderSettings(*configuration); !applied)
+    return std::unexpected(std::move(applied.error()));
   auto hardware = configuration->get("hardwareCursor").and_then([](Json j) { return j.optBool(); });
   if (!hardware)
     return std::unexpected(std::move(hardware.error()));
@@ -605,10 +607,6 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!frameSkip)
     return std::unexpected(std::move(frameSkip.error()));
   appController->setMaxFrameSkip(*frameSkip);
-  auto track = assets->json("/client.config:updateTrackWindow").and_then([](Json j) { return j.toFloat(); });
-  if (!track)
-    return std::unexpected(std::move(track.error()));
-  appController->setUpdateTrackWindow(*track);
   auto jVoice = configuration->get("voice");
   if (!jVoice)
     return std::unexpected(std::move(jVoice.error()));
@@ -796,6 +794,18 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
 }
 
 std::expected<void, StarException> ClientApplication::update() {
+  // Input between logic ticks must keep using the transform actually shown,
+  // even when a low render cap allows several updates before the next present.
+  struct DisplayCameraScope {
+    WorldCamera& camera;
+    WorldCamera displayed;
+    ~DisplayCameraScope() { camera.restoreRenderTransform(displayed); }
+  } displayCamera{m_worldPainter->camera(), m_worldPainter->camera()};
+  auto configuration = m_root->configuration();
+  if (!configuration)
+    return std::unexpected(std::move(configuration.error()));
+  if (auto applied = applyRenderSettings(**configuration); !applied)
+    return std::unexpected(std::move(applied.error()));
   float dt = m_root->timing().timestep * m_root->timing().timescale;
   auto& app = appController();
   if (m_state >= MainAppState::Title) {
@@ -874,6 +884,28 @@ std::expected<void, StarException> ClientApplication::update() {
   return {};
 }
 
+std::expected<void, StarException> ClientApplication::applyRenderSettings(Configuration const& configuration) {
+  auto limit = configuration.get("renderFpsLimit").and_then([](Json value) { return value.toDouble(); });
+  if (!limit)
+    return std::unexpected(std::move(limit.error()));
+  if (!isFinite(*limit) || *limit < 0.0 || *limit > std::numeric_limits<float>::max())
+    return std::unexpected(StarException("renderFpsLimit must be finite, nonnegative and representable as a float"));
+  auto vsync = configuration.get("vsync").and_then([](Json value) { return value.toBool(); });
+  if (!vsync)
+    return std::unexpected(std::move(vsync.error()));
+  if (m_appliedVSync != *vsync) {
+    if (auto applied = appController()->setVSyncEnabled(*vsync); !applied)
+      return std::unexpected(std::move(applied.error()));
+    m_appliedVSync = *vsync;
+  }
+  float rate = static_cast<float>(*limit);
+  if (m_appliedRenderFpsLimit != rate) {
+    appController()->setTargetRenderRate(rate);
+    m_appliedRenderFpsLimit = rate;
+  }
+  return {};
+}
+
 std::expected<void, StarException> ClientApplication::render() {
   m_framesSkipped = 0;
   auto configResult = m_root->configuration();
@@ -928,12 +960,28 @@ std::expected<void, StarException> ClientApplication::render() {
   } else if (m_state > MainAppState::Title) {
     std::shared_ptr<WorldClient> worldClient = m_universeClient->worldClient();
     if (worldClient) {
+      auto& camera = m_worldPainter->camera();
+      auto playerEpoch = m_player ? m_player->presentationEpoch() : 0;
+      auto renderEpoch = appController()->renderEpoch();
+      if (m_presentedWorld.lock() != worldClient || m_presentedPlayer.lock() != m_player
+          || m_presentedPlayerEpoch != playerEpoch || m_presentedRenderEpoch != renderEpoch) {
+        worldClient->resetPresentation();
+        camera.resetPresentation();
+        m_presentedWorld = worldClient;
+        m_presentedPlayer = m_player;
+        m_presentedPlayerEpoch = playerEpoch;
+        m_presentedRenderEpoch = renderEpoch;
+      }
+      float interpolation = m_universeClient->paused() || m_root->timing().timescale == 0.0f
+          ? 1.0f : appController()->renderInterpolation();
+      camera.setScreenSize(renderer->screenSize());
+      camera.setRenderInterpolation(interpolation);
       auto totalStart = Time::monotonicMicroseconds();
       auto worldEffect = renderer->switchEffectConfig("world");
       if (!worldEffect)
         return std::unexpected(std::move(worldEffect.error()));
       auto clientStart = totalStart;
-      auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer());
+      auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer(), interpolation);
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
       m_root->logMap().set("client_render_world_client", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - clientStart));
@@ -966,7 +1014,9 @@ std::expected<void, StarException> ClientApplication::render() {
     if (!interfaceEffect)
       return std::unexpected(std::move(interfaceEffect.error()));
     auto start = Time::monotonicMicroseconds();
-    auto inWorld = m_mainInterface->renderInWorldElements();
+    float interpolation = m_universeClient->paused() || m_root->timing().timescale == 0.0f
+        ? 1.0f : appController()->renderInterpolation();
+    auto inWorld = m_mainInterface->renderInWorldElements(interpolation);
     if (!inWorld)
       return std::unexpected(std::move(inWorld.error()));
     auto interfaceRendered = m_mainInterface->render();
@@ -996,6 +1046,7 @@ std::expected<void, StarException> ClientApplication::getAudioData(std::span<std
 constexpr char postProcessGroupsRoot[] = "postProcessGroups";
 
 std::expected<void, StarException> ClientApplication::renderReload() {
+  m_presentedWorld.reset();
   auto assetsResult = m_root->assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -2296,10 +2347,19 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
     return {};
 
   WorldCamera& camera = m_worldPainter->camera();
+  camera.beginUpdate();
+  camera.setScreenSize(Application::renderer()->screenSize());
+  auto zoom = m_root->configuration().and_then([](auto config) { return config->get("zoomLevel"); })
+      .and_then([](Json value) { return value.toFloat(); });
+  if (!zoom)
+    return std::unexpected(std::move(zoom.error()));
+  camera.setTargetPixelRatio(*zoom);
   camera.update(dt);
 
-  if (m_mainInterface->fixedCamera())
+  if (m_mainInterface->fixedCamera() || dt <= 0.0f) {
+    m_universeClient->worldClient()->setClientWindow(camera.worldTileRect());
     return {};
+  }
 
   auto assetsResult = m_root->assets();
   if (!assetsResult)

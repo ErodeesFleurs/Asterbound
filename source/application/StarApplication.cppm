@@ -61,14 +61,15 @@ public:
   // Called before update, once for every pending event.
   [[nodiscard]] virtual std::expected<void, StarException> processInput(InputEvent const& event);
 
-  // Will be called at updateRate hz, or as close as possible.
+  // Fixed simulation updates, zero or more times between renders. No ImGui
+  // frame is active here; immediate-mode UI submission belongs in render().
   [[nodiscard]] virtual std::expected<void, StarException> update();
   
   // Returns how many frames have been skipped.
   virtual unsigned framesSkipped() const;
 
-  // Will be called at updateRate hz, or more or less depending on settings and
-  // performance.  update() is always prioritized over render().
+  // Independently paced by the render cap and VSync, with one active ImGui
+  // frame per call. May run without a simulation update, or after several.
   [[nodiscard]] virtual std::expected<void, StarException> render();
 
   // Will be called *from a different thread* to retrieve audio data (if audio
@@ -81,8 +82,9 @@ public:
 
   std::shared_ptr<ApplicationController> const& appController() const;
   std::shared_ptr<Renderer> const& renderer() const;
-  // Previous completed frame, in wall-clock microseconds. Render/present are
-  // CPU submission/wait durations, not GPU execution timers. Main thread only.
+  // Previous completed outer-loop iteration, in wall-clock microseconds.
+  // Render/present are zero when no render was due. Main thread only; CPU
+  // submission/wait durations, not GPU execution timers.
   FrameTimings const& frameTimings() const { return m_frameTimings; }
   void recordFrameTimings(FrameTimings timings) { m_frameTimings = timings; }
 

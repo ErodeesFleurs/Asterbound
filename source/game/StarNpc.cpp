@@ -590,7 +590,12 @@ if (!result114) return std::unexpected(std::move(result114.error()));
 
   }
 
-  return {};
+  if (auto result = updateHumanoidDirectives(); !result)
+    return std::unexpected(std::move(result.error()));
+  auto pose = humanoid();
+  if (!pose)
+    return std::unexpected(std::move(pose.error()));
+  return (*pose)->prepareAnimatorPose();
 }
 
 std::expected<void, StarException> Npc::uninit() {
@@ -1182,6 +1187,52 @@ if (!result235) return std::unexpected(std::move(result235.error()));
   return {};
 }
 
+std::uint64_t Npc::presentationEpoch() const {
+  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+}
+
+std::expected<void, StarException> Npc::collectRenderEvents(RenderCallback& renderCallback) {
+  auto result246 = renderCallback.addParticles(m_humanoidDynamicTarget.pullNewParticles());
+if (!result246) return std::unexpected(std::move(result246.error()));
+  auto result247 = renderCallback.addAudios(m_humanoidDynamicTarget.pullNewAudios());
+if (!result247) return std::unexpected(std::move(result247.error()));
+  auto result250 = renderCallback.addParticles(m_statusController->pullNewParticles());
+if (!result250) return std::unexpected(std::move(result250.error()));
+  auto result251 = renderCallback.addAudios(m_statusController->pullNewAudios());
+if (!result251) return std::unexpected(std::move(result251.error()));
+
+  auto result252 = world();
+if (!result252) return std::unexpected(std::move(result252.error()));
+auto result253 = m_npcVariant.splashConfig.doSplash(position(), m_movementController->velocity(), result252->get());
+if (!result253) return std::unexpected(std::move(result253.error()));
+auto result254 = renderCallback.addParticles(std::move(*result253));
+if (!result254) return std::unexpected(std::move(result254.error()));
+  auto result261 = m_effectEmitter->collectRenderEvents(renderCallback);
+if (!result261) return std::unexpected(std::move(result261.error()));
+
+  auto result262 = m_songbook->collectRenderEvents(renderCallback);
+if (!result262) return std::unexpected(std::move(result262.error()));
+  return m_tools->collectRenderEvents(renderCallback);
+}
+
+std::expected<void, StarException> Npc::updateHumanoidDirectives() {
+  DirectivesGroup directives;
+  Vec2F scale = Vec2F::filled(1.f);
+  for (auto const& entry : m_statusController->parentDirectives().list()) {
+    auto extracted = Humanoid::extractScaleFromDirectives(entry);
+    if (!extracted)
+      return std::unexpected(std::move(extracted.error()));
+    scale = scale.piecewiseMultiply(extracted->first);
+    directives.append(extracted->second);
+  }
+  auto pose = humanoid();
+  if (!pose)
+    return std::unexpected(std::move(pose.error()));
+  (*pose)->setScale(scale);
+  m_presentationHumanoidDirectives = std::move(directives);
+  return {};
+}
+
 std::expected<void, StarException> Npc::render(RenderCallback& renderCallback) {
   EntityRenderLayer renderLayer = RenderLayerNpc;
   auto anchor = m_movementController->entityAnchor();
@@ -1190,27 +1241,16 @@ std::expected<void, StarException> Npc::render(RenderCallback& renderCallback) {
 
   auto result237 = humanoid();
 if (!result237) return std::unexpected(std::move(result237.error()));
-auto result238 = m_tools->setupHumanoidHandItemDrawables(*std::move(*result237));
+auto result238 = m_tools->setupHumanoidHandItemDrawables(*std::move(*result237), renderCallback.interpolation());
 if (!result238) return std::unexpected(std::move(result238.error()));
 
 
-  DirectivesGroup humanoidDirectives;
-  Vec2F scale = Vec2F::filled(1.f);
-  for (auto& directives : m_statusController->parentDirectives().list()) {
-    auto result239 = Humanoid::extractScaleFromDirectives(directives);
-if (!result239) return std::unexpected(std::move(result239.error()));
-auto result = std::move(*result239);
-    scale = scale.piecewiseMultiply(result.first);
-    humanoidDirectives.append(result.second);
-  }
-  auto result240 = humanoid();
-if (!result240) return std::unexpected(std::move(result240.error()));
-std::move(*result240)->setScale(scale);
+  auto const& humanoidDirectives = m_presentationHumanoidDirectives;
 
   {
   auto result241 = humanoid();
   if (!result241) return std::unexpected(std::move(result241.error()));
-  auto result242 = std::move(*result241)->render();
+  auto result242 = std::move(*result241)->render(true, true, renderCallback.interpolation());
   if (!result242) return std::unexpected(std::move(result242.error()));
   for (auto& drawable : std::move(*result242)) {
       drawable.translate(position());
@@ -1227,26 +1267,11 @@ std::move(*result240)->setScale(scale);
     }
 }
 
-  auto result246 = renderCallback.addParticles(m_humanoidDynamicTarget.pullNewParticles());
-if (!result246) return std::unexpected(std::move(result246.error()));
-  auto result247 = renderCallback.addAudios(m_humanoidDynamicTarget.pullNewAudios());
-if (!result247) return std::unexpected(std::move(result247.error()));
 
-  auto result248 = m_statusController->drawables();
+  auto result248 = m_statusController->drawables(renderCallback.interpolation());
 if (!result248) return std::unexpected(std::move(result248.error()));
 auto result249 = renderCallback.addDrawables(std::move(*result248), renderLayer);
 if (!result249) return std::unexpected(std::move(result249.error()));
-  auto result250 = renderCallback.addParticles(m_statusController->pullNewParticles());
-if (!result250) return std::unexpected(std::move(result250.error()));
-  auto result251 = renderCallback.addAudios(m_statusController->pullNewAudios());
-if (!result251) return std::unexpected(std::move(result251.error()));
-
-  auto result252 = world();
-if (!result252) return std::unexpected(std::move(result252.error()));
-auto result253 = m_npcVariant.splashConfig.doSplash(position(), m_movementController->velocity(), result252->get());
-if (!result253) return std::unexpected(std::move(result253.error()));
-auto result254 = renderCallback.addParticles(std::move(*result253));
-if (!result254) return std::unexpected(std::move(result254.error()));
 
   auto result255 = inToolRange();
 if (!result255) return std::unexpected(std::move(result255.error()));
@@ -1263,17 +1288,12 @@ if (!result259) return std::unexpected(std::move(result259.error()));
 auto result260 = renderCallback.addDrawables(std::move(*result259), renderLayer);
 if (!result260) return std::unexpected(std::move(result260.error()));
 
-  auto result261 = m_effectEmitter->render(renderCallback);
-if (!result261) return std::unexpected(std::move(result261.error()));
-
-  auto result262 = m_songbook->render(renderCallback);
-if (!result262) return std::unexpected(std::move(result262.error()));
 
   return {};
 }
 
 std::expected<void, StarException> Npc::renderLightSources(RenderCallback& renderCallback) {
-  auto result263 = lightSources();
+  auto result263 = presentationLightSources(renderCallback.interpolation());
 if (!result263) return std::unexpected(std::move(result263.error()));
 auto result264 = renderCallback.addLightSources(std::move(*result263));
 if (!result264) return std::unexpected(std::move(result264.error()));
@@ -1281,6 +1301,7 @@ if (!result264) return std::unexpected(std::move(result264.error()));
 }
 
 void Npc::setPosition(Vec2F const& pos) {
+  resetPresentation();
   m_movementController->setPosition(pos);
 }
 
@@ -1445,6 +1466,8 @@ if (!result284) return std::unexpected(std::move(result284.error()));
       m_movementController->controlFace(*overrideDirection);
 }
 
+  if (auto result = updateHumanoidDirectives(); !result)
+    return std::unexpected(std::move(result.error()));
   {
   auto result288 = world();
   if (!result288) return std::unexpected(std::move(result288.error()));
@@ -2355,16 +2378,23 @@ void Npc::disableWornArmor(bool disable) {
 }
 
 std::expected<List<LightSource>, StarException> Npc::lightSources() const {
+  return presentationLightSources(1.0f);
+}
+
+std::expected<List<LightSource>, StarException> Npc::presentationLightSources(float interpolation) const {
   List<LightSource> lights;
-  auto result498 = m_tools->lightSources();
+  auto result498 = m_tools->lightSources(interpolation);
 if (!result498) return std::unexpected(std::move(result498.error()));
 lights.appendAll(std::move(*result498));
-  auto result499 = m_statusController->lightSources();
+  auto result499 = m_statusController->lightSources(interpolation);
 if (!result499) return std::unexpected(std::move(result499.error()));
 lights.appendAll(std::move(*result499));
   auto result500 = humanoid();
 if (!result500) return std::unexpected(std::move(result500.error()));
 auto animator = (*result500)->networkedAnimator();
+auto humanoidSample = animator->get().sample(interpolation);
+auto prepared = (*result500)->prepareAnimatorPose(interpolation);
+if (!prepared) return std::unexpected(std::move(prepared.error()));
 auto result501 = animator->get().lightSources();
 if (!result501) return std::unexpected(std::move(result501.error()));
 lights.appendAll(std::move(*result501));

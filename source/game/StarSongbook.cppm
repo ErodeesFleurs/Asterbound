@@ -38,7 +38,7 @@ public:
   ~Songbook();
 
   [[nodiscard]] std::expected<void, StarException> update(EntityMode mode, World& world);
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback);
 
   // instrument needs to tell the songbook what type it is, and needs to keep
   // calling it to signal

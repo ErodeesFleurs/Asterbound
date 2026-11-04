@@ -11,8 +11,16 @@ function patch(original)
   image:copyInto({19, 26}, checkbox)  -- New Lighting
   image:copyInto({119, 26}, checkbox) -- Hardware Cursor
   image:copyInto({19, 15}, checkbox) -- HDR
+  image:copyInto({119, 15}, checkbox) -- VSync
 
   image:copyInto({119, 79}, image:process("?crop=19;79;117;98")) -- Camera Pan Speed
 
-  return image
+  -- Insert one slider row above zoom without moving any checkbox/button rows.
+  local expanded = image:process("?crop=0;0;1;1?scalenearest=236;205")
+  expanded:copyInto({0, 0}, image)
+  expanded:copyInto({0, 126}, image:process("?crop=0;98;236;177"))
+  expanded:copyInto({0, 98}, image:process("?crop=0;70;236;98"))
+  -- The FPS slider spans both columns, with its value on the right.
+  expanded:copyInto({19, 107}, original:process("?crop=55;108;181;126"))
+  return expanded
 end

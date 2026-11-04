@@ -34,6 +34,11 @@ import star.lua;
 import star.lua_game_converters;
 import star.mixer;
 import star.dance_database;
+import star.object_database;
+import star.world_server;
+import star.game_types;
+import star.drawable;
+import star.rect;
 
 #include "gtest/gtest.h"
 
@@ -154,6 +159,73 @@ const GameTestRegistration assetsAll("AssetsTest", "All", [](GameTest&) {
   EXPECT_EQ(
       AssetPath::relativeTo("/foo/bar/baz:baf?whoa?there", "thing:sub?directive"), "/foo/bar/thing:sub?directive");
 });
+
+const GameTestRegistration objectCursorPreviewRandomIsolation(
+  "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {
+    auto directory = File::temporaryDirectory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto settings = fixture.rootSettings();
+    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto isolatedRoot = Root::create(std::move(settings));
+    ASSERT_TRUE(isolatedRoot) << isolatedRoot.error().what();
+    auto& root = **isolatedRoot;
+    auto assets = root.assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto files = (*assets)->scanExtension("object");
+    ASSERT_TRUE(files) << files.error().what();
+    String objectName;
+    for (auto const& path : files->get()) {
+      auto config = (*assets)->json(path.string());
+      ASSERT_TRUE(config) << config.error().what();
+      auto flickering = config->contains("flickerPeriod");
+      ASSERT_TRUE(flickering);
+      if (*flickering) {
+        auto name = config->getString("objectName");
+        ASSERT_TRUE(name);
+        objectName = std::move(*name);
+        break;
+      }
+    }
+    ASSERT_FALSE(objectName.empty()) << "The installed assets must supply a flickering object for this regression";
+    SCOPED_TRACE(objectName.utf8());
+
+    auto storage = File::ephemeralFile(root.random());
+    ASSERT_TRUE(storage) << storage.error().what();
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world) << world.error().what();
+    auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+    (*world)->setSpawningEnabled(false);
+    Vec2I const position(1024, 1024);
+    ASSERT_TRUE((*world)->generateRegion(RectI::withSize(position - Vec2I(64, 64), Vec2I(128, 128))));
+
+    // There is no UniverseServer or world thread. Finish world/database setup
+    // before seeding, and use a fresh database so the first preview really
+    // parses the installed config, including its randomized light flicker.
+    for (auto direction : {Direction::Left, Direction::Right}) {
+      auto database = ObjectDatabase::create(root);
+      ASSERT_TRUE(database) << database.error().what();
+      constexpr std::uint64_t seed = 0x435552534f525052;
+      root.random().init(seed);
+      RandomSource untouchedGameplay(seed);
+      auto cold = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
+      ASSERT_TRUE(cold) << cold.error().what();
+      ASSERT_FALSE(cold->empty());
+      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "cold preview";
+      auto cachedConfig = (*database)->getConfig(objectName);
+      ASSERT_TRUE(cachedConfig) << cachedConfig.error().what();
+      ASSERT_TRUE((*cachedConfig)->lightFlickering);
+      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "warm config lookup";
+      auto warm = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
+      ASSERT_TRUE(warm) << warm.error().what();
+      EXPECT_EQ(*warm, *cold);
+      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "warm preview";
+    }
+  });
 
 const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "SymlinkLoopIsNotFollowed", [](GameTest& fixture) {
   // A link back to an ancestor must not make asset scanning fail with ELOOP.

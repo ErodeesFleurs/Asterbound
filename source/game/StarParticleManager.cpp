@@ -52,11 +52,15 @@ ParticleManager::ParticleManager(Root& root, WorldGeometry const& worldGeometry,
   : m_root(root), m_worldGeometry(worldGeometry), m_undergroundLevel(0.0f), m_tileSectorArray(tileSectorArray) {}
 
 void ParticleManager::add(Particle particle) {
+  m_presentationHistory.append({particle.presentationState(), 0.0f,
+      s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
   m_particles.push_back(std::move(particle));
 }
 
-void ParticleManager::addParticles(List<Particle> particles) {
-  m_particles.appendAll(std::move(particles));
+void ParticleManager::addParticles(List<Particle>&& particles) {
+  for (auto& particle : particles)
+    add(std::move(particle));
+  particles.clear();
 }
 
 std::size_t ParticleManager::count() const {
@@ -65,6 +69,9 @@ std::size_t ParticleManager::count() const {
 
 void ParticleManager::clear() {
   m_particles.clear();
+  m_nextParticles.clear();
+  m_presentationHistory.clear();
+  m_nextPresentationHistory.clear();
 }
 
 void ParticleManager::setUndergroundLevel(float undergroundLevel) {
@@ -79,7 +86,8 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
   if (!cullRects)
     return std::unexpected(std::move(cullRects.error()));
 
-  for (auto& particle : m_particles) {
+  for (std::size_t i = 0; i != m_particles.size(); ++i) {
+    auto& particle = m_particles[i];
     bool inRegion = false;
     Vec2F worldPos = m_worldGeometry.xwrap(particle.position);
     for (auto const& cullRect : *cullRects) {
@@ -91,6 +99,7 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
     if (!inRegion)
       continue;
 
+    PresentationHistory history{particle.presentationState(), dt, m_presentationHistory[i].identity};
     auto updated = particle.update(m_root, dt, Vec2F(wind, 0));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
@@ -136,15 +145,21 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
       trail.trail = false;
       trail.timeToLive = 0;
       trail.velocity = {};
+      m_nextPresentationHistory.append({trail.presentationState(), 0.0f,
+          s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
       m_nextParticles.append(std::move(trail));
     }
 
-    if (!particle.dead())
+    if (!particle.dead()) {
+      m_nextPresentationHistory.append(std::move(history));
       m_nextParticles.append(std::move(particle));
+    }
   }
 
   m_particles.clear();
   std::swap(m_particles, m_nextParticles);
+  m_presentationHistory.clear();
+  std::swap(m_presentationHistory, m_nextPresentationHistory);
   return {};
 }
 
@@ -152,13 +167,21 @@ List<Particle> const& ParticleManager::particles() const {
   return m_particles;
 }
 
-List<std::pair<Vec2F, Vec3F>> ParticleManager::lightSources() const {
-  List<std::pair<Vec2F, Vec3F>> lsources;
-  for (auto const& particle : m_particles) {
-    if (particle.light != Color::Clear)
-      lsources.append({particle.position, particle.light.toRgbF()});
+void ParticleManager::sampleParticles(float interpolation, List<Particle>& samples) const {
+  samples.resize(m_particles.size());
+  for (std::size_t i = 0; i != m_particles.size(); ++i) {
+    auto const& history = m_presentationHistory[i];
+    samples[i].samplePresentation(m_particles[i], history.previous, m_worldGeometry,
+        interpolation, history.timestep, history.identity);
   }
-  return lsources;
 }
+
+void ParticleManager::resetPresentation() {
+  for (std::size_t i = 0; i != m_particles.size(); ++i) {
+    m_presentationHistory[i].previous = m_particles[i].presentationState();
+    m_presentationHistory[i].timestep = 0.0f;
+  }
+}
+
 
 }

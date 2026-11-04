@@ -173,6 +173,10 @@ public:
   bool atWorldLimit(bool bottomOnly = false) const;
 
   void setPosition(Vec2F position);
+  // Explicit presentation discontinuities are separate from physics integration,
+  // which also uses setPosition internally.
+  void resetPresentation() { ++m_presentationEpoch; }
+  std::uint64_t presentationEpoch() const { return m_presentationEpoch; }
   void setXPosition(float xPosition);
   void setYPosition(float yPosition);
 
@@ -332,6 +336,7 @@ private:
   bool m_resting;
   int m_restTicks;
   float m_timeStep;
+  std::uint64_t m_presentationEpoch = 0;
 
   List<CollisionPoly> m_workingCollisions;
   List<PolyF> m_collisionBuffers;

@@ -24,20 +24,27 @@ struct AudioFormat {
   unsigned channels;
 };
 
-// Window size defaults to 800x600, target update rate to 60hz, maximized and
-// fullscreen are false, vsync is on, the cursor is visible, and audio and text
-// input are disabled.
+// Window size defaults to 800x600, fixed updates to 60hz, rendering to uncapped,
+// maximized and fullscreen are false, vsync is on, the cursor is visible, and
+// audio and text input are disabled.
 class ApplicationController {
 public:
   virtual ~ApplicationController() = default;
 
-  // Target hz at which update() will be called
+  // Fixed simulation frequency; changing it discards old timing debt.
+  // Invalid (non-finite or non-positive) rates are ignored.
   virtual void setTargetUpdateRate(float targetUpdateRate) = 0;
-  // Window that controls how long the update rate will be increased or
-  // decreased to make up for rate errors in the past.
-  virtual void setUpdateTrackWindow(float updateTrackWindow) = 0;
-  // Maximum number of calls to update() that can occur before we force
-  // 'render()' to be called, even if we are still behind on our update rate.
+  // Independent render cap, preserving the logic deadline when changed.
+  // Zero is unlimited; VSync may still block present.
+  // Invalid (non-finite or negative) rates are ignored.
+  virtual void setTargetRenderRate(float rate) = 0;
+  // Previous-to-current fixed-step presentation fraction, stable for a render.
+  // Starts at 1 after reset, until the first scheduled simulation update.
+  virtual float renderInterpolation() const = 0;
+  // Changes whenever timing resynchronizes or overdue logic debt is discarded.
+  virtual std::uint64_t renderEpoch() const = 0;
+  // Maximum extra updates in one outer-loop batch. Excess overdue whole ticks
+  // are discarded instead of allowing unbounded catch-up to starve rendering.
   virtual void setMaxFrameSkip(unsigned maxFrameSkip) = 0;
 
   virtual void setApplicationTitle(String title) = 0;

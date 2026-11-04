@@ -8,6 +8,21 @@ import star.matrix3;
 
 using namespace Star;
 
+TEST(Math, FiniteBoundaryClassificationSurvivesFastMath) {
+  for (auto value : {0.0, -0.0, 1.0, -1.0, std::numeric_limits<double>::max(), std::numeric_limits<double>::denorm_min()})
+    EXPECT_TRUE(isFinite(value));
+  for (auto bits : {0x7ff0000000000000ull, 0xfff0000000000000ull, 0x7ff8000000000001ull, 0xfff8000000000001ull}) {
+    volatile std::uint64_t input = bits;
+    EXPECT_FALSE(isFinite(std::bit_cast<double>(static_cast<std::uint64_t>(input))));
+  }
+  for (auto value : {0.0f, -0.0f, 1.0f, -1.0f, std::numeric_limits<float>::max(), std::numeric_limits<float>::denorm_min()})
+    EXPECT_TRUE(isFinite(value));
+  for (auto bits : {0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00001u}) {
+    volatile std::uint32_t input = bits;
+    EXPECT_FALSE(isFinite(std::bit_cast<float>(static_cast<std::uint32_t>(input))));
+  }
+}
+
 TEST(Math, CycleIncrement) {
   int a = 0;
   a = cycleIncrement(a, 10, 13);

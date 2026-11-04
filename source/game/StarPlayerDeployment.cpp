@@ -211,19 +211,23 @@ std::expected<void, StarException> PlayerDeployment::update(float dt) {
   return {};
 }
 
-std::expected<void, StarException> PlayerDeployment::render(RenderCallback& renderCallback, Vec2F const& position) {
-  for (auto drawablePair : m_scriptComponent.drawables()) {
-    drawablePair.first.translate(position);
-    auto added = renderCallback.addDrawable(drawablePair.first, drawablePair.second.value_or(RenderLayerPlayer));
-    if (!added)
-      return std::unexpected(std::move(added.error()));
-  }
+std::expected<void, StarException> PlayerDeployment::collectRenderEvents(RenderCallback& renderCallback, Vec2F const& position) {
   auto particles = renderCallback.addParticles(m_scriptComponent.pullNewParticles());
   if (!particles)
     return std::unexpected(std::move(particles.error()));
   for (auto audio : m_scriptComponent.pullNewAudios()) {
     audio->setPosition(position);
     auto added = renderCallback.addAudio(audio);
+    if (!added)
+      return std::unexpected(std::move(added.error()));
+  }
+  return {};
+}
+
+std::expected<void, StarException> PlayerDeployment::render(RenderCallback& renderCallback, Vec2F const& position) {
+  for (auto drawablePair : m_scriptComponent.drawables()) {
+    drawablePair.first.translate(position);
+    auto added = renderCallback.addDrawable(drawablePair.first, drawablePair.second.value_or(RenderLayerPlayer));
     if (!added)
       return std::unexpected(std::move(added.error()));
   }

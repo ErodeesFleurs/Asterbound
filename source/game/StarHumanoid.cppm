@@ -47,6 +47,7 @@ class LegsArmor;
 class BackArmor;
 
 struct Dance;
+struct DanceStep;
 
 enum class HumanoidEmote {
   Idle,
@@ -284,12 +285,16 @@ public:
   // wrapping or clamping animation time as appropriate.
   [[nodiscard]] std::expected<void, StarException> animate(float dt, std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>> dynamicTarget);
 
+  // Applies the current logical pose outside a sample, or the matching sampled
+  // pose inside NetworkedAnimator::sample. Does not advance clocks or events.
+  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(float interpolation = 1.f, bool withItems = true);
+
   // Reset animation time to 0.0f
   [[nodiscard]] std::expected<void, StarException> resetAnimation();
 
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in world space, not pixels)
-  [[nodiscard]] std::expected<List<Drawable>, StarException> render(bool withItems = true, bool withRotationAndScale = true);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render(bool withItems = true, bool withRotationAndScale = true, float interpolation = 1.f);
 
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in pixels, not world space)
@@ -319,7 +324,7 @@ public:
   [[nodiscard]] std::expected<Vec2F, StarException> armAdjustment() const;
 
   [[nodiscard]] std::expected<Vec2F, StarException> mouthOffset(bool ignoreAdjustments = false) const;
-  [[nodiscard]] std::expected<float, StarException> getBobYOffset() const;
+  [[nodiscard]] std::expected<float, StarException> getBobYOffset(float interpolation = 1.f) const;
   [[nodiscard]] std::expected<Vec2F, StarException> feetOffset() const;
 
   [[nodiscard]] std::expected<Vec2F, StarException> headArmorOffset() const;
@@ -389,13 +394,15 @@ private:
   Directives const& getFacialMaskDirectives() const;
   DirectivesGroup const& getHelmetMaskDirectivesGroup() const;
 
-  int getEmoteStateSequence() const;
-  [[nodiscard]] std::expected<int, StarException> getArmStateSequence() const;
-  int getBodyStateSequence() const;
+  int getEmoteStateSequence(float interpolation = 1.f) const;
+  [[nodiscard]] std::expected<int, StarException> getArmStateSequence(float interpolation = 1.f) const;
+  int getBodyStateSequence(float interpolation = 1.f) const;
 
   [[nodiscard]] std::expected<std::optional<std::shared_ptr<Dance>>, StarException> getDance() const;
 
   [[nodiscard]] std::expected<void, StarException> refreshAnimationState(bool startNew = false);
+  [[nodiscard]] std::expected<void, StarException> applyAnimatorPose(HandDrawingInfo const& frontHand, HandDrawingInfo const& backHand,
+      float frontAngle, float backAngle, float headRotation, DanceStep const* danceStep, bool withItems, bool withDrawables);
 
   Json m_baseConfig;
   Json m_mergeConfig;
@@ -478,6 +485,25 @@ private:
   float m_animationTimer = 0.0f;
   float m_emoteAnimationTimer = 0.0f;
   float m_danceTimer = 0.0f;
+  float m_previousAnimationTimer = 0;
+  float m_previousEmoteAnimationTimer = 0;
+  float m_previousDanceTimer = 0;
+  struct PresentationPose {
+    float headRotation = 0;
+    float rotation = 0;
+    Vec2F scale = Vec2F::filled(1.f);
+    float primaryAngle = 0;
+    float primaryItemAngle = 0;
+    float altAngle = 0;
+    float altItemAngle = 0;
+    bool primaryHolding = false;
+    bool altHolding = false;
+    Direction facing = Direction::Left;
+    bool twoHanded = false;
+  };
+  PresentationPose m_previousPose;
+  PresentationPose m_currentPose;
+  bool m_presentationHistory = false;
 
   Json m_particleEmitters;
   String m_defaultDeathParticles;

@@ -403,11 +403,12 @@ bool TechController::parentHidden() const {
   return m_parentHidden.get();
 }
 
-std::expected<List<Drawable>, StarException> TechController::backDrawables() {
+std::expected<List<Drawable>, StarException> TechController::backDrawables(float interpolation) {
   List<Drawable> drawables;
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
+      auto sample = animator->animator->sample(interpolation);
       auto pieces = animator->animator->drawablesWithZLevel(m_movementController->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
@@ -421,11 +422,12 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables() {
   return drawables;
 }
 
-std::expected<List<Drawable>, StarException> TechController::frontDrawables() {
+std::expected<List<Drawable>, StarException> TechController::frontDrawables(float interpolation) {
   List<Drawable> drawables;
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
+      auto sample = animator->animator->sample(interpolation);
       auto pieces = animator->animator->drawablesWithZLevel(m_movementController->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
@@ -439,11 +441,12 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables() {
   return drawables;
 }
 
-std::expected<List<LightSource>, StarException> TechController::lightSources() const {
+std::expected<List<LightSource>, StarException> TechController::lightSources(float interpolation) const {
   List<LightSource> lightSources;
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
+      auto sample = animator->animator->sample(interpolation);
       auto lights = animator->animator->lightSources(m_movementController->get().position());
       if (!lights)
         return std::unexpected(std::move(lights.error()));

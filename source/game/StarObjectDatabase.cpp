@@ -702,7 +702,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
   return res;
 }
 
-ObjectDatabase::ObjectDatabase(Root& root) : m_root(root), m_configCache(root.random()) {}
+ObjectDatabase::ObjectDatabase(Root& root) : m_root(root), m_configCache(root.presentationRandom()) {}
 
 std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::create(Root& root) {
   auto database = std::shared_ptr<ObjectDatabase>(new ObjectDatabase(root));
@@ -1014,7 +1014,7 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
     if (!intensityVariance)
       return std::unexpected(std::move(intensityVariance.error()));
     object.lightFlickering =
-      PeriodicFunction<float>(root.random(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
+      PeriodicFunction<float>(root.presentationRandom(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
   }
   return {};
 }

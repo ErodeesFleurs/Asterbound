@@ -42,7 +42,7 @@ public:
   [[nodiscard]] static std::expected<std::unique_ptr<NameplatePainter>, StarException> create(GuiContext& context);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> const& world, WorldCamera const& camera, bool inspectionMode);
-  [[nodiscard]] std::expected<void, StarException> render();
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
 
 private:
   explicit NameplatePainter(GuiContext& context);
@@ -53,6 +53,7 @@ private:
     Vec3B color;
     float opacity;
     EntityId entityId;
+    Vec2F origin;
   };
 
   TextPositioning namePosition(Vec2F bubblePosition) const;
@@ -70,7 +71,6 @@ private:
   TextStyle m_statusTextStyle;
   float m_opacityBoost;
 
-  WorldCamera m_camera;
 
   Set<EntityId> m_entitiesWithNametags;
   Set<EntityId> m_foundEntities;

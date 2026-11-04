@@ -345,7 +345,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::render(RenderCallback& renderCallback) {
+std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCallback& renderCallback) {
   auto assetsResult = root().assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -445,7 +445,7 @@ std::expected<void, StarException> ContainerObject::render(RenderCallback& rende
       m_animationFrameCooldown = 0;
     }
   }
-  return Object::render(renderCallback);
+  return Object::collectRenderEvents(renderCallback);
 }
 
 std::expected<void, StarException> ContainerObject::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {

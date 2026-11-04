@@ -41,7 +41,7 @@ import star.math_common;
 namespace Star {
 
 ImageMetadataDatabase::ImageMetadataDatabase(Root& root)
-  : m_root(root), m_sizeCache(root.random()), m_spacesCache(root.random()), m_regionCache(root.random()) {
+  : m_root(root), m_sizeCache(root.presentationRandom()), m_spacesCache(root.presentationRandom()), m_regionCache(root.presentationRandom()) {
   std::lock_guard locker(m_mutex);
   int timeSmear = 2000;
   std::int64_t timeToLive = 60000;

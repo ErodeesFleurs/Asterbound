@@ -1567,6 +1567,8 @@ std::expected<void, StarException> MainInterface::preUpdate(float) {
 }
 
 std::expected<void, StarException> MainInterface::update(float dt) {
+  m_debugSpatialClearDue |= m_debugSpatialClearTimer.wrapTick(dt);
+  m_debugMapClearDue |= m_debugMapClearTimer.wrapTick(dt);
   if (auto synchronized = synchronizeUiSession(); !synchronized)
     return std::unexpected(std::move(synchronized.error()));
 
@@ -1847,16 +1849,20 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   return {};
 }
 
-std::expected<void, StarException> MainInterface::renderInWorldElements() {
+std::expected<void, StarException> MainInterface::renderInWorldElements(float interpolation) {
   if (m_disableHud)
     return {};
   if (auto cleared = context().clearTextStyle(); !cleared)
     return std::unexpected(std::move(cleared.error()));
-  if (auto rendered = m_questIndicatorPainter->render(); !rendered)
+  auto world = m_client->worldClient();
+  if (!world)
+    return {};
+  auto const& camera = m_worldPainter.get().camera();
+  if (auto rendered = m_questIndicatorPainter->render(*world, camera, interpolation); !rendered)
     return std::unexpected(std::move(rendered.error()));
-  if (auto rendered = m_nameplatePainter->render(); !rendered)
+  if (auto rendered = m_nameplatePainter->render(*world, camera, interpolation); !rendered)
     return std::unexpected(std::move(rendered.error()));
-  return m_chatBubbleManager->render();
+  return m_chatBubbleManager->render(*world, camera, interpolation);
 }
 
 std::expected<void, StarException> MainInterface::render() {
@@ -1873,6 +1879,11 @@ std::expected<void, StarException> MainInterface::render() {
     return std::unexpected(std::move(size.error()));
   RectI screenRect = RectI::withSize(Vec2I(), Vec2I(*size));
   for (auto& pair : m_canvases) {
+    pair.second->setPosition(Vec2I());
+    auto canvasSize = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
+    if (!canvasSize)
+      return std::unexpected(std::move(canvasSize.error()));
+    pair.second->setSize(Vec2I(*canvasSize));
     auto rendered = pair.second->render(screenRect);
     if (!rendered)
       return std::unexpected(std::move(rendered.error()));
@@ -2081,7 +2092,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
     if (m_clientCommandProcessor->debugHudEnabled()) {
       if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().setLineSpacing(0.5f); !r) return std::unexpected(std::move(r.error()));
-      bool clearMap = m_debugMapClearTimer.wrapTick(context().root().timing().timestep);
+      bool clearMap = std::exchange(m_debugMapClearDue, false);
       auto logMapValues = context().root().logMap().getValues();
       if (clearMap) context().root().logMap().clear();
       auto height = windowHeight();
@@ -2110,7 +2121,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       }
     }
     auto const& camera = m_worldPainter.get().camera();
-    bool clearSpatial = m_debugSpatialClearTimer.wrapTick(context().root().timing().timestep);
+    bool clearSpatial = std::exchange(m_debugSpatialClearDue, false);
     for (auto const& line : context().root().spatialLogger().getLines("world", clearSpatial)) {
       Vec2F begin = camera.worldToScreen(line.begin);
       Vec2F end = camera.worldGeometry().diff(line.end, line.begin) * camera.pixelRatio() * TilePixels + begin;

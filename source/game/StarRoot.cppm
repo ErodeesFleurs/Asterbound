@@ -199,6 +199,8 @@ public:
   LogMap& logMap() { return m_logMap; }
   SpatialLogger& spatialLogger() { return m_spatialLogger; }
   RandomService& random() { return m_random; }
+  // Resource-cache jitter and presentation never consume gameplay randomness.
+  RandomService& presentationRandom() { return m_presentationRandom; }
   GameTiming& timing() { return m_timing; }
   Curve25519::KeySet const& identity() const { return m_identity; }
   SongbookSynchronization& songbookSynchronization() { return m_songbookSynchronization; }
@@ -222,6 +224,7 @@ private:
   LogMap m_logMap;
   SpatialLogger m_spatialLogger;
   RandomService m_random;
+  RandomService m_presentationRandom{0};
   GameTiming m_timing;
   Curve25519::KeySet m_identity;
   SongbookSynchronization m_songbookSynchronization;

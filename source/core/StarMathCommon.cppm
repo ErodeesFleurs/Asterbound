@@ -15,6 +15,19 @@ namespace Constants {
   inline double constexpr deg2rad = 1 / rad2deg;
 }
 
+// Keep integer-only classification behind a reference/call boundary: inlining
+// into a fast-math float-argument caller can fold even an exponent-mask test
+// into "always finite".
+template <typename T>
+  requires (std::same_as<T, float> || std::same_as<T, double>)
+[[gnu::noinline]] bool isFinite(T const& value) {
+  static_assert(std::numeric_limits<T>::is_iec559);
+  if constexpr (std::same_as<T, float>)
+    return (std::bit_cast<std::uint32_t>(value) & 0x7f800000u) != 0x7f800000u;
+  else
+    return (std::bit_cast<std::uint64_t>(value) & 0x7ff0000000000000ull) != 0x7ff0000000000000ull;
+}
+
 template <typename T, typename T2>
   requires (!std::numeric_limits<T>::is_integer && !std::numeric_limits<T2>::is_integer && sizeof(T) >= sizeof(T2))
 bool nearEqual(T x, T2 y, unsigned ulp) {
@@ -264,6 +277,7 @@ export module star.math_common;
 export namespace Star {
   using ::Star::MathExceptionTag;
   using ::Star::MathException;
+  using ::Star::isFinite;
   using ::Star::nearEqual;
   using ::Star::nearZero;
   using ::Star::square;

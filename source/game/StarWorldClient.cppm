@@ -278,7 +278,9 @@ public:
   [[nodiscard]] std::expected<void, StarException> update(float dt);
   // borderTiles here should extend the client window for border tile
   // calculations.  It is not necessary on the light array.
-  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, unsigned borderTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer);
+  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, unsigned borderTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, float interpolation);
+  Vec2F renderPosition(EntityId entityId, float interpolation) const;
+  void resetPresentation();
   List<std::shared_ptr<AudioInstance>> pullPendingAudio();
   List<std::shared_ptr<AudioInstance>> pullPendingMusic();
 
@@ -316,13 +318,20 @@ private:
   explicit WorldClient(Root& root, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(ClientSubWorldId subWorldId, UniverseClient& universe);
+  float presentationInterpolation(Entity const& entity, float interpolation) const;
 
   static const float DropDist;
 
   struct ClientRenderCallback : RenderCallback {
-    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer) : m_tileDrawer(drawer) {}
+    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer, float alpha = 1.0f, float dt = 0.0f, Vec2F offset = {}) : m_tileDrawer(drawer), m_interpolation(alpha), m_timestep(dt), m_offset(offset) {}
     std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const override { return m_tileDrawer; }
+    float interpolation() const override { return m_interpolation; }
+    float timestep() const override { return m_timestep; }
+    void clear();
     std::optional<std::reference_wrapper<TileDrawer>> m_tileDrawer;
+    float m_interpolation;
+    float m_timestep;
+    Vec2F m_offset;
     [[nodiscard]] std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) override;
     [[nodiscard]] std::expected<void, StarException> addLightSource(LightSource lightSource) override;
     [[nodiscard]] std::expected<void, StarException> addParticle(Particle particle) override;
@@ -331,11 +340,24 @@ private:
     [[nodiscard]] std::expected<void, StarException> addOverheadBar(OverheadBar bar) override;
 
     Map<EntityRenderLayer, List<Drawable>> drawables;
+    Map<EntityRenderLayer, List<Drawable>>* drawableTarget = nullptr;
     List<LightSource> lightSources;
     List<Particle> particles;
     List<std::shared_ptr<AudioInstance>> audios;
     List<PreviewTile> previewTiles;
     List<OverheadBar> overheadBars;
+  };
+
+  struct EntityPresentation {
+    std::weak_ptr<Entity> instance;
+    std::uint64_t epoch = 0;
+    PresentationPosition position;
+    bool continuous = false;
+  };
+
+  struct HiddenEntityAudio {
+    std::weak_ptr<Entity> instance;
+    List<std::shared_ptr<AudioInstance>> loops;
   };
 
   struct DamageNumber {
@@ -404,6 +426,11 @@ private:
   JsonObject m_worldProperties;
 
   std::shared_ptr<EntityMap> m_entityMap;
+  Map<EntityId, EntityPresentation> m_entityPresentation;
+  Map<EntityId, HiddenEntityAudio> m_hiddenEntityAudio;
+  float m_inspectionFlickerMultiplier = 1.0f;
+  float m_presentationTimestep = 0.0f;
+  ClientRenderCallback m_eventRenderCallback{std::nullopt};
   std::shared_ptr<ClientTileSectorArray> m_tileArray;
   ClientTileGetter m_tileGetterFunction;
   std::shared_ptr<DamageManager> m_damageManager;

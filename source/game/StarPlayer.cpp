@@ -1009,6 +1009,8 @@ ClientEntityMode Player::clientEntityMode() const {
 }
 
 std::expected<void, StarException> Player::init(World& world, EntityId entityId, EntityMode mode) {
+  m_hiddenLoopAudios.clear();
+  m_presentationBars.clear();
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
   m_movementController->setNetworkMovingDirection({});
@@ -1121,10 +1123,18 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       return std::unexpected(std::move(result.error()));
   }
   m_xAimPositionNetState.setInterpolator(world.geometry().xLerpFunction());
-  return refreshEquipment();
+  if (auto result = refreshEquipment(); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = updateHumanoidDirectives(); !result)
+    return std::unexpected(std::move(result.error()));
+  return humanoid()->prepareAnimatorPose();
 }
 
 std::expected<void, StarException> Player::uninit() {
+  for (auto const& audio : m_hiddenLoopAudios)
+    audio->stop();
+  m_hiddenLoopAudios.clear();
+  m_presentationBars.clear();
   std::optional<StarException> error;
   auto remember = [&error](auto result) {
     if (!result) {
@@ -1165,36 +1175,36 @@ std::expected<void, StarException> Player::uninit() {
   return {};
 }
 
-std::expected<List<Drawable>, StarException> Player::drawables() const {
+std::expected<void, StarException> Player::updateHumanoidDirectives() {
+  DirectivesGroup directives;
+  Vec2F scale = Vec2F::filled(1.f);
+  for (auto const* group : {&m_techController->parentDirectives(), &m_statusController->parentDirectives()}) {
+    for (auto const& entry : group->list()) {
+      auto extracted = Humanoid::extractScaleFromDirectives(entry);
+      if (!extracted)
+        return std::unexpected(std::move(extracted.error()));
+      scale = scale.piecewiseMultiply(extracted->first);
+      directives.append(extracted->second);
+    }
+  }
+  humanoid()->setScale(scale);
+  m_presentationHumanoidDirectives = std::move(directives);
+  return {};
+}
+
+std::expected<List<Drawable>, StarException> Player::drawables(float interpolation) const {
   List<Drawable> drawables;
   if (!isTeleporting()) {
-    auto backResult = m_techController->backDrawables();
+    auto backResult = m_techController->backDrawables(interpolation);
     if (!backResult)
       return std::unexpected(std::move(backResult.error()));
     auto back = std::move(*backResult);
     drawables.appendAll(std::move(back));
     if (!m_techController->parentHidden()) {
-      if (auto result = m_tools->setupHumanoidHandItemDrawables(*humanoid()); !result)
+      if (auto result = m_tools->setupHumanoidHandItemDrawables(*humanoid(), interpolation); !result)
         return std::unexpected(std::move(result.error()));
-      DirectivesGroup directives;
-      Vec2F scale = Vec2F::filled(1.f);
-      auto extractScale = [&](List<Directives> const& list) -> std::expected<void, StarException> {
-        for (auto const& entry : list) {
-          auto resultResult = Humanoid::extractScaleFromDirectives(entry);
-          if (!resultResult)
-            return std::unexpected(std::move(resultResult.error()));
-          auto result = std::move(*resultResult);
-          scale = scale.piecewiseMultiply(result.first);
-          directives.append(result.second);
-        }
-        return {};
-      };
-      if (auto result = extractScale(m_techController->parentDirectives().list()); !result)
-        return std::unexpected(std::move(result.error()));
-      if (auto result = extractScale(m_statusController->parentDirectives().list()); !result)
-        return std::unexpected(std::move(result.error()));
-      humanoid()->setScale(scale);
-      auto renderedResult = humanoid()->render();
+      auto const& directives = m_presentationHumanoidDirectives;
+      auto renderedResult = humanoid()->render(true, true, interpolation);
       if (!renderedResult)
         return std::unexpected(std::move(renderedResult.error()));
       auto rendered = std::move(*renderedResult);
@@ -1217,12 +1227,12 @@ std::expected<List<Drawable>, StarException> Player::drawables() const {
         drawables.append(std::move(drawable));
       }
     }
-    auto frontResult = m_techController->frontDrawables();
+    auto frontResult = m_techController->frontDrawables(interpolation);
     if (!frontResult)
       return std::unexpected(std::move(frontResult.error()));
     auto front = std::move(*frontResult);
     drawables.appendAll(std::move(front));
-    auto statusResult = m_statusController->drawables();
+    auto statusResult = m_statusController->drawables(interpolation);
     if (!statusResult)
       return std::unexpected(std::move(statusResult.error()));
     auto status = std::move(*statusResult);
@@ -1245,9 +1255,6 @@ std::expected<List<Drawable>, StarException> Player::drawables() const {
   return drawables;
 }
 
-std::expected<List<OverheadBar>, StarException> Player::bars() const {
-  return m_statusController->overheadBars();
-}
 
 std::expected<List<Particle>, StarException> Player::particles() {
   List<Particle> particles;
@@ -1327,22 +1334,29 @@ bool Player::underwater() const {
 }
 
 std::expected<List<LightSource>, StarException> Player::lightSources() const {
+  return presentationLightSources(1.0f);
+}
+
+std::expected<List<LightSource>, StarException> Player::presentationLightSources(float interpolation) const {
   List<LightSource> lights;
-  auto toolsResult = m_tools->lightSources();
+  auto toolsResult = m_tools->lightSources(interpolation);
   if (!toolsResult)
     return std::unexpected(std::move(toolsResult.error()));
   auto tools = std::move(*toolsResult);
   lights.appendAll(std::move(tools));
-  auto statusResult = m_statusController->lightSources();
+  auto statusResult = m_statusController->lightSources(interpolation);
   if (!statusResult)
     return std::unexpected(std::move(statusResult.error()));
   auto status = std::move(*statusResult);
   lights.appendAll(std::move(status));
-  auto techResult = m_techController->lightSources();
+  auto techResult = m_techController->lightSources(interpolation);
   if (!techResult)
     return std::unexpected(std::move(techResult.error()));
   auto tech = std::move(*techResult);
   lights.appendAll(std::move(tech));
+  auto humanoidSample = humanoid()->networkedAnimator()->get().sample(interpolation);
+  if (auto prepared = humanoid()->prepareAnimatorPose(interpolation); !prepared)
+    return std::unexpected(std::move(prepared.error()));
   auto humanoidLightsResult = humanoid()->networkedAnimator()->get().lightSources();
   if (!humanoidLightsResult)
     return std::unexpected(std::move(humanoidLightsResult.error()));
@@ -1621,6 +1635,7 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
+  resetPresentation();
   m_movementController->setPosition(footPosition - offset);
   m_movementController->setVelocity(Vec2F());
   if (auto result = m_techController->reloadTech(); !result)
@@ -2478,15 +2493,29 @@ EntityId Player::lastDamagedTarget() const {
   return m_lastDamagedTarget;
 }
 
-std::expected<void, StarException> Player::render(RenderCallback& renderCallback) {
-  if (invisible()) {
-    m_techController->pullNewAudios();
-    m_techController->pullNewParticles();
-    m_statusController->pullNewAudios();
-    m_statusController->pullNewParticles();
-    m_humanoidDynamicTarget.pullNewAudios();
-    m_humanoidDynamicTarget.pullNewParticles();
-    return {};
+std::uint64_t Player::presentationEpoch() const {
+  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+}
+
+std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& callback) {
+  NullRenderCallback discard(&m_hiddenLoopAudios);
+  bool hidden = invisible();
+  RenderCallback& renderCallback = hidden ? static_cast<RenderCallback&>(discard) : callback;
+  if (!hidden && !isTeleporting()) {
+    auto bars = m_statusController->overheadBars();
+    if (!bars)
+      return std::unexpected(std::move(bars.error()));
+    m_presentationBars = std::move(*bars);
+  } else {
+    m_presentationBars.clear();
+  }
+  if (!hidden) {
+    for (auto& audio : take(m_hiddenLoopAudios)) {
+      if (!audio->finished()) {
+        if (auto result = callback.addAudio(std::move(audio)); !result)
+          return std::unexpected(std::move(result.error()));
+      }
+    }
   }
   Vec2I sensor = Vec2I((m_config->footstepSensor + m_movementController->position()).floor());
   auto soundResult = getFootstepSound(sensor);
@@ -2568,6 +2597,26 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
     if (auto result = renderCallback.addAudio(std::move(audio)); !result)
       return std::unexpected(std::move(result.error()));
   }
+  auto emittedResult = particles();
+  if (!emittedResult)
+    return std::unexpected(std::move(emittedResult.error()));
+  if (auto result = renderCallback.addParticles(std::move(*emittedResult)); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_tools->collectRenderEvents(renderCallback); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_effectEmitter->collectRenderEvents(renderCallback); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_songbook->collectRenderEvents(renderCallback); !result)
+    return std::unexpected(std::move(result.error()));
+  if (isMaster())
+    return m_deployment->collectRenderEvents(renderCallback, position());
+  return {};
+}
+
+std::expected<void, StarException> Player::render(RenderCallback& renderCallback) {
+  if (invisible())
+    return {};
+  auto effectsSample = m_effectsAnimator->sample(renderCallback.interpolation());
   auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
   EntityRenderLayer layer = RenderLayerPlayer;
   auto overrideLayerResult = getSecretProperty("overrideRenderLayer");
@@ -2578,40 +2627,24 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
     auto valueResult = overrideLayer.toUInt();
     if (!valueResult)
       return std::unexpected(std::move(valueResult.error()));
-    auto value = std::move(*valueResult);
-    layer = value;
+    layer = *valueResult;
   }
   if (loungeAnchor)
     layer = loungeAnchor->loungeRenderLayer;
-  auto renderedResult = drawables();
+  auto renderedResult = drawables(renderCallback.interpolation());
   if (!renderedResult)
     return std::unexpected(std::move(renderedResult.error()));
-  auto rendered = std::move(*renderedResult);
-  if (auto result = renderCallback.addDrawables(std::move(rendered), layer); !result)
+  if (auto result = renderCallback.addDrawables(std::move(*renderedResult), layer); !result)
     return std::unexpected(std::move(result.error()));
   if (!isTeleporting()) {
-    auto overheadResult = bars();
-    if (!overheadResult)
-      return std::unexpected(std::move(overheadResult.error()));
-    auto overhead = std::move(*overheadResult);
-    if (auto result = renderCallback.addOverheadBars(std::move(overhead), position()); !result)
+    if (auto result = renderCallback.addOverheadBars(m_presentationBars, position()); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto emittedResult = particles();
-  if (!emittedResult)
-    return std::unexpected(std::move(emittedResult.error()));
-  auto emitted = std::move(*emittedResult);
-  if (auto result = renderCallback.addParticles(std::move(emitted)); !result)
-    return std::unexpected(std::move(result.error()));
   auto rangeResult = inToolRange();
   if (!rangeResult)
     return std::unexpected(std::move(rangeResult.error()));
   auto range = std::move(*rangeResult);
   if (auto result = m_tools->render(renderCallback, range, m_shifting, layer); !result)
-    return std::unexpected(std::move(result.error()));
-  if (auto result = m_effectEmitter->render(renderCallback); !result)
-    return std::unexpected(std::move(result.error()));
-  if (auto result = m_songbook->render(renderCallback); !result)
     return std::unexpected(std::move(result.error()));
   if (isMaster())
     return m_deployment->render(renderCallback, position());
@@ -2619,7 +2652,8 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
 }
 
 std::expected<void, StarException> Player::renderLightSources(RenderCallback& renderCallback) {
-  auto lightsResult = lightSources();
+  auto effectsSample = m_effectsAnimator->sample(renderCallback.interpolation());
+  auto lightsResult = presentationLightSources(renderCallback.interpolation());
   if (!lightsResult)
     return std::unexpected(std::move(lightsResult.error()));
   auto lights = std::move(*lightsResult);
@@ -3658,6 +3692,8 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       }
     }
   }
+  if (auto result = updateHumanoidDirectives(); !result)
+    return std::unexpected(std::move(result.error()));
   if (currentWorld.isClient()) {
     {
       if (auto result = humanoid()->animate(dt, std::ref(m_humanoidDynamicTarget)); !result)
@@ -3795,7 +3831,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       return std::unexpected(std::move(result.error()));
 
   }
-  return {};
+  return humanoid()->prepareAnimatorPose();
 }
 
 std::expected<String, StarException> Player::getFootstepSound(Vec2I const& sensor) const {
@@ -4084,6 +4120,7 @@ std::expected<void, StarException> Player::setBusyState(PlayerBusyState busyStat
 }
 
 std::expected<void, StarException> Player::teleportOut(String const& animationType, bool deploy) {
+  resetPresentation();
   m_state = State::TeleportOut;
   m_teleportAnimationType = animationType;
   {
@@ -4100,6 +4137,7 @@ std::expected<void, StarException> Player::teleportOut(String const& animationTy
 }
 
 std::expected<void, StarException> Player::teleportIn() {
+  resetPresentation();
   m_state = State::TeleportIn;
   if (auto result = m_effectsAnimator->setState("teleport", m_teleportAnimationType + "In"); !result)
     return std::unexpected(std::move(result.error()));
@@ -4128,6 +4166,7 @@ std::expected<void, StarException> Player::teleportIn() {
 }
 
 std::expected<void, StarException> Player::teleportAbort() {
+  resetPresentation();
   m_state = State::TeleportIn;
   {
     if (auto result = m_effectsAnimator->setState("teleport", "abort"); !result)
@@ -4143,6 +4182,7 @@ std::expected<void, StarException> Player::moveTo(Vec2F const& footPosition) {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
+  resetPresentation();
   m_movementController->setPosition(footPosition - offset);
   m_movementController->setVelocity(Vec2F());
   return {};
@@ -5174,7 +5214,9 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
         return std::unexpected(std::move(result.error()));
     }
   }
-  return {};
+  if (auto result = updateHumanoidDirectives(); !result)
+    return std::unexpected(std::move(result.error()));
+  return humanoid()->prepareAnimatorPose();
 }
 
 std::expected<void, StarException> Player::setAnimationParameter(String name, Json value) {

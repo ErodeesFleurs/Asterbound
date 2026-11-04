@@ -79,6 +79,26 @@ target_link_libraries (core_tests PRIVATE star_base_modules star_build_config st
 set_target_properties (core_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAND core_tests)
 
+# Exercise the production deadline scheduler without SDL, a renderer, or assets.
+# Its standalone module provider also keeps these tests available in headless builds.
+add_executable(fixed_scheduler_tests
+  $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
+  gtest/gtest-all.cc core_tests_main.cpp fixed_scheduler_test.cpp)
+target_sources(fixed_scheduler_tests PRIVATE FILE_SET CXX_MODULES
+  BASE_DIRS ${PROJECT_SOURCE_DIR}/application FILES
+  ${PROJECT_SOURCE_DIR}/application/StarFixedScheduler.cppm)
+target_include_directories(fixed_scheduler_tests PRIVATE
+  ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
+  ${STAR_PLATFORM_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(fixed_scheduler_tests PRIVATE
+  star_base_modules star_build_config star_vorbis_dependencies star_lua
+  $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
+set_target_properties(fixed_scheduler_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+add_test(NAME fixed_scheduler_tests
+  WORKING_DIRECTORY $<TARGET_FILE_DIR:fixed_scheduler_tests>
+  COMMAND fixed_scheduler_tests)
+set_tests_properties(fixed_scheduler_tests PROPERTIES LABELS "NoAssets")
+
 if (STAR_BUILD_GUI AND STAR_ENABLE_DISCORD_INTEGRATION)
   # Compile the real PC services in isolation: no Steam initialization, GUI,
   # assets, or native Discord library. The SDK wrappers call our DiscordCreate
@@ -149,6 +169,7 @@ set (star_game_tests_SOURCES
       assets_patch_read_test.cpp
       assets_reference_cache_test.cpp
       biome_placement_test.cpp
+      camera_presentation_test.cpp
       damage_database_test.cpp
       function_test.cpp
       humanoid_render_test.cpp
@@ -158,6 +179,7 @@ set (star_game_tests_SOURCES
       lua_component_test.cpp
       material_types_test.cpp
       movement_controller_test.cpp
+      particle_presentation_test.cpp
       physics_object_test.cpp
       root_test.cpp
       server_test.cpp

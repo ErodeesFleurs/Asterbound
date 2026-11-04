@@ -31,6 +31,7 @@ import star.root;
 
 import star.vector;
 import star.math_common;
+import star.world_geometry;
 namespace Star {
 
 std::expected<EnumMap<Particle::Type>, StarException> const Particle::TypeNames = EnumMap<Type>::create({{Type::Variance, "variance"},
@@ -281,7 +282,8 @@ Particle::Particle(Particle&& other)
     underwaterOnly(other.underwaterOnly),
     ignoreWind(other.ignoreWind),
     trail(other.trail),
-    animation(std::move(other.animation)) {
+    animation(std::move(other.animation)),
+    m_presentationIdentity(other.m_presentationIdentity) {
   other.animation.reset();
 }
 
@@ -318,6 +320,7 @@ Particle& Particle::operator=(Particle&& other) {
     ignoreWind = other.ignoreWind;
     trail = other.trail;
     animation = std::move(other.animation);
+    m_presentationIdentity = other.m_presentationIdentity;
     other.animation.reset();
   }
   return *this;
@@ -403,6 +406,58 @@ std::expected<void, StarException> Particle::update(Root& root, float dt, Vec2F 
 
 bool Particle::dead() const {
   return timeToLive < -destructionTime;
+}
+
+Particle::PresentationState Particle::presentationState() const {
+  return {position, velocity, rotation, size, color, light, timeToLive, type, destructionSet,
+      animation ? std::optional(animation->playbackState()) : std::nullopt};
+}
+
+void Particle::samplePresentation(Particle const& current, PresentationState const& previous,
+    WorldGeometry const& geometry, float interpolation, float timestep, std::uint64_t identity) {
+  float alpha = std::clamp(interpolation, 0.0f, 1.0f);
+  bool sameState = previous.type == current.type && previous.destructionSet == current.destructionSet;
+  if (m_presentationIdentity != identity || type != current.type || destructionSet != current.destructionSet) {
+    type = current.type;
+    string = type == Type::Text ? current.string : String();
+    image = type == Type::Textured ? current.image : AssetPath();
+    directives = type == Type::Textured ? current.directives : DirectivesGroup();
+    animation = type == Type::Animated ? current.animation : std::nullopt;
+    fullbright = current.fullbright;
+    flip = current.flip;
+    flippable = current.flippable;
+    layer = current.layer;
+    length = current.length;
+    m_presentationIdentity = identity;
+    destructionSet = current.destructionSet;
+  }
+
+  position = previous.position + geometry.diff(current.position, previous.position) * alpha;
+  velocity = previous.velocity + (current.velocity - previous.velocity) * alpha;
+  // Rotation is deliberately unwrapped: a particle can turn more than half a
+  // revolution in one tick, and its angular velocity defines that motion.
+  rotation = sameState
+      ? previous.rotation + (current.rotation - previous.rotation) * alpha : current.rotation;
+  size = sameState
+      ? previous.size + (current.size - previous.size) * alpha : current.size;
+  color = sameState ? previous.color.mix(current.color, alpha) : current.color;
+  light = previous.light.mix(current.light, alpha);
+  timeToLive = previous.timeToLive + (current.timeToLive - previous.timeToLive) * alpha;
+
+  // Destruction begins at the sampled lifetime boundary, not at the beginning
+  // of the tick that crosses it. Image changes remain discrete tick events.
+  if (sameState && current.destructionTime > 0) {
+    float factor = (timeToLive + current.destructionTime) / current.destructionTime;
+    if (current.destructionAction == DestructionAction::Shrink)
+      size = timeToLive < 0 ? current.baseSize * factor : previous.size;
+    else if (current.destructionAction == DestructionAction::Fade) {
+      color = previous.color;
+      if (timeToLive < 0)
+        color.setAlphaF(factor);
+    }
+  }
+  if (animation && previous.animation && sameState)
+    animation->samplePlayback(*previous.animation, timestep * alpha);
 }
 
 void Particle::applyVariance(Root& root, Particle const& variance) {

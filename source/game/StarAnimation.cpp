@@ -193,6 +193,32 @@ void Animation::update(float dt) {
   m_tagValues["index"] = toString(m_frame);
 }
 
+Animation::PlaybackState Animation::playbackState() const {
+  return {m_animationTimer, m_completed};
+}
+
+void Animation::samplePlayback(PlaybackState const& previous, float elapsed) {
+  int previousFrame = m_frame;
+  m_animationTimer = previous.timer + elapsed;
+  m_completed = previous.completed;
+  if (m_mode == Animation::LoopForever) {
+    m_animationTimer = std::fmod(m_animationTimer, m_animationCycle);
+  } else if (m_animationTimer >= m_timeToLive) {
+    m_completed = true;
+  }
+
+  if (m_completed && m_mode == Animation::EndAndDisappear) {
+    m_frame = -1;
+  } else if (m_completed) {
+    m_frame = m_variantOffset + m_frameNumber - 1;
+  } else {
+    float withinCycle = std::fmod(m_animationTimer, m_animationCycle);
+    m_frame = m_variantOffset + clamp<int>(withinCycle / (m_animationCycle / m_frameNumber), 0, m_frameNumber - 1);
+  }
+  if (m_frame != previousFrame)
+    m_tagValues["index"] = toString(m_frame);
+}
+
 bool Animation::isComplete() const {
   return m_completed;
 }

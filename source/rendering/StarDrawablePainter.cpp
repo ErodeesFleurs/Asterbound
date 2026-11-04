@@ -32,14 +32,19 @@ DrawablePainter::DrawablePainter(std::shared_ptr<Renderer> renderer, std::shared
 }
 
 std::expected<void, StarException> DrawablePainter::drawDrawable(Drawable const& drawable) {
+  return drawDrawableProjected(drawable, drawable.position, 1.0f, 1.0f);
+}
+
+std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawable const& drawable, Vec2F position, float scale, float lineWidthScale) {
   Vec4B color = drawable.color.toRgba();
   auto& primitives = m_renderer->immediatePrimitives();
 
   if (std::holds_alternative<Drawable::LinePart>(drawable.part)) {
     auto const& linePart = std::get<Drawable::LinePart>(drawable.part);
     auto line = linePart.line;
-    line.translate(drawable.position);
-    Vec2F left = Vec2F(vnorm(line.diff())).rot90() * linePart.width / 2.0f;
+    line.scale(Vec2F::filled(scale));
+    line.translate(position);
+    Vec2F left = Vec2F(vnorm(line.diff())).rot90() * linePart.width * lineWidthScale / 2.0f;
     
     float fullbright = drawable.fullbright ? 0.0f : 1.0f;
     auto& primitive = primitives.emplace_back(std::in_place_type_t<RenderQuad>(),
@@ -55,7 +60,8 @@ std::expected<void, StarException> DrawablePainter::drawDrawable(Drawable const&
   } else if (std::holds_alternative<Drawable::PolyPart>(drawable.part)) {
     auto const& polyPart = std::get<Drawable::PolyPart>(drawable.part);
     PolyF poly = polyPart.poly;
-    poly.translate(drawable.position);
+    poly.scale(Vec2F::filled(scale));
+    poly.translate(position);
 
     primitives.emplace_back(std::in_place_type_t<RenderPoly>(), poly.vertexes(), color, 0.0f);
 
@@ -66,9 +72,9 @@ std::expected<void, StarException> DrawablePainter::drawDrawable(Drawable const&
       return std::unexpected(std::move(loaded.error()));
     TexturePtr texture = std::move(*loaded);
 
-    Vec2F position = drawable.position;
     Vec2F textureSize(texture->size());
     Mat3F transformation = imagePart.transformation;
+    transformation.scale(Vec2F::filled(scale));
     Vec2F lowerLeft  = { transformation[0][2] += position.x(), transformation[1][2] += position.y() };
     Vec2F lowerRight = transformation * Vec2F(textureSize.x(), 0.f);
     Vec2F upperRight = transformation * textureSize;

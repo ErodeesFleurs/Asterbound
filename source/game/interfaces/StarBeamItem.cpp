@@ -173,7 +173,6 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
     target.get() = *value;
   }
   m_color = Color::White;
-  m_particleGenerateCooldown = .25;
   m_inRangeLastUpdate = false;
   return {};
 }
@@ -183,6 +182,10 @@ std::expected<void, StarException> BeamItem::init(ToolUserEntity& owner, ToolHan
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   m_beamCurve = CSplineF();
+  m_inRangeLastUpdate = false;
+  m_beamInRange = false;
+  m_beamCanPlace = true;
+  m_lastUpdateColor = m_color;
   if (!this->initialized())
     return std::unexpected(ItemException("BeamItem::init: Beam Gun not init'd properly, or user not recognized as Tool User."));
   m_color = owner.favoriteColor();
@@ -193,9 +196,7 @@ std::expected<void, StarException> BeamItem::init(ToolUserEntity& owner, ToolHan
   return {};
 }
 
-std::expected<void, StarException> BeamItem::update(float dt, FireMode, bool, HashSet<MoveControlType> const&) {
-  if (m_particleGenerateCooldown >= 0)
-    m_particleGenerateCooldown -= dt;
+std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashSet<MoveControlType> const&) {
   if (!initialized())
     return std::unexpected(ItemException("BeamItem::update: Beam Gun not init'd properly, or user not recognized as Tool User."));
   auto itemOwner = owner();
@@ -237,6 +238,82 @@ std::expected<void, StarException> BeamItem::update(float dt, FireMode, bool, Ha
   return {};
 }
 
+std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
+  m_beamInRange = false;
+  if (!visible || !beamActive() || !initialized()) {
+    m_inRangeLastUpdate = false;
+    return {};
+  }
+
+  auto itemOwner = owner();
+  if (!itemOwner)
+    return std::unexpected(std::move(itemOwner.error()));
+  auto aimPosition = itemOwner->get().aimPosition();
+  if (!aimPosition)
+    return std::unexpected(std::move(aimPosition.error()));
+  Vec2F endPoint;
+  if (m_endType == EndType::TileGroup)
+    endPoint = aimPosition->round();
+  else if (m_endType == EndType::Wire)
+    endPoint = *aimPosition;
+  else
+    endPoint = centerOfTile(*aimPosition);
+
+  float curveLen = m_beamCurve.length();
+  m_beamInRange = (endPoint - itemOwner->get().position()).magnitude() <= m_range && curveLen <= m_range;
+  if (m_beamInRange) {
+    auto canPlace = beamCanPlace();
+    if (!canPlace)
+      return std::unexpected(std::move(canPlace.error()));
+    m_beamCanPlace = *canPlace;
+    m_lastUpdateColor = m_color;
+    if (!m_beamCanPlace)
+      m_lastUpdateColor.setHue(m_lastUpdateColor.hue() + 120);
+    m_inRangeLastUpdate = true;
+    return {};
+  }
+  if (!std::exchange(m_inRangeLastUpdate, false))
+    return {};
+
+  List<Particle> beamLeftovers;
+  for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun * 2 - .5); i++) {
+    float pos = (float)i / (float)(int)(curveLen * m_targetSegmentRun * 2 + .5);
+    float curveLoc = m_beamCurve.arcLenPara(pos);
+    Particle beamParticle;
+    beamParticle.type = Particle::Type::Ember;
+    beamParticle.position = itemOwner->get().position() + m_beamCurve.pointAt(curveLoc);
+    beamParticle.size = 1.0f;
+    Color randomColor = m_lastUpdateColor;
+    auto valueScale = beamRoot().random().randf(1, 4);
+    if (!valueScale)
+      return std::unexpected(std::move(valueScale.error()));
+    randomColor.setValue(1 - (1 - randomColor.value()) / *valueScale);
+    auto saturationScale = beamRoot().random().randf(1, 4);
+    if (!saturationScale)
+      return std::unexpected(std::move(saturationScale.error()));
+    randomColor.setSaturation(randomColor.saturation() / *saturationScale);
+    beamParticle.color = randomColor;
+    beamParticle.velocity = Vec2F::filled(beamRoot().random().randf());
+    beamParticle.finalVelocity = Vec2F(0.0f, -20.0f);
+    beamParticle.approach = Vec2F(0.0f, 5.0f);
+    beamParticle.timeToLive = 0.25f;
+    beamParticle.destructionAction = Particle::DestructionAction::Shrink;
+    beamParticle.destructionTime = 0.2f;
+    beamLeftovers.append(std::move(beamParticle));
+  }
+  // Capture world positions at the producing tick, not at display sampling or
+  // a later owner position.
+  return itemOwner->get().addParticles(beamLeftovers);
+}
+
+bool BeamItem::beamActive() const {
+  return true;
+}
+
+std::expected<bool, StarException> BeamItem::beamCanPlace() const {
+  return true;
+}
+
 std::expected<List<Drawable>, StarException> BeamItem::nonRotatedDrawables() const {
   return beamDrawables();
 }
@@ -276,7 +353,7 @@ std::expected<float, StarException> BeamItem::getAppropriateOpacity() const {
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
   auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(beamRoot().random().nrandf(dev, projectOntoRange(min, max)), min, max);
+    return clamp<float>(beamRoot().presentationRandom().nrandf(dev, projectOntoRange(min, max)), min, max);
   };
 
   int numLines = projectOntoRange(m_minBeamLines, m_maxBeamLines);
@@ -292,7 +369,7 @@ void BeamItem::setEnd(EndType type) {
   m_endType = type;
 }
 
-std::expected<List<Drawable>, StarException> BeamItem::beamDrawables(bool canPlace) const {
+std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
   List<Drawable> res;
 
   float curveLen = m_beamCurve.length();
@@ -300,31 +377,12 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables(bool canPla
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
   auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(beamRoot().random().nrandf(dev, projectOntoRange(min, max)), min, max);
+    return clamp<float>(beamRoot().presentationRandom().nrandf(dev, projectOntoRange(min, max)), min, max);
   };
 
-  if (initialized()) {
-    auto itemOwner = owner();
-    if (!itemOwner)
-      return std::unexpected(std::move(itemOwner.error()));
-    auto aimPosition = itemOwner->get().aimPosition();
-    if (!aimPosition)
-      return std::unexpected(std::move(aimPosition.error()));
-    Vec2F endPoint;
-    if (m_endType == EndType::TileGroup)
-      endPoint = aimPosition->round();
-    else if (m_endType == EndType::Wire)
-      endPoint = *aimPosition;
-    else
-      endPoint = centerOfTile(*aimPosition);
-
-    if ((endPoint - itemOwner->get().position()).magnitude() <= m_range && curveLen <= m_range) {
-      m_inRangeLastUpdate = true;
+  if (initialized() && m_beamInRange) {
       int numLines = projectOntoRange(m_minBeamLines, m_maxBeamLines);
-      Color mainColor = m_color;
-      if (!canPlace)
-        mainColor.setHue(mainColor.hue() + 120);
-      m_lastUpdateColor = mainColor;
+      Color mainColor = m_lastUpdateColor;
 
       String endImage = "";
       if (m_endType != EndType::Invalid) {
@@ -332,7 +390,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables(bool canPla
       }
 
       if (!endImage.empty()) {
-        if (!canPlace) {
+        if (!m_beamCanPlace) {
           ImageOperation op = HueShiftImageOperation::hueShiftDegrees(120);
           endImage = strf("{}?{}", endImage, imageOperationToString(op));
         }
@@ -393,48 +451,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables(bool canPla
             Color::rgba(secondStripe),
             Vec2F()));
       }
-    } else {
-      if (m_inRangeLastUpdate) {
-        m_inRangeLastUpdate = false;
-        m_particleGenerateCooldown = .25; // TODO, expose to json
-        List<Particle> beamLeftovers;
-        for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun * 2 - .5); i++) { // one less than full length
-          float pos =
-              (float)i / (float)(int)(curveLen * m_targetSegmentRun * 2 + .5); // project the discrete steps evenly
-          float curveLoc = m_beamCurve.arcLenPara(pos);
-
-          Particle beamParticle;
-          beamParticle.type = Particle::Type::Ember;
-          beamParticle.position = m_beamCurve.pointAt(curveLoc);
-          beamParticle.size = 1.0f;
-
-          Color randomColor = m_lastUpdateColor;
-          auto valueScale = beamRoot().random().randf(1, 4);
-          if (!valueScale)
-            return std::unexpected(std::move(valueScale.error()));
-          randomColor.setValue(1 - (1 - randomColor.value()) / *valueScale);
-          auto saturationScale = beamRoot().random().randf(1, 4);
-          if (!saturationScale)
-            return std::unexpected(std::move(saturationScale.error()));
-          randomColor.setSaturation(randomColor.saturation() / *saturationScale);
-
-          beamParticle.color = randomColor;
-          beamParticle.velocity = Vec2F::filled(beamRoot().random().randf());
-          beamParticle.finalVelocity = Vec2F(0.0f, -20.0f);
-          beamParticle.approach = Vec2F(0.0f, 5.0f);
-          beamParticle.timeToLive = 0.25f;
-          beamParticle.destructionAction = Particle::DestructionAction::Shrink;
-          beamParticle.destructionTime = 0.2f;
-          beamLeftovers.append(beamParticle);
-        }
-
-        auto added = itemOwner->get().addParticles(beamLeftovers);
-        if (!added)
-          return std::unexpected(std::move(added.error()));
-      }
-    }
   }
-
   return res;
 }
 

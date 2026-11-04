@@ -1,4 +1,5 @@
 import std;
+import star.math_common;
 import star.json;
 import star.xx_hash;
 import star.json_extra;
@@ -178,6 +179,19 @@ import star.shaders_menu;
 
 namespace Star {
 
+namespace {
+
+std::expected<double, StarException> validatedRenderFpsLimit(Json const& value) {
+  auto rate = value.toDouble();
+  if (!rate)
+    return std::unexpected(std::move(rate.error()));
+  if (!isFinite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
+    return std::unexpected(GuiException("renderFpsLimit must be a finite nonnegative render rate"));
+  return *rate;
+}
+
+}
+
 GraphicsMenu::GraphicsMenu(GuiContext& guiContext, PaneManager& manager)
   : Pane(guiContext), m_paneManager(std::ref(manager)) {}
 
@@ -242,6 +256,16 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
   reader.registerCallback("interfaceScaleSlider", [this](Widget&) -> std::expected<void, StarException> {
     return updateFloatSlider("interfaceScaleSlider", "interfaceScale", m_interfaceScaleList, SettingUpdate::Staged);
   });
+  reader.registerCallback("renderFpsSlider", [this](Widget&) -> std::expected<void, StarException> {
+    auto slider = requireChild<SliderBarWidget>("renderFpsSlider");
+    if (!slider)
+      return std::unexpected(std::move(slider.error()));
+    auto rate = m_renderFpsList.at((*slider)->val());
+    if (!rate)
+      return std::unexpected(std::move(rate.error()));
+    m_localChanges.set("renderFpsLimit", rate->get());
+    return syncGui();
+  });
   // Zoom and camera speed also update the running configuration immediately.
   reader.registerCallback("zoomSlider", [this](Widget&) -> std::expected<void, StarException> {
     return updateFloatSlider("zoomSlider", "zoomLevel", m_zoomList, SettingUpdate::Live);
@@ -283,10 +307,11 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
       m_localChanges.set("fullscreen", !checked);
     return syncGui();
   });
-  // These texture settings are staged, unlike the live checkboxes above.
+  // Texture settings and presentation timing remain staged until Apply.
   for (auto const& [callback, key] :
        {std::pair{std::string_view("textureLimitCheckbox"), std::string_view("limitTextureAtlasSize")},
-        std::pair{std::string_view("multiTextureCheckbox"), std::string_view("useMultiTexturing")}}) {
+        std::pair{std::string_view("multiTextureCheckbox"), std::string_view("useMultiTexturing")},
+        std::pair{std::string_view("vsyncCheckbox"), std::string_view("vsync")}}) {
     reader.registerCallback(callback, [this, callback, key](Widget&) -> std::expected<void, StarException> {
       auto button = requireChild<ButtonWidget>(callback);
       if (!button)
@@ -347,6 +372,18 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
   if (!speeds)
     return std::unexpected(std::move(speeds.error()));
   m_cameraSpeedList = std::move(*speeds);
+  auto renderFpsJson = config->getArray("renderFpsList");
+  if (!renderFpsJson)
+    return std::unexpected(std::move(renderFpsJson.error()));
+  for (auto const& value : *renderFpsJson) {
+    auto rate = validatedRenderFpsLimit(value);
+    if (!rate)
+      return std::unexpected(std::move(rate.error()));
+    m_renderFpsPresets.append(*rate);
+  }
+  if (m_renderFpsPresets.empty() || m_renderFpsPresets.front() != 0
+      || !std::is_sorted(m_renderFpsPresets.begin(), m_renderFpsPresets.end()))
+    return std::unexpected(GuiException("Graphics menu render FPS presets must be sorted and begin with unlimited (0)"));
   if (m_interfaceScaleList.empty() || m_resList.empty() || m_zoomList.empty() || m_cameraSpeedList.empty())
     return std::unexpected(GuiException("Graphics menu slider value lists must not be empty"));
   if (auto result = reader.construct(*layout, *this); !result)
@@ -423,6 +460,8 @@ StringList const GraphicsMenu::ConfigKeys = {
   "interfaceScale",
   "zoomLevel",
   "cameraSpeedFactor",
+  "renderFpsLimit",
+  "vsync",
   "speechBubbles",
   "interactiveHighlight",
   "fullscreen",
@@ -446,6 +485,22 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
       return std::unexpected(std::move(value.error()));
     m_localChanges.set(key, std::move(*value));
   }
+  auto fps = m_localChanges.get("renderFpsLimit");
+  if (!fps)
+    return std::unexpected(std::move(fps.error()));
+  auto rate = validatedRenderFpsLimit(fps->get());
+  if (!rate)
+    return std::unexpected(std::move(rate.error()));
+  // Include the exact configured value, rather than rounding custom limits to a preset.
+  m_renderFpsList = m_renderFpsPresets;
+  auto it = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), *rate);
+  if (it == m_renderFpsList.end() || *it != *rate)
+    m_renderFpsList.insert(it, *rate);
+  auto slider = requireChild<SliderBarWidget>("renderFpsSlider");
+  if (!slider)
+    return std::unexpected(std::move(slider.error()));
+  if (auto result = (*slider)->setRange(0, m_renderFpsList.size() - 1, 1); !result)
+    return std::unexpected(std::move(result.error()));
   return {};
 }
 
@@ -518,11 +573,26 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     return std::unexpected(std::move(result.error()));
   if (auto result = setRequiredLabel("cameraSpeedValueLabel", strf("{}x", *speed)); !result)
     return std::unexpected(std::move(result.error()));
+  auto fpsSetting = m_localChanges.get("renderFpsLimit");
+  if (!fpsSetting)
+    return std::unexpected(std::move(fpsSetting.error()));
+  auto fps = validatedRenderFpsLimit(fpsSetting->get());
+  if (!fps)
+    return std::unexpected(std::move(fps.error()));
+  auto fpsSlider = requireChild<SliderBarWidget>("renderFpsSlider");
+  if (!fpsSlider)
+    return std::unexpected(std::move(fpsSlider.error()));
+  auto fpsIt = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), *fps);
+  if (auto result = (*fpsSlider)->setVal(fpsIt - m_renderFpsList.begin(), false); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = setRequiredLabel("renderFpsValueLabel", *fps == 0 ? "UNLIMITED" : toString(*fps)); !result)
+    return std::unexpected(std::move(result.error()));
   for (auto const& [name, key] : {
       std::pair{std::string_view("speechBubbleCheckbox"), std::string_view("speechBubbles")},
       std::pair{std::string_view("interactiveHighlightCheckbox"), std::string_view("interactiveHighlight")},
       std::pair{std::string_view("fullscreenCheckbox"), std::string_view("fullscreen")},
       std::pair{std::string_view("borderlessCheckbox"), std::string_view("borderless")},
+      std::pair{std::string_view("vsyncCheckbox"), std::string_view("vsync")},
       std::pair{std::string_view("textureLimitCheckbox"), std::string_view("limitTextureAtlasSize")},
       std::pair{std::string_view("antiAliasingCheckbox"), std::string_view("antiAliasing")},
       std::pair{std::string_view("monochromeCheckbox"), std::string_view("monochromeLighting")},
@@ -560,10 +630,26 @@ std::expected<void, StarException> GraphicsMenu::apply() {
   auto configuration = context().root().configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
+  auto fpsSetting = m_localChanges.get("renderFpsLimit");
+  if (!fpsSetting)
+    return std::unexpected(std::move(fpsSetting.error()));
+  auto fps = validatedRenderFpsLimit(fpsSetting->get());
+  if (!fps)
+    return std::unexpected(std::move(fps.error()));
+  auto vsyncSetting = m_localChanges.get("vsync");
+  if (!vsyncSetting)
+    return std::unexpected(std::move(vsyncSetting.error()));
+  auto vsync = vsyncSetting->get().toBool();
+  if (!vsync)
+    return std::unexpected(std::move(vsync.error()));
   for (auto const& [key, value] : m_localChanges) {
     if (auto result = (*configuration)->set(key, value); !result)
       return std::unexpected(std::move(result.error()));
   }
+  auto controller = context().applicationController();
+  if (auto result = controller->setVSyncEnabled(*vsync); !result)
+    return std::unexpected(std::move(result.error()));
+  controller->setTargetRenderRate(static_cast<float>(*fps));
   return {};
 }
 

@@ -49,13 +49,25 @@ public:
 
   void update(float dt);
 
+  // Logic samples stay independent of the camera used to present and hit-test.
+  void beginUpdate();
+  void setRenderInterpolation(float interpolation);
+  void resetPresentation();
+  void restoreRenderTransform(WorldCamera const& displayed);
+
 private:
+  void updateRenderPosition(Vec2F position, bool force);
+
   WorldGeometry m_worldGeometry;
   Vec2U m_screenSize;
   float m_pixelRatio = 1.0f;
   float m_targetPixelRatio = 1.0f;
   Vec2F m_worldCenter;
   Vec2F m_rawWorldCenter;
+  Vec2F m_previousWorldCenter;
+  float m_previousPixelRatio = 1.0f;
+  float m_renderPixelRatio = 1.0f;
+  bool m_presentationValid = false;
 };
 
 inline void WorldCamera::setScreenSize(Vec2U screenSize) {
@@ -71,14 +83,17 @@ inline void WorldCamera::setTargetPixelRatio(float targetPixelRatio) {
 }
 
 inline void WorldCamera::setPixelRatio(float pixelRatio) {
-  m_pixelRatio = m_targetPixelRatio = pixelRatio;
+  m_pixelRatio = m_targetPixelRatio = m_renderPixelRatio = m_previousPixelRatio = pixelRatio;
+  updateRenderPosition(m_rawWorldCenter, true);
 }
 
 inline float WorldCamera::pixelRatio() const {
-  return m_pixelRatio;
+  return m_renderPixelRatio;
 }
 
 inline void WorldCamera::setWorldGeometry(WorldGeometry geometry) {
+  if (m_worldGeometry != geometry)
+    m_presentationValid = false;
   m_worldGeometry = std::move(geometry);
 }
 
@@ -93,36 +108,36 @@ inline Vec2F WorldCamera::centerWorldPosition() const {
 inline Vec2F WorldCamera::worldToScreen(Vec2F worldCoord) const {
   Vec2F wrappedCoord = m_worldGeometry.nearestTo(Vec2F(m_worldCenter), worldCoord);
   return Vec2F(
-      (wrappedCoord[0] - m_worldCenter[0]) * (TilePixels * m_pixelRatio) + (float)m_screenSize[0] / 2.0,
-      (wrappedCoord[1] - m_worldCenter[1]) * (TilePixels * m_pixelRatio) + (float)m_screenSize[1] / 2.0
+      (wrappedCoord[0] - m_worldCenter[0]) * (TilePixels * m_renderPixelRatio) + (float)m_screenSize[0] / 2.0,
+      (wrappedCoord[1] - m_worldCenter[1]) * (TilePixels * m_renderPixelRatio) + (float)m_screenSize[1] / 2.0
     );
 }
 
 inline Vec2F WorldCamera::screenToWorld(Vec2F screen) const {
   return Vec2F(
-      (screen[0] - (float)m_screenSize[0] / 2.0) / (TilePixels * m_pixelRatio) + m_worldCenter[0],
-      (screen[1] - (float)m_screenSize[1] / 2.0) / (TilePixels * m_pixelRatio) + m_worldCenter[1]
+      (screen[0] - (float)m_screenSize[0] / 2.0) / (TilePixels * m_renderPixelRatio) + m_worldCenter[0],
+      (screen[1] - (float)m_screenSize[1] / 2.0) / (TilePixels * m_renderPixelRatio) + m_worldCenter[1]
     );
 }
 
 inline RectF WorldCamera::worldScreenRect() const {
   // screen dimensions in world space
-  float w = (float)m_screenSize[0] / (TilePixels * m_pixelRatio);
-  float h = (float)m_screenSize[1] / (TilePixels * m_pixelRatio);
+  float w = (float)m_screenSize[0] / (TilePixels * m_renderPixelRatio);
+  float h = (float)m_screenSize[1] / (TilePixels * m_renderPixelRatio);
   return RectF::withSize(Vec2F(m_worldCenter[0] - w / 2, m_worldCenter[1] - h / 2), Vec2F(w, h));
 }
 
 inline RectI WorldCamera::worldTileRect() const {
   RectF screen = worldScreenRect();
   Vec2I min = Vec2I::floor(screen.min());
-  Vec2I size = Vec2I::ceil(Vec2F(m_screenSize) / (TilePixels * m_pixelRatio) + (screen.min() - Vec2F(min)));
+  Vec2I size = Vec2I::ceil(Vec2F(m_screenSize) / (TilePixels * m_renderPixelRatio) + (screen.min() - Vec2F(min)));
   return RectI::withSize(min, size);
 }
 
 inline Vec2F WorldCamera::tileMinScreen() const {
   RectF screenRect = worldScreenRect();
   RectI tileRect = worldTileRect();
-  return (Vec2F(tileRect.min()) - screenRect.min()) * (TilePixels * m_pixelRatio);
+  return (Vec2F(tileRect.min()) - screenRect.min()) * (TilePixels * m_renderPixelRatio);
 }
 
 inline void WorldCamera::update(float dt) {
@@ -133,6 +148,11 @@ inline void WorldCamera::update(float dt) {
     m_pixelRatio = newPixelRatio;
     setCenterWorldPosition(m_rawWorldCenter, true);
   }
+}
+
+inline void WorldCamera::restoreRenderTransform(WorldCamera const& displayed) {
+  m_worldCenter = displayed.m_worldCenter;
+  m_renderPixelRatio = displayed.m_renderPixelRatio;
 }
 
 }

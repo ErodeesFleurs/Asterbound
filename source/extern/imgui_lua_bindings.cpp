@@ -13,14 +13,26 @@ extern "C" {
 #pragma clang diagnostic ignored "-Wformat-security"
 #endif
 
+static thread_local bool imguiPresentationActive = false;
+
+void setImguiPresentationActive(bool active) {
+  imguiPresentationActive = active;
+}
+
+#define REQUIRE_IMGUI_PRESENTATION() \
+  if (!imguiPresentationActive) \
+    return luaL_error(L, "imgui functions must be called from a render callback, not update");
+
 #define IMGUI_FUNCTION_DRAW_LIST(name) \
 static int impl_draw_list_##name(lua_State *L) { \
+  REQUIRE_IMGUI_PRESENTATION(); \
   int max_args = lua_gettop(L); \
   int arg = 1; \
   int stackval = 0;
 
 #define IMGUI_FUNCTION(name) \
 static int impl_##name(lua_State *L) { \
+  REQUIRE_IMGUI_PRESENTATION(); \
   int max_args = lua_gettop(L); \
   int arg = 1; \
   int stackval = 0;
