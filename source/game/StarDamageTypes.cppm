@@ -9,10 +9,23 @@ import star.game_types;
 namespace Star {
 
 enum DamageType : std::uint8_t { NoDamage, Damage, IgnoresDef, Knockback, Environment, Status };
-extern std::expected<EnumMap<DamageType>, StarException> const DamageTypeNames;
+inline constexpr auto DamageTypeNames = sortedEnumNames(std::to_array<std::pair<DamageType, std::string_view>>({
+  {DamageType::NoDamage, "NoDamage"},
+  {DamageType::Damage, "Damage"},
+  {DamageType::IgnoresDef, "IgnoresDef"},
+  {DamageType::Knockback, "Knockback"},
+  {DamageType::Environment, "Environment"},
+  {DamageType::Status, "Status"},
+}));
 
 enum class HitType { Hit, StrongHit, WeakHit, ShieldHit, Kill };
-extern std::expected<EnumMap<HitType>, StarException> const HitTypeNames;
+inline constexpr auto HitTypeNames = sortedEnumNames(std::to_array<std::pair<HitType, std::string_view>>({
+  {HitType::Hit, "Hit"},
+  {HitType::StrongHit, "StrongHit"},
+  {HitType::WeakHit, "WeakHit"},
+  {HitType::ShieldHit, "ShieldHit"},
+  {HitType::Kill, "Kill"},
+}));
 
 enum class TeamType : std::uint8_t {
   Null,
@@ -34,7 +47,17 @@ enum class TeamType : std::uint8_t {
   // cannot damage friendlies and cannot be damaged by anything
   Assistant
 };
-extern std::expected<EnumMap<TeamType>, StarException> const TeamTypeNames;
+inline constexpr auto TeamTypeNames = sortedEnumNames(std::to_array<std::pair<TeamType, std::string_view>>({
+  {TeamType::Null, "null"},
+  {TeamType::Friendly, "friendly"},
+  {TeamType::Enemy, "enemy"},
+  {TeamType::PVP, "pvp"},
+  {TeamType::Passive, "passive"},
+  {TeamType::Ghostly, "ghostly"},
+  {TeamType::Environment, "environment"},
+  {TeamType::Indiscriminate, "indiscriminate"},
+  {TeamType::Assistant, "assistant"},
+}));
 
 typedef std::uint16_t TeamNumber;
 

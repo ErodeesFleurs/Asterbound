@@ -388,9 +388,10 @@ auto speciesItemsConfig = std::move(*result59);
     if (!speciesItemsConfig.isNull()) {
       Json highestLevelItemsConfig;
       {
-  auto result62 = speciesItemsConfig.toArray();
-  if (!result62) return std::unexpected(std::move(result62.error()));
-  for (auto levelItemsConfig : std::move(*result62)) {
+        auto result62 = speciesItemsConfig.iterateArray();
+        if (!result62)
+          return std::unexpected(std::move(result62.error()));
+        for (auto const& levelItemsConfig : *result62) {
           {
     auto result63 = levelItemsConfig.getFloat(0);
     if (!result63) return std::unexpected(std::move(result63.error()));
@@ -410,20 +411,26 @@ if (!result65) return std::unexpected(std::move(result65.error()));
 bool matchColorIndices = std::move(*result65);
 
         {
-  auto result66 = highestLevelItemsConfig.toArray();
-  if (!result66) return std::unexpected(std::move(result66.error()));
-  auto result67 = randSource.randFrom(*result66);
-  if (!result67) return std::unexpected(std::move(result67.error()));
-  auto result68 = result67->get().toObject();
-  if (!result68) return std::unexpected(std::move(result68.error()));
-  for (auto itemSlotConfig : std::move(*result68)) {
-            auto result69 = itemSlotConfig.second.toArray();
-  if (!result69) return std::unexpected(std::move(result69.error()));
-  auto result70 = randSource.randFrom(*result69);
-  if (!result70) return std::unexpected(std::move(result70.error()));
-  auto result71 = ItemDescriptor::create(result70->get());
-  if (!result71) return std::unexpected(std::move(result71.error()));
-  ItemDescriptor item = std::move(*result71);
+          auto result66 = highestLevelItemsConfig.arrayPtr();
+          if (!result66)
+            return std::unexpected(std::move(result66.error()));
+          auto result67 = randSource.randFrom(**result66);
+          if (!result67)
+            return std::unexpected(std::move(result67.error()));
+          auto result68 = result67->get().toObject();
+          if (!result68)
+            return std::unexpected(std::move(result68.error()));
+          for (auto itemSlotConfig : std::move(*result68)) {
+            auto result69 = itemSlotConfig.second.arrayPtr();
+            if (!result69)
+              return std::unexpected(std::move(result69.error()));
+            auto result70 = randSource.randFrom(**result69);
+            if (!result70)
+              return std::unexpected(std::move(result70.error()));
+            auto result71 = ItemDescriptor::create(result70->get());
+            if (!result71)
+              return std::unexpected(std::move(result71.error()));
+            ItemDescriptor item = std::move(*result71);
 
             // Randomize color index if colorIndex is an array
             {
@@ -436,13 +443,16 @@ bool matchColorIndices = std::move(*result65);
                 if (colorIndex.isType(Json::Type::Array)) {
                   if (!matchColorIndices || randomColorIndex == -1)
                     {
-      auto result74 = colorIndex.toArray();
-      if (!result74) return std::unexpected(std::move(result74.error()));
-      auto result75 = randSource.randFrom(*result74);
-      if (!result75) return std::unexpected(std::move(result75.error()));
-      auto result76 = result75->get().toInt();
-      if (!result76) return std::unexpected(std::move(result76.error()));
-      randomColorIndex = std::move(*result76);
+                    auto result74 = colorIndex.arrayPtr();
+                    if (!result74)
+                      return std::unexpected(std::move(result74.error()));
+                    auto result75 = randSource.randFrom(**result74);
+                    if (!result75)
+                      return std::unexpected(std::move(result75.error()));
+                    auto result76 = result75->get().toInt();
+                    if (!result76)
+                      return std::unexpected(std::move(result76.error()));
+                    randomColorIndex = std::move(*result76);
     }
 
                   auto result77 = item.applyParameters({{"colorIndex", randomColorIndex}});
@@ -481,12 +491,12 @@ if (!result83) return std::unexpected(std::move(result83.error()));
 variant.damageTeam = std::move(*result83);
   auto result84 = config.getString("damageTeamType", "enemy");
 if (!result84) return std::unexpected(std::move(result84.error()));
-if (!TeamTypeNames) return std::unexpected(TeamTypeNames.error());
-auto result85 = TeamTypeNames->getLeft(std::move(*result84));
-if (!result85) return std::unexpected(std::move(result85.error()));
-variant.damageTeamType = result85->get();
+auto damageTeamType = enumValue<TeamTypeNames>(*result84);
+if (!damageTeamType)
+  return std::unexpected(std::move(damageTeamType.error()));
+variant.damageTeamType = *damageTeamType;
 
-  auto result86 = config.get("nametagColor", JsonArray{255, 255, 255});
+auto result86 = config.get("nametagColor", JsonArray{255, 255, 255});
 if (!result86) return std::unexpected(std::move(result86.error()));
 auto result87 = jsonToVec3B(std::move(*result86));
 if (!result87) return std::unexpected(std::move(result87.error()));
@@ -738,27 +748,25 @@ auto result154 = jsonFromMapV<StringMap<ItemDescriptor>>(variant.items, [&versio
       return descriptor.diskStore(*versioningDatabase);
     });
 if (!result154) return std::unexpected(std::move(result154.error()));
-if (!TeamTypeNames) return std::unexpected(TeamTypeNames.error());
-auto result155 = TeamTypeNames->getRight(variant.damageTeamType);
-if (!result155) return std::unexpected(std::move(result155.error()));
-JsonObject store {
-    {"species", variant.species},
-    {"typeName", variant.typeName},
-    {"level", variant.level},
-    {"seed", variant.seed},
-    {"overrides", variant.overrides},
-    {"initialScriptDelta", variant.initialScriptDelta},
-    {"humanoidIdentity", std::move(*result153)},
-    {"items", std::move(*result154)},
-    {"persistent", variant.persistent},
-    {"keepAlive", variant.keepAlive},
-    {"damageTeam", variant.damageTeam},
-    {"damageTeamType", result155->get()},
-    {"humanoidParameters", variant.humanoidParameters}
-  };
-  if (variant.description.has_value())
-    store.set("description", variant.description.value_or(String{}));
-  return store;
+auto damageTeamName = enumName<TeamTypeNames>(variant.damageTeamType);
+if (!damageTeamName)
+  return std::unexpected(std::move(damageTeamName.error()));
+JsonObject store{{"species", variant.species},
+                 {"typeName", variant.typeName},
+                 {"level", variant.level},
+                 {"seed", variant.seed},
+                 {"overrides", variant.overrides},
+                 {"initialScriptDelta", variant.initialScriptDelta},
+                 {"humanoidIdentity", std::move(*result153)},
+                 {"items", std::move(*result154)},
+                 {"persistent", variant.persistent},
+                 {"keepAlive", variant.keepAlive},
+                 {"damageTeam", variant.damageTeam},
+                 {"damageTeamType", String(*damageTeamName)},
+                 {"humanoidParameters", variant.humanoidParameters}};
+if (variant.description.has_value())
+  store.set("description", variant.description.value_or(String{}));
+return store;
 }
 
 std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariantFromJson(Json const& data) const {
@@ -914,12 +922,12 @@ if (!result199) return std::unexpected(std::move(result199.error()));
 variant.damageTeam = std::move(*result199);
   auto result200 = data.getString("damageTeamType");
 if (!result200) return std::unexpected(std::move(result200.error()));
-if (!TeamTypeNames) return std::unexpected(TeamTypeNames.error());
-auto result201 = TeamTypeNames->getLeft(std::move(*result200));
-if (!result201) return std::unexpected(std::move(result201.error()));
-variant.damageTeamType = result201->get();
+auto damageTeamType = enumValue<TeamTypeNames>(*result200);
+if (!damageTeamType)
+  return std::unexpected(std::move(damageTeamType.error()));
+variant.damageTeamType = *damageTeamType;
 
-  auto result202 = config.get("nametagColor", JsonArray{255, 255, 255});
+auto result202 = config.get("nametagColor", JsonArray{255, 255, 255});
 if (!result202) return std::unexpected(std::move(result202.error()));
 auto result203 = jsonToVec3B(std::move(*result202));
 if (!result203) return std::unexpected(std::move(result203.error()));

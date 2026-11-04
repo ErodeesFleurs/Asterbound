@@ -1,5 +1,6 @@
 import std;
 import star.json;
+import star.string;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
@@ -8,58 +9,28 @@ import star.format;
 
 namespace Star {
 
-extern std::expected<EnumMap<DamageType>, StarException> const DamageTypeNames = EnumMap<DamageType>::create({
-    {DamageType::NoDamage, "NoDamage"},
-    {DamageType::Damage, "Damage"},
-    {DamageType::IgnoresDef, "IgnoresDef"},
-    {DamageType::Knockback, "Knockback"},
-    {DamageType::Environment, "Environment"},
-    {DamageType::Status, "Status"}});
-
-extern std::expected<EnumMap<HitType>, StarException> const HitTypeNames = EnumMap<HitType>::create({
-    {HitType::Hit, "Hit"},
-    {HitType::StrongHit, "StrongHit"},
-    {HitType::WeakHit, "WeakHit"},
-    {HitType::ShieldHit, "ShieldHit"},
-    {HitType::Kill, "Kill"}});
-
-extern std::expected<EnumMap<TeamType>, StarException> const TeamTypeNames = EnumMap<TeamType>::create({
-    {TeamType::Null, "null"},
-    {TeamType::Friendly, "friendly"},
-    {TeamType::Enemy, "enemy"},
-    {TeamType::PVP, "pvp"},
-    {TeamType::Passive, "passive"},
-    {TeamType::Ghostly, "ghostly"},
-    {TeamType::Environment, "environment"},
-    {TeamType::Indiscriminate, "indiscriminate"},
-    {TeamType::Assistant, "assistant"}});
-
 EntityDamageTeam::EntityDamageTeam() : type(TeamType::Null), team(0) {}
 
 EntityDamageTeam::EntityDamageTeam(TeamType type, TeamNumber team) : type(type), team(team) {}
 
 std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json const& json) {
-  if (!TeamTypeNames)
-    return std::unexpected(TeamTypeNames.error());
   auto name = json.getString("type");
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto type = TeamTypeNames->getLeft(*name);
+  auto type = enumValue<TeamTypeNames>(*name);
   if (!type)
     return std::unexpected(std::move(type.error()));
   auto team = json.getUInt("team", 0);
   if (!team)
     return std::unexpected(std::move(team.error()));
-  return EntityDamageTeam(type->get(), *team);
+  return EntityDamageTeam(*type, *team);
 }
 
 std::expected<Json, StarException> EntityDamageTeam::toJson() const {
-  if (!TeamTypeNames)
-    return std::unexpected(TeamTypeNames.error());
-  auto name = TeamTypeNames->getRight(type);
+  auto name = enumName<TeamTypeNames>(type);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return JsonObject{{"type", name->get()}, {"team", team}};
+  return JsonObject{{"type", String(*name)}, {"team", team}};
 }
 
 bool EntityDamageTeam::canDamage(EntityDamageTeam victim, bool victimIsSelf) const {

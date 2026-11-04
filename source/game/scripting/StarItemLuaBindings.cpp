@@ -248,12 +248,10 @@ int LuaBindings::ItemCallbacks::rarity(Item& item) {
 //
 // @return a string representing the rarity of the item
 std::expected<String, StarException> LuaBindings::ItemCallbacks::rarityString(Item& item) {
-  if (!RarityNames)
-    return std::unexpected(RarityNames.error());
-  auto name = RarityNames->getRight(item.rarity());
+  auto name = enumName<RarityNames>(item.rarity());
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return name->get();
+  return String(*name);
 }
 
 // Returns the shop price of the item

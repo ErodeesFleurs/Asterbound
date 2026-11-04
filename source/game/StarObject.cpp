@@ -1435,13 +1435,11 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!directionResult)
     return std::unexpected(std::move(directionResult.error()));
   auto direction = std::move(*directionResult);
-  if (!DirectionNames)
-    return std::unexpected(DirectionNames.error());
-  auto directionValueResult = DirectionNames->getLeft(direction);
+  auto directionValueResult = enumValue<DirectionNames>(direction);
   if (!directionValueResult)
     return std::unexpected(std::move(directionValueResult.error()));
   auto directionValue = std::move(*directionValueResult);
-  m_direction.set(directionValue.get());
+  m_direction.set(directionValue);
   auto actionResult = configValue("interactAction", Json());
   if (!actionResult)
     return std::unexpected(std::move(actionResult.error()));
@@ -1554,24 +1552,20 @@ std::expected<Json, StarException> Object::writeStoredData() const {
       });
   }
 
-  if (!DirectionNames)
-    return std::unexpected(DirectionNames.error());
-  auto direction = DirectionNames->getRight(m_direction.get());
+  auto direction = enumName<DirectionNames>(m_direction.get());
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   auto storage = m_scriptComponent.getScriptStorage();
   if (!storage)
     return std::unexpected(std::move(storage.error()));
-  return JsonObject{
-    {"uniqueId", jsonFromOptional(uniqueId())},
-    {"tilePosition", jsonFromVec2I(tilePosition())},
-    {"orientationIndex", jsonFromSize(m_orientationIndex)},
-    {"direction", direction->get()},
-    {"scriptStorage", std::move(*storage)},
-    {"interactive", m_interactive.get()},
-    {"inputWireNodes", std::move(inputNodes)},
-    {"outputWireNodes", std::move(outputNodes)}
-  };
+  return JsonObject{{"uniqueId", jsonFromOptional(uniqueId())},
+                    {"tilePosition", jsonFromVec2I(tilePosition())},
+                    {"orientationIndex", jsonFromSize(m_orientationIndex)},
+                    {"direction", String(*direction)},
+                    {"scriptStorage", std::move(*storage)},
+                    {"interactive", m_interactive.get()},
+                    {"inputWireNodes", std::move(inputNodes)},
+                    {"outputWireNodes", std::move(outputNodes)}};
 }
 
 std::expected<void, StarException> Object::breakObject(bool smash) {

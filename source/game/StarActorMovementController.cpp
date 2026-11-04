@@ -755,35 +755,33 @@ void ActorMovementController::uninit() {
 }
 
 std::expected<Json, StarException> ActorMovementController::storeState() const {
-  if (!DirectionNames) return std::unexpected(DirectionNames.error());
-  auto movingName = DirectionNames->getRight(movingDirection());
+  auto movingName = enumName<DirectionNames>(movingDirection());
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto facingName = DirectionNames->getRight(m_facingDirection.get());
+  auto facingName = enumName<DirectionNames>(m_facingDirection.get());
   if (!facingName) return std::unexpected(std::move(facingName.error()));
   return JsonObject{{"position", jsonFromVec2F(MovementController::position())},
-      {"velocity", jsonFromVec2F(velocity())},
-      {"rotation", MovementController::rotation()},
-      {"movingDirection", movingName->get()},
-      {"facingDirection", facingName->get()},
-      {"crouching", m_crouching.get()}};
+                    {"velocity", jsonFromVec2F(velocity())},
+                    {"rotation", MovementController::rotation()},
+                    {"movingDirection", String(*movingName)},
+                    {"facingDirection", String(*facingName)},
+                    {"crouching", m_crouching.get()}};
 }
 
 std::expected<void, StarException> ActorMovementController::loadState(Json const& state) {
   auto loaded = MovementController::loadState(state);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
-  if (!DirectionNames) return std::unexpected(DirectionNames.error());
   auto movingName = state.getString("movingDirection");
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto movingDirection = DirectionNames->getLeft(*movingName);
+  auto movingDirection = enumValue<DirectionNames>(*movingName);
   if (!movingDirection) return std::unexpected(std::move(movingDirection.error()));
   auto facingName = state.getString("facingDirection");
   if (!facingName) return std::unexpected(std::move(facingName.error()));
-  auto facingDirection = DirectionNames->getLeft(*facingName);
+  auto facingDirection = enumValue<DirectionNames>(*facingName);
   if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
   auto crouchingValue = state.getBool("crouching");
   if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));
-  setMovingDirection(movingDirection->get());
-  m_facingDirection.set(facingDirection->get());
+  setMovingDirection(*movingDirection);
+  m_facingDirection.set(*facingDirection);
   m_crouching.set(*crouchingValue);
   return {};
 }

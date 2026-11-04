@@ -1,5 +1,6 @@
 import std;
 import star.game_types;
+import star.bi_map;
 import star.json;
 import star.json_extra;
 import star.data_stream;
@@ -55,10 +56,9 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     if (!name) return std::unexpected(std::move(name.error()));
     std::optional<Gender> gender;
     if (*name) {
-      if (!GenderNames) return std::unexpected(GenderNames.error());
-      auto value = GenderNames->getLeft(**name);
+      auto value = enumValue<GenderNames>(**name);
       if (!value) return std::unexpected(std::move(value.error()));
-      gender = value->get();
+      gender = *value;
     }
     return QuestParamDetail(QuestEntity{*id, *species, gender});
   } else if (*type == "location") {
@@ -154,10 +154,9 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
     auto const& entity = std::get<QuestEntity>(detail);
     Json gender;
     if (entity.gender) {
-      if (!GenderNames) return std::unexpected(GenderNames.error());
-      auto name = GenderNames->getRight(*entity.gender);
+      auto name = enumName<GenderNames>(*entity.gender);
       if (!name) return std::unexpected(std::move(name.error()));
-      gender = name->get();
+      gender = String(*name);
     }
     return JsonObject{{"type", "entity"}, {"uniqueId", jsonFromOptional(entity.uniqueId)}, {"species", jsonFromOptional(entity.species)}, {"gender", gender}};
   } else if (std::holds_alternative<QuestLocation>(detail)) {

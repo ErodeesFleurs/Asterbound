@@ -270,18 +270,15 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   if (!setLabelResult787)
     return std::unexpected(std::move(setLabelResult787.error()));
 
-  auto const& enumResult788 = RarityNames;
-  if (!enumResult788)
-    return std::unexpected(enumResult788.error());
-  auto getRightResult789 = (*enumResult788).getRight(item->rarity());
-  if (!getRightResult789)
-    return std::unexpected(std::move(getRightResult789.error()));
-  auto titleCaseResult790 = getRightResult789->get().titleCase();
-  if (!titleCaseResult790)
-    return std::unexpected(std::move(titleCaseResult790.error()));
-  auto setLabelResult791 = container->setLabel("rarityLabel", std::move(*titleCaseResult790));
-  if (!setLabelResult791)
-    return std::unexpected(std::move(setLabelResult791.error()));
+  auto rarityName = enumName<RarityNames>(item->rarity());
+  if (!rarityName)
+    return std::unexpected(std::move(rarityName.error()));
+  auto rarityTitle = String(*rarityName).titleCase();
+  if (!rarityTitle)
+    return std::unexpected(std::move(rarityTitle.error()));
+  auto rarityLabel = container->setLabel("rarityLabel", std::move(*rarityTitle));
+  if (!rarityLabel)
+    return std::unexpected(std::move(rarityLabel.error()));
 
   if (item->twoHanded())
     {

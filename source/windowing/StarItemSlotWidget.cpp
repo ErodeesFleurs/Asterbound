@@ -306,10 +306,9 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       if (*secondary) *icons = std::move(**secondary);
     }
     if (m_showRarity) {
-      if (!RarityNames) return std::unexpected(RarityNames.error());
-      auto rarity = RarityNames->getRight(m_item->rarity());
+      auto rarity = enumName<RarityNames>(m_item->rarity());
       if (!rarity) return std::unexpected(std::move(rarity.error()));
-      auto value = m_item->instanceValue("rarityBorder", rarity->get());
+      auto value = m_item->instanceValue("rarityBorder", String(*rarity));
       if (!value) return std::unexpected(std::move(value.error()));
       auto name = value->toString();
       if (!name) return std::unexpected(std::move(name.error()));

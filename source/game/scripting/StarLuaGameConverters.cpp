@@ -508,15 +508,15 @@ LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
 }
 
 std::expected<void, StarException> LuaConverter<DamageRequest>::from(LuaStack stack, DamageRequest const& v) {
-  auto hitType = enumName(HitTypeNames, v.hitType);
+  auto hitType = enumName<HitTypeNames>(v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
-  auto damageType = enumName(DamageTypeNames, v.damageType);
+  auto damageType = enumName<DamageTypeNames>(v.damageType);
   if (!damageType)
     return std::unexpected(std::move(damageType.error()));
-  return makeTable(stack, "hitType", hitType->get(), "damageType", damageType->get(), "damage", v.damage,
-                   "knockbackMomentum", v.knockbackMomentum, "sourceEntityId", v.sourceEntityId, "damageSourceKind",
-                   v.damageSourceKind, "statusEffects", v.statusEffects);
+  return makeTable(stack, "hitType", *hitType, "damageType", *damageType, "damage", v.damage, "knockbackMomentum",
+                   v.knockbackMomentum, "sourceEntityId", v.sourceEntityId, "damageSourceKind", v.damageSourceKind,
+                   "statusEffects", v.statusEffects);
 }
 
 std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRequest>::to(LuaStackValue v) {
@@ -536,7 +536,7 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
   if (!*read)
     return std::nullopt;
   if (hitType) {
-    auto converted = enumValue(HitTypeNames, *hitType);
+    auto converted = maybeEnumValue<HitTypeNames>(*hitType);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
@@ -544,7 +544,7 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
     result.hitType = **converted;
   }
   if (damageType) {
-    auto converted = enumValue(DamageTypeNames, *damageType);
+    auto converted = maybeEnumValue<DamageTypeNames>(*damageType);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
@@ -563,11 +563,11 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
 }
 
 std::expected<void, StarException> LuaConverter<DamageNotification>::from(LuaStack stack, DamageNotification const& v) {
-  auto hitType = enumName(HitTypeNames, v.hitType);
+  auto hitType = enumName<HitTypeNames>(v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
   return makeTable(stack, "sourceEntityId", v.sourceEntityId, "targetEntityId", v.targetEntityId, "position",
-                   v.position, "damageDealt", v.damageDealt, "healthLost", v.healthLost, "hitType", hitType->get(),
+                   v.position, "damageDealt", v.damageDealt, "healthLost", v.healthLost, "hitType", *hitType,
                    "damageSourceKind", v.damageSourceKind, "targetMaterialKind", v.targetMaterialKind);
 }
 
@@ -585,7 +585,7 @@ std::expected<std::optional<DamageNotification>, StarException> LuaConverter<Dam
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = enumValue(HitTypeNames, hitType);
+  auto converted = maybeEnumValue<HitTypeNames>(hitType);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)

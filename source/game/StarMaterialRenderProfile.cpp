@@ -111,10 +111,9 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
     auto layer = config.optString("requiredLayer");
     if (!layer) return std::unexpected(std::move(layer.error()));
     if (*layer) {
-      if (!TileLayerNames) return std::unexpected(TileLayerNames.error());
-      auto value = TileLayerNames->getLeft(**layer);
+      auto value = enumValue<TileLayerNames>(**layer);
       if (!value) return std::unexpected(std::move(value.error()));
-      match->requiredLayer = value->get();
+      match->requiredLayer = *value;
     }
     {
       auto value = config.getBool("haltOnMatch", false);

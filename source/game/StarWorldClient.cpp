@@ -1150,12 +1150,10 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           auto toolUser = as<ToolUserEntity>(entity);
           String image = "/rendering/sprites/error.png";
           if (toolUser) {
-            if (!DirectionNames)
-              return std::unexpected(DirectionNames.error());
-            auto result65 = DirectionNames->getRight(toolUser->facingDirection());
+            auto result65 = enumName<DirectionNames>(toolUser->facingDirection());
             if (!result65)
               return std::unexpected(std::move(result65.error()));
-            image = strf("/rendering/sprites/error_{}.png", result65->get());
+            image = strf("/rendering/sprites/error_{}.png", *result65);
           }
           Color color = Color::rgbf(0.8f + (float)std::sin(self.m_currentTime * std::numbers::pi * 2.0) * 0.2f, 0.0f, 0.0f);
           auto result66 = self.root().imageMetadataDatabase();

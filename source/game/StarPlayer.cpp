@@ -1454,14 +1454,12 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
         if (!namesResult)
           return std::unexpected(std::move(namesResult.error()));
         auto const& names = namesResult->get();
-        if (!ItemTypeNames)
-          return std::unexpected(ItemTypeNames.error());
         Set<ItemType> types;
         for (auto const& name : names) {
-          auto typeResult = ItemTypeNames->getLeft(name);
+          auto typeResult = enumValue<ItemTypeNames>(name);
           if (!typeResult)
             return std::unexpected(std::move(typeResult.error()));
-          auto const& type = typeResult->get();
+          auto const& type = *typeResult;
           types.add(type);
         }
         auto databaseResult = root().itemDatabase();

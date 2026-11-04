@@ -12,7 +12,6 @@ import star.directives;
 import star.asset_path;
 import star.strong_typedef;
 import star.bi_map;
-import star.game_types;
 import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;

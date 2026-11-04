@@ -75,8 +75,6 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
   auto parsed = [&]() -> std::expected<TechConfig, StarException> {
     if (!TechTypeNames)
       return std::unexpected(TechTypeNames.error());
-    if (!RarityNames)
-      return std::unexpected(RarityNames.error());
     TechConfig tech;
     auto name = config.getString("name");
     if (!name)
@@ -118,12 +116,12 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto rarityName = config.getString("rarity");
     if (!rarityName)
       return std::unexpected(std::move(rarityName.error()));
-    auto rarity = RarityNames->maybeLeftRef(*rarityName);
+    auto rarity = maybeEnumValue<RarityNames>(*rarityName);
     if (!rarity)
       return std::unexpected(std::move(rarity.error()));
     if (!*rarity)
       return std::unexpected(TechDatabaseException::format("Unknown tech rarity '{}'", *rarityName));
-    tech.rarity = (*rarity)->get();
+    tech.rarity = **rarity;
     auto icon = config.getString("icon");
     if (!icon)
       return std::unexpected(std::move(icon.error()));

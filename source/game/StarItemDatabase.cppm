@@ -75,7 +75,33 @@ enum class ItemType {
   ActiveItem,
   AugmentItem
 };
-extern std::expected<EnumMap<ItemType>, StarException> const ItemTypeNames;
+inline constexpr auto ItemTypeNames = sortedEnumNames(std::to_array<std::pair<ItemType, std::string_view>>({
+  {ItemType::Generic, "generic"},
+  {ItemType::LiquidItem, "liquid"},
+  {ItemType::MaterialItem, "material"},
+  {ItemType::ObjectItem, "object"},
+  {ItemType::CurrencyItem, "currency"},
+  {ItemType::MiningTool, "miningtool"},
+  {ItemType::Flashlight, "flashlight"},
+  {ItemType::WireTool, "wiretool"},
+  {ItemType::BeamMiningTool, "beamminingtool"},
+  {ItemType::HarvestingTool, "harvestingtool"},
+  {ItemType::TillingTool, "tillingtool"},
+  {ItemType::PaintingBeamTool, "paintingbeamtool"},
+  {ItemType::HeadArmor, "headarmor"},
+  {ItemType::ChestArmor, "chestarmor"},
+  {ItemType::LegsArmor, "legsarmor"},
+  {ItemType::BackArmor, "backarmor"},
+  {ItemType::Consumable, "consumable"},
+  {ItemType::Blueprint, "blueprint"},
+  {ItemType::Codex, "codex"},
+  {ItemType::InspectionTool, "inspectiontool"},
+  {ItemType::InstrumentItem, "instrument"},
+  {ItemType::ThrownItem, "thrownitem"},
+  {ItemType::UnlockItem, "unlockitem"},
+  {ItemType::ActiveItem, "activeitem"},
+  {ItemType::AugmentItem, "augmentitem"},
+}));
 
 class ItemDatabase {
 public:

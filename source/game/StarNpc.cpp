@@ -1478,12 +1478,15 @@ if (!result294) return std::unexpected(std::move(result294.error()));
   auto result295 = callbacks.registerCallback("species", [this]() { return m_npcVariant.species; });
 if (!result295) return std::unexpected(std::move(result295.error()));
 
-  auto result298 = callbacks.registerCallback("gender", [this]() -> std::expected<String, StarException> { auto result296 = humanoid();
-if (!result296) return std::unexpected(std::move(result296.error()));
-if (!GenderNames) return std::unexpected(GenderNames.error());
-auto result297 = GenderNames->getRight(std::move(*result296)->identity().gender);
-if (!result297) return std::unexpected(std::move(result297.error()));
-return result297->get(); });
+auto result298 = callbacks.registerCallback("gender", [this]() -> std::expected<String, StarException> {
+  auto result296 = humanoid();
+  if (!result296)
+    return std::unexpected(std::move(result296.error()));
+  auto result297 = enumName<GenderNames>(std::move(*result296)->identity().gender);
+  if (!result297)
+    return std::unexpected(std::move(result297.error()));
+  return String(*result297);
+});
 if (!result298) return std::unexpected(std::move(result298.error()));
 
   auto result300 = callbacks.registerCallback("humanoidIdentity", [this]() -> std::expected<Json, StarException> { auto result299 = humanoid();
@@ -1710,13 +1713,16 @@ if (!result364) return std::unexpected(std::move(result364.error()));
 });
 if (!result365) return std::unexpected(std::move(result365.error()));
 
-  auto result368 = callbacks.registerCallback("setGender", [this](String const& gender) -> std::expected<void, StarException> { if (!GenderNames) return std::unexpected(GenderNames.error());
-auto result366 = GenderNames->getLeft(gender);
-if (!result366) return std::unexpected(std::move(result366.error()));
-auto result367 = setGender(result366->get());
-if (!result367) return std::unexpected(std::move(result367.error()));
-   return {};
-});
+auto result368 =
+  callbacks.registerCallback("setGender", [this](String const& gender) -> std::expected<void, StarException> {
+    auto result366 = enumValue<GenderNames>(gender);
+    if (!result366)
+      return std::unexpected(std::move(result366.error()));
+    auto result367 = setGender(*result366);
+    if (!result367)
+      return std::unexpected(std::move(result367.error()));
+    return {};
+  });
 if (!result368) return std::unexpected(std::move(result368.error()));
 
   auto result369 = callbacks.registerCallback(   "personality", [this]() { return jsonFromPersonality(identity().personality); });

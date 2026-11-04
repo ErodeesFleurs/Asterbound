@@ -108,10 +108,9 @@ namespace Tiled {
     auto configured = presentProperty<String>(properties, "tilesetDirection");
     if (!configured) return std::unexpected(std::move(configured.error()));
     if (*configured) {
-      if (!DirectionNames) return std::unexpected(DirectionNames.error());
-      auto parsed = DirectionNames->getLeft(**configured);
+      auto parsed = enumValue<DirectionNames>(**configured);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      direction = parsed->get();
+      direction = *parsed;
     }
     auto flip = properties.contains("flipX");
     if (!flip) return std::unexpected(std::move(flip.error()));

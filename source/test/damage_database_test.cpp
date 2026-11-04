@@ -5,6 +5,10 @@ import star.algorithm;
 import star.assets;
 import star.damage_database;
 import star.damage_types;
+import star.damage;
+import star.lua;
+import star.lua_game_converters;
+import star.unicode;
 import star.file;
 import star.format;
 import star.game_test;
@@ -207,4 +211,91 @@ const GameTestRegistration
       EXPECT_EQ(database.error().is<MapException>(), failure.mapError);
       EXPECT_EQ(database.error().is<JsonException>(), !failure.mapError);
     }
+  });
+
+const GameTestRegistration
+  damageEnumJsonBoundaries("DamageTypesTest", "JsonDefaultsCanonicalNamesAndFirstError", [](GameTest&) {
+    for (Json const& input : {Json(JsonObject{{"damage", 3}}),
+                              Json(JsonObject{{"damage", 3}, {"hitType", Json()}, {"damageType", Json()}})}) {
+      auto request = DamageRequest::create(input);
+      ASSERT_TRUE(request);
+      EXPECT_EQ(request->hitType, HitType::Hit);
+      EXPECT_EQ(request->damageType, DamageType::Damage);
+      auto stored = request->toJson();
+      ASSERT_TRUE(stored);
+      EXPECT_EQ(stored->getString("hitType"), "Hit");
+      EXPECT_EQ(stored->getString("damageType"), "Damage");
+    }
+    auto mixedCase =
+      DamageRequest::create(JsonObject{{"damage", 3}, {"hitType", "sTrOnGhIt"}, {"damageType", "iGnOrEsDeF"}});
+    ASSERT_TRUE(mixedCase);
+    EXPECT_EQ(mixedCase->hitType, HitType::StrongHit);
+    EXPECT_EQ(mixedCase->damageType, DamageType::IgnoresDef);
+    auto stored = mixedCase->toJson();
+    ASSERT_TRUE(stored);
+    EXPECT_EQ(stored->getString("hitType"), "StrongHit");
+    EXPECT_EQ(stored->getString("damageType"), "IgnoresDef");
+
+    // An unknown first enum wins over a later malformed UTF-8 name or missing damage.
+    for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("Hit\0", 4))}) {
+      auto rejected =
+        DamageRequest::create(JsonObject{{"hitType", name}, {"damageType", String(std::string_view("Damage\xff", 7))}});
+      ASSERT_FALSE(rejected);
+      EXPECT_TRUE(rejected.error().is<MapException>());
+    }
+    auto malformed =
+      DamageRequest::create(JsonObject{{"hitType", String(std::string_view("Hit\xff", 4))}, {"damageType", "unknown"}});
+    ASSERT_FALSE(malformed);
+    EXPECT_TRUE(malformed.error().is<UnicodeException>());
+    auto team = EntityDamageTeam::create(JsonObject{{"type", "FrIeNdLy"}});
+    ASSERT_TRUE(team);
+    EXPECT_EQ(team->type, TeamType::Friendly);
+    EXPECT_EQ(team->team, 0);
+    EXPECT_EQ(team->toJson(), Json(JsonObject{{"type", "friendly"}, {"team", 0}}));
+  });
+
+const GameTestRegistration
+  damageEnumLuaBoundaries("DamageTypesTest", "LuaOptionalLookupAndCanonicalRoundTrip", [](GameTest&) {
+    auto engine = LuaEngine::create();
+    ASSERT_TRUE(engine);
+    auto context = (*engine)->createContext();
+    ASSERT_TRUE(context);
+    auto defaults = context->eval<DamageRequest>("return {damage = 3}");
+    ASSERT_TRUE(defaults);
+    EXPECT_EQ(defaults->hitType, HitType::Hit);
+    EXPECT_EQ(defaults->damageType, DamageType::Damage);
+    auto request =
+      context->eval<DamageRequest>("return {damage = 3, hitType = 'sTrOnGhIt', damageType = 'iGnOrEsDeF'}");
+    ASSERT_TRUE(request);
+    ASSERT_TRUE(context->setPath("request", *request));
+    auto rendered = context->eval<bool>("return request.hitType == 'StrongHit' and request.damageType == 'IgnoresDef'");
+    ASSERT_TRUE(rendered);
+    EXPECT_TRUE(*rendered);
+
+    for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("Hit\0", 4))}) {
+      ASSERT_TRUE(context->setPath("name", name));
+      auto value = context->eval<LuaValue>("return {damage = 3, hitType = name, damageType = string.char(255)}");
+      ASSERT_TRUE(value);
+      auto rejected = (*engine)->luaMaybeTo<DamageRequest>(*value);
+      ASSERT_TRUE(rejected);
+      EXPECT_FALSE(*rejected);
+    }
+    auto malformed =
+      context->eval<LuaValue>("return {damage = 3, hitType = 'Hit' .. string.char(255), damageType = 'unknown'}");
+    ASSERT_TRUE(malformed);
+    auto rejected = (*engine)->luaMaybeTo<DamageRequest>(*malformed);
+    ASSERT_FALSE(rejected);
+    EXPECT_TRUE(rejected.error().is<UnicodeException>());
+
+    DamageNotification notification;
+    notification.hitType = HitType::ShieldHit;
+    ASSERT_TRUE(context->setPath("notification", notification));
+    auto roundTrip = context->eval<DamageNotification>("return notification");
+    ASSERT_TRUE(roundTrip);
+    EXPECT_EQ(roundTrip->hitType, HitType::ShieldHit);
+    auto unknown = context->eval<LuaValue>("notification.hitType = 'unknown'; return notification");
+    ASSERT_TRUE(unknown);
+    auto noNotification = (*engine)->luaMaybeTo<DamageNotification>(*unknown);
+    ASSERT_TRUE(noNotification);
+    EXPECT_FALSE(*noNotification);
   });

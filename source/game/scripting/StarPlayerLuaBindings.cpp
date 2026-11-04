@@ -471,19 +471,24 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "gender", [&player]() -> std::expected<String, StarException> {
-    if (!GenderNames) return std::unexpected(GenderNames.error());
-    auto value = GenderNames->getRight(player.gender());
-    if (!value) return std::unexpected(std::move(value.error()));
-    return value->get();
-  }); !registered)
+  if (auto registered = callbacks.registerCallback("gender",
+                                                   [&player]() -> std::expected<String, StarException> {
+                                                     auto value = enumName<GenderNames>(player.gender());
+                                                     if (!value)
+                                                       return std::unexpected(std::move(value.error()));
+                                                     return String(*value);
+                                                   });
+      !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setGender", [&player](String const& gender) -> std::expected<void, StarException> {
-    if (!GenderNames) return std::unexpected(GenderNames.error());
-    auto value = GenderNames->getLeft(gender);
-    if (!value) return std::unexpected(std::move(value.error()));
-    return player.setGender(value->get());
-  }); !registered)
+  if (auto registered =
+        callbacks.registerCallback("setGender",
+                                   [&player](String const& gender) -> std::expected<void, StarException> {
+                                     auto value = enumValue<GenderNames>(gender);
+                                     if (!value)
+                                       return std::unexpected(std::move(value.error()));
+                                     return player.setGender(*value);
+                                   });
+      !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback(   "personality", [&player]() -> std::expected<Json, StarException> {
@@ -765,13 +770,17 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setDamageTeam", [&player](String const& typeName, std::optional<std::uint16_t> teamNumber) -> std::expected<void, StarException> {
-    if (!TeamTypeNames) return std::unexpected(TeamTypeNames.error());
-    auto type = TeamTypeNames->getLeft(typeName);
-    if (!type) return std::unexpected(std::move(type.error()));
-    player.setTeam(EntityDamageTeam(type->get(), teamNumber.value_or(0)));
-    return {};
-  }); !registered)
+  if (auto registered = callbacks.registerCallback(
+        "setDamageTeam",
+        [&player](String const& typeName,
+                  std::optional<std::uint16_t> teamNumber) -> std::expected<void, StarException> {
+          auto type = enumValue<TeamTypeNames>(typeName);
+          if (!type)
+            return std::unexpected(std::move(type.error()));
+          player.setTeam(EntityDamageTeam(*type, teamNumber.value_or(0)));
+          return {};
+        });
+      !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback("say", [&player](String const& message) -> std::expected<void, StarException> {

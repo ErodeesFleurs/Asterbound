@@ -223,10 +223,19 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 ### JSON values and formatting
 
 - `Json` is immutable. Prefer `find`, `arrayPtr` / `objectPtr` or `iterateArray` / `iterateObject` for synchronous reads; `toArray` / `toObject` make mutable container copies. A borrowed child must not outlive its retained owner.
+- Borrow read-only generation arrays without changing random draw order. Explicit monster part overrides still consume their normal random part draw; NPC equipment retains its object snapshot and slot iteration order. Rebuilding a hash table can change traversal order, so object copies cannot always be replaced by borrowed iteration.
+- Reuse `jsonToList` for ordered item conversion. Preserve each field's missing/null default separately; a present `example: null` is not an absent example.
 - Contiguous UTF-8 input borrows unescaped tokens during synchronous callbacks; escaped strings and generic iterators retain the decoded path. Unicode validation, parser error order and missing/null distinctions remain unchanged.
 - `FormattedJson::create` reuses the immutable semantic value. Use `createArray(span)` for batch output instead of repeatedly appending immutable arrays; child comments and numeric spellings are retained. Its private token index does not change the global JSON hash or wire ordering.
 - Path updates still rebuild the immutable ancestor spine. Asset patch groups commit only on success, and search keeps the first match and defers value validation until a match exists.
 - Configuration field tables may group only reads with the same type/default policy. Preserve source order, first-error behavior and missing/null distinctions when extracting domain readers.
+
+### UI and rendering preparation
+
+- Options callbacks share volume and boolean writers, retaining local changes before live configuration writes and label updates. Capture configuration keys once when registering callbacks; head rotation also updates the running Root cache.
+- Text measurement and wrapping share only the `font=`, `set` and `reset` command subset. Full rendering commands also change colors, shadows and other saved state.
+- Entity highlights draw all underlays before main drawables and overlays. Keep the original drawables available for overlays and preserve offscreen preload random draws.
+- Horizon rendering queues every layer's textures before testing readiness. Load both halves before submitting either; shared geometry preparation retains rotation, vertex/UV order and floating-point operation order.
 
 ### Lua embedding
 

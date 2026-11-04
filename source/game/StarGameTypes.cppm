@@ -18,7 +18,10 @@ enum class Direction : std::uint8_t {
   Left,
   Right
 };
-extern std::expected<EnumMap<Direction>, StarException> const DirectionNames;
+inline constexpr auto DirectionNames = sortedEnumNames(std::to_array<std::pair<Direction, std::string_view>>({
+  {Direction::Left, "left"},
+  {Direction::Right, "right"},
+}));
 
 inline Direction operator-(Direction dir) {
   if (dir == Direction::Left)
@@ -45,26 +48,39 @@ enum class Gender : std::uint8_t {
   Male,
   Female
 };
-extern std::expected<EnumMap<Gender>, StarException> const GenderNames;
+inline constexpr auto GenderNames = sortedEnumNames(std::to_array<std::pair<Gender, std::string_view>>({
+  {Gender::Male, "male"},
+  {Gender::Female, "female"},
+}));
 
 enum class FireMode : std::uint8_t {
   None,
   Primary,
   Alt
 };
-extern std::expected<EnumMap<FireMode>, StarException> const FireModeNames;
+inline constexpr auto FireModeNames = sortedEnumNames(std::to_array<std::pair<FireMode, std::string_view>>({
+  {FireMode::None, "none"},
+  {FireMode::Primary, "primary"},
+  {FireMode::Alt, "alt"},
+}));
 
 enum class ToolHand : std::uint8_t {
   Primary,
   Alt
 };
-extern std::expected<EnumMap<ToolHand>, StarException> const ToolHandNames;
+inline constexpr auto ToolHandNames = sortedEnumNames(std::to_array<std::pair<ToolHand, std::string_view>>({
+  {ToolHand::Primary, "primary"},
+  {ToolHand::Alt, "alt"},
+}));
 
 enum class TileLayer : std::uint8_t {
   Foreground,
   Background
 };
-extern std::expected<EnumMap<TileLayer>, StarException> const TileLayerNames;
+inline constexpr auto TileLayerNames = sortedEnumNames(std::to_array<std::pair<TileLayer, std::string_view>>({
+  {TileLayer::Foreground, "foreground"},
+  {TileLayer::Background, "background"},
+}));
 
 enum class MoveControlType : std::uint8_t {
   Left,
@@ -73,7 +89,14 @@ enum class MoveControlType : std::uint8_t {
   Up,
   Jump
 };
-extern std::expected<EnumMap<MoveControlType>, StarException> const MoveControlTypeNames;
+inline constexpr auto MoveControlTypeNames =
+  sortedEnumNames(std::to_array<std::pair<MoveControlType, std::string_view>>({
+    {MoveControlType::Left, "left"},
+    {MoveControlType::Right, "right"},
+    {MoveControlType::Down, "down"},
+    {MoveControlType::Up, "up"},
+    {MoveControlType::Jump, "jump"},
+  }));
 
 enum class PortraitMode {
   Head,
@@ -83,7 +106,14 @@ enum class PortraitMode {
   FullNude,
   FullNeutralNude
 };
-extern std::expected<EnumMap<PortraitMode>, StarException> const PortraitModeNames;
+inline constexpr auto PortraitModeNames = sortedEnumNames(std::to_array<std::pair<PortraitMode, std::string_view>>({
+  {PortraitMode::Head, "head"},
+  {PortraitMode::Bust, "bust"},
+  {PortraitMode::Full, "full"},
+  {PortraitMode::FullNeutral, "fullneutral"},
+  {PortraitMode::FullNude, "fullnude"},
+  {PortraitMode::FullNeutralNude, "fullneutralnude"},
+}));
 
 enum class Rarity {
   Common,
@@ -92,7 +122,13 @@ enum class Rarity {
   Legendary,
   Essential
 };
-extern std::expected<EnumMap<Rarity>, StarException> const RarityNames;
+inline constexpr auto RarityNames = sortedEnumNames(std::to_array<std::pair<Rarity, std::string_view>>({
+  {Rarity::Common, "common"},
+  {Rarity::Uncommon, "uncommon"},
+  {Rarity::Rare, "rare"},
+  {Rarity::Legendary, "legendary"},
+  {Rarity::Essential, "essential"},
+}));
 
 // Transformation from tile space to pixel space.  Number of pixels in 1.0
 // distance (one tile).

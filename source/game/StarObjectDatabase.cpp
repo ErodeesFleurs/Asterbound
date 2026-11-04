@@ -568,12 +568,10 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!directionResult)
         return std::unexpected(std::move(directionResult.error()));
       auto direction = std::move(*directionResult);
-      if (!DirectionNames)
-        return std::unexpected(DirectionNames.error());
-      auto affinityResult = DirectionNames->getLeft(direction);
+      auto affinityResult = enumValue<DirectionNames>(direction);
       if (!affinityResult)
         return std::unexpected(std::move(affinityResult.error()));
-      orientation->directionAffinity = affinityResult->get();
+      orientation->directionAffinity = *affinityResult;
     }
     auto collisionTypeResult = orientationSettings.getString("collision", "none");
     if (!collisionTypeResult)
@@ -935,9 +933,7 @@ std::expected<void, StarException> readObjectDamageTeam(Json const& config, Enti
     return std::unexpected(std::move(damageTeam.error()));
   auto type = damageTeam->getString("type", "environment")
                 .and_then([](String const& name) -> std::expected<TeamType, StarException> {
-                  if (!TeamTypeNames)
-                    return std::unexpected(TeamTypeNames.error());
-                  return TeamTypeNames->getLeft(name).transform([](auto value) { return value.get(); });
+                  return enumValue<TeamTypeNames>(name);
                 });
   if (!type)
     return std::unexpected(std::move(type.error()));

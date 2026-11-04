@@ -42,6 +42,31 @@ import star.math_common;
 import star.pythonic;
 namespace Star {
 
+namespace {
+
+std::expected<void, StarException> applyMeasurementFontCommands(FontTextureGroup& fontTextureGroup, String& font,
+                                                                String& setFont, std::string_view remaining) {
+  while (!remaining.empty()) {
+    auto comma = remaining.find(',');
+    auto command = remaining.substr(0, comma);
+    std::expected<void, StarException> changed;
+    if (command == "reset")
+      changed = fontTextureGroup.switchFont(font = setFont);
+    else if (command == "set")
+      setFont = font;
+    else if (command.starts_with("font="))
+      changed = fontTextureGroup.switchFont(font = String(command.substr(5)));
+    if (!changed)
+      return std::unexpected(std::move(changed.error()));
+    if (comma == std::string_view::npos)
+      break;
+    remaining.remove_prefix(comma + 1);
+  }
+  return {};
+}
+
+}// namespace
+
 TextPositioning::TextPositioning() {
   pos = Vec2F();
   hAnchor = HorizontalAnchor::LeftAnchor;
@@ -189,23 +214,8 @@ std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigne
   if (!switched)
     return std::unexpected(std::move(switched.error()));
   Text::CommandsCallback commandsCallback = [&](StringView commands) -> std::expected<bool, StarException> {
-    auto remaining = commands.utf8();
-    while (!remaining.empty()) {
-      auto comma = remaining.find(',');
-      auto command = remaining.substr(0, comma);
-      std::expected<void, StarException> changed;
-      if (command == "reset")
-        changed = m_fontTextureGroup.switchFont(font = setFont);
-      else if (command == "set")
-        setFont = font;
-      else if (command.starts_with("font="))
-        changed = m_fontTextureGroup.switchFont(font = String(command.substr(5)));
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      if (comma == std::string_view::npos)
-        break;
-      remaining.remove_prefix(comma + 1);
-    }
+    if (auto changed = applyMeasurementFontCommands(m_fontTextureGroup, font, setFont, commands.utf8()); !changed)
+      return std::unexpected(std::move(changed.error()));
     return true;
   };
   int width = 0;
@@ -275,23 +285,10 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
         }
       }
       if (commandStart == index && commandEnd != NPos) {
-        auto remaining = text.utf8().substr(commandStart + 1, commandEnd - commandStart - 1);
-        while (!remaining.empty()) {
-          auto comma = remaining.find(',');
-          auto command = remaining.substr(0, comma);
-          std::expected<void, StarException> changed;
-          if (command == "reset")
-            changed = m_fontTextureGroup.switchFont(font = setFont);
-          else if (command == "set")
-            setFont = font;
-          else if (command.starts_with("font="))
-            changed = m_fontTextureGroup.switchFont(font = String(command.substr(5)));
-          if (!changed)
-            return std::unexpected(std::move(changed.error()));
-          if (comma == std::string_view::npos)
-            break;
-          remaining.remove_prefix(comma + 1);
-        }
+        if (auto changed = applyMeasurementFontCommands(
+              m_fontTextureGroup, font, setFont, text.utf8().substr(commandStart + 1, commandEnd - commandStart - 1));
+            !changed)
+          return std::unexpected(std::move(changed.error()));
         iterator = cursorBase = commandEnd + 1;
         cursor = Utf8Cursor(text.utf8().substr(cursorBase));
         commandStart = commandEnd = NPos;

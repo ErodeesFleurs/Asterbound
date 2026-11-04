@@ -144,34 +144,6 @@ std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseCompone
 
 }// namespace
 
-extern std::expected<EnumMap<ItemType>, StarException> const ItemTypeNames = EnumMap<ItemType>::create({
-  {ItemType::Generic, "generic"},
-  {ItemType::LiquidItem, "liquid"},
-  {ItemType::MaterialItem, "material"},
-  {ItemType::ObjectItem, "object"},
-  {ItemType::CurrencyItem, "currency"},
-  {ItemType::MiningTool, "miningtool"},
-  {ItemType::Flashlight, "flashlight"},
-  {ItemType::WireTool, "wiretool"},
-  {ItemType::BeamMiningTool, "beamminingtool"},
-  {ItemType::HarvestingTool, "harvestingtool"},
-  {ItemType::TillingTool, "tillingtool"},
-  {ItemType::PaintingBeamTool, "paintingbeamtool"},
-  {ItemType::HeadArmor, "headarmor"},
-  {ItemType::ChestArmor, "chestarmor"},
-  {ItemType::LegsArmor, "legsarmor"},
-  {ItemType::BackArmor, "backarmor"},
-  {ItemType::Consumable, "consumable"},
-  {ItemType::Blueprint, "blueprint"},
-  {ItemType::Codex, "codex"},
-  {ItemType::InspectionTool, "inspectiontool"},
-  {ItemType::InstrumentItem, "instrument"},
-  {ItemType::ThrownItem, "thrownitem"},
-  {ItemType::UnlockItem, "unlockitem"},
-  {ItemType::ActiveItem, "activeitem"},
-  {ItemType::AugmentItem, "augmentitem"}
-});
-
 std::uint64_t ItemDatabase::getCountOfItem(List<std::shared_ptr<Item>> const& bag, ItemDescriptor const& item, bool exactMatch) {
   auto normalizedBag = normalizeBag(bag);
   return getCountOfItem(normalizedBag, item, exactMatch);
@@ -1140,12 +1112,10 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
           return std::unexpected(std::move(inventoryIcon.error()));
         config["inventoryIcon"] = std::move(*inventoryIcon);
       }
-      if (!RarityNames)
-        return std::unexpected(RarityNames.error());
-      auto rarity = RarityNames->getRight((*baseItem)->rarity());
+      auto rarity = enumName<RarityNames>((*baseItem)->rarity());
       if (!rarity)
         return std::unexpected(std::move(rarity.error()));
-      config["rarity"] = rarity->get();
+      config["rarity"] = String(*rarity);
       config["price"] = (*baseItem)->price();
       data.customConfig = std::move(config);
       data.directory = baseData->get().directory;

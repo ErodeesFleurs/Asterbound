@@ -337,12 +337,10 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           [&](std::shared_ptr<Entity> const& entity,
               String const& portraitMode) -> std::expected<std::optional<List<Drawable>>, StarException> {
             if (auto portrait = asRef<PortraitEntity>(*entity)) {
-              if (!PortraitModeNames)
-                return std::unexpected(PortraitModeNames.error());
-              auto mode = PortraitModeNames->getLeft(portraitMode);
+              auto mode = enumValue<PortraitModeNames>(portraitMode);
               if (!mode)
                 return std::unexpected(std::move(mode.error()));
-              auto drawables = portrait->get().portrait(mode->get());
+              auto drawables = portrait->get().portrait(*mode);
               if (!drawables)
                 return std::unexpected(std::move(drawables.error()));
               return std::move(*drawables);
@@ -744,12 +742,10 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
             gender = npc->get().gender();
         if (!gender)
             return {};
-        if (!GenderNames)
-            return std::unexpected(GenderNames.error());
-        auto name = GenderNames->getRight(*gender);
+        auto name = enumName<GenderNames>(*gender);
         if (!name)
           return std::unexpected(std::move(name.error()));
-        return name->get();
+        return String(*name);
   }); !registration)
       return std::unexpected(std::move(registration.error()));
 

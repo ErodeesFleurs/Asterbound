@@ -76,12 +76,10 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto rarity = instanceValue("rarity").and_then([](Json const& value) { return value.toString(); });
   if (!rarity)
     return std::unexpected(std::move(rarity.error()));
-  if (!RarityNames)
-    return std::unexpected(RarityNames.error());
-  auto rarityValue = RarityNames->getLeft(*rarity);
+  auto rarityValue = enumValue<RarityNames>(*rarity);
   if (!rarityValue)
     return std::unexpected(std::move(rarityValue.error()));
-  m_rarity = rarityValue->get();
+  m_rarity = *rarityValue;
 
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)

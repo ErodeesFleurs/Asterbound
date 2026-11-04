@@ -1,62 +1,9 @@
 import std;
-import star.bi_map;
 import star.math_common;
 import star.format;
 import star.game_types;
 
 namespace Star {
-
-
-extern std::expected<EnumMap<Direction>, StarException> const DirectionNames = EnumMap<Direction>::create({
-  {Direction::Left, "left"},
-  {Direction::Right, "right"},
-});
-
-extern std::expected<EnumMap<Gender>, StarException> const GenderNames = EnumMap<Gender>::create({
-  {Gender::Male, "male"},
-  {Gender::Female, "female"},
-});
-
-extern std::expected<EnumMap<FireMode>, StarException> const FireModeNames = EnumMap<FireMode>::create({
-  {FireMode::None, "none"},
-  {FireMode::Primary, "primary"},
-  {FireMode::Alt, "alt"}
-});
-
-extern std::expected<EnumMap<ToolHand>, StarException> const ToolHandNames = EnumMap<ToolHand>::create({
-  {ToolHand::Primary, "primary"},
-  {ToolHand::Alt, "alt"}
-});
-
-extern std::expected<EnumMap<TileLayer>, StarException> const TileLayerNames = EnumMap<TileLayer>::create({
-  {TileLayer::Foreground, "foreground"},
-  {TileLayer::Background, "background"}
-});
-
-extern std::expected<EnumMap<MoveControlType>, StarException> const MoveControlTypeNames = EnumMap<MoveControlType>::create({
-  {MoveControlType::Left, "left"},
-  {MoveControlType::Right, "right"},
-  {MoveControlType::Down, "down"},
-  {MoveControlType::Up, "up"},
-  {MoveControlType::Jump, "jump"}
-});
-
-extern std::expected<EnumMap<PortraitMode>, StarException> const PortraitModeNames = EnumMap<PortraitMode>::create({
-  {PortraitMode::Head, "head"},
-  {PortraitMode::Bust, "bust"},
-  {PortraitMode::Full, "full"},
-  {PortraitMode::FullNeutral, "fullneutral"},
-  {PortraitMode::FullNude, "fullnude"},
-  {PortraitMode::FullNeutralNude, "fullneutralnude"}
-});
-
-extern std::expected<EnumMap<Rarity>, StarException> const RarityNames = EnumMap<Rarity>::create({
-  {Rarity::Common, "common"},
-  {Rarity::Uncommon, "uncommon"},
-  {Rarity::Rare, "rare"},
-  {Rarity::Legendary, "legendary"},
-  {Rarity::Essential, "essential"}
-});
 
 std::expected<std::pair<EntityId, EntityId>, StarException> connectionEntitySpace(ConnectionId connectionId) {
   if (connectionId == ServerConnectionId) {

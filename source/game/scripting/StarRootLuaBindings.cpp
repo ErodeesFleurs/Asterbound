@@ -629,10 +629,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     if (!database) return std::unexpected(std::move(database.error()));
     std::optional<Gender> parsedGender;
     if (gender) {
-      if (!GenderNames) return std::unexpected(GenderNames.error());
-      auto parsed = GenderNames->getLeft(*gender);
+      auto parsed = enumValue<GenderNames>(*gender);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      parsedGender = parsed->get();
+      parsedGender = *parsed;
     }
     auto result = (*database)->generateHumanoid(species, seed.value_or(root.random().randu64()), parsedGender, itemCatalog);
     if (!result) return std::unexpected(std::move(result.error()));
@@ -846,10 +845,9 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::allRecipes(I
 std::expected<String, StarException> LuaBindings::RootCallbacks::itemType(ItemDatabase const& database, String const& itemName) {
   auto type = database.itemType(itemName);
   if (!type) return std::unexpected(std::move(type.error()));
-  if (!ItemTypeNames) return std::unexpected(ItemTypeNames.error());
-  auto name = ItemTypeNames->getRight(*type);
+  auto name = enumName<ItemTypeNames>(*type);
   if (!name) return std::unexpected(std::move(name.error()));
-  return name->get();
+  return String(*name);
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::itemTags(ItemDatabase const& database, String const& itemName) {
@@ -930,10 +928,9 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
   if (!database) return std::unexpected(std::move(database.error()));
   auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().randu64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
-  if (!PortraitModeNames) return std::unexpected(PortraitModeNames.error());
-  auto mode = PortraitModeNames->getLeft(portraitMode);
+  auto mode = enumValue<PortraitModeNames>(portraitMode);
   if (!mode) return std::unexpected(std::move(mode.error()));
-  auto drawables = (*database)->npcPortrait(*variant, mode->get(), itemCatalog);
+  auto drawables = (*database)->npcPortrait(*variant, *mode, itemCatalog);
   if (!drawables) return std::unexpected(std::move(drawables.error()));
   JsonArray result;
   result.reserve(drawables->size());

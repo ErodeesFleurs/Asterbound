@@ -799,11 +799,11 @@ if (!result132) return std::unexpected(std::move(result132.error()));
 variant.persistent = std::move(*result132);
   auto result133 = variant.parameters.getString("damageTeamType", "enemy");
 if (!result133) return std::unexpected(std::move(result133.error()));
-if (!TeamTypeNames) return std::unexpected(TeamTypeNames.error());
-auto result134 = TeamTypeNames->getLeft(std::move(*result133));
-if (!result134) return std::unexpected(std::move(result134.error()));
-variant.damageTeamType = result134->get();
-  auto result135 = variant.parameters.getUInt("damageTeam", 2);
+auto damageTeamType = enumValue<TeamTypeNames>(*result133);
+if (!damageTeamType)
+  return std::unexpected(std::move(damageTeamType.error()));
+variant.damageTeamType = *damageTeamType;
+auto result135 = variant.parameters.getUInt("damageTeam", 2);
 if (!result135) return std::unexpected(std::move(result135.error()));
 variant.damageTeam = std::move(*result135);
 
@@ -902,13 +902,10 @@ if (!result152) return std::unexpected(std::move(result152.error()));
 auto selectedPart = std::move(*result152);
     if (selectedPart)
       {
-  auto result153 = m_partDirectory.get(categoryName);
-  if (!result153) return std::unexpected(std::move(result153.error()));
-  auto result154 = result153->get().get(partTypeName);
-  if (!result154) return std::unexpected(std::move(result154.error()));
-  auto result155 = result154->get().get(*selectedPart);
-  if (!result155) return std::unexpected(std::move(result155.error()));
-  monsterParts.append(result155->get());
+      auto result155 = result149->get().get(*selectedPart);
+      if (!result155)
+        return std::unexpected(std::move(result155.error()));
+      monsterParts.append(result155->get());
 }
     else
       monsterParts.append(randPart);
@@ -964,9 +961,10 @@ if (!result163) return std::unexpected(std::move(result163.error()));
   monsterVariant.animatorZoom = monsterVariant.scale;
   if (monsterVariant.dropPoolConfig.isType(Json::Type::Array))
     {
-  auto result164 = monsterVariant.dropPoolConfig.toArray();
-  if (!result164) return std::unexpected(std::move(result164.error()));
-  monsterVariant.dropPoolConfig = rand.randValueFrom(std::move(*result164));
+    auto result164 = monsterVariant.dropPoolConfig.arrayPtr();
+    if (!result164)
+      return std::unexpected(std::move(result164.error()));
+    monsterVariant.dropPoolConfig = rand.randValueFrom(**result164);
 }
 
   return monsterVariant;

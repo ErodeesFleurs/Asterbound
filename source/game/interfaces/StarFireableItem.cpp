@@ -271,12 +271,10 @@ std::expected<bool, StarException> FireableItem::windup() const {
 
 std::expected<void, StarException> FireableItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const&) {
   if (m_scriptComponent) {
-    if (!FireModeNames)
-      return std::unexpected(FireModeNames.error());
-    auto modeName = FireModeNames->getRight(fireMode);
+    auto modeName = enumName<FireModeNames>(fireMode);
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
-    auto invoked = m_scriptComponent->invoke("update", dt, modeName->get(), shifting);
+    auto invoked = m_scriptComponent->invoke("update", dt, *modeName, shifting);
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }

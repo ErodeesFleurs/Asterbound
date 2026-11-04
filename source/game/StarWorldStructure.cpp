@@ -185,12 +185,12 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autokeyField7Result1 = blockKeyConfig.getString("object", "");
     if (!autokeyField7Result1) return std::unexpected(std::move(autokeyField7Result1.error()));
     auto keyField7 = std::move((*autokeyField7Result1));
-    auto autokeyField8Result1 = blockKeyConfig.getString("objectDirection", "left");
-    if (!autokeyField8Result1) return std::unexpected(std::move(autokeyField8Result1.error()));
-    if (!DirectionNames) return std::unexpected(DirectionNames.error());
-    auto autokeyField8Result2 = DirectionNames->getLeft((*autokeyField8Result1));
-    if (!autokeyField8Result2) return std::unexpected(std::move(autokeyField8Result2.error()));
-    auto keyField8 = autokeyField8Result2->get();
+    auto objectDirection = blockKeyConfig.getString("objectDirection", "left").and_then([](String const& name) {
+      return enumValue<DirectionNames>(name);
+    });
+    if (!objectDirection)
+      return std::unexpected(std::move(objectDirection.error()));
+    auto keyField8 = *objectDirection;
     auto autokeyField9Result1 = blockKeyConfig.getObject("objectParameters", JsonObject());
     if (!autokeyField9Result1) return std::unexpected(std::move(autokeyField9Result1.error()));
     auto keyField9 = std::move((*autokeyField9Result1));
@@ -346,12 +346,11 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     auto autofield1Result1 = v.getString("name");
     if (!autofield1Result1) return std::unexpected(std::move(autofield1Result1.error()));
     auto field1 = std::move((*autofield1Result1));
-    auto autofield2Result1 = v.getString("direction");
-    if (!autofield2Result1) return std::unexpected(std::move(autofield2Result1.error()));
-    if (!DirectionNames) return std::unexpected(DirectionNames.error());
-    auto autofield2Result2 = DirectionNames->getLeft((*autofield2Result1));
-    if (!autofield2Result2) return std::unexpected(std::move(autofield2Result2.error()));
-    auto field2 = autofield2Result2->get();
+    auto direction =
+      v.getString("direction").and_then([](String const& name) { return enumValue<DirectionNames>(name); });
+    if (!direction)
+      return std::unexpected(std::move(direction.error()));
+    auto field2 = *direction;
     auto autofield3Result1 = v.get("parameters", {});
     if (!autofield3Result1) return std::unexpected(std::move(autofield3Result1.error()));
     auto field3 = std::move((*autofield3Result1));
@@ -514,15 +513,15 @@ std::expected<Json, StarException> WorldStructure::store() const {
   };
 
   auto objectToJson = [](Object const& o) -> std::expected<Json, StarException> {
-    if (!DirectionNames) return std::unexpected(DirectionNames.error());
-    auto direction = DirectionNames->getRight(o.direction);
-    if (!direction) return std::unexpected(std::move(direction.error()));
+    auto direction = enumName<DirectionNames>(o.direction);
+    if (!direction)
+      return std::unexpected(std::move(direction.error()));
     return JsonObject{
-        {"position", jsonFromVec2I(o.position)},
-        {"name", o.name},
-        {"direction", direction->get()},
-        {"parameters", o.parameters},
-        {"residual", o.residual},
+      {"position", jsonFromVec2I(o.position)},
+      {"name", o.name},
+      {"direction", String(*direction)},
+      {"parameters", o.parameters},
+      {"residual", o.residual},
     };
   };
 

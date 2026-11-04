@@ -303,12 +303,10 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
     Direction direction = *orientation->directionAffinity;
     if (orientation->flipImages)
       direction = -direction;
-    if (!DirectionNames)
-      return std::unexpected(DirectionNames.error());
-    auto directionName = DirectionNames->getRight(direction);
+    auto directionName = enumName<DirectionNames>(direction);
     if (!directionName)
       return std::unexpected(std::move(directionName.error()));
-    properties["tilesetDirection"] = directionName->get();
+    properties["tilesetDirection"] = String(*directionName);
   }
 
   auto tilesets = categorizeObject(root, objectName, imageSize);

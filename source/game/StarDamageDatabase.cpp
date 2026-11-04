@@ -31,8 +31,6 @@ namespace Star {
 
 std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::create(std::shared_ptr<Assets const> assets) {
   auto database = std::shared_ptr<DamageDatabase>(new DamageDatabase);
-  if (!HitTypeNames)
-    return std::unexpected(HitTypeNames.error());
   auto loadElementalTypes = [&]() -> std::expected<void, StarException> {
     auto elementalConfig = assets->json("/damage/elementaltypes.config");
     if (!elementalConfig)
@@ -51,13 +49,13 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       if (!particles)
         return std::unexpected(std::move(particles.error()));
       for (auto const& particle : *particles) {
-        auto hit = HitTypeNames->getLeft(particle.first);
+        auto hit = enumValue<HitTypeNames>(particle.first);
         if (!hit)
           return std::unexpected(std::move(hit.error()));
         auto name = particle.second.toString();
         if (!name)
           return std::unexpected(std::move(name.error()));
-        type.damageNumberParticles.set(hit->get(), std::move(*name));
+        type.damageNumberParticles.set(*hit, std::move(*name));
       }
       database->m_elementalTypes.set(p.first, std::move(type));
     }
@@ -109,10 +107,10 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
             auto particles = hit.second.get("particles", JsonArray());
             if (!particles)
               return std::unexpected(std::move(particles.error()));
-            auto hitType = HitTypeNames->getLeft(hit.first);
+            auto hitType = enumValue<HitTypeNames>(hit.first);
             if (!hitType)
               return std::unexpected(std::move(hitType.error()));
-            materialEffects.set(hitType->get(), DamageEffect{std::move(*sounds), std::move(*particles)});
+            materialEffects.set(*hitType, DamageEffect{std::move(*sounds), std::move(*particles)});
           }
           kind.effects.set(effect.first, std::move(materialEffects));
         }

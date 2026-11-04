@@ -34,31 +34,29 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
     auto type = entry.second.getString("type");
     if (!type) return std::unexpected(std::move(type.error()));
     result->parameterTypes[entry.first] = std::move(*type);
-    auto contains = entry.second.contains("example");
-    if (!contains) return std::unexpected(std::move(contains.error()));
-    if (*contains) {
-      auto example = entry.second.get("example");
-      if (!example) return std::unexpected(std::move(example.error()));
-      result->parameterExamples[entry.first] = std::move(*example);
-    }
+    auto example = entry.second.find("example");
+    if (!example)
+      return std::unexpected(std::move(example.error()));
+    if (*example)
+      result->parameterExamples[entry.first] = (**example).get();
   }
   auto rangeJson = config.get("moneyRange", JsonArray{0, 0});
   if (!rangeJson) return std::unexpected(std::move(rangeJson.error()));
   auto range = jsonToVec2U(*rangeJson);
   if (!range) return std::unexpected(std::move(range.error()));
   result->moneyRange = *range;
-  auto rewards = config.getArray("rewards", {});
+  auto rewards = config.find("rewards");
   if (!rewards) return std::unexpected(std::move(rewards.error()));
-  for (auto const& options : *rewards) {
-    auto array = options.toArray();
-    if (!array) return std::unexpected(std::move(array.error()));
-    List<ItemDescriptor> rewardOption;
-    for (auto const& entry : *array) {
-      auto item = ItemDescriptor::create(entry);
-      if (!item) return std::unexpected(std::move(item.error()));
-      rewardOption.append(std::move(*item));
+  if (*rewards && !(**rewards).get().isNull()) {
+    auto options = (**rewards).get().iterateArray();
+    if (!options)
+      return std::unexpected(std::move(options.error()));
+    for (auto const& option : *options) {
+      auto items = jsonToList<ItemDescriptor>(option, [](Json const& entry) { return ItemDescriptor::create(entry); });
+      if (!items)
+        return std::unexpected(std::move(items.error()));
+      result->rewards.append(std::move(*items));
     }
-    result->rewards.append(std::move(rewardOption));
   }
   auto rewardParameters = config.get("rewardParameters", JsonArray{});
   if (!rewardParameters) return std::unexpected(std::move(rewardParameters.error()));
@@ -106,12 +104,14 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
   auto level = config.optUInt("requiredShipLevel");
   if (!level) return std::unexpected(std::move(level.error()));
   result->requiredShipLevel = *level;
-  auto items = config.getArray("requiredItems", {});
+  auto items = config.find("requiredItems");
   if (!items) return std::unexpected(std::move(items.error()));
-  for (auto const& json : *items) {
-    auto item = ItemDescriptor::create(json);
-    if (!item) return std::unexpected(std::move(item.error()));
-    result->requiredItems.append(std::move(*item));
+  if (*items && !(**items).get().isNull()) {
+    auto descriptors =
+      jsonToList<ItemDescriptor>((**items).get(), [](Json const& entry) { return ItemDescriptor::create(entry); });
+    if (!descriptors)
+      return std::unexpected(std::move(descriptors.error()));
+    result->requiredItems = std::move(*descriptors);
   }
   auto delta = config.getUInt("updateDelta", 10);
   if (!delta) return std::unexpected(std::move(delta.error()));

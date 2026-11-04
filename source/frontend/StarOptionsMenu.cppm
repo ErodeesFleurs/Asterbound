@@ -86,13 +86,9 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> initConfig();
 
-  [[nodiscard]] std::expected<void, StarException> updateInstrumentVol();
-  [[nodiscard]] std::expected<void, StarException> updateSFXVol();
-  [[nodiscard]] std::expected<void, StarException> updateMusicVol();
-  [[nodiscard]] std::expected<void, StarException> updateTutorialMessages();
-  [[nodiscard]] std::expected<void, StarException> updateClientIPJoinable();
-  [[nodiscard]] std::expected<void, StarException> updateClientP2PJoinable();
-  [[nodiscard]] std::expected<void, StarException> updateAllowAssetsMismatch();
+  [[nodiscard]] std::expected<void, StarException> updateVolume(String const& key, SliderBarWidget& slider,
+                                                                LabelWidget& label);
+  [[nodiscard]] std::expected<void, StarException> updateBool(String const& key, ButtonWidget& button);
   [[nodiscard]] std::expected<void, StarException> updateHeadRotation();
 
   [[nodiscard]] std::expected<void, StarException> syncGuiToConf();

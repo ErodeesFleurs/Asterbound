@@ -322,31 +322,27 @@ std::expected<void, StarException> ActiveItem::uninit() {
 std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) {
   StringMap<bool> moveMap;
   for (auto move : moves) {
-    if (!MoveControlTypeNames)
-      return std::unexpected(MoveControlTypeNames.error());
-    auto name = MoveControlTypeNames->getRight(move);
+    auto name = enumName<MoveControlTypeNames>(move);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    moveMap[name->get()] = true;
+    moveMap[String(*name)] = true;
   }
   auto mode = entityMode();
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master) {
-    if (!FireModeNames)
-      return std::unexpected(FireModeNames.error());
-    auto fireModeName = FireModeNames->getRight(fireMode);
+    auto fireModeName = enumName<FireModeNames>(fireMode);
     if (!fireModeName)
       return std::unexpected(std::move(fireModeName.error()));
     if (fireMode != m_currentFireMode) {
       m_currentFireMode = fireMode;
       if (fireMode != FireMode::None) {
-        auto activated = m_script.invoke("activate", fireModeName->get(), shifting, moveMap);
+        auto activated = m_script.invoke("activate", *fireModeName, shifting, moveMap);
         if (!activated)
           return std::unexpected(std::move(activated.error()));
       }
     }
-    auto updated = m_script.update(m_script.updateDt(dt), fireModeName->get(), shifting, moveMap);
+    auto updated = m_script.update(m_script.updateDt(dt), *fireModeName, shifting, moveMap);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.toBool(); });
@@ -678,19 +674,20 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().powerMultiplier(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("fireMode", [this]() -> std::expected<String, StarException> {
-      if (!FireModeNames)
-        return std::unexpected(FireModeNames.error());
-      return FireModeNames->getRight(m_currentFireMode).transform([](std::reference_wrapper<String const> name) { return name.get(); });
-    }); !added)
+  if (auto added = callbacks.registerCallback(
+        "fireMode",
+        [this]() -> std::expected<String, StarException> {
+          return enumName<FireModeNames>(m_currentFireMode).transform([](std::string_view name) {
+            return String(name);
+          });
+        });
+      !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.registerCallback("hand", [this]() -> std::expected<String, StarException> {
       auto itemHand = hand();
       if (!itemHand)
         return std::unexpected(std::move(itemHand.error()));
-      if (!ToolHandNames)
-        return std::unexpected(ToolHandNames.error());
-      return ToolHandNames->getRight(*itemHand).transform([](std::reference_wrapper<String const> name) { return name.get(); });
+      return enumName<ToolHandNames>(*itemHand).transform([](std::string_view name) { return String(name); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.registerCallback("handPosition", [this](std::optional<Vec2F> offset) {

@@ -58,6 +58,10 @@ import star.player_log;
 import star.radio_message_database;
 import star.npc;
 import star.npc_database;
+import star.item_descriptor;
+import star.plant_database;
+import star.quest_template_database;
+import star.monster_database;
 import star.status_controller;
 import star.world_lua_bindings;
 import star.lua_game_converters;
@@ -451,6 +455,171 @@ writeIsolationModules(String const& overlay, std::initializer_list<std::pair<Str
   }
   return {};
 }
+const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplateItemBoundaries", [](GameTest&) {
+  for (auto const& config :
+       {Json(JsonObject{{"id", "borrowed-quest"}}),
+        Json(JsonObject{{"id", "borrowed-quest"}, {"rewards", Json()}, {"requiredItems", Json()}})}) {
+    auto quest = QuestTemplate::create(config);
+    ASSERT_TRUE(quest) << quest.error().what();
+    EXPECT_TRUE((*quest)->rewards.empty());
+    EXPECT_TRUE((*quest)->requiredItems.empty());
+  }
+  auto config = Json::parseJson(R"JSON({
+    "id": "borrowed-quest",
+    "parameters": {
+      "absent": {"type": "item"},
+      "null": {"type": "item", "example": null},
+      "value": {"type": "item", "example": {"name": "money", "count": 3}}
+    },
+    "rewards": [[], ["money", ["torch", 2, {"colorIndex": 4}]]],
+    "requiredItems": [null, {"name": "money", "count": 5}]
+  })JSON");
+  ASSERT_TRUE(config) << config.error().what();
+  auto quest = QuestTemplate::create(*config);
+  ASSERT_TRUE(quest) << quest.error().what();
+  EXPECT_FALSE((*quest)->parameterExamples.contains("absent"));
+  auto nullExample = (*quest)->parameterExamples.get("null");
+  ASSERT_TRUE(nullExample) << nullExample.error().what();
+  EXPECT_TRUE(nullExample->get().isNull());
+  auto valueExample = (*quest)->parameterExamples.get("value");
+  ASSERT_TRUE(valueExample) << valueExample.error().what();
+  EXPECT_EQ(valueExample->get().getUInt("count"), 3u);
+  ASSERT_EQ((*quest)->rewards.size(), 2u);
+  EXPECT_TRUE((*quest)->rewards[0].empty());
+  ASSERT_EQ((*quest)->rewards[1].size(), 2u);
+  EXPECT_EQ((*quest)->rewards[1][0].name(), "money");
+  EXPECT_EQ((*quest)->rewards[1][1].name(), "torch");
+  EXPECT_EQ((*quest)->rewards[1][1].count(), 2u);
+  EXPECT_EQ((*quest)->rewards[1][1].parameters().getInt("colorIndex"), 4);
+  ASSERT_EQ((*quest)->requiredItems.size(), 2u);
+  EXPECT_TRUE((*quest)->requiredItems[0].isNull());
+  EXPECT_EQ((*quest)->requiredItems[1].count(), 5u);
+  for (auto const& fields : {JsonObject{{"rewards", false}}, JsonObject{{"rewards", JsonArray{Json()}}},
+                             JsonObject{{"rewards", JsonArray{JsonArray{false}}}}, JsonObject{{"requiredItems", false}},
+                             JsonObject{{"requiredItems", JsonArray{false}}}}) {
+    auto invalid = Json(fields).set("id", "borrowed-quest");
+    ASSERT_TRUE(invalid) << invalid.error().what();
+    EXPECT_FALSE(QuestTemplate::create(*invalid));
+  }
+});
+
+const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries", [](GameTest& fixture) {
+  auto directory = File::temporaryDirectory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "bush-shapes");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relativeTo(*directory, "assets");
+  ASSERT_TRUE(writeIsolationModules(
+    overlay,
+    {{"borrowed-no-mods.bush", R"JSON({"name":"borrowed-no-mods","shapes":[{"base":"base.png"}]})JSON"},
+     {"borrowed-mods.bush", R"JSON({"name":"borrowed-mods","shapes":[
+      {"base":"first.png","mods":{"flower":["red.png","blue.png"]}},
+      {"base":"second.png","mods":{}}
+    ]})JSON"},
+     {"borrowed-null-mods.bush", R"JSON({"name":"borrowed-null-mods","shapes":[{"base":"base.png","mods":null}]})JSON"},
+     {"borrowed-null-selection.bush",
+      R"JSON({"name":"borrowed-null-selection","shapes":[{"base":"base.png","mods":{"flower":null}}]})JSON"},
+     {"borrowed-invalid-base.bush", R"JSON({"name":"borrowed-invalid-base","shapes":[{"mods":{}}]})JSON"},
+     {"borrowed-null-shape.bush", R"JSON({"name":"borrowed-null-shape","shapes":[null]})JSON"}}));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->plantDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  for (auto const& name : {"borrowed-no-mods", "borrowed-null-mods"}) {
+    auto variant = (*database)->buildBushVariant(String(std::string_view(name)), 12.0f, "", 24.0f);
+    ASSERT_TRUE(variant) << variant.error().what();
+    ASSERT_EQ(variant->shapes.size(), 1u);
+    EXPECT_EQ(variant->shapes[0].image, "base.png");
+    EXPECT_TRUE(variant->shapes[0].mods.empty());
+    EXPECT_EQ(variant->baseHueShift, 12.0f);
+    EXPECT_EQ(variant->modHueShift, 24.0f);
+    EXPECT_FALSE((*database)->buildBushVariant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+  }
+  auto variant = (*database)->buildBushVariant("borrowed-mods", 12.0f, "flower", 24.0f);
+  ASSERT_TRUE(variant) << variant.error().what();
+  ASSERT_EQ(variant->shapes.size(), 2u);
+  EXPECT_EQ(variant->shapes[0].image, "first.png");
+  EXPECT_EQ(variant->shapes[0].mods, (StringList{"red.png", "blue.png"}));
+  EXPECT_EQ(variant->shapes[1].image, "second.png");
+  EXPECT_TRUE(variant->shapes[1].mods.empty());
+  for (auto const& name : {"borrowed-null-selection", "borrowed-invalid-base", "borrowed-null-shape"})
+    EXPECT_FALSE((*database)->buildBushVariant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+});
+
+const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBoundaries", [](GameTest& fixture) {
+  auto database = fixture.root().npcDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  auto overrides = Json::parseJson(R"JSON({
+    "levelVariance":[0,0], "npcname":"Borrowed", "matchColorIndices":true,
+    "items":{"override":[
+      [0,[{"head":["early"]}]],
+      [8,[{"head":["higher"]}]],
+      [2,[{
+        "head":[{"name":"late-head","parameters":{"colorIndex":[2,4]}}],
+        "chest":[{"name":"late-chest","parameters":{"colorIndex":[2,4]}}]
+      }]],
+      [20,[{"head":["unqualified"]}]]
+    ]}
+  })JSON");
+  ASSERT_TRUE(overrides) << overrides.error().what();
+  auto variant = (*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *overrides);
+  ASSERT_TRUE(variant) << variant.error().what();
+  auto head = variant->items.get("head");
+  auto chest = variant->items.get("chest");
+  ASSERT_TRUE(head) << head.error().what();
+  ASSERT_TRUE(chest) << chest.error().what();
+  EXPECT_EQ(head->get().name(), "late-head");
+  EXPECT_EQ(chest->get().name(), "late-chest");
+  auto color = head->get().parameters().getInt("colorIndex");
+  ASSERT_TRUE(color) << color.error().what();
+  EXPECT_TRUE(*color == 2 || *color == 4);
+  EXPECT_EQ(chest->get().parameters().getInt("colorIndex"), *color);
+
+  // Removing unselected levels cannot change any generated variant field or
+  // equipment RNG draw. The last qualifying entry wins, not the greatest level.
+  auto items = overrides->get("items");
+  ASSERT_TRUE(items) << items.error().what();
+  auto levels = items->get("override");
+  ASSERT_TRUE(levels) << levels.error().what();
+  auto lastSelected = levels->get(2);
+  ASSERT_TRUE(lastSelected) << lastSelected.error().what();
+  auto collapsed = overrides->set("items", JsonObject{{"override", JsonArray{*lastSelected}}});
+  ASSERT_TRUE(collapsed) << collapsed.error().what();
+  auto expected = (*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *collapsed);
+  ASSERT_TRUE(expected) << expected.error().what();
+  expected->overrides = *overrides;
+  auto actualJson = (*database)->writeNpcVariantToJson(*variant);
+  auto expectedJson = (*database)->writeNpcVariantToJson(*expected);
+  ASSERT_TRUE(actualJson) << actualJson.error().what();
+  ASSERT_TRUE(expectedJson) << expectedJson.error().what();
+  EXPECT_EQ(*actualJson, *expectedJson);
+  auto actualBytes = (*database)->writeNpcVariant(*variant);
+  auto expectedBytes = (*database)->writeNpcVariant(*expected);
+  ASSERT_TRUE(actualBytes) << actualBytes.error().what();
+  ASSERT_TRUE(expectedBytes) << expectedBytes.error().what();
+  EXPECT_EQ(*actualBytes, *expectedBytes);
+
+  for (auto const& source :
+       {R"JSON({"items":{"override":[[0,[]]]}})JSON", R"JSON({"items":{"override":[[0,[{"head":[]}]]]}})JSON",
+        R"JSON({"items":{"override":[[0,[{"head":[{"name":"empty-color","parameters":{"colorIndex":[]}}]}]]]}})JSON"}) {
+    auto invalid = Json::parseJson(String(std::string_view(source)));
+    ASSERT_TRUE(invalid) << invalid.error().what();
+    EXPECT_FALSE((*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *invalid));
+  }
+});
+
+const GameTestRegistration monsterDropPoolBoundaries("RootTest", "MonsterDropPoolBoundaries", [](GameTest& fixture) {
+  auto database = fixture.root().monsterDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  auto pool = Json(JsonObject{{"default", "borrowed-pool"}, {"fire", "borrowed-fire-pool"}});
+  for (auto const& config : {Json(JsonArray{}), Json("borrowed-pool"), Json(JsonArray{pool})}) {
+    auto variant = (*database)->monsterVariant("poptop", 0x12345678, JsonObject{{"dropPools", config}});
+    ASSERT_TRUE(variant) << variant.error().what();
+    auto expected = config.isType(Json::Type::Array) ? (config == Json(JsonArray{}) ? Json() : pool) : config;
+    EXPECT_EQ(variant->dropPoolConfig, expected);
+  }
+});
 
 void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
   auto message = result.getString(field);

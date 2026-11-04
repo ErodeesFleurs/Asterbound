@@ -477,33 +477,36 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
   auto maxLevel = m_highlightConfig.getFloat("maxHighlightLevel", 1.0);
   if (!maxLevel) return std::unexpected(std::move(maxLevel.error()));
   highlightEffect.level *= *maxLevel;
-  if (m_highlightDirectives.contains(highlightEffect.type) && highlightEffect.level > 0) {
+  if (auto directives = m_highlightDirectives.maybeRef(highlightEffect.type); directives && highlightEffect.level > 0) {
+    auto const& underlayDirectives = directives->get().first;
+    auto const& overlayDirectives = directives->get().second;
+    auto drawHighlight = [&](Drawable const& drawable,
+                             Directives const& highlightDirectives) -> std::expected<void, StarException> {
+      auto highlightDrawable = Drawable(drawable);
+      highlightDrawable.fullbright = true;
+      highlightDrawable.color = Color::rgbaf(1, 1, 1, highlightEffect.level * drawable.color.alphaF());
+      if (auto result = highlightDrawable.imagePart().addDirectives(*m_imageMetadata, highlightDirectives, true);
+          !result)
+        return std::unexpected(std::move(result.error()));
+      return drawDrawable(std::move(highlightDrawable));
+    };
+
     // first pass, draw underlay
-    auto underlayDirectives = m_highlightDirectives[highlightEffect.type].first;
     if (!underlayDirectives.empty()) {
-      for (auto& d : drawables) {
+      for (auto const& d : drawables) {
         if (d.isImage()) {
-          auto underlayDrawable = Drawable(d);
-          underlayDrawable.fullbright = true;
-          underlayDrawable.color = Color::rgbaf(1, 1, 1, highlightEffect.level * d.color.alphaF());
-          if (auto result = underlayDrawable.imagePart().addDirectives(*m_imageMetadata, underlayDirectives, true); !result)
+          if (auto result = drawHighlight(d, underlayDirectives); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto result = drawDrawable(std::move(underlayDrawable)); !result) return std::unexpected(std::move(result.error()));
         }
       }
     }
 
     // second pass, draw main drawables and overlays
-    auto overlayDirectives = m_highlightDirectives[highlightEffect.type].second;
-    for (auto& d : drawables) {
+    for (auto const& d : drawables) {
       if (auto result = drawDrawable(d); !result) return std::unexpected(std::move(result.error()));
       if (!overlayDirectives.empty() && d.isImage()) {
-        auto overlayDrawable = Drawable(d);
-        overlayDrawable.fullbright = true;
-        overlayDrawable.color = Color::rgbaf(1, 1, 1, highlightEffect.level * d.color.alphaF());
-        if (auto result = overlayDrawable.imagePart().addDirectives(*m_imageMetadata, overlayDirectives, true); !result)
+        if (auto result = drawHighlight(d, overlayDirectives); !result)
           return std::unexpected(std::move(result.error()));
-        if (auto result = drawDrawable(std::move(overlayDrawable)); !result) return std::unexpected(std::move(result.error()));
       }
     }
   } else {

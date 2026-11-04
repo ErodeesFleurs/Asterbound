@@ -1371,8 +1371,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
   if (!database) return std::unexpected(std::move(database.error()));
   auto type = (*database)->itemType(items->name());
   if (!type) return std::unexpected(std::move(type.error()));
-  if (!ItemTypeNames) return std::unexpected(ItemTypeNames.error());
-  auto typeName = ItemTypeNames->getRight(*type);
+  auto typeName = enumName<ItemTypeNames>(*type);
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   for (auto const& entry : {std::pair<String, bool>{"typeWhitelist", false}, {"typeBlacklist", true}}) {
     auto present = filterConfig.contains(entry.first);
@@ -1380,7 +1379,8 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
     if (*present) {
       auto list = filterConfig.getArray(entry.first);
       if (!list) return std::unexpected(std::move(list.error()));
-      if (list->contains(Json(typeName->get())) == entry.second) return false;
+      if (list->contains(Json(String(*typeName))) == entry.second)
+        return false;
     }
   }
   auto tags = (*database)->itemTags(items->name());

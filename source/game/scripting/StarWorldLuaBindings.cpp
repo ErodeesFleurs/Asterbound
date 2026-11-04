@@ -1209,10 +1209,9 @@ namespace LuaBindings {
             std::optional<std::uint64_t> knownRevision) -> std::expected<std::optional<LuaTable>, StarException> {
       auto entity = world.get<PortraitEntity>(id);
       if (!entity) return {};
-      if (!PortraitModeNames) return std::unexpected(PortraitModeNames.error());
-      auto mode = PortraitModeNames->getLeft(modeName);
+      auto mode = enumValue<PortraitModeNames>(modeName);
       if (!mode) return std::unexpected(std::move(mode.error()));
-      auto portrait = entity->portrait(mode->get());
+      auto portrait = entity->portrait(*mode);
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       auto& cache = *portraitCache;
       if (cache.entity.lock() != entity || cache.mode != modeName || cache.drawables != *portrait) {
@@ -1526,21 +1525,22 @@ namespace LuaBindings {
     if (auto result = callbacks.registerCallbackWithSignature<bool, Vec2I, String, String, std::optional<int>, bool>("placeMod", std::bind(WorldEnvironmentCallbacks::placeMod, std::ref(world), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5)); !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("radialTileQuery", [&world](Vec2F center, float radius, String layerName) -> std::expected<List<Vec2I>, StarException> {
-      if (!TileLayerNames)
-        return std::unexpected(TileLayerNames.error());
-      auto layerPointerResult = TileLayerNames->getLeft(layerName);
-      if (!layerPointerResult)
-        return std::unexpected(std::move(layerPointerResult.error()));
-      auto layerPointer = std::move(*layerPointerResult);
-      auto layer = layerPointer.get();
-      List<Vec2I> tiles;
-      for (auto const& tile : tileAreaBrush(radius, center, false)) {
-        if (world.material(tile, layer) != EmptyMaterialId)
-          tiles.append(tile);
-      }
-      return tiles;
-      }); !result)
+    if (auto result = callbacks.registerCallback(
+          "radialTileQuery",
+          [&world](Vec2F center, float radius, String layerName) -> std::expected<List<Vec2I>, StarException> {
+            auto layerPointerResult = enumValue<TileLayerNames>(layerName);
+            if (!layerPointerResult)
+              return std::unexpected(std::move(layerPointerResult.error()));
+            auto layerPointer = std::move(*layerPointerResult);
+            auto layer = layerPointer;
+            List<Vec2I> tiles;
+            for (auto const& tile : tileAreaBrush(radius, center, false)) {
+              if (world.material(tile, layer) != EmptyMaterialId)
+                tiles.append(tile);
+            }
+            return tiles;
+          });
+        !result)
       return std::unexpected(std::move(result.error()));
     
     if (auto result = callbacks.registerCallbackWithSignature<List<std::pair<Vec2I, LiquidLevel>>, Vec2F, Vec2F>("liquidAlongLine", std::bind(WorldEnvironmentCallbacks::liquidAlongLine, std::ref(world), std::placeholders::_1, std::placeholders::_2)); !result)
@@ -2591,13 +2591,11 @@ namespace LuaBindings {
       gender = npc->gender();
     if (!gender)
       return {};
-    if (!GenderNames)
-      return std::unexpected(GenderNames.error());
-    auto namePointerResult = GenderNames->getRight(*gender);
+    auto namePointerResult = enumName<GenderNames>(*gender);
     if (!namePointerResult)
       return std::unexpected(std::move(namePointerResult.error()));
     auto namePointer = std::move(*namePointerResult);
-    auto const& name = namePointer.get();
+    String name(namePointer);
     return name;
   }
 
@@ -2670,13 +2668,11 @@ namespace LuaBindings {
   std::expected<std::optional<List<Drawable>>, StarException>
   WorldEntityCallbacks::entityPortrait(World& world, EntityId entityId, String const& portraitMode) {
     if (auto entity = as<PortraitEntity>(world.entity(entityId))) {
-      if (!PortraitModeNames)
-        return std::unexpected(PortraitModeNames.error());
-      auto modePointerResult = PortraitModeNames->getLeft(portraitMode);
+      auto modePointerResult = enumValue<PortraitModeNames>(portraitMode);
       if (!modePointerResult)
         return std::unexpected(std::move(modePointerResult.error()));
       auto modePointer = std::move(*modePointerResult);
-      auto mode = modePointer.get();
+      auto mode = modePointer;
       auto portraitResult = entity->portrait(mode);
       if (!portraitResult)
         return std::unexpected(std::move(portraitResult.error()));

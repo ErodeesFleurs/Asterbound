@@ -285,38 +285,27 @@ std::expected<void, StarException> EnvironmentPainter::renderPlanetHorizon(float
   Vec2F center = planetHorizon.center * pixelRatio;
 
   auto& primitives = m_renderer->immediatePrimitives();
+  auto drawHorizonHalf = [&](TexturePtr texture, bool leftHalf) {
+    Vec2F textureSize(texture->size());
+    Vec2F layerPosition = center;
+    if (leftHalf)
+      layerPosition[0] -= textureSize[0] * planetPixelRatio;
+    auto rect = RectF::withSize(layerPosition, textureSize * planetPixelRatio);
+    PolyF image = PolyF(rect);
+    image.rotate(planetHorizon.rotation, center);
+
+    primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(texture), image[0], Vec2F(0, 0), image[1],
+                            Vec2F(textureSize[0], 0), image[2], Vec2F(textureSize[0], textureSize[1]), image[3],
+                            Vec2F(0, textureSize[1]), Vec4B::filled(255), 0.0f);
+  };
 
   for (auto const& layer : planetHorizon.layers) {
     auto left = m_textureGroup->loadTexture(layer.first);
     if (!left) return std::unexpected(std::move(left.error()));
     auto right = m_textureGroup->loadTexture(layer.second);
     if (!right) return std::unexpected(std::move(right.error()));
-    TexturePtr leftTexture = std::move(*left);
-    TexturePtr rightTexture = std::move(*right);
-    Vec2F leftTextureSize(leftTexture->size());
-    Vec2F rightTextureSize(rightTexture->size());
-
-    Vec2F leftLayer = center;
-    leftLayer[0] -= leftTextureSize[0] * planetPixelRatio;
-    auto leftRect = RectF::withSize(leftLayer, leftTextureSize * planetPixelRatio);
-    PolyF leftImage = PolyF(leftRect);
-    leftImage.rotate(planetHorizon.rotation, center);
-
-    auto rightRect = RectF::withSize(center, rightTextureSize * planetPixelRatio);
-    PolyF rightImage = PolyF(rightRect);
-    rightImage.rotate(planetHorizon.rotation, center);
-
-    primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(leftTexture),
-        leftImage[0], Vec2F(0, 0),
-        leftImage[1], Vec2F(leftTextureSize[0], 0),
-        leftImage[2], Vec2F(leftTextureSize[0], leftTextureSize[1]),
-        leftImage[3], Vec2F(0, leftTextureSize[1]), Vec4B::filled(255), 0.0f);
-
-    primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(rightTexture),
-        rightImage[0], Vec2F(0, 0),
-        rightImage[1], Vec2F(rightTextureSize[0], 0),
-        rightImage[2], Vec2F(rightTextureSize[0], rightTextureSize[1]),
-        rightImage[3], Vec2F(0, rightTextureSize[1]), Vec4B::filled(255), 0.0f);
+    drawHorizonHalf(std::move(*left), true);
+    drawHorizonHalf(std::move(*right), false);
   }
 
   return m_renderer->flush();

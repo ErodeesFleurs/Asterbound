@@ -886,13 +886,10 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
             return std::unexpected(std::move(jsonToStringSetResult441.error()));
           for (auto entry : std::move(*jsonToStringSetResult441))
             {
-              auto const& enumResult442 = RarityNames;
-              if (!enumResult442)
-                return std::unexpected(enumResult442.error());
-              auto getLeftResult443 = (*enumResult442).getLeft(entry);
-              if (!getLeftResult443)
-                return std::unexpected(std::move(getLeftResult443.error()));
-              rarityFilter.add(getLeftResult443->get());
+            auto rarity = enumValue<RarityNames>(entry);
+            if (!rarity)
+              return std::unexpected(std::move(rarity.error()));
+            rarityFilter.add(*rarity);
             }
         }
       }
@@ -1498,13 +1495,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
             return std::unexpected(std::move(jsonToStringSetResult535.error()));
           for (auto entry : std::move(*jsonToStringSetResult535))
             {
-              auto const& enumResult536 = RarityNames;
-              if (!enumResult536)
-                return std::unexpected(enumResult536.error());
-              auto getLeftResult537 = (*enumResult536).getLeft(entry);
-              if (!getLeftResult537)
-                return std::unexpected(std::move(getLeftResult537.error()));
-              rarityFilter.add(getLeftResult537->get());
+            auto rarity = enumValue<RarityNames>(entry);
+            if (!rarity)
+              return std::unexpected(std::move(rarity.error()));
+            rarityFilter.add(*rarity);
             }
         }
       }

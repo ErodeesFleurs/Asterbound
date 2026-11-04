@@ -228,12 +228,11 @@ if (!checked14) return std::unexpected(std::move(checked14.error()));
 identity.species = std::move(*checked14);
 }
   {
-if (!GenderNames) return std::unexpected(GenderNames.error());
 auto checked15 = config.getString("gender", "male");
 if (!checked15) return std::unexpected(std::move(checked15.error()));
-auto checked16 = GenderNames->getLeft(std::move(*checked15));
+auto checked16 = enumValue<GenderNames>(std::move(*checked15));
 if (!checked16) return std::unexpected(std::move(checked16.error()));
-identity.gender = checked16->get();
+identity.gender = *checked16;
 }
   {
 auto checked17 = config.getString("hairGroup", "hair");
@@ -342,13 +341,13 @@ identity.imagePath = std::move(*checked38);
 }
 
 std::expected<Json, StarException> HumanoidIdentity::toJson() const {
-  if (!GenderNames) return std::unexpected(GenderNames.error());
-auto checked39 = GenderNames->getRight(gender);
-if (!checked39) return std::unexpected(std::move(checked39.error()));
-auto result = JsonObject{
+  auto checked39 = enumName<GenderNames>(gender);
+  if (!checked39)
+    return std::unexpected(std::move(checked39.error()));
+  auto result = JsonObject{
     {"name", name},
     {"species", species},
-    {"gender", checked39->get()},
+    {"gender", String(*checked39)},
     {"hairGroup", hairGroup},
     {"hairType", hairType},
     {"hairDirectives", hairDirectives.string()},
@@ -733,10 +732,10 @@ std::expected<std::shared_ptr<Humanoid>, StarException> Humanoid::create(Root& r
 }
 
 std::expected<void, StarException> Humanoid::setIdentity(HumanoidIdentity const& identity) {
-  if (!GenderNames) return std::unexpected(GenderNames.error());
-  auto checked93 = GenderNames->getRight(identity.gender);
-if (!checked93) return std::unexpected(std::move(checked93.error()));
-  m_genderName = checked93->get();
+  auto checked93 = enumName<GenderNames>(identity.gender);
+  if (!checked93)
+    return std::unexpected(std::move(checked93.error()));
+  m_genderName = String(*checked93);
   m_identity = identity;
   m_headFrameset = getHeadFromIdentity();
   m_bodyFrameset = getBodyFromIdentity();
@@ -1274,12 +1273,9 @@ animations.set(anim.first, {std::move(*checked239), std::move(*checked241), std:
         
 }
 }
-      if (!PortraitModeNames) return std::unexpected(PortraitModeNames.error());
-auto checked244 = PortraitModeNames->getLeft(pair.first);
+auto checked244 = enumValue<PortraitModeNames>(pair.first);
 if (!checked244) return std::unexpected(std::move(checked244.error()));
-m_portraitAnimationStates.set(checked244->get(), animations);
-
-      
+m_portraitAnimationStates.set(*checked244, animations);
 }
 }
     
@@ -3062,16 +3058,15 @@ if (!checked566) return std::unexpected(std::move(checked566.error()));
 auto checked550 = std::move(*checked566).toString();
 if (!checked550) return std::unexpected(std::move(checked550.error()));
 humanoid->m_backArmFrameset = std::move(*checked550);
-  if (!DirectionNames) return std::unexpected(DirectionNames.error());
 auto checked567 = assets->json("/humanoid/any/dummy.config:direction");
 if (!checked567) return std::unexpected(std::move(checked567.error()));
 auto checked551 = std::move(*checked567).toString();
 if (!checked551) return std::unexpected(std::move(checked551.error()));
-auto checked552 = DirectionNames->getLeft(std::move(*checked551));
+auto checked552 = enumValue<DirectionNames>(std::move(*checked551));
 if (!checked552) return std::unexpected(std::move(checked552.error()));
-humanoid->setFacingDirection(checked552->get());
+humanoid->setFacingDirection(*checked552);
 
-  return humanoid;
+return humanoid;
 }
 
 std::expected<List<Drawable>, StarException> Humanoid::renderDummy(Gender gender, std::optional<std::reference_wrapper<HeadArmor const>> head, std::optional<std::reference_wrapper<ChestArmor const>> chest, std::optional<std::reference_wrapper<LegsArmor const>> legs, std::optional<std::reference_wrapper<BackArmor const>> back) {

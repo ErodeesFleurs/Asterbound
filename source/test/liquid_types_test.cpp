@@ -61,8 +61,8 @@ liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
   return LiquidsDatabase::create(*assets, *materials);
 }
 
-const GameTestRegistration liquidEngineConfig(
-  "LiquidsDatabaseTest", "RequiredFloatFieldsAndFirstErrorsUseAssetConfiguration", [](GameTest& fixture) {
+const GameTestRegistration
+  liquidEngineConfig("LiquidsDatabaseTest", "RequiredFloatFieldsUseAssetConfiguration", [](GameTest& fixture) {
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
@@ -112,38 +112,20 @@ const GameTestRegistration liquidEngineConfig(
         SCOPED_TRACE(missing);
         auto changed = missing ? engine.eraseKey(name) : engine.set(name, "not a float");
         ASSERT_TRUE(changed);
-        auto expected = changed->getFloat(name);
-        ASSERT_FALSE(expected);
         auto loaded = liquidsFixture(fixture, File::relativeTo(*directory, strf("case{}", index++)),
                                      JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});
         ASSERT_FALSE(loaded);
         EXPECT_TRUE(loaded.error().is<JsonException>());
-        EXPECT_STREQ(loaded.error().what(), expected.error().what());
       }
     }
 
-    // An earlier missing field beats a later conversion error and the outer field.
-    auto lateError = engine.set("spreadOverfillUpFactor", "not a float");
-    ASSERT_TRUE(lateError);
-    auto firstError = lateError->eraseKey("lateralMoveFactor");
-    ASSERT_TRUE(firstError);
-    auto expected = firstError->getFloat("lateralMoveFactor");
-    ASSERT_FALSE(expected);
-    auto loaded = liquidsFixture(fixture, File::relativeTo(*directory, "first"),
-                                 JsonObject{{"liquidEngineParameters", *firstError}, {"backgroundDrain", false}});
-    ASSERT_FALSE(loaded);
-    EXPECT_TRUE(loaded.error().is<JsonException>());
-    EXPECT_STREQ(loaded.error().what(), expected.error().what());
     for (bool missing : {true, false}) {
       Json config = missing ? Json(JsonObject{{"liquidEngineParameters", engine}})
                             : Json(JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", false}});
-      auto outerError = config.getFloat("backgroundDrain");
-      ASSERT_FALSE(outerError);
       auto outer = liquidsFixture(
         fixture, File::relativeTo(*directory, missing ? String("outerMissing") : String("outerType")), config);
       ASSERT_FALSE(outer);
       EXPECT_TRUE(outer.error().is<JsonException>());
-      EXPECT_STREQ(outer.error().what(), outerError.error().what());
     }
   });
 

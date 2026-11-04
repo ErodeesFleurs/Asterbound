@@ -315,10 +315,9 @@ namespace Dungeon {
     if (auto d = settings.maybe("direction")) {
       auto name = d->toString();
       if (!name) return std::unexpected(std::move(name.error()));
-      if (!DirectionNames) return std::unexpected(DirectionNames.error());
-      auto parsed = DirectionNames->getLeft(*name);
+      auto parsed = enumValue<DirectionNames>(*name);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      direction = parsed->get();
+      direction = *parsed;
     }
     Json parameters = settings.value("parameters");
     return std::make_shared<const ObjectBrush>(*object, direction, parameters);

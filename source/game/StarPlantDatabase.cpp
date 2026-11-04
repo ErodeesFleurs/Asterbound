@@ -550,31 +550,35 @@ auto const& config = result193->get();
   bushVariant.directory = config.directory;
   auto result194 = config.settings.get("shapes");
 if (!result194) return std::unexpected(std::move(result194.error()));
-auto result195 = std::move(*result194).toArray();
-if (!result195) return std::unexpected(std::move(result195.error()));
-auto shapes = std::move(*result195);
-  for (auto shapeVar : shapes) {
-    auto result196 = shapeVar.toObject();
-if (!result196) return std::unexpected(std::move(result196.error()));
-auto shapeMap = std::move(*result196);
-    auto result197 = shapeMap.get("base");
-if (!result197) return std::unexpected(std::move(result197.error()));
-auto result198 = result197->get().toString();
-if (!result198) return std::unexpected(std::move(result198.error()));
-auto base = std::move(*result198);
-    StringList mods;
-    if (!modName.empty())
-      {
-auto result199 = shapeMap.get("mods");
-if (!result199) return std::unexpected(std::move(result199.error()));
-auto result200 = result199->get().get(modName, JsonArray());
-if (!result200) return std::unexpected(std::move(result200.error()));
-auto result201 = jsonToStringList(std::move(*result200));
-if (!result201) return std::unexpected(std::move(result201.error()));
-mods = std::move(*result201);
-}
-    bushVariant.shapes.push_back({base, mods});
+auto shapes = result194->iterateArray();
+if (!shapes)
+  return std::unexpected(std::move(shapes.error()));
+for (auto const& shapeVar : *shapes) {
+  auto shapeMap = shapeVar.objectPtr();
+  if (!shapeMap)
+    return std::unexpected(std::move(shapeMap.error()));
+  auto result197 = (*shapeMap)->get("base");
+  if (!result197)
+    return std::unexpected(std::move(result197.error()));
+  auto result198 = result197->get().toString();
+  if (!result198)
+    return std::unexpected(std::move(result198.error()));
+  auto base = std::move(*result198);
+  StringList mods;
+  if (!modName.empty()) {
+    auto result199 = (*shapeMap)->get("mods");
+    if (!result199)
+      return std::unexpected(std::move(result199.error()));
+    auto result200 = result199->get().get(modName, JsonArray());
+    if (!result200)
+      return std::unexpected(std::move(result200.error()));
+    auto result201 = jsonToStringList(std::move(*result200));
+    if (!result201)
+      return std::unexpected(std::move(result201.error()));
+    mods = std::move(*result201);
   }
+  bushVariant.shapes.push_back({base, mods});
+}
   bushVariant.baseHueShift = baseHueShift;
   bushVariant.modHueShift = modHueShift;
   auto result202 = config.settings.getBool("ceiling", false);
