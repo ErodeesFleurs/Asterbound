@@ -335,7 +335,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
       if (!transmitted) {
         p.second->packetSocket->close();
         connectionLocker.unlock();
-        auto logged = m_logger.error("Error receiving incoming server packets, disconnecting client '{}' {}", p.first, outputException(transmitted.error(), true));
+        auto logged = m_logger.errorException(strf("Error receiving incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(transmitted.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         continue;
@@ -349,7 +349,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
           if (p.second->packetSocket)
             p.second->packetSocket->close();
           connectionLocker.unlock();
-          auto logged = m_logger.error("Error handling incoming server packets, disconnecting client '{}' {}", p.first, outputException(received.error(), true));
+          auto logged = m_logger.errorException(strf("Error handling incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(received.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -389,7 +389,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
     auto finished = thread.finish();
     if (!finished) {
       if (failure)
-        failure = failure->withContext(strf("Additional connection worker shutdown failure: {}", outputException(finished.error(), true)));
+        failure = failure->withRelated(finished.error(), "Additional connection worker shutdown failure");
       else
         failure = std::move(finished.error());
     }

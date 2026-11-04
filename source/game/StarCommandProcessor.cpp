@@ -408,7 +408,7 @@ std::expected<String, StarException> CommandProcessor::warp(ConnectionId connect
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn("Could not parse warp target: {}", outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException("Could not parse warp target", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not parse the argument {} as a warp target", argumentString);
     }
@@ -720,22 +720,22 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<JsonParsingException>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawnitem '{}' command. Json parse problem: {}", arguments[0], outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not parse item parameters";
     }
   if (exception.is<ItemException>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawnitem '{}' command. Item instantiation problem: {}", arguments[0], outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
   if (exception.is<BadLexicalCast>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawnitem command. Number expected. Got something else: {}", outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException("Error while processing /spawnitem command. Number expected", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
   {
-    auto logged = m_root.logger().warn("Error while processing /spawnitem command '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
@@ -788,22 +788,22 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<JsonParsingException>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawntreasure '{}' command. Json parse problem: {}", arguments[0], outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not parse item parameters";
     }
   if (exception.is<ItemException>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawntreasure '{}' command. Item instantiation problem: {}", arguments[0], outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
   if (exception.is<BadLexicalCast>()) {
-    auto logged = m_root.logger().warn("Error while processing /spawntreasure command. Number expected. Got something else: {}", outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException("Error while processing /spawntreasure command. Number expected", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
   {
-    auto logged = m_root.logger().warn("Error while processing /spawntreasure command '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not load item '{}'", arguments[0]);
     }
@@ -815,10 +815,11 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
+  StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
     auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
-  auto arguments = std::move(*parsedArguments);
+  arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
@@ -867,7 +868,7 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn("Could not spawn Monster of type '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Could not spawn Monster of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not spawn Monster of type '{}'", argumentString);
     }
@@ -931,7 +932,7 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn("Could not spawn NPC of species '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), true));
+    auto logged = m_root.logger().warnException(strf("Could not spawn NPC of species '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not spawn NPC of species '{}'", argumentString);
     }
@@ -984,7 +985,7 @@ std::expected<String, StarException> CommandProcessor::spawnVehicle(ConnectionId
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn("Could not spawn vehicle, exception caught: {}", outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException("Could not spawn vehicle", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not spawn vehicle");
     }
@@ -996,10 +997,11 @@ std::expected<String, StarException> CommandProcessor::spawnStagehand(Connection
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
+  StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
     auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
-  auto arguments = std::move(*parsedArguments);
+  arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
@@ -1033,7 +1035,7 @@ std::expected<String, StarException> CommandProcessor::spawnStagehand(Connection
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn("Could not spawn Stagehand of type '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Could not spawn Stagehand of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return strf("Could not spawn Stagehand of type '{}'", argumentString);
     }
@@ -1069,10 +1071,11 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
+  StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
     auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
-  auto arguments = std::move(*parsedArguments);
+  arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
@@ -1110,8 +1113,7 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warn(
-        "Could not spawn liquid '{}', exception caught: {}", argumentString, outputException(ExceptionDiagnostic(exception), false));
+    auto logged = m_root.logger().warnException(strf("Could not spawn liquid '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not spawn liquid.";
     }

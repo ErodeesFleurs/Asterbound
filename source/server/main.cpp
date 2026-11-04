@@ -161,7 +161,7 @@ Json const AdditionalDefaultConfiguration = JsonObject{
     {"allowAssetsMismatch", true},
     {"serverOverrideAssetsDigest", Json()}};
 
-static std::expected<void, StarException> runServer(int argc, char** argv) {
+static std::expected<void, StarException> runServer(int argc, char** argv, bool& diagnosticReported) {
   #if defined STAR_SYSTEM_WINDOWS
   unsigned long exceptionStackSize = 131072;
   SetThreadStackGuarantee(&exceptionStackSize);
@@ -174,6 +174,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv) {
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   auto root = std::move(initialized->first);
+  auto result = [&]() -> std::expected<void, StarException> {
   auto loaded = root->fullyLoad();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
@@ -214,8 +215,12 @@ static std::expected<void, StarException> runServer(int argc, char** argv) {
     auto started = server->start();
     if (!started) {
       auto closed = server->close();
-      if (!closed)
-        EmergencyLog::error("Server cleanup after failed start also failed: {}", closed.error().what());
+      if (!closed) {
+        if (auto logged = root->logger().errorException("Server cleanup after failed start also failed", ExceptionDiagnostic(closed.error())); !logged) {
+          EmergencyLog::error("Server cleanup after failed start also failed: {}", exceptionReport(closed.error()));
+          EmergencyLog::error("Server cleanup logging failed: {}", exceptionReport(logged.error()));
+        }
+      }
       return std::unexpected(std::move(started.error()));
     }
 
@@ -292,12 +297,14 @@ static std::expected<void, StarException> runServer(int argc, char** argv) {
     }();
 
     std::optional<StarException> shutdownError;
-    auto collect = [&shutdownError](auto result) {
+    auto collect = [&shutdownError, &root](auto result) {
       if (!result) {
         if (!shutdownError)
           shutdownError = std::move(result.error());
-        else
-          EmergencyLog::error("Additional server shutdown error: {}", result.error().what());
+        else if (auto logged = root->logger().errorException("Additional server shutdown error", ExceptionDiagnostic(result.error())); !logged) {
+          EmergencyLog::error("Additional server shutdown error: {}", exceptionReport(result.error()));
+          EmergencyLog::error("Server shutdown logging failed: {}", exceptionReport(logged.error()));
+        }
       }
     };
     if (!session) {
@@ -318,14 +325,26 @@ static std::expected<void, StarException> runServer(int argc, char** argv) {
       return std::unexpected(std::move(*shutdownError));
   }
   return root->logger().info("Server shutdown gracefully");
+  }();
+  if (!result) {
+    auto logged = root->logger().errorException("Fatal server error", ExceptionDiagnostic(result.error()));
+    if (!logged) {
+      EmergencyLog::error("{}", exceptionReport(result.error()));
+      EmergencyLog::error("Fatal server error logging failed: {}", exceptionReport(logged.error()));
+    }
+    diagnosticReported = true;
+  }
+  return result;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
-  auto result = nativeRuntime ? runServer(argc, argv) : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
+  bool diagnosticReported = false;
+  auto result = nativeRuntime ? runServer(argc, argv, diagnosticReported)
+      : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
   if (!result) {
-    auto text = exceptionReport(result.error());
-    EmergencyLog::error("Fatal server error: {}", text);
+    auto text = exceptionSummary(result.error());
+    EmergencyLog::error("Fatal server error: {}", diagnosticReported ? text : exceptionReport(result.error()));
     #if defined STAR_SYSTEM_WINDOWS
     auto wideText = stringToUtf16(text);
     MessageBoxW(nullptr, wideText ? wideText->get() : L"Server startup failed; diagnostic conversion failed. See the log.",

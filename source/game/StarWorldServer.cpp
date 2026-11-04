@@ -1009,7 +1009,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       return {};
       };
       if (auto accepted = acceptEntity(); !accepted) {
-        auto logged = this->root().logger().warn("WorldServer: rejected SpawnEntity from client {}: {}", clientId, accepted.error().what());
+        auto logged = this->root().logger().warnException(strf("WorldServer: rejected SpawnEntity from client {}", clientId), ExceptionDiagnostic(accepted.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       }
@@ -1127,7 +1127,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return {};
         };
         if (auto accepted = acceptEntity(); !accepted) {
-          auto logged = this->root().logger().warn("WorldServer: rejected EntityCreate from client {}: {}", clientId, accepted.error().what());
+          auto logged = this->root().logger().warnException(strf("WorldServer: rejected EntityCreate from client {}", clientId), ExceptionDiagnostic(accepted.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }

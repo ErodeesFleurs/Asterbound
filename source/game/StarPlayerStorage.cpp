@@ -219,8 +219,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         return {};
       }();
       if (!loaded) {
-        auto logged = m_root.logger().error("Error loading player file, ignoring! {} : {}", filename,
-            outputException(ExceptionDiagnostic(loaded.error()), false));
+        auto logged = m_root.logger().errorException(strf("Error loading player file {}, ignoring", filename), ExceptionDiagnostic(loaded.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       } else if (duplicate) {
@@ -257,11 +256,10 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         if (!fileName)
           return std::unexpected(std::move(fileName.error()));
         String uuidHex = entry.first.hex();
-        auto logged = uuidHex == fileName->get()
-            ? m_root.logger().error("Failed to validate player with uuid {} : {}", uuidHex,
-                outputException(ExceptionDiagnostic(validated.error()), true))
-            : m_root.logger().error("Failed to validate player with uuid {} ({}.player) : {}", uuidHex, fileName->get(),
-                outputException(ExceptionDiagnostic(validated.error()), true));
+        auto logged = m_root.logger().errorException(
+            uuidHex == fileName->get() ? strf("Failed to validate player with uuid {}", uuidHex)
+                                      : strf("Failed to validate player with uuid {} ({}.player)", uuidHex, fileName->get()),
+            ExceptionDiagnostic(validated.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         it = m_savedPlayersCache.erase(it);
@@ -304,8 +302,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
     return {};
   }();
   if (!metadata)
-    return m_root.logger().warn("Error loading player storage metadata file, resetting: {}",
-        outputException(ExceptionDiagnostic(metadata.error()), false));
+    return m_root.logger().warnException("Error loading player storage metadata file, resetting", ExceptionDiagnostic(metadata.error()));
   return {};
 }
 
@@ -468,7 +465,7 @@ std::expected<std::shared_ptr<Player>, StarException> PlayerStorage::loadPlayer(
   }();
   if (loaded)
     return std::move(*loaded);
-  auto logged = m_root.logger().error("Error loading player file, ignoring! {}", outputException(ExceptionDiagnostic(loaded.error()), false));
+  auto logged = m_root.logger().errorException("Error loading player file, ignoring", ExceptionDiagnostic(loaded.error()));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   std::unique_lock locker(m_mutex, std::defer_lock);
@@ -534,8 +531,7 @@ std::expected<WorldChunks, StarException> PlayerStorage::loadShipData(Uuid const
     auto chunks = WorldStorage::getWorldChunksFromFile(m_root.logger(), filename);
     if (chunks)
       return std::move(*chunks);
-    auto logged = m_root.logger().error("Failed to load shipworld file, removing {} : {}", filename,
-        outputException(ExceptionDiagnostic(chunks.error()), false));
+    auto logged = m_root.logger().errorException(strf("Failed to load shipworld file {}, removing", filename), ExceptionDiagnostic(chunks.error()));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     auto removed = File::remove(filename);

@@ -552,6 +552,7 @@ public:
     EmergencyLog::info("Application: startup...");
     if (auto result = m_application->startup(cmdLineArgs); !result)
       return std::unexpected(ApplicationException("Application failed during startup", ExceptionDiagnostic(result.error())));
+    m_applicationStarted = true;
 
 #ifdef STAR_SYSTEM_LINUX
     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_SCALE_TO_DISPLAY, "1");
@@ -775,6 +776,16 @@ public:
     return contextScope->restore();
   }
 
+  bool logInitializationFailure(StarException const& error) {
+    if (!m_applicationStarted)
+      return false;
+    if (auto logged = m_application->logger().errorException("Application: failed during initialization", ExceptionDiagnostic(error)); !logged) {
+      EmergencyLog::error("{}", exceptionReport(error));
+      EmergencyLog::error("Application: failure logging failed: {}", exceptionReport(logged.error()));
+    }
+    return true;
+  }
+
   ~SdlPlatform() {
     if (auto result = releaseResources(); !result)
       EmergencyLog::error("Application: cleanup failed: {}", outputException(ExceptionDiagnostic(result.error()), true));
@@ -955,16 +966,22 @@ public:
     if (imguiFrameActive)
       ImGui::EndFrame();
     if (!result)
-      if (auto logged = m_application->logger().error("Application: failed: {}", exceptionReport(result.error())); !logged)
-        EmergencyLog::error("Application: failure logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
+      if (auto logged = m_application->logger().errorException("Application: failed", ExceptionDiagnostic(result.error())); !logged) {
+        EmergencyLog::error("{}", exceptionReport(result.error()));
+        EmergencyLog::error("Application: failure logging failed: {}", exceptionReport(logged.error()));
+      }
 
     closeAudioOutputDevice();
     closeAudioInputDevice();
     if (auto error = takeAudioError()) {
-      if (result)
+      if (result) {
         result = std::unexpected(std::move(*error));
-      else
-        if (auto logged = m_application->logger().error("Application: audio callback failed: {}", outputException(ExceptionDiagnostic(*error), true)); !logged) {
+        if (auto logged = m_application->logger().errorException("Application: audio callback failed", ExceptionDiagnostic(result.error())); !logged) {
+          EmergencyLog::error("Application: audio callback failed: {}", exceptionReport(result.error()));
+          EmergencyLog::error("Application: cleanup logging failed: {}", exceptionReport(logged.error()));
+        }
+      } else
+        if (auto logged = m_application->logger().errorException("Application: audio callback failed", ExceptionDiagnostic(*error)); !logged) {
           EmergencyLog::error("Application: audio callback failed: {}", outputException(ExceptionDiagnostic(*error), true));
           EmergencyLog::error("Application: cleanup logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
         }
@@ -972,7 +989,7 @@ public:
     if (auto logged = m_application->logger().info("Application: shutdown..."); !logged)
       EmergencyLog::error("Application: cleanup logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
     if (auto shutdown = m_application->shutdown(); !shutdown) {
-      if (auto logged = m_application->logger().error("Application: failed during shutdown: {}", outputException(ExceptionDiagnostic(shutdown.error()), true)); !logged) {
+      if (auto logged = m_application->logger().errorException("Application: failed during shutdown", ExceptionDiagnostic(shutdown.error())); !logged) {
         EmergencyLog::error("Application: failed during shutdown: {}", outputException(ExceptionDiagnostic(shutdown.error()), true));
         EmergencyLog::error("Application: cleanup logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
       }
@@ -985,15 +1002,20 @@ public:
 
     m_platformServices.reset();
     m_renderer.reset();
-    if (result)
-      if (auto logged = m_application->logger().info("Application: stopped gracefully"); !logged)
+    if (result) {
+      if (auto logged = m_application->logger().info("Application: stopped gracefully"); !logged) {
         result = std::unexpected(std::move(logged.error()));
+        if (auto reported = m_application->logger().errorException("Application: final logging failed", ExceptionDiagnostic(result.error())); !reported)
+          EmergencyLog::error("Application: final logging failed: {}", exceptionReport(result.error()));
+      }
+    }
     m_application.reset();
     if (contextScope) {
       if (auto restored = contextScope->restore(); !restored) {
-        if (result)
+        if (result) {
           result = std::unexpected(std::move(restored.error()));
-        else
+          EmergencyLog::error("Application: context restoration failed: {}", exceptionReport(result.error()));
+        } else
           EmergencyLog::error("Application: context restoration failed: {}", outputException(ExceptionDiagnostic(restored.error()), true));
       }
     }
@@ -1006,7 +1028,7 @@ private:
     if (!m_audioError)
       m_audioError.emplace(std::move(error));
     else
-      if (auto logged = m_application->logger().error("Application: audio callback failed: {}", outputException(ExceptionDiagnostic(error), true)); !logged) {
+      if (auto logged = m_application->logger().errorException("Application: audio callback failed", ExceptionDiagnostic(error)); !logged) {
         EmergencyLog::error("Application: audio callback failed: {}", outputException(ExceptionDiagnostic(error), true));
         EmergencyLog::error("Application: audio failure logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
       }
@@ -1664,6 +1686,7 @@ private:
   bool m_acceptingTextInput = false;
   bool m_audioEnabled = false;
   bool m_quitRequested = false;
+  bool m_applicationStarted = false;
   float m_displayScale = 1.0f;
 
   std::shared_ptr<OpenGlRenderer> m_renderer;
@@ -1672,20 +1695,25 @@ private:
 };
 
 int runMainApplication(std::unique_ptr<Application> application, StringList cmdLineArgs) {
-  auto reportError = [](StarException const& error) {
-    auto diagnostic = exceptionReport(error);
-    EmergencyLog::error("{}", diagnostic);
+  auto reportError = [](StarException const& error, bool diagnosticReported) {
+    auto diagnostic = exceptionSummary(error);
+    EmergencyLog::error("{}", diagnosticReported ? diagnostic : exceptionReport(error));
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", diagnostic.c_str(), nullptr);
     return 1;
   };
+  bool diagnosticReported = false;
   auto result = [&]() -> std::expected<void, StarException> {
     SdlPlatform platform(std::move(application));
-    if (auto initialized = platform.initialize(std::move(cmdLineArgs)); !initialized)
+    auto initialized = platform.initialize(std::move(cmdLineArgs));
+    if (!initialized) {
+      diagnosticReported = platform.logInitializationFailure(initialized.error());
       return std::unexpected(std::move(initialized.error()));
+    }
+    diagnosticReported = true;
     return platform.run();
   }();
   if (!result)
-    return reportError(result.error());
+    return reportError(result.error(), diagnosticReported);
   return 0;
 }
 

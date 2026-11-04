@@ -513,7 +513,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       return std::unexpected(std::move(parsed.error()));
     m_inputBuffer.clear();
     m_socket->shutdown();
-    auto logged = m_logger.warn("I/O error in TcpPacketSocket::receivePackets, closing: {}", outputException(parsed.error(), false));
+    auto logged = m_logger.warnException("I/O error in TcpPacketSocket::receivePackets, closing", ExceptionDiagnostic(parsed.error()));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
   }
@@ -565,7 +565,7 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
         return std::unexpected(std::move(logged.error()));
     } else if (written.error().is<IOException>()) {
       m_socket->shutdown();
-      auto logged = m_logger.warn("I/O error in TcpPacketSocket::writeData: {}", outputException(written.error(), false));
+      auto logged = m_logger.warnException("I/O error in TcpPacketSocket::writeData", ExceptionDiagnostic(written.error()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else {
@@ -609,7 +609,7 @@ std::expected<bool, StarException> TcpPacketSocket::readData() {
         return std::unexpected(std::move(logged.error()));
     } else if (received.error().is<IOException>()) {
       m_socket->shutdown();
-      auto logged = m_logger.warn("I/O error in TcpPacketSocket::receiveData: {}", outputException(received.error(), false));
+      auto logged = m_logger.warnException("I/O error in TcpPacketSocket::receiveData", ExceptionDiagnostic(received.error()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else {
@@ -796,7 +796,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
     if (!parsed.error().is<IOException>())
       return std::unexpected(std::move(parsed.error()));
     m_socket.reset();
-    auto logged = m_logger.warn("I/O error in P2PPacketSocket::receivePackets, closing: {}", outputException(parsed.error(), false));
+    auto logged = m_logger.warnException("I/O error in P2PPacketSocket::receivePackets, closing", ExceptionDiagnostic(parsed.error()));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
   }
@@ -816,7 +816,7 @@ std::expected<bool, StarException> P2PPacketSocket::writeData() {
     auto sent = m_socket->sendMessage(front->get());
     if (!sent) {
       m_socket.reset();
-      auto logged = m_logger.warn("Exception in P2PPacketSocket::writeData, closing: {}", outputException(sent.error(), false));
+      auto logged = m_logger.warnException("Exception in P2PPacketSocket::writeData, closing", ExceptionDiagnostic(sent.error()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       break;
@@ -857,7 +857,7 @@ std::expected<bool, StarException> P2PPacketSocket::readData() {
   auto received = receive();
   if (!received) {
     m_socket.reset();
-    auto logged = m_logger.warn("Exception in P2PPacketSocket::readData, closing: {}", outputException(received.error(), false));
+    auto logged = m_logger.warnException("Exception in P2PPacketSocket::readData, closing", ExceptionDiagnostic(received.error()));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
   }

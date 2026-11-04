@@ -103,7 +103,7 @@ bool Statistics::reset() {
 std::expected<void, StarException> Statistics::update() {
   if (m_service) {
     if (auto error = m_service->error()) {
-      if (auto logged = m_root.logger().error("Statistics platform service error: {}", error->what()); !logged)
+      if (auto logged = m_root.logger().errorException("Statistics platform service error", ExceptionDiagnostic(*error)); !logged)
         return std::unexpected(std::move(logged.error()));
       // Service failed. Continue with local stats and achievements only.
       m_service = {};
@@ -248,7 +248,7 @@ std::expected<void, StarException> Statistics::readStatistics() {
     return {};
   }();
   if (!loaded)
-    return m_root.logger().warn("Error loading local player statistics file, resetting: {}", outputException(ExceptionDiagnostic(loaded.error()), false));
+    return m_root.logger().warnException("Error loading local player statistics file, resetting", ExceptionDiagnostic(loaded.error()));
   return {};
 }
 

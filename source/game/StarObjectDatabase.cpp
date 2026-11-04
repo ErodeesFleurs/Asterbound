@@ -730,12 +730,12 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
       return config->getString("objectName");
     }();
     if (!name) {
-      auto logged = root.logger().error("Error loading object file {}: {}", file, outputException((*assets)->withAssetContext(std::move(name.error()), file, "Loading object"), true));
+      auto logged = root.logger().errorException(strf("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (database->m_paths.contains(*name)) {
       auto error = (*assets)->withAssetContext(ObjectException::format("Object {} defined twice, second time from {}", *name, file), file, "Loading object");
-      auto logged = root.logger().error("{}", outputException(error, true));
+      auto logged = root.logger().errorException("Error loading object", ExceptionDiagnostic(error));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else {
@@ -785,20 +785,29 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::createObje
   auto config = getConfig(objectName);
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto const& type = (*config)->type;
-  if (type == "object")
-    return Object::create(m_root, *config, parameters);
-  if (type == "loungeable")
-    return LoungeableObject::create(m_root, *config, parameters);
-  if (type == "container")
-    return ContainerObject::create(m_root, *config, parameters);
-  if (type == "farmable")
-    return FarmableObject::create(m_root, *config, parameters);
-  if (type == "teleporter")
-    return TeleporterObject::create(m_root, *config, parameters);
-  if (type == "physics")
-    return PhysicsObject::create(m_root, *config, parameters);
-  return std::unexpected(ObjectException::format("Unknown objectType '{}' constructing object '{}'", type, objectName));
+  auto created = [&]() -> std::expected<std::shared_ptr<Object>, StarException> {
+    auto const& type = (*config)->type;
+    if (type == "object")
+      return Object::create(m_root, *config, parameters);
+    if (type == "loungeable")
+      return LoungeableObject::create(m_root, *config, parameters);
+    if (type == "container")
+      return ContainerObject::create(m_root, *config, parameters);
+    if (type == "farmable")
+      return FarmableObject::create(m_root, *config, parameters);
+    if (type == "teleporter")
+      return TeleporterObject::create(m_root, *config, parameters);
+    if (type == "physics")
+      return PhysicsObject::create(m_root, *config, parameters);
+    return std::unexpected(ObjectException::format("Unknown objectType '{}' constructing object '{}'", type, objectName));
+  }();
+  if (!created) {
+    auto assets = m_root.assets();
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    return std::unexpected((*assets)->withAssetContext(std::move(created.error()), (*config)->path, "Constructing object"));
+  }
+  return created;
 }
 
 std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadObject(Json const& diskStore) const {
@@ -851,16 +860,20 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
     return std::unexpected(std::move(rebuilt.error()));
   if (*rebuilt)
     return object;
-  auto storedText = diskStore.repr();
-  if (!storedText)
-    return std::unexpected(std::move(storedText.error()));
+  if (m_root.logger().loggable(LogLevel::Debug)) {
+    auto storedText = diskStore.repr();
+    if (!storedText)
+      return std::unexpected(std::move(storedText.error()));
+    if (auto details = m_root.logger().debug("Object disk store: {}", *storedText); !details)
+      return std::unexpected(std::move(details.error()));
+  }
   if (*originalName == "perfectlygenericitem") {
-    auto logged = m_root.logger().error("Could not re-instantiate object '{}'. {}", *storedText, outputException(originalError, false));
+    auto logged = m_root.logger().errorException(strf("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     return createObject(*originalName, *originalParams);
   }
-  auto logged = m_root.logger().error("Could not instantiate object '{}'. {}", *storedText, outputException(originalError, false));
+  auto logged = m_root.logger().errorException(strf("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return createObject("perfectlygenericitem", JsonObject{

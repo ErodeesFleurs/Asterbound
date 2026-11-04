@@ -627,8 +627,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
           if (loaded) {
             currentConfig = std::move(*loaded);
           } else {
-            auto logged = m_logger.warn("Root: Failed to load user configuration file {}, resetting user config: {}",
-              *m_runtimeConfigFile, outputException(loaded.error(), false));
+            auto logged = m_logger.warnException(strf("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             auto backup = File::rename(*m_runtimeConfigFile, *m_runtimeConfigFile + ".old");

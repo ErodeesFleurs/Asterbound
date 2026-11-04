@@ -266,7 +266,10 @@ inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> cons
     out << (i == 0 ? "\n  Script: " : "\n  Called from: ") << location.source;
     if (location.line > 0)
       out << ":" << location.line;
-    if (!location.provider.empty() && location.provider != summary->patchProvider)
+    if (!location.provider.empty() && location.provider != summary->patchProvider
+        && location.provider != summary->assetProvider
+        && std::none_of(summary->locations.begin(), summary->locations.begin() + i,
+            [&](auto const& previous) { return previous.provider == location.provider; }))
       out << "\n    Provider: " << location.provider;
   }
   return out.str();

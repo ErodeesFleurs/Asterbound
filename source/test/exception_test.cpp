@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.output_proxy;
+import star.logging;
 
 #include "gtest/gtest.h"
 
@@ -137,6 +138,62 @@ TEST(ExceptionTest, StructuredSummaryDoesNotReplaceTypedOriginalDiagnostic) {
   enriched = StarException("replacement-marker", false);
   EXPECT_EQ(owned.diagnosticSummary()->operation, "init");
   EXPECT_EQ(printException(owned, true), originalText);
+}
+
+TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
+  class RecordingSink : public LogSink {
+  public:
+    std::expected<void, StarException> log(std::string_view message, LogLevel level) override {
+      if (failLevel == level)
+        return std::unexpected(IOException("diagnostic-sink-failure", false));
+      records.emplace_back(level, message);
+      return {};
+    }
+    std::optional<LogLevel> failLevel;
+    std::vector<std::pair<LogLevel, std::string>> records;
+  };
+  Logger logger;
+  logger.removeStdoutSink();
+  auto sink = std::make_shared<RecordingSink>();
+  logger.addSink(sink);
+  auto error = OutOfRangeException("diagnostic-reason", false).withContext("full-only-context");
+  auto summary = *error.diagnosticSummary();
+  summary.locations.push_back({"/scripts/diagnostic.lua", 17, "diagnostic-provider"});
+  summary.locations.push_back({"/scripts/diagnostic-caller.lua", 29, "diagnostic-provider"});
+  error = std::move(error).withSummary(std::move(summary));
+  auto diagnostic = ExceptionDiagnostic(error);
+
+  ASSERT_TRUE(logger.errorException("error-operation", diagnostic));
+  ASSERT_TRUE(logger.warnException("warning-operation", diagnostic));
+  ASSERT_EQ(sink->records.size(), 2u);
+  EXPECT_EQ(sink->records[0].first, LogLevel::Error);
+  EXPECT_EQ(sink->records[1].first, LogLevel::Warn);
+  for (auto const& record : sink->records) {
+    EXPECT_NE(record.second.find("diagnostic-reason"), std::string::npos);
+    EXPECT_NE(record.second.find("diagnostic-provider"), std::string::npos);
+    EXPECT_NE(record.second.find("/scripts/diagnostic.lua:17"), std::string::npos);
+    EXPECT_NE(record.second.find("/scripts/diagnostic-caller.lua:29"), std::string::npos);
+    auto provider = record.second.find("diagnostic-provider");
+    EXPECT_EQ(record.second.find("diagnostic-provider", provider + 1), std::string::npos);
+    EXPECT_EQ(record.second.find("full-only-context"), std::string::npos);
+  }
+
+  sink->records.clear();
+  sink->setLevel(LogLevel::Debug);
+  ASSERT_TRUE(logger.errorException("debug-operation", diagnostic));
+  ASSERT_EQ(sink->records.size(), 2u);
+  EXPECT_EQ(sink->records[0].first, LogLevel::Error);
+  EXPECT_EQ(sink->records[1].first, LogLevel::Debug);
+  EXPECT_NE(sink->records[1].second.find("full-only-context"), std::string::npos);
+  EXPECT_NE(sink->records[1].second.find("diagnostic-reason"), std::string::npos);
+
+  for (auto failLevel : {LogLevel::Error, LogLevel::Debug}) {
+    sink->failLevel = failLevel;
+    auto failed = logger.errorException("failing-operation", diagnostic);
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<IOException>());
+    EXPECT_EQ(failed.error().diagnosticSummary()->reason, "diagnostic-sink-failure");
+  }
 }
 
 TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {

@@ -59,7 +59,7 @@ std::expected<std::shared_ptr<TenantDatabase>, StarException> TenantDatabase::cr
       return config->getString("name");
     }();
     if (!name) {
-      auto logged = root.logger().error("Error loading tenant file {}: {}", file, outputException(ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading tenant")), true));
+      auto logged = root.logger().errorException(strf("Error loading tenant file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading tenant")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;

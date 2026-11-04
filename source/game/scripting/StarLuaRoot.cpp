@@ -62,7 +62,7 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> LuaRoot::create(Root& roo
 
 LuaRoot::~LuaRoot() {
   if (auto result = shutdown(); !result) {
-    if (auto logged = m_root.logger().error("Error while shutting down Lua root: {}", outputException(result.error(), true)); !logged)
+    if (auto logged = m_root.logger().errorException("Error while shutting down Lua root", ExceptionDiagnostic(result.error())); !logged)
       EmergencyLog::error("Could not log Lua root shutdown failure: {}; original failure: {}", outputException(logged.error(), true), outputException(result.error(), true));
   }
 }

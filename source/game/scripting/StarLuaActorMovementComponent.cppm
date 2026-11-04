@@ -304,7 +304,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withContext(strf("Original Lua movement update failure: {}", outputException(result.error(), true))));
+        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;
@@ -377,7 +377,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withContext(strf("Original Lua movement update failure: {}", outputException(result.error(), true))));
+        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;
@@ -449,7 +449,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withContext(strf("Original Lua movement update failure: {}", outputException(result.error(), true))));
+        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;

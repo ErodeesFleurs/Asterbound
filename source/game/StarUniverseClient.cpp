@@ -650,7 +650,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     return handlePackets(packets);
   }();
   if (!handled) {
-    auto logged = m_root.logger().error("Exception caught handling incoming server packets {}", outputException(handled.error(), true));
+    auto logged = m_root.logger().errorException("Exception caught handling incoming server packets", ExceptionDiagnostic(handled.error()));
     auto cleared = reset();
     if (!m_disconnectReason)
       m_disconnectReason = "Exception caught handling incoming server packets, check log";
@@ -1827,7 +1827,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
               if (!operation83)
                 return std::unexpected(std::move(operation83.error()));
             } else {
-              auto operation84 = m_root.logger().error("Failed to load custom world file {} : {}", filename, outputException(chunks.error(), false));
+              auto operation84 = m_root.logger().errorException(strf("Failed to load custom world file {}", filename), ExceptionDiagnostic(chunks.error()));
               if (!operation84)
                 return std::unexpected(std::move(operation84.error()));
               auto operation85 = m_connection->pushSingle(std::make_shared<ClientCustomWorldResponse>(request->name, WorldChunks()));
@@ -1960,10 +1960,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
       return false;
     }();
     if (!handled) {
-      auto logged = m_root.logger().error("Exception thrown while handling {} packet", type.get());
-      if (!logged)
-        return std::unexpected(handled.error().withContext(strf("Error logging packet failure: {}", logged.error().what())));
-      return std::unexpected(std::move(handled.error()));
+      return std::unexpected(handled.error().withContext(strf("Exception while handling {} packet", type.get())));
     }
     if (*handled)
       break;

@@ -289,16 +289,19 @@ std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shift
   auto name = objectName();
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto parameters = objectParameters();
-  if (!parameters)
-    return std::unexpected(std::move(parameters.error()));
-  auto representation = parameters->repr(0, true);
-  if (!representation)
-    return std::unexpected(std::move(representation.error()));
-  auto logged = root().logger().error("Failed to instantiate object for placement. {} {} : {}",
-      *name, *representation, outputException(attempted.error(), true));
+  auto logged = root().logger().errorException(strf("Failed to instantiate object '{}' for placement", *name), ExceptionDiagnostic(attempted.error()));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
+  if (root().logger().loggable(LogLevel::Debug)) {
+    auto parameters = objectParameters();
+    if (!parameters)
+      return std::unexpected(std::move(parameters.error()));
+    auto representation = parameters->repr(0, true);
+    if (!representation)
+      return std::unexpected(std::move(representation.error()));
+    if (auto details = root().logger().debug("Object placement parameters: {}", *representation); !details)
+      return std::unexpected(std::move(details.error()));
+  }
   return true;
 }
 

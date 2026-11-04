@@ -85,6 +85,14 @@ public:
   [[nodiscard]] std::expected<void, StarException> warn(std::format_string<Args...> msg, Args const&... args);
   template <typename... Args>
   [[nodiscard]] std::expected<void, StarException> error(std::format_string<Args...> msg, Args const&... args);
+
+  // Summary at the requested severity; complete diagnostics only for Debug sinks.
+  [[nodiscard]] std::expected<void, StarException> logException(
+      LogLevel level, std::string_view operation, ExceptionDiagnostic const& error);
+  [[nodiscard]] std::expected<void, StarException> errorException(
+      std::string_view operation, ExceptionDiagnostic const& error);
+  [[nodiscard]] std::expected<void, StarException> warnException(
+      std::string_view operation, ExceptionDiagnostic const& error);
   bool loggable(LogLevel level);
 
 private:

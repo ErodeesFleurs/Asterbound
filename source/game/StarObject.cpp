@@ -1119,7 +1119,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       return {};
     }();
     if (!dropped) {
-      auto operation8 = root().logger().warn("Failed to create treasure for object '{}': {}", m_config->name, outputException(dropped.error(), false));
+      auto operation8 = root().logger().warnException(strf("Failed to create treasure for object '{}'", m_config->name), ExceptionDiagnostic(dropped.error()));
       if (!operation8)
         return std::unexpected(std::move(operation8.error()));
     }

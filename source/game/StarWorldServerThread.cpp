@@ -184,8 +184,7 @@ WorldServerThread::~WorldServerThread() {
 
 std::expected<void, StarException> WorldServerThread::recordError(StarException const& error) const {
   m_errorOccurred = true;
-  auto logged = m_worldServer->root().logger().error("WorldServerThread error: {}",
-      outputException(ExceptionDiagnostic(error), true));
+  auto logged = m_worldServer->root().logger().errorException("WorldServerThread error", ExceptionDiagnostic(error));
   if (!logged)
     return std::unexpected(error.withRelated(logged.error(), "World error logging also failed"));
   return {};
@@ -578,8 +577,8 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
     queueLocker.unlock();
     auto handled = m_worldServer->handleIncomingPackets(clientId, std::move(incomingPackets));
     if (!handled) {
-      auto logged = m_worldServer->root().logger().error("WorldServerThread error handling incoming packets for client {}: {}",
-          clientId, outputException(ExceptionDiagnostic(handled.error()), true));
+      auto logged = m_worldServer->root().logger().errorException(
+          strf("WorldServerThread error handling incoming packets for client {}", clientId), ExceptionDiagnostic(handled.error()));
       auto removed = m_worldServer->removeClient(clientId);
       if (!removed)
         return std::unexpected(std::move(removed.error()));

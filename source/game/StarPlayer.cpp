@@ -1131,7 +1131,7 @@ std::expected<void, StarException> Player::uninit() {
       if (!error)
         error = std::move(result.error());
       else
-        error = error->withContext(strf("Additional error while uninitializing player: {}", outputException(ExceptionDiagnostic(result.error()), true)));
+        error = error->withRelated(result.error(), "Additional error while uninitializing player");
     }
   };
   remember(m_techController->uninit());
@@ -4871,7 +4871,7 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     if (!descriptionResult)
       return std::unexpected(std::move(descriptionResult.error()));
     auto description = std::move(*descriptionResult);
-    if (auto result = root().logger().error("Couldn't queue radio message '{}': {}", description, decoded.error().what()); !result)
+    if (auto result = root().logger().errorException(strf("Couldn't queue radio message '{}'", description), ExceptionDiagnostic(decoded.error())); !result)
       return std::unexpected(std::move(result.error()));
     return {};
   }
@@ -5073,7 +5073,7 @@ std::expected<Json, StarException> Player::getSecretProperty(String const& name,
     auto value = buffer.read<Json>();
     if (value)
       return std::move(*value);
-    if (auto result = root().logger().error("Exception reading secret player property '{}': {}", name, value.error().what()); !result)
+    if (auto result = root().logger().errorException(strf("Exception reading secret player property '{}'", name), ExceptionDiagnostic(value.error())); !result)
       return std::unexpected(std::move(result.error()));
   }
   return defaultValue;

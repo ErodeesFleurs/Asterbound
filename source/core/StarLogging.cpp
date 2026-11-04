@@ -9,6 +9,7 @@ import star.bi_map;
 import star.file;
 import star.io_device;
 import star.format;
+import star.output_proxy;
 import star.time;
 
 import star.array;
@@ -97,6 +98,27 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
     }
   }
   return {};
+}
+
+std::expected<void, StarException> Logger::logException(
+    LogLevel level, std::string_view operation, ExceptionDiagnostic const& diagnostic) {
+  if (loggable(level)) {
+    if (auto result = logf(level, "{}: {}", operation, exceptionSummary(diagnostic)); !result)
+      return std::unexpected(std::move(result.error()));
+  }
+  if (loggable(LogLevel::Debug))
+    return debug("{} details:\n{}", operation, outputException(diagnostic, true));
+  return {};
+}
+
+std::expected<void, StarException> Logger::errorException(
+    std::string_view operation, ExceptionDiagnostic const& diagnostic) {
+  return logException(LogLevel::Error, operation, diagnostic);
+}
+
+std::expected<void, StarException> Logger::warnException(
+    std::string_view operation, ExceptionDiagnostic const& diagnostic) {
+  return logException(LogLevel::Warn, operation, diagnostic);
 }
 
 Logger::Logger()

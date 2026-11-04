@@ -222,7 +222,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
     auto resumed = thread->resume<ActionReturn>(*parameters, blackboardPtr(), id, m_lastDt);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught running action node {} in behavior {}: {}", node.name, m_tree->name, outputException(ExceptionDiagnostic(resumed.error()), false))));
+      return std::unexpected(StarException(strf("Lua Exception caught running action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
     auto status = std::get<0>(result);
@@ -232,7 +232,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
     auto resumed = thread.resume<ActionReturn>(m_lastDt);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught resuming action node {} in behavior {}: {}", node.name, m_tree->name, outputException(ExceptionDiagnostic(resumed.error()), false))));
+      return std::unexpected(StarException(strf("Lua Exception caught resuming action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
     auto status = std::get<0>(result);
@@ -257,7 +257,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNo
     auto resumed = thread->resume<NodeStatus>(*parameters, blackboardPtr(), id);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught initializing decorator node {} in behavior {}: {}", node.name, m_tree->name, outputException(ExceptionDiagnostic(resumed.error()), false))));
+      return std::unexpected(StarException(strf("Lua Exception caught initializing decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     status = resumed->value_or(NodeStatus::Invalid);
     if (status == NodeStatus::Success || status == NodeStatus::Failure) return status;
@@ -271,7 +271,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNo
       auto resumed = decorator.thread.resume<NodeStatus>(*child);
       if (!resumed) {
         if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-        return std::unexpected(StarException(strf("Lua Exception caught resuming decorator node {} in behavior {}: {}", node.name, m_tree->name, outputException(ExceptionDiagnostic(resumed.error()), false))));
+        return std::unexpected(StarException(strf("Lua Exception caught resuming decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
       }
       status = resumed->value_or(NodeStatus::Invalid);
     } else return NodeStatus::Running;

@@ -217,7 +217,7 @@ std::expected<void, StarException> Songbook::update(EntityMode mode, World& worl
       }();
       if (!parsed) {
         m_stopped = true;
-        auto logged = m_root.logger().error("Failed to handle abc: {}", outputException(ExceptionDiagnostic(parsed.error()), true));
+        auto logged = m_root.logger().errorException("Failed to handle abc", ExceptionDiagnostic(parsed.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       } else {

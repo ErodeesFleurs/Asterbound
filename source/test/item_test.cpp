@@ -134,6 +134,68 @@ const GameTestRegistration itemDescriptorConstruction("ItemTest", "ItemDescripto
   }
 });
 
+const GameTestRegistration itemFallbackDiagnostics(
+    "ItemTest", "FallbackKeepsDescriptorWhileLogsSeparateSummaryAndSavedState", [](GameTest& fixture) {
+      class DiagnosticSink final : public LogSink {
+      public:
+        std::vector<std::pair<LogLevel, std::string>> records;
+        std::expected<void, StarException> log(std::string_view text, LogLevel level) override {
+          records.emplace_back(level, text);
+          return {};
+        }
+      };
+      auto directory = File::temporaryDirectory(fixture.root().random());
+      ASSERT_TRUE(directory);
+      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto settings = fixture.rootSettings();
+      settings.storageDirectory = File::relativeTo(*directory, "storage");
+      settings.runtimeConfigFile = {};
+      settings.logDirectory = {};
+      settings.logFile = {};
+      settings.logLevel = LogLevel::Error;
+      settings.includeUGC = false;
+      auto root = Root::create(std::move(settings));
+      ASSERT_TRUE(root);
+      auto database = (*root)->itemDatabase();
+      ASSERT_TRUE(database);
+      auto sink = std::make_shared<DiagnosticSink>();
+      sink->setLevel(LogLevel::Error);
+      (*root)->logger().addSink(sink);
+      auto descriptor = ItemDescriptor::create("missing-item-diagnostics-probe", 37,
+          JsonObject{{"scriptStorage", JsonObject{{"savedState", "private-saved-state-marker"}}}});
+      ASSERT_TRUE(descriptor);
+      auto storedDescriptor = descriptor->toJson().eraseKey("count");
+      ASSERT_TRUE(storedDescriptor);
+      for (auto level : {LogLevel::Error, LogLevel::Debug}) {
+        sink->setLevel(level);
+        sink->records.clear();
+        auto item = (*database)->item(*descriptor);
+        ASSERT_TRUE(item);
+        ASSERT_TRUE(*item);
+        EXPECT_EQ((*item)->name(), "perfectlygenericitem");
+        EXPECT_EQ((*item)->count(), 37u);
+        EXPECT_EQ((*item)->descriptor().parameters().get("genericItemStorage"), *storedDescriptor);
+        bool sawError = false;
+        bool sawSavedState = false;
+        for (auto const& [recordLevel, text] : sink->records) {
+          if (recordLevel == LogLevel::Error) {
+            sawError = true;
+            EXPECT_NE(text.find("missing-item-diagnostics-probe"), std::string::npos);
+            EXPECT_NE(text.find("37"), std::string::npos);
+            EXPECT_EQ(text.find("private-saved-state-marker"), std::string::npos);
+            EXPECT_EQ(text.find("Caused by:"), std::string::npos);
+            EXPECT_EQ(text.find("Details:"), std::string::npos);
+          }
+          if (text.find("private-saved-state-marker") != std::string::npos) {
+            sawSavedState = true;
+            EXPECT_EQ(recordLevel, LogLevel::Debug);
+          }
+        }
+        EXPECT_TRUE(sawError);
+        EXPECT_EQ(sawSavedState, level == LogLevel::Debug);
+      }
+    });
+
 const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameTest& fixture) {
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
