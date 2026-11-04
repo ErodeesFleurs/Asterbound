@@ -266,14 +266,14 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
   return {};
 }
 
-std::expected<void, StarException> NameplatePainter::render(WorldClient const& world, WorldCamera const& camera, float interpolation) {
+std::expected<void, StarException> NameplatePainter::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   auto& context = m_guiContext.get();
-  return m_nametags.forEach([&context, &world, &camera, interpolation, this](BubbleState<Nametag> const& bubble, Nametag const& nametag) -> std::expected<void, StarException> {
+  return m_nametags.forEach([&context, &world, &camera, presentation, this](BubbleState<Nametag> const& bubble, Nametag const& nametag) -> std::expected<void, StarException> {
     if (nametag.opacity == 0.0f) return {};
     auto entity = world.entity(nametag.entityId);
     if (!entity)
       return {};
-    auto origin = nametag.origin + world.geometry().diff(world.renderPosition(nametag.entityId, interpolation), entity->position());
+    auto origin = nametag.origin + world.geometry().diff(world.renderPosition(nametag.entityId, presentation), entity->position());
     auto position = camera.worldToScreen(origin) + m_offset * camera.pixelRatio()
         + (bubble.currentPosition - bubble.idealDestination);
     auto style = context.setTextStyle(m_textStyle);

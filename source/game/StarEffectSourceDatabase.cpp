@@ -251,7 +251,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> EffectSource:
   return result;
 }
 
-void EffectSource::postRender() {
+void EffectSource::finishEventCollection() {
   m_initialTick = false;
   m_loopTick = false;
   if (m_finalTick) {

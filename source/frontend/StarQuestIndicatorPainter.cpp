@@ -224,7 +224,7 @@ std::expected<Drawable, StarException> QuestIndicatorPainter::Indicator::render(
   return animation->drawable(pixelRatio);
 }
 
-std::expected<void, StarException> QuestIndicatorPainter::render(WorldClient const& world, WorldCamera const& camera, float interpolation) {
+std::expected<void, StarException> QuestIndicatorPainter::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   auto& context = m_guiContext.get();
 
   for (auto const& indicator : m_indicators | std::views::values) {
@@ -235,7 +235,7 @@ std::expected<void, StarException> QuestIndicatorPainter::render(WorldClient con
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
     drawable->fullbright = true;
-    auto position = indicator.worldPosition + world.geometry().diff(world.renderPosition(indicator.entityId, interpolation), entity->position());
+    auto position = indicator.worldPosition + world.geometry().diff(world.renderPosition(indicator.entityId, presentation), entity->position());
     auto drawn = context.drawDrawable(*drawable, camera.worldToScreen(position), 1, Vec4B(255, 255, 255, 255));
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));

@@ -7,6 +7,7 @@ import star.map;
 import star.set;
 import star.vector;
 import star.game_types;
+import star.entity_rendering_types;
 
 
 
@@ -30,7 +31,7 @@ public:
   QuestIndicatorPainter(GuiContext& context, std::shared_ptr<UniverseClient> const& client);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> const& world, WorldCamera const& camera);
-  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation);
 
 private:
   struct Indicator {

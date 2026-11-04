@@ -658,8 +658,8 @@ if (!result901) return std::unexpected(std::move(result901.error()));
 }
 
 std::expected<void, StarException> Projectile::render(RenderCallback& renderCallback) {
-  float rotation = samplePresentationRotation(m_movementController->rotation(), renderCallback.interpolation());
-  float alpha = std::clamp(renderCallback.interpolation(), 0.0f, 1.0f);
+  float rotation = samplePresentationRotation(m_movementController->rotation(), renderCallback.presentation().interpolation());
+  float alpha = renderCallback.presentation().interpolation();
   int frame = m_frame;
   if (frame == getFrame())
     frame = frameAt(std::lerp(m_previousAnimationTimer, m_animationTimer, alpha), std::lerp(m_previousTimeToLive, m_timeToLive, alpha));

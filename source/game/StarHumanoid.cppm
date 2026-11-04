@@ -285,9 +285,9 @@ public:
   // wrapping or clamping animation time as appropriate.
   [[nodiscard]] std::expected<void, StarException> animate(float dt, std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>> dynamicTarget);
 
-  // Applies the current logical pose outside a sample, or the matching sampled
-  // pose inside NetworkedAnimator::sample. Does not advance clocks or events.
-  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(float interpolation = 1.f, bool withItems = true);
+  // Logical pose is committed by ticks; visual queries use an explicit sampled view.
+  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose();
+  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(NetworkedAnimator::Sample& sample, bool withItems = true);
 
   // Reset animation time to 0.0f
   [[nodiscard]] std::expected<void, StarException> resetAnimation();
@@ -295,6 +295,7 @@ public:
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in world space, not pixels)
   [[nodiscard]] std::expected<List<Drawable>, StarException> render(bool withItems = true, bool withRotationAndScale = true, float interpolation = 1.f);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render(NetworkedAnimator::Sample& sample, bool withItems = true, bool withRotationAndScale = true);
 
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in pixels, not world space)
@@ -401,8 +402,12 @@ private:
   [[nodiscard]] std::expected<std::optional<std::shared_ptr<Dance>>, StarException> getDance() const;
 
   [[nodiscard]] std::expected<void, StarException> refreshAnimationState(bool startNew = false);
-  [[nodiscard]] std::expected<void, StarException> applyAnimatorPose(HandDrawingInfo const& frontHand, HandDrawingInfo const& backHand,
-      float frontAngle, float backAngle, float headRotation, DanceStep const* danceStep, bool withItems, bool withDrawables);
+  template <typename Animator>
+  [[nodiscard]] std::expected<void, StarException> applyAnimatorPose(Animator& animator, HandDrawingInfo const& frontHand, HandDrawingInfo const& backHand,
+      float frontAngle, float backAngle, float headRotation, DanceStep const* danceStep, bool withItems);
+
+  template <typename Animator>
+  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(Animator& animator, float interpolation, bool withItems);
 
   Json m_baseConfig;
   Json m_mergeConfig;

@@ -160,7 +160,7 @@ std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCall
     }
   }
   for (auto& source : m_sources)
-    source->postRender();
+    source->finishEventCollection();
   return {};
 }
 

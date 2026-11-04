@@ -55,15 +55,15 @@ struct PresentationPosition {
   }
 };
 
-// Callback interface for entities to produce light sources, particles,
-// drawables, and sounds on render.  Everything added is expected to already be
-// translated into world space.
+// Synchronous output sink. Tick-owned event collection submits particles and
+// sounds; display sampling submits geometry and lights. Positions supplied to
+// the sink are already in world space.
 class RenderCallback {
 public:
   virtual ~RenderCallback();
 
   virtual std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const;
-  virtual float interpolation() const { return 1.0f; }
+  virtual PresentationContext presentation() const { return PresentationContext(); }
   virtual float timestep() const { return 0.0f; }
 
 

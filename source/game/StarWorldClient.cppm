@@ -278,8 +278,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> update(float dt);
   // borderTiles here should extend the client window for border tile
   // calculations.  It is not necessary on the light array.
-  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, unsigned borderTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, float interpolation);
-  Vec2F renderPosition(EntityId entityId, float interpolation) const;
+  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, unsigned borderTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, PresentationContext presentation);
+  Vec2F renderPosition(EntityId entityId, PresentationContext presentation) const;
   void resetPresentation();
   List<std::shared_ptr<AudioInstance>> pullPendingAudio();
   List<std::shared_ptr<AudioInstance>> pullPendingMusic();
@@ -318,18 +318,18 @@ private:
   explicit WorldClient(Root& root, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(ClientSubWorldId subWorldId, UniverseClient& universe);
-  float presentationInterpolation(Entity const& entity, float interpolation) const;
+  PresentationContext presentationFor(Entity const& entity, PresentationContext presentation) const;
 
   static const float DropDist;
 
   struct ClientRenderCallback : RenderCallback {
-    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer, float alpha = 1.0f, float dt = 0.0f, Vec2F offset = {}) : m_tileDrawer(drawer), m_interpolation(alpha), m_timestep(dt), m_offset(offset) {}
+    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer, PresentationContext presentation = PresentationContext(), float dt = 0.0f, Vec2F offset = {}) : m_tileDrawer(drawer), m_presentation(presentation), m_timestep(dt), m_offset(offset) {}
     std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const override { return m_tileDrawer; }
-    float interpolation() const override { return m_interpolation; }
+    PresentationContext presentation() const override { return m_presentation; }
     float timestep() const override { return m_timestep; }
     void clear();
     std::optional<std::reference_wrapper<TileDrawer>> m_tileDrawer;
-    float m_interpolation;
+    PresentationContext m_presentation;
     float m_timestep;
     Vec2F m_offset;
     [[nodiscard]] std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) override;

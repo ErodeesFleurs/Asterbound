@@ -1008,9 +1008,9 @@ if (!result167) return std::unexpected(std::move(result167.error()));
 }
 
 std::expected<void, StarException> Monster::render(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
+  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
   {
-  auto result154 = m_networkedAnimator->drawables(position());
+  auto result154 = sample.drawables(position());
   if (!result154) return std::unexpected(std::move(result154.error()));
   for (auto& drawable : std::move(*result154)) {
       if (drawable.isImage())
@@ -1027,7 +1027,7 @@ std::expected<void, StarException> Monster::render(RenderCallback& renderCallbac
 }
 
 
-  auto result160 = m_statusController->drawables(renderCallback.interpolation());
+  auto result160 = m_statusController->drawables(renderCallback.presentation().interpolation());
 if (!result160) return std::unexpected(std::move(result160.error()));
 auto result161 = renderCallback.addDrawables(std::move(*result160), m_monsterVariant.renderLayer);
 if (!result161) return std::unexpected(std::move(result161.error()));
@@ -1042,12 +1042,12 @@ if (!result161) return std::unexpected(std::move(result161.error()));
 }
 
 std::expected<void, StarException> Monster::renderLightSources(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
-  auto result168 = m_networkedAnimator->lightSources(position());
+  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+  auto result168 = sample.lightSources(position());
 if (!result168) return std::unexpected(std::move(result168.error()));
 auto result169 = renderCallback.addLightSources(std::move(*result168));
 if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = m_statusController->lightSources(renderCallback.interpolation());
+  auto result170 = m_statusController->lightSources(renderCallback.presentation().interpolation());
 if (!result170) return std::unexpected(std::move(result170.error()));
 auto result171 = renderCallback.addLightSources(std::move(*result170));
 if (!result171) return std::unexpected(std::move(result171.error()));

@@ -86,7 +86,6 @@ public:
   RectF metaBoundBox() const override;
 
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
 
   void setPosition();
   void setVelocity(Vec2F const& position);

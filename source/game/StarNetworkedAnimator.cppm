@@ -49,6 +49,8 @@ using NetworkedAnimatorException = StarError<NetworkedAnimatorExceptionTag, Star
 // Wraps an AnimatedPartSet with a set of optional light sources and particle
 // emitters to produce a network capable animation system.
 class NetworkedAnimator : public NetElementSyncGroup {
+  struct Presentation;
+
 public:
   // Target for dynamic render data such as sounds and particles that are not
   // persistent and are instead produced during a call to update, and may need
@@ -107,16 +109,52 @@ public:
   NetworkedAnimator& operator=(NetworkedAnimator const&) = delete;
 
 
-  // Read-only semantic sampling for a visual pass. Local render overrides are
-  // isolated from logical state. Nested scopes inherit the outer sample.
+  // Explicit read-only view of logical animation with reusable local pose overrides.
+  // Each root sample borrows an independent reusable scratch slot until destruction.
+  // Logical updates/configuration changes are the synchronization boundary.
+  // Pass the view to nested work (or copy it); animator queries remain logical.
   class Sample {
   public:
     Sample(NetworkedAnimator const& animator, float interpolation);
+    Sample(Sample const& sample);
     ~Sample();
-    Sample(Sample const&) = delete;
     Sample& operator=(Sample const&) = delete;
+    float interpolation() const { return m_interpolation; }
+    [[nodiscard]] std::expected<String, StarException> state(String const& stateType) const;
+    [[nodiscard]] std::expected<int, StarException> stateFrame(String const& stateType) const;
+    [[nodiscard]] std::expected<int, StarException> stateNextFrame(String const& stateType) const;
+    [[nodiscard]] std::expected<float, StarException> stateFrameProgress(String const& stateType) const;
+    [[nodiscard]] std::expected<float, StarException> stateTimer(String const& stateType) const;
+    [[nodiscard]] std::expected<bool, StarException> stateReverse(String const& stateType) const;
+    [[nodiscard]] std::expected<float, StarException> stateCycle(String const& stateType, std::optional<String> state) const;
+    [[nodiscard]] std::expected<int, StarException> stateFrames(String const& stateType, std::optional<String> state) const;
+    [[nodiscard]] std::expected<Json, StarException> stateProperty(String const& stateType, String const& propertyName, std::optional<String> state = {}, std::optional<int> frame = {}) const;
+    [[nodiscard]] std::expected<Json, StarException> stateNextProperty(String const& stateType, String const& propertyName) const;
+    [[nodiscard]] std::expected<Json, StarException> partProperty(String const& partName, String const& propertyName, std::optional<String> stateType = {}, std::optional<String> state = {}, std::optional<int> frame = {}) const;
+    [[nodiscard]] std::expected<Json, StarException> partNextProperty(String const & partName, String const & propertyName) const;
+    [[nodiscard]] std::expected<Mat3F, StarException> groupTransformation(StringList const& transformationGroups) const;
+    [[nodiscard]] std::expected<Mat3F, StarException> partTransformation(String const& partName) const;
+    [[nodiscard]] std::expected<Mat3F, StarException> finalPartTransformation(String const& partName) const;
+    [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> partPoint(String const& partName, String const& propertyName) const;
+    [[nodiscard]] std::expected<std::optional<PolyF>, StarException> partPoly(String const& partName, String const& propertyName) const;
+    [[nodiscard]] std::expected<String, StarException> applyPartTags(String const& partName, String apply) const;
+    [[nodiscard]] std::expected<float, StarException> currentRotationAngle(String const& rotationGroup) const;
+    [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(Vec2F const& translate = Vec2F()) const;
+    [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> drawablesWithZLevel(Vec2F const& translate = Vec2F()) const;
+    [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(Vec2F const& translate = Vec2F()) const;
+    [[nodiscard]] std::expected<bool, StarException> hasState(String const& type, std::optional<String> const& state = {}) const;
+    [[nodiscard]] std::expected<bool, StarException> setLocalState(String const& type, String const& state, bool startNew = false, bool reverse = false);
+    void setLocalTag(String name, std::optional<String> value = {});
+    void setPartDrawables(String const& name, List<Drawable> const* drawables);
+    [[nodiscard]] std::expected<void, StarException> resetLocalTransformationGroup(String const& name);
+    [[nodiscard]] std::expected<void, StarException> rotateLocalTransformationGroup(String const& name, float rotation, Vec2F const& center = Vec2F());
+    [[nodiscard]] std::expected<void, StarException> translateLocalTransformationGroup(String const& name, Vec2F const& translation);
+    [[nodiscard]] std::expected<Mat3F, StarException> getLocalTransformationGroup(String const& name) const;
   private:
+    friend class NetworkedAnimator;
+    Presentation* m_presentation;
     NetworkedAnimator const& m_animator;
+    float m_interpolation;
   };
   [[nodiscard]] Sample sample(float interpolation) const;
   StringList stateTypes() const;
@@ -280,6 +318,29 @@ public:
   std::uint8_t version() const;
 
 private:
+  [[nodiscard]] std::expected<String, StarException> queryState(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<int, StarException> queryStateFrame(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<int, StarException> queryStateNextFrame(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<float, StarException> queryStateFrameProgress(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<float, StarException> queryStateTimer(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<bool, StarException> queryStateReverse(String const& stateType, Sample const* sample) const;
+  [[nodiscard]] std::expected<float, StarException> queryStateCycle(String const& stateType, std::optional<String> state, Sample const* sample) const;
+  [[nodiscard]] std::expected<int, StarException> queryStateFrames(String const& stateType, std::optional<String> state, Sample const* sample) const;
+  [[nodiscard]] std::expected<Json, StarException> queryStateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame, Sample const* sample) const;
+  [[nodiscard]] std::expected<Json, StarException> queryStateNextProperty(String const& stateType, String const& propertyName, Sample const* sample) const;
+  [[nodiscard]] std::expected<Json, StarException> queryPartProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame, Sample const* sample) const;
+  [[nodiscard]] std::expected<Json, StarException> queryPartNextProperty(String const & partName, String const & propertyName, Sample const* sample) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> queryGroupTransformation(StringList const& transformationGroups, Sample const* sample) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> queryPartTransformation(String const& partName, Sample const* sample) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> queryFinalPartTransformation(String const& partName, Sample const* sample) const;
+  [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> queryPartPoint(String const& partName, String const& propertyName, Sample const* sample) const;
+  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> queryPartPoly(String const& partName, String const& propertyName, Sample const* sample) const;
+  [[nodiscard]] std::expected<String, StarException> queryApplyPartTags(String const& partName, String apply, Sample const* sample) const;
+  [[nodiscard]] std::expected<float, StarException> queryCurrentRotationAngle(String const& rotationGroup, Sample const* sample) const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> queryDrawables(Vec2F const& translate, Sample const* sample) const;
+  [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> queryDrawablesWithZLevel(Vec2F const& translate, Sample const* sample) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> queryLightSources(Vec2F const& translate, Sample const* sample) const;
+  List<Drawable> const* partDrawables(String const& name, Sample const* sample) const;
   explicit NetworkedAnimator(Root& root);
 
   struct RotationGroup {
@@ -306,11 +367,7 @@ private:
     bool interpolated;
 
     Mat3F localTransform;
-    mutable Mat3F presentationLocalTransform;
-    mutable Mat3F presentationTransform;
-    mutable Mat3F presentationAnimationTransform;
-    mutable bool presentationAnimationDirty = true;
-    mutable bool sampling = false;
+    mutable std::size_t presentationIndex = 0;
     Mat3F previousTransform;
     Mat3F currentTransform;
     Mat3F previousLocalTransform;
@@ -418,7 +475,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
 
   [[nodiscard]] std::expected<Json, StarException> mergeIncludes(Root& root, Json config, Json includes, String relativePath);
-  [[nodiscard]] std::expected<Mat3F, StarException> animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base, Sample const* sample = nullptr) const;
 
   std::reference_wrapper<Root> m_root;
   String m_relativePath;
@@ -449,8 +506,29 @@ private:
   HashMap<String,List<Drawable>> m_partDrawables;
 
   mutable StringMap<std::pair<std::size_t, Drawable>> m_cachedPartDrawables;
-  mutable unsigned m_sampleDepth = 0;
-  mutable float m_interpolation = 1;
+  struct Presentation {
+    struct Group {
+      Mat3F localTransform;
+      Mat3F transform;
+      Mat3F animationTransform;
+      bool animationDirty;
+    };
+    struct Tag {
+      bool active = false;
+      std::optional<String> value;
+    };
+    struct Attachment {
+      bool active = false;
+      List<Drawable> const* drawables = nullptr;
+    };
+    unsigned users = 0;
+    AnimatedPartSet::Sample parts;
+    std::vector<Group> groups;
+    HashMap<String, Tag> tags;
+    // Borrow attachments; only the final transformed output copies Drawables.
+    HashMap<String, Attachment> drawables;
+  };
+  mutable std::vector<std::unique_ptr<Presentation>> m_presentations;
 };
 
 }

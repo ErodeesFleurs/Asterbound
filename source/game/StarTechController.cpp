@@ -409,7 +409,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = animator->animator->drawablesWithZLevel(m_movementController->get().position());
+      auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -428,7 +428,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = animator->animator->drawablesWithZLevel(m_movementController->get().position());
+      auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -447,7 +447,7 @@ std::expected<List<LightSource>, StarException> TechController::lightSources(flo
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto lights = animator->animator->lightSources(m_movementController->get().position());
+      auto lights = sample.lightSources(m_movementController->get().position());
       if (!lights)
         return std::unexpected(std::move(lights.error()));
       lightSources.appendAll(std::move(*lights));

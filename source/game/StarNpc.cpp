@@ -1241,7 +1241,7 @@ std::expected<void, StarException> Npc::render(RenderCallback& renderCallback) {
 
   auto result237 = humanoid();
 if (!result237) return std::unexpected(std::move(result237.error()));
-auto result238 = m_tools->setupHumanoidHandItemDrawables(*std::move(*result237), renderCallback.interpolation());
+auto result238 = m_tools->setupHumanoidHandItemDrawables(*std::move(*result237), renderCallback.presentation().interpolation());
 if (!result238) return std::unexpected(std::move(result238.error()));
 
 
@@ -1250,7 +1250,7 @@ if (!result238) return std::unexpected(std::move(result238.error()));
   {
   auto result241 = humanoid();
   if (!result241) return std::unexpected(std::move(result241.error()));
-  auto result242 = std::move(*result241)->render(true, true, renderCallback.interpolation());
+  auto result242 = std::move(*result241)->render(true, true, renderCallback.presentation().interpolation());
   if (!result242) return std::unexpected(std::move(result242.error()));
   for (auto& drawable : std::move(*result242)) {
       drawable.translate(position());
@@ -1268,7 +1268,7 @@ if (!result238) return std::unexpected(std::move(result238.error()));
 }
 
 
-  auto result248 = m_statusController->drawables(renderCallback.interpolation());
+  auto result248 = m_statusController->drawables(renderCallback.presentation().interpolation());
 if (!result248) return std::unexpected(std::move(result248.error()));
 auto result249 = renderCallback.addDrawables(std::move(*result248), renderLayer);
 if (!result249) return std::unexpected(std::move(result249.error()));
@@ -1293,7 +1293,7 @@ if (!result260) return std::unexpected(std::move(result260.error()));
 }
 
 std::expected<void, StarException> Npc::renderLightSources(RenderCallback& renderCallback) {
-  auto result263 = presentationLightSources(renderCallback.interpolation());
+  auto result263 = presentationLightSources(renderCallback.presentation().interpolation());
 if (!result263) return std::unexpected(std::move(result263.error()));
 auto result264 = renderCallback.addLightSources(std::move(*result263));
 if (!result264) return std::unexpected(std::move(result264.error()));
@@ -2393,9 +2393,9 @@ lights.appendAll(std::move(*result499));
 if (!result500) return std::unexpected(std::move(result500.error()));
 auto animator = (*result500)->networkedAnimator();
 auto humanoidSample = animator->get().sample(interpolation);
-auto prepared = (*result500)->prepareAnimatorPose(interpolation);
+auto prepared = (*result500)->prepareAnimatorPose(humanoidSample);
 if (!prepared) return std::unexpected(std::move(prepared.error()));
-auto result501 = animator->get().lightSources();
+auto result501 = humanoidSample.lightSources();
 if (!result501) return std::unexpected(std::move(result501.error()));
 lights.appendAll(std::move(*result501));
   return lights;

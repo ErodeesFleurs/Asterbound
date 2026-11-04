@@ -123,35 +123,286 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
 }
 
 NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float interpolation)
-  : m_animator(animator) {
-  if (m_animator.m_sampleDepth++ == 0) {
-    m_animator.m_interpolation = std::clamp(interpolation, 0.f, 1.f);
-    m_animator.m_animatedParts.setPresentationInterpolation(m_animator.m_interpolation);
-    for (auto const& pair : m_animator.m_transformationGroups) {
-      pair.second.sampling = true;
-      pair.second.presentationLocalTransform = pair.second.localTransform;
-      auto& group = pair.second;
-      group.presentationTransform = group.affineTransform();
-      group.presentationAnimationTransform = group.animationAffineTransform();
-      group.presentationAnimationDirty = true;
-      if (group.presentationHistory) {
-        group.presentationTransform = sampleAffine(m_animator.m_interpolation, group.previousTransform, group.presentationTransform);
-        group.presentationLocalTransform = sampleAffine(m_animator.m_interpolation, group.previousLocalTransform, group.localTransform);
-      }
+  : m_presentation(nullptr), m_animator(animator), m_interpolation(std::clamp(interpolation, 0.f, 1.f)) {
+  for (auto const& slot : animator.m_presentations) {
+    if (!slot->users) {
+      m_presentation = slot.get();
+      break;
     }
   }
+  if (!m_presentation) {
+    animator.m_presentations.push_back(std::make_unique<Presentation>());
+    m_presentation = animator.m_presentations.back().get();
+  }
+  auto& presentation = *m_presentation;
+  animator.m_animatedParts.prepareSample(presentation.parts, m_interpolation);
+  presentation.groups.resize(animator.m_transformationGroups.size());
+  for (auto& tag : presentation.tags)
+    tag.second.active = false;
+  for (auto& drawables : presentation.drawables)
+    drawables.second.active = false;
+  std::size_t index = 0;
+  for (auto const& pair : animator.m_transformationGroups) {
+    auto const& group = pair.second;
+    group.presentationIndex = index;
+    auto& cache = presentation.groups[index++];
+    cache.localTransform = group.localTransform;
+    cache.transform = group.affineTransform();
+    cache.animationDirty = true;
+    if (group.presentationHistory) {
+      cache.transform = sampleAffine(m_interpolation, group.previousTransform, cache.transform);
+      cache.localTransform = sampleAffine(m_interpolation, group.previousLocalTransform, group.localTransform);
+    }
+  }
+  presentation.users = 1;
+}
+
+NetworkedAnimator::Sample::Sample(Sample const& sample)
+  : m_presentation(sample.m_presentation), m_animator(sample.m_animator), m_interpolation(sample.m_interpolation) {
+  ++m_presentation->users;
 }
 
 NetworkedAnimator::Sample::~Sample() {
-  if (--m_animator.m_sampleDepth == 0) {
-    m_animator.m_animatedParts.setPresentationInterpolation(-1);
-    for (auto const& pair : m_animator.m_transformationGroups)
-      pair.second.sampling = false;
-  }
+  --m_presentation->users;
 }
 
 NetworkedAnimator::Sample NetworkedAnimator::sample(float interpolation) const {
   return Sample(*this, interpolation);
+}
+
+std::expected<String, StarException> NetworkedAnimator::state(String const& stateType) const {
+  return queryState(stateType, nullptr);
+}
+
+std::expected<String, StarException> NetworkedAnimator::Sample::state(String const& stateType) const {
+  return m_animator.queryState(stateType, this);
+}
+
+std::expected<int, StarException> NetworkedAnimator::stateFrame(String const& stateType) const {
+  return queryStateFrame(stateType, nullptr);
+}
+
+std::expected<int, StarException> NetworkedAnimator::Sample::stateFrame(String const& stateType) const {
+  return m_animator.queryStateFrame(stateType, this);
+}
+
+std::expected<int, StarException> NetworkedAnimator::stateNextFrame(String const& stateType) const {
+  return queryStateNextFrame(stateType, nullptr);
+}
+
+std::expected<int, StarException> NetworkedAnimator::Sample::stateNextFrame(String const& stateType) const {
+  return m_animator.queryStateNextFrame(stateType, this);
+}
+
+std::expected<float, StarException> NetworkedAnimator::stateFrameProgress(String const& stateType) const {
+  return queryStateFrameProgress(stateType, nullptr);
+}
+
+std::expected<float, StarException> NetworkedAnimator::Sample::stateFrameProgress(String const& stateType) const {
+  return m_animator.queryStateFrameProgress(stateType, this);
+}
+
+std::expected<float, StarException> NetworkedAnimator::stateTimer(String const& stateType) const {
+  return queryStateTimer(stateType, nullptr);
+}
+
+std::expected<float, StarException> NetworkedAnimator::Sample::stateTimer(String const& stateType) const {
+  return m_animator.queryStateTimer(stateType, this);
+}
+
+std::expected<bool, StarException> NetworkedAnimator::stateReverse(String const& stateType) const {
+  return queryStateReverse(stateType, nullptr);
+}
+
+std::expected<bool, StarException> NetworkedAnimator::Sample::stateReverse(String const& stateType) const {
+  return m_animator.queryStateReverse(stateType, this);
+}
+
+std::expected<float, StarException> NetworkedAnimator::stateCycle(String const& stateType, std::optional<String> state) const {
+  return queryStateCycle(stateType, std::move(state), nullptr);
+}
+
+std::expected<float, StarException> NetworkedAnimator::Sample::stateCycle(String const& stateType, std::optional<String> state) const {
+  return m_animator.queryStateCycle(stateType, std::move(state), this);
+}
+
+std::expected<int, StarException> NetworkedAnimator::stateFrames(String const& stateType, std::optional<String> state) const {
+  return queryStateFrames(stateType, std::move(state), nullptr);
+}
+
+std::expected<int, StarException> NetworkedAnimator::Sample::stateFrames(String const& stateType, std::optional<String> state) const {
+  return m_animator.queryStateFrames(stateType, std::move(state), this);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::stateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame) const {
+  return queryStateProperty(stateType, propertyName, std::move(state), std::move(frame), nullptr);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::Sample::stateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame) const {
+  return m_animator.queryStateProperty(stateType, propertyName, std::move(state), std::move(frame), this);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::stateNextProperty(String const& stateType, String const& propertyName) const {
+  return queryStateNextProperty(stateType, propertyName, nullptr);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::Sample::stateNextProperty(String const& stateType, String const& propertyName) const {
+  return m_animator.queryStateNextProperty(stateType, propertyName, this);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::partProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame) const {
+  return queryPartProperty(partName, propertyName, std::move(stateType), std::move(state), std::move(frame), nullptr);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::Sample::partProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame) const {
+  return m_animator.queryPartProperty(partName, propertyName, std::move(stateType), std::move(state), std::move(frame), this);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::partNextProperty(String const & partName, String const & propertyName) const {
+  return queryPartNextProperty(partName, propertyName, nullptr);
+}
+
+std::expected<Json, StarException> NetworkedAnimator::Sample::partNextProperty(String const & partName, String const & propertyName) const {
+  return m_animator.queryPartNextProperty(partName, propertyName, this);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::groupTransformation(StringList const& transformationGroups) const {
+  return queryGroupTransformation(transformationGroups, nullptr);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::groupTransformation(StringList const& transformationGroups) const {
+  return m_animator.queryGroupTransformation(transformationGroups, this);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String const& partName) const {
+  return queryPartTransformation(partName, nullptr);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::partTransformation(String const& partName) const {
+  return m_animator.queryPartTransformation(partName, this);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::finalPartTransformation(String const& partName) const {
+  return queryFinalPartTransformation(partName, nullptr);
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::finalPartTransformation(String const& partName) const {
+  return m_animator.queryFinalPartTransformation(partName, this);
+}
+
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::partPoint(String const& partName, String const& propertyName) const {
+  return queryPartPoint(partName, propertyName, nullptr);
+}
+
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::Sample::partPoint(String const& partName, String const& propertyName) const {
+  return m_animator.queryPartPoint(partName, propertyName, this);
+}
+
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::partPoly(String const& partName, String const& propertyName) const {
+  return queryPartPoly(partName, propertyName, nullptr);
+}
+
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::Sample::partPoly(String const& partName, String const& propertyName) const {
+  return m_animator.queryPartPoly(partName, propertyName, this);
+}
+
+std::expected<String, StarException> NetworkedAnimator::applyPartTags(String const& partName, String apply) const {
+  return queryApplyPartTags(partName, std::move(apply), nullptr);
+}
+
+std::expected<String, StarException> NetworkedAnimator::Sample::applyPartTags(String const& partName, String apply) const {
+  return m_animator.queryApplyPartTags(partName, std::move(apply), this);
+}
+
+std::expected<float, StarException> NetworkedAnimator::currentRotationAngle(String const& rotationGroup) const {
+  return queryCurrentRotationAngle(rotationGroup, nullptr);
+}
+
+std::expected<float, StarException> NetworkedAnimator::Sample::currentRotationAngle(String const& rotationGroup) const {
+  return m_animator.queryCurrentRotationAngle(rotationGroup, this);
+}
+
+std::expected<List<Drawable>, StarException> NetworkedAnimator::drawables(Vec2F const& translate) const {
+  return queryDrawables(translate, nullptr);
+}
+
+std::expected<List<Drawable>, StarException> NetworkedAnimator::Sample::drawables(Vec2F const& translate) const {
+  return m_animator.queryDrawables(translate, this);
+}
+
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::drawablesWithZLevel(Vec2F const& translate) const {
+  return queryDrawablesWithZLevel(translate, nullptr);
+}
+
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::Sample::drawablesWithZLevel(Vec2F const& translate) const {
+  return m_animator.queryDrawablesWithZLevel(translate, this);
+}
+
+std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(Vec2F const& translate) const {
+  return queryLightSources(translate, nullptr);
+}
+
+std::expected<List<LightSource>, StarException> NetworkedAnimator::Sample::lightSources(Vec2F const& translate) const {
+  return m_animator.queryLightSources(translate, this);
+}
+
+std::expected<bool, StarException> NetworkedAnimator::Sample::hasState(String const& type, std::optional<String> const& state) const {
+  return m_animator.hasState(type, state);
+}
+
+std::expected<bool, StarException> NetworkedAnimator::Sample::setLocalState(String const& type, String const& state, bool startNew, bool reverse) {
+  auto changed = m_animator.m_animatedParts.setPresentationState(type, state, startNew, reverse, m_presentation->parts);
+  if (changed && *changed)
+    for (auto& group : m_presentation->groups)
+      group.animationDirty = true;
+  return changed;
+}
+
+void NetworkedAnimator::Sample::setLocalTag(String name, std::optional<String> value) {
+  m_presentation->tags.set(std::move(name), {true, std::move(value)});
+}
+
+void NetworkedAnimator::Sample::setPartDrawables(String const& name, List<Drawable> const* drawables) {
+  m_presentation->drawables.set(name, {true, drawables});
+}
+
+std::expected<void, StarException> NetworkedAnimator::Sample::resetLocalTransformationGroup(String const& name) {
+  auto group = m_animator.m_transformationGroups.get(name);
+  if (!group) return std::unexpected(std::move(group.error()));
+  m_presentation->groups[group->get().presentationIndex].localTransform = Mat3F::identity();
+  return {};
+}
+
+std::expected<void, StarException> NetworkedAnimator::Sample::rotateLocalTransformationGroup(String const& name, float rotation, Vec2F const& center) {
+  auto group = m_animator.m_transformationGroups.get(name);
+  if (!group) return std::unexpected(std::move(group.error()));
+  auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
+  matrix = Mat3F::rotation(rotation, center) * matrix;
+  return {};
+}
+
+std::expected<void, StarException> NetworkedAnimator::Sample::translateLocalTransformationGroup(String const& name, Vec2F const& translation) {
+  auto group = m_animator.m_transformationGroups.get(name);
+  if (!group) return std::unexpected(std::move(group.error()));
+  auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
+  matrix = Mat3F::translation(translation) * matrix;
+  return {};
+}
+
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::getLocalTransformationGroup(String const& name) const {
+  auto group = m_animator.m_transformationGroups.get(name);
+  if (!group) return std::unexpected(std::move(group.error()));
+  return m_presentation->groups[group->get().presentationIndex].localTransform;
+}
+
+List<Drawable> const* NetworkedAnimator::partDrawables(String const& name, Sample const* sample) const {
+  if (sample) {
+    if (auto override = sample->m_presentation->drawables.maybeRef(name); override && override->get().active)
+      return override->get().drawables;
+  }
+  if (auto drawables = m_partDrawables.maybeRef(name))
+    return &drawables->get();
+  return nullptr;
 }
 
 NetworkedAnimator::DynamicTarget::~DynamicTarget() {
@@ -588,56 +839,49 @@ std::expected<bool, StarException> NetworkedAnimator::setState(String const& sta
 }
 
 std::expected<bool, StarException> NetworkedAnimator::setLocalState(String const& stateType, String const& state, bool startNew, bool reverse) {
-  if (m_sampleDepth) {
-    auto changed = m_animatedParts.setPresentationState(stateType, state, startNew, reverse);
-    if (changed && *changed)
-      for (auto const& pair : m_transformationGroups)
-        pair.second.presentationAnimationDirty = true;
-    return changed;
-  }
   return m_animatedParts.setActiveState(stateType, state, startNew, reverse);
 }
 
-std::expected<String, StarException> NetworkedAnimator::state(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<String, StarException> NetworkedAnimator::queryState(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().stateName;
 }
-std::expected<int, StarException> NetworkedAnimator::stateFrame(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<int, StarException> NetworkedAnimator::queryStateFrame(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().frame;
 }
-std::expected<int, StarException> NetworkedAnimator::stateNextFrame(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<int, StarException> NetworkedAnimator::queryStateNextFrame(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().nextFrame;
 }
-std::expected<float, StarException> NetworkedAnimator::stateFrameProgress(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<float, StarException> NetworkedAnimator::queryStateFrameProgress(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().frameProgress;
 }
-std::expected<float, StarException> NetworkedAnimator::stateTimer(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<float, StarException> NetworkedAnimator::queryStateTimer(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().timer;
 }
-std::expected<bool, StarException> NetworkedAnimator::stateReverse(String const& stateType) const {
-  auto state = m_animatedParts.activeState(stateType);
+std::expected<bool, StarException> NetworkedAnimator::queryStateReverse(String const& stateType, Sample const* sample) const {
+  auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().reverse;
 }
 
-std::expected<float, StarException> NetworkedAnimator::stateCycle(String const& stateType, std::optional<String> state) const {
-  auto active = m_animatedParts.activeState(stateType);
+std::expected<float, StarException> NetworkedAnimator::queryStateCycle(String const& stateType, std::optional<String> state, Sample const* sample) const {
+  auto active = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto selected = m_animatedParts.getState(stateType, state.value_or(active->get().stateName));
   if (!selected) return std::unexpected(std::move(selected.error()));
   return selected->get().cycle;
 }
-std::expected<int, StarException> NetworkedAnimator::stateFrames(String const& stateType, std::optional<String> state) const {
-  auto active = m_animatedParts.activeState(stateType);
+std::expected<int, StarException> NetworkedAnimator::queryStateFrames(String const& stateType, std::optional<String> state, Sample const* sample) const {
+  auto active = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto selected = m_animatedParts.getState(stateType, state.value_or(active->get().stateName));
   if (!selected) return std::unexpected(std::move(selected.error()));
@@ -668,32 +912,32 @@ StringList NetworkedAnimator::partNames() const {
   return m_animatedParts.partNames();
 }
 
-std::expected<Json, StarException> NetworkedAnimator::stateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame) const {
+std::expected<Json, StarException> NetworkedAnimator::queryStateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame, Sample const* sample) const {
   if (state) {
     if (!frame) return std::unexpected(NetworkedAnimatorException("State property requires a frame"));
     return m_animatedParts.getStateFrameProperty(stateType, propertyName, *state, *frame);
   }
-  auto active = m_animatedParts.activeState(stateType);
+  auto active = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   return active->get().properties.value(propertyName);
 }
-std::expected<Json, StarException> NetworkedAnimator::stateNextProperty(String const& stateType, String const& propertyName) const {
-  auto active = m_animatedParts.activeState(stateType);
+std::expected<Json, StarException> NetworkedAnimator::queryStateNextProperty(String const& stateType, String const& propertyName, Sample const* sample) const {
+  auto active = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   return active->get().nextProperties.value(propertyName);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::partProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame) const {
+std::expected<Json, StarException> NetworkedAnimator::queryPartProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame, Sample const* sample) const {
   if (stateType) {
     if (!state || !frame) return std::unexpected(NetworkedAnimatorException("Part state property requires a state and frame"));
     return m_animatedParts.getPartStateFrameProperty(partName, propertyName, *stateType, *state, *frame);
   }
-  auto active = m_animatedParts.activePart(partName);
+  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   return active->get().properties.value(propertyName);
 }
-std::expected<Json, StarException> NetworkedAnimator::partNextProperty(String const& partName, String const& propertyName) const {
-  auto active = m_animatedParts.activePart(partName);
+std::expected<Json, StarException> NetworkedAnimator::queryPartNextProperty(String const& partName, String const& propertyName, Sample const* sample) const {
+  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   return active->get().nextProperties.value(propertyName);
 }
@@ -705,9 +949,9 @@ Mat3F NetworkedAnimator::globalTransformation() const {
   return transformation;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base) const {
+std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base, Sample const* sample) const {
   for (auto const& stateType : m_animationStateTypes) {
-    auto state = m_animatedParts.activeState(stateType);
+    auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
     if (!state) return std::unexpected(std::move(state.error()));
     auto const& active = state->get();
     if (auto transforms = active.properties.maybeRef(name)) {
@@ -726,27 +970,28 @@ std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformat
   return base;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::groupTransformation(StringList const& transformationGroups) const {
+std::expected<Mat3F, StarException> NetworkedAnimator::queryGroupTransformation(StringList const& transformationGroups, Sample const* sample) const {
   auto mat = Mat3F::identity();
   for (auto const& tg : transformationGroups) {
     auto group = m_transformationGroups.get(tg);
     if (!group) return std::unexpected(std::move(group.error()));
     auto const& value = group->get();
-    if (m_sampleDepth && value.presentationAnimationDirty) {
-      auto sampled = animationGroupTransformation(tg, value, value.animationBaseTransform);
+    auto cache = sample ? &sample->m_presentation->groups[value.presentationIndex] : nullptr;
+    if (cache && cache->animationDirty) {
+      auto sampled = animationGroupTransformation(tg, value, value.animationBaseTransform, sample);
       if (!sampled) return std::unexpected(std::move(sampled.error()));
-      value.presentationAnimationTransform = *sampled;
-      value.presentationAnimationDirty = false;
+      cache->animationTransform = *sampled;
+      cache->animationDirty = false;
     }
-    auto base = m_sampleDepth ? value.presentationTransform : value.affineTransform();
-    auto animation = m_sampleDepth ? value.presentationAnimationTransform : value.animationAffineTransform();
-    mat = base * value.localAffineTransform() * animation * mat;
+    auto base = sample ? cache->transform : value.affineTransform();
+    auto animation = sample ? cache->animationTransform : value.animationAffineTransform();
+    mat = base * (sample ? cache->localTransform : value.localAffineTransform()) * animation * mat;
   }
   return mat;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String const& partName) const {
-  auto active = m_animatedParts.activePart(partName);
+std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(String const& partName, Sample const* sample) const {
+  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto const& part = active->get();
   Mat3F transformation = Mat3F::identity();
@@ -758,7 +1003,7 @@ std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String
   transformation = part.animationAffineTransform() * transformation;
   auto groups = jsonToStringList(part.properties.value("transformationGroups", JsonArray()));
   if (!groups) return std::unexpected(std::move(groups.error()));
-  auto group = groupTransformation(*groups);
+  auto group = queryGroupTransformation(*groups, sample);
   if (!group) return std::unexpected(std::move(group.error()));
   transformation = *group * transformation;
   auto rotationName = part.properties.value("rotationGroup").optString();
@@ -773,45 +1018,45 @@ std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String
       center = *configuredCenter;
     }
     auto const& value = rotation->get();
-    float angle = m_sampleDepth ? angleLerp(m_interpolation, value.previousAngle, value.currentAngle) : value.currentAngle;
+    float angle = sample ? angleLerp(sample->interpolation(), value.previousAngle, value.currentAngle) : value.currentAngle;
     transformation = Mat3F::rotation(angle, center) * transformation;
   }
   if (auto anchorJson = part.properties.maybeRef("anchorPart")) {
     auto anchorName = anchorJson->get().toString();
     if (!anchorName) return std::unexpected(std::move(anchorName.error()));
-    auto anchor = partTransformation(*anchorName);
+    auto anchor = queryPartTransformation(*anchorName, sample);
     if (!anchor) return std::unexpected(std::move(anchor.error()));
     transformation = *anchor * transformation;
   }
   return transformation;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::finalPartTransformation(String const& partName) const {
-  auto part = partTransformation(partName);
+std::expected<Mat3F, StarException> NetworkedAnimator::queryFinalPartTransformation(String const& partName, Sample const* sample) const {
+  auto part = queryPartTransformation(partName, sample);
   if (!part) return std::unexpected(std::move(part.error()));
   return globalTransformation() * *part;
 }
 
-std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::partPoint(String const& partName, String const& propertyName) const {
-  auto active = m_animatedParts.activePart(partName);
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::queryPartPoint(String const& partName, String const& propertyName, Sample const* sample) const {
+  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto property = active->get().properties.value(propertyName);
   if (!property) return std::optional<Vec2F>{};
   auto value = jsonToVec2F(property);
   if (!value) return std::unexpected(std::move(value.error()));
-  auto transform = finalPartTransformation(partName);
+  auto transform = queryFinalPartTransformation(partName, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
   return std::optional<Vec2F>(transform->transformVec2(*value));
 }
 
-std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::partPoly(String const& partName, String const& propertyName) const {
-  auto active = m_animatedParts.activePart(partName);
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::queryPartPoly(String const& partName, String const& propertyName, Sample const* sample) const {
+  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto property = active->get().properties.value(propertyName);
   if (!property) return std::optional<PolyF>{};
   auto value = jsonToPolyF(property);
   if (!value) return std::unexpected(std::move(value.error()));
-  auto transform = finalPartTransformation(partName);
+  auto transform = queryFinalPartTransformation(partName, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
   value->transform(*transform);
   return std::optional<PolyF>(std::move(*value));
@@ -853,12 +1098,22 @@ void NetworkedAnimator::setPartDrawables(String const& partName, List<Drawable> 
 void NetworkedAnimator::addPartDrawables(String const& partName, List<Drawable> drawables) {
   m_partDrawables[partName].appendAll(drawables);
 }
-std::expected<String, StarException> NetworkedAnimator::applyPartTags(String const& partName, String apply) const {
+std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(String const& partName, String apply, Sample const* sample) const {
   HashMap<String, String> animationTags = m_localTags;
+  if (sample) {
+    for (auto const& tag : sample->m_presentation->tags) {
+      if (!tag.second.active)
+        continue;
+      if (tag.second.value)
+        animationTags.set(tag.first, *tag.second.value);
+      else
+        animationTags.remove(tag.first);
+    }
+  }
   std::optional<unsigned> frame;
   String frameStr;
   String frameIndexStr;
-  auto activePartResult = m_animatedParts.activePart(partName);
+  auto activePartResult = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
   if (!activePartResult) return std::unexpected(std::move(activePartResult.error()));
   auto const& activePart = activePartResult->get();
   auto partTagsResult = m_partTags.get(partName);
@@ -873,7 +1128,7 @@ std::expected<String, StarException> NetworkedAnimator::applyPartTags(String con
   if (version() > 0) {
     animationTags.set("relativePath", m_relativePath);
     for (auto& stateTypeName : m_animatedParts.stateTypes()) {
-      auto activeStateResult = m_animatedParts.activeState(stateTypeName);
+      auto activeStateResult = m_animatedParts.activeState(stateTypeName, sample ? &sample->m_presentation->parts : nullptr);
       if (!activeStateResult) return std::unexpected(std::move(activeStateResult.error()));
       auto const& activeState = activeStateResult->get();
       unsigned stateFrame = activeState.frame;
@@ -973,11 +1228,11 @@ std::expected<void, StarException> NetworkedAnimator::rotateGroup(String const& 
   return {};
 }
 
-std::expected<float, StarException> NetworkedAnimator::currentRotationAngle(String const& rotationGroup) const {
+std::expected<float, StarException> NetworkedAnimator::queryCurrentRotationAngle(String const& rotationGroup, Sample const* sample) const {
   auto entry = m_rotationGroups.get(rotationGroup);
   if (!entry) return std::unexpected(std::move(entry.error()));
   auto const& group = entry->get();
-  return m_sampleDepth ? angleLerp(m_interpolation, group.previousAngle, group.currentAngle) : group.currentAngle;
+  return sample ? angleLerp(sample->interpolation(), group.previousAngle, group.currentAngle) : group.currentAngle;
 }
 
 bool NetworkedAnimator::hasTransformationGroup(String const& transformationGroup) const {
@@ -1249,16 +1504,16 @@ std::expected<void, StarException> NetworkedAnimator::setEffectEnabled(String co
   return {};
 }
 
-std::expected<List<Drawable>, StarException> NetworkedAnimator::drawables(Vec2F const& position) const {
+std::expected<List<Drawable>, StarException> NetworkedAnimator::queryDrawables(Vec2F const& position, Sample const* sample) const {
   List<Drawable> drawables;
-  auto rendered = drawablesWithZLevel(position);
+  auto rendered = queryDrawablesWithZLevel(position, sample);
   if (!rendered) return std::unexpected(std::move(rendered.error()));
   for (auto& p : *rendered)
     drawables.append(std::move(p.first));
   return drawables;
 }
 
-std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::drawablesWithZLevel(Vec2F const& position) const {
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::queryDrawablesWithZLevel(Vec2F const& position, Sample const* sample) const {
   std::size_t partCount = m_animatedParts.constParts().size();
   if (!partCount)
     return List<std::pair<Drawable, float>>{};
@@ -1281,10 +1536,20 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     }
   }
   HashMap<String, String> animationTags = m_localTags;
+  if (sample) {
+    for (auto const& tag : sample->m_presentation->tags) {
+      if (!tag.second.active)
+        continue;
+      if (tag.second.value)
+        animationTags.set(tag.first, *tag.second.value);
+      else
+        animationTags.remove(tag.first);
+    }
+  }
   if (version() > 0) {
     animationTags.set("relativePath", m_relativePath);
     for (auto& stateTypeName : m_animatedParts.stateTypes()) {
-      auto activeStateResult = m_animatedParts.activeState(stateTypeName);
+      auto activeStateResult = m_animatedParts.activeState(stateTypeName, sample ? &sample->m_presentation->parts : nullptr);
       if (!activeStateResult) return std::unexpected(std::move(activeStateResult.error()));
       auto const& activeState = activeStateResult->get();
       unsigned stateFrame = activeState.frame;
@@ -1331,11 +1596,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       maybeZLevel = *z;
     }
 
-    if (auto drawables = m_partDrawables.maybeRef(partName))
-      drawableCount += drawables->get().size();
+    if (auto drawables = partDrawables(partName, sample))
+      drawableCount += drawables->size();
     parts.append(std::make_tuple(std::cref(activePart), std::cref(partName), maybeZLevel.value_or(0.0f)));
     return {};
-  });
+  }, sample ? &sample->m_presentation->parts : nullptr);
   if (!collected) return std::unexpected(std::move(collected.error()));
 
   std::sort(parts.begin(), parts.end(), [](auto const& a, auto const& b) { return std::get<2>(a) < std::get<2>(b); });
@@ -1443,7 +1708,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     });
     String const& usedImage = processedImage ? *processedImage : image;
 
-    auto partTransform = partTransformation(partName);
+    auto partTransform = queryPartTransformation(partName, sample);
     if (!partTransform) return std::unexpected(std::move(partTransform.error()));
     auto transformation = globalTransformation() * *partTransform;
     transformation.translate(position);
@@ -1488,11 +1753,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       drawables.append({std::move(drawable), std::get<2>(entry)});
     }
 
-    if (m_partDrawables.contains(partName)) {
-      auto partDrawables = m_partDrawables.maybeRef(partName)->get();
-      Drawable::transformAll(partDrawables, transformation);
-      for (auto drawable : partDrawables) {
-      drawables.append({drawable, std::get<2>(entry)});
+    if (auto attached = partDrawables(partName, sample)) {
+      for (auto const& attachedDrawable : *attached) {
+        Drawable drawable = attachedDrawable;
+        drawable.transform(transformation);
+        drawables.append({std::move(drawable), std::get<2>(entry)});
       }
     }
 
@@ -1502,7 +1767,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
   return drawables;
 }
 
-std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(Vec2F const& translate) const {
+std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSources(Vec2F const& translate, Sample const* sample) const {
   List<LightSource> lightSources;
   for (auto const& pair : m_lights) {
     if (!pair.second.active.get())
@@ -1512,11 +1777,11 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(
     float pointAngle = constrainAngle(pair.second.pointAngle.get());
     Mat3F transformation = Mat3F::identity();
     if (pair.second.anchorPart) {
-      auto anchor = partTransformation(*pair.second.anchorPart);
+      auto anchor = queryPartTransformation(*pair.second.anchorPart, sample);
       if (!anchor) return std::unexpected(std::move(anchor.error()));
       transformation = *anchor;
     }
-    auto group = groupTransformation(pair.second.transformationGroups);
+    auto group = queryGroupTransformation(pair.second.transformationGroups, sample);
     if (!group) return std::unexpected(std::move(group.error()));
     transformation = *group * transformation;
     position = transformation.transformVec2(position);
@@ -1525,7 +1790,7 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(
       auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
       if (!rotation) return std::unexpected(std::move(rotation.error()));
       auto const& rg = rotation->get();
-      float angle = m_sampleDepth ? angleLerp(m_interpolation, rg.previousAngle, rg.currentAngle) : rg.currentAngle;
+      float angle = sample ? angleLerp(sample->interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
       position = (position - pair.second.rotationCenter.value_or(rg.rotationCenter)).rotate(angle)
           + pair.second.rotationCenter.value_or(rg.rotationCenter);
       pointAngle += angle;
@@ -1705,7 +1970,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
     for (auto& pair : m_transformationGroups) {
       auto& group = pair.second;
       group.animationBaseTransform = group.animationAffineTransform();
-      auto transform = animationGroupTransformation(pair.first, group, group.animationBaseTransform);
+      auto transform = animationGroupTransformation(pair.first, group, group.animationBaseTransform, nullptr);
       if (!transform) return std::unexpected(std::move(transform.error()));
       group.setAnimationAffineTransform(*transform);
     }
@@ -1896,11 +2161,11 @@ void NetworkedAnimator::TransformationGroup::setAffineTransform(Mat3F const& mat
 }
 
 void NetworkedAnimator::TransformationGroup::setLocalAffineTransform(Mat3F const& matrix) {
-  (sampling ? presentationLocalTransform : localTransform) = matrix;
+  localTransform = matrix;
 }
 
 Mat3F NetworkedAnimator::TransformationGroup::localAffineTransform() const {
-  return sampling ? presentationLocalTransform : localTransform;
+  return localTransform;
 }
 
 void NetworkedAnimator::TransformationGroup::setAnimationAffineTransform(Mat3F const& matrix) {

@@ -409,7 +409,7 @@ std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAl
   if (!evaluated) return std::unexpected(std::move(evaluated.error()));
   return std::clamp((int)*evaluated, 0, 255);
 }
-std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, float interpolation) {
+std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   if (m_bubbles.empty() && m_portraitBubbles.empty())
     return {};
   auto configuration = m_guiContext.get().root().configuration();
@@ -422,12 +422,12 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
 
   float pixelRatio = m_guiContext.get().interfaceScale();
 
-  auto rendered = m_bubbles.forEach([this, &world, &camera, interpolation, pixelRatio](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
+  auto rendered = m_bubbles.forEach([this, &world, &camera, presentation, pixelRatio](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
       if (bubble.onscreen) {
         auto entity = world.entity(bubble.entity);
         auto origin = m_camera.screenToWorld(state.idealDestination);
         if (entity)
-          origin += world.geometry().diff(world.renderPosition(bubble.entity, interpolation), entity->position());
+          origin += world.geometry().diff(world.renderPosition(bubble.entity, presentation), entity->position());
         auto screenPosition = camera.worldToScreen(origin)
             + (state.currentPosition - state.idealDestination);
         auto fade = calcDistanceFadeAlpha(screenPosition, m_bubbleFadeFunction, camera);
@@ -448,7 +448,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
     if (portraitBubble.onscreen) {
       auto position = portraitBubble.position;
       if (auto entity = world.entity(portraitBubble.entity))
-        position += world.geometry().diff(world.renderPosition(portraitBubble.entity, interpolation), entity->position());
+        position += world.geometry().diff(world.renderPosition(portraitBubble.entity, presentation), entity->position());
       Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
       int frame = 0;
       if (portraitBubble.age <= m_portraitChatterDuration)

@@ -22,6 +22,22 @@ import star.material_types;
 
 namespace Star {
 
+// Captured once for a display frame. World geometry, lights and overlays share
+// the same sample and scheduler-discontinuity epoch; this is not simulation time.
+class PresentationContext {
+public:
+  explicit PresentationContext(float interpolation = 1.0f, std::uint64_t epoch = 0)
+    : m_interpolation(std::clamp(interpolation, 0.0f, 1.0f)), m_epoch(epoch) {}
+
+  float interpolation() const { return m_interpolation; }
+  std::uint64_t epoch() const { return m_epoch; }
+  PresentationContext current() const { return PresentationContext(1.0f, m_epoch); }
+
+private:
+  float m_interpolation;
+  std::uint64_t m_epoch;
+};
+
 typedef std::uint32_t EntityRenderLayer;
 
 inline constexpr unsigned RenderLayerUpperBits = 5;
@@ -103,6 +119,7 @@ struct EntityHighlightEffect {
 export module star.entity_rendering_types;
 
 export namespace Star {
+  using ::Star::PresentationContext;
   using ::Star::EntityRenderLayer;
   using ::Star::parseRenderLayer;
   using ::Star::PreviewTile;

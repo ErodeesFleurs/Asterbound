@@ -486,14 +486,6 @@ if (!result335) return std::unexpected(std::move(result335.error()));
   return {};
 }
 
-std::expected<void, StarException> PlantDrop::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  if (renderCallback)
-    {
-auto result306 = collectRenderEvents(renderCallback->get());
-if (!result306) return std::unexpected(std::move(result306.error()));
-}
-  return {};
-}
 
 std::expected<void, StarException> PlantDrop::particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& renderCallback) {
   auto result295 = mainConfig.get("particles", JsonObject());
@@ -668,7 +660,7 @@ if (!result292) return std::unexpected(std::move(result292.error()));
 }
 
 std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallback) {
-  float alpha = std::clamp(renderCallback.interpolation(), 0.0f, 1.0f);
+  float alpha = renderCallback.presentation().interpolation();
   float rotation = isMaster()
     ? m_movementController->rotation() - m_presentationRotationTravel * (1.0f - alpha)
     : samplePresentationRotation(m_movementController->rotation(), alpha);

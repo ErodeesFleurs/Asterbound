@@ -959,10 +959,14 @@ std::expected<void, StarException> ClientApplication::render() {
 
   } else if (m_state > MainAppState::Title) {
     std::shared_ptr<WorldClient> worldClient = m_universeClient->worldClient();
+    PresentationContext const presentation(
+        m_universeClient->paused() || m_root->timing().timescale == 0.0f
+            ? 1.0f : appController()->renderInterpolation(),
+        appController()->renderEpoch());
     if (worldClient) {
       auto& camera = m_worldPainter->camera();
       auto playerEpoch = m_player ? m_player->presentationEpoch() : 0;
-      auto renderEpoch = appController()->renderEpoch();
+      auto renderEpoch = presentation.epoch();
       if (m_presentedWorld.lock() != worldClient || m_presentedPlayer.lock() != m_player
           || m_presentedPlayerEpoch != playerEpoch || m_presentedRenderEpoch != renderEpoch) {
         worldClient->resetPresentation();
@@ -972,16 +976,14 @@ std::expected<void, StarException> ClientApplication::render() {
         m_presentedPlayerEpoch = playerEpoch;
         m_presentedRenderEpoch = renderEpoch;
       }
-      float interpolation = m_universeClient->paused() || m_root->timing().timescale == 0.0f
-          ? 1.0f : appController()->renderInterpolation();
       camera.setScreenSize(renderer->screenSize());
-      camera.setRenderInterpolation(interpolation);
+      camera.setRenderInterpolation(presentation.interpolation());
       auto totalStart = Time::monotonicMicroseconds();
       auto worldEffect = renderer->switchEffectConfig("world");
       if (!worldEffect)
         return std::unexpected(std::move(worldEffect.error()));
       auto clientStart = totalStart;
-      auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer(), interpolation);
+      auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer(), presentation);
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
       m_root->logMap().set("client_render_world_client", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - clientStart));
@@ -1014,9 +1016,7 @@ std::expected<void, StarException> ClientApplication::render() {
     if (!interfaceEffect)
       return std::unexpected(std::move(interfaceEffect.error()));
     auto start = Time::monotonicMicroseconds();
-    float interpolation = m_universeClient->paused() || m_root->timing().timescale == 0.0f
-        ? 1.0f : appController()->renderInterpolation();
-    auto inWorld = m_mainInterface->renderInWorldElements(interpolation);
+    auto inWorld = m_mainInterface->renderInWorldElements(presentation);
     if (!inWorld)
       return std::unexpected(std::move(inWorld.error()));
     auto interfaceRendered = m_mainInterface->render();

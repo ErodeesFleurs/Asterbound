@@ -107,9 +107,7 @@ public:
     mutable bool activeStateDirty;
     float previousTimer = 0;
     float timerAdvance = 0;
-    mutable ActiveStateInformation presentationState;
-    mutable bool presentationStateDirty = true;
-    mutable bool presentationStateInitialized = false;
+    mutable std::size_t presentationIndex = 0;
   };
 
   struct PartState {
@@ -124,18 +122,32 @@ public:
     // Derived from part properties and the currently active state.
     mutable ActivePartInformation activePart;
     mutable bool activePartDirty;
-    mutable ActivePartInformation presentationPart;
-    mutable bool presentationPartDirty = true;
+    mutable std::size_t presentationIndex = 0;
     mutable Mat3F activePartBaseTransform = Mat3F::identity();
+  };
+
+  // Reusable derived data owned by one visual view, never by logical state.
+  struct Sample {
+    struct StateCache {
+      ActiveStateInformation state;
+      bool dirty = true;
+      bool initialized = false;
+    };
+    struct PartCache {
+      ActivePartInformation part;
+      bool dirty = true;
+    };
+    float interpolation = 1;
+    std::vector<StateCache> states;
+    std::vector<PartCache> parts;
   };
 
   AnimatedPartSet();
   [[nodiscard]] static std::expected<AnimatedPartSet, StarException> create(Json config, std::uint8_t animatorVersion);
 
-  // Selects reusable presentation caches, leaving the logical state and frame
-  // caches untouched. A negative value disables presentation sampling.
-  float setPresentationInterpolation(float interpolation) const;
-  [[nodiscard]] std::expected<bool, StarException> setPresentationState(String const& stateTypeName, String const& stateName, bool alwaysStart, bool reverse);
+  // Reuses a view's storage and initializes it from the current logical endpoints.
+  void prepareSample(Sample& sample, float interpolation) const;
+  [[nodiscard]] std::expected<bool, StarException> setPresentationState(String const& stateTypeName, String const& stateName, bool alwaysStart, bool reverse, Sample& sample) const;
 
   // Returns the available state types.
   StringList stateTypes() const;
@@ -161,8 +173,8 @@ public:
   // Restart this given state type's timer off at the beginning.
   [[nodiscard]] std::expected<void, StarException> restartState(String const& stateTypeName);
 
-  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> activeState(String const& stateTypeName) const;
-  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(String const& partName) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> activeState(String const& stateTypeName, Sample* sample = nullptr) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(String const& partName, Sample* sample = nullptr) const;
   [[nodiscard]] std::expected<std::reference_wrapper<State const>, StarException> getState(String const& stateTypeName, String const& stateName) const;
 
   StringMap<Part> const& constParts() const;
@@ -170,11 +182,11 @@ public:
 
   // Function will be given the name of each state type, and the
   // ActiveStateInformation for the active state for that state type.
-  [[nodiscard]] std::expected<void, StarException> forEachActiveState(std::function<std::expected<void, StarException>(String const&, ActiveStateInformation const&)> callback) const;
+  [[nodiscard]] std::expected<void, StarException> forEachActiveState(std::function<std::expected<void, StarException>(String const&, ActiveStateInformation const&)> callback, Sample* sample = nullptr) const;
 
   // Function will be given the name of each part, and the
   // ActivePartInformation for the active part.
-  [[nodiscard]] std::expected<void, StarException> forEachActivePart(std::function<std::expected<void, StarException>(String const&, ActivePartInformation const&)> callback) const;
+  [[nodiscard]] std::expected<void, StarException> forEachActivePart(std::function<std::expected<void, StarException>(String const&, ActivePartInformation const&)> callback, Sample* sample = nullptr) const;
 
   // Useful for serializing state changes.  Since each set of states for a
   // state type is ordered, it is possible to simply serialize and deserialize
@@ -198,14 +210,13 @@ public:
 private:
   [[nodiscard]] static std::expected<AnimationMode, StarException> stringToAnimationMode(String const& string);
 
-  [[nodiscard]] std::expected<void, StarException> freshenActiveState(StateType const& stateType) const;
-  [[nodiscard]] std::expected<void, StarException> freshenActivePart(Part const& part) const;
+  [[nodiscard]] std::expected<void, StarException> freshenActiveState(StateType const& stateType, Sample* sample = nullptr) const;
+  [[nodiscard]] std::expected<void, StarException> freshenActivePart(Part const& part, Sample* sample = nullptr) const;
 
   OrderedHashMap<String, StateType> m_stateTypes;
   StringMap<Part> m_parts;
 
   std::uint8_t m_animatorVersion = 0;
-  mutable float m_presentationInterpolation = -1;
 };
 
 }

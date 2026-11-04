@@ -1849,7 +1849,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   return {};
 }
 
-std::expected<void, StarException> MainInterface::renderInWorldElements(float interpolation) {
+std::expected<void, StarException> MainInterface::renderInWorldElements(PresentationContext presentation) {
   if (m_disableHud)
     return {};
   if (auto cleared = context().clearTextStyle(); !cleared)
@@ -1858,11 +1858,11 @@ std::expected<void, StarException> MainInterface::renderInWorldElements(float in
   if (!world)
     return {};
   auto const& camera = m_worldPainter.get().camera();
-  if (auto rendered = m_questIndicatorPainter->render(*world, camera, interpolation); !rendered)
+  if (auto rendered = m_questIndicatorPainter->render(*world, camera, presentation); !rendered)
     return std::unexpected(std::move(rendered.error()));
-  if (auto rendered = m_nameplatePainter->render(*world, camera, interpolation); !rendered)
+  if (auto rendered = m_nameplatePainter->render(*world, camera, presentation); !rendered)
     return std::unexpected(std::move(rendered.error()));
-  return m_chatBubbleManager->render(*world, camera, interpolation);
+  return m_chatBubbleManager->render(*world, camera, presentation);
 }
 
 std::expected<void, StarException> MainInterface::render() {

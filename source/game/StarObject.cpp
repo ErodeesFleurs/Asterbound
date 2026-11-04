@@ -710,7 +710,12 @@ std::expected<void, StarException> Object::uninit() {
 }
 
 std::expected<List<LightSource>, StarException> Object::lightSources() const {
-  auto lightsResult = m_networkedAnimator->lightSources(position() + m_animationPosition);
+  return lightSources(nullptr);
+}
+
+std::expected<List<LightSource>, StarException> Object::lightSources(NetworkedAnimator::Sample const* sample) const {
+  auto lightsResult = sample ? sample->lightSources(position() + m_animationPosition)
+                            : m_networkedAnimator->lightSources(position() + m_animationPosition);
   if (!lightsResult)
     return std::unexpected(std::move(lightsResult.error()));
   auto lights = std::move(*lightsResult);
@@ -909,13 +914,13 @@ std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& r
 }
 
 std::expected<void, StarException> Object::render(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
+  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
   if (!m_networkedAnimator->constParts().empty()) {
     auto shakeResult = damageShake();
     if (!shakeResult)
       return std::unexpected(std::move(shakeResult.error()));
     auto shake = std::move(*shakeResult);
-    auto drawablesResult = m_networkedAnimator->drawables(position() + m_animationPosition + shake);
+    auto drawablesResult = sample.drawables(position() + m_animationPosition + shake);
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
@@ -941,10 +946,12 @@ std::expected<void, StarException> Object::render(RenderCallback& renderCallback
 }
 
 std::expected<void, StarException> Object::renderLightSources(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.interpolation());
-  auto operation1 = renderLights(renderCallback);
-  if (!operation1)
-    return std::unexpected(std::move(operation1.error()));
+  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+  auto lightsResult = lightSources(&sample);
+  if (!lightsResult)
+    return std::unexpected(std::move(lightsResult.error()));
+  if (auto added = renderCallback.addLightSources(std::move(*lightsResult)); !added)
+    return std::unexpected(std::move(added.error()));
   auto const& lights = m_scriptedAnimator.lightSources();
   return renderCallback.addLightSources(lights);
 }
@@ -2435,14 +2442,6 @@ EntityRenderLayer Object::renderLayer() const {
     return orientation->renderLayer;
   else
     return RenderLayerObject;
-}
-
-std::expected<void, StarException> Object::renderLights(RenderCallback& renderCallback) const {
-  auto lightsResult = lightSources();
-  if (!lightsResult)
-    return std::unexpected(std::move(lightsResult.error()));
-  auto lights = std::move(*lightsResult);
-  return renderCallback.addLightSources(lights);
 }
 
 std::expected<void, StarException> Object::collectParticles(RenderCallback& renderCallback) {

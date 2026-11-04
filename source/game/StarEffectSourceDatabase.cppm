@@ -22,7 +22,8 @@ public:
   void stop();
   [[nodiscard]] std::expected<List<String>, StarException> particles();
   [[nodiscard]] std::expected<List<std::shared_ptr<AudioInstance>>, StarException> sounds(Vec2F offset);
-  void postRender();
+  // Acknowledge the current tick's particle/audio stages after collection.
+  void finishEventCollection();
   String effectSpawnLocation() const;
   String suggestedSpawnLocation() const;
 

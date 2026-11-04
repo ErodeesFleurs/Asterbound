@@ -1247,7 +1247,8 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
     auto previews = std::move(*previewsResult);
     drawables.appendAll(std::move(previews));
   }
-  auto effectsResult = m_effectsAnimator->drawables(position());
+  auto effectsSample = m_effectsAnimator->sample(interpolation);
+  auto effectsResult = effectsSample.drawables(position());
   if (!effectsResult)
     return std::unexpected(std::move(effectsResult.error()));
   auto effects = std::move(*effectsResult);
@@ -1355,9 +1356,9 @@ std::expected<List<LightSource>, StarException> Player::presentationLightSources
   auto tech = std::move(*techResult);
   lights.appendAll(std::move(tech));
   auto humanoidSample = humanoid()->networkedAnimator()->get().sample(interpolation);
-  if (auto prepared = humanoid()->prepareAnimatorPose(interpolation); !prepared)
+  if (auto prepared = humanoid()->prepareAnimatorPose(humanoidSample); !prepared)
     return std::unexpected(std::move(prepared.error()));
-  auto humanoidLightsResult = humanoid()->networkedAnimator()->get().lightSources();
+  auto humanoidLightsResult = humanoidSample.lightSources();
   if (!humanoidLightsResult)
     return std::unexpected(std::move(humanoidLightsResult.error()));
   auto humanoidLights = std::move(*humanoidLightsResult);
@@ -2523,6 +2524,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     return std::unexpected(std::move(soundResult.error()));
   auto sound = std::move(*soundResult);
   if (!sound.empty() && !m_techController->parentState() && !m_techController->parentHidden()) {
+    if (m_landingNoisePending || m_footstepPending) {
     auto assetsResult = root().assets();
     if (!assetsResult)
       return std::unexpected(std::move(assetsResult.error()));
@@ -2562,6 +2564,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
       noise->setVolume(1 - variance);
       if (auto result = renderCallback.addAudio(std::move(noise)); !result)
         return std::unexpected(std::move(result.error()));
+    }
     }
   } else {
     m_footstepTimer = m_config->footstepTiming;
@@ -2616,7 +2619,6 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
 std::expected<void, StarException> Player::render(RenderCallback& renderCallback) {
   if (invisible())
     return {};
-  auto effectsSample = m_effectsAnimator->sample(renderCallback.interpolation());
   auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
   EntityRenderLayer layer = RenderLayerPlayer;
   auto overrideLayerResult = getSecretProperty("overrideRenderLayer");
@@ -2631,7 +2633,7 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
   }
   if (loungeAnchor)
     layer = loungeAnchor->loungeRenderLayer;
-  auto renderedResult = drawables(renderCallback.interpolation());
+  auto renderedResult = drawables(renderCallback.presentation().interpolation());
   if (!renderedResult)
     return std::unexpected(std::move(renderedResult.error()));
   if (auto result = renderCallback.addDrawables(std::move(*renderedResult), layer); !result)
@@ -2652,8 +2654,7 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
 }
 
 std::expected<void, StarException> Player::renderLightSources(RenderCallback& renderCallback) {
-  auto effectsSample = m_effectsAnimator->sample(renderCallback.interpolation());
-  auto lightsResult = presentationLightSources(renderCallback.interpolation());
+  auto lightsResult = presentationLightSources(renderCallback.presentation().interpolation());
   if (!lightsResult)
     return std::unexpected(std::move(lightsResult.error()));
   auto lights = std::move(*lightsResult);

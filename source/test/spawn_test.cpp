@@ -4,6 +4,7 @@ import star.ordered_map;
 import star.either;
 import star.vector;
 import star.game_types;
+import star.entity_rendering_types;
 import star.color;
 import star.bi_map;
 import star.random;
@@ -276,14 +277,14 @@ const GameTestRegistration presentationRemovalLifecycle(
       return nullptr;
     };
     for (float alpha : {0.0f, 0.5f, 1.0f, 0.25f}) {
-      ASSERT_TRUE(world->render(display, 0, std::nullopt, alpha));
+      ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext(alpha)));
       auto sampled = findNewborn();
       ASSERT_TRUE(sampled);
       EXPECT_EQ(sampled->position, newborn.position);
       EXPECT_FLOAT_EQ(sampled->timeToLive, 2.0f);
     }
     ASSERT_TRUE(world->update(dt));
-    ASSERT_TRUE(world->render(display, 0, std::nullopt, 1.0f));
+    ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
     auto advanced = findNewborn();
     ASSERT_TRUE(advanced);
     auto travel = world->geometry().diff(advanced->position, newborn.position);

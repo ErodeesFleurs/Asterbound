@@ -4,6 +4,7 @@ import star.format;
 import star.json;
 
 import star.game_types;
+import star.entity_rendering_types;
 
 
 import star.rect;
@@ -42,7 +43,7 @@ public:
   [[nodiscard]] static std::expected<std::unique_ptr<NameplatePainter>, StarException> create(GuiContext& context);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> const& world, WorldCamera const& camera, bool inspectionMode);
-  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation);
 
 private:
   explicit NameplatePainter(GuiContext& context);

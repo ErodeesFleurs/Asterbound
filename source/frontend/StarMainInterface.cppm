@@ -4,6 +4,7 @@ import star.format;
 import star.json;
 import star.id_map;
 import star.game_types;
+import star.entity_rendering_types;
 import star.vector;
 import star.casting;
 import star.input_event;
@@ -175,7 +176,7 @@ public:
 
   // Render things e.g. quest indicators that should be drawn in the world
   // behind interface e.g. chat bubbles
-  [[nodiscard]] std::expected<void, StarException> renderInWorldElements(float interpolation);
+  [[nodiscard]] std::expected<void, StarException> renderInWorldElements(PresentationContext presentation);
   [[nodiscard]] std::expected<void, StarException> render();
 
   Vec2F cursorWorldPosition() const;

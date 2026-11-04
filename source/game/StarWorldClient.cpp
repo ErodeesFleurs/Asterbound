@@ -981,26 +981,26 @@ WorldClientState& WorldClient::clientState() {
   return *m_clientState;
 }
 
-Vec2F WorldClient::renderPosition(EntityId entityId, float interpolation) const {
+Vec2F WorldClient::renderPosition(EntityId entityId, PresentationContext presentation) const {
   auto entity = this->entity(entityId);
   if (!entity)
     return {};
   if (auto entry = m_entityPresentation.maybeRef(entityId)) {
     auto const& state = entry->get();
     if (state.continuous && state.instance.lock() == entity && state.epoch == entity->presentationEpoch())
-      return state.position.sample(m_geometry, interpolation);
+      return state.position.sample(m_geometry, presentation.interpolation());
   }
   return entity->position();
 }
 
-float WorldClient::presentationInterpolation(Entity const& entity, float interpolation) const {
+PresentationContext WorldClient::presentationFor(Entity const& entity, PresentationContext presentation) const {
   if (auto entry = m_entityPresentation.maybeRef(entity.entityId())) {
     auto const& state = entry->get();
     if (state.continuous && state.instance.lock().get() == &entity && state.epoch == entity.presentationEpoch())
-      return interpolation;
+      return presentation;
   }
   // A replacement, teleport, or explicit reset has no previous display pose.
-  return 1.0f;
+  return presentation.current();
 }
 
 void WorldClient::resetPresentation() {
@@ -1009,7 +1009,7 @@ void WorldClient::resetPresentation() {
     m_particles->resetPresentation();
 }
 
-std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, float interpolation) {
+std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, PresentationContext presentation) {
   if (m_headless) {
     return {};
   }
@@ -1030,7 +1030,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   }
   
   renderData.prepareFrame();
-  interpolation = std::clamp(interpolation, 0.0f, 1.0f);
+  float const interpolation = presentation.interpolation();
   if (!inWorld()) {
     renderData.entityDrawables.clear();
     renderData.particles.clear();
@@ -1060,14 +1060,14 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   renderData.geometry = m_geometry;
   m_particles->sampleParticles(interpolation, renderData.particles);
   
-  ClientRenderCallback lightingRenderCallback(tileDrawer, interpolation, m_presentationTimestep);
+  ClientRenderCallback lightingRenderCallback(tileDrawer, presentation, m_presentationTimestep);
   auto result47 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
       
-      lightingRenderCallback.m_offset = self.m_geometry.diff(self.renderPosition(entity->entityId(), interpolation), entity->position());
-      lightingRenderCallback.m_interpolation = self.presentationInterpolation(*entity, interpolation);
+      lightingRenderCallback.m_offset = self.m_geometry.diff(self.renderPosition(entity->entityId(), presentation), entity->position());
+      lightingRenderCallback.m_presentation = self.presentationFor(*entity, presentation);
       auto result46 = entity->renderLightSources(lightingRenderCallback);
       if (!result46)
         return std::unexpected(std::move(result46.error()));
@@ -1168,8 +1168,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       if (drawableIndex == renderData.entityDrawables.size())
         renderData.entityDrawables.append({});
       auto& ed = renderData.entityDrawables[drawableIndex++];
-      ClientRenderCallback renderCallback(tileDrawer, self.presentationInterpolation(*entity, interpolation), self.m_presentationTimestep,
-          self.m_geometry.diff(self.renderPosition(entity->entityId(), interpolation), entity->position()));
+      ClientRenderCallback renderCallback(tileDrawer, self.presentationFor(*entity, presentation), self.m_presentationTimestep,
+          self.m_geometry.diff(self.renderPosition(entity->entityId(), presentation), entity->position()));
       renderCallback.drawableTarget = &ed.layers;
       
       auto rendered = entity->render(renderCallback);

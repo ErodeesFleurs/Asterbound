@@ -4,6 +4,7 @@ import star.format;
 import star.json;
 
 import star.game_types;
+import star.entity_rendering_types;
 
 import star.color;
 import star.list;
@@ -49,7 +50,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> addChatActions(List<ChatAction> chatActions, bool silent = false);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::shared_ptr<WorldClient> world);
-  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, float interpolation);
+  [[nodiscard]] std::expected<void, StarException> render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation);
 
 private:
   explicit ChatBubbleManager(GuiContext& context);

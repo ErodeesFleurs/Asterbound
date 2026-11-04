@@ -763,7 +763,7 @@ std::expected<List<Drawable>, StarException> StatusController::drawables(float i
   List<Drawable> output;
   for (auto const& animator : m_effectAnimators.netElements()) {
     auto sample = animator->animator->sample(interpolation);
-    auto values = animator->animator->drawables(m_movementController->get().position());
+    auto values = sample.drawables(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.appendAll(std::move(*values));
   }
@@ -774,7 +774,7 @@ std::expected<List<LightSource>, StarException> StatusController::lightSources(f
   List<LightSource> output;
   for (auto const& animator : m_effectAnimators.netElements()) {
     auto sample = animator->animator->sample(interpolation);
-    auto values = animator->animator->lightSources(m_movementController->get().position());
+    auto values = sample.lightSources(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.appendAll(std::move(*values));
   }

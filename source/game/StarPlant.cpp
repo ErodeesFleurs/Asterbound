@@ -1380,10 +1380,10 @@ auto drawable = std::move(*result1283);
       drawable.scale(Vec2F(-1, 1));
 
     if (plantPiece.rotationType == RotateCrownBranch || plantPiece.rotationType == RotateCrownLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.presentation().interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
       drawable.translate(Vec2F(0, -0.40f));
     } else if (plantPiece.rotationType == RotateBranch || plantPiece.rotationType == RotateLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.presentation().interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
     }
     drawable.translate(position());
     auto result604 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlant);

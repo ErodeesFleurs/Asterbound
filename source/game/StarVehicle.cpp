@@ -789,8 +789,8 @@ if (!result1199) return std::unexpected(std::move(result1199.error()));
 }
 
 std::expected<void, StarException> Vehicle::render(RenderCallback& renderer) {
-  auto sample = m_networkedAnimator->sample(renderer.interpolation());
-  auto result1187 = m_networkedAnimator->drawablesWithZLevel(position());
+  auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
+  auto result1187 = sample.drawablesWithZLevel(position());
 if (!result1187) return std::unexpected(std::move(result1187.error()));
 for (auto& drawable : std::move(*result1187)) {
     if (drawable.second < 0.0f)
@@ -816,8 +816,8 @@ if (!result1195) return std::unexpected(std::move(result1195.error()));
 }
 
 std::expected<void, StarException> Vehicle::renderLightSources(RenderCallback& renderer) {
-  auto sample = m_networkedAnimator->sample(renderer.interpolation());
-  auto result1183 = m_networkedAnimator->lightSources(position());
+  auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
+  auto result1183 = sample.lightSources(position());
 if (!result1183) return std::unexpected(std::move(result1183.error()));
 auto result1184 = renderer.addLightSources(std::move(*result1183));
 if (!result1184) return std::unexpected(std::move(result1184.error()));

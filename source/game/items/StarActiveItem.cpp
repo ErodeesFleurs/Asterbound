@@ -532,7 +532,7 @@ std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float int
     Drawable::scaleAll(*drawables, 1.0f / TilePixels);
     return drawables;
   } else {
-    return m_itemAnimator->drawables();
+    return sample.drawables();
   }
 }
 
@@ -544,7 +544,7 @@ std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpo
   auto sample = m_itemAnimator->sample(interpolation);
   // Same as pullNewAudios, we translate and flip ourselves.
   List<LightSource> result;
-  auto lights = m_itemAnimator->lightSources();
+  auto lights = sample.lightSources();
   if (!lights)
     return std::unexpected(std::move(lights.error()));
   for (auto& light : *lights) {

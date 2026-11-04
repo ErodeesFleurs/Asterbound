@@ -279,7 +279,7 @@ private:
   EntityRenderLayer renderLayer() const;
 
   // Lights are sampled for display; emissions are collected once per logic tick.
-  [[nodiscard]] std::expected<void, StarException> renderLights(RenderCallback& renderCallback) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(NetworkedAnimator::Sample const* sample) const;
   [[nodiscard]] std::expected<void, StarException> collectParticles(RenderCallback& renderCallback);
   [[nodiscard]] std::expected<void, StarException> collectSounds(RenderCallback& renderCallback);
 

@@ -13,6 +13,7 @@ import star.client_context;
 import star.drawable;
 import star.file;
 import star.entity_rendering;
+import star.entity_rendering_types;
 import star.format;
 import star.list;
 import star.light_source;
@@ -405,51 +406,47 @@ const GameTestRegistration semanticPartSampling(
     auto logical = parts->activeState("movement");
     ASSERT_TRUE(logical);
     EXPECT_FLOAT_EQ(logical->get().timer, .4f);
-    parts->setPresentationInterpolation(.5f);
-    auto sampled = parts->activeState("movement");
+    AnimatedPartSet::Sample sample;
+    parts->prepareSample(sample, .5f);
+    auto sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_FLOAT_EQ(sampled->get().timer, .2f);
-    auto body = parts->activePart("body");
+    auto body = parts->activePart("body", &sample);
     ASSERT_TRUE(body);
     EXPECT_NEAR(body->get().animationAffineTransform().transformVec2(Vec2F{})[0], 3.2f, 1e-5f);
-    parts->setPresentationInterpolation(-1);
     logical = parts->activeState("movement");
     ASSERT_TRUE(logical);
     EXPECT_FLOAT_EQ(logical->get().timer, .4f);
     ASSERT_TRUE(parts->update(.5f));
     ASSERT_TRUE(parts->update(.2f));
-    parts->setPresentationInterpolation(.25f);
-    sampled = parts->activeState("movement");
+    parts->prepareSample(sample, .25f);
+    sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_NEAR(sampled->get().timer, .95f, 1e-5f);
-    parts->setPresentationInterpolation(.75f);
-    sampled = parts->activeState("movement");
+    parts->prepareSample(sample, .75f);
+    sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_NEAR(sampled->get().timer, .05f, 1e-5f);
-    parts->setPresentationInterpolation(-1);
     ASSERT_TRUE(parts->restartState("movement"));
-    parts->setPresentationInterpolation(0);
-    sampled = parts->activeState("movement");
+    parts->prepareSample(sample, 0);
+    sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_FLOAT_EQ(sampled->get().timer, 0);
-    parts->setPresentationInterpolation(-1);
     ASSERT_TRUE(parts->setActiveState("movement", "change"));
     ASSERT_TRUE(parts->update(.2f));
-    parts->setPresentationInterpolation(.5f);
-    sampled = parts->activeState("movement");
+    parts->prepareSample(sample, .5f);
+    sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_EQ(sampled->get().stateName, "stop");
     EXPECT_FLOAT_EQ(sampled->get().timer, 0);
-    parts->setPresentationInterpolation(-1);
     ASSERT_TRUE(parts->setActiveState("movement", "walk", true, true));
     ASSERT_TRUE(parts->update(.4f));
-    parts->setPresentationInterpolation(.5f);
-    sampled = parts->activeState("movement");
+    parts->prepareSample(sample, .5f);
+    sampled = parts->activeState("movement", &sample);
     ASSERT_TRUE(sampled);
     EXPECT_EQ(sampled->get().frame, 1u);
     EXPECT_EQ(sampled->get().nextFrame, 0u);
     EXPECT_NEAR(sampled->get().frameProgress, .4f, 1e-5f);
-    parts->setPresentationInterpolation(-1);
   });
 
 const GameTestRegistration animatorSemanticSampling(
@@ -486,39 +483,74 @@ const GameTestRegistration animatorSemanticSampling(
     ASSERT_TRUE(animator.update(.25f, std::ref(events)));
     auto logicalTimer = animator.stateTimer("movement");
     ASSERT_TRUE(logicalTimer);
+    animator.setLocalTag("pose", "logical");
     for (int repeat = 0; repeat != 3; ++repeat) {
       auto sample = animator.sample(.5f);
-      auto timer = animator.stateTimer("movement");
+      auto other = animator.sample(.1f);
+      auto otherPoint = other.partPoint("body", "testPoint");
+      ASSERT_TRUE(otherPoint);
+      ASSERT_TRUE(*otherPoint);
+      EXPECT_NEAR((**otherPoint)[0], 1.2f, 1e-5f);
+      auto timer = sample.stateTimer("movement");
       ASSERT_TRUE(timer);
       EXPECT_NEAR(*timer, .225f, 1e-5f);
-      auto angle = animator.currentRotationAngle("aim");
+      auto angle = sample.currentRotationAngle("aim");
       ASSERT_TRUE(angle);
       EXPECT_NEAR(*angle, .25f, 1e-5f);
-      auto point = animator.partPoint("body", "testPoint");
+      auto point = sample.partPoint("body", "testPoint");
       ASSERT_TRUE(point);
       ASSERT_TRUE(*point);
       EXPECT_NEAR((**point)[0], 2.8f, 1e-5f);
-      auto drawables = animator.drawables();
+      auto drawables = sample.drawables();
       ASSERT_TRUE(drawables) << drawables.error().what();
       ASSERT_EQ(drawables->size(), 1u);
       auto expected = line;
       expected.transform(Mat3F::translation({2.8f, 0}));
       EXPECT_NEAR((*drawables)[0].position[0], expected.position[0], 1e-5f);
-      auto lights = animator.lightSources();
+      auto lights = sample.lightSources();
       ASSERT_TRUE(lights);
       ASSERT_EQ(lights->size(), 1u);
       EXPECT_NEAR((*lights)[0].position[0], 2.8f, 1e-5f);
-      ASSERT_TRUE(animator.setLocalState("movement", "stop"));
-      ASSERT_TRUE(animator.translateLocalTransformationGroup("moving", {10, 0}));
-      auto state = animator.state("movement");
+      ASSERT_TRUE(sample.setLocalState("movement", "stop"));
+      EXPECT_FALSE(sample.setLocalState("movement", "missing"));
+      sample.setLocalTag("pose", "sampled");
+      auto sampledTag = sample.applyPartTags("body", "<pose>");
+      auto otherTag = other.applyPartTags("body", "<pose>");
+      auto logicalTag = animator.applyPartTags("body", "<pose>");
+      ASSERT_TRUE(sampledTag);
+      ASSERT_TRUE(otherTag);
+      ASSERT_TRUE(logicalTag);
+      EXPECT_EQ(*sampledTag, "sampled");
+      EXPECT_EQ(*otherTag, "logical");
+      EXPECT_EQ(*logicalTag, "logical");
+      ASSERT_TRUE(sample.translateLocalTransformationGroup("moving", {10, 0}));
+      auto state = sample.state("movement");
       ASSERT_TRUE(state);
       EXPECT_EQ(*state, "stop");
       {
-        auto nested = animator.sample(.1f);
-        auto inherited = animator.state("movement");
+        auto nested = sample;
+        auto inherited = nested.state("movement");
         ASSERT_TRUE(inherited);
         EXPECT_EQ(*inherited, "stop");
+        EXPECT_FLOAT_EQ(nested.interpolation(), .5f);
       }
+      auto untouched = other.partPoint("body", "testPoint");
+      ASSERT_TRUE(untouched);
+      ASSERT_TRUE(*untouched);
+      EXPECT_NEAR((**untouched)[0], 1.2f, 1e-5f);
+      auto logicalState = animator.state("movement");
+      auto logicalLocal = animator.getLocalTransformationGroup("moving");
+      ASSERT_TRUE(logicalState);
+      ASSERT_TRUE(logicalLocal);
+      EXPECT_EQ(*logicalState, "walk");
+      EXPECT_EQ(*logicalLocal, Mat3F::identity());
+      sample.setPartDrawables("body", nullptr);
+      auto hidden = sample.drawables();
+      auto untouchedDrawables = other.drawables();
+      ASSERT_TRUE(hidden);
+      ASSERT_TRUE(untouchedDrawables);
+      EXPECT_TRUE(hidden->empty());
+      EXPECT_EQ(untouchedDrawables->size(), 1u);
     }
     auto timer = animator.stateTimer("movement");
     ASSERT_TRUE(timer);
@@ -533,7 +565,7 @@ const GameTestRegistration animatorSemanticSampling(
     EXPECT_TRUE(events.pullNewParticles().empty());
     ASSERT_TRUE(animator.rotateGroup("aim", -2.f, true));
     auto sample = animator.sample(0);
-    auto angle = animator.currentRotationAngle("aim");
+    auto angle = sample.currentRotationAngle("aim");
     ASSERT_TRUE(angle);
     EXPECT_FLOAT_EQ(*angle, -2.f);
   });
@@ -610,7 +642,7 @@ const GameTestRegistration playerPresentationEvents(
       unsigned particles = 0;
       unsigned audios = 0;
       float alpha = 1.0f;
-      float interpolation() const override { return alpha; }
+      PresentationContext presentation() const override { return PresentationContext(alpha); }
       std::expected<void, StarException> addParticle(Particle particle) override {
         if (particle.string == "presentation-event-fixture")
           ++particles;
@@ -754,14 +786,18 @@ const GameTestRegistration authoredAnimationGroupSampling(
     ASSERT_TRUE(animator.update(.2f, {}));
     for (float alpha : {.25f, .75f, .25f}) {
       auto sample = animator.sample(alpha);
-      auto frame = animator.stateFrame("body");
+      auto opposite = animator.sample(1.f - alpha);
+      auto otherFrame = opposite.stateFrame("body");
+      ASSERT_TRUE(otherFrame);
+      EXPECT_EQ(*otherFrame, alpha < .5f ? 1 : 0);
+      auto frame = sample.stateFrame("body");
       ASSERT_TRUE(frame);
       EXPECT_EQ(*frame, alpha < .5f ? 0 : 1);
-      auto discrete = animator.partPoint("body", "point");
+      auto discrete = sample.partPoint("body", "point");
       ASSERT_TRUE(discrete);
       ASSERT_TRUE(*discrete);
       EXPECT_FLOAT_EQ((**discrete)[0], alpha < .5f ? 0 : 8);
-      auto smooth = animator.groupTransformation({"smooth"});
+      auto smooth = sample.groupTransformation({"smooth"});
       ASSERT_TRUE(smooth);
       EXPECT_NEAR(smooth->transformVec2(Vec2F{})[0], 7.2f, 1e-5f);
     }
@@ -844,17 +880,17 @@ const GameTestRegistration humanoidTickOwnedPose(
       List<LightSource> sampledLights;
       {
         auto sample = animator.sample(alpha);
-        ASSERT_TRUE(humanoid.prepareAnimatorPose(alpha));
-        auto freshLights = animator.lightSources();
+        ASSERT_TRUE(humanoid.prepareAnimatorPose(sample));
+        auto freshLights = sample.lightSources();
         ASSERT_TRUE(freshLights);
         ASSERT_EQ(freshLights->size(), 2u);
         sampledLights = *freshLights;
       }
       {
         auto sample = animator.sample(alpha);
-        auto drawables = humanoid.render(true, true, alpha);
+        auto drawables = humanoid.render(sample, true, true);
         ASSERT_TRUE(drawables) << drawables.error().what();
-        auto afterGeometry = animator.lightSources();
+        auto afterGeometry = sample.lightSources();
         ASSERT_TRUE(afterGeometry);
         ASSERT_EQ(afterGeometry->size(), sampledLights.size());
         for (std::size_t i = 0; i != sampledLights.size(); ++i) {
