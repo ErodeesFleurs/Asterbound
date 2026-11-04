@@ -54,7 +54,11 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 - Rebuild Lua 5.3 bytecode. Finalizer errors become warnings; `math.random` sequences may change.
 - Text templates use `<name>` and `<<` for a literal `<`, not brace-format placeholders.
 
-Starbound-style `require` executes successful modules once per Lua context. Requiring a module already being initialized returns without executing it again, preserving compatibility with reentrant and cyclic utility dependencies. Failed loads remove their marker so they can be retried; syntax/runtime errors and cache-invalidation errors still propagate. Accessing a global before its defining module finishes initialization can still fail.
+### Bundled mod compatibility
+
+`assets/opensb-compat` is a separate, optional-fix asset source, shipped as `opensb-compat.pak` beside `opensb.pak` in distributions and as a sibling directory in Nix packages. Normal asset-directory scanning loads it automatically; custom boot configurations using explicit `assetSources` must include it. It does not require any third-party mod to be installed.
+
+For [StarCore Simplified Chinese](https://steamcommunity.com/sharedfiles/filedetails/?id=807695810) (`SChinese`, version `V108_241106_09`), it removes four unused imports from `/scripts/replaceTags.lua` in memory, breaking `util.lua → replaceTags.lua → util.lua`. The replacement function body, utility functions and translations remain unchanged; the engine still rejects cyclic `require` calls. The repair applies only when the effective script provider is that known SChinese version and its import header matches the [verified upstream release](https://github.com/sffxzzp/Starbound-Chinese/releases/tag/UTC-241105-1953). Other providers, unknown versions and unrecognized headers are left untouched. No installed mod files or saves are rewritten; restart the game after installing the compatibility source.
 
 ### Mod error diagnostics
 

@@ -517,7 +517,7 @@ const GameTestRegistration
   });
 
 const GameTestRegistration
-  luaModulesAllowReentryAndRetryFailures("RootTest", "LuaModulesAllowReentrantRequiresAndRetryFailures", [](GameTest& fixture) {
+  luaModulesRetryFailuresAndCycles("RootTest", "LuaModulesRetryFailuresAndCycles", [](GameTest& fixture) {
     auto directory = File::temporaryDirectory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
     auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
@@ -534,31 +534,18 @@ const GameTestRegistration
     )LUA"},
                                        {"p5-self.lua", R"LUA(
       selfRuns = (selfRuns or 0) + 1
-      require("/p5-self.lua")
+      if not allowSelf then require("/p5-self.lua") end
       selfReady = true
     )LUA"},
                                        {"p5-cycle-a.lua", R"LUA(
       cycleARuns = (cycleARuns or 0) + 1
-      require("/p5-cycle-b.lua")
-      function cycleValue() return cycleBValue() + 1 end
+      if not allowCycle then require("/p5-cycle-b.lua") end
       cycleAReady = true
     )LUA"},
                                        {"p5-cycle-b.lua", R"LUA(
       cycleBRuns = (cycleBRuns or 0) + 1
       require("/p5-cycle-a.lua")
-      function cycleBValue() return 41 end
       cycleBReady = true
-    )LUA"},
-                                       {"p5-early-a.lua", R"LUA(
-      earlyARuns = (earlyARuns or 0) + 1
-      require("/p5-early-b.lua")
-      function earlyAValue() return 7 end
-    )LUA"},
-                                       {"p5-early-b.lua", R"LUA(
-      earlyBRuns = (earlyBRuns or 0) + 1
-      require("/p5-early-a.lua")
-      if not allowEarlyUse then earlyAValue() end
-      earlyBReady = true
     )LUA"}}));
     auto root = Root::create(std::move(*settings));
     ASSERT_TRUE(root) << root.error().what();
@@ -593,6 +580,29 @@ const GameTestRegistration
     ASSERT_TRUE(retry) << retry.error().what();
     EXPECT_EQ(*retry, Json(JsonObject{{"results", 0}, {"attempts", 3}, {"dependencies", 1}, {"ready", true}}));
     auto cycles = context->eval<Json>(R"LUA(
+    local selfOk, selfError = pcall(require, "/p5-self.lua")
+    local cycleOk, cycleError = pcall(require, "/p5-cycle-a.lua")
+    return {
+      selfOk = selfOk, selfError = tostring(selfError),
+      cycleOk = cycleOk, cycleError = tostring(cycleError),
+      selfAttempts = selfRuns, aAttempts = cycleARuns, bAttempts = cycleBRuns,
+      selfReady = selfReady == true, aReady = cycleAReady == true, bReady = cycleBReady == true
+    }
+  )LUA");
+    ASSERT_TRUE(cycles) << cycles.error().what();
+    EXPECT_EQ(cycles->getBool("selfOk"), false);
+    EXPECT_EQ(cycles->getBool("cycleOk"), false);
+    expectIsolationModuleError(*cycles, "selfError", "/p5-self.lua -> /p5-self.lua");
+    expectIsolationModuleError(*cycles, "cycleError", "/p5-cycle-a.lua -> /p5-cycle-b.lua -> /p5-cycle-a.lua");
+    EXPECT_EQ(cycles->getInt("selfAttempts"), 1);
+    EXPECT_EQ(cycles->getInt("aAttempts"), 1);
+    EXPECT_EQ(cycles->getInt("bAttempts"), 1);
+    EXPECT_EQ(cycles->getBool("selfReady"), false);
+    EXPECT_EQ(cycles->getBool("aReady"), false);
+    EXPECT_EQ(cycles->getBool("bReady"), false);
+    auto recovered = context->eval<Json>(R"LUA(
+    allowSelf = true
+    allowCycle = true
     local selfResults = select("#", require("/p5-self.lua"))
     local aResults = select("#", require("/p5-cycle-a.lua"))
     local bResults = select("#", require("/p5-cycle-b.lua"))
@@ -602,48 +612,20 @@ const GameTestRegistration
     return {
       selfResults = selfResults, aResults = aResults, bResults = bResults,
       selfAttempts = selfRuns, aAttempts = cycleARuns, bAttempts = cycleBRuns,
-      selfReady = selfReady, aReady = cycleAReady, bReady = cycleBReady,
-      value = cycleValue()
+      selfReady = selfReady, aReady = cycleAReady, bReady = cycleBReady
     }
   )LUA");
-    ASSERT_TRUE(cycles) << cycles.error().what();
-    EXPECT_EQ(*cycles,
+    ASSERT_TRUE(recovered) << recovered.error().what();
+    EXPECT_EQ(*recovered,
               Json(JsonObject{{"selfResults", 0},
                               {"aResults", 0},
                               {"bResults", 0},
-                              {"selfAttempts", 1},
-                              {"aAttempts", 1},
-                              {"bAttempts", 1},
+                              {"selfAttempts", 2},
+                              {"aAttempts", 2},
+                              {"bAttempts", 2},
                               {"selfReady", true},
                               {"aReady", true},
-                              {"bReady", true},
-                              {"value", 42}}));
-    auto earlyFailures = context->eval<Json>(R"LUA(
-    local firstOk, firstError = pcall(require, "/p5-early-a.lua")
-    local secondOk, secondError = pcall(require, "/p5-early-a.lua")
-    return {
-      firstOk = firstOk, secondOk = secondOk,
-      firstError = tostring(firstError), secondError = tostring(secondError),
-      aAttempts = earlyARuns, bAttempts = earlyBRuns, ready = earlyBReady == true
-    }
-  )LUA");
-    ASSERT_TRUE(earlyFailures) << earlyFailures.error().what();
-    EXPECT_EQ(earlyFailures->getBool("firstOk"), false);
-    EXPECT_EQ(earlyFailures->getBool("secondOk"), false);
-    expectIsolationModuleError(*earlyFailures, "firstError", "earlyAValue");
-    expectIsolationModuleError(*earlyFailures, "secondError", "earlyAValue");
-    EXPECT_EQ(earlyFailures->getInt("aAttempts"), 2);
-    EXPECT_EQ(earlyFailures->getInt("bAttempts"), 2);
-    EXPECT_EQ(earlyFailures->getBool("ready"), false);
-    auto recovered = context->eval<Json>(R"LUA(
-    allowEarlyUse = true
-    require("/p5-early-a.lua")
-    require("/p5-early-b.lua")
-    require("/p5-early-a.lua")
-    return {aAttempts = earlyARuns, bAttempts = earlyBRuns, ready = earlyBReady, value = earlyAValue()}
-  )LUA");
-    ASSERT_TRUE(recovered) << recovered.error().what();
-    EXPECT_EQ(*recovered, Json(JsonObject{{"aAttempts", 3}, {"bAttempts", 3}, {"ready", true}, {"value", 7}}));
+                              {"bReady", true}}));
   });
 
 const GameTestRegistration

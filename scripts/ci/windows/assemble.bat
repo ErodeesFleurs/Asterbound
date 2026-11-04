@@ -15,12 +15,14 @@ if exist %server% rmdir %server% /S /Q
 xcopy %client% %server% /E /I
 
 .\dist\asset_packer.exe -c scripts\packing.config assets\opensb %client%\assets\opensb.pak
+.\dist\asset_packer.exe -c scripts\packing.config assets\opensb-compat %client%\assets\opensb-compat.pak
 
 for /f "delims=" %%f in (scripts\ci\windows\files_client.txt) do (
     xcopy "%%f" "%client%\win\" /Y
 )
 
 .\dist\asset_packer.exe -c scripts\packing.config -s assets\opensb %server%\assets\opensb.pak
+.\dist\asset_packer.exe -c scripts\packing.config -s assets\opensb-compat %server%\assets\opensb-compat.pak
 
 for /f "delims=" %%f in (scripts\ci\windows\files_server.txt) do (
     xcopy "%%f" "%server%\win\" /Y

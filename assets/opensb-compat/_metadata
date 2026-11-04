@@ -1,0 +1,11 @@
+{
+  "author" : "OpenStarbound contributors",
+  "name" : "opensb_compat",
+  "friendlyName" : "OpenStarbound Mod Compatibility",
+  "version" : "1.0.0",
+  "requires" : ["base", "opensb_base"],
+  "includes" : ["SChinese"],
+  "scripts" : {
+    "postLoad" : ["/scripts/opensb/compat/starcore.lua"]
+  }
+}

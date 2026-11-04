@@ -5,6 +5,7 @@ mkdir client_distribution/assets
 mkdir client_distribution/assets/user
 
 ./dist/asset_packer -c scripts/packing.config assets/opensb client_distribution/assets/opensb.pak
+./dist/asset_packer -c scripts/packing.config assets/opensb-compat client_distribution/assets/opensb-compat.pak
 
 mkdir client_distribution/mods
 touch client_distribution/mods/mods_go_here
@@ -38,6 +39,7 @@ mkdir server_distribution/mods
 touch server_distribution/mods/mods_go_here
 
 ./dist/asset_packer -c scripts/packing.config -s assets/opensb server_distribution/assets/opensb.pak
+./dist/asset_packer -c scripts/packing.config -s assets/opensb-compat server_distribution/assets/opensb-compat.pak
 
 mkdir server_distribution/linux
 

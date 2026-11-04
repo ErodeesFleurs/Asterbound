@@ -208,28 +208,32 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
   auto cache = m_scriptCache;
   auto sourceDiagnostics = m_sourceDiagnostics;
   if (auto required = context.setRequireFunction(
-        [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{}](
-            LuaStackValue environment, StringView module) mutable -> std::expected<void, StarException> {
+        [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
+         loading = std::vector<String>{}](LuaStackValue environment,
+                                          StringView module) mutable -> std::expected<void, StarException> {
           if (loaded.contains(module))
             return {};
           String path(module.utf8());
+          if (std::ranges::find(loading, path) != loading.end()) {
+            String chain;
+            for (auto const& entry : loading) {
+              if (!chain.empty())
+                chain += " -> ";
+              chain += entry;
+            }
+            return std::unexpected(LuaException::format("Cyclic Lua require: {} -> {}", chain, path));
+          }
           auto script = cache->script(environment.stack().engine(), path, revision, *sourceDiagnostics);
           if (!script)
             return std::unexpected(std::move(script.error()));
-          // Loading counts as visited too: Starbound modules may require each
-          // other before their global definitions have finished initializing.
-          (void)loaded.insert(path);
-          bool completed = false;
-          auto rollback = finally([&] {
-            if (!completed)
-              loaded.remove(path);
-          });
+          loading.push_back(path);
+          auto popped = finally([&] { loading.pop_back(); });
           if (auto result = environment.stack().load(environment, (*script)->span(), path); !result)
             return std::unexpected(std::move(result.error()));
           if (cache->revision() != revision)
             return std::unexpected(
               LuaException::format("Lua script cache changed while loading '{}'; recreate the context", path));
-          completed = true;
+          (void)loaded.insert(std::move(path));
           return {};
         });
       !required)

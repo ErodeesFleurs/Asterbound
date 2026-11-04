@@ -361,6 +361,7 @@ stdenv.mkDerivation {
         --replace-fail '@bundledAssets@' "$out/share/openstarbound/assets"
     ''}
     cp -r ../assets/opensb "$out/share/openstarbound/assets/opensb"
+    cp -r ../assets/opensb-compat "$out/share/openstarbound/assets/opensb-compat"
     install -m644 ../scripts/packing.config "$out/share/openstarbound/packing.config"
     install -m644 ../scripts/ci/linux/sbinit.config \
       "$out/share/openstarbound/sbinit.config.example"

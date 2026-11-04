@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 GAME_TESTS = "@gameTests@"
-BUNDLED_ASSETS = "@bundledAssets@/opensb"
+BUNDLED_ASSETS = ("@bundledAssets@/opensb", "@bundledAssets@/opensb-compat")
 # Only this test binds a fixed TCP port. TestUniverse/ServerTest leave TCP
 # listening disabled; the other connection tests bind ephemeral port 0.
 FIXED_PORT_CASE = "UniverseConnections.All"
@@ -144,7 +144,7 @@ def runtime(directory, vanilla):
         (directory / name).mkdir(exist_ok=True)
     boot = directory / "sbinit.config"
     boot.write_text(json.dumps({
-        "assetSources": [str(vanilla), BUNDLED_ASSETS],
+        "assetSources": [str(vanilla), *BUNDLED_ASSETS],
         "storageDirectory": str(directory / "storage"),
         "logDirectory": str(directory / "logs"),
     }, indent=2) + "\n")
