@@ -92,11 +92,11 @@ public:
 private:
   class WorkerThread : public Thread {
   public:
-    WorkerThread(WorkerPool& parent);
+    WorkerThread(WorkerPool& parent, std::stop_token stopToken);
     ~WorkerThread();
     [[nodiscard]] std::expected<void, StarException> run() override;
     WorkerPool& parent;
-    std::atomic<bool> shouldStop{false};
+    std::stop_token stopToken;
     std::atomic<bool> waiting{false};
     std::thread::id id;
   };
@@ -121,6 +121,8 @@ private:
 
   String m_name;
   std::mutex m_threadMutex;
+  // One cancellation domain per worker generation; replace only after joining.
+  std::stop_source m_workerStopSource{std::nostopstate};
   std::vector<std::unique_ptr<WorkerThread>> m_workerThreads;
   mutable std::mutex m_workMutex;
   std::condition_variable m_workCondition;

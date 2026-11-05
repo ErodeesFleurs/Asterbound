@@ -161,7 +161,7 @@ public:
 private:
   UniverseConnectionServer(Logger& logger, PacketReceiveCallback packetReceiver, std::size_t numWorkerThreads);
   [[nodiscard]] std::expected<void, StarException> initialize();
-  [[nodiscard]] std::expected<void, StarException> processConnections(std::size_t shard);
+  [[nodiscard]] std::expected<void, StarException> processConnections(std::size_t shard, std::stop_token stopToken);
   struct Connection {
     std::mutex mutex;
     std::unique_ptr<PacketSocket> packetSocket;
@@ -201,7 +201,7 @@ private:
   // The registry itself is partitioned; workers never snapshot other shards.
   List<HashMap<ConnectionId, std::shared_ptr<Connection>>> m_connections;
 
-  std::atomic<bool> m_shutdown;
+  std::stop_source m_stopSource{std::nostopstate};
   std::atomic<bool> m_closed{false};
   std::size_t m_numWorkerThreads;
   std::mutex m_workMutex;

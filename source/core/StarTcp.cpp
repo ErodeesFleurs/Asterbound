@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<TcpSocket>, StarException> TcpSocket::listen(Logge
 }
 
 std::expected<std::shared_ptr<TcpSocket>, StarException> TcpSocket::accept(Logger& logger) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
 
   if (m_socketMode != SocketMode::Bound)
     return std::unexpected(SocketClosedException("TcpSocket not bound in TcpSocket::accept"));
@@ -95,7 +95,7 @@ std::expected<std::shared_ptr<TcpSocket>, StarException> TcpSocket::accept(Logge
 }
 
 std::expected<void, StarException> TcpSocket::setNoDelay(bool noDelay) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("TcpSocket::setNoDelay"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -104,7 +104,7 @@ std::expected<void, StarException> TcpSocket::setNoDelay(bool noDelay) {
 }
 
 std::expected<std::size_t, StarException> TcpSocket::receive(std::span<char> data) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("TcpSocket::receive"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -134,7 +134,7 @@ std::expected<std::size_t, StarException> TcpSocket::receive(std::span<char> dat
 }
 
 std::expected<std::size_t, StarException> TcpSocket::send(std::span<char const> data) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("TcpSocket::send"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -162,12 +162,12 @@ std::expected<std::size_t, StarException> TcpSocket::send(std::span<char const> 
 }
 
 HostAddressWithPort TcpSocket::localAddress() const {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   return m_localAddress;
 }
 
 HostAddressWithPort TcpSocket::remoteAddress() const {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   return m_remoteAddress;
 }
 
@@ -176,7 +176,7 @@ TcpSocket::TcpSocket(NetworkMode networkMode) : Socket(networkMode) {}
 TcpSocket::TcpSocket(NetworkMode networkMode, std::shared_ptr<SocketImpl> impl) : Socket(networkMode, impl, SocketMode::Connected) {}
 
 std::expected<void, StarException> TcpSocket::connect(HostAddressWithPort const& addressWithPort) {
-  WriteLocker locker(m_mutex);
+  std::unique_lock locker(m_mutex);
   if (auto status = checkOpen("TcpSocket::connect"); !status)
     return std::unexpected(std::move(status.error()));
 

@@ -68,8 +68,7 @@ std::expected<void, StarException> WorkerPool::start(unsigned threadCount) {
   std::lock_guard threadLock(m_threadMutex);
   {
     std::lock_guard workLock(m_workMutex);
-    for (auto const& worker : m_workerThreads)
-      worker->shouldStop = true;
+    m_workerStopSource.request_stop();
     m_workCondition.notify_all();
   }
   auto joined = joinWorkers();
@@ -79,9 +78,10 @@ std::expected<void, StarException> WorkerPool::start(unsigned threadCount) {
   std::optional<StarException> failure;
   {
     std::lock_guard workLock(m_workMutex);
+    m_workerStopSource = std::stop_source{};
     m_workerThreads.reserve(threadCount);
     for (unsigned i = 0; i < threadCount; ++i) {
-      auto worker = std::make_unique<WorkerThread>(*this);
+      auto worker = std::make_unique<WorkerThread>(*this, m_workerStopSource.get_token());
       auto started = worker->start();
       if (!started) {
         failure.emplace(std::move(started.error()));
@@ -113,8 +113,7 @@ std::expected<void, StarException> WorkerPool::stopWorkers() {
   {
     std::lock_guard workLock(m_workMutex);
     m_acceptingWork = false;
-    for (auto const& worker : m_workerThreads)
-      worker->shouldStop = true;
+    m_workerStopSource.request_stop();
     cancelledWork = std::move(m_pendingWork);
     m_pendingWork.clear();
     m_workCondition.notify_all();
@@ -186,8 +185,7 @@ std::expected<void, StarException> WorkerPool::finish() {
     workLock.lock();
   }
   m_finishingThread = {};
-  for (auto const& worker : m_workerThreads)
-    worker->shouldStop = true;
+  m_workerStopSource.request_stop();
   m_workCondition.notify_all();
   workLock.unlock();
   auto joined = joinWorkers();
@@ -219,8 +217,9 @@ bool WorkerPool::isWorkerThread() const {
   return false;
 }
 
-WorkerPool::WorkerThread::WorkerThread(WorkerPool& parent)
-  : Thread(strf("WorkerThread for WorkerPool '{}'", parent.m_name)), parent(parent) {}
+WorkerPool::WorkerThread::WorkerThread(WorkerPool& parent, std::stop_token stopToken)
+  : Thread(strf("WorkerThread for WorkerPool '{}'", parent.m_name)),
+    parent(parent), stopToken(std::move(stopToken)) {}
 
 WorkerPool::WorkerThread::~WorkerThread() {
   auto result = join();
@@ -231,7 +230,7 @@ WorkerPool::WorkerThread::~WorkerThread() {
 std::expected<void, StarException> WorkerPool::WorkerThread::run() {
   std::unique_lock workLock(parent.m_workMutex);
   id = std::this_thread::get_id();
-  while (!shouldStop) {
+  while (!stopToken.stop_requested()) {
     if (parent.m_pendingWork.empty()) {
       waiting = true;
       parent.m_workCondition.wait(workLock);

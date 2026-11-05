@@ -198,3 +198,73 @@ TEST(WorkerPoolTest, CancelledConcreteCallablesNeverRun) {
   EXPECT_FALSE(producer.get());
   EXPECT_EQ(calls, 0);
 }
+
+TEST(WorkerPoolTest, StopCancelsQueuedWorkAndRestartUsesFreshWorkers) {
+  std::atomic<bool> entered{false};
+  std::atomic<bool> released{false};
+  int queuedCalls = 0;
+  WorkerPool pool("stop-restart");
+  struct ReleaseOnExit {
+    std::atomic<bool>& released;
+    void open() {
+      released.store(true);
+      released.notify_all();
+    }
+    ~ReleaseOnExit() { open(); }
+  } releaseOnExit{released};
+  ASSERT_TRUE(pool.start(1));
+  auto running = pool.addProducer<int>([&]() -> std::expected<int, StarException> {
+    entered.store(true);
+    entered.notify_all();
+    released.wait(false);
+    return 41;
+  });
+  entered.wait(false);
+  auto queued = pool.addProducer<int>([&]() -> std::expected<int, StarException> {
+    ++queuedCalls;
+    return 43;
+  });
+  std::optional<std::expected<void, StarException>> stopped;
+  std::thread stopper([&] { stopped.emplace(pool.stop()); });
+  auto cancelled = queued.wait(5000);
+  releaseOnExit.open();
+  stopper.join();
+  EXPECT_FALSE(cancelled);
+  ASSERT_TRUE(stopped);
+  ASSERT_TRUE(*stopped);
+  EXPECT_FALSE(queued.get());
+  EXPECT_EQ(queuedCalls, 0);
+  auto completed = running.get();
+  ASSERT_TRUE(completed);
+  EXPECT_EQ(completed->get(), 41);
+  auto rejected = pool.addProducer<int>([]() -> std::expected<int, StarException> { return 47; });
+  EXPECT_FALSE(rejected.get());
+
+  ASSERT_TRUE(pool.start(2));
+  auto fresh = pool.addProducer<int>([]() -> std::expected<int, StarException> { return 53; });
+  auto ready = fresh.wait(5000);
+  EXPECT_TRUE(ready && *ready);
+  ASSERT_TRUE(pool.finish());
+  auto value = fresh.get();
+  ASSERT_TRUE(value);
+  EXPECT_EQ(value->get(), 53);
+}
+
+TEST(WorkerPoolTest, ReconfigurationRetiresOnlyThePreviousWorkerGeneration) {
+  WorkerPool pool("reconfigure");
+  ASSERT_TRUE(pool.start(1));
+  auto before = pool.addProducer<int>([]() -> std::expected<int, StarException> { return 59; });
+  auto beforeReady = before.wait(5000);
+  EXPECT_TRUE(beforeReady && *beforeReady);
+  ASSERT_TRUE(pool.start(3));
+  auto after = pool.addProducer<int>([]() -> std::expected<int, StarException> { return 61; });
+  auto afterReady = after.wait(5000);
+  EXPECT_TRUE(afterReady && *afterReady);
+  ASSERT_TRUE(pool.finish());
+  auto beforeValue = before.get();
+  auto afterValue = after.get();
+  ASSERT_TRUE(beforeValue);
+  ASSERT_TRUE(afterValue);
+  EXPECT_EQ(beforeValue->get(), 59);
+  EXPECT_EQ(afterValue->get(), 61);
+}

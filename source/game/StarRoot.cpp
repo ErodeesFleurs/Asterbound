@@ -231,9 +231,10 @@ std::expected<void, StarException> Root::initialize() {
   if (!preparing)
     return std::unexpected(std::move(preparing.error()));
 
-  auto maintenance = Thread::invoke("Root::maintenanceMain", [this]() -> std::expected<void, StarException> {
+  m_maintenanceStopSource = std::stop_source{};
+  auto maintenance = Thread::invoke("Root::maintenanceMain", [this, stopToken = m_maintenanceStopSource.get_token()]() -> std::expected<void, StarException> {
       std::unique_lock locker(m_maintenanceStopMutex);
-      while (!m_stopMaintenanceThread) {
+      while (!stopToken.stop_requested()) {
         m_reloadListeners.clearExpiredListeners();
 
         {
@@ -307,7 +308,7 @@ Root::~Root() {
 
   {
     std::lock_guard locker(m_maintenanceStopMutex);
-    m_stopMaintenanceThread = true;
+    m_maintenanceStopSource.request_stop();
     m_maintenanceStopCondition.notify_one();
   }
   if (m_maintenanceThread) {

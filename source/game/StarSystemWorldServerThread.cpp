@@ -109,7 +109,7 @@ SystemWorldServerThread::SystemWorldServerThread(Vec3I const& location, std::sha
 }
 
 SystemWorldServerThread::~SystemWorldServerThread() {
-  m_stop = true;
+  m_stopSource.request_stop();
   auto joined = join();
   if (!joined)
     EmergencyLog::error("System world thread cleanup failed: {}", outputException(joined.error(), true));
@@ -128,7 +128,7 @@ List<ConnectionId> SystemWorldServerThread::clients() {
 }
 
 std::expected<void, StarException> SystemWorldServerThread::addClient(ConnectionId clientId, Uuid const& uuid, float shipSpeed, SystemLocation const& location) {
-  WriteLocker locker(m_mutex);
+  std::unique_lock locker(m_mutex);
   m_clients.add(clientId);
   m_outgoingPacketQueue.set(clientId, {});
   auto added = m_systemWorld->addClientShip(clientId, uuid, shipSpeed, location);
@@ -150,7 +150,7 @@ std::expected<void, StarException> SystemWorldServerThread::addClient(Connection
 }
 
 std::expected<void, StarException> SystemWorldServerThread::removeClient(ConnectionId clientId) {
-  WriteLocker locker(m_mutex);
+  std::unique_lock locker(m_mutex);
   auto removed = m_systemWorld->removeClientShip(clientId);
   if (!removed)
     return std::unexpected(std::move(removed.error()));
@@ -165,9 +165,17 @@ void SystemWorldServerThread::setPause(std::shared_ptr<const std::atomic<bool>> 
   m_pause = std::move(pause);
 }
 
+std::expected<bool, StarException> SystemWorldServerThread::start() {
+  if (!isJoined())
+    return false;
+  m_stopSource = std::stop_source();
+  return Thread::start();
+}
+
 std::expected<void, StarException> SystemWorldServerThread::run() {
+  auto stopToken = m_stopSource.get_token();
   TickRateApproacher tickApproacher(1.0 / SystemWorldTimestep, 0.5);
-  while (!m_stop) {
+  while (!stopToken.stop_requested()) {
     m_systemWorld->root().logMap().set(strf("system_{}_update_rate", m_systemLocation), strf("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update();
     if (!updated)
@@ -189,12 +197,12 @@ std::expected<void, StarException> SystemWorldServerThread::run() {
 }
 
 void SystemWorldServerThread::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
 }
 
 std::expected<void, StarException> SystemWorldServerThread::update() {
-  WriteLocker queueLocker(m_queueMutex);
-  WriteLocker locker(m_mutex);
+  std::unique_lock queueLocker(m_queueMutex);
+  std::unique_lock locker(m_mutex);
   for (auto const& packet : take(m_incomingPacketQueue)) {
     auto handled = m_systemWorld->handleIncomingPacket(packet.first, packet.second);
     if (!handled)
@@ -249,20 +257,20 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
 }
 
 void SystemWorldServerThread::setClientDestination(ConnectionId clientId, SystemLocation const& destination) {
-  WriteLocker locker(m_queueMutex);
+  std::unique_lock locker(m_queueMutex);
   m_clientShipDestinations.set(clientId, destination);
 }
 
 std::expected<void, StarException> SystemWorldServerThread::executeClientShipAction(ConnectionId clientId, ClientShipAction action) {
   if (!action)
     return std::unexpected(StarException("System client ship action cannot be empty"));
-  WriteLocker locker(m_queueMutex);
+  std::unique_lock locker(m_queueMutex);
   m_clientShipActions.append({clientId, std::move(action)});
   return {};
 }
 
 std::expected<SystemLocation, StarException> SystemWorldServerThread::clientShipLocation(ConnectionId clientId) {
-  ReadLocker locker(m_queueMutex);
+  std::shared_lock locker(m_queueMutex);
   if (m_clientShipDestinations.contains(clientId))
     return SystemLocation{};
   auto location = m_clientShipLocations.get(clientId);
@@ -272,14 +280,14 @@ std::expected<SystemLocation, StarException> SystemWorldServerThread::clientShip
 }
 
 std::optional<std::pair<WarpAction, WarpMode>> SystemWorldServerThread::clientWarpAction(ConnectionId clientId) {
-  ReadLocker locker(m_queueMutex);
+  std::shared_lock locker(m_queueMutex);
   if (m_clientShipDestinations.contains(clientId))
     return {};
   return m_clientWarpActions.maybe(clientId);
 }
 
 std::expected<SkyParameters, StarException> SystemWorldServerThread::clientSkyParameters(ConnectionId clientId) {
-  ReadLocker locker(m_queueMutex);
+  std::shared_lock locker(m_queueMutex);
   auto location = m_clientShipLocations.get(clientId);
   if (!location)
     return std::unexpected(std::move(location.error()));
@@ -295,17 +303,17 @@ void SystemWorldServerThread::setUpdateAction(std::function<std::expected<void, 
 }
 
 void SystemWorldServerThread::pushIncomingPacket(ConnectionId clientId, std::shared_ptr<Packet> packet) {
-  WriteLocker locker(m_queueMutex);
+  std::unique_lock locker(m_queueMutex);
   m_incomingPacketQueue.append({std::move(clientId), std::move(packet)});
 }
 
 List<std::shared_ptr<Packet>> SystemWorldServerThread::pullOutgoingPackets(ConnectionId clientId) {
-  WriteLocker locker(m_queueMutex);
+  std::unique_lock locker(m_queueMutex);
   return take(m_outgoingPacketQueue[clientId]);
 }
 
 std::expected<void, StarException> SystemWorldServerThread::store() {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   auto data = m_systemWorld->diskStore();
   if (!data)
     return std::unexpected(std::move(data.error()));

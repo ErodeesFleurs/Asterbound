@@ -80,7 +80,7 @@ private:
 
   std::reference_wrapper<UniverseServer> m_universe;
   std::unique_ptr<UdpServer> m_queryServer;
-  bool m_stop;
+  std::stop_source m_stopSource{std::nostopstate};
   DataStreamBuffer m_playersResponse;
   DataStreamBuffer m_rulesResponse;
   DataStreamBuffer m_generalResponse;

@@ -115,6 +115,10 @@ All configurations use static mimalloc with `MI_OVERRIDE=OFF`; dependencies must
 
 Lua is fetched with a [version/hash lock](cmake/dependencies/lua.json) and [project patch](cmake/patches/lua-openstarbound.patch); Git is required unless using Nix or prepatched sources.
 
+Thread creation and joining retain a narrow native backend returning `std::expected`: project code disables exceptions, while `std::thread`/`std::jthread` report creation failures by throwing. Mutexes, condition variables and atomic waits use the standard library. The writer-preferring `ReadersWriterMutex` exposes standard locking operations for `std::shared_lock` and `std::unique_lock`; its multiple shared acquisitions by one thread and queued-writer priority are not replaced by `std::shared_mutex`.
+
+Worker cancellation uses `std::stop_source`/`std::stop_token`, with stable tokens for each run and a new cancellation domain only after previous workers have joined. Terminal owners retain one lifetime domain. Stop requests still require explicit condition-variable notification or native I/O shutdown before joining, and derived owners join before destroying borrowed state. `Socket::close()` shuts down under shared ownership before waiting for exclusive descriptor release, so blocking send/receive cannot prevent their own shutdown. Worker pools retain checked startup rollback, queued-work cancellation versus draining, stored-lvalue task invocation and checked result publication.
+
 ### Nix on Linux
 
 Supports x86_64 and ARM64. From the repository root:
@@ -207,6 +211,8 @@ Each native asset-backed CTest invocation runs one process per executable with a
 `ImageProcessingTest.*` covers byte-preserving neutral directives, cached color conversions, replacement thresholds and ordered four-channel blends. Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState` cover catalog errors, sleeve lighting and blueprint state/error boundaries.
 
 Core timing tests use a short real-clock smoke and explicit worker synchronization rather than long per-task sleeps. Lua limit tests retain all three execution entry points and post-error recovery at reduced instruction/recursion scales. Exception tests retain synchronized cold-cache contention while limiting repeated hot-cache reads; FlatHash randomized tests use bounded samples and retain insert, erase, reinsert and lifetime checks.
+
+Threading regressions cover queued-task cancellation, restart/reconfiguration with fresh workers, script-worker restart and duplicate start, writer priority, and closing a real socket during blocking receive. Native readiness wakeups and buffered-packet delivery after close retain their separate coverage.
 
 `fixed_scheduler_tests` exercises deadline pacing, bounded catch-up, clock discontinuities, invalid rates and repeated slow presents without game assets. Asset-backed presentation regressions cover wrapped camera sampling, repeatable entity/animation sampling, tick-owned spawn/removal effects and beam transitions, and cold/warm visual-cache isolation from gameplay randomness.
 

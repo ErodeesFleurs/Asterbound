@@ -253,7 +253,7 @@ std::optional<PacketStats> UniverseConnection::outgoingStats() const {
 }
 
 UniverseConnectionServer::UniverseConnectionServer(Logger& logger, PacketReceiveCallback packetReceiver, std::size_t numWorkerThreads)
-    : m_logger(logger), m_packetReceiver(std::move(packetReceiver)), m_shutdown(false),
+    : m_logger(logger), m_packetReceiver(std::move(packetReceiver)),
       m_numWorkerThreads(numWorkerThreads ? numWorkerThreads : std::max<std::size_t>(2, std::thread::hardware_concurrency() / 4)) {}
 
 std::expected<std::shared_ptr<UniverseConnectionServer>, StarException> UniverseConnectionServer::create(
@@ -274,9 +274,11 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
   m_connections.resize(m_numWorkerThreads);
   m_workerStats.resize(m_numWorkerThreads);
   m_processingThreads.reserve(m_numWorkerThreads);
+  m_stopSource = std::stop_source{};
+  auto stopToken = m_stopSource.get_token();
   for (std::size_t i = 0; i < m_numWorkerThreads; ++i) {
-    auto thread = Thread::invoke(strf("UniverseConnectionServer::worker_{}", i), [&server = *this, i]() -> std::expected<void, StarException> {
-      auto processed = server.processConnections(i);
+    auto thread = Thread::invoke(strf("UniverseConnectionServer::worker_{}", i), [&server = *this, i, stopToken]() -> std::expected<void, StarException> {
+      auto processed = server.processConnections(i, stopToken);
       if (!processed) {
         std::unique_lock connectionsLocker(server.m_connectionsMutex, std::defer_lock);
         lockWithDiagnostics(connectionsLocker);
@@ -288,15 +290,19 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
       }
       return processed;
     });
-    if (!thread)
-      return std::unexpected(std::move(thread.error()));
+    if (!thread) {
+      auto failure = std::move(thread.error());
+      if (auto closed = close(); !closed)
+        failure = failure.withRelated(closed.error(), "Connection worker startup rollback failure");
+      return std::unexpected(std::move(failure));
+    }
     m_processingThreads.append(std::move(*thread));
   }
   return {};
 }
 
-std::expected<void, StarException> UniverseConnectionServer::processConnections(std::size_t i) {
-  while (!m_shutdown) {
+std::expected<void, StarException> UniverseConnectionServer::processConnections(std::size_t i, std::stop_token stopToken) {
+  while (!stopToken.stop_requested()) {
     std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
     lockWithDiagnostics(connectionsLocker);
     auto connections = m_connections[i].pairs();
@@ -357,7 +363,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
     m_workerStats[i].connectionsHandled = handledCount;
     if (!dataTransmitted) {
       std::unique_lock workLocker(m_workMutex);
-      if (!m_shutdown)
+      if (!stopToken.stop_requested())
         m_workCondition.wait_for(workLocker, PacketSocketPollInterval);
     }
   }
@@ -378,8 +384,10 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
   if (m_closed)
     return {};
   {
+    std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
+    lockWithDiagnostics(connectionsLocker);
     std::lock_guard workLocker(m_workMutex);
-    m_shutdown = true;
+    m_stopSource.request_stop();
   }
   m_workCondition.notify_all();
   std::optional<StarException> failure;
@@ -460,7 +468,7 @@ std::expected<std::chrono::time_point<std::chrono::steady_clock, std::chrono::mi
 std::expected<void, StarException> UniverseConnectionServer::addConnection(ConnectionId clientId, UniverseConnection uc) {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
   lockWithDiagnostics(connectionsLocker);
-  if (m_shutdown)
+  if (m_stopSource.stop_requested())
     return std::unexpected(UniverseConnectionException("Cannot add a connection after network shutdown begins"));
   auto& shard = m_connections[clientId % m_numWorkerThreads];
   if (shard.contains(clientId))

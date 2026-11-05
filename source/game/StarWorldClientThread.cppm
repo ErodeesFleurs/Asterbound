@@ -166,7 +166,7 @@ private:
   [[nodiscard]]
   std::expected<void, StarException> update();
   [[nodiscard]]
-  std::expected<void, StarException> runLoop();
+  std::expected<void, StarException> runLoop(std::stop_token stopToken);
 
   mutable std::recursive_mutex m_mutex;
 
@@ -181,7 +181,7 @@ private:
   mutable std::recursive_mutex m_messageMutex;
   List<Message> m_messages;
 
-  std::atomic<bool> m_stop;
+  std::stop_source m_stopSource;
   std::shared_ptr<const std::atomic<bool>> m_pause;
   mutable std::atomic<bool> m_errorOccurred;
   mutable std::atomic<bool> m_shouldExpire;

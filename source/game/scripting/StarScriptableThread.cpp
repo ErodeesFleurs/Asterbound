@@ -23,7 +23,7 @@ namespace Star {
 ScriptableThread::ScriptableThread(Json parameters, String name, LuaBaseComponent& parent)
   : Thread("ScriptableThread: " + name), m_parameters(std::move(parameters)),
     m_name(std::move(name)), m_logMapped(true), m_timestep(1.0f / 60.0f),
-    m_stop(false), m_pause(false), m_errorOccurred(false), m_shouldExpire(false), m_parent(parent) {}
+    m_pause(false), m_errorOccurred(false), m_shouldExpire(false), m_parent(parent) {}
 
 std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread::create(Json parameters, LuaBaseComponent& parent) {
   auto name = parameters.getString("name");
@@ -141,12 +141,16 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
 std::expected<bool, StarException> ScriptableThread::start() {
   if (!isJoined())
     return false;
-  m_stop = false;
-  m_errorOccurred = false;
-  m_shouldExpire = false;
+  {
+    std::scoped_lock locks(m_messageMutex, m_sleepMutex);
+    if (m_stopSource.stop_requested())
+      m_stopSource = std::stop_source{};
+    m_errorOccurred = false;
+    m_shouldExpire = false;
+  }
   auto started = Thread::start();
   if (!started) {
-    m_stop = true;
+    requestStop();
     m_errorOccurred = true;
     if (auto stopped = stop(); !stopped)
       started.error() = started.error().withRelated(stopped.error(), "Error settling failed worker startup");
@@ -155,12 +159,16 @@ std::expected<bool, StarException> ScriptableThread::start() {
   return started;
 }
 
-std::expected<void, StarException> ScriptableThread::stop() {
+void ScriptableThread::requestStop() {
   {
     std::lock_guard lock(m_sleepMutex);
-    m_stop = true;
+    m_stopSource.request_stop();
   }
   m_stopped.notify_one();
+}
+
+std::expected<void, StarException> ScriptableThread::stop() {
+  requestStop();
   auto joined = Thread::join();
   List<Message> messages;
   {
@@ -195,13 +203,14 @@ std::expected<void, StarException> ScriptableThread::passMessage(Message&& messa
   lockWithDiagnostics(locker);
   if (m_errorOccurred)
     return message.promise.fail("Thread failed");
-  if (m_stop || m_shouldExpire)
+  if (m_stopSource.stop_requested() || m_shouldExpire)
     return message.promise.cancel("Thread is stopped").transform([](bool) {});
   m_messages.append(std::move(message));
   return {};
 }
 
 std::expected<void, StarException> ScriptableThread::run() {
+  auto stopToken = m_stopSource.get_token();
   auto result = [&]() -> std::expected<void, StarException> {
     auto scripts = m_parameters.getObject("scripts");
     if (!scripts)
@@ -236,7 +245,7 @@ std::expected<void, StarException> ScriptableThread::run() {
     if (!window)
       return std::unexpected(std::move(window.error()));
     TickRateApproacher approacher(1.0f / m_timestep, *window);
-    while (!m_stop && !m_errorOccurred) {
+    while (!stopToken.stop_requested() && !m_errorOccurred) {
       if (m_logMapped)
         m_luaRoot->root().logMap().set(strf("lua_{}_update", m_name), strf("{:4.2f}Hz", approacher.rate()));
       if (auto updated = update(); !updated)
@@ -246,7 +255,7 @@ std::expected<void, StarException> ScriptableThread::run() {
       std::int64_t spare = std::floor(approacher.spareTime() * 1000);
       if (spare > 0) {
         std::unique_lock lock(m_sleepMutex);
-        m_stopped.wait_for(lock, std::chrono::milliseconds(spare), [&] { return m_stop.load(); });
+        m_stopped.wait_for(lock, std::chrono::milliseconds(spare), [&] { return stopToken.stop_requested(); });
       }
     }
     return {};
@@ -267,7 +276,7 @@ std::expected<void, StarException> ScriptableThread::run() {
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
     lockWithDiagnostics(locker);
-    m_stop = true;
+    requestStop();
     messages = std::move(m_messages);
   }
   for (auto& message : messages) {
@@ -360,7 +369,7 @@ std::expected<void, StarException> ScriptableThread::update() {
 std::expected<LuaCallbacks, StarException> ScriptableThread::makeThreadCallbacks() {
   LuaCallbacks callbacks;
   if (auto result = callbacks.registerCallback("stop", [&self = *this]() {
-    self.m_stop = true;
+    self.requestStop();
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("sendParentMessage", [&self = *this](String const& message, LuaVariadic<Json> args) {

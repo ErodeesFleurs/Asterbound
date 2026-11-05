@@ -36,7 +36,7 @@ ServerRconClient::create(UniverseServer& universe, std::shared_ptr<TcpSocket> so
 
 ServerRconClient::ServerRconClient(UniverseServer& universe, std::shared_ptr<TcpSocket> socket, String password)
     : Thread("RconClient"), m_universe(universe), m_socket(std::move(socket)), m_packetBuffer(MaxPacketSize),
-      m_stop(true), m_authed(false), m_rconPassword(std::move(password)) {
+      m_authed(false), m_rconPassword(std::move(password)) {
   m_packetBuffer.setByteOrder(ByteOrder::LittleEndian);
   m_packetBuffer.setNullTerminatedStrings(true);
 }
@@ -45,6 +45,8 @@ ServerRconClient::~ServerRconClient() {
   stop();
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON client shutdown failed: {}", joined.error().what());
+  if (!isJoined())
+    fatalError("Cannot destroy an RCON client with an unjoined native worker", false);
 }
 
 std::expected<ServerCommandResult, StarException> ServerRconClient::handleCommand(String commandLine) {
@@ -131,17 +133,20 @@ std::expected<void, StarException> ServerRconClient::sendCmdResponse(std::uint32
 }
 
 std::expected<void, StarException> ServerRconClient::start() {
-  m_stop = false;
+  // Do not replace a source until the previous native run has been joined.
+  if (!isJoined())
+    return {};
+  m_stopSource = std::stop_source{};
   auto started = Thread::start();
   if (!started) {
-    m_stop = true;
+    m_stopSource.request_stop();
     return std::unexpected(std::move(started.error()));
   }
   return {};
 }
 
 void ServerRconClient::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
   m_socket->close();
 }
 
@@ -256,7 +261,8 @@ std::expected<void, StarException> ServerRconClient::processRequest() {
 }
 
 std::expected<void, StarException> ServerRconClient::run() {
-  while (!m_stop) {
+  auto stopToken = m_stopSource.get_token();
+  while (!stopToken.stop_requested()) {
     auto request = processRequest();
     if (!request) {
       if (!request.error().is<NoMoreRequests>()) {
@@ -294,16 +300,19 @@ ServerRconThread::create(UniverseServer& universe, HostAddressWithPort const& ad
 }
 
 ServerRconThread::ServerRconThread(UniverseServer& universe, std::unique_ptr<TcpServer> server)
-    : Thread("RconServer"), m_universe(universe), m_rconServer(std::move(server)), m_stop(true) {}
+    : Thread("RconServer"), m_universe(universe), m_rconServer(std::move(server)) {}
 
 ServerRconThread::~ServerRconThread() {
   if (auto stopped = stop(); !stopped)
     EmergencyLog::error("RCON server stop failed: {}", stopped.error().what());
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON server shutdown failed: {}", joined.error().what());
+  if (!isJoined())
+    fatalError("Cannot destroy an RCON server with an unjoined native worker", false);
 }
 
 void ServerRconThread::clearClients(bool all) {
+  std::lock_guard clientsLocker(m_clientsMutex);
   for (auto it = m_clients.begin(); it != m_clients.end();) {
     auto const& pair = *it;
     auto client = pair.second;
@@ -318,24 +327,32 @@ void ServerRconThread::clearClients(bool all) {
 }
 
 std::expected<void, StarException> ServerRconThread::start() {
-  m_stop = false;
+  // Do not replace a source until the previous native run has been joined.
+  if (!isJoined())
+    return {};
+  m_stopSource = std::stop_source{};
   auto started = Thread::start();
   if (!started) {
-    m_stop = true;
+    m_stopSource.request_stop();
     return std::unexpected(std::move(started.error()));
   }
   return {};
 }
 
 std::expected<void, StarException> ServerRconThread::stop() {
-  m_stop = true;
+  {
+    // Serialize the stop transition with accepted-client publication.
+    std::lock_guard clientsLocker(m_clientsMutex);
+    m_stopSource.request_stop();
+  }
   auto stopped = m_rconServer->stop();
   clearClients(true);
   return stopped;
 }
 
 std::expected<void, StarException> ServerRconThread::run() {
-  auto loop = [this]() -> std::expected<void, StarException> {
+  auto stopToken = m_stopSource.get_token();
+  auto loop = [this, stopToken]() -> std::expected<void, StarException> {
     auto configuration = m_universe.get().root().configuration();
     if (!configuration)
       return std::unexpected(std::move(configuration.error()));
@@ -345,12 +362,14 @@ std::expected<void, StarException> ServerRconThread::run() {
     auto timeout = setting->toInt();
     if (!timeout)
       return std::unexpected(std::move(timeout.error()));
-    while (!m_stop) {
+    while (!stopToken.stop_requested()) {
       auto client = m_rconServer->accept(100);
       if (!client)
         return std::unexpected(std::move(client.error()));
       if (!*client)
         continue;
+      if (stopToken.stop_requested())
+        break;
       auto configured = (*client)->setTimeout(*timeout);
       if (!configured)
         return std::unexpected(std::move(configured.error()));
@@ -360,7 +379,12 @@ std::expected<void, StarException> ServerRconThread::run() {
       auto started = (*rconClient)->start();
       if (!started)
         return std::unexpected(std::move(started.error()));
-      m_clients[(*client)->remoteAddress().address()] = std::move(*rconClient);
+      {
+        std::lock_guard clientsLocker(m_clientsMutex);
+        if (stopToken.stop_requested())
+          break;
+        m_clients[(*client)->remoteAddress().address()] = std::move(*rconClient);
+      }
       clearClients();
     }
     return {};

@@ -48,7 +48,7 @@ ServerQueryThread::create(UniverseServer& universe, HostAddressWithPort const& b
 
 ServerQueryThread::ServerQueryThread(UniverseServer& universe, std::unique_ptr<UdpServer> server,
                                      std::uint8_t maxPlayers, String serverName)
-    : Thread("QueryServer"), m_universe(universe), m_queryServer(std::move(server)), m_stop(true),
+    : Thread("QueryServer"), m_universe(universe), m_queryServer(std::move(server)),
       m_playersResponse(A2S_PACKET_SIZE), m_rulesResponse(A2S_PACKET_SIZE), m_generalResponse(A2S_PACKET_SIZE),
       m_serverPort(0), m_maxPlayers(maxPlayers), m_serverName(std::move(serverName)),
       m_lastChallengeCheck(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_lastPlayersResponse(), m_lastRulesResponse(),
@@ -65,21 +65,26 @@ ServerQueryThread::~ServerQueryThread() {
   stop();
   if (auto joined = join(); !joined)
     EmergencyLog::error("Query server shutdown failed: {}", joined.error().what());
+  if (!isJoined())
+    fatalError("Cannot destroy a query server with an unjoined native worker", false);
 }
 
 std::expected<void, StarException> ServerQueryThread::start() {
-  m_stop = false;
+  // A completed but unjoined run still owns its cancellation state.
+  if (!isJoined())
+    return {};
+  m_stopSource = std::stop_source{};
+  m_lastActiveTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto started = Thread::start();
   if (!started) {
-    m_stop = true;
+    m_stopSource.request_stop();
     return std::unexpected(std::move(started.error()));
   }
-  m_lastActiveTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   return {};
 }
 
 void ServerQueryThread::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
   m_queryServer->close();
 }
 
@@ -281,6 +286,7 @@ void ServerQueryThread::pruneChallenges() {
 }
 
 std::expected<void, StarException> ServerQueryThread::run() {
+  auto stopToken = m_stopSource.get_token();
   HostAddressWithPort udpAddress;
   char udpData[MaxUdpData];
   auto report = [this](StarException const& error) -> std::expected<void, StarException> {
@@ -289,7 +295,7 @@ std::expected<void, StarException> ServerQueryThread::run() {
                                                     outputException(ExceptionDiagnostic(error), true));
     return {};
   };
-  while (!m_stop) {
+  while (!stopToken.stop_requested()) {
     auto received = m_queryServer->receive(std::ref(udpAddress), std::span(udpData), 100);
     if (!received) {
       auto logged = report(received.error());

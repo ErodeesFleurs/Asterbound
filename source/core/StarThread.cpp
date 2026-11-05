@@ -13,7 +13,7 @@ void lockWithDiagnostics(std::unique_lock<std::recursive_mutex>& lock) {
 ReadersWriterMutex::ReadersWriterMutex()
   : m_readers(), m_writers(), m_readWaiters(), m_writeWaiters() {}
 
-void ReadersWriterMutex::readLock() {
+void ReadersWriterMutex::lock_shared() {
   std::unique_lock locker(m_mutex);
   if (m_writers || m_writeWaiters) {
     m_readWaiters++;
@@ -24,7 +24,7 @@ void ReadersWriterMutex::readLock() {
   m_readers++;
 }
 
-bool ReadersWriterMutex::tryReadLock() {
+bool ReadersWriterMutex::try_lock_shared() {
   std::lock_guard locker(m_mutex);
   if (m_writers || m_writeWaiters)
     return false;
@@ -32,14 +32,14 @@ bool ReadersWriterMutex::tryReadLock() {
   return true;
 }
 
-void ReadersWriterMutex::readUnlock() {
+void ReadersWriterMutex::unlock_shared() {
   std::lock_guard locker(m_mutex);
   m_readers--;
   if (m_writeWaiters)
     m_writeCond.notify_one();
 }
 
-void ReadersWriterMutex::writeLock() {
+void ReadersWriterMutex::lock() {
   std::unique_lock locker(m_mutex);
   if (m_readers || m_writers) {
     m_writeWaiters++;
@@ -50,7 +50,7 @@ void ReadersWriterMutex::writeLock() {
   m_writers = 1;
 }
 
-bool ReadersWriterMutex::tryWriteLock() {
+bool ReadersWriterMutex::try_lock() {
   std::lock_guard locker(m_mutex);
   if (m_readers || m_writers)
     return false;
@@ -58,71 +58,13 @@ bool ReadersWriterMutex::tryWriteLock() {
   return true;
 }
 
-void ReadersWriterMutex::writeUnlock() {
+void ReadersWriterMutex::unlock() {
   std::lock_guard locker(m_mutex);
   m_writers = 0;
   if (m_writeWaiters)
     m_writeCond.notify_one();
   else if (m_readWaiters)
     m_readCond.notify_all();
-}
-
-ReadLocker::ReadLocker(ReadersWriterMutex& rwlock, bool startLocked) : m_lock(rwlock), m_locked(false) {
-  if (startLocked)
-    lock();
-}
-
-ReadLocker::~ReadLocker() {
-  unlock();
-}
-
-void ReadLocker::unlock() {
-  if (m_locked)
-    m_lock.readUnlock();
-  m_locked = false;
-}
-
-void ReadLocker::lock() {
-  if (!m_locked)
-    m_lock.readLock();
-  m_locked = true;
-}
-
-bool ReadLocker::tryLock() {
-  if (!m_locked) {
-    m_locked = m_lock.tryReadLock();
-    return m_locked;
-  }
-  return true;
-}
-
-WriteLocker::WriteLocker(ReadersWriterMutex& rwlock, bool startLocked) : m_lock(rwlock), m_locked(false) {
-  if (startLocked)
-    lock();
-}
-
-WriteLocker::~WriteLocker() {
-  unlock();
-}
-
-void WriteLocker::unlock() {
-  if (m_locked)
-    m_lock.writeUnlock();
-  m_locked = false;
-}
-
-void WriteLocker::lock() {
-  if (!m_locked)
-    m_lock.writeLock();
-  m_locked = true;
-}
-
-bool WriteLocker::tryLock() {
-  if (!m_locked) {
-    m_locked = m_lock.tryWriteLock();
-    return m_locked;
-  }
-  return true;
 }
 
 }

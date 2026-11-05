@@ -115,25 +115,25 @@ TEST(Thread, UniqueCallableOwnershipAlignmentAndEmptyState) {
 
 TEST(Thread, ReadersWriterMutex) {
   ReadersWriterMutex mutex;
-  ReadLocker rl1(mutex);
-  ReadLocker rl2(mutex);
-  WriteLocker wl(mutex, false);
-  EXPECT_FALSE(wl.tryLock());
+  std::shared_lock rl1(mutex);
+  std::shared_lock rl2(mutex);
+  std::unique_lock wl(mutex, std::defer_lock);
+  EXPECT_FALSE(wl.try_lock());
   rl1.unlock();
-  EXPECT_FALSE(wl.tryLock());
+  EXPECT_FALSE(wl.try_lock());
   rl2.unlock();
-  EXPECT_TRUE(wl.tryLock());
+  EXPECT_TRUE(wl.try_lock());
 }
 
 TEST(Thread, ReadersWriterMutexPrefersQueuedWriter) {
   ReadersWriterMutex mutex;
-  ReadLocker initialReader(mutex);
+  std::shared_lock initialReader(mutex);
   std::latch releaseWriter(1);
   std::atomic<unsigned> order = 0;
   std::atomic<unsigned> writerOrder = 0;
   std::atomic<unsigned> readerOrder = 0;
   std::thread writer([&] {
-    WriteLocker lock(mutex);
+    std::unique_lock lock(mutex);
     writerOrder = ++order;
     releaseWriter.wait();
   });
@@ -143,16 +143,16 @@ TEST(Thread, ReadersWriterMutexPrefersQueuedWriter) {
   bool writerQueued = false;
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
   while ((deadline - std::chrono::steady_clock::now()).count() > 0) {
-    if (!mutex.tryReadLock()) {
+    if (!mutex.try_lock_shared()) {
       writerQueued = true;
       break;
     }
-    mutex.readUnlock();
+    mutex.unlock_shared();
     std::this_thread::yield();
   }
   EXPECT_TRUE(writerQueued);
   std::thread reader([&] {
-    ReadLocker lock(mutex);
+    std::shared_lock lock(mutex);
     readerOrder = ++order;
   });
   initialReader.unlock();

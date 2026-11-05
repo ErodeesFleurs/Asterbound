@@ -197,8 +197,8 @@ std::expected<std::shared_ptr<Voice>, StarException> Voice::create(Root& root, s
   if (!speaker)
     return std::unexpected(std::move(speaker.error()));
   voice->m_clientSpeaker = std::move(*speaker);
-  voice->m_stopThread = false;
-  auto thread = Thread::invoke("Voice::thread", std::mem_fn(&Voice::thread), std::ref(*voice));
+  voice->m_threadStopSource = std::stop_source{};
+  auto thread = Thread::invoke("Voice::thread", std::mem_fn(&Voice::thread), std::ref(*voice), voice->m_threadStopSource.get_token());
   if (!thread)
     return std::unexpected(std::move(thread.error()));
   voice->m_thread = std::move(*thread);
@@ -208,10 +208,10 @@ std::expected<std::shared_ptr<Voice>, StarException> Voice::create(Root& root, s
 Voice::~Voice() {
   // Detach and finish capture callbacks before stopping their consumer.
   closeDevice();
-  m_stopThread = true;
 
   {
     std::lock_guard locker(m_threadMutex);
+    m_threadStopSource.request_stop();
     m_threadCond.notify_all();
   }
 
@@ -786,14 +786,14 @@ bool Voice::playSpeaker(std::shared_ptr<Speaker> const& speaker, int) {
   return true;
 }
 
-std::expected<void, StarException> Voice::thread() {
+std::expected<void, StarException> Voice::thread(std::stop_token stopToken) {
   while (true) {
     std::unique_lock locker(m_threadMutex);
-    if (m_stopThread)
+    if (stopToken.stop_requested())
       return {};
 
     m_threadCond.wait(locker);
-    if (m_stopThread)
+    if (stopToken.stop_requested())
       return {};
 
     {

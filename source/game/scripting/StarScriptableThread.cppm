@@ -51,6 +51,7 @@ protected:
 
 private:
   ScriptableThread(Json parameters, String name, LuaBaseComponent& parent);
+  void requestStop();
   [[nodiscard]] std::expected<void, StarException> update();
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, JsonArray const& args);
 
@@ -70,7 +71,7 @@ private:
   mutable std::recursive_mutex m_messageMutex;
   List<Message> m_messages;
 
-  std::atomic<bool> m_stop;
+  std::stop_source m_stopSource;
   std::atomic<bool> m_pause;
   mutable std::atomic<bool> m_errorOccurred;
   mutable std::atomic<bool> m_shouldExpire;

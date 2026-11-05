@@ -212,7 +212,7 @@ const std::string SECRET_BROADCAST_PUBLIC_KEY = "SecretBroadcastPublicKey";
 const std::string SECRET_BROADCAST_PREFIX = std::string("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
 
 const float WorldClient::DropDist = 6.0f;
-WorldClient::WorldClient(Root& root, UniverseClient& universe) : World(root), m_currentStep(0), m_currentTime(0), m_stopLightingThread(false), m_pendingLightReady(false), m_subWorldId(MainClientWorldId), m_worldDimLevel(0), m_latency(0), m_ambientSounds(root), m_musicTrack(root), m_altMusicTrack(root), m_universe(universe) {}
+WorldClient::WorldClient(Root& root, UniverseClient& universe) : World(root), m_currentStep(0), m_currentTime(0), m_pendingLightReady(false), m_subWorldId(MainClientWorldId), m_worldDimLevel(0), m_latency(0), m_ambientSounds(root), m_musicTrack(root), m_altMusicTrack(root), m_universe(universe) {}
 
 std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe) {
   auto client = std::shared_ptr<WorldClient>(new WorldClient(root, universe));
@@ -394,7 +394,6 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   m_altMusicTrack.setVolume(0, 0, 0);
   m_altMusicActive = false;
   
-  m_stopLightingThread = false;
   m_pendingLightReady = false;
   
   auto result31 = clearWorld();
@@ -508,9 +507,9 @@ WorldClient::~WorldClient() {
 std::expected<void, StarException> WorldClient::close() {
   std::optional<StarException> error;
   if (m_lightingThreadStarted) {
-    m_stopLightingThread = true;
     {
       std::lock_guard locker(m_lightingMutex);
+      m_lightingStopSource.request_stop();
       m_lightingCond.notify_all();
     }
     auto stopped = m_lightingThread.finish();
@@ -1021,7 +1020,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     }
   }
   if (!m_lightingThreadStarted && m_asyncLighting) {
-    auto result45 = Thread::invoke("WorldClient::lightingMain", std::mem_fn(&WorldClient::lightingMain), std::ref(*this));
+    m_lightingStopSource = std::stop_source{};
+    auto result45 = Thread::invoke("WorldClient::lightingMain", std::mem_fn(&WorldClient::lightingMain), std::ref(*this), m_lightingStopSource.get_token());
     if (!result45)
       return std::unexpected(std::move(result45.error()));
     m_lightingThread = (std::move(*result45));
@@ -3320,11 +3320,13 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   return {};
 }
 
-std::expected<void, StarException> WorldClient::lightingMain() {
+std::expected<void, StarException> WorldClient::lightingMain(std::stop_token stopToken) {
   std::unique_lock condLocker(m_lightingMutex);
   while (true) {
+    if (stopToken.stop_requested())
+      return {};
     m_lightingCond.wait(condLocker);
-    if (m_stopLightingThread) {
+    if (stopToken.stop_requested()) {
       return {};
     }
     

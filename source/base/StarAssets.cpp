@@ -998,8 +998,9 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   // The owning factory destroys this object on failure, stopping and joining
   // all workers while their mutexes, Lua engine, and asset sources are alive.
   m_workerThreads.reserve(m_settings.workerPoolSize);
+  m_workerStopSource = std::stop_source{};
   for (unsigned i = 0; i < m_settings.workerPoolSize; ++i) {
-    auto worker = Thread::invoke("Assets::workerMain", std::mem_fn(&Assets::workerMain), std::ref(*this));
+    auto worker = Thread::invoke("Assets::workerMain", std::mem_fn(&Assets::workerMain), std::ref(*this), m_workerStopSource.get_token());
     if (!worker)
       return std::unexpected(std::move(worker.error()));
     m_workerThreads.append(std::move(*worker));
@@ -1065,7 +1066,7 @@ Assets::~Assets() {
 std::expected<void, StarException> Assets::stopWorkers() {
   {
     std::lock_guard locker(m_assetsMutex);
-    m_stopThreads = true;
+    m_workerStopSource.request_stop();
     m_assetsQueued.notify_all();
     m_assetsDone.notify_all();
   }
@@ -1593,7 +1594,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::tryAsse
   std::lock_guard assetsLocker(m_assetsMutex);
   if (m_workerError)
     return std::unexpected(*m_workerError);
-  if (m_stopThreads)
+  if (m_workerStopSource.stop_requested())
     return std::unexpected(AssetException("Asset loading stopped"));
   if (auto error = m_assetErrors.maybeRef(id))
     return std::unexpected(error->get());
@@ -1614,7 +1615,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::getAsse
   while (true) {
     if (m_workerError)
       return std::unexpected(*m_workerError);
-    if (m_stopThreads)
+    if (m_workerStopSource.stop_requested())
       return std::unexpected(AssetException("Asset loading stopped"));
     if (auto error = m_assetErrors.maybeRef(id))
       return std::unexpected(error->get());
@@ -1628,15 +1629,15 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::getAsse
     auto worked = doLoad(id);
     if (!worked)
       return std::unexpected(std::move(worked.error()));
-    if (!*worked && !m_stopThreads)
+    if (!*worked && !m_workerStopSource.stop_requested())
       m_assetsDone.wait(assetsLocker);
   }
 }
 
-std::expected<void, StarException> Assets::workerMain() {
+std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken) {
   while (true) {
     std::unique_lock assetsLocker(m_assetsMutex);
-    if (m_stopThreads)
+    if (stopToken.stop_requested())
       break;
 
     AssetId assetId;
@@ -1668,7 +1669,7 @@ std::expected<void, StarException> Assets::workerMain() {
         if (!collected) {
           if (!m_workerError)
             m_workerError = collected.error();
-          m_stopThreads = true;
+          m_workerStopSource.request_stop();
           m_assetsQueued.notify_all();
           m_assetsDone.notify_all();
           return std::unexpected(std::move(collected.error()));
@@ -1676,7 +1677,7 @@ std::expected<void, StarException> Assets::workerMain() {
       }
       // Queueing and shutdown can happen while the asset mutex is released.
       m_assetsQueued.wait(assetsLocker, [&] {
-        if (m_stopThreads)
+        if (stopToken.stop_requested())
           return true;
         if (m_queue.empty() && m_luaGcPending)
           return true;
@@ -1692,12 +1693,12 @@ std::expected<void, StarException> Assets::workerMain() {
     if (!worked) {
       if (!m_workerError)
         m_workerError = worked.error();
-      m_stopThreads = true;
+      m_workerStopSource.request_stop();
       m_assetsQueued.notify_all();
       m_assetsDone.notify_all();
       return std::unexpected(std::move(worked.error()));
     }
-    if (!*worked && !m_stopThreads) {
+    if (!*worked && !stopToken.stop_requested()) {
       // We are blocking on some sort of busy asset, so need to wait on
       // something to complete here, rather than spinning and burning cpu.
       m_assetsDone.wait(assetsLocker);

@@ -253,7 +253,7 @@ protected:
 private:
   explicit UniverseServer(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize(String const& storageDir, bool const& isLocal);
-  [[nodiscard]] std::expected<void, StarException> runLoop();
+  [[nodiscard]] std::expected<void, StarException> runLoop(std::stop_token stopToken);
   [[nodiscard]] std::expected<void, StarException> shutdown();
   bool m_closed = false;
   bool m_initialized = false;
@@ -401,7 +401,8 @@ private:
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_storageTriggerDeadline;
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_clearBrokenWorldsDeadline;
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastClockUpdateSent;
-  std::atomic<bool> m_stop;
+  // Acceptance can start before the native universe thread; shutdown is terminal.
+  std::stop_source m_stopSource;
   std::atomic<TcpState> m_tcpState;
 
   mutable ReadersWriterMutex m_clientsLock;

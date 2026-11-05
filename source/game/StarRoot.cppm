@@ -248,7 +248,7 @@ private:
   ThreadFunction<void> m_maintenanceThread;
   std::mutex m_maintenanceStopMutex;
   std::condition_variable m_maintenanceStopCondition;
-  bool m_stopMaintenanceThread = false;
+  std::stop_source m_maintenanceStopSource{std::nostopstate};
 
   std::shared_ptr<Assets> m_assets;
   std::mutex m_assetsMutex;

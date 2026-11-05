@@ -32,9 +32,8 @@ public:
 
   Thread(String const& name);
   Thread(Thread&&);
-  // Will not automatically join!  ALL implementations of this class MUST call
-  // join() in their most derived constructors, or not rely on the destructor
-  // joining.
+  // Derived destructors must stop and join while their borrowed state is alive.
+  // Destroying an unjoined thread is a fatal lifetime violation.
   virtual ~Thread();
 
   Thread& operator=(Thread&&);
@@ -43,9 +42,8 @@ public:
   // thread was joined and is now started, false if the thread was not joined.
   [[nodiscard]] std::expected<bool, StarException> start();
 
-  // Wait for a thread to finish and re-join with the thread, on completion
-  // isJoined() will be false.  Returns true if the thread was joinable, and is
-  // now joined, false if the thread was already joined.
+  // Wait for a thread to finish and re-join with it. On success isJoined() is
+  // true. Returns true if joined here, false if the thread was already joined.
   [[nodiscard]] std::expected<bool, StarException> join();
 
   // Returns false when this thread been started without being joined.  This is
@@ -129,16 +127,19 @@ private:
 void lockWithDiagnostics(std::unique_lock<std::recursive_mutex>& lock);
 
 class ReadersWriterMutex {
+  // Writer-preferring shared locking, including multiple read acquisitions by
+  // one thread. Standard guards manage ownership; std::shared_mutex cannot
+  // preserve these scheduling and shared-ownership contracts.
 public:
   ReadersWriterMutex();
 
-  void readLock();
-  bool tryReadLock();
-  void readUnlock();
+  void lock_shared();
+  bool try_lock_shared();
+  void unlock_shared();
 
-  void writeLock();
-  bool tryWriteLock();
-  void writeUnlock();
+  void lock();
+  bool try_lock();
+  void unlock();
 
 private:
   std::mutex m_mutex;
@@ -150,39 +151,6 @@ private:
   unsigned m_writeWaiters;
 };
 
-class ReadLocker {
-public:
-  ReadLocker(ReadersWriterMutex& rwlock, bool startLocked = true);
-  ~ReadLocker();
-
-  ReadLocker(ReadLocker const&) = delete;
-  ReadLocker& operator=(ReadLocker const&) = delete;
-
-  void unlock();
-  void lock();
-  bool tryLock();
-
-private:
-  ReadersWriterMutex& m_lock;
-  bool m_locked;
-};
-
-class WriteLocker {
-public:
-  WriteLocker(ReadersWriterMutex& rwlock, bool startLocked = true);
-  ~WriteLocker();
-
-  WriteLocker(WriteLocker const&) = delete;
-  WriteLocker& operator=(WriteLocker const&) = delete;
-
-  void unlock();
-  void lock();
-  bool tryLock();
-
-private:
-  ReadersWriterMutex& m_lock;
-  bool m_locked;
-};
 
 class SpinLock {
 public:
@@ -301,7 +269,5 @@ export namespace Star {
   class ThreadFunction<void>;
   using ::Star::lockWithDiagnostics;
   using ::Star::ReadersWriterMutex;
-  using ::Star::ReadLocker;
-  using ::Star::WriteLocker;
   using ::Star::SpinLock;
 }

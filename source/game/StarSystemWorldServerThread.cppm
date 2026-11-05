@@ -55,6 +55,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> removeClient(ConnectionId clientId);
 
   void setPause(std::shared_ptr<const std::atomic<bool>> pause);
+  [[nodiscard]] std::expected<bool, StarException> start();
   [[nodiscard]] std::expected<void, StarException> run() override;
   void stop();
 
@@ -80,7 +81,7 @@ private:
   Vec3I m_systemLocation;
   std::shared_ptr<SystemWorldServer> m_systemWorld;
 
-  std::atomic<bool> m_stop{false};
+  std::stop_source m_stopSource{std::nostopstate};
   float m_periodicStorage{300.0f};
   bool m_triggerStorage{ false};
   String m_storageFile;

@@ -48,12 +48,12 @@ struct AssetWorkerTestAccess {
   static std::expected<void, StarException> drain(Assets& assets) {
     std::unique_lock lock(assets.m_assetsMutex);
     if (!assets.m_assetsDone.wait_for(lock, std::chrono::seconds(60), [&] {
-          return assets.m_queue.empty() || assets.m_workerError || assets.m_stopThreads;
+          return assets.m_queue.empty() || assets.m_workerError || assets.m_workerStopSource.stop_requested();
         }))
       return std::unexpected(StarException("Asset queue regression did not drain"));
     if (assets.m_workerError)
       return std::unexpected(*assets.m_workerError);
-    if (assets.m_stopThreads)
+    if (assets.m_workerStopSource.stop_requested())
       return std::unexpected(StarException("Asset queue stopped before draining"));
     return {};
   }

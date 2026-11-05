@@ -161,7 +161,7 @@ WorldClientThread::WorldClientThread(ClientSubWorldId subWorldId, std::shared_pt
   : Thread(strf("WorldClientThread: {}", subWorldId)),
     m_worldClient(std::move(worldClient)),
     m_subWorldId(subWorldId),
-    m_stop(false),
+    m_stopSource(std::nostopstate),
     m_errorOccurred(false),
     m_shouldExpire(false) {}
 
@@ -179,7 +179,9 @@ ClientSubWorldId WorldClientThread::subWorldId() const {
 }
 
 std::expected<void, StarException> WorldClientThread::start() {
-  m_stop = false;
+  if (!isJoined())
+    return {};
+  m_stopSource = std::stop_source();
   m_errorOccurred = false;
   auto started = Thread::start();
   if (!started)
@@ -188,7 +190,7 @@ std::expected<void, StarException> WorldClientThread::start() {
 }
 
 std::expected<void, StarException> WorldClientThread::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
   auto joined = Thread::join();
   auto cleared = clearMessages();
   if (!joined) {
@@ -264,7 +266,7 @@ std::expected<void, StarException> WorldClientThread::clearMessages() {
 }
 
 std::expected<void, StarException> WorldClientThread::run() {
-  auto result = runLoop();
+  auto result = runLoop(m_stopSource.get_token());
   if (!result) {
     auto logged = m_worldClient->root().logger().errorException("WorldClientThread error", ExceptionDiagnostic(result.error()));
     if (!logged)
@@ -283,7 +285,7 @@ std::expected<void, StarException> WorldClientThread::run() {
   return result;
 }
 
-std::expected<void, StarException> WorldClientThread::runLoop() {
+std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token stopToken) {
   auto& root = m_worldClient->root();
   auto assets = root.assets();
   if (!assets)
@@ -296,7 +298,7 @@ std::expected<void, StarException> WorldClientThread::runLoop() {
     return std::unexpected(std::move(updateMeasureWindow.error()));
 
   TickRateApproacher tickApproacher(1.0f / root.timing().timestep, *updateMeasureWindow);
-  while (!m_stop && !m_errorOccurred) {
+  while (!stopToken.stop_requested() && !m_errorOccurred) {
     root.logMap().set(strf("client_{}_update", m_subWorldId), strf("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update();
     if (!updated)

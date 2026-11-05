@@ -348,7 +348,7 @@ private:
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> tryAsset(AssetId const& id) const;
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> getAsset(AssetId const& id) const;
 
-  [[nodiscard]] std::expected<void, StarException> workerMain();
+  [[nodiscard]] std::expected<void, StarException> workerMain(std::stop_token stopToken);
   [[nodiscard]] std::expected<void, StarException> stopWorkers();
 
   // All methods below assume that the asset mutex is locked when calling.
@@ -450,8 +450,8 @@ private:
 
   ByteArray m_digest;
 
-  // Protected by m_assetsMutex; outlives the joining thread handles.
-  bool m_stopThreads = false;
+  // Requests and CV notifications use m_assetsMutex; shared by this worker run.
+  std::stop_source m_workerStopSource{std::nostopstate};
   mutable std::optional<StarException> m_workerError;
   List<ThreadFunction<void>> m_workerThreads;
 };

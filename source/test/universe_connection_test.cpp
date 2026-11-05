@@ -160,8 +160,12 @@ namespace Star {
 // retain their normal settings and expose no test/failure control API.
 struct SocketTestAccess {
   [[nodiscard]] static std::expected<void, StarException> setBufferSize(Socket& socket, int option, int bytes) {
-    ReadLocker locker(socket.m_mutex);
+    std::shared_lock locker(socket.m_mutex);
     return socket.m_impl->setSockOpt(SOL_SOCKET, option, &bytes, sizeof(bytes));
+  }
+  static bool operationHoldsLock(Socket& socket) {
+    std::unique_lock locker(socket.m_mutex, std::try_to_lock);
+    return !locker.owns_lock();
   }
 };
 }
@@ -644,6 +648,50 @@ const GameTestRegistration universeConnectionsTcpCloseWakesNativeReadinessWithou
   EXPECT_LT(std::chrono::steady_clock::now() - before, std::chrono::milliseconds(500));
   EXPECT_EQ(received.wait_for(std::chrono::milliseconds(500)), std::future_status::ready);
   EXPECT_EQ(received.get(), false);
+});
+
+const GameTestRegistration universeConnectionsTcpCloseInterruptsBlockingReceive(
+    "UniverseConnections", "TcpCloseInterruptsBlockingReceive", [](GameTest& fixture) {
+  auto pair = connectionTestTcpPair(fixture.root().logger());
+  ASSERT_TRUE(pair) << pair.error().what();
+  auto [sender, socket] = std::move(*pair);
+  ASSERT_TRUE(socket->setNonBlocking(false));
+  ASSERT_TRUE(socket->setTimeout(5000));
+  std::array<char, 1> buffer{};
+  auto receiveTask = ConnectionTestAsync<std::size_t>::create([&] { return socket->receive(buffer); });
+  ASSERT_TRUE(receiveTask) << receiveTask.error().what();
+  // Peer shutdown is only a failure-cleanup escape hatch, never the wake being
+  // measured. Keep it before the asynchronous receiver's joining destructor.
+  auto cleanup = finally([&] {
+    sender->close();
+    socket->close();
+  });
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  bool receiving = false;
+  while ((deadline - std::chrono::steady_clock::now()).count() > 0) {
+    if (SocketTestAccess::operationHoldsLock(*socket)) {
+      receiving = true;
+      break;
+    }
+    std::this_thread::yield();
+  }
+  EXPECT_TRUE(receiving);
+  if (!receiving)
+    return;
+  auto closeTask = ConnectionTestAsync<void>::create([&]() -> std::expected<void, StarException> {
+    socket->close();
+    return {};
+  });
+  ASSERT_TRUE(closeTask) << closeTask.error().what();
+  EXPECT_EQ((*closeTask)->wait_for(std::chrono::milliseconds(500)), std::future_status::ready);
+  sender->close();
+  EXPECT_TRUE((*closeTask)->get());
+  auto received = (*receiveTask)->get();
+  if (received)
+    EXPECT_EQ(*received, 0u);
+  else
+    EXPECT_TRUE(received.error().is<SocketClosedException>()) << received.error().what();
+  EXPECT_FALSE(socket->isOpen());
 });
 
 const GameTestRegistration universeConnectionsTcpBufferedPacketSurvivesLocalClose(

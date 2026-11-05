@@ -51,12 +51,12 @@ namespace Star {
   }
 
   std::uint32_t BTreeDatabase::blockSize() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_blockSize;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setBlockSize(std::uint32_t blockSize) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto result296 = checkIfOpen("setBlockSize", false);
     if (!result296) return std::unexpected(std::move(result296.error()));
 
@@ -65,12 +65,12 @@ namespace Star {
   }
 
   std::uint32_t BTreeDatabase::keySize() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_keySize;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setKeySize(std::uint32_t keySize) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto result295 = checkIfOpen("setKeySize", false);
     if (!result295) return std::unexpected(std::move(result295.error()));
 
@@ -79,12 +79,12 @@ namespace Star {
   }
 
   String BTreeDatabase::contentIdentifier() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_contentIdentifier;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setContentIdentifier(String contentIdentifier) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto result294 = checkIfOpen("setContentIdentifier", false);
     if (!result294) return std::unexpected(std::move(result294.error()));
 
@@ -103,12 +103,12 @@ namespace Star {
   }
 
   bool BTreeDatabase::autoCommit() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_autoCommit;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setAutoCommit(bool autoCommit) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     m_autoCommit = autoCommit;
     if (m_autoCommit)
       return doCommit();
@@ -116,12 +116,12 @@ namespace Star {
   }
 
   std::shared_ptr<IODevice> BTreeDatabase::ioDevice() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_device;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setIODevice(std::shared_ptr<IODevice> device) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto result292 = checkIfOpen("setIODevice", false);
     if (!result292) return std::unexpected(std::move(result292.error()));
 
@@ -130,12 +130,12 @@ namespace Star {
   }
 
   bool BTreeDatabase::isOpen() const {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     return m_open;
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::open() {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     if (m_open) {
       return false;
     }
@@ -278,7 +278,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::contains(ByteArray const& k) {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto keyChecked = checkKeySize(k); !keyChecked)
       return std::unexpected(std::move(keyChecked.error()));
 
@@ -286,7 +286,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::optional<ByteArray>, StarException> BTreeDatabase::find(ByteArray const& k) {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto keyChecked = checkKeySize(k); !keyChecked)
       return std::unexpected(std::move(keyChecked.error()));
 
@@ -294,7 +294,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<List<std::pair<ByteArray, ByteArray>>, StarException> BTreeDatabase::find(ByteArray const& lower, ByteArray const& upper) {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto lowerKeyChecked = checkKeySize(lower); !lowerKeyChecked)
       return std::unexpected(std::move(lowerKeyChecked.error()));
 
@@ -308,7 +308,7 @@ namespace Star {
     if (!v) {
       return std::unexpected(DBException("Missing database visitor"));
     }
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto lowerKeyChecked = checkKeySize(lower); !lowerKeyChecked)
       return std::unexpected(std::move(lowerKeyChecked.error()));
 
@@ -322,7 +322,7 @@ namespace Star {
     if (!v) {
       return std::unexpected(DBException("Missing database visitor"));
     }
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto stateChecked = checkIfOpen("forAll", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
@@ -333,7 +333,7 @@ namespace Star {
     if (!v || !e) {
       return std::unexpected(DBException("Missing database recovery callback"));
     }
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto stateChecked = checkIfOpen("recoverAll", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
@@ -341,7 +341,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::insert(ByteArray const& k, ByteArray const& data) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto keyChecked = checkKeySize(k);
     if (!keyChecked) return std::unexpected(std::move(keyChecked.error()));
     auto modified = m_impl.insert(k, data);
@@ -354,7 +354,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::remove(ByteArray const& k) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto keyChecked = checkKeySize(k);
     if (!keyChecked) return std::unexpected(std::move(keyChecked.error()));
     auto modified = m_impl.remove(k);
@@ -380,7 +380,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint64_t, StarException> BTreeDatabase::recordCount() {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     if (auto stateChecked = checkIfOpen("recordCount", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
@@ -388,7 +388,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint8_t, StarException> BTreeDatabase::indexLevels() {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     auto result269 = checkIfOpen("indexLevels", true);
     if (!result269) return std::unexpected(std::move(result269.error()));
 
@@ -398,7 +398,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::totalBlockCount() {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     auto result267 = checkIfOpen("totalBlockCount", true);
     if (!result267) return std::unexpected(std::move(result267.error()));
 
@@ -408,7 +408,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::freeBlockCount() {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     auto result264 = checkIfOpen("freeBlockCount", true);
     if (!result264) return std::unexpected(std::move(result264.error()));
 
@@ -436,7 +436,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::indexBlockCount() {
-    ReadLocker readLocker(m_lock);
+    std::shared_lock readLocker(m_lock);
     auto result262 = checkIfOpen("indexBlockCount", true);
     if (!result262) return std::unexpected(std::move(result262.error()));
 
@@ -447,7 +447,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::leafBlockCount() {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto result260 = checkIfOpen("leafBlockCount", true);
     if (!result260) return std::unexpected(std::move(result260.error()));
 
@@ -475,12 +475,12 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::commit() {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     return doCommit();
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::rollback() {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     auto stateChecked = checkIfOpen("rollback", true);
     if (!stateChecked) return std::unexpected(std::move(stateChecked.error()));
 
@@ -498,7 +498,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::close(bool closeDevice) {
-    WriteLocker writeLocker(m_lock);
+    std::unique_lock writeLocker(m_lock);
     if (m_open) {
 
       auto flattened = tryFlatten();

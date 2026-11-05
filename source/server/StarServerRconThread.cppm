@@ -57,7 +57,7 @@ private:
   std::reference_wrapper<UniverseServer> m_universe;
   std::shared_ptr<TcpSocket> m_socket;
   DataStreamBuffer m_packetBuffer;
-  bool m_stop;
+  std::stop_source m_stopSource{std::nostopstate};
   bool m_authed;
   String m_rconPassword;
 
@@ -81,7 +81,8 @@ private:
 
   std::reference_wrapper<UniverseServer> m_universe;
   std::unique_ptr<TcpServer> m_rconServer;
-  bool m_stop;
+  std::stop_source m_stopSource{std::nostopstate};
+  std::mutex m_clientsMutex;
   HashMap<HostAddress, std::shared_ptr<ServerRconClient>> m_clients;
 };
 

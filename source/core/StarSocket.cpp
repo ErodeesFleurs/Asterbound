@@ -37,7 +37,7 @@ std::expected<std::optional<SocketPollResult>, StarException> Socket::poll(Socke
     return std::nullopt;
 
   // Prevent close from being called on any socket during this call.
-  LinkedList<ReadLocker> readLockers;
+  LinkedList<std::shared_lock<ReadersWriterMutex>> readLockers;
   for (auto const& p : query)
     readLockers.emplaceAppend(p.first->m_mutex);
 
@@ -137,7 +137,7 @@ std::expected<std::optional<SocketPollResult>, StarException> Socket::poll(Socke
 }
 
 std::expected<void, StarException> Socket::waitForData(bool writable, std::chrono::steady_clock::time_point deadline) const {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (!isActive())
     return {};
   auto impl = m_impl;
@@ -192,7 +192,7 @@ Socket::~Socket() {
 }
 
 std::expected<void, StarException> Socket::bind(Logger& logger, HostAddressWithPort const& addressWithPort) {
-  WriteLocker locker(m_mutex);
+  std::unique_lock locker(m_mutex);
   if (auto status = checkOpen("Socket::bind"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -226,7 +226,7 @@ std::expected<void, StarException> Socket::bind(Logger& logger, HostAddressWithP
 }
 
 std::expected<void, StarException> Socket::listen(int backlog) {
-  WriteLocker locker(m_mutex);
+  std::unique_lock locker(m_mutex);
   if (auto status = checkOpen("Socket::listen"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -236,7 +236,7 @@ std::expected<void, StarException> Socket::listen(int backlog) {
 }
 
 std::expected<void, StarException> Socket::setTimeout(unsigned timeout) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("Socket::setTimeout"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -259,7 +259,7 @@ std::expected<void, StarException> Socket::setTimeout(unsigned timeout) {
 }
 
 std::expected<void, StarException> Socket::setNonBlocking(bool nonBlocking) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("Socket::setNonBlocking"); !status)
     return std::unexpected(std::move(status.error()));
 #ifdef WIN32
@@ -278,12 +278,12 @@ std::expected<void, StarException> Socket::setNonBlocking(bool nonBlocking) {
 }
 
 NetworkMode Socket::networkMode() const {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   return m_networkMode;
 }
 
 SocketMode Socket::socketMode() const {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   return m_socketMode;
 }
 
@@ -296,13 +296,18 @@ bool Socket::isOpen() const {
 }
 
 void Socket::shutdown() {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   doShutdown();
 }
 
 void Socket::close() {
-  WriteLocker locker(m_mutex);
-  doShutdown();
+  {
+    // Blocking send/recv retain shared ownership. Wake them before waiting for
+    // exclusive ownership to release the descriptor.
+    std::shared_lock locker(m_mutex);
+    doShutdown();
+  }
+  std::unique_lock locker(m_mutex);
   doClose();
 }
 

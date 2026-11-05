@@ -378,7 +378,7 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> lightingTileGather();
   [[nodiscard]] std::expected<void, StarException> lightingCalc();
-  [[nodiscard]] std::expected<void, StarException> lightingMain();
+  [[nodiscard]] std::expected<void, StarException> lightingMain(std::stop_token stopToken);
 
   [[nodiscard]] std::expected<void, StarException> initWorld(WorldStartPacket const& packet);
   [[nodiscard]] std::expected<void, StarException> initializeWorld(WorldStartPacket const& packet);
@@ -448,7 +448,7 @@ private:
   
   std::mutex m_lightingMutex;
   std::condition_variable m_lightingCond;
-  std::atomic<bool> m_stopLightingThread;
+  std::stop_source m_lightingStopSource{std::nostopstate};
 
   std::mutex m_lightMapPrepMutex;
   std::mutex m_lightMapMutex;

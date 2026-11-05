@@ -169,7 +169,7 @@ WorldServerThread::WorldServerThread(std::shared_ptr<WorldServer> server, WorldI
     m_worldServer(std::move(server)),
     m_worldId(std::move(worldId)),
     m_worldName(std::move(worldName)),
-    m_stop(false),
+    m_stopSource(std::nostopstate),
     m_errorOccurred(false),
     m_shouldExpire(true) {
   m_worldServer->setWorldId(m_worldName);
@@ -195,7 +195,9 @@ WorldId WorldServerThread::worldId() const {
 }
 
 std::expected<void, StarException> WorldServerThread::start() {
-  m_stop = false;
+  if (!isJoined())
+    return {};
+  m_stopSource = std::stop_source();
   m_errorOccurred = false;
   auto started = Thread::start();
   if (!started)
@@ -204,7 +206,7 @@ std::expected<void, StarException> WorldServerThread::start() {
 }
 
 std::expected<void, StarException> WorldServerThread::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
   auto joined = Thread::join();
   if (!joined)
     return std::unexpected(std::move(joined.error()));
@@ -463,7 +465,7 @@ std::expected<void, StarException> WorldServerThread::drainMessages() {
 }
 
 std::expected<void, StarException> WorldServerThread::run() {
-  auto result = runLoop();
+  auto result = runLoop(m_stopSource.get_token());
   if (!result) {
     auto logged = recordError(result.error());
     if (!logged)
@@ -483,7 +485,7 @@ std::expected<void, StarException> WorldServerThread::run() {
   return result;
 }
 
-std::expected<void, StarException> WorldServerThread::runLoop() {
+std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token stopToken) {
   auto& root = m_worldServer->root();
   auto assets = root.assets();
   if (!assets)
@@ -529,7 +531,7 @@ std::expected<void, StarException> WorldServerThread::runLoop() {
   TickRateApproacher tickApproacher(1.0f / root.timing().serverTimestep, *updateMeasureWindow);
   double fidelityScore = 0.0;
   WorldServerFidelity automaticFidelity = WorldServerFidelity::Medium;
-  while (!m_stop && !m_errorOccurred) {
+  while (!stopToken.stop_requested() && !m_errorOccurred) {
     auto fidelity = lockedFidelity.value_or(automaticFidelity);
     auto fidelityName = WorldServerFidelityNames->getRight(fidelity);
     if (!fidelityName)

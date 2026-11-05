@@ -161,7 +161,7 @@ namespace Star {
 UniverseServer::UniverseServer(Root& root)
   : Thread("UniverseServer"), m_root(root), m_isLocal(false),
     m_workerPool("UniverseServerWorkerPool"), m_storageTriggerDeadline(), m_clearBrokenWorldsDeadline(),
-    m_lastClockUpdateSent(), m_stop(false), m_tcpState(TcpState::No),
+    m_lastClockUpdateSent(), m_tcpState(TcpState::No),
     m_maxPlayers(0), m_secureWarps(true) {}
 
 std::expected<std::shared_ptr<UniverseServer>, StarException> UniverseServer::create(Root& root, String const& storageDir, bool const& isLocal) {
@@ -320,7 +320,7 @@ UniverseServer::~UniverseServer() {
 std::expected<void, StarException> UniverseServer::close() {
   if (m_closed)
     return {};
-  m_stop = true;
+  m_stopSource.request_stop();
   auto joined = join();
   // A failed native join still owns a running runLoop/shutdown: do not race it.
   if (!joined && !isJoined())
@@ -344,7 +344,7 @@ void UniverseServer::setListeningTcp(bool listenTcp) {
 std::expected<void, StarException> UniverseServer::addClient(UniverseConnection remoteConnection) {
   std::unique_lock acceptThreadsLocker(m_connectionAcceptThreadsMutex, std::defer_lock);
   lockWithDiagnostics(acceptThreadsLocker);
-  if (m_stop)
+  if (m_stopSource.stop_requested())
     return std::unexpected(UniverseServerException("Cannot accept a connection while the universe is stopping"));
   auto thread = Thread::invoke("UniverseServer::acceptConnection", [&universe = *this, conn = std::move(remoteConnection)]() mutable {
     return universe.acceptConnection(std::move(conn), {});
@@ -363,7 +363,7 @@ std::expected<UniverseConnection, StarException> UniverseServer::addLocalClient(
 }
 
 std::expected<void, StarException> UniverseServer::stop() {
-  m_stop = true;
+  m_stopSource.request_stop();
   auto joined = join();
   if (!joined)
     return std::unexpected(std::move(joined.error()));
@@ -371,7 +371,7 @@ std::expected<void, StarException> UniverseServer::stop() {
 }
 
 std::expected<void, StarException> UniverseServer::setPause(bool pause) {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   // Pausing is disabled for multiplayer
   if (m_clients.size() > 1)
     pause = false;
@@ -413,7 +413,7 @@ std::expected<void, StarException> UniverseServer::setPause(bool pause) {
 }
 
 std::expected<void, StarException> UniverseServer::setTimescale(float timescale) {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   m_root.timing().timescale = timescale;
   for (auto& p : m_clients) {
     if (auto result = m_connectionServer->sendPackets(p.first, {std::make_shared<PausePacket>(*m_pause, m_root.timing().timescale)}); !result)
@@ -439,13 +439,13 @@ bool UniverseServer::isWorldActive(WorldId const& worldId) const {
 }
 
 List<ConnectionId> UniverseServer::clientIds() const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   return m_clients.keys();
 }
 
 std::expected<List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>>, StarException> UniverseServer::clientIdsAndCreationTime() const {
   List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> result;
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   result.reserve(m_clients.size());
   for (auto& pair : m_clients)
     result.emplaceAppend(pair.first, pair.second->creationTime());
@@ -453,7 +453,7 @@ std::expected<List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::
 }
 
 std::size_t UniverseServer::numberOfClients() const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   return m_clients.size();
 }
 
@@ -462,12 +462,12 @@ std::uint32_t UniverseServer::maxClients() const {
 }
 
 bool UniverseServer::isConnectedClient(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   return m_clients.contains(clientId);
 }
 
 std::expected<String, StarException> UniverseServer::clientDescriptor(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->descriptiveName();
   else
@@ -475,7 +475,7 @@ std::expected<String, StarException> UniverseServer::clientDescriptor(Connection
 }
 
 std::expected<unsigned, StarException> UniverseServer::clientConnectionVersion(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->netRules().version();
   else
@@ -491,7 +491,7 @@ std::optional<ConnectionId> UniverseServer::findNick(String const& nick) const {
 }
 
 std::expected<String, StarException> UniverseServer::clientAccount(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId)) {
     if (!clientContext->account().empty())
       return clientContext->account();
@@ -501,14 +501,14 @@ std::expected<String, StarException> UniverseServer::clientAccount(ConnectionId 
 
 
 std::optional<Uuid> UniverseServer::uuidForClient(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->playerUuid();
   return {};
 }
 
 std::optional<ConnectionId> UniverseServer::clientForUuid(Uuid const& uuid) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   return getClientForUuid(uuid);
 }
 
@@ -528,49 +528,49 @@ std::expected<ServerCommandResult, StarException> UniverseServer::adminCommand(S
 }
 
 std::expected<bool, StarException> UniverseServer::isAdmin(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->isAdmin();
   return false;
 }
 
 std::expected<bool, StarException> UniverseServer::canBecomeAdmin(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->canBecomeAdmin();
   return false;
 }
 
 std::expected<void, StarException> UniverseServer::setAdmin(ConnectionId clientId, bool admin) {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     clientContext->setAdmin(admin);
   return {};
 }
 
 std::expected<bool, StarException> UniverseServer::serverDebug(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->serverDebug();
   return false;
 }
 
 std::expected<void, StarException> UniverseServer::setServerDebug(ConnectionId clientId, bool serverDebug) {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     clientContext->setServerDebug(serverDebug);
   return {};
 }
 
 std::expected<bool, StarException> UniverseServer::isLocal(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return !clientContext->remoteAddress();
   return false;
 }
 
 std::expected<bool, StarException> UniverseServer::isPvp(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->team().type == TeamType::PVP;
   return false;
@@ -579,7 +579,7 @@ std::expected<bool, StarException> UniverseServer::isPvp(ConnectionId clientId) 
 std::expected<void, StarException> UniverseServer::setPvp(ConnectionId clientId, bool pvp) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId)) {
     if (pvp) {
       TeamNumber pvpTeam = m_teamManager->getPvpTeam(clientContext->playerUuid());
@@ -610,7 +610,7 @@ std::expected<void, StarException> UniverseServer::clientWarpPlayer(ConnectionId
 std::expected<void, StarException> UniverseServer::clientFlyShip(ConnectionId clientId, Vec3I const& system, SystemLocation const& location, Json const& settings) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   if (m_pendingFlights.contains(clientId) || m_queuedFlights.contains(clientId))
     return {};
@@ -651,14 +651,14 @@ std::expected<void, StarException> UniverseServer::clientFlyShip(ConnectionId cl
 std::expected<WorldId, StarException> UniverseServer::clientWorld(ConnectionId clientId) const {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->playerWorldId();
   return WorldId();
 }
 
 std::expected<CelestialCoordinate, StarException> UniverseServer::clientShipCoordinate(ConnectionId clientId) const {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId))
     return clientContext->shipCoordinate();
   return CelestialCoordinate();
@@ -679,7 +679,7 @@ std::shared_ptr<CelestialDatabase> UniverseServer::celestialDatabase() {
 std::expected<bool, StarException> UniverseServer::executeForClient(ConnectionId clientId, std::function<std::expected<void, StarException>(WorldServer&, std::shared_ptr<Player>)> action) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   bool success = false;
   if (auto clientContext = m_clients.value(clientId)) {
     if (auto currentWorld = clientContext->playerWorld()) {
@@ -827,7 +827,7 @@ std::expected<bool, StarException> UniverseServer::updatePlanetType(CelestialCoo
   (*parameters)->setVisitableParameters(replacement);
   if (auto updated = m_celestialDatabase->updateParameters(coordinate, **parameters); !updated)
     return std::unexpected(std::move(updated.error()));
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto clientId : m_clients | std::views::keys) {
     if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<PlanetTypeUpdatePacket>(coordinate)}); !sent)
       return std::unexpected(std::move(sent.error()));
@@ -888,7 +888,7 @@ std::expected<StringList, StarException> UniverseServer::weatherList(CelestialCo
 std::expected<bool, StarException> UniverseServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> packet) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (!m_clients.contains(clientId))
     return false;
   clientsLocker.unlock();
@@ -898,7 +898,7 @@ std::expected<bool, StarException> UniverseServer::sendPacket(ConnectionId clien
 }
 
 std::expected<void, StarException> UniverseServer::run() {
-  auto result = runLoop();
+  auto result = runLoop(m_stopSource.get_token());
   auto stopped = shutdown();
   if (!result) {
     if (!stopped)
@@ -908,7 +908,7 @@ std::expected<void, StarException> UniverseServer::run() {
   return stopped;
 }
 
-std::expected<void, StarException> UniverseServer::runLoop() {
+std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopToken) {
   if (auto result = m_root.logger().info("UniverseServer: Starting UniverseServer with UUID: {}", m_universeSettings->uuid().hex()); !result)
     return std::unexpected(std::move(result.error()));
   auto assetsResult = m_root.assets();
@@ -922,7 +922,7 @@ std::expected<void, StarException> UniverseServer::runLoop() {
   if (!interval)
     return std::unexpected(std::move(interval.error()));
 
-  while (!m_stop) {
+  while (!stopToken.stop_requested()) {
     if (m_tcpState == TcpState::Yes && !m_tcpServer) {
       auto setup = [&]() -> std::expected<void, StarException> {
         auto configuration = m_root.configuration();
@@ -955,10 +955,10 @@ std::expected<void, StarException> UniverseServer::runLoop() {
         if (!server)
           return std::unexpected(std::move(server.error()));
         m_tcpServer = std::move(*server);
-        return m_tcpServer->setAcceptCallback([&universe = *this, maxPendingConnections = *pending](std::shared_ptr<TcpSocket> socket) -> std::expected<void, StarException> {
+        return m_tcpServer->setAcceptCallback([&universe = *this, maxPendingConnections = *pending, stopToken](std::shared_ptr<TcpSocket> socket) -> std::expected<void, StarException> {
           std::unique_lock acceptThreadsLocker(universe.m_connectionAcceptThreadsMutex, std::defer_lock);
           lockWithDiagnostics(acceptThreadsLocker);
-          if (universe.m_stop)
+          if (stopToken.stop_requested())
             return {};
           if (universe.m_connectionAcceptThreads.size() >= maxPendingConnections)
             return universe.m_root.logger().warn("UniverseServer: maximum pending connections, dropping connection from: {}", socket->remoteAddress().address());
@@ -1091,7 +1091,7 @@ bool UniverseServer::shutdownThreadsJoined() const {
 }
 
 std::expected<void, StarException> UniverseServer::shutdown() {
-  m_stop = true;
+  m_stopSource.request_stop();
   std::optional<StarException> error;
   auto record = [&](auto&& result) {
     if (!result) {
@@ -1279,7 +1279,7 @@ std::expected<std::shared_ptr<WorldServerThread>, StarException> UniverseServer:
 std::expected<void, StarException> UniverseServer::processUniverseFlags() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto actions = m_universeSettings->pullPendingFlagActions()) {
     for (auto const& action : *actions) {
       if (std::holds_alternative<PlaceDungeonFlagAction>(action)) {
@@ -1332,7 +1332,7 @@ std::expected<void, StarException> UniverseServer::processUniverseFlags() {
 std::expected<void, StarException> UniverseServer::sendPendingChat() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto const& client : m_clients) {
     if (m_disconnectingClients.contains(client.first))
       continue;
@@ -1354,7 +1354,7 @@ std::expected<void, StarException> UniverseServer::sendPendingChat() {
 std::expected<void, StarException> UniverseServer::updateTeams() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   StringMap<List<Uuid>> connectedPlayers;
   auto teams = m_teamManager->getPvpTeams();
@@ -1388,7 +1388,7 @@ std::expected<void, StarException> UniverseServer::updateTeams() {
 std::expected<void, StarException> UniverseServer::updateShips() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto const& entry : m_clients) {
     if (m_disconnectingClients.contains(entry.first))
       continue;
@@ -1478,7 +1478,7 @@ std::expected<void, StarException> UniverseServer::updateShips() {
 std::expected<void, StarException> UniverseServer::sendClockUpdates() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
@@ -1514,7 +1514,7 @@ std::expected<void, StarException> UniverseServer::sendClientContextUpdate(std::
 std::expected<void, StarException> UniverseServer::sendClientContextUpdates() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   HashMap<ConnectionId, ByteArray> contextUpdates;
   for (auto const& p : m_clients) {
@@ -1594,7 +1594,7 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
     if (auto disconnected = doDisconnection(connection.first, connection.second); !disconnected)
       return std::unexpected(std::move(disconnected.error()));
   }
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto clientId : m_clients.keys()) {
     auto client = m_clients.value(clientId);
     std::expected<bool, StarException> open = false;
@@ -1674,7 +1674,7 @@ std::expected<void, StarException> UniverseServer::processPlanetTypeChanges() {
 std::expected<void, StarException> UniverseServer::warpPlayers() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   for (auto const& clientId : m_pendingPlayerWarps.keys()) {
     auto warpEntry = m_pendingPlayerWarps.get(clientId);
@@ -1880,7 +1880,7 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
 std::expected<void, StarException> UniverseServer::flyShips() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   auto assets = m_root.assets();
   if (!assets)
@@ -2002,7 +2002,7 @@ std::expected<void, StarException> UniverseServer::flyShips() {
 std::expected<void, StarException> UniverseServer::arriveShips() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   for (auto it = m_pendingArrivals.begin(); it != m_pendingArrivals.end();) {
     auto process = [&]() -> std::expected<bool, StarException> {
@@ -2092,7 +2092,7 @@ std::expected<void, StarException> UniverseServer::arriveShips() {
 std::expected<void, StarException> UniverseServer::respondToCelestialRequests() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto& entry : m_pendingCelestialRequests) {
     List<CelestialResponse> responses;
     for (auto it = entry.second.begin(); it != entry.second.end();) {
@@ -2121,7 +2121,7 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
 std::expected<void, StarException> UniverseServer::processChat() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   
   for (auto const& p : take(m_pendingChat)) {
     auto context = m_clients.get(p.first);
@@ -2192,7 +2192,7 @@ std::expected<void, StarException> UniverseServer::clearBrokenWorlds() {
 std::expected<void, StarException> UniverseServer::handleWorldMessages() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   for (auto it = m_pendingWorldMessages.begin(); it != m_pendingWorldMessages.end();) {
     auto created = triggerWorldCreation(it->first);
     if (!created)
@@ -2223,7 +2223,7 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
   for (auto const& uuid : m_universeMessagePromises.keys()) {
     auto& entry = m_universeMessagePromises[uuid];
     {
-      ReadLocker clientsLocker(m_clientsLock);
+      std::shared_lock clientsLocker(m_clientsLock);
       if (!m_clients.value(entry.first)) {
         m_universeMessagePromises.remove(uuid);
         continue;
@@ -2304,7 +2304,7 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
 std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   // Shutdown idle and errored worlds.
   for (auto const& worldId : m_worlds.keys()) {
@@ -2451,9 +2451,9 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
             m_tempWorldIndex[instanceWorldId].first = m_universeClock->milliseconds();
         }
       }
-      clientsLocker.unlock();
     }
   }
+  clientsLocker.unlock();
 
   // A queued warp is not a completed departure: warpPlayers() must first
   // remove the client and send its GiveItem/WorldStop (and other final) packets.
@@ -2520,7 +2520,7 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
 std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) < m_storageTriggerDeadline)
     return {};
   if (auto logged = m_root.logger().debug("UniverseServer: periodic sync to disk"); !logged)
@@ -2946,7 +2946,7 @@ std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser
 std::expected<void, StarException> UniverseServer::doTempBan(ConnectionId clientId, String const& reason, std::pair<bool, bool> banType, int timeout) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   if (auto clientContext = m_clients.value(clientId)) {
     if (!clientContext->remoteAddress())
@@ -2970,7 +2970,7 @@ std::expected<void, StarException> UniverseServer::doTempBan(ConnectionId client
 std::expected<void, StarException> UniverseServer::doPermBan(ConnectionId clientId, String const& reason, std::pair<bool, bool> banType) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
 
   if (auto clientContext = m_clients.value(clientId)) {
     if (!clientContext->remoteAddress())
@@ -3053,7 +3053,7 @@ std::expected<void, StarException> UniverseServer::systemWorldUpdated(SystemWorl
 }
 
 std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConnectionServer&, ConnectionId clientId, List<std::shared_ptr<Packet>> packets) {
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   if (auto clientContext = m_clients.value(clientId); clientContext && !m_disconnectingClients.contains(clientId)) {
     clientsLocker.unlock();
 
@@ -3276,6 +3276,7 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
                 return std::unexpected(std::move(sent.error()));
             }
           } else {
+            clientsLocker.unlock();
             if (auto sent = m_connectionServer->sendPackets(
                   clientId,
                   {std::make_shared<UniverseMessageResponse>(std::unexpected(String("Client does not exist")),
@@ -3570,7 +3571,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     socket->get().setNetRules(rules);
     if (auto logged = m_root.logger().log(LogLevel::Info, connectionLog.utf8()); !logged)
       return std::unexpected(std::move(logged.error()));
-    WriteLocker clientsLocker(m_clientsLock);
+    std::unique_lock clientsLocker(m_clientsLock);
     if (auto clash = getClientForUuid(connect->playerUuid)) {
       if (!administrator)
         return fail("Duplicate player UUID");
@@ -3730,10 +3731,10 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       return std::unexpected(std::move(flown.error()));
     if (auto logged = m_root.logger().info("UniverseServer: Client {} connected", client->descriptiveName()); !logged)
       return std::unexpected(std::move(logged.error()));
-    ReadLocker clientsReadLocker(m_clientsLock);
+    std::shared_lock clientsReadGuard(m_clientsLock);
     auto players = static_cast<std::uint16_t>(m_clients.size());
     auto clients = m_clients.keys();
-    clientsReadLocker.unlock();
+    clientsReadGuard.unlock();
     for (auto id : clients) {
       if (auto sent = m_connectionServer->sendPackets(id, {std::make_shared<ServerInfoPacket>(players, static_cast<std::uint16_t>(m_maxPlayers))}); !sent)
         return std::unexpected(std::move(sent.error()));
@@ -3867,7 +3868,7 @@ std::expected<bool, StarException> UniverseServer::canWarpToShip(ConnectionId cl
 std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId clientId, String const& reason) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  WriteLocker clientsLocker(m_clientsLock);
+  std::unique_lock clientsLocker(m_clientsLock);
   auto client = m_clients.value(clientId);
   if (!client)
     return {};
@@ -4710,7 +4711,7 @@ std::expected<void, StarException> UniverseServer::notifyWorldCreated(WorldId co
   auto configuration = m_root.configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
-  ReadLocker clientsLocker(m_clientsLock);
+  std::shared_lock clientsLocker(m_clientsLock);
   auto allJson = (*configuration)->get("notifyClientsOnWorldCreate");
   if (!allJson)
     return std::unexpected(std::move(allJson.error()));
@@ -4929,7 +4930,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
       return std::unexpected(std::move(passed.error()));
     return pair.first;
   } else {
-    ReadLocker clientsLocker(m_clientsLock);
+    std::shared_lock clientsLocker(m_clientsLock);
     if (auto client = m_clients.value(connectionId); client && !m_disconnectingClients.contains(connectionId)) {
       clientsLocker.unlock();
       if (client->netRules().version() < 18) {

@@ -1133,13 +1133,32 @@ const GameTestRegistration closedWorkerMessages(
     ASSERT_TRUE(worker->passMessage({"queued", {}, beforeStart.second}));
     ASSERT_TRUE(worker->stop());
     expectPromiseStatus(beforeStart.first, RpcPromiseStatus::Cancelled);
-    auto started = worker->start();
-    ASSERT_TRUE(started);
-    ASSERT_TRUE(*started);
-    ASSERT_TRUE(worker->stop());
-    EXPECT_TRUE(worker->isJoined());
-    EXPECT_TRUE(worker->shouldExpire());
-    EXPECT_FALSE(worker->errorOccurred());
+    for (unsigned generation = 0; generation < 2; ++generation) {
+      SCOPED_TRACE(generation);
+      auto started = worker->start();
+      ASSERT_TRUE(started);
+      ASSERT_TRUE(*started);
+      auto alreadyStarted = worker->start();
+      ASSERT_TRUE(alreadyStarted);
+      EXPECT_FALSE(*alreadyStarted);
+      auto running = RpcPromise<Json>::createPair();
+      ASSERT_TRUE(worker->passMessage({"no-handler", {}, running.second}));
+      auto status = running.first.status();
+      auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      while (status && *status == RpcPromiseStatus::Pending
+             && (deadline - std::chrono::steady_clock::now()).count() > 0) {
+        std::this_thread::yield();
+        status = running.first.status();
+      }
+      ASSERT_TRUE(status);
+      // Failed means the real worker dispatched the message; cancellation
+      // would hide a stale token that prevented the restarted loop from running.
+      EXPECT_EQ(*status, RpcPromiseStatus::Failed);
+      ASSERT_TRUE(worker->stop());
+      EXPECT_TRUE(worker->isJoined());
+      EXPECT_TRUE(worker->shouldExpire());
+      EXPECT_FALSE(worker->errorOccurred());
+    }
     auto late = RpcPromise<Json>::createPair();
     ASSERT_TRUE(worker->passMessage({"after-close", {}, late.second}));
     expectPromiseStatus(late.first, RpcPromiseStatus::Cancelled);

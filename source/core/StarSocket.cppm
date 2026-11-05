@@ -81,7 +81,7 @@ public:
   // Shuts down the underlying socket only.
   void shutdown();
 
-  // Shuts down and closes the underlying socket.
+  // Interrupts blocking I/O before waiting to close the underlying socket.
   void close();
 
 protected:

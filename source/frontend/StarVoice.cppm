@@ -160,7 +160,7 @@ private:
 
   bool playSpeaker(std::shared_ptr<Speaker> const& speaker, int channels);
 
-  [[nodiscard]] std::expected<void, StarException> thread();
+  [[nodiscard]] std::expected<void, StarException> thread(std::stop_token stopToken);
 
   SpeakerId m_speakerId = 0;
   std::shared_ptr<Speaker> m_clientSpeaker;
@@ -199,7 +199,7 @@ private:
   ThreadFunction<void> m_thread;
   std::mutex m_threadMutex;
   std::condition_variable m_threadCond;
-  std::atomic<bool> m_stopThread = true;
+  std::stop_source m_threadStopSource{std::nostopstate};
 
   std::vector<std::int16_t> m_decodeBuffer;
   std::vector<std::int16_t> m_resampleBuffer;

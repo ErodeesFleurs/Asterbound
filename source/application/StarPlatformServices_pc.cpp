@@ -192,9 +192,9 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
       if (!logged)
         state.discordError = std::move(logged.error());
     });
-    discordEventShutdown = false;
-    auto eventThread = Thread::invoke("PcPlatformServices::discordEventThread", [&state = *this]() -> std::expected<void, StarException> {
-        while (!state.discordEventShutdown) {
+    discordEventStopSource = std::stop_source{};
+    auto eventThread = Thread::invoke("PcPlatformServices::discordEventThread", [&state = *this, stopToken = discordEventStopSource.get_token()]() -> std::expected<void, StarException> {
+        while (!stopToken.stop_requested()) {
           {
             std::lock_guard locker(state.discordMutex);
             auto result = state.discordCore->RunCallbacks();
@@ -235,7 +235,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
 PcPlatformServicesState::~PcPlatformServicesState() {
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   if (discordEventThread) {
-    discordEventShutdown = true;
+    discordEventStopSource.request_stop();
     auto finished = discordEventThread.finish();
     if (!finished)
       EmergencyLog::error("Could not finish Discord event thread: {}", finished.error().what());

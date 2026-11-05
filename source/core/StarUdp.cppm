@@ -79,7 +79,7 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
 }
 
 [[nodiscard]] std::expected<std::size_t, StarException> UdpSocket::receive(std::optional<std::reference_wrapper<HostAddressWithPort>> address, std::span<char> data) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("UdpSocket::receive"); !status)
     return std::unexpected(std::move(status.error()));
 
@@ -108,7 +108,7 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
 }
 
 [[nodiscard]] std::expected<std::size_t, StarException> UdpSocket::send(HostAddressWithPort const& address, std::span<char const> data) {
-  ReadLocker locker(m_mutex);
+  std::shared_lock locker(m_mutex);
   if (auto status = checkOpen("UdpSocket::send"); !status)
     return std::unexpected(std::move(status.error()));
 

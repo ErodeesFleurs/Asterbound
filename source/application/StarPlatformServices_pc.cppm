@@ -55,7 +55,7 @@ struct PcPlatformServicesState {
   
   std::optional<discord::User> discordCurrentUser;
   ThreadFunction<void> discordEventThread;
-  std::atomic<bool> discordEventShutdown = false;
+  std::stop_source discordEventStopSource{std::nostopstate};
 #endif
 
   bool overlayActive = false;
