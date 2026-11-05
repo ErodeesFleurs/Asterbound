@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 import std;
 import star.file;
@@ -180,6 +181,16 @@ std::expected<void*, StarException> File::fopen(char const* filename, IOMode mod
   int fd = ::open(filename, flags, 0666);
   if (fd < 0)
     return std::unexpected(IOException::format("Error opening file '{}', error: {}", filename, std::strerror(errno)));
+  struct stat status;
+  if (::fstat(fd, &status) < 0) {
+    auto error = errno;
+    closeAfterFailure(fd);
+    return std::unexpected(IOException::format("Error inspecting file '{}', error: {}", filename, std::strerror(error)));
+  }
+  if (S_ISDIR(status.st_mode)) {
+    closeAfterFailure(fd);
+    return std::unexpected(IOException::format("Cannot open directory '{}' as a file", filename));
+  }
   if (mode & IOMode::Append && ::lseek(fd, 0, SEEK_END) < 0) {
     auto error = errno;
     closeAfterFailure(fd);

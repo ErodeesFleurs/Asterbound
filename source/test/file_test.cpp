@@ -62,6 +62,26 @@ namespace {
   }
 }
 
+TEST(FileTest, DirectoryOpenFailsWithoutPreventingSubsequentFileReads) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporaryDirectory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&]() { removeTree(*directory); });
+
+  auto opened = File::open(*directory, IOMode::Read);
+  ASSERT_FALSE(opened);
+  EXPECT_TRUE(opened.error().is<IOException>());
+  auto contents = File::readFile(*directory);
+  ASSERT_FALSE(contents);
+  EXPECT_TRUE(contents.error().is<IOException>());
+
+  auto file = File::relativeTo(*directory, "contents");
+  String payload("ordinary file remains readable");
+  ASSERT_TRUE(File::writeFile(payload, file));
+  EXPECT_EQ(File::readFileString(file), payload);
+}
+
 TEST(FileTest, All) {
   auto randomResult = RandomService::create();
   ASSERT_TRUE(randomResult);
