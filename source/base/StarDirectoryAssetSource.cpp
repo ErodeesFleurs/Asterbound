@@ -67,6 +67,9 @@ std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> DirectoryAss
 
 JsonObject DirectoryAssetSource::metadata() const { return m_metadata; }
 StringList DirectoryAssetSource::assetPaths() const { return m_assetPaths; }
+bool DirectoryAssetSource::contains(String const& path) const {
+  return std::binary_search(m_assetPaths.begin(), m_assetPaths.end(), path);
+}
 
 std::expected<std::shared_ptr<IODevice>, StarException> DirectoryAssetSource::open(String const& path) {
   auto filesystem = toFilesystem(path);

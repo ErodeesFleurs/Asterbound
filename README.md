@@ -76,6 +76,20 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 
 For [StarCore Simplified Chinese](https://steamcommunity.com/sharedfiles/filedetails/?id=807695810) (`SChinese`, version `V108_241106_09`), it removes four unused imports from `/scripts/replaceTags.lua` in memory, breaking `util.lua → replaceTags.lua → util.lua`. The replacement function body, utility functions and translations remain unchanged; the engine still rejects cyclic `require` calls. The repair applies only when the effective script provider is that known SChinese version and its import header matches the [verified upstream release](https://github.com/sffxzzp/Starbound-Chinese/releases/tag/UTC-241105-1953). Other providers, unknown versions and unrecognized headers are left untouched. No installed mod files or saves are rewritten; restart the game after installing the compatibility source.
 
+Additional provider/version/content-guarded repairs cover:
+
+- Arcana 1.4.2.9/1.4.2.10's `dump` helper: use a local display key instead of assigning to Lua 5.5's read-only loop variable; deployment and relic behavior are retained.
+- Known translation/UI and weather patches: preserve translated fields and registered patch order while adapting changed schemas. SChinese's complete matter-manipulator translation follows QuickbarMini's active `.original.config` pane; Project45 loot changes follow the relocated treasure pools.
+- Neia projectile image fields and registration of its bundled spear-throw ability, Draconis staff emitters and pet-spawner path, Titancorp's identical duplicate projectile and bundled powered-assembler integration, PropPack's bundled upper-bed callback and empty drop pool, Halloween's malformed path/art references, and Brewology/docking-bay frame aliases. Existing spear-throw ability mappings supplied by another mod are preserved.
+- The Forge: Blade Dance 0.7.1's five custom-weapon recipes: make their global carrier-image paths absolute without replacing or changing the encoded artwork. Already-saved custom item descriptors are not migrated.
+- Advanced Teleporter Interface 1.1.1: retain concise inspection warnings and keep complete caught diagnostics in Debug logs instead of embedding native stacks in every warning.
+
+Rebuild the engine and compatibility source together: source-owned patch/load-script replacement uses the [current Assets APIs](doc/lua/openstarbound/assets.md). These are targeted compatibility fixes, not global suppression of invalid patches or Lua errors.
+
+Voyage addons still require the real [Voyage base mod](https://steamcommunity.com/sharedfiles/filedetails/?id=2957477338); missing items, builders and NPC scripts are not fabricated. Halloween's absent `pumpkinfrag` physics definition is intentionally not guessed, so its two unresolved projectile references remain an upstream defect.
+
+Neia's harpoons also require the real [Elithian Races Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=850109963): their physics preset and return sound are absent from Neia itself. The compatibility source does not redistribute the missing audio or substitute unrelated sounds; installing Elithian also installs its gameplay content.
+
 ### Mod error diagnostics
 
 Lua runtime errors retain their original traceback and append a deduplicated `Lua source providers` summary identifying the scripts on the failed stack, including coroutine failures. Engine-loaded scripts use their actual loaded asset provider: the mod's `friendlyName`, internal `name`, and directory or `.pak` path. Syntax and indexed-script read failures also include provider context. Missing or invalid optional metadata falls back to the source path. Chunk names remain unchanged; provider snapshots are recorded during loading, not by scanning mods every frame.

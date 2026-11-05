@@ -36,6 +36,10 @@ public:
   // Should return all the available assets in this source
   virtual StringList assetPaths() const = 0;
 
+  // Exact, case-sensitive membership in this source's enumerated asset index.
+  // Does not probe the filesystem or copy the asset path collection.
+  virtual bool contains(String const& path) const = 0;
+
   // Open the given path in this source and return an IODevicePtr to it.
   [[nodiscard]] virtual std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) = 0;
 

@@ -376,6 +376,31 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
+    registered = callbacks.registerCallback("sourceBytes", [this](String const& sourcePath, String const& path) -> std::expected<String, StarException> {
+      auto source = m_assetSourcePaths.maybeRightRef(sourcePath);
+      if (!source)
+        return std::unexpected(AssetException::format("Cannot read asset '{}' from unknown asset source '{}'", path, sourcePath));
+      // DirectoryAssetSource::read also accepts unindexed filesystem-relative paths.
+      // Only expose paths actually enumerated by this provider, including shadowed assets.
+      if (!source->get()->contains(path))
+        return std::unexpected(AssetException::format("Asset '{}' is not indexed in {}", path,
+            sourceDiagnostic(*source->get(), std::cref(sourcePath))));
+      auto data = source->get()->read(path);
+      if (!data) {
+        auto provider = sourceDiagnostic(*source->get(), std::cref(sourcePath));
+        auto error = std::move(data.error()).withContext(strf("Reading asset '{}' from {}", path, provider));
+        auto summary = *error.diagnosticSummary();
+        summary.kind = ExceptionSummaryKind::Resource;
+        summary.asset = path.utf8();
+        summary.assetProvider = std::move(provider);
+        summary.operation = "Reading source asset bytes";
+        return std::unexpected(std::move(error).withSummary(std::move(summary)));
+      }
+      return String(std::string_view(data->begin(), data->end()));
+    });
+    if (!registered)
+      return std::unexpected(std::move(registered.error()));
+
     registered = callbacks.registerCallback("image", [this](String const& path) -> std::expected<Image, StarException> {
       auto assetImage = image(path);
       if (!assetImage)
@@ -418,6 +443,24 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto pushedAssets = pushGlobalContext("assets", *baseCallbacks);
   if (!pushedAssets)
     return std::unexpected(std::move(pushedAssets.error()));
+
+  struct LoadScriptReference {
+    std::shared_ptr<AssetSource> source;
+    String path;
+
+    bool operator==(LoadScriptReference const&) const = default;
+  };
+  struct LoadScriptReplacement {
+    LoadScriptReference original;
+    LoadScriptReference replacement;
+  };
+  struct LoadScriptState {
+    List<LoadScriptReplacement> replacements;
+    List<LoadScriptReference> unavailable;
+    bool active = true;
+  };
+  // Callbacks retain their state even if a script retains a function past its group.
+  auto loadScriptState = std::make_shared<LoadScriptState>();
 
   auto decorateLuaContext = [&](LuaContext& context, std::shared_ptr<MemoryAssetSource> newFiles) -> std::expected<void, StarException> {
     if (!newFiles)
@@ -512,6 +555,118 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         }
       }
       return false;
+    });
+    if (!registered)
+      return std::unexpected(std::move(registered.error()));
+
+    registered = callbacks->registerCallback("patchReplace", [this, newFiles](String const& target,
+        String const& originalPatchPath, String const& sourcePath, String const& replacementPatchPath,
+        std::optional<String> const& replacementTarget) -> std::expected<bool, StarException> {
+      auto originalSource = m_assetSourcePaths.maybeRightRef(sourcePath);
+      if (!originalSource)
+        return false;
+      auto targetKey = CaseInsensitiveStringView::create(target);
+      if (!targetKey)
+        return std::unexpected(std::move(targetKey.error()));
+      auto file = m_files.maybeRef(*targetKey);
+      if (!file)
+        return false;
+      auto matches = [&](auto const& patch) {
+        return patch.first == originalPatchPath && patch.second == originalSource->get();
+      };
+      if (!std::ranges::any_of(file->get().patchSources, matches))
+        return false;
+      auto* destination = std::addressof(file->get());
+      if (replacementTarget) {
+        auto destinationKey = CaseInsensitiveStringView::create(*replacementTarget);
+        if (!destinationKey)
+          return std::unexpected(std::move(destinationKey.error()));
+        auto descriptor = m_files.maybeRef(*destinationKey);
+        if (!descriptor)
+          return false;
+        destination = std::addressof(descriptor->get());
+      }
+      std::pair<String, std::shared_ptr<AssetSource>> replacement{replacementPatchPath, newFiles};
+      if (!newFiles->contains(replacementPatchPath)) {
+        auto replacementKey = CaseInsensitiveStringView::create(replacementPatchPath);
+        if (!replacementKey)
+          return std::unexpected(std::move(replacementKey.error()));
+        auto descriptor = m_files.maybeRef(*replacementKey);
+        if (!descriptor)
+          return false;
+        replacement = {descriptor->get().sourceName, descriptor->get().source};
+      }
+      if (destination == std::addressof(file->get())) {
+        for (auto& patch : file->get().patchSources) {
+          if (matches(patch))
+            patch = replacement;
+        }
+      } else {
+        for (auto const& patch : file->get().patchSources) {
+          if (matches(patch))
+            destination->patchSources.append(replacement);
+        }
+        file->get().patchSources.filter([&](auto const& patch) { return !matches(patch); });
+      }
+      // As at the load-script group boundary, dependent assets may already be
+      // cached. Invalidate immediately so this same context observes the repair.
+      // A previously failed target must also be allowed to load its new patches.
+      m_framesSpecifications.clear();
+      m_assetsCache.clear();
+      m_assetErrors.clear();
+      return true;
+    });
+    if (!registered)
+      return std::unexpected(std::move(registered.error()));
+
+    registered = callbacks->registerCallback("loadScriptReplace", [this, newFiles, loadScriptState](
+        String const& sourcePath, String const& originalScriptPath, String const& replacementScriptPath) -> std::expected<bool, StarException> {
+      if (!loadScriptState->active)
+        return false;
+      auto originalSource = m_assetSourcePaths.maybeRightRef(sourcePath);
+      if (!originalSource || !originalSource->get()->contains(originalScriptPath))
+        return false;
+      LoadScriptReference original{originalSource->get(), originalScriptPath};
+      if (loadScriptState->unavailable.contains(original))
+        return false;
+      auto metadata = original.source->metadata();
+      auto scripts = metadata.maybeRef("scripts");
+      if (!scripts)
+        return false;
+      bool declared = false;
+      for (String const& group : {String("onLoad"), String("postLoad")}) {
+        auto paths = scripts->get().optArray(group);
+        if (!paths)
+          return std::unexpected(std::move(paths.error()));
+        if (*paths) {
+          for (auto const& path : **paths) {
+            auto text = path.toString();
+            if (!text)
+              return std::unexpected(std::move(text.error()));
+            declared = declared || *text == originalScriptPath;
+          }
+        }
+      }
+      if (!declared)
+        return false;
+      LoadScriptReference replacement{newFiles, replacementScriptPath};
+      if (!newFiles->contains(replacementScriptPath)) {
+        auto replacementKey = CaseInsensitiveStringView::create(replacementScriptPath);
+        if (!replacementKey)
+          return std::unexpected(std::move(replacementKey.error()));
+        auto descriptor = m_files.maybeRef(*replacementKey);
+        if (!descriptor)
+          return false;
+        replacement = {descriptor->get().source, descriptor->get().sourceName};
+      }
+      for (auto& entry : loadScriptState->replacements) {
+        if (entry.original == original) {
+          entry.replacement = std::move(replacement);
+          return true;
+        }
+      }
+      loadScriptState->replacements.append({std::move(original), std::move(replacement)});
+      return true;
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
@@ -690,18 +845,35 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             auto path = jPath.toString();
             if (!path)
               return std::unexpected(std::move(path.error()));
-            auto script = source->read(*path);
+            LoadScriptReference selected{source, *path};
+            loadScriptState->unavailable.append(selected);
+            for (auto const& entry : loadScriptState->replacements) {
+              if (entry.original == selected) {
+                selected = entry.replacement;
+                break;
+              }
+            }
+            auto provider = sourceDiagnostic(*selected.source, m_assetSourcePaths.maybeLeftRef(selected.source));
+            auto script = selected.source->read(selected.path);
             if (!script)
-              return std::unexpected(scriptSourceFailure(std::move(script.error()), *path,
-                  sourceDiagnostic(*source, std::cref(sourcePath))));
-            auto loaded = context->load(script->span(), *path);
+              return std::unexpected(scriptSourceFailure(std::move(script.error()), selected.path, provider));
+            auto loaded = context->load(script->span(), selected.path);
             if (!loaded)
-              return std::unexpected(scriptSourceFailure(std::move(loaded.error()), *path,
-                  sourceDiagnostic(*source, std::cref(sourcePath))));
+              return std::unexpected(scriptSourceFailure(std::move(loaded.error()), selected.path, provider));
           }
           return {};
         };
         auto ran = runScripts();
+        // A failed script closes the rest of its group too; those declarations
+        // will not be executed later and must not report a successful replacement.
+        for (auto const& jPath : **scriptGroup) {
+          auto path = jPath.toString();
+          if (!path)
+            return std::unexpected(std::move(path.error()));
+          LoadScriptReference closed{source, std::move(*path)};
+          if (!loadScriptState->unavailable.contains(closed))
+            loadScriptState->unavailable.append(std::move(closed));
+        }
         if (!ran) {
           if (!ran.error().is<LuaException>())
             return std::unexpected(std::move(ran.error()));
@@ -764,6 +936,8 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
   }
+
+  loadScriptState->active = false;
 
   Sha256Hasher digest;
   StringList digestPaths;

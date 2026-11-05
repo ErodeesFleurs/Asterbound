@@ -31,6 +31,7 @@ public:
 
   JsonObject metadata() const override;
   StringList assetPaths() const override;
+  bool contains(String const& path) const override;
 
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) override;
   [[nodiscard]] std::expected<ByteArray, StarException> read(String const& path) override;

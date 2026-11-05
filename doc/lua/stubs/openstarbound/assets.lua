@@ -25,6 +25,12 @@ function assets.json(path) end
 ---@return string
 function assets.bytes(path) end
 
+--- Reads exact raw bytes from an indexed source, including shadowed assets. Only that source's enumerated paths are accessible. Unknown sources, unindexed paths, and read failures raise source/path-specific errors. Also available in read-only Lua asset patches.
+---@param sourcePath string
+---@param path string
+---@return string
+function assets.sourceBytes(sourcePath, path) end
+
 --- Returns the specified image asset as an `Image`. Similar to `root.assetImage`. ---
 ---@param path string
 ---@return Image
@@ -50,6 +56,22 @@ function assets.add(path, data) end
 ---@param patchPath string
 ---@return boolean
 function assets.patch(path, patchPath) end
+
+--- Load scripts only. Replaces every held patch registration matching the exact original path and source, in place by default. A different replacementTarget removes matching source slots and appends replacement copies after existing destination patches, preserving all unrelated order. Uses current-group added assets before the indexed replacement provider. Missing either target/original/source/replacement returns false without mutation. Subsequent reads see the replacement; normal patch errors remain errors.
+---@param target string
+---@param originalPatchPath string
+---@param sourcePath string
+---@param replacementPatchPath string
+---@param replacementTarget? string
+---@return boolean
+function assets.patchReplace(target, originalPatchPath, sourcePath, replacementPatchPath, replacementTarget) end
+
+--- Load scripts only. Replaces future metadata onLoad/postLoad executions for one exact indexed source/path, preserving declaration order and group context. Uses current-group assets before indexed replacements; does not redirect game scripts or other providers. Unknown, undeclared, unindexed, started, or skipped declarations and missing replacements return false without mutation. Failures retain actual replacement provenance.
+---@param sourcePath string
+---@param originalScriptPath string
+---@param replacementScriptPath string
+---@return boolean
+function assets.loadScriptReplace(sourcePath, originalScriptPath, replacementScriptPath) end
 
 --- Removes the specified asset. Returns true if successful. ---
 ---@param path string
