@@ -55,11 +55,13 @@ std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
 
 std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLevel level) {
   std::lock_guard locker(m_logMutex);
-  auto timestamp = Time::printCurrentDateAndTime("<hours>:<minutes>:<seconds>.<millis>");
+  auto timestamp = Time::localTime(std::chrono::system_clock::now());
+  if (!timestamp)
+    return std::unexpected(std::move(timestamp.error()));
   auto name = enumName<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto line = strf("[{}] [{}] {}\n", timestamp, *name, msg);
+  auto line = strf("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
   auto written = m_output->write(line);
   if (!written)
     return std::unexpected(std::move(written.error()));

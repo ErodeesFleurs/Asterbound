@@ -11,7 +11,6 @@ import star.list;
 import star.bi_map;
 import star.game_types;
 import star.math_common;
-import star.time;
 import star.map;
 import star.format;
 import star.version;
@@ -106,7 +105,7 @@ namespace Star {
 PacketStatCollector::PacketStatCollector() : PacketStatCollector(1.0f) {}
 
 PacketStatCollector::PacketStatCollector(float calculationWindow)
-  : m_calculationWindow(calculationWindow), m_stats(), m_totalBytes(0), m_lastMixTime(0) {}
+  : m_calculationWindow(calculationWindow), m_stats(), m_totalBytes(0), m_lastMixTime() {}
 
 void PacketStatCollector::mix(std::size_t size) {
   calculate();
@@ -135,8 +134,8 @@ PacketStats PacketStatCollector::stats() const {
 }
 
 void PacketStatCollector::calculate() {
-  std::int64_t currentTime = Time::monotonicMilliseconds();
-  float elapsedTime = (currentTime - m_lastMixTime) / 1000.0f;
+  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  std::chrono::duration<float> elapsedTime((currentTime - m_lastMixTime).count() / 1000.0f);
   if (elapsedTime >= m_calculationWindow) {
     m_lastMixTime = currentTime;
     m_stats.worstPacketSize = 0;
@@ -147,9 +146,9 @@ void PacketStatCollector::calculate() {
         m_stats.worstPacketSize = pair.second;
       }
 
-      m_stats.packetBytesPerSecond[pair.first] = std::round(pair.second / elapsedTime);
+      m_stats.packetBytesPerSecond[pair.first] = std::round(pair.second / elapsedTime.count());
     }
-    m_stats.bytesPerSecond = std::round(float(m_totalBytes) / elapsedTime);
+    m_stats.bytesPerSecond = std::round(float(m_totalBytes) / elapsedTime.count());
     m_totalBytes = 0;
     m_unmixed.clear();
   }

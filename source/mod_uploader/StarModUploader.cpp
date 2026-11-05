@@ -399,7 +399,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
         if (!dispatched)
           return std::unexpected(std::move(dispatched.error()));
       }
-      Thread::sleep(20);
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     if (m_closing)
       return {};
@@ -489,7 +489,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
         if (!dispatched)
           return std::unexpected(std::move(dispatched.error()));
       }
-      Thread::sleep(20);
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     if (m_closing)
       return {};

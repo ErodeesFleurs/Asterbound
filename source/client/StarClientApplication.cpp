@@ -981,7 +981,7 @@ std::expected<void, StarException> ClientApplication::render() {
       }
       camera.setScreenSize(renderer->screenSize());
       camera.setRenderInterpolation(presentation.interpolation());
-      auto totalStart = Time::monotonicMicroseconds();
+      auto totalStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
       auto worldEffect = renderer->switchEffectConfig("world");
       if (!worldEffect)
         return std::unexpected(std::move(worldEffect.error()));
@@ -989,16 +989,16 @@ std::expected<void, StarException> ClientApplication::render() {
       auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer(), presentation);
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
-      m_root->logMap().set("client_render_world_client", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - clientStart));
+      m_root->logMap().set("client_render_world_client", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - clientStart).count()));
 
-      auto paintStart = Time::monotonicMicroseconds();
+      auto paintStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
       auto painted = m_worldPainter->render(m_renderData, [&]() -> std::expected<bool, StarException> {
         return worldClient->waitForLighting(std::ref(m_renderData));
       });
       if (!painted)
         return std::unexpected(std::move(painted.error()));
-      m_root->logMap().set("client_render_world_painter", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - paintStart));
-      m_root->logMap().set("client_render_world_total", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - totalStart));
+      m_root->logMap().set("client_render_world_painter", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - paintStart).count()));
+      m_root->logMap().set("client_render_world_total", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - totalStart).count()));
       m_preparedCamera = PresentedCamera{camera, worldClient, m_player, playerEpoch, renderEpoch};
       
       auto size = Vec2F(renderer->screenSize());
@@ -1019,7 +1019,7 @@ std::expected<void, StarException> ClientApplication::render() {
     auto interfaceEffect = renderer->switchEffectConfig("interface");
     if (!interfaceEffect)
       return std::unexpected(std::move(interfaceEffect.error()));
-    auto start = Time::monotonicMicroseconds();
+    auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     auto inWorld = m_mainInterface->renderInWorldElements(presentation);
     if (!inWorld)
       return std::unexpected(std::move(inWorld.error()));
@@ -1029,7 +1029,7 @@ std::expected<void, StarException> ClientApplication::render() {
     auto cinematic = m_cinematicOverlay->render();
     if (!cinematic)
       return std::unexpected(std::move(cinematic.error()));
-    m_root->logMap().set("client_render_interface", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - start));
+    m_root->logMap().set("client_render_interface", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   }
 
   if (!m_errorScreen->accepted())

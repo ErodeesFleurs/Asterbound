@@ -43,8 +43,8 @@ namespace Star {
 ImageMetadataDatabase::ImageMetadataDatabase(Root& root)
   : m_root(root), m_sizeCache(root.presentationRandom()), m_spacesCache(root.presentationRandom()), m_regionCache(root.presentationRandom()) {
   std::lock_guard locker(m_mutex);
-  int timeSmear = 2000;
-  std::int64_t timeToLive = 60000;
+  std::chrono::milliseconds timeSmear(2000);
+  std::chrono::milliseconds timeToLive(60000);
   m_sizeCache.setTimeSmear(timeSmear);
   m_spacesCache.setTimeSmear(timeSmear);
   m_regionCache.setTimeSmear(timeSmear);

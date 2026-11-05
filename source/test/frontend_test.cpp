@@ -198,13 +198,17 @@ TEST(MainThreadDispatcher, WakeBeforeWaitRemainsObservable) {
 
 TEST(FixedScheduler, InFlightFrameWaitUsesOnlyLogicDeadline) {
   FixedScheduler scheduler(60.0, 0.0);
-  scheduler.reset(0.0);
-  EXPECT_DOUBLE_EQ(scheduler.sleepTime(0.0), 0.0);
-  EXPECT_NEAR(scheduler.updateSleepTime(0.0), 1.0 / 60.0, 1e-12);
-  EXPECT_EQ(scheduler.updatesDue(0.02, 5), 1u);
-  EXPECT_NEAR(scheduler.updateSleepTime(0.02), 1.0 / 30.0 - 0.02, 1e-12);
-  EXPECT_EQ(scheduler.updatesDue(0.4, 5), 1u);
-  EXPECT_GT(scheduler.updateSleepTime(0.4), 0.0);
+  auto at = [](double seconds) {
+    return std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>>(
+        std::chrono::duration<double>(seconds));
+  };
+  scheduler.reset(at(0.0));
+  EXPECT_DOUBLE_EQ(scheduler.sleepTime(at(0.0)).count(), 0.0);
+  EXPECT_NEAR(scheduler.updateSleepTime(at(0.0)).count(), 1.0 / 60.0, 1e-12);
+  EXPECT_EQ(scheduler.updatesDue(at(0.02), 5), 1u);
+  EXPECT_NEAR(scheduler.updateSleepTime(at(0.02)).count(), 1.0 / 30.0 - 0.02, 1e-12);
+  EXPECT_EQ(scheduler.updatesDue(at(0.4), 5), 1u);
+  EXPECT_GT(scheduler.updateSleepTime(at(0.4)).count(), 0.0);
 }
 
 auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, String const& overlay,

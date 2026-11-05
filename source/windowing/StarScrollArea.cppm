@@ -179,7 +179,7 @@ private:
   int advanceFactorHelper();
 
   int m_buttonAdvance;
-  std::int64_t m_advanceLimiter;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_advanceLimiter;
 
   Vec2I m_scrollOffset;
   Vec2I m_lastMaxScroll;

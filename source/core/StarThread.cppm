@@ -22,16 +22,9 @@ public:
   virtual std::string_view dynamicTypeName() const noexcept {
     return typeName<Thread>();
   }
-  // Implementations of this method should sleep for at least the given amount
-  // of time, but may sleep for longer due to scheduling.
-  static void sleep(unsigned millis);
-
   // Sleep a more precise amount of time, but uses more resources to do so.
   // Should be less likely to sleep much longer than the given amount of time.
   static void sleepPrecise(unsigned millis);
-
-  // Yield this thread, offering the opportunity to reschedule.
-  static void yield();
 
   template <typename Function, typename... Args>
   [[nodiscard]] static auto invoke(String const& name, Function&& f, Args&&... args)

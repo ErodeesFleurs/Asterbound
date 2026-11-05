@@ -8,7 +8,6 @@ import star.logging;
 import star.string;
 import star.ordered_map;
 import star.ordered_set;
-import star.time;
 import star.format;
 import star.version;
 import star.rect;
@@ -225,7 +224,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   if (!reportEvery)
     return std::unexpected(std::move(reportEvery.error()));
 
-  double sumTime = 0.0;
+  std::chrono::duration<double> sumTime = std::chrono::duration<double>::zero();
   for (std::uint64_t i = 0; i < *times; ++i) {
     auto storage = File::ephemeralFile(root->random());
     if (!storage)
@@ -236,8 +235,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto& worldServer = **server;
 
     coutf("Starting world simulation for {} steps\n", *steps);
-    double start = Time::monotonicTime();
-    double lastReport = Time::monotonicTime();
+    auto start = std::chrono::steady_clock::now();
+    auto lastReport = std::chrono::steady_clock::now();
     std::uint64_t entityCount = 0;
     for (std::uint64_t j = 0; j < *steps; ++j) {
       if (j % *signalEvery == 0) {
@@ -254,17 +253,17 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       }
 
       if (*reportEvery != 0 && j % *reportEvery == 0) {
-        float fps = *reportEvery / (Time::monotonicTime() - lastReport);
-        lastReport = Time::monotonicTime();
-        coutf("[{}] {}s | FPS: {} | Entities: {}\n", j, Time::monotonicTime() - start, fps, entityCount);
+        float fps = *reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
+        lastReport = std::chrono::steady_clock::now();
+        coutf("[{}] {}s | FPS: {} | Entities: {}\n", j, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), fps, entityCount);
       }
       auto updated = worldServer.update(root->timing().serverTimestep * root->timing().timescale);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
-    double totalTime = Time::monotonicTime() - start;
+    std::chrono::duration<double> totalTime = std::chrono::steady_clock::now() - start;
     coutf("Finished run of running dungeon world '{}' with seed {} for {} steps in {} seconds, average FPS: {}\n",
-          dungeon, *worldSeed, *steps, totalTime, *steps / totalTime);
+          dungeon, *worldSeed, *steps, totalTime.count(), *steps / totalTime.count());
     sumTime += totalTime;
     auto closed = worldServer.close();
     if (!closed)
@@ -272,7 +271,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   }
 
   if (*times != 1)
-    coutf("Average of all runs - time: {}, FPS: {}\n", sumTime / *times, *steps / (sumTime / *times));
+    coutf("Average of all runs - time: {}, FPS: {}\n", (sumTime / *times).count(), *steps / (sumTime / *times).count());
   return {};
 }
 

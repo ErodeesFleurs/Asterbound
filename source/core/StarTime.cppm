@@ -1,6 +1,7 @@
 module;
 import std;
 import star.string;
+import star.format;
 
 namespace Star {
 
@@ -10,33 +11,13 @@ namespace Time {
 
   double monotonicTime();
   std::int64_t monotonicMilliseconds();
-  std::int64_t monotonicMicroseconds();
 
   // Pretty print a duration of time (In days, hours, minutes, seconds, and milliseconds)
   String printDuration(double time);
 
-  // Pretty print a given date and time
-  String printDateAndTime(std::int64_t epochTicks, String format = "<year>-<month>-<day> <hours>:<minutes>:<seconds>.<millis>");
-  String printCurrentDateAndTime(String format = "<year>-<month>-<day> <hours>:<minutes>:<seconds>.<millis>");
-
-  // Native system_clock ticks since the Unix epoch; use epochTickFrequency()
-  // rather than assuming a fixed tick unit.
-  std::int64_t epochTicks();
-  // Epoch ticks per second, static throughout application lifetime.
-  std::int64_t epochTickFrequency();
-
-  // Native steady_clock ticks since an unspecified time before program start;
-  // use monotonicTickFrequency() rather than assuming a fixed tick unit.
-  std::int64_t monotonicTicks();
-  // Monotonic ticks per second, static throughout application lifetime.
-  std::int64_t monotonicTickFrequency();
-
-  double ticksToSeconds(std::int64_t ticks, std::int64_t tickFrequency);
-  std::int64_t ticksToMilliseconds(std::int64_t ticks, std::int64_t tickFrequency);
-  std::int64_t ticksToMicroseconds(std::int64_t ticks, std::int64_t tickFrequency);
-  std::int64_t secondsToTicks(double seconds, std::int64_t tickFrequency);
-  std::int64_t millisecondsToTicks(std::int64_t milliseconds, std::int64_t tickFrequency);
-  std::int64_t microsecondsToTicks(std::int64_t microseconds, std::int64_t tickFrequency);
+  // Convert a system timestamp to local civil time without a tzdb dependency.
+  [[nodiscard]] std::expected<std::chrono::local_time<std::chrono::milliseconds>, StarException>
+  localTime(std::chrono::system_clock::time_point time);
 }
 
 // Keeps track of elapsed real time since a given moment.  Guaranteed
@@ -120,18 +101,6 @@ export namespace Star::Time {
   using ::Star::Time::millisecondsSinceEpoch;
   using ::Star::Time::monotonicTime;
   using ::Star::Time::monotonicMilliseconds;
-  using ::Star::Time::monotonicMicroseconds;
   using ::Star::Time::printDuration;
-  using ::Star::Time::printDateAndTime;
-  using ::Star::Time::printCurrentDateAndTime;
-  using ::Star::Time::epochTicks;
-  using ::Star::Time::epochTickFrequency;
-  using ::Star::Time::monotonicTicks;
-  using ::Star::Time::monotonicTickFrequency;
-  using ::Star::Time::ticksToSeconds;
-  using ::Star::Time::ticksToMilliseconds;
-  using ::Star::Time::ticksToMicroseconds;
-  using ::Star::Time::secondsToTicks;
-  using ::Star::Time::millisecondsToTicks;
-  using ::Star::Time::microsecondsToTicks;
+  using ::Star::Time::localTime;
 }

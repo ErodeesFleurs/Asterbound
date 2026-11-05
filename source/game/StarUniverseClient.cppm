@@ -298,7 +298,7 @@ private:
   bool m_respawning;
   GameTimer m_respawnTimer;
 
-  std::int64_t m_storageTriggerDeadline;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_storageTriggerDeadline;
 
   List<ChatReceivedMessage> m_pendingMessages;
 

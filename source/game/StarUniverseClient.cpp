@@ -54,7 +54,6 @@ import star.ref_ptr;
 import star.listener;
 import star.a_star;
 import star.periodic_function;
-import star.time;
 import star.io_device;
 import star.string;
 import star.encode;
@@ -189,7 +188,7 @@ import star.net_element;
 import star.algorithm;
 namespace Star {
 
-UniverseClient::UniverseClient(Root& root) : m_root(root), m_storageTriggerDeadline(0) {}
+UniverseClient::UniverseClient(Root& root) : m_root(root), m_storageTriggerDeadline() {}
 
 std::expected<std::shared_ptr<UniverseClient>, StarException> UniverseClient::create(Root& root, std::shared_ptr<PlayerStorage> playerStorage, std::shared_ptr<Statistics> statistics, String const& customWorldStorageDir) {
   auto client = std::shared_ptr<UniverseClient>(new UniverseClient(root));
@@ -819,7 +818,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
   auto operation64 = m_connection->send();
   if (!operation64)
     return std::unexpected(std::move(operation64.error()));
-  if (Time::monotonicMilliseconds() >= m_storageTriggerDeadline) {
+  if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) >= m_storageTriggerDeadline) {
     if (m_mainPlayer) {
       auto operation65 = m_playerStorage->savePlayer(m_mainPlayer);
       if (!operation65)
@@ -846,7 +845,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     if (!intervalResult)
       return std::unexpected(std::move(intervalResult.error()));
     auto interval = std::move(*intervalResult);
-    m_storageTriggerDeadline = Time::monotonicMilliseconds() + interval;
+    m_storageTriggerDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(interval);
     for (auto const& id : m_subWorldThreads.keys()) {
       auto entryResult = m_subWorldThreads.get(id);
       if (!entryResult)

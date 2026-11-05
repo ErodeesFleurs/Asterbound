@@ -15,7 +15,6 @@ import star.directives;
 import star.asset_path;
 import star.strong_typedef;
 import star.game_types;
-import star.time;
 import star.version;
 import star.ordered_map;
 import star.lru_cache;
@@ -157,13 +156,13 @@ TeamClient::TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shar
   m_clientContext = clientContext;
 
   m_hasPendingInvitation = false;
-  m_pollInvitationsTimer = 0;
+  m_pollInvitationsTimer = {};
 
   m_fullUpdateRunning = false;
-  m_fullUpdateTimer = 0;
+  m_fullUpdateTimer = {};
 
   m_statusUpdateRunning = false;
-  m_statusUpdateTimer = 0;
+  m_statusUpdateTimer = {};
 }
 
 bool TeamClient::isTeamLeader() {
@@ -289,8 +288,8 @@ std::expected<void, StarException> TeamClient::update() {
   if (!m_hasPendingInvitation) {
     auto interval = readInterval("invitationPollInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
-    if (Time::monotonicTime() - m_pollInvitationsTimer > *interval) {
-      m_pollInvitationsTimer = Time::monotonicTime();
+    if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_pollInvitationsTimer > std::chrono::duration<double>(*interval)) {
+      m_pollInvitationsTimer = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
       JsonObject request;
       request["playerUuid"] = m_clientContext->playerUuid().hex();
       auto invoked = invokeRemote("team.pollInvitation", request, [&self = *this](Json response) -> std::expected<void, StarException> {
@@ -311,8 +310,8 @@ std::expected<void, StarException> TeamClient::update() {
   if (!m_fullUpdateRunning) {
     auto interval = readInterval("fullUpdateInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
-    if (Time::monotonicTime() - m_fullUpdateTimer > *interval) {
-      m_fullUpdateTimer = Time::monotonicTime();
+    if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_fullUpdateTimer > std::chrono::duration<double>(*interval)) {
+      m_fullUpdateTimer = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
       auto update = pullFullUpdate();
       if (!update) return std::unexpected(std::move(update.error()));
     }
@@ -320,8 +319,8 @@ std::expected<void, StarException> TeamClient::update() {
   if (!m_statusUpdateRunning) {
     auto interval = readInterval("statusUpdateInterval");
     if (!interval) return std::unexpected(std::move(interval.error()));
-    if (Time::monotonicTime() - m_statusUpdateTimer > *interval) {
-      m_statusUpdateTimer = Time::monotonicTime();
+    if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_statusUpdateTimer > std::chrono::duration<double>(*interval)) {
+      m_statusUpdateTimer = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
       auto update = statusUpdate();
       if (!update) return std::unexpected(std::move(update.error()));
     }
@@ -421,10 +420,10 @@ std::expected<void, StarException> TeamClient::statusUpdate() {
     return {};
   if (!m_teamUuid)
     return {};
-  auto now = Time::monotonicTime();
+  auto now = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
   bool fullWrite = !m_lastFullStatusUpdate
       || m_fullStatusRequired
-      || now - *m_lastFullStatusUpdate >= 10.0;
+      || now - *m_lastFullStatusUpdate >= std::chrono::duration<double>(10.0);
   JsonObject request;
   auto written = writePlayerData(request, m_mainPlayer, fullWrite);
   if (!written)
@@ -440,7 +439,7 @@ std::expected<void, StarException> TeamClient::statusUpdate() {
   if (fullWrite) {
     // Legacy RPC maps remote failures to null too; only local submission is
     // distinguishable. Do not advance this state on encoding/enqueue failure.
-    m_lastFullStatusUpdate = Time::monotonicTime();
+    m_lastFullStatusUpdate = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
     m_fullStatusRequired = false;
   }
   return {};
@@ -489,9 +488,9 @@ std::expected<std::optional<Json>, StarException> TeamClient::memberPortrait(Uui
 }
 
 void TeamClient::forceUpdate() {
-  m_statusUpdateTimer = 0;
-  m_fullUpdateTimer = 0;
-  m_pollInvitationsTimer = 0;
+  m_statusUpdateTimer = {};
+  m_fullUpdateTimer = {};
+  m_pollInvitationsTimer = {};
   m_fullStatusRequired = true;
 }
 

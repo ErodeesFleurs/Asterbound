@@ -85,8 +85,8 @@ public:
     std::shared_ptr<VoiceAudioStream> audioStream;
     std::mutex mutex;
 
-    std::int64_t lastReceiveTime = 0;
-    std::int64_t lastPlayTime = 0;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> lastReceiveTime{};
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> lastPlayTime{};
     float smoothDb = -96.0f;
     Array<float, 10> dbHistory = Array<float, 10>::filled(0);
 
@@ -181,10 +181,10 @@ private:
 
   float m_threshold = -50.0f;
   
-  std::int64_t m_lastSentTime = 0;
-  std::int64_t m_lastInputTime = 0;
-  std::int64_t m_lastThresholdTime = 0;
-  std::int64_t m_nextSaveTime = 0;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastSentTime{};
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastInputTime{};
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastThresholdTime{};
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_nextSaveTime{};
   bool m_enabled = true;
   bool m_inputEnabled = false;
   bool m_loopback = false;

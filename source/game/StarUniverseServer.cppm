@@ -177,7 +177,7 @@ public:
   bool isWorldActive(WorldId const& worldId) const;
 
   List<ConnectionId> clientIds() const;
-  [[nodiscard]] std::expected<List<std::pair<ConnectionId, std::int64_t>>, StarException> clientIdsAndCreationTime() const;
+  [[nodiscard]] std::expected<List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>>, StarException> clientIdsAndCreationTime() const;
   std::size_t numberOfClients() const;
   std::uint32_t maxClients() const;
   bool isConnectedClient(ConnectionId clientId) const;
@@ -260,7 +260,7 @@ private:
   bool shutdownThreadsJoined() const;
 
   struct TimeoutBan {
-    std::int64_t banExpiry;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> banExpiry;
     String reason;
     std::optional<HostAddress> ip;
     std::optional<Uuid> uuid;
@@ -398,9 +398,9 @@ private:
   std::shared_ptr<UniverseSettings> m_universeSettings;
   WorkerPool m_workerPool;
 
-  std::int64_t m_storageTriggerDeadline;
-  std::int64_t m_clearBrokenWorldsDeadline;
-  std::int64_t m_lastClockUpdateSent;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_storageTriggerDeadline;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_clearBrokenWorldsDeadline;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastClockUpdateSent;
   std::atomic<bool> m_stop;
   std::atomic<TcpState> m_tcpState;
 
@@ -424,7 +424,7 @@ private:
 
   std::recursive_mutex m_connectionAcceptThreadsMutex;
   List<ThreadFunction<void>> m_connectionAcceptThreads;
-  LinkedList<std::pair<UniverseConnection, std::int64_t>> m_deadConnections;
+  LinkedList<std::pair<UniverseConnection, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> m_deadConnections;
 
   std::shared_ptr<ChatProcessor> m_chatProcessor;
   std::shared_ptr<CommandProcessor> m_commandProcessor;

@@ -19,7 +19,6 @@ import star.thread;
 import star.string;
 import star.format;
 import star.output_proxy;
-import star.time;
 import star.logging;
 
 #ifdef MAXCOMLEN
@@ -129,17 +128,17 @@ void lockWithDiagnostics(std::unique_lock<std::recursive_mutex>& lock) {
 }
 
 void Thread::sleepPrecise(unsigned msecs) {
-  std::int64_t now = Time::monotonicMilliseconds();
-  std::int64_t deadline = now + msecs;
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto deadline = now + std::chrono::milliseconds(msecs);
 
-  while (deadline - now > 10) {
-    usleep((deadline - now - 10) * 1000);
-    now = Time::monotonicMilliseconds();
+  while (deadline - now > std::chrono::milliseconds(10)) {
+    usleep(std::chrono::duration_cast<std::chrono::microseconds>(deadline - now - std::chrono::milliseconds(10)).count());
+    now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   }
 
   while (deadline > now) {
-    usleep((deadline - now) * 500);
-    now = Time::monotonicMilliseconds();
+    usleep(std::chrono::duration_cast<std::chrono::microseconds>(deadline - now).count() / 2);
+    now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   }
 }
 

@@ -72,15 +72,14 @@ TEST(ClockTest, StoppedCountdownPreservesClippingAndSignedRounding) {
   EXPECT_EQ(expired.millisecondsLeft(true), -1500);
 }
 
-TEST(ClockTest, NumericTickConversionsPreserveUnitsAndRounding) {
-  constexpr std::int64_t frequency = 1'000'000'000;
-  EXPECT_DOUBLE_EQ(Time::ticksToSeconds(1'500'000'000, frequency), 1.5);
-  EXPECT_EQ(Time::ticksToMilliseconds(1'234'500'000, frequency), 1235);
-  EXPECT_EQ(Time::ticksToMilliseconds(-1'234'500'000, frequency), -1234);
-  EXPECT_EQ(Time::ticksToMicroseconds(1'234'500, frequency), 1235);
-  EXPECT_EQ(Time::ticksToMicroseconds(-1'234'500, frequency), -1234);
-  EXPECT_EQ(Time::secondsToTicks(1.25, frequency), 1'250'000'000);
-  EXPECT_EQ(Time::secondsToTicks(-1.25, frequency), -1'250'000'000);
-  EXPECT_EQ(Time::millisecondsToTicks(1250, frequency), 1'250'000'000);
-  EXPECT_EQ(Time::microsecondsToTicks(-1250, frequency), -1'250'000);
+TEST(ClockTest, LocalCalendarPreservesSubsecondsAcrossSecondBoundary) {
+  auto base = std::chrono::sys_days(std::chrono::year(2024) / 1 / 15) + std::chrono::hours(12);
+  auto whole = Time::localTime(base);
+  ASSERT_TRUE(whole) << whole.error().what();
+  auto before = Time::localTime(base + std::chrono::milliseconds(999));
+  ASSERT_TRUE(before) << before.error().what();
+  auto after = Time::localTime(base + std::chrono::milliseconds(1001));
+  ASSERT_TRUE(after) << after.error().what();
+  EXPECT_EQ(*before - *whole, std::chrono::milliseconds(999));
+  EXPECT_EQ(*after - *before, std::chrono::milliseconds(2));
 }

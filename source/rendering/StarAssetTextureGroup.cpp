@@ -12,7 +12,6 @@ import star.asset_path;
 import star.string;
 import star.bi_map;
 import star.listener;
-import star.time;
 import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;
@@ -58,15 +57,17 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
     m_textureDeduplicationMap.clear();
 
   } else {
-    std::int64_t time = Time::monotonicMilliseconds();
-    auto interval = std::clamp<std::int64_t>(textureTimeout / 10, 0, 1000);
+    auto time = std::chrono::time_point_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+    auto timeout = std::chrono::milliseconds(textureTimeout);
+    auto interval = std::clamp(timeout / 10, std::chrono::milliseconds(0), std::chrono::milliseconds(1000));
     if (time - m_lastCleanup < interval)
       return;
     m_lastCleanup = time;
 
     List<std::reference_wrapper<Texture const>> liveTextures;
     filter(m_textureMap, [&](auto const& pair) {
-        if (time - pair.second.second < textureTimeout) {
+        if (time - pair.second.second < timeout) {
           liveTextures.append(std::cref(*pair.second.first));
           return true;
         }
@@ -86,7 +87,8 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
 
 std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPath const& imagePath, bool tryTexture) {
   if (auto p = m_textureMap.maybeRef(imagePath)) {
-    p->get().second = Time::monotonicMilliseconds();
+    p->get().second = std::chrono::time_point_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     return p->get().first;
   }
 
@@ -106,7 +108,8 @@ std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPat
   // in the texture group for these, so we keep track of the image pointers
   // returned to deduplicate them.
   if (auto existingTexture = m_textureDeduplicationMap.value(image)) {
-    auto inserted = m_textureMap.add(imagePath, {existingTexture, Time::monotonicMilliseconds()});
+    auto inserted = m_textureMap.add(imagePath, {existingTexture, std::chrono::time_point_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
     return existingTexture;
@@ -114,7 +117,8 @@ std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPat
     auto texture = m_textureGroup->create(*image);
     if (!texture)
       return std::unexpected(std::move(texture.error()));
-    auto inserted = m_textureMap.add(imagePath, {*texture, Time::monotonicMilliseconds()});
+    auto inserted = m_textureMap.add(imagePath, {*texture, std::chrono::time_point_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
     auto deduplicated = m_textureDeduplicationMap.add(image, *texture);

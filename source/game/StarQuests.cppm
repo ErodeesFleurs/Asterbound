@@ -126,7 +126,7 @@ public:
   std::uint64_t rewardsRevision() const;
 
   // The time when this quest last changed state (active/completed/failed)
-  std::int64_t lastUpdatedOn() const;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> lastUpdatedOn() const;
   bool unread() const;
   void markAsRead();
   bool canTurnIn() const;
@@ -199,7 +199,7 @@ private:
   std::optional<Uuid> m_serverUuid;
   std::size_t m_money;
   List<std::shared_ptr<Item const>> m_rewards;
-  std::int64_t m_lastUpdatedOn;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastUpdatedOn;
   bool m_unread;
   bool m_canTurnIn;
   StringSet m_indicators;

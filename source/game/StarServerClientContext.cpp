@@ -6,7 +6,6 @@ import star.id_map;
 import star.ordered_map;
 import star.lru_cache;
 import star.thread;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.casting;
@@ -263,7 +262,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
-  m_creationTime = Time::monotonicMilliseconds();
+  m_creationTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   return {};
 }
 
@@ -723,7 +722,7 @@ std::expected<Json, StarException> ServerClientContext::storeServerData() {
   };
 }
 
-std::int64_t ServerClientContext::creationTime() const {
+std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> ServerClientContext::creationTime() const {
   return m_creationTime;
 }
 

@@ -7,22 +7,22 @@ import star.thread;
 namespace Star {
 namespace Time {
 
-std::int64_t epochTicks() {
-  return std::chrono::system_clock::now().time_since_epoch().count();
-}
+// Implemented by the platform adapter; calendar conversion can fail.
+std::expected<std::tm, StarException> localCalendarTime(std::time_t time);
 
-std::int64_t epochTickFrequency() {
-  static_assert(std::chrono::system_clock::period::num == 1);
-  return std::chrono::system_clock::period::den;
-}
-
-std::int64_t monotonicTicks() {
-  return std::chrono::steady_clock::now().time_since_epoch().count();
-}
-
-std::int64_t monotonicTickFrequency() {
-  static_assert(std::chrono::steady_clock::period::num == 1);
-  return std::chrono::steady_clock::period::den;
+std::expected<std::chrono::local_time<std::chrono::milliseconds>, StarException>
+localTime(std::chrono::system_clock::time_point time) {
+  auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(time);
+  auto calendar = localCalendarTime(std::chrono::system_clock::to_time_t(wholeSeconds));
+  if (!calendar)
+    return std::unexpected(std::move(calendar.error()));
+  auto date = std::chrono::year(calendar->tm_year + 1900)
+      / std::chrono::month(calendar->tm_mon + 1) / std::chrono::day(calendar->tm_mday);
+  return std::chrono::local_days(date)
+      + std::chrono::hours(calendar->tm_hour)
+      + std::chrono::minutes(calendar->tm_min)
+      + std::chrono::seconds(calendar->tm_sec)
+      + std::chrono::duration_cast<std::chrono::milliseconds>(time - wholeSeconds);
 }
 
 double timeSinceEpoch() {
@@ -43,10 +43,6 @@ std::int64_t monotonicMilliseconds() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed + std::chrono::microseconds(500)).count();
 }
 
-std::int64_t monotonicMicroseconds() {
-  auto elapsed = std::chrono::steady_clock::now().time_since_epoch();
-  return std::chrono::duration_cast<std::chrono::microseconds>(elapsed + std::chrono::nanoseconds(500)).count();
-}
 
 String printDuration(double time) {
   String hours;
@@ -81,37 +77,6 @@ String printDuration(double time) {
   return result;
 }
 
-String printCurrentDateAndTime(String format) {
-  return printDateAndTime(epochTicks(), std::move(format));
-}
-
-double ticksToSeconds(std::int64_t ticks, std::int64_t tickFrequency) {
-  return ticks / (double)tickFrequency;
-}
-
-// Retain the numeric API's half-unit bias followed by truncation toward zero,
-// including its asymmetric rounding for negative countdown values.
-std::int64_t ticksToMilliseconds(std::int64_t ticks, std::int64_t tickFrequency) {
-  std::int64_t ticksPerMs = (tickFrequency + 500) / 1000;
-  return (ticks + ticksPerMs / 2) / ticksPerMs;
-}
-
-std::int64_t ticksToMicroseconds(std::int64_t ticks, std::int64_t tickFrequency) {
-  std::int64_t ticksPerUs = (tickFrequency + 500000) / 1000000;
-  return (ticks + ticksPerUs / 2) / ticksPerUs;
-}
-
-std::int64_t secondsToTicks(double seconds, std::int64_t tickFrequency) {
-  return std::round(seconds * tickFrequency);
-}
-
-std::int64_t millisecondsToTicks(std::int64_t milliseconds, std::int64_t tickFrequency) {
-  return milliseconds * ((tickFrequency + 500) / 1000);
-}
-
-std::int64_t microsecondsToTicks(std::int64_t microseconds, std::int64_t tickFrequency) {
-  return microseconds * ((tickFrequency + 500000) / 1000000);
-}
 
 }
 
@@ -181,7 +146,9 @@ void Clock::setTime(double time) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   updateElapsed();
-  m_elapsed = std::chrono::steady_clock::duration(Time::secondsToTicks(time, Time::monotonicTickFrequency()));
+  auto ticks = std::chrono::duration<double, std::chrono::steady_clock::period>(std::chrono::duration<double>(time));
+  m_elapsed = std::chrono::steady_clock::duration(
+      static_cast<std::chrono::steady_clock::rep>(std::round(ticks.count())));
 }
 
 void Clock::setMilliseconds(std::int64_t millis) {

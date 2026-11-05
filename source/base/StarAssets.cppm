@@ -138,7 +138,8 @@ public:
     // the cache.
     virtual bool shouldPersist() const = 0;
 
-    double time = 0.0;
+    // Keep absolute seconds at double precision before computing cache ages.
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> time{};
     bool needsPostProcessing = false;
     bool forcePersist = false;
   };
@@ -392,7 +393,7 @@ private:
 
   [[nodiscard]] std::expected<std::shared_ptr<AssetData>, StarException> postProcessAudio(std::shared_ptr<AssetData> const& original) const;
 
-  // Updates time on the given asset (with smearing).
+  // Updates the asset's monotonic access time.
   void freshen(std::shared_ptr<AssetData> const& asset) const;
 
   Logger& m_logger;

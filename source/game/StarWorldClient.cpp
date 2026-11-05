@@ -6,7 +6,6 @@ import star.id_map;
 import star.ordered_map;
 import star.lru_cache;
 import star.thread;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.casting;
@@ -303,7 +302,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
     return std::unexpected(std::move(result7.error()));
   m_modifiedTilePredictionTimeout = (int)std::round((std::move(*result7)) / this->root().timing().timestep);
   
-  m_latency = 0.0;
+  m_latency = std::chrono::milliseconds::zero();
   
   auto result8 = m_clientConfig.getObject("blockDamageParticle");
   if (!result8)
@@ -346,7 +345,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result18 = m_clientConfig.getFloat("damageNotificationBatchDuration");
   if (!result18)
     return std::unexpected(std::move(result18.error()));
-  m_damageNotificationBatchDuration = (std::move(*result18));
+  m_damageNotificationBatchDuration = std::chrono::duration<float>(std::move(*result18));
   
   auto result19 = assets->json("/interface.config:ambientTrackFadeInTime");
   if (!result19)
@@ -488,12 +487,12 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
     return std::unexpected(std::move(result42.error()));
   m_modifiedTilePredictionTimeout = (int)std::round((std::move(*result42)) / this->root().timing().timestep);
   
-  m_latency = 0.0;
+  m_latency = std::chrono::milliseconds::zero();
   
   auto result43 = m_clientConfig.getFloat("damageNotificationBatchDuration");
   if (!result43)
     return std::unexpected(std::move(result43.error()));
-  m_damageNotificationBatchDuration = (std::move(*result43));
+  m_damageNotificationBatchDuration = std::chrono::duration<float>(std::move(*result43));
   
   auto result44 = clearWorld();
   if (!result44)
@@ -590,7 +589,7 @@ void WorldClient::setRespawnInWorld(bool respawnInWorld) {
 }
 
 std::int64_t WorldClient::latency() const {
-  return m_latency;
+  return m_latency.count();
 }
 
 std::expected<void, StarException> WorldClient::resendEntity(EntityId entityId) {
@@ -1124,7 +1123,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (!result54)
     return std::unexpected(std::move(result54.error()));
   float pulseRate = (std::move(*result54));
-  float pulseLevel = 1 - pulseAmount * 0.5 * (std::sin(2 * std::numbers::pi * pulseRate * Time::monotonicMilliseconds() / 1000.0) + 1);
+  float pulseLevel = 1 - pulseAmount * 0.5 * (std::sin(2 * std::numbers::pi * pulseRate * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count() / 1000.0) + 1);
   
   bool inspecting = m_mainPlayer->inspecting();
   
@@ -2038,12 +2037,12 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result149.error()));
     } else if (auto pongPacket = as<PongPacket>(packet)) {
       if (pongPacket->time) {
-        m_latency = Time::monotonicMilliseconds() - pongPacket->time;
+        m_latency = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>(std::chrono::milliseconds(pongPacket->time));
       } else if (m_pingTime) {
         auto result150 = takeOptional(m_pingTime);
         if (!result150)
           return std::unexpected(std::move(result150.error()));
-        m_latency = Time::monotonicMilliseconds() - (std::move(*result150));
+        m_latency = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - (std::move(*result150));
       }
     } else {
       auto result151 = this->root().logger().error("Improper packet type {} received by client", (int)packet->type());
@@ -2117,10 +2116,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return std::unexpected(std::move(result153.error()));
   auto assets = (std::move(*result153));
   
-  float expireTime = std::min(float(m_latency + 800), 2000.f);
-  auto now = Time::monotonicMilliseconds();
+  auto expireTime = std::min(std::chrono::duration<float, std::milli>(float((m_latency + std::chrono::milliseconds(800)).count())), std::chrono::duration<float, std::milli>(2000.f));
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   eraseWhere(m_predictedTiles, [&, &self = *this](auto& pair) {
-    float expiry = (float)(now - pair.second.time) / expireTime;
+    float expiry = std::chrono::duration<float, std::milli>(float((now - pair.second.time).count())) / expireTime;
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
     auto poly = PolyF(RectF::withCenter(center, size));
@@ -2334,7 +2333,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
                 return std::unexpected(std::move(result174.error()));
               if ((std::move(*result174)) != 0) {
                 m_startupHiddenEntities.erase(itemDrop->entityId());
-                auto result175 = itemDrop->takeBy(m_mainPlayer->entityId(), (float)m_latency / 1000);
+                auto result175 = itemDrop->takeBy(m_mainPlayer->entityId(), (float)m_latency.count() / 1000);
                 if (!result175)
                   return std::unexpected(std::move(result175.error()));
                 m_outgoingPackets.append(std::make_shared<RequestDropPacket>(itemDrop->entityId()));
@@ -2536,11 +2535,11 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return std::unexpected(std::move(result194.error()));
   
   if ((!m_clientState->netCompatibilityRules().isLegacy() && m_currentStep % 3 == 0) || !m_pingTime.has_value()) {
-    m_pingTime = Time::monotonicMilliseconds();
-    m_outgoingPackets.append(std::make_shared<PingPacket>(*m_pingTime));
+    m_pingTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+    m_outgoingPackets.append(std::make_shared<PingPacket>(m_pingTime->time_since_epoch().count()));
   }
   
-  this->root().logMap().set(strf("client_{}_ping",m_subWorldId), m_latency);
+  this->root().logMap().set(strf("client_{}_ping",m_subWorldId), m_latency.count());
   
   // Remove active sectors that are outside of the current monitoring region
   Set<ClientTileSectorArray::Sector> neededSectors;
@@ -2920,7 +2919,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
   
   for (auto it = m_damageNumbers.begin(); it != m_damageNumbers.end();) {
     auto const& entry = *it;
-    if (Time::monotonicTime() - entry.second.timestamp > m_damageNotificationBatchDuration) {
+    if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - entry.second.timestamp > m_damageNotificationBatchDuration) {
       auto result214 = renderParticle(entry.second.position, entry.second.amount, entry.first.damageNumberParticleKind);
       if (!result214)
         return std::unexpected(std::move(result214.error()));
@@ -2975,7 +2974,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
           return std::unexpected(std::move(result221.error()));
       }
       number.amount = 0;
-      number.timestamp = Time::monotonicTime();
+      number.timestamp = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
     }
     
     if (damageNotification.hitType != HitType::Kill) {
@@ -3192,7 +3191,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
 }
 
 std::expected<void, StarException> WorldClient::lightingTileGather() {
-  std::int64_t start = Time::monotonicMicroseconds();
+  auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   Vec3F environmentLight = m_sky->environmentLight().toRgbF();
   float undergroundLevel = m_worldTemplate->undergroundLevel();
   auto result234 = this->root().liquidsDatabase();
@@ -3211,14 +3210,14 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
                                              *liquidsDatabase, environmentLight, undergroundLevel);
   if (!result237)
     return std::unexpected(std::move(result237.error()));
-  this->root().logMap().set("client_render_world_async_light_gather", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - start));
+  this->root().logMap().set("client_render_world_async_light_gather", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::lightingCalc() {
-  std::int64_t prepWaitStart = Time::monotonicMicroseconds();
+  auto prepWaitStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   std::unique_lock prepLocker(m_lightMapPrepMutex);
-  std::int64_t prepStart = Time::monotonicMicroseconds();
+  auto prepStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   if (!m_pendingLightReady.load()) {
     return {};
   }
@@ -3265,7 +3264,7 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   if (!result248)
     return std::unexpected(std::move(result248.error()));
 
-  std::int64_t prepEnd = Time::monotonicMicroseconds();
+  auto prepEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   prepLocker.unlock();
   
   Vec2I regionMin = m_lightingCalculator.calculationRegion().min();
@@ -3302,22 +3301,22 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   auto result249 = m_lightingCalculator.calculate(m_pendingLightMap);
   if (!result249)
     return std::unexpected(std::move(result249.error()));
-  std::int64_t propagationEnd = Time::monotonicMicroseconds();
-  std::int64_t publicationStart;
+  auto propagationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds> publicationStart;
   {
     std::lock_guard mapLocker(m_lightMapMutex);
-    publicationStart = Time::monotonicMicroseconds();
+    publicationStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     m_lightMinPosition = lightRange.min();
     m_lightMap = std::move(m_pendingLightMap);
   }
-  std::int64_t publicationEnd = Time::monotonicMicroseconds();
-  root.logMap().set("client_render_world_async_light_prep_wait", strf("{:05d}\u00b5s", prepStart - prepWaitStart));
-  root.logMap().set("client_render_world_async_light_prep", strf("{:05d}\u00b5s", prepEnd - prepStart));
-  root.logMap().set("client_render_world_async_light_propagation", strf("{:05d}\u00b5s", propagationEnd - prepEnd));
+  auto publicationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  root.logMap().set("client_render_world_async_light_prep_wait", strf("{:05d}\u00b5s", (prepStart - prepWaitStart).count()));
+  root.logMap().set("client_render_world_async_light_prep", strf("{:05d}\u00b5s", (prepEnd - prepStart).count()));
+  root.logMap().set("client_render_world_async_light_propagation", strf("{:05d}\u00b5s", (propagationEnd - prepEnd).count()));
   root.logMap().set("client_render_world_async_light_publication_wait",
-                    strf("{:05d}\u00b5s", publicationStart - propagationEnd));
+                    strf("{:05d}\u00b5s", (publicationStart - propagationEnd).count()));
   root.logMap().set("client_render_world_async_light_publication",
-                    strf("{:05d}\u00b5s", publicationEnd - publicationStart));
+                    strf("{:05d}\u00b5s", (publicationEnd - publicationStart).count()));
   return {};
 }
 
@@ -3329,11 +3328,11 @@ std::expected<void, StarException> WorldClient::lightingMain() {
       return {};
     }
     
-    std::int64_t start = Time::monotonicMicroseconds();
+    auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     auto result250 = lightingCalc();
     if (!result250)
       return std::unexpected(std::move(result250.error()));
-    this->root().logMap().set("client_render_world_async_light_calc", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - start));
+    this->root().logMap().set("client_render_world_async_light_calc", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   }
   return {};
 }
@@ -4372,7 +4371,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
 }
 
 std::expected<void, StarException> WorldClient::informTilePrediction(Vec2I const& pos, TileModification const& modification) {
-  auto now = Time::monotonicMilliseconds();
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto& p = m_predictedTiles[pos];
   p.time = now;
   if (std::holds_alternative<PlaceMaterial>(modification)) {

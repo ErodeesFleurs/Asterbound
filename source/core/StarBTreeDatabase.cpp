@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 import std;
-import star.time;
 import star.string;
 import star.list;
 import star.io_device;
@@ -1641,7 +1640,7 @@ namespace Star {
 
     BlockIndex count = 1; // 1 to include root index
 
-    double start = Time::monotonicTime();
+    auto start = std::chrono::steady_clock::now();
     BTreeImpl storage(*this);
     auto result150 = storage.loadIndex(storage.rootPointer());
     if (!result150) return std::unexpected(std::move(result150.error()));
@@ -1675,7 +1674,7 @@ namespace Star {
 
     auto result156 = m_device->deviceName();
     if (!result156) return std::unexpected(std::move(result156.error()));
-    auto finishedLogged = m_logger.info("[BTreeDatabase] Finished flattening '{}' in {:.2f} milliseconds", *result156, (Time::monotonicTime() - start) * 1000.f);
+    auto finishedLogged = m_logger.info("[BTreeDatabase] Finished flattening '{}' in {:.2f} milliseconds", *result156, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     if (!finishedLogged) return std::unexpected(std::move(finishedLogged.error()));
     return true;
   }

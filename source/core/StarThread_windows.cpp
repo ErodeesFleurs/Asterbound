@@ -9,7 +9,6 @@ import star.thread;
 import star.string;
 import star.format;
 import star.output_proxy;
-import star.time;
 import star.logging;
 
 import star.algorithm;
@@ -90,20 +89,20 @@ struct ThreadFunctionImpl : ThreadImpl {
 };
 
 void Thread::sleepPrecise(unsigned msecs) {
-  std::int64_t now = Time::monotonicMilliseconds();
-  std::int64_t deadline = now + msecs;
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto deadline = now + std::chrono::milliseconds(msecs);
 
-  while (deadline - now > 10) {
-    Sleep(deadline - now - 10);
-    now = Time::monotonicMilliseconds();
+  while (deadline - now > std::chrono::milliseconds(10)) {
+    Sleep((deadline - now - std::chrono::milliseconds(10)).count());
+    now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   }
 
   while (deadline > now) {
-    if (deadline - now >= 2)
-      Sleep((deadline - now) / 2);
+    if (deadline - now >= std::chrono::milliseconds(2))
+      Sleep(((deadline - now) / 2).count());
     else
       Sleep(0);
-    now = Time::monotonicMilliseconds();
+    now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   }
 }
 

@@ -16,7 +16,6 @@ import star.string_view;
 import star.thread;
 import star.directives;
 import star.font_texture_group;
-import star.time;
 import star.logging;
 import star.root;
 
@@ -28,8 +27,10 @@ FontTextureGroup::FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> tex
   : m_root(root), m_textureGroup(std::move(textureGroup)) {}
 
 void FontTextureGroup::cleanup(std::int64_t timeout) {
-  std::int64_t currentTime = Time::monotonicMilliseconds();
-  eraseWhere(m_glyphs, [&](auto const& p) { return currentTime - p.second.time > timeout; });
+  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto timeToLive = std::chrono::milliseconds(timeout);
+  eraseWhere(m_glyphs, [&](auto const& p) { return currentTime - p.second.time > timeToLive; });
 }
 
 std::expected<void, StarException> FontTextureGroup::switchFont(String const& font) {
@@ -95,7 +96,8 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
     processingDirectives.reset();
   GlyphDescriptor descriptor{c, size, processingDirectives ? processingDirectives->get().hash() : 0, std::ref(font)};
   if (auto cached = m_glyphs.maybeRef(descriptor)) {
-    cached->get().time = Time::monotonicMilliseconds();
+    cached->get().time = std::chrono::time_point_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     return std::cref(cached->get());
   }
 
@@ -151,7 +153,8 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
   if (!texture)
     return std::unexpected(std::move(texture.error()));
   glyphTexture.texture = std::move(*texture);
-  glyphTexture.time = Time::monotonicMilliseconds();
+  glyphTexture.time = std::chrono::time_point_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto inserted = m_glyphs.add(descriptor, std::move(glyphTexture));
   if (!inserted)
     return std::unexpected(std::move(inserted.error()));

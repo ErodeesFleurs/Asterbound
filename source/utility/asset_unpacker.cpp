@@ -3,7 +3,6 @@ import star.io_device;
 import star.json;
 import star.asset_source;
 import star.thread;
-import star.time;
 import star.json_extra;
 import star.file;
 import star.string;
@@ -22,7 +21,7 @@ using namespace Star;
 
 [[nodiscard]]
 static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
-  double startTime = Time::monotonicTime();
+  auto startTime = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
@@ -121,7 +120,7 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
       return std::unexpected(std::move(written.error()));
   }
 
-  coutf("Unpacked assets to {} in {}s\n", outputFolderPath, Time::monotonicTime() - startTime);
+  coutf("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count());
   return 0;
 }
 

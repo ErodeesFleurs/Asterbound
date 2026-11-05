@@ -1,7 +1,5 @@
 module;
 import std;
-import star.thread;
-import star.time;
 
 export module star.tick_rate_monitor;
 
@@ -26,10 +24,9 @@ public:
   double rate() const;
 
 private:
-  void dropOff(double currentTime);
-
-  double m_window;
-  double m_lastTick;
+  std::chrono::duration<double> m_window;
+  // Retain absolute double-seconds quantization before subtracting tick times.
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_lastTick;
   double m_ticks;
 };
 
@@ -84,30 +81,30 @@ TickRateMonitor::TickRateMonitor(double window) : m_window(window) {
 }
 
 double TickRateMonitor::window() const {
-  return m_window;
+  return m_window.count();
 }
 
 void TickRateMonitor::reset() {
-  m_lastTick = Time::monotonicTime() - m_window;
+  m_lastTick = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_window;
   m_ticks = 0;
 }
 
 double TickRateMonitor::tick(unsigned count) {
-  double currentTime = Time::monotonicTime();
+  auto currentTime = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
 
   if (m_lastTick > currentTime) {
     m_lastTick = currentTime - m_window;
     m_ticks = 0;
   } else if (m_lastTick < currentTime) {
-    double timePast = currentTime - m_lastTick;
-    double rate = m_ticks / m_window;
-    m_ticks = std::max(0.0, m_ticks - timePast * rate);
+    auto timePast = currentTime - m_lastTick;
+    double rate = m_ticks / m_window.count();
+    m_ticks = std::max(0.0, m_ticks - timePast.count() * rate);
     m_lastTick = currentTime;
   }
 
   m_ticks += count;
 
-  return m_ticks / m_window;
+  return m_ticks / m_window.count();
 }
 
 double TickRateMonitor::rate() const {

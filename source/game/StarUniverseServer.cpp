@@ -15,10 +15,10 @@ import star.hash;
 import star.data_stream;
 import star.string_view;
 import star.thread;
+import star.time;
 import star.directives;
 import star.asset_path;
 import star.id_map;
-import star.time;
 import star.string;
 import star.lock_file;
 import star.rpc_promise;
@@ -160,8 +160,8 @@ namespace Star {
 
 UniverseServer::UniverseServer(Root& root)
   : Thread("UniverseServer"), m_root(root), m_isLocal(false),
-    m_workerPool("UniverseServerWorkerPool"), m_storageTriggerDeadline(0), m_clearBrokenWorldsDeadline(0),
-    m_lastClockUpdateSent(0), m_stop(false), m_tcpState(TcpState::No),
+    m_workerPool("UniverseServerWorkerPool"), m_storageTriggerDeadline(), m_clearBrokenWorldsDeadline(),
+    m_lastClockUpdateSent(), m_stop(false), m_tcpState(TcpState::No),
     m_maxPlayers(0), m_secureWarps(true) {}
 
 std::expected<std::shared_ptr<UniverseServer>, StarException> UniverseServer::create(Root& root, String const& storageDir, bool const& isLocal) {
@@ -443,8 +443,8 @@ List<ConnectionId> UniverseServer::clientIds() const {
   return m_clients.keys();
 }
 
-std::expected<List<std::pair<ConnectionId, std::int64_t>>, StarException> UniverseServer::clientIdsAndCreationTime() const {
-  List<std::pair<ConnectionId, std::int64_t>> result;
+std::expected<List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>>, StarException> UniverseServer::clientIdsAndCreationTime() const {
+  List<std::pair<ConnectionId, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> result;
   ReadLocker clientsLocker(m_clientsLock);
   result.reserve(m_clients.size());
   for (auto& pair : m_clients)
@@ -1051,7 +1051,7 @@ std::expected<void, StarException> UniverseServer::runLoop() {
       if (auto logged = m_root.logger().errorException("UniverseServer: exception caught", ExceptionDiagnostic(update.error())); !logged)
         return std::unexpected(std::move(logged.error()));
     }
-    Thread::sleep(*interval);
+    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<unsigned>(*interval)));
   }
   return {};
 }
@@ -1488,8 +1488,8 @@ std::expected<void, StarException> UniverseServer::sendClockUpdates() {
   auto interval = json->toInt();
   if (!interval)
     return std::unexpected(std::move(interval.error()));
-  auto now = Time::monotonicMilliseconds();
-  if (now > m_lastClockUpdateSent + *interval) {
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  if (now > m_lastClockUpdateSent + std::chrono::milliseconds(*interval)) {
     auto packet = std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time());
     for (auto clientId : m_clients | std::views::keys) {
       if (m_disconnectingClients.contains(clientId))
@@ -1560,7 +1560,7 @@ std::expected<void, StarException> UniverseServer::kickErroredPlayers() {
 }
 
 std::expected<void, StarException> UniverseServer::reapConnections() {
-  auto start = Time::monotonicMilliseconds();
+  auto start = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
@@ -1611,7 +1611,7 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
       auto activity = m_connectionServer->lastActivityTime(clientId);
       if (!activity)
         return std::unexpected(std::move(activity.error()));
-      if (start - *activity > *timeout) {
+      if (start - *activity > std::chrono::milliseconds(*timeout)) {
         if (auto logged = m_root.logger().info("UniverseServer: Kicking client {} due to inactivity", client->descriptiveName()); !logged)
           return std::unexpected(std::move(logged.error()));
         reason = "Disconnected due to inactivity";
@@ -1638,7 +1638,7 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
     }
     if (*sent)
       connection.second = start;
-    return connection.first.isOpen() && start - connection.second < *timeout;
+    return connection.first.isOpen() && start - connection.second < std::chrono::milliseconds(*timeout);
   });
   if (error)
     return std::unexpected(std::move(*error));
@@ -2162,7 +2162,7 @@ std::expected<void, StarException> UniverseServer::processChat() {
 std::expected<void, StarException> UniverseServer::clearBrokenWorlds() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (Time::monotonicMilliseconds() >= m_clearBrokenWorldsDeadline) {
+  if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) >= m_clearBrokenWorldsDeadline) {
     for (auto it = m_worlds.begin(); it != m_worlds.end();) {
       if (!it->second) {
         auto name = printWorldId(it->first);
@@ -2184,7 +2184,7 @@ std::expected<void, StarException> UniverseServer::clearBrokenWorlds() {
     auto interval = json->toInt();
     if (!interval)
       return std::unexpected(std::move(interval.error()));
-    m_clearBrokenWorldsDeadline = Time::monotonicMilliseconds() + *interval;
+    m_clearBrokenWorldsDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*interval);
   }
   return {};
 }
@@ -2521,7 +2521,7 @@ std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
   ReadLocker clientsLocker(m_clientsLock);
-  if (Time::monotonicMilliseconds() < m_storageTriggerDeadline)
+  if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) < m_storageTriggerDeadline)
     return {};
   if (auto logged = m_root.logger().debug("UniverseServer: periodic sync to disk"); !logged)
     return std::unexpected(std::move(logged.error()));
@@ -2579,7 +2579,7 @@ std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
   auto interval = json->toInt();
   if (!interval)
     return std::unexpected(std::move(interval.error()));
-  m_storageTriggerDeadline = Time::monotonicMilliseconds() + *interval;
+  m_storageTriggerDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*interval);
   return m_celestialDatabase->cleanupAndCommit();
 }
 
@@ -2952,7 +2952,7 @@ std::expected<void, StarException> UniverseServer::doTempBan(ConnectionId client
     if (!clientContext->remoteAddress())
       return {};
 
-    auto banExpiry = Time::monotonicMilliseconds() + timeout * 1000;// current time is in millis, conversion factor
+    auto banExpiry = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(timeout * 1000);
     std::optional<HostAddress> ip;
     if (banType.first)
       ip = clientContext->remoteAddress();
@@ -3017,7 +3017,7 @@ std::expected<void, StarException> UniverseServer::doPermBan(ConnectionId client
 std::expected<void, StarException> UniverseServer::removeTimedBan() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  auto currentTime = Time::monotonicMilliseconds();
+  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   m_tempBans.filter([currentTime](TimeoutBan const& b) { return b.banExpiry > currentTime; });
   return {};
 }
@@ -3386,7 +3386,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (auto sent = connection.sendAll(clientWaitLimit); !sent)
         return std::unexpected(std::move(sent.error()));
       lockWithDiagnostics(mainLocker);
-      m_deadConnections.append({std::move(connection), Time::monotonicMilliseconds()});
+      m_deadConnections.append({std::move(connection), std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
       return {};
     }
     bool compressionStream = false;
@@ -3428,7 +3428,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (auto pushed = connection.pushSingle(std::make_shared<ConnectFailurePacket>("connect timeout")); !pushed)
         return std::unexpected(std::move(pushed.error()));
       lockWithDiagnostics(mainLocker);
-      m_deadConnections.append({std::move(connection), Time::monotonicMilliseconds()});
+      m_deadConnections.append({std::move(connection), std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
       return {};
     }
     bool administrator = false;
@@ -3439,7 +3439,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (auto pushed = connection.pushSingle(std::make_shared<ConnectFailurePacket>(std::move(message))); !pushed)
         return std::unexpected(std::move(pushed.error()));
       lockWithDiagnostics(mainLocker);
-      m_deadConnections.append({std::move(connection), Time::monotonicMilliseconds()});
+      m_deadConnections.append({std::move(connection), std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
       return {};
     };
     auto latest = settings->getBool("requireLatestVersion", false);
@@ -3754,7 +3754,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return std::unexpected(accepted.error().withRelated(removed.error(), "Removing failed connection failed"));
       std::unique_lock locker(m_mainLock, std::defer_lock);
       lockWithDiagnostics(locker);
-      m_deadConnections.append({std::move(*removed), Time::monotonicMilliseconds()});
+      m_deadConnections.append({std::move(*removed), std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
     }
   }
   return accepted;
@@ -4018,7 +4018,7 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
   if (registered && departed) {
     auto removed = m_connectionServer->removeConnection(clientId);
     if (record(removed))
-      m_deadConnections.append({std::move(*removed), Time::monotonicMilliseconds()});
+      m_deadConnections.append({std::move(*removed), std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
   }
   if (persisted && departed)
     record(m_root.logger().info("UniverseServer: Client {} disconnected for reason: {}", client->descriptiveName(), reason));

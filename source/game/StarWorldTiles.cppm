@@ -172,7 +172,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 
 // For storing predicted tile state.
 struct PredictedTile {
-  std::int64_t time;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> time;
   std::optional<MaterialId> background;
   std::optional<MaterialHue> backgroundHueShift;
   std::optional<MaterialColorVariant> backgroundColorVariant;

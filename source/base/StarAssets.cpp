@@ -19,7 +19,6 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.file;
-import star.time;
 import star.io_device;
 import star.string;
 import star.json_parser;
@@ -827,7 +826,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         auto memoryName = strf("{}::{}", *sourceName, groupName);
         JsonObject memoryMetadata{{"name", memoryName}};
         auto memoryAssets = std::make_shared<MemoryAssetSource>(memoryName, memoryMetadata);
-        auto now = Time::monotonicTime();
+        auto now = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
         auto scriptGroupText = Json(**scriptGroup).repr();
         if (!scriptGroupText)
           return std::unexpected(std::move(scriptGroupText.error()));
@@ -887,7 +886,9 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
-        logged = m_logger.info("Took {} seconds to run {} scripts {}", Time::monotonicTime() - now, groupName, *scriptGroupText);
+        logged = m_logger.info("Took {} seconds to run {} scripts {}",
+            (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - now).count(),
+            groupName, *scriptGroupText);
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         if (!memoryAssets->empty()) {
@@ -1374,7 +1375,7 @@ void Assets::clearCache() {
 void Assets::cleanup() {
   std::lock_guard assetsLocker(m_assetsMutex);
 
-  double time = Time::monotonicTime();
+  auto time = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
   HashSet<AssetData const*> keepLonger;
   if (m_settings.referenceImageTimeToLive > m_settings.assetTimeToLive && m_settings.referenceImagePixelBudget != 0) {
     std::vector<ImageData const*> references;
@@ -1401,9 +1402,9 @@ void Assets::cleanup() {
     auto const& pair = *it;
     // Don't clean up broken assets or queued assets.
     if (pair.second && !m_queue.contains(pair.first)) {
-      double liveTime = time - pair.second->time;
-      float timeToLive =
-        keepLonger.contains(pair.second.get()) ? m_settings.referenceImageTimeToLive : m_settings.assetTimeToLive;
+      auto liveTime = time - pair.second->time;
+      auto timeToLive = std::chrono::duration<float>(
+        keepLonger.contains(pair.second.get()) ? m_settings.referenceImageTimeToLive : m_settings.assetTimeToLive);
       if (liveTime > timeToLive) {
         // If the asset should persist, just refresh the access time.
         if (pair.second->shouldPersist())
@@ -1706,7 +1707,7 @@ std::expected<void, StarException> Assets::workerMain() {
     // After processing an asset, unlock the main asset mutex and yield so we
     // don't starve other threads.
     assetsLocker.unlock();
-    Thread::yield();
+    std::this_thread::yield();
   }
   return {};
 }
@@ -2337,7 +2338,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::postPro
 }
 
 void Assets::freshen(std::shared_ptr<AssetData> const& asset) const {
-  asset->time = Time::monotonicTime();
+  asset->time = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
 }
 
 }

@@ -182,8 +182,12 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     if (auto result = File::makeDirectory(m_storageDirectory); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto timestamp = Time::printCurrentDateAndTime("<year>-<month>-<day>-<hours>-<minutes>-<seconds>-<millis>");
-  String filename = strf("{}.luaprofile", timestamp);
+  auto timestamp = Time::localTime(std::chrono::system_clock::now());
+  if (!timestamp)
+    return std::unexpected(std::move(timestamp.error()));
+  auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(*timestamp);
+  auto millis = *timestamp - wholeSeconds;
+  String filename = strf("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
   String path = File::relativeTo(m_storageDirectory, filename);
   if (auto logged = m_root.logger().info("Writing lua profile {}", filename); !logged)
     return std::unexpected(std::move(logged.error()));

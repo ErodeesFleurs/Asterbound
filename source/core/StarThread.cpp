@@ -10,15 +10,6 @@ void lockWithDiagnostics(std::unique_lock<std::recursive_mutex>& lock) {
 }
 #endif
 
-void Thread::sleep(unsigned millis) {
-  std::this_thread::sleep_for(std::chrono::milliseconds(millis));
-}
-
-void Thread::yield() {
-  std::this_thread::yield();
-}
-
-
 ReadersWriterMutex::ReadersWriterMutex()
   : m_readers(), m_writers(), m_readWaiters(), m_writeWaiters() {}
 

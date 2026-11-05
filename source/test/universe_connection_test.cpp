@@ -228,7 +228,7 @@ private:
       auto sent = m_connection.send();
       if (!sent)
         return std::unexpected(std::move(sent.error()));
-      Thread::sleep(ASyncSleepMillis);
+      std::this_thread::sleep_for(std::chrono::milliseconds(ASyncSleepMillis));
       if (!m_connection.isOpen())
         break;
     }

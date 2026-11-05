@@ -80,10 +80,10 @@ private:
 
   struct PolledInvitation {
     explicit PolledInvitation(RandomService& random) : inviterUuid(random) {}
-    PolledInvitation(Uuid uuid, double time) : inviterUuid(std::move(uuid)), polledAt(time) {}
+    PolledInvitation(Uuid uuid, std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> time) : inviterUuid(std::move(uuid)), polledAt(time) {}
 
     Uuid inviterUuid;
-    double polledAt;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> polledAt;
   };
 
   void purgeInvitationsFor(Uuid const& playerUuid);
@@ -104,7 +104,7 @@ private:
   Map<Uuid, PolledInvitation> m_polledInvitations;
 
   unsigned m_maxTeamSize;
-  double m_polledInvitationTimeout;
+  std::chrono::duration<double> m_polledInvitationTimeout;
   bool m_secureTeams;
 
   TeamNumber m_pvpTeamCounter;

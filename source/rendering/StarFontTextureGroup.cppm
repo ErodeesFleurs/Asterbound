@@ -44,7 +44,7 @@ public:
   struct GlyphTexture {
     TexturePtr texture;
     bool colored = false;
-    std::int64_t time = 0;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> time{};
     Vec2F offset;
   };
 
@@ -57,8 +57,8 @@ public:
 
   [[nodiscard]] std::expected<unsigned, StarException> glyphWidth(String::Char c, unsigned fontSize);
 
-  // Removes glyphs that haven't been used in more than the given time in
-  // milliseconds
+  // Removes glyphs that haven't been used in more than the given timeout in
+  // milliseconds (configuration units).
   void cleanup(std::int64_t timeout);
   // Switches the current font
   [[nodiscard]] std::expected<void, StarException> switchFont(String const& font);

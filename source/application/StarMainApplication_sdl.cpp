@@ -46,7 +46,6 @@ import star.texture_atlas;
 import star.renderer_opengl;
 import star.ordered_map;
 import star.lru_cache;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.list;
@@ -779,7 +778,7 @@ public:
       return std::unexpected(std::move(result.error()));
     m_renderer = std::make_shared<ThreadedRenderer>(m_glRenderer, m_dispatcher);
 
-    m_cursorCache.setTimeToLive(30000);
+    m_cursorCache.setTimeToLive(std::chrono::milliseconds(30000));
 
     IMGUI_CHECKVERSION();
     m_imguiContext.reset(ImGui::CreateContext());
@@ -1062,7 +1061,7 @@ private:
     ThreadedRenderer::FrameTicket ticket;
     ImDrawData* drawData = nullptr;
     Application::FrameTimings timings;
-    std::int64_t started = 0;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds> started{};
     bool captureKeyboard = false;
     bool captureText = false;
     bool captureMouse = false;
@@ -1077,24 +1076,24 @@ private:
       frame = std::move(m_pendingFrame);
       m_pendingFrame.reset();
     }
-    auto finishStart = Time::monotonicMicroseconds();
+    auto finishStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     auto result = m_renderer->consumeFrame(frame->ticket);
-    auto guiStart = Time::monotonicMicroseconds();
+    auto guiStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     if (result)
       ImGui_ImplOpenGL3_RenderDrawData(frame->drawData);
-    auto presentStart = Time::monotonicMicroseconds();
+    auto presentStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     if (result && !SDL_GL_SwapWindow(m_sdlWindow.get()))
       result = std::unexpected(ApplicationException::format("Application: Could not present OpenGL frame: {}", SDL_GetError()));
-    auto presentEnd = Time::monotonicMicroseconds();
+    auto presentEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     if (result) {
       m_captureKeyboard = frame->captureKeyboard;
       m_captureText = frame->captureText;
       m_captureMouse = frame->captureMouse;
     }
-    frame->timings.finish += guiStart - finishStart;
-    frame->timings.gui += presentStart - guiStart;
-    frame->timings.present = presentEnd - presentStart;
-    frame->timings.total = presentEnd - frame->started;
+    frame->timings.finish += (guiStart - finishStart).count();
+    frame->timings.gui += (presentStart - guiStart).count();
+    frame->timings.present = (presentEnd - presentStart).count();
+    frame->timings.total = (presentEnd - frame->started).count();
     float rate = result ? m_renderTicker.tick() : 0.0f;
     {
       std::lock_guard lock(m_pipelineMutex);
@@ -1150,18 +1149,18 @@ private:
       if (auto initialized = m_application->renderInit(m_renderer); !initialized)
         return std::unexpected(std::move(initialized.error()));
       m_updateTicker.reset();
-      m_scheduler.reset(Time::monotonicMicroseconds() / 1000000.0);
+      m_scheduler.reset(std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)));
       while (!m_quitRequested) {
         auto observed = m_dispatcher.generation();
-        auto frameStart = Time::monotonicMicroseconds();
+        auto frameStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         if (auto acknowledged = acknowledgeFrame(false); !acknowledged)
           return std::unexpected(std::move(acknowledged.error()));
         if (auto error = takeAudioError())
           return std::unexpected(std::move(*error));
         if (auto events = processOwnerEvents(); !events)
           return std::unexpected(std::move(events.error()));
-        auto updateStart = Time::monotonicMicroseconds();
-        unsigned updatesDue = m_scheduler.updatesDue(updateStart / 1000000.0, m_maxFrameSkip);
+        auto updateStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+        unsigned updatesDue = m_scheduler.updatesDue(updateStart, m_maxFrameSkip);
         auto epoch = m_scheduler.updateEpoch();
         unsigned updateCount = 0;
         for (; updateCount < updatesDue; ++updateCount) {
@@ -1174,10 +1173,10 @@ private:
           }
         }
         // Void native state is coalesced by the main event pump.
-        auto renderStart = Time::monotonicMicroseconds();
+        auto renderStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         bool prepared = false;
-        if (!m_ownerFrame && !m_quitRequested && m_scheduler.beginRender(renderStart / 1000000.0)) {
-          m_renderInterpolation = m_scheduler.interpolation(renderStart / 1000000.0);
+        if (!m_ownerFrame && !m_quitRequested && m_scheduler.beginRender(renderStart)) {
+          m_renderInterpolation = m_scheduler.interpolation(renderStart);
           // Only backend setup touches SDL/GL. Main owns IO until this call
           // returns; afterward it does not touch ImGui until consuming us.
           m_dispatcher.invoke([&] {
@@ -1194,18 +1193,18 @@ private:
           setImguiPresentationActive(false);
           if (!rendered)
             return std::unexpected(std::move(rendered.error()));
-          auto finishStart = Time::monotonicMicroseconds();
+          auto finishStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
           if (auto finished = m_renderer->finishFrame(); !finished)
             return std::unexpected(std::move(finished.error()));
-          auto guiStart = Time::monotonicMicroseconds();
+          auto guiStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
           ImGui::Render();
           imguiFrameActive = false;
           auto& io = ImGui::GetIO();
           auto ticket = m_renderer->frameTicket();
           m_ownerFrame = ticket;
           PresentedFrame frame{ticket, ImGui::GetDrawData(),
-            {updateStart - frameStart, renderStart - updateStart, finishStart - renderStart,
-             guiStart - finishStart, Time::monotonicMicroseconds() - guiStart, 0, 0, 0, updateCount},
+            {(updateStart - frameStart).count(), (renderStart - updateStart).count(), (finishStart - renderStart).count(),
+             (guiStart - finishStart).count(), (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - guiStart).count(), 0, 0, 0, updateCount},
             frameStart, io.WantCaptureKeyboard, io.WantTextInput, io.WantCaptureMouse};
           {
             std::lock_guard lock(m_pipelineMutex);
@@ -1216,17 +1215,16 @@ private:
         }
         if (m_signalHandler.interruptCaught())
           m_quitRequested = true;
-        auto throttleStart = Time::monotonicMicroseconds();
+        auto throttleStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         if (!m_quitRequested) {
-          auto now = throttleStart / 1000000.0;
-          auto sleep = m_ownerFrame ? m_scheduler.updateSleepTime(now) : m_scheduler.sleepTime(now);
-          if (sleep > 0.0)
-            m_dispatcher.wait(observed, std::chrono::duration<double>(sleep));
+          auto sleep = m_ownerFrame ? m_scheduler.updateSleepTime(throttleStart) : m_scheduler.sleepTime(throttleStart);
+          if (sleep > std::chrono::duration<double>::zero())
+            m_dispatcher.wait(observed, sleep);
         }
         if (!prepared) {
-          auto end = Time::monotonicMicroseconds();
-          m_application->recordFrameTimings({updateStart - frameStart, renderStart - updateStart,
-            0, 0, 0, 0, end - throttleStart, end - frameStart, updateCount});
+          auto end = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+          m_application->recordFrameTimings({(updateStart - frameStart).count(), (renderStart - updateStart).count(),
+            0, 0, 0, 0, (end - throttleStart).count(), (end - frameStart).count(), updateCount});
         }
       }
       return {};
@@ -1369,11 +1367,11 @@ private:
     }
 
     void setTargetUpdateRate(float targetUpdateRate) override {
-      parent.m_scheduler.setUpdateRate(targetUpdateRate, Time::monotonicMicroseconds() / 1000000.0);
+      parent.m_scheduler.setUpdateRate(targetUpdateRate, std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)));
     }
 
     void setTargetRenderRate(float rate) override {
-      parent.m_scheduler.setRenderRate(rate, Time::monotonicMicroseconds() / 1000000.0);
+      parent.m_scheduler.setRenderRate(rate, std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)));
     }
 
     float renderInterpolation() const override {

@@ -60,8 +60,8 @@ private:
   static constexpr std::string_view GAME_DIR = "starbound";
   static constexpr std::string_view GAME_DESC = "Starbound";
   static constexpr std::string_view GAME_TYPE = "SMP";
-  static constexpr std::int32_t challengeCheckInterval = 30000;
-  static constexpr std::int32_t responseCacheTime = 5000;
+  static constexpr std::chrono::milliseconds challengeCheckInterval{30000};
+  static constexpr std::chrono::milliseconds responseCacheTime{5000};
 
   [[nodiscard]] std::expected<void, StarException> sendTo(HostAddressWithPort const& address, DataStreamBuffer const& ds);
   [[nodiscard]] std::expected<bool, StarException> processPacket(HostAddressWithPort const& address, std::span<std::uint8_t const> data);
@@ -88,11 +88,11 @@ private:
   class RequestChallenge {
   public:
     explicit RequestChallenge(RandomService& random);
-    bool before(std::uint64_t time);
+    bool before(std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<std::uint64_t, std::milli>> time);
     std::int32_t getChallenge();
 
   private:
-    std::uint64_t m_time;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<std::uint64_t, std::milli>> m_time;
     std::int32_t m_challenge;
   };
 
@@ -100,10 +100,10 @@ private:
   std::uint8_t m_maxPlayers;
   String m_serverName;
   HashMap<HostAddress, std::shared_ptr<RequestChallenge>> m_validChallenges;
-  std::int64_t m_lastChallengeCheck;
-  std::int64_t m_lastPlayersResponse;
-  std::int64_t m_lastRulesResponse;
-  std::int64_t m_lastActiveTime;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastChallengeCheck;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastPlayersResponse;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastRulesResponse;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastActiveTime;
 };
 
 }

@@ -29,7 +29,6 @@ import star.game_types;
 import star.material_types;
 import star.ordered_map;
 import star.lru_cache;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.image;
@@ -497,7 +496,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    float pulse = (float)std::sin(2 * std::numbers::pi * 4.0 * Time::monotonicTime());
+    float pulse = (float)std::sin(2 * std::numbers::pi * 4.0 * std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()).time_since_epoch().count());
     float pulseA = 0.85 - pulse * 0.15f;
     float pulseB = 0.85 + pulse * 0.15f;
     Color color = itemOwner->get().favoriteColor().mix(Color::White);

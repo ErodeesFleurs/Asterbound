@@ -7,8 +7,6 @@ import star.hash;
 import star.ordered_map;
 import star.block_allocator;
 import star.lru_cache;
-import star.thread;
-import star.time;
 import star.random;
 
 import star.algorithm;
@@ -21,13 +19,13 @@ public:
   typedef typename LruCacheType::Value::second_type Value;
 
   explicit TtlCacheBase(RandomService& random);
-  TtlCacheBase(RandomService& random, std::int64_t timeToLive, int timeSmear = 1000, std::size_t maxSize = NPos, bool ttlUpdateEnabled = true);
+  TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear = std::chrono::milliseconds(1000), std::size_t maxSize = NPos, bool ttlUpdateEnabled = true);
 
-  std::int64_t timeToLive() const;
-  void setTimeToLive(std::int64_t timeToLive);
+  std::chrono::milliseconds timeToLive() const;
+  void setTimeToLive(std::chrono::milliseconds timeToLive);
 
-  int timeSmear() const;
-  void setTimeSmear(int timeSmear);
+  std::chrono::milliseconds timeSmear() const;
+  void setTimeSmear(std::chrono::milliseconds timeSmear);
 
   // If a max size is set, this cache also acts as an LRU cache with the given
   // maximum size.
@@ -94,23 +92,24 @@ private:
   // The owning service must outlive this cache.
   std::reference_wrapper<RandomService> m_random;
   LruCacheType m_cache;
-  std::int64_t m_timeToLive;
-  int m_timeSmear;
+  std::chrono::milliseconds m_timeToLive;
+  // Sampling retains the historical int endpoint conversion for random smear.
+  std::chrono::milliseconds m_timeSmear;
   bool m_ttlUpdateEnabled;
 };
 
-template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::int64_t, Value>>, 1024>>
-using TtlCache = TtlCacheBase<LruCache<Key, std::pair<std::int64_t, Value>, Compare, Allocator>>;
+template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>>, 1024>>
+using TtlCache = TtlCacheBase<LruCache<Key, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, Compare, Allocator>>;
 
-template <typename Key, typename Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::int64_t, Value>>, 1024>>
-using HashTtlCache = TtlCacheBase<HashLruCache<Key, std::pair<std::int64_t, Value>, Hash, Equals, Allocator>>;
+template <typename Key, typename Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>>, 1024>>
+using HashTtlCache = TtlCacheBase<HashLruCache<Key, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, Hash, Equals, Allocator>>;
 
 template <typename LruCacheType>
 TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random)
-  : TtlCacheBase(random, 10000, 1000, NPos, true) {}
+  : TtlCacheBase(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(1000), NPos, true) {}
 
 template <typename LruCacheType>
-TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::int64_t timeToLive, int timeSmear, std::size_t maxSize, bool ttlUpdateEnabled)
+TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear, std::size_t maxSize, bool ttlUpdateEnabled)
   : m_random(random) {
   m_cache.setMaxSize(maxSize);
   m_timeToLive = timeToLive;
@@ -119,22 +118,22 @@ TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::int64_t tim
 }
 
 template <typename LruCacheType>
-std::int64_t TtlCacheBase<LruCacheType>::timeToLive() const {
+std::chrono::milliseconds TtlCacheBase<LruCacheType>::timeToLive() const {
   return m_timeToLive;
 }
 
 template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setTimeToLive(std::int64_t timeToLive) {
+void TtlCacheBase<LruCacheType>::setTimeToLive(std::chrono::milliseconds timeToLive) {
   m_timeToLive = timeToLive;
 }
 
 template <typename LruCacheType>
-int TtlCacheBase<LruCacheType>::timeSmear() const {
+std::chrono::milliseconds TtlCacheBase<LruCacheType>::timeSmear() const {
   return m_timeSmear;
 }
 
 template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setTimeSmear(int timeSmear) {
+void TtlCacheBase<LruCacheType>::setTimeSmear(std::chrono::milliseconds timeSmear) {
   m_timeSmear = timeSmear;
 }
 
@@ -180,10 +179,10 @@ template <typename LruCacheType>
 [[nodiscard]] auto TtlCacheBase<LruCacheType>::maybeRef(Key const& key) -> std::expected<std::optional<std::reference_wrapper<Value>>, StarException> {
   if (auto p = m_cache.maybeRef(key)) {
     if (m_ttlUpdateEnabled) {
-      auto smear = m_random.get().randInt(-m_timeSmear, m_timeSmear);
+      auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
       if (!smear)
         return std::unexpected(std::move(smear.error()));
-      p->get().first = Time::monotonicMilliseconds() + *smear;
+      p->get().first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear);
     }
     return std::optional{std::reference_wrapper<Value>(p->get().second)};
   }
@@ -199,10 +198,10 @@ auto TtlCacheBase<LruCacheType>::maybeRef(Key const& key) const -> std::optional
 
 template <typename LruCacheType>
 [[nodiscard]] std::expected<void, StarException> TtlCacheBase<LruCacheType>::set(Key const& key, Value value) {
-  auto smear = m_random.get().randInt(-m_timeSmear, m_timeSmear);
+  auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
   if (!smear)
     return std::unexpected(std::move(smear.error()));
-  m_cache.set(key, std::make_pair(Time::monotonicMilliseconds() + *smear, std::move(value)));
+  m_cache.set(key, std::make_pair(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear), std::move(value)));
   return {};
 }
 
@@ -222,7 +221,7 @@ template <typename LruCacheType>
 template <typename Producer>
   requires std::invocable<Producer&, typename LruCacheType::Key const&>
 [[nodiscard]] auto TtlCacheBase<LruCacheType>::get(Key const& key, Producer&& producer) -> std::expected<std::reference_wrapper<Value>, StarException> {
-  auto result = m_cache.get(key, [&producer](Key const& key) -> std::expected<std::pair<std::int64_t, Value>, StarException> {
+  auto result = m_cache.get(key, [&producer](Key const& key) -> std::expected<std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, StarException> {
       if constexpr (!std::is_function_v<std::remove_reference_t<Producer>> && requires { producer == nullptr; }) {
         if (producer == nullptr)
           return std::unexpected(StarException("Cannot invoke an empty cache producer"));
@@ -231,19 +230,19 @@ template <typename Producer>
         auto produced = std::invoke(producer, key);
         if (!produced)
           return std::unexpected(std::move(produced.error()));
-        return std::pair<std::int64_t, Value>(0, std::move(*produced));
+        return std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>(std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{}, std::move(*produced));
       } else {
-        return std::pair<std::int64_t, Value>(0, std::invoke(producer, key));
+        return std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>(std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{}, std::invoke(producer, key));
       }
     });
   if (!result)
     return std::unexpected(std::move(result.error()));
   auto& value = result->get();
-  if (value.first == 0 || m_ttlUpdateEnabled) {
-    auto smear = m_random.get().randInt(-m_timeSmear, m_timeSmear);
+  if (value.first == std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{} || m_ttlUpdateEnabled) {
+    auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
     if (!smear)
       return std::unexpected(std::move(smear.error()));
-    value.first = Time::monotonicMilliseconds() + *smear;
+    value.first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear);
   }
   return std::reference_wrapper<Value>(value.second);
 }
@@ -262,7 +261,7 @@ template <typename LruCacheType>
 template <typename Filter>
   requires std::is_invocable_r_v<bool, Filter&, typename LruCacheType::Key const&, typename LruCacheType::Value::second_type const&>
 void TtlCacheBase<LruCacheType>::cleanup(Filter&& refreshFilter) {
-  std::int64_t currentTime = Time::monotonicMilliseconds();
+  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   m_cache.removeWhere([&](auto const& key, auto& value) {
       if (refreshFilterPresent(refreshFilter) && std::invoke(refreshFilter, key, std::as_const(value.second))) {
         value.first = currentTime;

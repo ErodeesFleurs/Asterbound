@@ -99,15 +99,15 @@ private:
 
   bool m_hasPendingInvitation;
   std::pair<Uuid, String> m_pendingInvitation;
-  double m_pollInvitationsTimer;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_pollInvitationsTimer;
   List<std::variant<std::pair<String, bool>, StringList>> m_pendingInviteResults;
 
   bool m_fullUpdateRunning;
-  double m_fullUpdateTimer;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_fullUpdateTimer;
 
   bool m_statusUpdateRunning;
-  double m_statusUpdateTimer;
-  std::optional<double> m_lastFullStatusUpdate;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_statusUpdateTimer;
+  std::optional<std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>>> m_lastFullStatusUpdate;
   bool m_fullStatusRequired = true;
 
   List<RpcResponseHandler> m_pendingResponses;

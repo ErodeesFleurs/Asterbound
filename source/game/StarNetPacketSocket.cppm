@@ -54,11 +54,11 @@ public:
 private:
   void calculate();
 
-  float m_calculationWindow;
+  std::chrono::duration<float> m_calculationWindow;
   PacketStats m_stats;
   Map<PacketType, float> m_unmixed;
   std::size_t m_totalBytes;
-  std::int64_t m_lastMixTime;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastMixTime;
 };
 
 // Interface for bidirectional communication using NetPackets, based around a

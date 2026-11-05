@@ -4,7 +4,6 @@ import star.json_extra;
 import star.ordered_map;
 import star.lru_cache;
 import star.thread;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.casting;
@@ -211,7 +210,7 @@ std::uint64_t nextQuestPresentationRevision() {
 Quest::Quest(Root& root)
   : m_root(root),
     m_state(QuestState::New), m_inited(false), m_showDialog(false), m_arcPos(0),
-    m_displayParameters{}, m_money(0), m_lastUpdatedOn(0),
+    m_displayParameters{}, m_money(0), m_lastUpdatedOn(),
     m_unread(true), m_canTurnIn(false), m_presentationRevision(nextQuestPresentationRevision()),
     m_portraitRevision(m_presentationRevision), m_rewardsRevision(m_presentationRevision),
     m_stateRevision(m_presentationRevision), m_scriptComponent(root) {}
@@ -230,7 +229,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
   auto untrackedString = untracked->toString();
   if (!untrackedString) return std::unexpected(std::move(untrackedString.error()));
   quest->m_untrackedIndicator = std::move(*untrackedString);
-  quest->m_lastUpdatedOn = Time::monotonicMilliseconds();
+  quest->m_lastUpdatedOn = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if (arcPos >= arc.quests.size())
     return std::unexpected(StarException::format("Quest arc position {} out of range", arcPos));
   quest->m_arc = arc;
@@ -357,7 +356,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   }
   auto updated = store->getInt("lastUpdatedOn");
   if (!updated) return std::unexpected(std::move(updated.error()));
-  quest->m_lastUpdatedOn = *updated;
+  quest->m_lastUpdatedOn = std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>(std::chrono::milliseconds(*updated));
   auto unread = store->getBool("unread", true);
   if (!unread) return std::unexpected(std::move(unread.error()));
   quest->m_unread = *unread;
@@ -444,7 +443,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   auto rewards = jsonFromList(m_rewards, [&items](auto const& item) { return (*items)->diskStore(item); });
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   result["rewards"] = std::move(*rewards);
-  result["lastUpdatedOn"] = m_lastUpdatedOn;
+  result["lastUpdatedOn"] = m_lastUpdatedOn.time_since_epoch().count();
   result["unread"] = m_unread;
   result["canTurnIn"] = m_canTurnIn;
   result["indicators"] = jsonFromStringSet(m_indicators);
@@ -712,7 +711,7 @@ std::uint64_t Quest::rewardsRevision() const {
   return m_rewardsRevision;
 }
 
-std::int64_t Quest::lastUpdatedOn() const {
+std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> Quest::lastUpdatedOn() const {
   return m_lastUpdatedOn;
 }
 
@@ -858,7 +857,7 @@ bool Quest::hideCrossServer() const {
 void Quest::setState(QuestState state) {
   m_state = state;
   m_stateRevision = nextQuestPresentationRevision();
-  m_lastUpdatedOn = Time::monotonicMilliseconds();
+  m_lastUpdatedOn = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
 }
 
 std::expected<void, StarException> Quest::initScript() {

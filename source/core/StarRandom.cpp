@@ -5,7 +5,6 @@ import star.math_common;
 
 import star.random;
 import star.byte_array;
-import star.time;
 import star.secure_random;
 
 namespace Star {
@@ -186,7 +185,8 @@ std::expected<std::uint64_t, StarException> produceRandomSeed() {
     return std::unexpected(std::move(entropy.error()));
   std::uint64_t random;
   std::memcpy(&random, entropy->ptr(), sizeof(random));
-  return static_cast<std::uint64_t>(Time::monotonicTicks()) * 1099511628211ULL ^ random;
+  return static_cast<std::uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count())
+      * 1099511628211ULL ^ random;
 }
 }
 

@@ -200,7 +200,7 @@ TEST(TtlCache, MoveOnlyProducerAndOptionalRefreshFilters) {
   auto randomResult = RandomService::create();
   ASSERT_TRUE(randomResult);
   auto& random = **randomResult;
-  HashTtlCache<int, int> cache(random, -1, 0, 4, false);
+  HashTtlCache<int, int> cache(random, std::chrono::milliseconds(-1), std::chrono::milliseconds(0), 4, false);
   auto produced = cache.get(1, [value = std::make_unique<int>(42)](int const&) mutable { return *value; });
   ASSERT_TRUE(produced);
   EXPECT_EQ(produced->get(), 42);
@@ -223,4 +223,54 @@ TEST(TtlCache, MoveOnlyProducerAndOptionalRefreshFilters) {
   ASSERT_TRUE(cache.set(3, 30));
   cache.cleanup({});
   EXPECT_TRUE(cache.keys().empty());
+}
+
+TEST(TtlCache, FailedSmearRetainsProducedEntryAndRetriesZeroTimestamp) {
+  RandomService random(123);
+  HashTtlCache<int, int> cache(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(-1), 4, false);
+  unsigned calls = 0;
+  auto produce = [&](int const&) { ++calls; return 42; };
+
+  EXPECT_FALSE(cache.get(1, produce));
+  EXPECT_EQ(cache.currentSize(), 1u);
+  auto retained = std::as_const(cache).maybeRef(1);
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(retained->get(), 42);
+  EXPECT_FALSE(cache.get(1, produce));
+  EXPECT_EQ(calls, 1u);
+
+  cache.setTimeSmear(std::chrono::milliseconds(0));
+  auto initialized = cache.get(1, produce);
+  ASSERT_TRUE(initialized);
+  EXPECT_EQ(initialized->get(), 42);
+  cache.setTimeSmear(std::chrono::milliseconds(-1));
+  auto hit = cache.get(1, produce);
+  ASSERT_TRUE(hit);
+  EXPECT_EQ(hit->get(), 42);
+  EXPECT_EQ(calls, 1u);
+
+  cache.setTtlUpdateEnabled(true);
+  EXPECT_FALSE(cache.maybeRef(1));
+  EXPECT_FALSE(cache.set(1, 99));
+  EXPECT_FALSE(cache.set(2, 20));
+  retained = std::as_const(cache).maybeRef(1);
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(retained->get(), 42);
+  EXPECT_FALSE(std::as_const(cache).maybeRef(2));
+}
+
+TEST(TtlCache, CleanupRefreshInitializesTimestampWithoutSamplingSmear) {
+  RandomService random(123);
+  HashTtlCache<int, int> cache(random, std::chrono::milliseconds(-1), std::chrono::milliseconds(-1), 4, false);
+  unsigned calls = 0;
+  auto produce = [&](int const&) { ++calls; return 42; };
+  EXPECT_FALSE(cache.get(1, produce));
+
+  cache.cleanup([](int const&, int const&) { return true; });
+  auto hit = cache.get(1, produce);
+  ASSERT_TRUE(hit);
+  EXPECT_EQ(hit->get(), 42);
+  EXPECT_EQ(calls, 1u);
+  cache.cleanup();
+  EXPECT_EQ(cache.currentSize(), 0u);
 }

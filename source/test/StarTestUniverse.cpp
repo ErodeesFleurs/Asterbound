@@ -14,7 +14,6 @@ import star.asset_path;
 import star.ref_ptr;
 import star.logging;
 import star.listener;
-import star.time;
 import star.version;
 import star.file;
 import star.id_map;
@@ -327,13 +326,13 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // The client context only exists once the server has answered the connect
   // handshake, and both the warp call and the caller's expectations read it, so
   // let the client settle first.
-  std::int64_t connectStart = Time::monotonicMilliseconds();
-  while (!m_client->clientContext() && Time::monotonicMilliseconds() - connectStart < 60000) {
+  auto connectStart = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  while (!m_client->clientContext() && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - connectStart < std::chrono::milliseconds(60000)) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (!m_client->clientContext())
-      Thread::sleep(16);
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
   if (!m_client->clientContext())
@@ -347,16 +346,16 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // to a celestial world legitimately takes tens of seconds, and a sanitizer
   // build several times that, so the runner's per-case timeout
   // (OPENSTARBOUND_TEST_TIMEOUT) is the practical limit.
-  std::int64_t startTime = Time::monotonicMilliseconds();
+  auto startTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   while (m_mainPlayer->isTeleporting() || std::holds_alternative<std::monostate>(m_client->playerWorld())) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (!m_mainPlayer->isTeleporting() && !std::holds_alternative<std::monostate>(m_client->playerWorld()))
       break;
-    if (Time::monotonicMilliseconds() - startTime > 300000)
+    if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - startTime > std::chrono::milliseconds(300000))
       return std::unexpected(StarException("Timed out waiting for the test player to finish warping"));
-    Thread::sleep(16);
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
   return {};
 }
@@ -373,7 +372,7 @@ std::expected<void, StarException> TestUniverse::update(unsigned times) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    Thread::sleep(16);
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
   return {};
 }
@@ -416,7 +415,8 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
   std::optional<RpcPromise<Json>> barrier;
   auto worldId = currentPlayerWorld();
   auto connectionId = m_client->clientContext()->connectionId();
-  auto start = Time::monotonicMilliseconds();
+  auto start = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto timeout = std::chrono::milliseconds(timeoutMilliseconds);
   bool sampled = false;
   auto assets = m_mainPlayer->root().assets();
   if (!assets)
@@ -434,7 +434,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
     auto updated = update(1);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    if (Time::monotonicMilliseconds() - start >= timeoutMilliseconds)
+    if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - start >= timeout)
       return std::unexpected(TestUniverseTimeoutException(
         strf("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
              ready.firstServerStep, ready.readyServerStep, ready.observedScriptedNpcs, ready.observedCoordinators)));

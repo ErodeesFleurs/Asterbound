@@ -15,7 +15,6 @@ import star.json_rpc;
 import star.strong_typedef;
 import star.game_types;
 import std;
-import star.time;
 import star.map;
 import star.version;
 import star.random;
@@ -159,7 +158,7 @@ void TeamManager::purgeInvitationsFrom(Uuid const& playerUuid) {
 }
 
 void TeamManager::expirePolledInvitations() {
-  double now = Time::monotonicTime();
+  auto now = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
   eraseWhere(m_polledInvitations, [&](auto const& entry) {
     return (now - entry.second.polledAt) >= m_polledInvitationTimeout;
   });
@@ -497,7 +496,7 @@ std::expected<Json, StarException> TeamManager::pollInvitation(Json const& argum
     auto invitation = m_invitations.take(playerUuid);
     if (!invitation) return std::unexpected(std::move(invitation.error()));
     auto invite = std::move(*invitation);
-    m_polledInvitations.try_emplace(playerUuid, m_root.random()).first->second = PolledInvitation{invite.inviterUuid, Time::monotonicTime()};
+    m_polledInvitations.try_emplace(playerUuid, m_root.random()).first->second = PolledInvitation{invite.inviterUuid, std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now())};
     JsonObject result;
     result["inviterUuid"] = invite.inviterUuid.hex();
     result["inviterName"] = invite.inviterName;

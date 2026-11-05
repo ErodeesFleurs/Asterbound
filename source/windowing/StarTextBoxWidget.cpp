@@ -20,7 +20,6 @@ import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.time;
 import star.version;
 import star.string;
 import star.text;
@@ -66,7 +65,7 @@ TextBoxWidget::TextBoxWidget(GuiContext& context, String const& startingText, St
   : Widget(context), m_text(startingText), m_hint(hint), m_callback(std::move(callback)) {
   m_textHidden = false;
   m_regex = "[\\s\\S]*";
-  m_repeatKeyThreshold = 0;
+  m_repeatKeyThreshold = {};
   m_repeatCode = SpecialRepeatKeyCodes::None;
   m_isPressed = false;
   m_isHover = false;
@@ -210,7 +209,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
   if (!focused)
     return std::unexpected(std::move(focused.error()));
   if (*focused) {
-    float cc = 0.6f + 0.4f * std::sin(static_cast<double>(Time::monotonicMilliseconds()) / 300.0);
+    float cc = 0.6f + 0.4f * std::sin(static_cast<double>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count()) / 300.0);
     auto cursorColor = Color::rgbf(cc, cc, cc).toRgba();
     float fontSize = m_textStyle.fontSize;
     auto vertical = context().drawInterfaceLine(
@@ -263,8 +262,8 @@ std::expected<void, StarException> TextBoxWidget::update(float dt) {
   auto updated = Widget::update(dt);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
-  if (m_repeatCode != SpecialRepeatKeyCodes::None && Time::monotonicMilliseconds() >= m_repeatKeyThreshold) {
-    m_repeatKeyThreshold += 50;
+  if (m_repeatCode != SpecialRepeatKeyCodes::None && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) >= m_repeatKeyThreshold) {
+    m_repeatKeyThreshold += std::chrono::milliseconds(50);
     auto length = m_text.size();
     if (!length)
       return std::unexpected(std::move(length.error()));
@@ -536,7 +535,7 @@ std::expected<bool, StarException> TextBoxWidget::sendEvent(InputEvent const& ev
 std::expected<bool, StarException> TextBoxWidget::innerSendEvent(InputEvent const& event) {
   if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
-    m_repeatKeyThreshold = Time::monotonicMilliseconds() + 300LL;
+    m_repeatKeyThreshold = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(300);
     m_repeatCode = SpecialRepeatKeyCodes::None;
     bool selecting = (keyDown.mods & (KeyMod::LShift | KeyMod::RShift)) != KeyMod::NoMod;
     m_repeatSelecting = selecting;

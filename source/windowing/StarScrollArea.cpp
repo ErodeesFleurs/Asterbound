@@ -19,7 +19,6 @@ import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.time;
 import star.version;
 import star.string;
 import star.text;
@@ -68,7 +67,7 @@ static int const ScrollButtonStackSize = 6;
 static int const ScrollThumbSize = 3;
 static int const ScrollThumbOverhead = ScrollThumbSize + ScrollThumbSize;
 static int const ScrollBarTrackOverhead = ScrollButtonStackSize + ScrollButtonStackSize + ScrollThumbOverhead;
-static std::int64_t const ScrollAdvanceTimer = 100;
+static std::chrono::milliseconds const ScrollAdvanceTimer{100};
 
 ScrollThumb::ScrollThumb(GuiContext& context, GuiDirection direction) : Widget(context) {
   m_hovered = false;
@@ -382,7 +381,7 @@ std::expected<Vec2I, StarException> ScrollBar::offsetFromThumbPosition(Vec2I con
 }
 
 ScrollArea::ScrollArea(GuiContext& context) : Widget(context), m_buttonAdvance(0),
-    m_advanceLimiter(Time::monotonicMilliseconds()), m_dragActive(false),
+    m_advanceLimiter(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_dragActive(false),
     m_horizontalScroll(false), m_verticalScroll(true), m_updatesChildren(false) {}
 
 std::expected<std::shared_ptr<ScrollArea>, StarException> ScrollArea::create(GuiContext& context) {
@@ -636,11 +635,11 @@ std::expected<void, StarException> ScrollArea::drawChildren() {
 }
 
 int ScrollArea::advanceFactorHelper() {
-  auto t = Time::monotonicMilliseconds() - m_advanceLimiter;
-  m_advanceLimiter = Time::monotonicMilliseconds();
-  if ((t > ScrollAdvanceTimer) || (t < 0))
+  auto t = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - m_advanceLimiter;
+  m_advanceLimiter = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  if ((t > ScrollAdvanceTimer) || (t < std::chrono::milliseconds::zero()))
     t = ScrollAdvanceTimer;
-  return (int)std::ceil((m_buttonAdvance * t) / (float)ScrollAdvanceTimer);
+  return (int)std::ceil((m_buttonAdvance * t.count()) / (float)ScrollAdvanceTimer.count());
 }
 
 void ScrollArea::setUpdatesChildren(bool slop) {

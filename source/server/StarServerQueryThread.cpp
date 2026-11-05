@@ -15,7 +15,6 @@ import star.root;
 import star.socket;
 import star.string;
 import star.thread;
-import star.time;
 import star.udp;
 import star.universe_server;
 import star.version;
@@ -52,8 +51,8 @@ ServerQueryThread::ServerQueryThread(UniverseServer& universe, std::unique_ptr<U
     : Thread("QueryServer"), m_universe(universe), m_queryServer(std::move(server)), m_stop(true),
       m_playersResponse(A2S_PACKET_SIZE), m_rulesResponse(A2S_PACKET_SIZE), m_generalResponse(A2S_PACKET_SIZE),
       m_serverPort(0), m_maxPlayers(maxPlayers), m_serverName(std::move(serverName)),
-      m_lastChallengeCheck(Time::monotonicMilliseconds()), m_lastPlayersResponse(0), m_lastRulesResponse(0),
-      m_lastActiveTime(0) {
+      m_lastChallengeCheck(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_lastPlayersResponse(), m_lastRulesResponse(),
+      m_lastActiveTime() {
   m_playersResponse.setByteOrder(ByteOrder::LittleEndian);
   m_playersResponse.setNullTerminatedStrings(true);
   m_rulesResponse.setByteOrder(ByteOrder::LittleEndian);
@@ -75,7 +74,7 @@ std::expected<void, StarException> ServerQueryThread::start() {
     m_stop = true;
     return std::unexpected(std::move(started.error()));
   }
-  m_lastActiveTime = Time::monotonicMilliseconds();
+  m_lastActiveTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   return {};
 }
 
@@ -216,7 +215,7 @@ std::expected<bool, StarException> ServerQueryThread::processPacket(HostAddressW
 }
 
 std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
-  std::int64_t now = Time::monotonicMilliseconds();
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if (now < m_lastPlayersResponse + responseCacheTime)
     return {};
   auto clientIds = m_universe.get().clientIdsAndCreationTime();
@@ -233,7 +232,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
     auto name = m_universe.get().clientNick(pair.first);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto timeConnected = float(now - pair.second) / 1000.f;
+    auto timeConnected = float((now - pair.second).count()) / 1000.f;
     auto player = m_playersResponse << i++ << *name << kills << timeConnected;
     if (!player)
       return std::unexpected(std::move(player.error()));
@@ -243,7 +242,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
 }
 
 std::expected<void, StarException> ServerQueryThread::buildRuleResponse() {
-  std::int64_t now = Time::monotonicMilliseconds();
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if (now < m_lastRulesResponse + responseCacheTime)
     return {};
   std::uint16_t count = 1;
@@ -266,7 +265,7 @@ std::expected<void, StarException> ServerQueryThread::sendChallenge(HostAddressW
 }
 
 void ServerQueryThread::pruneChallenges() {
-  std::int64_t now = Time::monotonicMilliseconds();
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if (now < m_lastChallengeCheck + challengeCheckInterval) {
     return;
   }
@@ -312,9 +311,9 @@ std::expected<void, StarException> ServerQueryThread::run() {
 }
 
 ServerQueryThread::RequestChallenge::RequestChallenge(RandomService& random)
-    : m_time(Time::monotonicMilliseconds()), m_challenge(random.randi32()) {}
+    : m_time(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_challenge(random.randi32()) {}
 
-bool ServerQueryThread::RequestChallenge::before(std::uint64_t time) { return m_time < time; }
+bool ServerQueryThread::RequestChallenge::before(std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<std::uint64_t, std::milli>> time) { return m_time < time; }
 
 int ServerQueryThread::RequestChallenge::getChallenge() { return m_challenge; }
 

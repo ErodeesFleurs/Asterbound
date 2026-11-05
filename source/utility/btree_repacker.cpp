@@ -6,7 +6,6 @@ import star.lru_cache;
 import star.data_stream_devices;
 import star.thread;
 import star.btree_database;
-import star.time;
 import star.file;
 import star.string;
 import star.ordered_set;
@@ -25,7 +24,7 @@ using namespace Star;
 [[nodiscard]]
 static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   Logger logger;
-  double startTime = Time::monotonicTime();
+  auto startTime = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
@@ -116,7 +115,7 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   if (!closedOutput)
     return std::unexpected(std::move(closedOutput.error()));
 
-  coutf("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", outputFilename, Time::monotonicTime() - startTime, count, overwritten);
+  coutf("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count(), count, overwritten);
   return 0;
 }
 

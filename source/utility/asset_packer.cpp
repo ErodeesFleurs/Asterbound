@@ -4,7 +4,6 @@ import star.asset_source;
 import star.string;
 import star.directory_asset_source;
 import star.thread;
-import star.time;
 import star.json_extra;
 import star.file;
 import star.ordered_map;
@@ -24,7 +23,7 @@ using namespace Star;
 [[nodiscard]]
 static std::expected<int, StarException> packAssets(int argc, char** argv) {
   Logger logger;
-  double startTime = Time::monotonicTime();
+  auto startTime = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
@@ -138,7 +137,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
   if (!built)
     return std::unexpected(std::move(built.error()));
 
-  coutf("Output packed assets to {} in {}s\n", outputFilename, Time::monotonicTime() - startTime);
+  coutf("Output packed assets to {} in {}s\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count());
   return 0;
 }
 

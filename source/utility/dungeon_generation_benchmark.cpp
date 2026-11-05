@@ -20,7 +20,6 @@ import star.directives;
 import star.asset_path;
 import star.string;
 import star.ordered_set;
-import star.time;
 import star.format;
 import star.version;
 import star.io_device;
@@ -180,15 +179,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     dungeonWorldName = text->get();
   }
 
-  double start = Time::monotonicTime();
-  double lastReport = Time::monotonicTime();
+  auto start = std::chrono::steady_clock::now();
+  auto lastReport = std::chrono::steady_clock::now();
   coutf("testing {} generations of dungeonWorld {}\n", repetitions, dungeonWorldName);
 
   for (unsigned i = 0; i < repetitions; ++i) {
     if (i > 0 && i % reportEvery == 0) {
-      float gps = reportEvery / (Time::monotonicTime() - lastReport);
-      lastReport = Time::monotonicTime();
-      coutf("[{}] {}s | Generations Per Second: {}\n", i, Time::monotonicTime() - start, gps);
+      float gps = reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
+      lastReport = std::chrono::steady_clock::now();
+      coutf("[{}] {}s | Generations Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps);
     }
 
     auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeonWorldName);
@@ -208,7 +207,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(closed.error()));
   }
 
-  coutf("Finished {} generations of dungeonWorld {} in {} seconds", repetitions, dungeonWorldName, Time::monotonicTime() - start);
+  coutf("Finished {} generations of dungeonWorld {} in {} seconds", repetitions, dungeonWorldName, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
   return {};
 }
 

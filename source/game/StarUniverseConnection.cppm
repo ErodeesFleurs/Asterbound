@@ -145,7 +145,7 @@ public:
   bool hasConnection(ConnectionId clientId) const;
   List<ConnectionId> allConnections() const;
   [[nodiscard]] std::expected<bool, StarException> connectionIsOpen(ConnectionId clientId) const;
-  [[nodiscard]] std::expected<std::int64_t, StarException> lastActivityTime(ConnectionId clientId) const;
+  [[nodiscard]] std::expected<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, StarException> lastActivityTime(ConnectionId clientId) const;
 
   [[nodiscard]] std::expected<void, StarException> addConnection(ConnectionId clientId, UniverseConnection connection);
   [[nodiscard]] std::expected<UniverseConnection, StarException> removeConnection(ConnectionId clientId);
@@ -167,7 +167,7 @@ private:
     std::unique_ptr<PacketSocket> packetSocket;
     List<std::shared_ptr<Packet>> sendQueue;
     Deque<std::shared_ptr<Packet>> receiveQueue;
-    std::int64_t lastActivityTime;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> lastActivityTime;
   };
 
   struct WorkerStats {

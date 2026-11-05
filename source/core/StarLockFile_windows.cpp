@@ -5,7 +5,6 @@ import star.format;
 import star.string;
 import star.lock_file;
 import star.thread;
-import star.time;
 import star.string_windows;
 
 namespace Star {
@@ -63,16 +62,18 @@ std::expected<bool, StarException> LockFile::lock(std::int64_t timeout) {
   };
   if (timeout == 0)
     return acquire();
-  auto start = Time::monotonicMilliseconds();
+  auto start = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto timeoutDuration = std::chrono::milliseconds(timeout);
   while (true) {
     auto acquired = acquire();
     if (!acquired)
       return std::unexpected(std::move(acquired.error()));
     if (*acquired)
       return true;
-    if (timeout > 0 && Time::monotonicMilliseconds() - start > timeout)
+    if (timeout > 0 && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - start > timeoutDuration)
       return false;
-    Thread::sleep(timeout < 0 ? MaximumSleepMillis : std::min(timeout / 4, MaximumSleepMillis));
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        timeout < 0 ? MaximumSleepMillis : std::min(timeout / 4, MaximumSleepMillis)));
   }
 }
 

@@ -143,7 +143,7 @@ private:
   bool m_isHover;
   bool m_isPressed;
   SpecialRepeatKeyCodes m_repeatCode;
-  std::int64_t m_repeatKeyThreshold;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_repeatKeyThreshold;
   WidgetCallbackFunc m_callback;
   WidgetCallbackFunc m_onBlur;
   WidgetCallbackFunc m_onEnterKey;

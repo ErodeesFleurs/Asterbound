@@ -9,7 +9,6 @@ import star.vector;
 import star.game_types;
 import star.thread;
 import star.data_stream_devices;
-import star.time;
 import star.logging;
 import star.audio;
 import star.ordered_map;
@@ -222,7 +221,7 @@ Voice::~Voice() {
       if (!logged) EmergencyLog::error("Voice: Error logging capture thread failure: {}", logged.error().what());
     }
   }
-  if (m_nextSaveTime) {
+  if (m_nextSaveTime != std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{}) {
     if (auto result = save(); !result) {
       auto logged = m_root.logger().error("Voice: Error saving settings: {}", result.error().what());
       if (!logged) EmergencyLog::error("Voice: Error logging save failure: {}", logged.error().what());
@@ -307,7 +306,7 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   if (change(m_loopback, *loopback, changed))
     m_clientSpeaker->playing = false;
   if (change(m_inputMode, inputMode, changed))
-    m_lastInputTime = 0;
+    m_lastInputTime = {};
   bool shouldResetEncoder = change(m_bitrate, newBitrate, changed);
   if (change(m_channelMode, channelMode, changed)) {
     closeDevice();
@@ -349,8 +348,8 @@ std::expected<void, StarException> Voice::save() const {
 }
 
 void Voice::scheduleSave() {
-  if (!m_nextSaveTime)
-    m_nextSaveTime = Time::monotonicMilliseconds() + 2000;
+  if (m_nextSaveTime == std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{})
+    m_nextSaveTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(2000);
 }
 
 std::shared_ptr<Voice::Speaker> Voice::setLocalSpeaker(SpeakerId speakerId) {
@@ -409,7 +408,7 @@ void Voice::clearSpeakers() {
 }
 
 void Voice::readAudioData(std::span<std::uint8_t> stream) {
-  auto now = Time::monotonicMilliseconds();
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   bool active = m_encoder && m_encodedChunksLength < 2048
        && (m_inputMode == VoiceInputMode::VoiceActivity || now < m_lastInputTime);
 
@@ -423,7 +422,7 @@ void Voice::readAudioData(std::span<std::uint8_t> stream) {
     if (m_inputMode == VoiceInputMode::VoiceActivity) {
       if (decibels > m_threshold)
         m_lastThresholdTime = now;
-      active = now - m_lastThresholdTime < 50;
+      active = now - m_lastThresholdTime < std::chrono::milliseconds(50);
     }
   }
 
@@ -536,8 +535,8 @@ std::expected<void, StarException> Voice::update(float, PositionalAttenuationFun
     }
   }
 
-  if (m_nextSaveTime && Time::monotonicMilliseconds() > m_nextSaveTime) {
-    m_nextSaveTime = 0;
+  if (m_nextSaveTime != std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{} && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) > m_nextSaveTime) {
+    m_nextSaveTime = {};
     if (auto result = save(); !result)
       return result;
   }
@@ -591,7 +590,7 @@ std::expected<int, StarException> Voice::send(DataStreamBuffer& out, std::size_t
       break;
   }
 
-  m_lastSentTime = Time::monotonicMilliseconds();
+  m_lastSentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if (m_loopback) {
     auto received = receive(m_clientSpeaker, std::string_view(out.span()));
     if (!received) return std::unexpected(std::move(received.error()));
@@ -658,8 +657,8 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
         std::lock_guard lock(speaker->audioStream->mutex);
         auto& samples = speaker->audioStream->samples;
 
-        auto now = Time::monotonicMilliseconds();
-        if (now - speaker->lastReceiveTime < 1000) {
+        auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+        if (now - speaker->lastReceiveTime < std::chrono::milliseconds(1000)) {
           auto limit = (std::size_t)speaker->minimumPlaySamples + 22050;
           if (samples.size() > limit) { // skip ahead if we're getting too far
             for (std::size_t i = samples.size(); i >= limit; --i)
@@ -688,7 +687,7 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
 }
 
 void Voice::setInput(bool input) {
-  m_lastInputTime = (m_deviceOpen && input) ? Time::monotonicMilliseconds() + 1000 : 0;
+  m_lastInputTime = (m_deviceOpen && input) ? std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(1000) : std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{};
 }
 
 std::expected<std::unique_ptr<OpusDecoder, void(*)(OpusDecoder*)>, StarException> Voice::createDecoder(int channels) {
@@ -779,7 +778,7 @@ bool Voice::playSpeaker(std::shared_ptr<Speaker> const& speaker, int) {
     return false;
 
   if (!speaker->playing) {
-    speaker->lastPlayTime = Time::monotonicMilliseconds();
+    speaker->lastPlayTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     speaker->playing = true;
     std::lock_guard lock(m_activeSpeakersMutex);
     m_activeSpeakers.insert(speaker);
@@ -845,7 +844,7 @@ std::expected<void, StarException> Voice::thread() {
     continue;
 
     locker.unlock();
-    Thread::yield();
+    std::this_thread::yield();
   }
   return {};
 }

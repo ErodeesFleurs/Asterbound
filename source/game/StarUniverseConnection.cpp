@@ -10,7 +10,6 @@ import star.data_stream;
 import star.list;
 import star.bi_map;
 import star.game_types;
-import star.time;
 import star.version;
 import star.ordered_map;
 import star.color;
@@ -325,7 +324,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
         if (!packets)
           return std::unexpected(std::move(packets.error()));
         if (!packets->empty()) {
-          p.second->lastActivityTime = Time::monotonicMilliseconds();
+          p.second->lastActivityTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
           m_workerStats[i].packetsProcessed += packets->size();
           p.second->receiveQueue.appendAll(std::move(*packets));
         }
@@ -447,7 +446,7 @@ std::expected<bool, StarException> UniverseConnectionServer::connectionIsOpen(Co
   return std::unexpected(UniverseConnectionException::format("No such client '{}' in UniverseConnectionServer::connectionIsOpen", clientId));
 }
 
-std::expected<std::int64_t, StarException> UniverseConnectionServer::lastActivityTime(ConnectionId clientId) const {
+std::expected<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, StarException> UniverseConnectionServer::lastActivityTime(ConnectionId clientId) const {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
   lockWithDiagnostics(connectionsLocker);
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
@@ -471,7 +470,7 @@ std::expected<void, StarException> UniverseConnectionServer::addConnection(Conne
   connection->packetSocket = std::move(uc.m_packetSocket);
   connection->sendQueue = std::move(uc.m_sendQueue);
   connection->receiveQueue = std::move(uc.m_receiveQueue);
-  connection->lastActivityTime = Time::monotonicMilliseconds();
+  connection->lastActivityTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto added = shard.add(clientId, std::move(connection));
   if (!added)
     return std::unexpected(std::move(added.error()));

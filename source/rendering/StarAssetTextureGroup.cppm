@@ -40,8 +40,8 @@ public:
   // Has the texture been loaded?
   bool textureLoaded(AssetPath const& imagePath) const;
 
-  // Frees textures unused for textureTimeout milliseconds. Full scans are
-  // spaced by up to one tenth of that timeout, capped at one second.
+  // Frees textures unused for textureTimeout milliseconds (configuration units).
+  // Full scans are spaced by one tenth of that timeout, capped at one second.
   // Root reloads clear the group immediately, regardless of that interval.
   void cleanup(std::int64_t textureTimeout);
 
@@ -53,11 +53,11 @@ private:
 
   Root& m_root;
   std::shared_ptr<TextureGroup> m_textureGroup;
-  HashMap<AssetPath, std::pair<TexturePtr, std::int64_t>> m_textureMap;
+  HashMap<AssetPath, std::pair<TexturePtr, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> m_textureMap;
   HashMap<std::shared_ptr<Image const>, TexturePtr> m_textureDeduplicationMap;
   std::shared_ptr<TrackerListener> m_reloadTracker;
   ListenerSubscription m_reloadSubscription;
-  std::int64_t m_lastCleanup = 0;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastCleanup{};
 };
 
 }

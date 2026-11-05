@@ -370,7 +370,7 @@ template <bool Pool, Shape Workload>
   requires (Workload == Shape::Lru || Workload == Shape::HashLru || Workload == Shape::HashTtl)
 struct Fixture<Pool, Workload> {
   using Allocator = CacheAllocator<Pool, Pair>;
-  using TtlAllocator = CacheAllocator<Pool, std::pair<Key const, std::pair<std::int64_t, Value>>>;
+  using TtlAllocator = CacheAllocator<Pool, std::pair<Key const, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>>>;
   using Cache = std::conditional_t<Workload == Shape::Lru,
       Star::LruCache<Key, Value, std::less<Key>, Allocator>,
       std::conditional_t<Workload == Shape::HashLru,
@@ -388,7 +388,7 @@ struct Fixture<Pool, Workload> {
 
   static Cache makeCache(Star::RandomService& random, std::size_t size) {
     if constexpr (Workload == Shape::HashTtl)
-      return Cache(random, 86'400'000, 0, size, false);
+      return Cache(random, std::chrono::milliseconds(86'400'000), std::chrono::milliseconds(0), size, false);
     else
       return Cache(size);
   }

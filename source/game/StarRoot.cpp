@@ -4,7 +4,6 @@ import star.id_map;
 import star.ordered_map;
 import star.lru_cache;
 import star.thread;
-import star.time;
 import star.random;
 import star.ttl_cache;
 import star.casting;
@@ -523,7 +522,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::dungeonDefinitions);
   add(&Root::tilesetDatabase);
 
-  auto startSeconds = Time::monotonicTime();
+  auto startSeconds = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
   std::optional<StarException> failure;
   for (auto& loader : loaders) {
     auto finished = loader.finish();
@@ -536,7 +535,7 @@ std::expected<void, StarException> Root::fullyLoad() {
     failure = std::move(finished.error());
   if (failure)
     return std::unexpected(std::move(*failure));
-  auto logged = m_logger.info("Root: Loaded everything in {} seconds", Time::monotonicTime() - startSeconds);
+  auto logged = m_logger.info("Root: Loaded everything in {} seconds", (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - startSeconds).count());
   if (!logged)
     return std::unexpected(std::move(logged.error()));
 
@@ -1089,11 +1088,11 @@ template <typename T>
 [[nodiscard]] std::expected<std::shared_ptr<T>, StarException> Root::loadMemberFunction(std::shared_ptr<T>& ptr, std::mutex& mutex, std::string_view name, std::function<std::expected<std::shared_ptr<T>, StarException>()> loadFunction) {
   std::lock_guard locker(mutex);
   if (!ptr) {
-    auto startSeconds = Time::monotonicTime();
+    auto startSeconds = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
     auto loaded = loadFunction();
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     ptr = std::move(*loaded);
-    auto logged = m_logger.info("Root: Loaded {} in {} seconds", name, Time::monotonicTime() - startSeconds);
+    auto logged = m_logger.info("Root: Loaded {} in {} seconds", name, (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - startSeconds).count());
     if (!logged) return std::unexpected(std::move(logged.error()));
   }
   return ptr;

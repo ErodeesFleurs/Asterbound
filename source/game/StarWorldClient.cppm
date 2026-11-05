@@ -363,7 +363,7 @@ private:
   struct DamageNumber {
     float amount;
     Vec2F position;
-    double timestamp;
+    std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> timestamp;
   };
 
   struct DamageNumberKey {
@@ -515,8 +515,8 @@ private:
   GameTimer m_entityUpdateTimer;
 
   List<std::shared_ptr<Packet>> m_outgoingPackets;
-  std::optional<std::int64_t> m_pingTime;
-  std::int64_t m_latency;
+  std::optional<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>> m_pingTime;
+  std::chrono::milliseconds m_latency;
 
   Set<EntityId> m_requestedDrops;
 
@@ -537,7 +537,7 @@ private:
   List<std::pair<float, WorldAction>> m_timers;
 
   Map<DamageNumberKey, DamageNumber> m_damageNumbers;
-  float m_damageNotificationBatchDuration;
+  std::chrono::duration<float> m_damageNotificationBatchDuration;
 
   std::shared_ptr<AudioInstance> m_spaceSound;
   String m_activeSpaceSound;

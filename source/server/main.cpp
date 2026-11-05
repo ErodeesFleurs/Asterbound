@@ -291,7 +291,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
           return std::unexpected(std::move(stopped.error()));
         break;
       }
-      Thread::sleep(100);
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     return {};
     }();

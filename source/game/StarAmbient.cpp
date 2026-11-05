@@ -2,7 +2,6 @@ import star.format;
 import star.json;
 import star.json_extra;
 import star.thread;
-import star.time;
 import star.audio;
 import star.list;
 import star.map;
@@ -103,7 +102,7 @@ AmbientManager::~AmbientManager() {
 }
 
 void AmbientManager::setTrackSwitchGrace(float grace) {
-  m_trackSwitchGrace = grace;
+  m_trackSwitchGrace = std::chrono::duration<float>(grace);
 }
 
 void AmbientManager::setTrackFadeInTime(float fadeInTime) {
@@ -132,12 +131,12 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
       switchTrack = !*present;
     }
     if (switchTrack) {
-      if (m_trackSwitchGrace <= Time::monotonicTime() - m_trackGraceTimestamp) {
+      if (m_trackSwitchGrace <= std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_trackGraceTimestamp) {
         m_currentTrack->stop(m_trackFadeInTime);
         m_currentTrack = {};
       }
     } else {
-      m_trackGraceTimestamp = Time::monotonicTime();
+      m_trackGraceTimestamp = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
     }
   }
   if (!m_currentTrack) {

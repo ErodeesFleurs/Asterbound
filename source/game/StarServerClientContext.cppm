@@ -178,7 +178,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> loadServerData(Json const& store);
   [[nodiscard]] std::expected<Json, StarException> storeServerData();
 
-  std::int64_t creationTime() const;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> creationTime() const;
 
 private:
   ServerClientContext(Root& root, ConnectionId clientId, std::optional<HostAddress> remoteAddress, NetCompatibilityRules netRules, Uuid playerUuid,
@@ -227,7 +227,7 @@ private:
 
   NetElementTopGroup m_netGroup;
   std::uint64_t m_netVersion = 0;
-  std::int64_t m_creationTime;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_creationTime;
   
   StringMap<RpcPromiseKeeper<WorldChunks>> m_worldRequests;
   StringMap<CustomWorld> m_customWorlds;

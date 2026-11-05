@@ -61,8 +61,8 @@ private:
   String m_currentTrackName;
   String m_weatherTrackName;
   float m_trackFadeInTime = 0.0f;
-  float m_trackSwitchGrace = 0.0f;
-  double m_trackGraceTimestamp = 0;
+  std::chrono::duration<float> m_trackSwitchGrace{};
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_trackGraceTimestamp{};
   Deque<String> m_recentTracks;
   float m_volume = 1.0f;
   float m_delay = 0.0f;
