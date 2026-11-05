@@ -70,6 +70,8 @@ import star.widget_lua_bindings;
 import star.world_camera;
 import star.poly;
 import star.json_extra;
+import star.main_thread_dispatcher;
+import star.fixed_scheduler;
 
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -77,6 +79,133 @@ import star.json_extra;
 using namespace Star;
 
 namespace {
+
+TEST(MainThreadDispatcher, ConsumerOwnsExecutionAndMoveOnlyResults) {
+  MainThreadDispatcher dispatcher;
+  auto mainThread = std::this_thread::get_id();
+  std::vector<int> consumed;
+  std::atomic<bool> done = false;
+  std::atomic<unsigned> destroyed = 0;
+  struct Payload {
+    std::atomic<unsigned>& destroyed;
+    std::array<int, 4> values{3, 5, 8, 13};
+    ~Payload() { ++destroyed; }
+  };
+  std::thread producer([&] {
+    auto payload = std::make_unique<Payload>(destroyed);
+    auto result = dispatcher.invoke([owned = std::move(payload), &consumed, mainThread]() mutable {
+      EXPECT_EQ(std::this_thread::get_id(), mainThread);
+      consumed.insert(consumed.end(), owned->values.begin(), owned->values.end());
+      return std::move(owned);
+    });
+    EXPECT_EQ(consumed, (std::vector<int>{3, 5, 8, 13}));
+    EXPECT_EQ(result->values[2], 8);
+    EXPECT_EQ(destroyed.load(), 0u);
+    result.reset();
+    EXPECT_EQ(destroyed.load(), 1u);
+    auto failure = dispatcher.invoke([]() -> std::expected<void, StarException> {
+      return std::unexpected(StarException("native consumer failure"));
+    });
+    EXPECT_FALSE(failure);
+    if (!failure)
+      EXPECT_NE(std::string_view(failure.error().what()).find("native consumer failure"), std::string_view::npos);
+    done.store(true, std::memory_order_release);
+    dispatcher.wake();
+  });
+  while (!done.load(std::memory_order_acquire)) {
+    auto observed = dispatcher.generation();
+    dispatcher.drain();
+    dispatcher.wait(observed, std::chrono::milliseconds(20));
+  }
+  producer.join();
+  EXPECT_EQ(destroyed.load(), 1u);
+}
+
+TEST(MainThreadDispatcher, OrderedCallsCanNestOnConsumerAndReturnReferences) {
+  MainThreadDispatcher dispatcher;
+  std::array<int, 128> slots{};
+  std::atomic<bool> done = false;
+  unsigned next = 0;
+  std::thread producer([&] {
+    for (unsigned index = 0; index != slots.size(); ++index) {
+      int& value = dispatcher.invoke([&, index]() -> int& {
+        EXPECT_EQ(next++, index);
+        dispatcher.invoke([&] { slots[index] = static_cast<int>(index * 7); });
+        return slots[index];
+      });
+      EXPECT_EQ(&value, &slots[index]);
+      EXPECT_EQ(value, static_cast<int>(index * 7));
+    }
+    done.store(true, std::memory_order_release);
+    dispatcher.wake();
+  });
+  while (!done.load(std::memory_order_acquire)) {
+    auto observed = dispatcher.generation();
+    dispatcher.drain();
+    dispatcher.wait(observed, std::chrono::milliseconds(20));
+  }
+  producer.join();
+  EXPECT_EQ(next, slots.size());
+}
+
+TEST(MainThreadDispatcher, SimultaneousProducersRetainTheirStackTasks) {
+  MainThreadDispatcher dispatcher;
+  constexpr unsigned Producers = 4;
+  constexpr unsigned Calls = 64;
+  std::array<std::array<unsigned, Calls>, Producers> consumed{};
+  std::array<unsigned, Producers> next{};
+  std::atomic<unsigned> done = 0;
+  std::barrier start(static_cast<std::ptrdiff_t>(Producers + 1));
+  std::array<std::thread, Producers> producers;
+  for (unsigned producer = 0; producer != Producers; ++producer) {
+    producers[producer] = std::thread([&, producer] {
+      start.arrive_and_wait();
+      for (unsigned index = 0; index != Calls; ++index) {
+        std::array<unsigned, 3> stackPayload{producer, index, producer * Calls + index + 1};
+        dispatcher.invoke([&] {
+          EXPECT_EQ(next[stackPayload[0]]++, stackPayload[1]);
+          consumed[stackPayload[0]][stackPayload[1]] = stackPayload[2];
+        });
+        EXPECT_EQ(consumed[producer][index], stackPayload[2]);
+      }
+      done.fetch_add(1, std::memory_order_release);
+      dispatcher.wake();
+    });
+  }
+  start.arrive_and_wait();
+  while (done.load(std::memory_order_acquire) != Producers) {
+    auto observed = dispatcher.generation();
+    dispatcher.drain();
+    dispatcher.wait(observed, std::chrono::milliseconds(20));
+  }
+  for (auto& producer : producers)
+    producer.join();
+  for (unsigned producer = 0; producer != Producers; ++producer)
+    for (unsigned index = 0; index != Calls; ++index)
+      EXPECT_EQ(consumed[producer][index], producer * Calls + index + 1);
+}
+
+TEST(MainThreadDispatcher, WakeBeforeWaitRemainsObservable) {
+  MainThreadDispatcher dispatcher;
+  auto observed = dispatcher.generation();
+  std::thread notifier([&] { dispatcher.wake(); });
+  notifier.join();
+  // The notify has already happened. The token predicate, rather than a
+  // notification edge, makes this arbitrarily long wait return immediately.
+  dispatcher.wait(observed, std::chrono::hours(24));
+  EXPECT_NE(dispatcher.generation(), observed);
+}
+
+TEST(FixedScheduler, InFlightFrameWaitUsesOnlyLogicDeadline) {
+  FixedScheduler scheduler(60.0, 0.0);
+  scheduler.reset(0.0);
+  EXPECT_DOUBLE_EQ(scheduler.sleepTime(0.0), 0.0);
+  EXPECT_NEAR(scheduler.updateSleepTime(0.0), 1.0 / 60.0, 1e-12);
+  EXPECT_EQ(scheduler.updatesDue(0.02, 5), 1u);
+  EXPECT_NEAR(scheduler.updateSleepTime(0.02), 1.0 / 30.0 - 0.02, 1e-12);
+  EXPECT_EQ(scheduler.updatesDue(0.4, 5), 1u);
+  EXPECT_GT(scheduler.updateSleepTime(0.4), 0.0);
+}
 
 auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, String const& overlay,
                               String runtimeConfig) {

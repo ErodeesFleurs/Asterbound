@@ -24,6 +24,10 @@ enum class WindowMode {
   Borderless
 };
 
+// Lifecycle, input, simulation and presentation preparation have one application
+// owner (ClientLogic), separate from the SDL/OpenGL main thread. Audio callbacks
+// are the explicit exception below. Never share live UI/Lua/world state with
+// the graphics consumer.
 class Application {
 public:
   struct FrameTimings {
@@ -72,19 +76,24 @@ public:
   // frame per call. May run without a simulation update, or after several.
   [[nodiscard]] virtual std::expected<void, StarException> render();
 
+  // A prepared frame has actually been presented. Runs on the application
+  // owner before preparing another frame, never on the graphics consumer.
+  [[nodiscard]] virtual std::expected<void, StarException> framePresented();
+
   // Will be called *from a different thread* to retrieve audio data (if audio
   // is playing). Default implementation simply fills the buffer with silence.
   [[nodiscard]] virtual std::expected<void, StarException> getAudioData(std::span<std::int16_t> sampleData, std::size_t frameCount);
 
-  // Will be called once on application shutdown, including when shutting down
-  // due to an Application exception.
+  // Called once after audio callbacks stop, including on failure. Release all
+  // retained platform services and sockets here: main joins SDK callbacks and
+  // releases graphics resources before Application destruction and logger death.
   [[nodiscard]] virtual std::expected<void, StarException> shutdown();
 
   std::shared_ptr<ApplicationController> const& appController() const;
   std::shared_ptr<Renderer> const& renderer() const;
-  // Previous completed outer-loop iteration, in wall-clock microseconds.
-  // Render/present are zero when no render was due. Main thread only; CPU
-  // submission/wait durations, not GPU execution timers.
+  // Previous completed pipeline iteration, in wall-clock microseconds.
+  // Accessed on the application owner only. CPU preparation, backend submission
+  // and waiting may overlap; these are not GPU execution timers.
   FrameTimings const& frameTimings() const { return m_frameTimings; }
   void recordFrameTimings(FrameTimings timings) { m_frameTimings = timings; }
 

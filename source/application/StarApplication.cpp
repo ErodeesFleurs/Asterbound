@@ -32,6 +32,8 @@ unsigned Application::framesSkipped() const { return 0; }
 
 std::expected<void, StarException> Application::render() { return {}; }
 
+std::expected<void, StarException> Application::framePresented() { return {}; }
+
 std::expected<void, StarException> Application::getAudioData(std::span<std::int16_t> samples, std::size_t) {
   std::ranges::fill(samples, 0);
   return {};

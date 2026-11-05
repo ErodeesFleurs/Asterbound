@@ -2,6 +2,8 @@
 
 The new `renderer` table is accessible from almost every clientside script and allows configuring shaders.
 
+Calls belong to the client application owner. Graphics-state reads and scriptable parameter writes use an ordered main-thread barrier and may wait for pending presentation. Getters observe preceding writes. A scriptable parameter type mismatch raises an error in the setter itself: `pcall` can catch it without invalidating later frames.
+
 ---
 
 #### `void` renderer.setPostProcessGroupEnabled(`String` group, `bool` enabled, [`bool` save])
@@ -22,7 +24,7 @@ Returns every post process group. Identical to grabbing them from client.config 
 
 ---
 
-#### `Json` renderer.setEffectParameter(`String` effectName, `String` parameterName, `Json` value)
+#### `void` renderer.setEffectParameter(`String` effectName, `String` parameterName, `Json` value)
 
 Sets the specified scriptable parameter of the specified shader effect to the provided value. 
 This is accessed from the shader as a uniform and must be defined in the effect's configuration.

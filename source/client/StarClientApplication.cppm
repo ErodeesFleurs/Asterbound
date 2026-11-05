@@ -16,6 +16,7 @@ import star.root;
 import star.listener;
 import star.logging;
 import star.format;
+import star.world_camera;
 
 namespace Star {
 
@@ -61,6 +62,7 @@ protected:
 
   [[nodiscard]] std::expected<void, StarException> update() override;
   [[nodiscard]] std::expected<void, StarException> render() override;
+  [[nodiscard]] std::expected<void, StarException> framePresented() override;
 
   [[nodiscard]] std::expected<void, StarException> getAudioData(std::span<std::int16_t> stream, std::size_t len) override;
 
@@ -129,6 +131,7 @@ private:
   bool isHeldActionTaken(InterfaceAction action) const;
 
   [[nodiscard]] std::expected<void, StarException> updateCamera(float dt);
+  void restorePresentedCamera();
 
   std::unique_ptr<Root> m_root;
   ThreadFunction<void> m_rootLoader;
@@ -178,6 +181,16 @@ private:
   std::weak_ptr<Player> m_presentedPlayer;
   std::uint64_t m_presentedPlayerEpoch = 0;
   std::uint64_t m_presentedRenderEpoch = 0;
+  struct PresentedCamera {
+    WorldCamera camera;
+    std::weak_ptr<WorldClient> world;
+    std::weak_ptr<Player> player;
+    std::uint64_t playerEpoch;
+    std::uint64_t renderEpoch;
+  };
+  // Main acknowledges presentation; only the application owner touches these.
+  std::optional<PresentedCamera> m_preparedCamera;
+  std::optional<PresentedCamera> m_inputCamera;
   float m_appliedRenderFpsLimit = -1.0f;
   bool m_appliedVSync = true;
 

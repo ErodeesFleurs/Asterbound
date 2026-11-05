@@ -4,8 +4,11 @@ target_sources (star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES F
     StarApplicationController.cppm
     StarFixedScheduler.cppm
     StarMainApplication.cppm
+    StarMainThreadDispatcher.cppm
+    StarMainThreadServices.cppm
     StarNativeUiContext.cppm
     StarRenderer.cppm
+    StarThreadedRenderer.cppm
     StarTextureAtlas.cppm
     StarRenderer_opengl.cppm
     StarP2PNetworkingService_pc.cppm
@@ -15,6 +18,7 @@ target_sources (star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES F
 add_library (star_application_modules STATIC
     StarApplication.cpp
     StarRenderer.cpp
+    StarThreadedRenderer.cpp
     StarMainApplication_sdl.cpp
     StarP2PNetworkingService_pc.cpp
     StarPlatformServices_pc.cpp

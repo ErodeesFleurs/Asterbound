@@ -2,5 +2,5 @@ struct lua_State;
 
 void pushImguiBindings(lua_State* lState);
 
-// Main-thread application render scope, not a simulation tick or worker script.
+// Application-owner render scope, not a simulation tick or another worker script.
 void setImguiPresentationActive(bool active);

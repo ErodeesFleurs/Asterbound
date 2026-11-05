@@ -20,12 +20,14 @@ function renderer.postProcessGroupEnabled(group) end
 function renderer.postProcessGroups() end
 
 --- Sets the specified scriptable parameter of the specified shader effect to the provided value. This is accessed from the shader as a uniform and must be defined in the effect's configuration. ---
+--- Ordered main-thread access; a type mismatch raises immediately and can be caught with pcall.
 ---@param effectName string
 ---@param parameterName string
 ---@param value number|boolean|number[]
 function renderer.setEffectParameter(effectName, parameterName, value) end
 
 --- Returns the specified scriptable parameter of the specified shader effect.
+--- Waits for preceding graphics-state writes before returning.
 ---@param effectName string
 ---@param parameterName string
 ---@return Json

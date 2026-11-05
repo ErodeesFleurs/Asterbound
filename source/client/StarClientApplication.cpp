@@ -730,6 +730,7 @@ std::expected<void, StarException> ClientApplication::windowChanged(WindowMode w
 }
 
 std::expected<void, StarException> ClientApplication::processInput(InputEvent const& event) {
+  restorePresentedCamera();
   if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
     m_heldKeyEvents.append(keyDown);
@@ -794,13 +795,14 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
 }
 
 std::expected<void, StarException> ClientApplication::update() {
+  restorePresentedCamera();
   // Input between logic ticks must keep using the transform actually shown,
   // even when a low render cap allows several updates before the next present.
   struct DisplayCameraScope {
-    WorldCamera& camera;
+    std::shared_ptr<WorldPainter> painter;
     WorldCamera displayed;
-    ~DisplayCameraScope() { camera.restoreRenderTransform(displayed); }
-  } displayCamera{m_worldPainter->camera(), m_worldPainter->camera()};
+    ~DisplayCameraScope() { painter->camera().restoreRenderTransform(displayed); }
+  } displayCamera{m_worldPainter, m_worldPainter->camera()};
   auto configuration = m_root->configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
@@ -907,6 +909,7 @@ std::expected<void, StarException> ClientApplication::applyRenderSettings(Config
 }
 
 std::expected<void, StarException> ClientApplication::render() {
+  m_preparedCamera.reset();
   m_framesSkipped = 0;
   auto configResult = m_root->configuration();
   if (!configResult)
@@ -996,6 +999,7 @@ std::expected<void, StarException> ClientApplication::render() {
         return std::unexpected(std::move(painted.error()));
       m_root->logMap().set("client_render_world_painter", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - paintStart));
       m_root->logMap().set("client_render_world_total", strf("{:05d}\u00b5s", Time::monotonicMicroseconds() - totalStart));
+      m_preparedCamera = PresentedCamera{camera, worldClient, m_player, playerEpoch, renderEpoch};
       
       auto size = Vec2F(renderer->screenSize());
       auto quad = renderFlatRect(RectF::withSize(size / -2, size), Vec4B::filled(0), 0.0f);
@@ -1030,6 +1034,28 @@ std::expected<void, StarException> ClientApplication::render() {
 
   if (!m_errorScreen->accepted())
     return m_errorScreen->render();
+  return {};
+}
+
+void ClientApplication::restorePresentedCamera() {
+  if (!m_inputCamera || !m_worldPainter)
+    return;
+  auto world = m_universeClient ? m_universeClient->worldClient() : nullptr;
+  if (m_state <= MainAppState::Title || !world
+      || m_inputCamera->world.lock() != world || m_inputCamera->player.lock() != m_player
+      || m_inputCamera->playerEpoch != (m_player ? m_player->presentationEpoch() : 0)
+      || m_inputCamera->renderEpoch != appController()->renderEpoch()) {
+    m_inputCamera.reset();
+    m_worldPainter->camera().resetPresentation();
+    return;
+  }
+  m_worldPainter->camera().restoreRenderTransform(m_inputCamera->camera);
+}
+
+std::expected<void, StarException> ClientApplication::framePresented() {
+  m_inputCamera = std::move(m_preparedCamera);
+  m_preparedCamera.reset();
+  restorePresentedCamera();
   return {};
 }
 

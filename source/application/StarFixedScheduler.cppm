@@ -6,7 +6,7 @@ export module star.fixed_scheduler;
 
 export namespace Star {
 
-// Main-thread deadline bookkeeping only; callers supply a monotonic clock in
+// Owner-thread deadline bookkeeping only; callers supply a monotonic clock in
 // seconds. No sleeping, application callbacks, or wall-clock reads live here.
 class FixedScheduler {
 public:
@@ -92,6 +92,13 @@ public:
     observe(now);
     double next = m_renderPeriod > 0.0 ? std::min(m_nextUpdate, m_nextRender) : now;
     return std::clamp(next - now, 0.0, MaximumSleep);
+  }
+
+  // While a sealed frame is being presented, only simulation can become due.
+  // An unlimited render rate must not turn that backpressure into a busy loop.
+  double updateSleepTime(double now) {
+    observe(now);
+    return std::clamp(m_nextUpdate - now, 0.0, MaximumSleep);
   }
 
   std::uint64_t epoch() const { return m_epoch; }
