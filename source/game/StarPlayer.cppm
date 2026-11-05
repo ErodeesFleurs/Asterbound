@@ -246,7 +246,7 @@ public:
   void moveDown();
   void jump();
 
-  // Presentation-only request, refreshed during each generic script update.
+  // Presentation-only idle/walk/run/jump/fall/duck request, refreshed each generic script update.
   [[nodiscard]] std::expected<void, StarException> controlMovementState(std::optional<String> const& state);
 
   [[nodiscard]] std::expected<void, StarException> dropItem();

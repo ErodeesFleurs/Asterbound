@@ -32,14 +32,18 @@ function player.setDescription(description) end
 
 --- Requests a presentation-only movement animation for this simulation frame.
 --- Refresh in generic update with updateDelta=1; nil revokes, last call wins.
+--- Requests expire before the next player update, including postUpdate calls;
+--- uninit clears them and they are not saved. "crouch" is not an alias for "duck".
 --- Native physics/state are unchanged. Anchors/lounge, dead, teleport and tech
 --- parent states take precedence. Existing dances and item poses/facing remain.
+--- Duck does not set mcontroller.crouching() or shrink the collision polygon.
 --- Walk/run backwards direction uses velocity in the rotated body's local X.
 --- Repeated requests retain cycle progress; cycle speed is the humanoid default.
 --- Transient, not saved; uses existing vanilla/legacy player-state and moving-
---- direction fields without changing local native state/direction or physics.
+--- direction fields in full/incremental updates; duck maps to native Crouch.
+--- Local native state/direction and physics remain unchanged.
 --- Facing/velocity/rotation retain native replication; no custom animation key.
----@param state? "idle"|"walk"|"run"|"jump"|"fall"
+---@param state? "idle"|"walk"|"run"|"jump"|"fall"|"duck"
 function player.controlMovementState(state) end
 
 --- Refreshes the active humanoid parameters by re-building the current humanoid instance. This must be called when certain values in the humanoid config would be changed by a parameter, such as the animationConfig and movementParameters. This is implicitly called whenever the current humanoid identity's species or imagePath changes. This has to network the humanoid identity and humanoid parameters as intialization arguments for the new instance, so only use it when necessary. ---

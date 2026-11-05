@@ -51,8 +51,9 @@ Sets the player's description. The new description will not be networked until t
 #### `void` player.controlMovementState(`Maybe<String>` state)
 
 Requests a presentation-only humanoid movement state: `"idle"`, `"walk"`, `"run"`,
-`"jump"` or `"fall"`. Other names are rejected. Passing `nil` revokes the current
-request. The last call in a frame wins; this is not a per-script ownership stack.
+`"jump"`, `"fall"` or `"duck"`. Other names (including `"crouch"`) are rejected.
+Passing `nil` revokes the current request. The last call in a frame wins; this is
+not a per-script ownership stack.
 
 Refresh the request in a generic player script's `update` on every simulation
 frame (`script.setUpdateDelta(1)`). Requests are cleared before the next player
@@ -62,6 +63,8 @@ World exit/uninitialization clears the request, and it is never saved.
 
 The request does not change velocity, collision, `onGround`, the movement
 controller's state, or the player's native movement state and movement effects.
+In particular, `"duck"` only selects the crouching animation: it does not set
+`mcontroller.crouching()` or shrink the collision polygon.
 Lounge/anchored, dead and teleporting players ignore it; a tech's explicit parent
 animation state retains precedence. Existing dances, held-item arm poses and
 item-controlled facing retain their normal behavior.
@@ -76,9 +79,10 @@ rotation still comes from `mcontroller.rotation()`.
 
 Outbound replication reuses the vanilla player movement-state field and the
 movement controller's existing moving-direction field, including legacy protocol
-0. Only their network presentation values are overridden: local native player
-state and `mcontroller.movingDirection()` remain unchanged. The moving-direction
-value is the same body-local projection used for local backwards playback;
+0, in both full and incremental updates. `"duck"` explicitly maps to the native
+player `Crouch` wire state. Only their network presentation values are overridden:
+local native player state and `mcontroller.movingDirection()` remain unchanged.
+The moving-direction value is the same body-local projection used for local backwards playback;
 facing, position, velocity, body rotation and physics flags retain their normal
 network values. A tech's parent state is not changed and no tech is equipped.
 Stopping requests restores both fields to their native values on that update.

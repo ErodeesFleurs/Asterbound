@@ -130,7 +130,7 @@ const GameTestRegistration transientMovementAnimation(
         if player.getProperty("poseRevoke") then player.controlMovementState(nil) end
       end
       function postUpdate()
-        if player.getProperty("poseLate") then player.controlMovementState("run") end
+        if player.getProperty("poseLate") then player.controlMovementState("duck") end
       end
     )LUA"), File::relativeTo(overlay, "pose.lua")));
     auto settings = fixture.rootSettings();
@@ -169,6 +169,7 @@ const GameTestRegistration transientMovementAnimation(
     parameters.frictionEnabled = false;
     ASSERT_TRUE(movement.updateBaseParameters(parameters));
     movement.setPosition(Vec2F(1024, 1024));
+    auto nativeCollisionPoly = movement.collisionPoly();
 
     // The real Lua callback rejects other humanoid states, not just unknown
     // names, and accepts nil. No fixture implementation stands in for it.
@@ -180,10 +181,10 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(callbacks);
     ASSERT_TRUE(context->setCallbacks("player", *callbacks));
     auto valid = context->eval<bool>(R"LUA(
-      for _, state in ipairs({"idle", "walk", "run", "jump", "fall"}) do
+      for _, state in ipairs({"idle", "walk", "run", "jump", "fall", "duck"}) do
         assert(pcall(player.controlMovementState, state))
       end
-      for _, state in ipairs({"swim", "duck", "sit", "lay", "RUN", "invalid"}) do
+      for _, state in ipairs({"swim", "crouch", "sit", "lay", "RUN", "invalid"}) do
         assert(not pcall(player.controlMovementState, state))
       end
       assert(pcall(player.controlMovementState, nil))
@@ -213,10 +214,10 @@ const GameTestRegistration transientMovementAnimation(
     }
     // This tests the actual legacy compatibility filter, not a custom animation
     // parameter or a new tech state. It is not a vanilla-executable smoke test.
-    auto sync = [&](Humanoid::State state, Direction networkDirection) {
+    auto sync = [&](Humanoid::State state, Direction networkDirection, bool full = false) {
       for (std::size_t i = 0; i != remotes.size(); ++i) {
         SCOPED_TRACE(rules[i].version());
-        auto packet = player.writeNetState(versions[i], rules[i]);
+        auto packet = player.writeNetState(full ? 0 : versions[i], rules[i]);
         ASSERT_TRUE(packet);
         versions[i] = packet->second;
         ASSERT_TRUE(remotes[i]->readNetState(packet->first, 0.f, rules[i]));
@@ -227,13 +228,15 @@ const GameTestRegistration transientMovementAnimation(
         EXPECT_EQ(remotes[i]->movementController().movingDirection(), networkDirection);
         EXPECT_NEAR(remotes[i]->movementController().rotation(), movement.rotation(), .011f);
         EXPECT_FALSE(remotes[i]->movementController().onGround());
+        EXPECT_FALSE(remotes[i]->movementController().crouching());
+        EXPECT_EQ(remotes[i]->movementController().collisionPoly(), nativeCollisionPoly);
         auto rendered = remotes[i]->humanoid()->render();
         ASSERT_TRUE(rendered) << rendered.error().what();
         EXPECT_FALSE(rendered->empty());
       }
     };
-    std::array states{Humanoid::Idle, Humanoid::Walk, Humanoid::Run, Humanoid::Jump, Humanoid::Fall};
-    std::array<std::string_view, 5> names{"idle", "walk", "run", "jump", "fall"};
+    std::array states{Humanoid::Idle, Humanoid::Walk, Humanoid::Run, Humanoid::Jump, Humanoid::Fall, Humanoid::Duck};
+    std::array<std::string_view, 6> names{"idle", "walk", "run", "jump", "fall", "duck"};
     auto nativeDirection = movement.movingDirection();
     for (float rotation : {0.f, std::numbers::pi_v<float> / 2, std::numbers::pi_v<float>, -std::numbers::pi_v<float> / 2}) {
       movement.setRotation(rotation);
@@ -251,7 +254,13 @@ const GameTestRegistration transientMovementAnimation(
             EXPECT_EQ(movement.movingDirection(), nativeDirection);
             EXPECT_FALSE(movement.onGround());
             EXPECT_TRUE(movement.zeroG());
+            EXPECT_FALSE(movement.crouching());
+            EXPECT_EQ(movement.collisionPoly(), nativeCollisionPoly);
             sync(states[i], direction);
+            // Exercise Duck both on the existing incremental stream and a
+            // complete legacy/current packet, without a new presentation field.
+            if (states[i] == Humanoid::Duck)
+              sync(states[i], direction, true);
           }
         }
       }
@@ -274,13 +283,16 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     EXPECT_FALSE(player.humanoid()->movingBackwards());
     sync(Humanoid::Run, player.humanoid()->facingDirection());
+    player.setGenericProperty("poseFixture", "duck");
+    ASSERT_TRUE(tick());
+    sync(Humanoid::Duck, player.humanoid()->facingDirection());
 
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     EXPECT_EQ(movement.movingDirection(), nativeDirection);
     sync(Humanoid::SwimIdle, nativeDirection);
-    player.setGenericProperty("poseFixture", "walk");
+    player.setGenericProperty("poseFixture", "duck");
     player.setGenericProperty("poseRevoke", true);
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
@@ -293,7 +305,7 @@ const GameTestRegistration transientMovementAnimation(
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, nativeDirection);
     player.setGenericProperty("poseLate", false);
-    player.setGenericProperty("poseFixture", "run");
+    player.setGenericProperty("poseFixture", "duck");
     ASSERT_TRUE(tick());
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(player.uninit());
@@ -303,11 +315,11 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, movement.movingDirection());
-    player.setGenericProperty("poseFixture", "run");
+    player.setGenericProperty("poseFixture", "duck");
     movement.setVelocity(Vec2F());
     movement.controlFace(Direction::Right);
     ASSERT_TRUE(tick());
-    sync(Humanoid::Run, Direction::Right);
+    sync(Humanoid::Duck, Direction::Right);
     ASSERT_TRUE(player.teleportOut());
     // A higher-priority state can start between update and packet generation.
     for (std::size_t i = 0; i != remotes.size(); ++i) {
@@ -339,13 +351,13 @@ const GameTestRegistration transientMovementAnimation(
     for (unsigned i = 0; i < abortTicks && player.isTeleporting(); ++i)
       ASSERT_TRUE(tick());
     ASSERT_FALSE(player.isTeleporting());
-    ASSERT_EQ(player.humanoid()->state(), Humanoid::Run);
-    sync(Humanoid::Run, Direction::Right);
+    ASSERT_EQ(player.humanoid()->state(), Humanoid::Duck);
+    sync(Humanoid::Duck, Direction::Right);
     ASSERT_TRUE(player.kill());
     ASSERT_TRUE(player.isDead());
     ASSERT_TRUE(tick());
     ASSERT_TRUE(player.isDead());
-    EXPECT_NE(player.humanoid()->state(), Humanoid::Run);
+    EXPECT_NE(player.humanoid()->state(), Humanoid::Duck);
     sync(player.humanoid()->state(), movement.movingDirection());
   });
 

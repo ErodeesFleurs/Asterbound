@@ -3610,8 +3610,10 @@ std::expected<void, StarException> Player::controlMovementState(std::optional<St
     parsed = Humanoid::Jump;
   else if (*state == "fall")
     parsed = Humanoid::Fall;
+  else if (*state == "duck")
+    parsed = Humanoid::Duck;
   else
-    return std::unexpected(PlayerException("Movement state must be idle, walk, run, jump, fall, or nil"));
+    return std::unexpected(PlayerException("Movement state must be idle, walk, run, jump, fall, duck, or nil"));
   if (inWorld() && isMaster())
     m_controlMovementState = parsed;
   return {};
@@ -3949,6 +3951,7 @@ std::expected<void, StarException> Player::setNetStates() {
       case Humanoid::Run: state = State::Run; break;
       case Humanoid::Jump: state = State::Jump; break;
       case Humanoid::Fall: state = State::Fall; break;
+      case Humanoid::Duck: state = State::Crouch; break;
       default: break;
     }
   }
