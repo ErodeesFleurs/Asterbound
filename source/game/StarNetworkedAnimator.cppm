@@ -513,6 +513,10 @@ private:
       Mat3F animationTransform;
       bool animationDirty;
     };
+    struct PartTransform {
+      Mat3F transform;
+      bool valid = false;
+    };
     struct Tag {
       bool active = false;
       std::optional<String> value;
@@ -524,9 +528,16 @@ private:
     unsigned users = 0;
     AnimatedPartSet::Sample parts;
     std::vector<Group> groups;
+    // Local part/anchor transforms only; consumers apply global zoom and flip.
+    std::vector<PartTransform> partTransforms;
     HashMap<String, Tag> tags;
     // Borrow attachments; only the final transformed output copies Drawables.
     HashMap<String, Attachment> drawables;
+    void invalidatePartTransforms() {
+      // Any group or state override can also affect anchored descendants.
+      for (auto& part : partTransforms)
+        part.valid = false;
+    }
   };
   mutable std::vector<std::unique_ptr<Presentation>> m_presentations;
 };

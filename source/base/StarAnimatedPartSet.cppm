@@ -132,17 +132,34 @@ public:
       ActiveStateInformation state;
       bool dirty = true;
       bool initialized = false;
+      std::shared_ptr<State const> propertyState;
+      unsigned propertyFrame = 0;
+      unsigned propertyNextFrame = 0;
     };
     struct PartCache {
       ActivePartInformation part;
       bool dirty = true;
+      // Keys describe discrete sources only; timing and affine interpolation
+      // are refreshed whenever this sample is prepared.
+      Part const* definition = nullptr;
+      PartState const* stateDefinition = nullptr;
+      State const* state = nullptr;
+      unsigned frame = 0;
+      unsigned nextFrame = 0;
+      bool propertiesValid = false;
     };
     float interpolation = 1;
     std::vector<StateCache> states;
     std::vector<PartCache> parts;
+    std::shared_ptr<JsonObject const> configuration;
+    std::uint8_t animatorVersion = 0;
   };
 
   AnimatedPartSet();
+  AnimatedPartSet(AnimatedPartSet const&) = default;
+  AnimatedPartSet(AnimatedPartSet&&) = default;
+  AnimatedPartSet& operator=(AnimatedPartSet const& other);
+  AnimatedPartSet& operator=(AnimatedPartSet&& other);
   [[nodiscard]] static std::expected<AnimatedPartSet, StarException> create(Json config, std::uint8_t animatorVersion);
 
   // Reuses a view's storage and initializes it from the current logical endpoints.
@@ -175,6 +192,8 @@ public:
 
   [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> activeState(String const& stateTypeName, Sample* sample = nullptr) const;
   [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(String const& partName, Sample* sample = nullptr) const;
+  // The part must belong to this set, as returned by constParts().
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(Part const& part, Sample* sample = nullptr) const;
   [[nodiscard]] std::expected<std::reference_wrapper<State const>, StarException> getState(String const& stateTypeName, String const& stateName) const;
 
   StringMap<Part> const& constParts() const;
@@ -217,6 +236,10 @@ private:
   StringMap<Part> m_parts;
 
   std::uint8_t m_animatorVersion = 0;
+  // Retain the immutable input for sample identity without allocating an ID.
+  std::shared_ptr<JsonObject const> m_sampleConfiguration;
+  // A retained reference to the map survives assignment; exposure is sticky.
+  bool m_mutablePartsExposed = false;
 };
 
 }

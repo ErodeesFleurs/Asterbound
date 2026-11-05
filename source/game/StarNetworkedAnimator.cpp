@@ -136,6 +136,8 @@ NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float inter
   }
   auto& presentation = *m_presentation;
   animator.m_animatedParts.prepareSample(presentation.parts, m_interpolation);
+  presentation.partTransforms.resize(presentation.parts.parts.size());
+  presentation.invalidatePartTransforms();
   presentation.groups.resize(animator.m_transformationGroups.size());
   for (auto& tag : presentation.tags)
     tag.second.active = false;
@@ -352,9 +354,11 @@ std::expected<bool, StarException> NetworkedAnimator::Sample::hasState(String co
 
 std::expected<bool, StarException> NetworkedAnimator::Sample::setLocalState(String const& type, String const& state, bool startNew, bool reverse) {
   auto changed = m_animator.m_animatedParts.setPresentationState(type, state, startNew, reverse, m_presentation->parts);
-  if (changed && *changed)
+  if (changed && *changed) {
+    m_presentation->invalidatePartTransforms();
     for (auto& group : m_presentation->groups)
       group.animationDirty = true;
+  }
   return changed;
 }
 
@@ -370,6 +374,7 @@ std::expected<void, StarException> NetworkedAnimator::Sample::resetLocalTransfor
   auto group = m_animator.m_transformationGroups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
   m_presentation->groups[group->get().presentationIndex].localTransform = Mat3F::identity();
+  m_presentation->invalidatePartTransforms();
   return {};
 }
 
@@ -378,6 +383,7 @@ std::expected<void, StarException> NetworkedAnimator::Sample::rotateLocalTransfo
   if (!group) return std::unexpected(std::move(group.error()));
   auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
   matrix = Mat3F::rotation(rotation, center) * matrix;
+  m_presentation->invalidatePartTransforms();
   return {};
 }
 
@@ -386,6 +392,7 @@ std::expected<void, StarException> NetworkedAnimator::Sample::translateLocalTran
   if (!group) return std::unexpected(std::move(group.error()));
   auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
   matrix = Mat3F::translation(translation) * matrix;
+  m_presentation->invalidatePartTransforms();
   return {};
 }
 
@@ -991,7 +998,15 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryGroupTransformation(
 }
 
 std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(String const& partName, Sample const* sample) const {
-  auto active = m_animatedParts.activePart(partName, sample ? &sample->m_presentation->parts : nullptr);
+  auto definition = m_animatedParts.constParts().get(partName);
+  if (!definition) return std::unexpected(std::move(definition.error()));
+  Presentation::PartTransform* cache = nullptr;
+  if (sample) {
+    cache = &sample->m_presentation->partTransforms[definition->get().presentationIndex];
+    if (cache->valid)
+      return cache->transform;
+  }
+  auto active = m_animatedParts.activePart(definition->get(), sample ? &sample->m_presentation->parts : nullptr);
   if (!active) return std::unexpected(std::move(active.error()));
   auto const& part = active->get();
   Mat3F transformation = Mat3F::identity();
@@ -1027,6 +1042,10 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
     auto anchor = queryPartTransformation(*anchorName, sample);
     if (!anchor) return std::unexpected(std::move(anchor.error()));
     transformation = *anchor * transformation;
+  }
+  if (cache) {
+    cache->transform = transformation;
+    cache->valid = true;
   }
   return transformation;
 }

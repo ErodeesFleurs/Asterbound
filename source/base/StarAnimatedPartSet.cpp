@@ -14,6 +14,28 @@ namespace Star {
 
 AnimatedPartSet::AnimatedPartSet() {}
 
+AnimatedPartSet& AnimatedPartSet::operator=(AnimatedPartSet const& other) {
+  if (this != &other) {
+    m_mutablePartsExposed = m_mutablePartsExposed || other.m_mutablePartsExposed;
+    m_stateTypes = other.m_stateTypes;
+    m_parts = other.m_parts;
+    m_animatorVersion = other.m_animatorVersion;
+    m_sampleConfiguration = other.m_sampleConfiguration;
+  }
+  return *this;
+}
+
+AnimatedPartSet& AnimatedPartSet::operator=(AnimatedPartSet&& other) {
+  if (this != &other) {
+    m_mutablePartsExposed = m_mutablePartsExposed || other.m_mutablePartsExposed;
+    m_stateTypes = std::move(other.m_stateTypes);
+    m_parts = std::move(other.m_parts);
+    m_animatorVersion = other.m_animatorVersion;
+    m_sampleConfiguration = std::move(other.m_sampleConfiguration);
+  }
+  return *this;
+}
+
 std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json config, std::uint8_t animatorVersion) {
   AnimatedPartSet result;
   result.m_animatorVersion = animatorVersion;
@@ -123,6 +145,9 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
     auto active = result.setActiveState(pair.first, pair.second.defaultState, true, false);
     if (!active) return std::unexpected(std::move(active.error()));
   }
+  auto source = config.objectPtr();
+  if (!source) return std::unexpected(std::move(source.error()));
+  result.m_sampleConfiguration = std::move(*source);
   return result;
 }
 
@@ -174,12 +199,17 @@ void AnimatedPartSet::prepareSample(Sample& sample, float interpolation) const {
   sample.interpolation = std::clamp(interpolation, 0.f, 1.f);
   sample.states.resize(m_stateTypes.size());
   sample.parts.resize(m_parts.size());
+  bool sameConfiguration = sample.configuration == m_sampleConfiguration && sample.animatorVersion == m_animatorVersion;
+  sample.configuration = m_sampleConfiguration;
+  sample.animatorVersion = m_animatorVersion;
   std::size_t index = 0;
   for (auto const& entry : m_stateTypes) {
     entry.second.presentationIndex = index;
     auto& cache = sample.states[index++];
     cache.dirty = true;
     cache.initialized = false;
+    if (!sameConfiguration)
+      cache.propertyState.reset();
   }
   index = 0;
   for (auto const& entry : m_parts) {
@@ -187,6 +217,8 @@ void AnimatedPartSet::prepareSample(Sample& sample, float interpolation) const {
     auto& cache = sample.parts[index++];
     cache.part.partName = entry.first;
     cache.dirty = true;
+    if (!sameConfiguration || m_mutablePartsExposed)
+      cache.propertiesValid = false;
   }
 }
 
@@ -253,9 +285,13 @@ std::expected<std::reference_wrapper<AnimatedPartSet::ActiveStateInformation con
 std::expected<std::reference_wrapper<AnimatedPartSet::ActivePartInformation const>, StarException> AnimatedPartSet::activePart(String const& name, Sample* sample) const {
   auto part = m_parts.get(name);
   if (!part) return std::unexpected(std::move(part.error()));
-  auto fresh = freshenActivePart(part->get(), sample);
+  return activePart(part->get(), sample);
+}
+
+std::expected<std::reference_wrapper<AnimatedPartSet::ActivePartInformation const>, StarException> AnimatedPartSet::activePart(Part const& part, Sample* sample) const {
+  auto fresh = freshenActivePart(part, sample);
   if (!fresh) return std::unexpected(std::move(fresh.error()));
-  return std::cref(sample ? sample->parts[part->get().presentationIndex].part : part->get().activePart);
+  return std::cref(sample ? sample->parts[part.presentationIndex].part : part.activePart);
 }
 
 std::expected<std::reference_wrapper<AnimatedPartSet::State const>, StarException> AnimatedPartSet::getState(String const& type, String const& name) const {
@@ -271,6 +307,9 @@ StringMap<AnimatedPartSet::Part> const& AnimatedPartSet::constParts() const {
 }
 
 StringMap<AnimatedPartSet::Part>& AnimatedPartSet::parts() {
+  // The caller may retain this reference and edit it without another parts()
+  // call. Never reuse composed part properties across prepares after exposure.
+  m_mutablePartsExposed = true;
   return m_parts;
 }
 
@@ -433,24 +472,36 @@ std::expected<void, StarException> AnimatedPartSet::freshenActiveState(StateType
       }
     }
 
-    activeState.properties = stateType.stateTypeProperties;
-    activeState.properties.merge(state.stateProperties, true);
+    auto* cache = presentation ? &sample->states[stateType.presentationIndex] : nullptr;
+    bool compose = !cache || cache->propertyState != stateEntry->get()
+      || cache->propertyFrame != activeState.frame || cache->propertyNextFrame != activeState.nextFrame;
+    if (compose) {
+      // Do not publish a new key until all lazily used frame data validates.
+      if (cache)
+        cache->propertyState.reset();
+      activeState.properties = stateType.stateTypeProperties;
+      activeState.properties.merge(state.stateProperties, true);
+      activeState.nextProperties = stateType.stateTypeProperties;
+      activeState.nextProperties.merge(state.stateProperties, true);
 
-    activeState.nextProperties = stateType.stateTypeProperties;
-    activeState.nextProperties.merge(state.stateProperties, true);
-
-    for (auto const& pair : state.stateFrameProperties) {
-      auto size = pair.second.size();
-      if (!size) return std::unexpected(std::move(size.error()));
-      if (activeState.frame < *size) {
-        auto value = pair.second.get(activeState.frame);
-        if (!value) return std::unexpected(std::move(value.error()));
-        activeState.properties[pair.first] = std::move(*value);
+      for (auto const& pair : state.stateFrameProperties) {
+        auto size = pair.second.size();
+        if (!size) return std::unexpected(std::move(size.error()));
+        if (activeState.frame < *size) {
+          auto value = pair.second.get(activeState.frame);
+          if (!value) return std::unexpected(std::move(value.error()));
+          activeState.properties[pair.first] = std::move(*value);
+        }
+        if (activeState.nextFrame < *size) {
+          auto value = pair.second.get(activeState.nextFrame);
+          if (!value) return std::unexpected(std::move(value.error()));
+          activeState.nextProperties[pair.first] = std::move(*value);
+        }
       }
-      if (activeState.nextFrame < *size) {
-        auto value = pair.second.get(activeState.nextFrame);
-        if (!value) return std::unexpected(std::move(value.error()));
-        activeState.nextProperties[pair.first] = std::move(*value);
+      if (cache) {
+        cache->propertyState = stateEntry->get();
+        cache->propertyFrame = activeState.frame;
+        cache->propertyNextFrame = activeState.nextFrame;
       }
     }
 
@@ -469,60 +520,73 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       activePart.setAnimationAffineTransform(part.activePartDirty ? part.activePart.animationAffineTransform() : part.activePartBaseTransform);
     else
       part.activePartBaseTransform = activePart.animationAffineTransform();
-    activePart.activeState = {};
-    activePart.properties = part.partProperties;
-    activePart.nextProperties = part.partProperties;
-
-    // Then go through each of the state types and states and look for a part
-    // state match in order of priority.
+    ActiveStateInformation const* sampledState = nullptr;
+    PartState const* selectedPartState = nullptr;
+    State const* selectedState = nullptr;
+    // Selection remains lazy and priority ordered: disabled/unmatched states
+    // must not cause validation of otherwise unused frame data.
     for (auto const& stateTypePair : m_stateTypes) {
       auto const& stateTypeName = stateTypePair.first;
       auto const& stateType = stateTypePair.second;
-
-      // Skip disabled state types
       if (!stateType.enabled)
         continue;
-
       auto partStateType = part.partStates.maybeRef(stateTypeName);
       if (!partStateType)
         continue;
-
       auto stateResult = activeState(stateTypeName, sample);
       if (!stateResult) return std::unexpected(std::move(stateResult.error()));
-      auto const& sampledState = stateResult->get();
-      auto const& stateName = sampledState.stateName;
-      auto partState = partStateType->get().maybeRef(stateName);
+      auto partState = partStateType->get().maybeRef(stateResult->get().stateName);
       if (!partState)
         continue;
+      sampledState = &stateResult->get();
+      selectedPartState = &partState->get();
+      selectedState = presentation ? sample->states[stateType.presentationIndex].propertyState.get()
+                                   : &stateType.activeStateReference->get();
+      break;
+    }
 
-      // If we have a partState match, then set the active state information.
-      activePart.activeState = sampledState;
-      unsigned frame = sampledState.frame;
-      unsigned nextFrame = sampledState.nextFrame;
-
-      // Then set the part state data, as well as any part state frame data if
-      // the current frame is within the list size.
-      activePart.properties.merge(partState->get().partStateProperties, true);
-
-      activePart.nextProperties.merge(partState->get().partStateProperties, true);
-
-      for (auto const& pair : partState->get().partStateFrameProperties) {
-        auto size = pair.second.size();
-        if (!size) return std::unexpected(std::move(size.error()));
-        if (frame < *size) {
-          auto value = pair.second.get(frame);
-          if (!value) return std::unexpected(std::move(value.error()));
-          activePart.properties[pair.first] = std::move(*value);
-        }
-        if (nextFrame < *size) {
-          auto value = pair.second.get(nextFrame);
-          if (!value) return std::unexpected(std::move(value.error()));
-          activePart.nextProperties[pair.first] = std::move(*value);
+    auto* cache = presentation ? &sample->parts[part.presentationIndex] : nullptr;
+    unsigned frame = sampledState ? sampledState->frame : 0;
+    unsigned nextFrame = sampledState ? sampledState->nextFrame : 0;
+    bool compose = !cache || !cache->propertiesValid || cache->definition != &part
+      || cache->stateDefinition != selectedPartState || cache->state != selectedState
+      || cache->frame != frame || cache->nextFrame != nextFrame;
+    if (compose) {
+      if (cache)
+        cache->propertiesValid = false;
+      activePart.activeState = sampledState ? std::optional<ActiveStateInformation>(*sampledState) : std::nullopt;
+      activePart.properties = part.partProperties;
+      activePart.nextProperties = part.partProperties;
+      if (selectedPartState) {
+        activePart.properties.merge(selectedPartState->partStateProperties, true);
+        activePart.nextProperties.merge(selectedPartState->partStateProperties, true);
+        for (auto const& pair : selectedPartState->partStateFrameProperties) {
+          auto size = pair.second.size();
+          if (!size) return std::unexpected(std::move(size.error()));
+          if (frame < *size) {
+            auto value = pair.second.get(frame);
+            if (!value) return std::unexpected(std::move(value.error()));
+            activePart.properties[pair.first] = std::move(*value);
+          }
+          if (nextFrame < *size) {
+            auto value = pair.second.get(nextFrame);
+            if (!value) return std::unexpected(std::move(value.error()));
+            activePart.nextProperties[pair.first] = std::move(*value);
+          }
         }
       }
-
-      // Each part can only have one state type x state match, so we are done.
-      break;
+      if (cache) {
+        cache->definition = &part;
+        cache->stateDefinition = selectedPartState;
+        cache->state = selectedState;
+        cache->frame = frame;
+        cache->nextFrame = nextFrame;
+      }
+    } else if (sampledState) {
+      // Keep the copied state properties, refreshing only continuous timing.
+      activePart.activeState->timer = sampledState->timer;
+      activePart.activeState->frameProgress = sampledState->frameProgress;
+      activePart.activeState->reverse = sampledState->reverse;
     }
     if (version() > 0) {
       auto processTransforms = [](Mat3F mat, Json const& transforms, JsonObject const& properties) -> std::expected<Mat3F, StarException> {
@@ -597,6 +661,8 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       }
     }
 
+    if (cache)
+      cache->propertiesValid = true;
     dirty = false;
   }
   return {};

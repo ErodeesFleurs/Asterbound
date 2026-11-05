@@ -35,6 +35,7 @@ import star.networked_animator;
 import star.lua_root;
 import star.net_compatibility;
 import star.player;
+import star.poly;
 import star.player_factory;
 import star.player_lua_bindings;
 import star.root;
@@ -568,6 +569,142 @@ const GameTestRegistration animatorSemanticSampling(
     auto angle = sample.currentRotationAngle("aim");
     ASSERT_TRUE(angle);
     EXPECT_FLOAT_EQ(*angle, -2.f);
+  });
+
+const GameTestRegistration sampledPartTransformOverrides(
+  "HumanoidRenderTest", "SharedSampleTransformOverridesReachAnchorsAndConsumers", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "version":1,
+      "transformationGroups":{"moving":{}},
+      "animatedParts":{
+        "stateTypes":{"pose":{"default":"idle","states":{
+          "idle":{"frames":1,"cycle":1,"properties":{"moving":[["reset"],["translate",[1,0]]]}},
+          "shifted":{"frames":1,"cycle":1,"properties":{"moving":[["reset"],["translate",[3,0]]]}},
+          "badGroup":{"frames":1,"cycle":1},
+          "badAnchor":{"frames":1,"cycle":1}
+        }}},
+        "parts":{
+          "parent":{
+            "properties":{"offset":[2,0],"transformationGroups":["moving"]},
+            "partStates":{"pose":{
+              "idle":{},
+              "shifted":{"properties":{"offset":[4,0]}},
+              "badGroup":{"properties":{"transformationGroups":["missing"]}},
+              "badAnchor":{}
+            }}
+          },
+          "child":{
+            "properties":{"anchorPart":"parent","offset":[0,3],"point":[1,0],"poly":[[0,0],[1,0],[0,1]]},
+            "partStates":{"pose":{
+              "idle":{},"shifted":{},"badGroup":{},
+              "badAnchor":{"properties":{"anchorPart":"missing"}}
+            }}
+          }
+        }
+      },
+      "lights":{"glow":{"active":true,"position":[0,0],"color":[255,255,255],"anchorPart":"child"}}
+    })");
+    ASSERT_TRUE(config);
+    auto made = NetworkedAnimator::create(fixture.root(), *config);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& animator = **made;
+    ASSERT_TRUE(animator.update(0, {}));
+    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::White);
+    animator.setPartDrawables("child", {line});
+    auto expectVec = [](Vec2F const& actual, Vec2F const& expected) {
+      EXPECT_NEAR(actual[0], expected[0], 1e-5f);
+      EXPECT_NEAR(actual[1], expected[1], 1e-5f);
+    };
+    auto expectPose = [&](NetworkedAnimator::Sample const& view, Mat3F const& parent, Mat3F const& global = Mat3F::identity()) {
+      auto child = parent * Mat3F::translation({0, 3});
+      // Query the child first so the parent's transformation is also reached recursively.
+      auto childTransform = view.partTransformation("child");
+      auto parentTransform = view.partTransformation("parent");
+      ASSERT_TRUE(childTransform);
+      ASSERT_TRUE(parentTransform);
+      for (auto point : {Vec2F{}, Vec2F{1, 0}, Vec2F{0, 1}}) {
+        expectVec(childTransform->transformVec2(point), child.transformVec2(point));
+        expectVec(parentTransform->transformVec2(point), parent.transformVec2(point));
+      }
+      auto final = global * child;
+      auto point = view.partPoint("child", "point");
+      auto poly = view.partPoly("child", "poly");
+      auto lights = view.lightSources();
+      auto drawables = view.drawables();
+      ASSERT_TRUE(point);
+      ASSERT_TRUE(*point);
+      ASSERT_TRUE(poly);
+      ASSERT_TRUE(*poly);
+      ASSERT_TRUE(lights);
+      ASSERT_EQ(lights->size(), 1u);
+      ASSERT_TRUE(drawables);
+      ASSERT_EQ(drawables->size(), 1u);
+      expectVec(**point, final.transformVec2(Vec2F{1, 0}));
+      ASSERT_EQ((**poly).sides(), 3u);
+      expectVec((**poly)[0], final.transformVec2(Vec2F{0, 0}));
+      expectVec((**poly)[1], final.transformVec2(Vec2F{1, 0}));
+      expectVec((**poly)[2], final.transformVec2(Vec2F{0, 1}));
+      expectVec((*lights)[0].position, final.transformVec2(Vec2F{0, 0}));
+      auto expectedLine = line;
+      expectedLine.transform(final);
+      ASSERT_TRUE((*drawables)[0].isLine());
+      expectVec((*drawables)[0].position, expectedLine.position);
+      expectVec((*drawables)[0].linePart().line.min(), expectedLine.linePart().line.min());
+      expectVec((*drawables)[0].linePart().line.max(), expectedLine.linePart().line.max());
+    };
+    auto idle = Mat3F::translation({3, 0});
+    for (int reuse = 0; reuse != 2; ++reuse) {
+      auto sample = animator.sample(.5f);
+      auto independent = animator.sample(.5f);
+      expectPose(sample, idle);
+      expectPose(independent, idle);
+      {
+        auto shared = sample;
+        ASSERT_TRUE(shared.translateLocalTransformationGroup("moving", {5, 2}));
+        auto translated = Mat3F::translation({5, 2}) * idle;
+        expectPose(sample, translated);
+        expectPose(shared, translated);
+        ASSERT_TRUE(shared.rotateLocalTransformationGroup("moving", std::numbers::pi_v<float> / 2));
+        expectPose(sample, Mat3F::rotation(std::numbers::pi_v<float> / 2) * translated);
+        ASSERT_TRUE(shared.resetLocalTransformationGroup("moving"));
+        expectPose(sample, idle);
+        ASSERT_TRUE(shared.setLocalState("pose", "shifted"));
+        expectPose(sample, Mat3F::translation({7, 0}));
+        EXPECT_FALSE(shared.setLocalState("pose", "missing"));
+        EXPECT_FALSE(shared.translateLocalTransformationGroup("missing", {5, 2}));
+        EXPECT_FALSE(shared.rotateLocalTransformationGroup("missing", 1));
+        EXPECT_FALSE(shared.resetLocalTransformationGroup("missing"));
+        EXPECT_FALSE(shared.partTransformation("missing"));
+        expectPose(sample, Mat3F::translation({7, 0}));
+        ASSERT_TRUE(shared.setLocalState("pose", "badGroup"));
+        EXPECT_FALSE(sample.partTransformation("child"));
+        ASSERT_TRUE(shared.setLocalState("pose", "badAnchor"));
+        EXPECT_FALSE(sample.partTransformation("child"));
+        ASSERT_TRUE(shared.setLocalState("pose", "idle"));
+        expectPose(sample, idle);
+      }
+      expectPose(independent, idle);
+      auto logical = animator.partTransformation("child");
+      auto logicalState = animator.state("pose");
+      auto logicalGroup = animator.getLocalTransformationGroup("moving");
+      ASSERT_TRUE(logical);
+      ASSERT_TRUE(logicalState);
+      ASSERT_TRUE(logicalGroup);
+      expectVec(logical->transformVec2(Vec2F{0, 0}), {3, 3});
+      EXPECT_EQ(*logicalState, "idle");
+      EXPECT_EQ(*logicalGroup, Mat3F::identity());
+      animator.setZoom(2);
+      animator.setFlipped(true);
+      auto global = Mat3F::scaling(Vec2F{-1, 1}) * Mat3F::scaling(2.f);
+      expectPose(sample, idle, global);
+      expectPose(independent, idle, global);
+      animator.setFlipped(false);
+      animator.setZoom(1);
+      // Leave both state and local group overrides behind before the slot is reused.
+      ASSERT_TRUE(sample.setLocalState("pose", "shifted"));
+      ASSERT_TRUE(sample.translateLocalTransformationGroup("moving", {20, 0}));
+      expectPose(sample, Mat3F::translation({27, 0}));
+    }
   });
 
 const GameTestRegistration humanoidSemanticSampling(
