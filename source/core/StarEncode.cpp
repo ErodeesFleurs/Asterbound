@@ -68,7 +68,7 @@ std::expected<std::size_t, StarException> nibbleDecode(std::span<char const> src
   return src.size();
 }
 
-static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static constexpr std::string_view base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 std::size_t base64Encode(std::span<char const> data, std::span<char> destination) {
   auto output = destination.data();

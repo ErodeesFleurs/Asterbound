@@ -111,14 +111,11 @@ T clampMagnitude(T const& v, T2 const& mag) {
     return v;
 }
 
+// Legacy policy for bounds that may be reversed: the upper bound wins.
+// Use std::clamp at call sites with proven ordered bounds.
 template <typename T>
 T clamp(T const val, T const min, T const max) {
   return std::min(std::max(val, min), max);
-}
-
-template <typename T>
-T clampDynamic(T const val, T const a, T const b) {
-  return std::min(std::max(val, std::min(a, b)), std::max(a, b));
 }
 
 template <typename IntType, typename PowType>
@@ -287,7 +284,6 @@ export namespace Star {
   using ::Star::rfpart;
   using ::Star::clampMagnitude;
   using ::Star::clamp;
-  using ::Star::clampDynamic;
   using ::Star::intPow;
   using ::Star::sigmoid;
   using ::Star::pmod;

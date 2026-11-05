@@ -149,8 +149,8 @@ std::expected<String, StarException> MaterialRenderProfile::pieceImage(String co
 
 std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarException> MaterialRenderProfile::damageImage(float damageLevel, TileDamageType damageType) const {
   if (damageType == TileDamageType::Protected)
-    return protectedFrames.at(clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
-  return crackingFrames.at(clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
+    return protectedFrames.at(std::clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
+  return crackingFrames.at(std::clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
 }
 
 std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& imageMetadata, Json const& spec, String const& relativePath) {

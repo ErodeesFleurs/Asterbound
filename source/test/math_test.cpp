@@ -54,6 +54,15 @@ TEST(Math, ClampedFloatToBytePreservesSaturationAndTruncation) {
   EXPECT_EQ(floatToByte(2.0f, true), 255);
 }
 
+TEST(Math, LegacyClampPreservesReversedBounds) {
+  // Runtime-configured ranges can put the upper bound below the lower bound.
+  // These calls intentionally retain the project policy rather than std::clamp.
+  EXPECT_EQ(clamp(-5, 0, -2), -2);
+  EXPECT_EQ(clamp(1, 0, -2), -2);
+  EXPECT_EQ(clamp(-5.0f, 0.0f, -2.0f), -2.0f);
+  EXPECT_EQ(clamp(1.0f, 0.0f, -2.0f), -2.0f);
+}
+
 TEST(Matrix3, RangeCopyPreservesRowMajorValuesAndDestinationBounds) {
   std::array<int, 9> input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   Matrix3<int> matrix(input);

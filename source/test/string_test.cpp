@@ -361,6 +361,36 @@ TEST(StringTest, tags) {
   EXPECT_EQ(testString.replaceTags(tags), "hello:there");
 }
 
+TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
+  constexpr char inputBytes[] = "前\0<one><two>後\0<unfinished";
+  constexpr char outputBytes[] = "前\0x\0y後\0<unfinished";
+  String source(std::string_view(inputBytes, sizeof(inputBytes) - 1));
+  StringList visited;
+  auto result = source.lookupTags([&](String const& key) -> std::expected<String, StarException> {
+    visited.append(key);
+    if (key == "one")
+      return String(std::string_view("x\0y", 3));
+    if (key == "two")
+      return String();
+    return std::unexpected(StarException("Unexpected lookup of an unfinished tag", false));
+  });
+  ASSERT_TRUE(result) << result.error().what();
+  EXPECT_EQ(result->utf8(), std::string_view(outputBytes, sizeof(outputBytes) - 1));
+  EXPECT_EQ(visited, (StringList{"one", "two"}));
+
+  visited.clear();
+  auto failed = String("<one><bad><later>").lookupTags(
+      [&](String const& key) -> std::expected<String, StarException> {
+        visited.append(key);
+        if (key == "bad")
+          return std::unexpected(OutOfRangeException("Tag lookup failure", false));
+        return key;
+      });
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<OutOfRangeException>());
+  EXPECT_EQ(visited, (StringList{"one", "bad"}));
+}
+
 TEST(StringTest, TagViewsPreserveOwningAndBorrowedReplacementBytes) {
   String source("a<x>b<x>");
   String replacement(std::string(4096, 'R') + std::string("\0中", 4));

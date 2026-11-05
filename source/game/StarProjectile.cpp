@@ -985,7 +985,7 @@ if (!result742) return std::unexpected(std::move(result742.error()));
 bool allowEntityOverlap = std::move(*result742);
 
     this->root().random().shuffle(tileDrops);
-    for (auto& tile : zip(openSpaces, tileDrops)) {
+    for (auto const& tile : std::views::zip(openSpaces, tileDrops)) {
       auto result743 = world();
 if (!result743) return std::unexpected(std::move(result743.error()));
 auto result746 = result743->get().modifyTile(std::get<0>(tile), PlaceMaterial{TileLayer::Foreground, std::get<1>(tile), MaterialHue()}, allowEntityOverlap);

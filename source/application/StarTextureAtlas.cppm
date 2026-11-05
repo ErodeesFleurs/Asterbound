@@ -183,8 +183,8 @@ template <typename AtlasTextureHandle>
     // Fill 1px border on all sides of the image
     for (unsigned y = 0; y < finalImageSize[1]; ++y) {
       for (unsigned x = 0; x < finalImageSize[0]; ++x) {
-        unsigned xind = clamp<unsigned>(x, 1, imageSize[0]) - 1;
-        unsigned yind = clamp<unsigned>(y, 1, imageSize[1]) - 1;
+        unsigned xind = std::clamp<unsigned>(x, 1, imageSize[0]) - 1;
+        unsigned yind = std::clamp<unsigned>(y, 1, imageSize[1]) - 1;
         auto pixel = image.getrgb(xind, yind);
         if (!pixel)
           return std::unexpected(std::move(pixel.error()));

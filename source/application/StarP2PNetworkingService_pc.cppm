@@ -81,13 +81,13 @@ private:
     JoinUnavailableWrapper& operator=(Arg&& other) {
       static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
               || std::is_same<JoinUnavailableWrapper, typename std::decay<Arg>::type>::value,
-          "JoinUnavailable can not implicitly be assigned from Empty-derived classes or strong Empty typedefs");
+          "JoinUnavailable can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef JoinUnavailableWrapper<Empty> JoinUnavailable;
+  typedef JoinUnavailableWrapper<std::monostate> JoinUnavailable;
   struct JoinLocal {
     bool operator==(JoinLocal const& rhs) const { return capacity == rhs.capacity; };
     std::uint32_t capacity;

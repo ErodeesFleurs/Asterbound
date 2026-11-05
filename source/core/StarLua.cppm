@@ -71,7 +71,7 @@ struct LuaConversionExceptionTag {
 };
 using LuaConversionException = StarError<LuaConversionExceptionTag, LuaException>;
 
-typedef Empty LuaNilType;
+typedef std::monostate LuaNilType;
 typedef bool LuaBoolean;
 typedef lua_Integer LuaInt;
 typedef lua_Number LuaFloat;

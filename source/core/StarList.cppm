@@ -381,7 +381,7 @@ public:
   }
 
   bool contains(const_reference e) const {
-    return std::ranges::find(*this, e) != end();
+    return std::ranges::contains(*this, e);
   }
 
   std::size_t remove(const_reference e) {
@@ -843,7 +843,7 @@ public:
   }
 
   bool contains(const_reference e) const {
-    return std::ranges::find(*this, e) != end();
+    return std::ranges::contains(*this, e);
   }
 
   std::size_t remove(const_reference e) {
@@ -1299,7 +1299,7 @@ public:
   }
 
   bool contains(const_reference e) const {
-    return std::ranges::find(*this, e) != end();
+    return std::ranges::contains(*this, e);
   }
 
   std::size_t remove(const_reference e) {
@@ -1759,7 +1759,7 @@ public:
   }
 
   bool contains(const_reference e) const {
-    return std::ranges::find(*this, e) != end();
+    return std::ranges::contains(*this, e);
   }
 
   std::size_t remove(const_reference e) {
@@ -2270,7 +2270,7 @@ public:
   }
 
   bool contains(const_reference e) const {
-    return std::ranges::find(*this, e) != end();
+    return std::ranges::contains(*this, e);
   }
 
   std::size_t remove(const_reference e) {
@@ -2707,24 +2707,6 @@ template <SequenceContainer Sequence>
 std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
 
-template <typename... Containers>
-struct ListZipTypes {
-  typedef std::tuple<typename std::decay<Containers>::type::value_type...> Tuple;
-  typedef List<Tuple> Result;
-};
-
-template <typename... Containers>
-typename ListZipTypes<Containers...>::Result zip(Containers&&... args);
-
-template <typename Container>
-struct ListEnumerateTypes {
-  typedef std::pair<typename std::decay<Container>::type::value_type, std::size_t> Pair;
-  typedef List<Pair> Result;
-};
-
-template <typename Container>
-typename ListEnumerateTypes<Container>::Result enumerate(Container&& container);
-
 template <SequenceContainer Sequence>
 std::ostream& operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::ostream&> {
@@ -2759,24 +2741,6 @@ std::size_t ListHasher<List>::operator()(List const& l) const {
   for (auto const& e : l)
     hashCombine(h, elemHasher(e));
   return h;
-}
-
-template <typename... Containers>
-typename ListZipTypes<Containers...>::Result zip(Containers&&... args) {
-  typename ListZipTypes<Containers...>::Result res;
-  for (auto el : std::views::zip(args...))
-    res.push_back(std::move(el));
-
-  return res;
-}
-
-template <typename Container>
-typename ListEnumerateTypes<Container>::Result enumerate(Container&& container) {
-  typename ListEnumerateTypes<Container>::Result res;
-  for (auto [index, value] : std::views::enumerate(container))
-    res.emplace_back(value, static_cast<std::size_t>(index));
-
-  return res;
 }
 
 }
@@ -2824,10 +2788,6 @@ export namespace Star {
   using ::Star::SmallList;
   using ::Star::Deque;
   using ::Star::LinkedList;
-  using ::Star::ListZipTypes;
-  using ::Star::ListEnumerateTypes;
-  using ::Star::zip;
-  using ::Star::enumerate;
   using ::Star::operator<<;
   using ::Star::hash;
 }

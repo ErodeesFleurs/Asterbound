@@ -300,7 +300,7 @@ private:
   friend bool jsonPartialMatch(Json const& base, Json const& compare);
 
 
-  std::variant<Empty, double, bool, std::int64_t, std::shared_ptr<String const>, std::shared_ptr<JsonArray const>, std::shared_ptr<JsonObject const>> m_data;
+  std::variant<std::monostate, double, bool, std::int64_t, std::shared_ptr<String const>, std::shared_ptr<JsonArray const>, std::shared_ptr<JsonObject const>> m_data;
 };
 
 std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Json const& v);

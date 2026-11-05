@@ -203,7 +203,7 @@ std::expected<void, StarException> SliderBarWidget::setVal(int val, bool callbac
     m_updateJog = true;
 
   m_val = val;
-  m_val = clamp(m_val, m_low, m_high);
+  m_val = std::clamp(m_val, m_low, m_high);
 
   if (doCallback)
     return m_callback(*this);

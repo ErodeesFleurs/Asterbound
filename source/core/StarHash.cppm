@@ -82,15 +82,7 @@ public:
 
 template <typename EnumType>
   requires std::is_enum_v<EnumType>
-struct hash<EnumType> {
-private:
-  using UnderlyingType = std::underlying_type_t<EnumType>;
-
-public:
-  std::size_t operator()(EnumType e) const {
-    return std::hash<UnderlyingType>()((UnderlyingType)e);
-  }
-};
+struct hash<EnumType> : std::hash<std::remove_cv_t<EnumType>> {};
 
 template <typename T>
 std::size_t hashOf(T const& t) {

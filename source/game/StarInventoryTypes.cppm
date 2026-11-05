@@ -66,16 +66,15 @@ template <typename BaseType> struct TrashSlotWrapper;
     SwapSlotWrapper& operator=(Arg&& other) {
       static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
               || std::is_same<SwapSlotWrapper, typename std::decay<Arg>::type>::value,
-          "" "SwapSlot" " can not implicitly be assigned from " "Empty" "-derived classes or strong " "Empty"
-          " typedefs");
+          "SwapSlot can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
     friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& ostream,
-        std::variant<EquipmentSlot, BagSlot, SwapSlotWrapper<Empty>, TrashSlotWrapper<Empty>> const& slot);
+        std::variant<EquipmentSlot, BagSlot, SwapSlotWrapper<std::monostate>, TrashSlotWrapper<std::monostate>> const& slot);
   };
-  typedef SwapSlotWrapper<Empty> SwapSlot;
+  typedef SwapSlotWrapper<std::monostate> SwapSlot;
 template <typename BaseType>
 struct TrashSlotWrapper : BaseType {
   using BaseType::BaseType;
@@ -104,13 +103,13 @@ struct TrashSlotWrapper : BaseType {
   TrashSlotWrapper& operator=(Arg&& other) {
     static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
             || std::is_same<TrashSlotWrapper, typename std::decay<Arg>::type>::value,
-        "TrashSlot can not implicitly be assigned from Empty-derived classes or strong Empty typedefs");
+        "TrashSlot can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
 
     BaseType::operator=(std::forward<Arg>(other));
     return *this;
   }
 };
-typedef TrashSlotWrapper<Empty> TrashSlot;
+typedef TrashSlotWrapper<std::monostate> TrashSlot;
 
 // Any manageable location in the player inventory can be pointed to by an
 // InventorySlot

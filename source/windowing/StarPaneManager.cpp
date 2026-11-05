@@ -145,7 +145,7 @@ std::expected<void, StarException> PaneManager::dismissPane(std::shared_ptr<Pane
 
 std::expected<void, StarException> PaneManager::dismissAllPanes(Set<PaneLayer> const& paneLayers) {
   for (auto const& paneLayer : paneLayers) {
-    for (auto const& panePair : copy(m_displayedPanes[paneLayer])) {
+    for (auto const& panePair : auto(m_displayedPanes[paneLayer])) {
       auto dismissed = dismiss(panePair.first);
       if (!dismissed)
         return std::unexpected(std::move(dismissed.error()));
@@ -155,7 +155,7 @@ std::expected<void, StarException> PaneManager::dismissAllPanes(Set<PaneLayer> c
 }
 
 std::expected<void, StarException> PaneManager::dismissAllPanes() {
-  for (auto const& layerPair : copy(m_displayedPanes)) {
+  for (auto const& layerPair : auto(m_displayedPanes)) {
     for (auto const& panePair : layerPair.second) {
       auto dismissed = dismiss(panePair.first);
       if (!dismissed)
@@ -408,7 +408,7 @@ std::expected<bool, StarException> PaneManager::sendInputEvent(InputEvent const&
 
   bool foundModal = false;
   for (auto& layerPair : m_displayedPanes) {
-    for (auto const& panePair : copy(layerPair.second)) {
+    for (auto const& panePair : auto(layerPair.second)) {
       if (!panePair.first->interactive())
         continue;
       auto consumed = panePair.first->sendEvent(event);
@@ -550,7 +550,7 @@ std::expected<void, StarException> PaneManager::update(float dt) {
   }
 
   for (auto const& layerPair : m_displayedPanes) {
-    for (auto const& panePair : copy(layerPair.second)) {
+    for (auto const& panePair : auto(layerPair.second)) {
       if (panePair.first->isDismissed()) {
         auto dismissed = dismiss(panePair.first);
         if (!dismissed)

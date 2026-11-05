@@ -145,7 +145,7 @@ TEST(ShaTest, All) {
       "thing was a girl.  Did you just read my mind?  Yup!  How?!  Muffin button.")));
   expected.append(hexDecode("9253b707d18e956cde492ae999a67957a48a6720ad76a6cfa2046f697ebeafd3"));
 
-  for (auto i : zip(computed, expected)) {
+  for (auto i : std::views::zip(computed, expected)) {
     EXPECT_TRUE(std::get<0>(i) == std::get<1>(i));
   }
 }

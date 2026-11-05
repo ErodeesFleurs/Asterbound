@@ -182,7 +182,7 @@ inline Vec2I WorldGeometry::xwrap(Vec2I const& pos) const {
 }
 
 inline float WorldGeometry::yclamp(float y) const {
-  return clamp<float>(y, 0, std::nextafter(m_size[1], 0.0f));
+  return std::clamp<float>(y, 0, std::nextafter(m_size[1], 0.0f));
 }
 
 inline Vec2F WorldGeometry::limit(Vec2F const& pos) const {

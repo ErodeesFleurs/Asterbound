@@ -62,16 +62,6 @@ SwallowReturn<Func> swallow(Func f) {
   return SwallowReturn<Func>{std::move(f)};
 }
 
-struct Empty {
-  bool operator==(Empty const) const {
-    return true;
-  }
-
-  bool operator<(Empty const) const {
-    return false;
-  }
-};
-
 template <typename MapType1, typename MapType2>
 [[nodiscard]] auto mapMerge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
   using Insertion = std::remove_cvref_t<decltype(targetMap.insert(*sourceMap.begin()))>;
@@ -295,11 +285,6 @@ template <typename Container, typename Getter>
   return sortByComputedValue(container, std::forward<Getter>(valueGetter), true);
 }
 
-template <typename T>
-T copy(T c) {
-  return c;
-}
-
 template <typename OutContainer, typename InContainer, typename Function>
 [[nodiscard]] auto transformInto(OutContainer& outContainer, InContainer&& inContainer, Function&& function) {
   using Input = decltype(std::forward_like<InContainer>(*std::begin(inContainer)));
@@ -468,7 +453,6 @@ export namespace Star {
   using ::Star::construct;
   using ::Star::SwallowReturn;
   using ::Star::swallow;
-  using ::Star::Empty;
   using ::Star::mapMerge;
   using ::Star::mapsEqual;
   using ::Star::filter;
@@ -477,7 +461,6 @@ export namespace Star {
   using ::Star::sorted;
   using ::Star::sortByComputedValue;
   using ::Star::stableSortByComputedValue;
-  using ::Star::copy;
   using ::Star::transformInto;
   using ::Star::transform;
   using ::Star::take;

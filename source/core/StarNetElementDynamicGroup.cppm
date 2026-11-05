@@ -102,13 +102,13 @@ private:
     ElementResetWrapper& operator=(Arg&& other) {
       static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
               || std::is_same<ElementResetWrapper, typename std::decay<Arg>::type>::value,
-          "ElementReset can not implicitly be assigned from Empty-derived classes or strong Empty typedefs");
+          "ElementReset can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef ElementResetWrapper<Empty> ElementReset;
+  typedef ElementResetWrapper<std::monostate> ElementReset;
   using ElementRemoval = StrongTypedefBuiltin<ElementRemovalType, struct ElementRemovalTag>;
   template <typename BaseType>
   struct ElementAdditionWrapper : BaseType {

@@ -15,6 +15,23 @@ import star.vector;
 import star.static_vector;
 using namespace Star;
 
+TEST(ListPredicates, MembershipConvertsToElementType) {
+  auto expectMembership = [](auto const& values) {
+    EXPECT_TRUE(values.contains(1));
+    EXPECT_TRUE(values.contains(1.5));
+    EXPECT_FALSE(values.contains(2));
+    EXPECT_FALSE(values.contains(2.5));
+  };
+
+  expectMembership(List<int>{1});
+  auto bounded = StaticList<int, 1>::create({1});
+  ASSERT_TRUE(bounded);
+  expectMembership(*bounded);
+  expectMembership(SmallList<int, 1>{1});
+  expectMembership(Deque<int>{1});
+  expectMembership(LinkedList<int>{1});
+}
+
 TEST(ListPredicates, Any) {
   int a = 60;
   List<int> asdf{1, 2, 3, 4, 5, 6};
@@ -96,25 +113,6 @@ TEST(ContainerOperators, allTests) {
   EXPECT_FALSE(a.all());
   EXPECT_EQ(b, c);
   EXPECT_EQ(e, f);
-}
-
-TEST(ZipTest, All) {
-  List<int> a{1, 2, 3};
-  std::vector<std::uint64_t> b{5, 4, 3, 2, 1};
-  std::deque<std::int64_t> c{3, 2, 2};
-  std::list<unsigned> d{0, 0, 0, 0, 4, 8};
-
-  auto zipResult = zip(a, b, c, d);
-
-  EXPECT_EQ(zipResult.size(), 3u);
-  EXPECT_EQ(std::get<0>(zipResult[0]), 1);
-  EXPECT_EQ(std::get<1>(zipResult[0]), 5u);
-  EXPECT_EQ(std::get<2>(zipResult[0]), 3);
-  EXPECT_EQ(std::get<3>(zipResult[0]), 0u);
-  EXPECT_EQ(std::get<0>(zipResult[2]), 3);
-  EXPECT_EQ(std::get<1>(zipResult[2]), 3u);
-  EXPECT_EQ(std::get<2>(zipResult[2]), 2);
-  EXPECT_EQ(std::get<3>(zipResult[2]), 0u);
 }
 
 TEST(ListPredicates, NoncopyableExplicitBoolShortCircuit) {

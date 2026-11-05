@@ -49,11 +49,11 @@ struct DataStreamReadFunctor {
   template <typename T> [[nodiscard]] std::expected<void, StarException> operator()(T& t) const { return ds.read(t); }
 };
 
-[[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Empty const&) {
+[[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, std::monostate const&) {
   return std::ref(ds);
 }
 
-[[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Empty&) {
+[[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, std::monostate&) {
   return std::ref(ds);
 }
 

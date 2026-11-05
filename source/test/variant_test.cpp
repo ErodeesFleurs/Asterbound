@@ -3,6 +3,8 @@ import star.format;
 import star.optional;
 import star.data_stream_devices;
 import star.data_stream_extra;
+import star.net_element_dynamic_group;
+import star.net_element_group;
 
 #include "gtest/gtest.h"
 
@@ -62,4 +64,31 @@ TEST(VariantSerialization, MonostateAndDuplicateAlternativeBytes) {
       std::array<unsigned char, 3>{0x01, 0x12, 0x34});
   expectVariantWire(Value(std::in_place_index<2>, 0x1234),
       std::array<unsigned char, 3>{0x02, 0x12, 0x34});
+}
+
+TEST(VariantSerialization, DynamicGroupResetHasNoPayload) {
+  NetElementDynamicGroup<NetElementGroup> master;
+  master.initNetVersion();
+
+  DataStreamBuffer stream;
+  auto written = master.writeNetDelta(stream, 0);
+  ASSERT_TRUE(written);
+  ASSERT_TRUE(*written);
+  // Delta flag, change code, reset alternative, terminator: no marker payload.
+  std::array<unsigned char, 4> expected{0x00, 0x01, 0x00, 0x00};
+  ASSERT_EQ(stream.size(), expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i)
+    EXPECT_EQ(static_cast<unsigned char>(stream.span()[i]), expected[i]);
+  ASSERT_TRUE(stream.write<std::uint8_t>(0x5a));
+
+  NetElementDynamicGroup<NetElementGroup> slave;
+  auto added = slave.addNetElement(std::make_shared<NetElementGroup>());
+  ASSERT_TRUE(added);
+  ASSERT_FALSE(slave.netElementIds().empty());
+  ASSERT_TRUE(stream.seek(0));
+  ASSERT_TRUE(slave.readNetDelta(stream));
+  EXPECT_TRUE(slave.netElementIds().empty());
+  auto sentinel = stream.read<std::uint8_t>();
+  ASSERT_TRUE(sentinel);
+  EXPECT_EQ(*sentinel, 0x5a);
 }

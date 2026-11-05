@@ -468,10 +468,6 @@ template <typename Lookup>
   using Result = std::conditional_t<fallible, std::expected<String, StarException>, String>;
   // Tag delimiters and offsets are bytes, not codepoints.
 
-  auto substrInto = [](std::string const& ref, std::size_t position, std::size_t n, std::string& result) {
-    result.append(ref.data() + position, std::min(n, ref.size() - position));
-  };
-
   std::string finalString;
 
   std::size_t start = 0;
@@ -488,8 +484,8 @@ template <typename Lookup>
     std::size_t beginTag = m_string.find("<", start);
     std::size_t endTag = m_string.find(">", beginTag);
     if (beginTag != NPos && endTag != NPos) {
-      substrInto(m_string, beginTag + 1, endTag - beginTag - 1, key.m_string);
-      substrInto(m_string, start, beginTag - start, finalString);
+      key.m_string.append(m_string, beginTag + 1, endTag - beginTag - 1);
+      finalString.append(m_string, start, beginTag - start);
       decltype(auto) replacement = lookup(key);
       if constexpr (fallible) {
         if (!replacement) return Result(std::unexpected(std::move(replacement.error())));
@@ -501,7 +497,7 @@ template <typename Lookup>
       start = endTag + 1;
 
     } else {
-      substrInto(m_string, start, NPos, finalString);
+      finalString.append(m_string, start, std::string::npos);
       break;
     }
   }
