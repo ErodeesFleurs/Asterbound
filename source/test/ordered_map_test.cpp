@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.ordered_map;
+import star.map;
 import star.list;
 import star.lru_cache;
 import star.ttl_cache;
@@ -38,6 +39,55 @@ TEST(OrderedMap, Insert) {
       keys.append(i->first);
     EXPECT_EQ(comp, keys);
   }
+}
+
+TEST(OrderedMap, PairSnapshotsPreserveKeysValuesAndOwnership) {
+  auto check = []<typename Map>() {
+    Map map{{3, 7}, {1, 7}, {2, 9}};
+    auto pairs = map.pairs();
+    auto keys = map.keys();
+    auto values = map.values();
+    map.clear();
+    EXPECT_EQ(pairs, (List<std::pair<int, int>>{{3, 7}, {1, 7}, {2, 9}}));
+    EXPECT_EQ(keys, (List<int>{3, 1, 2}));
+    EXPECT_EQ(values, (List<int>{7, 7, 9}));
+  };
+  check.template operator()<OrderedMap<int, int>>();
+  check.template operator()<OrderedHashMap<int, int>>();
+}
+
+TEST(OrderedMap, KeyOfUsesCurrentOrderAndPreservesMissingErrors) {
+  auto check = []<typename Map>() {
+    Map map{{3, 7}, {1, 7}, {2, 9}};
+    auto first = map.keyOf(7);
+    ASSERT_TRUE(first);
+    EXPECT_EQ(*first, 3);
+    map.sortByKey();
+    auto sorted = map.keyOf(7);
+    ASSERT_TRUE(sorted);
+    EXPECT_EQ(*sorted, 1);
+    auto missing = map.keyOf(8);
+    ASSERT_FALSE(missing);
+    EXPECT_TRUE(missing.error().template is<MapException>());
+    map.clear();
+    auto empty = map.keyOf(7);
+    ASSERT_FALSE(empty);
+    EXPECT_TRUE(empty.error().template is<MapException>());
+  };
+  check.template operator()<OrderedMap<int, int>>();
+  check.template operator()<OrderedHashMap<int, int>>();
+}
+
+TEST(OrderedMap, KeyOfOnlyRendersDiagnosticsAfterMissing) {
+  Json malformed(std::string("\xff", 1));
+  OrderedHashMap<int, Json> map{{4, malformed}};
+  auto found = map.keyOf(malformed);
+  ASSERT_TRUE(found);
+  EXPECT_EQ(*found, 4);
+  map.clear();
+  auto missing = map.keyOf(malformed);
+  ASSERT_FALSE(missing);
+  EXPECT_TRUE(missing.error().is<UnicodeException>());
 }
 
 TEST(OrderedMap, Getters) {

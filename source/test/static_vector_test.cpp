@@ -61,6 +61,68 @@ TEST(StaticVectorTest, Comparators) {
   EXPECT_FALSE(*longer < *base);
 }
 
+TEST(StaticVectorTest, EqualityNeedsOnlyContextualInequality) {
+  struct Result {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  struct Value {
+    int value;
+    int* comparisons;
+    Result operator!=(Value const& other) const {
+      ++*comparisons;
+      return {value != other.value};
+    }
+  };
+  int comparisons = 0;
+  StaticVector<Value, 4> left;
+  StaticVector<Value, 4> right;
+  EXPECT_TRUE(left == right);
+  ASSERT_TRUE(left.emplace_back(1, &comparisons));
+  EXPECT_FALSE(left == right);
+  EXPECT_EQ(comparisons, 0);
+  ASSERT_TRUE(right.emplace_back(1, &comparisons));
+  ASSERT_TRUE(left.emplace_back(2, &comparisons));
+  ASSERT_TRUE(right.emplace_back(2, &comparisons));
+  EXPECT_TRUE(left == right);
+  comparisons = 0;
+  EXPECT_TRUE(left == left);
+  EXPECT_FALSE(left != left);
+  EXPECT_EQ(comparisons, 0);
+  right[0].value = 3;
+  EXPECT_FALSE(left == right);
+  EXPECT_EQ(comparisons, 1);
+  EXPECT_TRUE(left != right);
+}
+
+TEST(StaticVectorTest, OrderingNeedsOnlyContextualLess) {
+  struct Result {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  struct Value {
+    int value;
+    Result operator<(Value const& other) const { return {value < other.value}; }
+  };
+  StaticVector<Value, 4> left;
+  StaticVector<Value, 4> right;
+  EXPECT_FALSE(left < right);
+  ASSERT_TRUE(right.emplace_back(1));
+  EXPECT_TRUE(left < right);
+  EXPECT_FALSE(right < left);
+  ASSERT_TRUE(left.emplace_back(1));
+  EXPECT_FALSE(left < right);
+  EXPECT_FALSE(left < left);
+  ASSERT_TRUE(right.emplace_back(2));
+  EXPECT_TRUE(left < right);
+  EXPECT_FALSE(right < left);
+  ASSERT_TRUE(left.emplace_back(3));
+  EXPECT_FALSE(left < right);
+  EXPECT_TRUE(right < left);
+}
+
 TEST(StaticVectorTest, SizeLimits) {
   StaticVector<int, 0> a;
   StaticVector<int, 1> b;
@@ -322,6 +384,83 @@ TEST(StaticVectorTest, MoveOnlyAssignmentAndEraseNeedNoCopyOrDefault) {
   EXPECT_EQ(alive, 0);
 }
 
+TEST(StaticVectorTest, AssignmentPreservesForwardEffectsAndReverseTailDestruction) {
+  struct Value {
+    std::vector<int>* effects;
+    int value;
+    int slot;
+    Value(std::vector<int>& effects, int value) : effects(&effects), value(value), slot(value) {}
+    Value(Value const&) = default;
+    Value(Value&&) = default;
+    Value& operator=(Value const& other) {
+      effects->push_back(other.value);
+      value = other.value;
+      return *this;
+    }
+    Value& operator=(Value&& other) {
+      effects->push_back(100 + other.value);
+      value = std::exchange(other.value, -1);
+      return *this;
+    }
+    ~Value() { effects->push_back(-slot); }
+  };
+  std::vector<int> effects;
+  StaticVector<Value, 4> source;
+  ASSERT_TRUE(source.emplace_back(effects, 10));
+  ASSERT_TRUE(source.emplace_back(effects, 20));
+  StaticVector<Value, 4> target;
+  for (int value : {1, 2, 3, 4})
+    ASSERT_TRUE(target.emplace_back(effects, value));
+  target = source;
+  EXPECT_EQ(effects, (std::vector<int>{10, 20, -4, -3}));
+  ASSERT_TRUE(target.emplace_back(effects, 3));
+  ASSERT_TRUE(target.emplace_back(effects, 4));
+  effects.clear();
+  target = std::move(source);
+  EXPECT_EQ(effects, (std::vector<int>{110, 120, -4, -3}));
+  ASSERT_EQ(source.size(), 2u);
+  EXPECT_EQ(source[0].value, -1);
+  EXPECT_EQ(source[1].value, -1);
+  ASSERT_TRUE(target.emplace_back(effects, 3));
+  ASSERT_TRUE(target.emplace_back(effects, 4));
+  std::initializer_list<Value> replacement{Value(effects, 30), Value(effects, 40)};
+  effects.clear();
+  ASSERT_TRUE(target.assign(replacement));
+  EXPECT_EQ(effects, (std::vector<int>{30, 40, -4, -3}));
+  ASSERT_EQ(target.size(), 2u);
+  EXPECT_EQ(target[0].value, 30);
+  EXPECT_EQ(target[1].value, 40);
+}
+
+TEST(StaticVectorTest, EraseShiftsElementsAppendedDuringMoveAssignment) {
+  struct Value {
+    int value;
+    std::function<void()>* onMove;
+    Value(int value, std::function<void()>& onMove) : value(value), onMove(&onMove) {}
+    Value(Value&&) = default;
+    Value& operator=(Value&& other) {
+      value = std::exchange(other.value, -1);
+      (*onMove)();
+      return *this;
+    }
+  };
+  for (bool rangeErase : {false, true}) {
+    StaticVector<Value, 4> values;
+    bool appended = false;
+    std::function<void()> onMove = [&] {
+      if (!std::exchange(appended, true))
+        ASSERT_TRUE(values.emplace_back(4, onMove));
+    };
+    for (int value : {1, 2, 3})
+      ASSERT_TRUE(values.emplace_back(value, onMove));
+    auto erased = rangeErase ? values.erase(values.begin(), values.begin() + 1) : values.erase(values.begin());
+    EXPECT_EQ(erased, values.begin());
+    ASSERT_EQ(values.size(), 3u);
+    EXPECT_EQ(values[0].value, 2);
+    EXPECT_EQ(values[1].value, 3);
+    EXPECT_EQ(values[2].value, 4);
+  }
+}
 
 TEST(StaticVectorTest, InitializerAssignmentChecksCapacityBeforeMutation) {
   auto created = StaticVector<int, 2>::create({1});

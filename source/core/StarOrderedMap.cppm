@@ -225,24 +225,24 @@ OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::OrderedMapWrapper(std
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::keys() const -> List<key_type> {
   List<key_type> keys;
-  for (auto const& p : *this)
-    keys.append(p.first);
+  keys.reserve(size());
+  std::ranges::copy(std::views::keys(*this), std::back_inserter(keys));
   return keys;
 }
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::values() const -> List<mapped_type> {
   List<mapped_type> values;
-  for (auto const& p : *this)
-    values.append(p.second);
+  values.reserve(size());
+  std::ranges::copy(std::views::values(*this), std::back_inserter(values));
   return values;
 }
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::pairs() const -> List<std::pair<key_type, mapped_type>> {
   List<std::pair<key_type, mapped_type>> plist;
-  for (auto const& p : *this)
-    plist.append(p.second);
+  plist.reserve(size());
+  std::ranges::copy(*this, std::back_inserter(plist));
   return plist;
 }
 
@@ -309,10 +309,13 @@ bool OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::operator==(Order
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::keyOf(mapped_type const& v) const -> std::expected<key_type, StarException> {
-  for (const_iterator i = begin(); i != end(); ++i) {
-    if (i->second == v)
-      return i->first;
-  }
+  auto found = std::find_if(begin(), end(), [&](auto const& pair) {
+    if (pair.second == v)
+      return true;
+    return false;
+  });
+  if (found != end())
+    return found->first;
   return std::unexpected(mapDiagnosticError("Value '{}' not found in OrderedMap::keyOf()", "OrderedMap::keyOf: value not found while rendering its diagnostic", v));
 }
 
