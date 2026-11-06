@@ -1496,13 +1496,9 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   return {};
 }
 
-List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingAudio() {
-  return take(m_samples);
-}
+List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingAudio() { return std::exchange(m_samples, {}); }
 
-List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingMusic() {
-  return take(m_music);
-}
+List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingMusic() { return std::exchange(m_music, {}); }
 
 void WorldClient::dimWorld() {
   m_worldDimTimer.reset();
@@ -1835,7 +1831,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         auto result126 = m_weather->clear();
         if (!result126)
           return std::unexpected(std::move(result126.error()));
-        m_weatherDomain = take(weatherDomain);
+        m_weatherDomain = std::exchange(weatherDomain, {});
       }
       auto result127 = m_weather->readUpdate(environmentUpdatePacket->weatherDelta, m_clientState->netCompatibilityRules());
       if (!result127)
@@ -2012,7 +2008,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       m_playerStart = setPlayerStart->playerStart;
       m_respawnInWorld = setPlayerStart->respawnInWorld;
     } else if (auto findUniqueEntityResponse = as<FindUniqueEntityResponsePacket>(packet)) {
-      for (auto& promise : take(m_findUniqueEntityResponses[findUniqueEntityResponse->uniqueEntityId])) {
+      for (auto& promise : std::exchange(m_findUniqueEntityResponses[findUniqueEntityResponse->uniqueEntityId], {})) {
         if (findUniqueEntityResponse->entityPosition) {
           auto result145 = promise.fulfill(*findUniqueEntityResponse->entityPosition);
           if (!result145)
@@ -3649,13 +3645,13 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     m_spaceSound = {};
   }
 
-  for (auto& response : take(m_entityMessageResponses))
+  for (auto& response : std::exchange(m_entityMessageResponses, {}))
     remember(response.second.cancel("Client world closed"));
-  for (auto& responses : take(m_findUniqueEntityResponses)) {
+  for (auto& responses : std::exchange(m_findUniqueEntityResponses, {})) {
     for (auto& response : responses.second)
       remember(response.cancel("Client world closed"));
   }
-  for (auto& response : take(m_entityInteractionResponses))
+  for (auto& response : std::exchange(m_entityInteractionResponses, {}))
     remember(response.second.cancel("Client world closed"));
   m_entityMessagePromises = {};
 

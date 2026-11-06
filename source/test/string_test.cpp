@@ -14,6 +14,7 @@ import star.bi_map;
 import star.input_event;
 import star.logging;
 import star.map;
+import star.text;
 
 #include "gtest/gtest.h"
 
@@ -573,4 +574,44 @@ TEST(StringTest, InvalidUnicodeIsRecoverableAndDoesNotModifyTheSource) {
   EXPECT_TRUE(invalidView.error().is<UnicodeException>());
   EXPECT_EQ(malformed.utf8(), std::string("\xff", 1));
   EXPECT_EQ(String("日本語").size(), 3u);
+}
+
+TEST(StringTest, EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError) {
+  constexpr char input[] = "a;\0^red;b\x1breset;c";
+  StringView text(std::string_view(input, sizeof(input) - 1));
+  std::vector<std::string> fragments;
+  std::vector<std::string> commands;
+  auto processed = Text::processText(
+    text,
+    [&](StringView part) -> std::expected<bool, StarException> {
+      fragments.emplace_back(part.utf8());
+      return true;
+    },
+    [&](StringView command) -> std::expected<bool, StarException> {
+      commands.emplace_back(command.utf8());
+      return true;
+    });
+  ASSERT_TRUE(processed);
+  EXPECT_TRUE(*processed);
+  EXPECT_EQ(fragments, (std::vector<std::string>{std::string("a;\0", 3), "b", "c"}));
+  EXPECT_EQ(commands, (std::vector<std::string>{"red", "reset"}));
+
+  fragments.clear();
+  commands.clear();
+  auto failed = Text::processText(
+    text,
+    [&](StringView part) -> std::expected<bool, StarException> {
+      fragments.emplace_back(part.utf8());
+      if (part.utf8() == "b")
+        return std::unexpected(IOException("Text callback failure", false));
+      return true;
+    },
+    [&](StringView command) -> std::expected<bool, StarException> {
+      commands.emplace_back(command.utf8());
+      return true;
+    });
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<IOException>());
+  EXPECT_EQ(fragments, (std::vector<std::string>{std::string("a;\0", 3), "b"}));
+  EXPECT_EQ(commands, (std::vector<std::string>{"red"}));
 }

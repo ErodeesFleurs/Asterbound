@@ -264,16 +264,18 @@ std::shared_ptr<WorldLayout> WorldTemplate::worldLayout() const {
 }
 
 std::expected<void, StarException> WorldTemplate::setWorldParameters(std::shared_ptr<VisitableWorldParameters> newParameters) {
-  m_worldParameters = take(newParameters);
+  m_worldParameters = std::exchange(newParameters, {});
   return setupWeatherDomains();
 }
 
 void WorldTemplate::setWorldLayout(std::shared_ptr<WorldLayout> newLayout) {
-  m_layout = take(newLayout);
+  m_layout = std::exchange(newLayout, {});
   m_blockCache.clear();
 }
 
 void WorldTemplate::setSkyParameters(SkyParameters newParameters) {
+  // SkyParameters constructs an owning JSON object on reset; preserve the
+  // move-before-allocation sequencing rather than constructing it up front.
   m_skyParameters = take(newParameters);
 }
 
@@ -903,7 +905,7 @@ std::expected<void, StarException> WorldTemplate::setupWeatherDomains() {
         }
       }
 
-      m_weatherLayers.append({definition.name, take(domain), minHeight, maxHeight});
+      m_weatherLayers.append({definition.name, std::exchange(domain, {}), minHeight, maxHeight});
     }
   } else {
     m_weatherDomains.append({"surface", m_worldParameters->weatherPool, (int)undergroundLevel()});

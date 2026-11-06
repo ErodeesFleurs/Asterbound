@@ -291,7 +291,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     m_swapReturnSlot = {};
   auto item = retrieveForMutation(slot);
   if (!item) return std::unexpected(std::move(item.error()));
-  return take(item->get());
+  return std::exchange(item->get(), {});
 }
 
 [[nodiscard]] std::expected<bool, StarException> PlayerInventory::exchangeItems(InventorySlot const& first, InventorySlot const& second) {
@@ -434,7 +434,7 @@ bool PlayerInventory::slotValid(InventorySlot const& slot) const {
       auto slot = std::as_const(*pair.second).at(i);
       if (!slot) return std::unexpected(std::move(slot.error()));
       if (!*slot) {
-        auto assigned = pair.second->setItem(i, take(items));
+        auto assigned = pair.second->setItem(i, std::exchange(items, {}));
         if (!assigned) return std::unexpected(std::move(assigned.error()));
         auto added = autoAddToCustomBar(BagSlot(pair.first, i));
         if (!added) return std::unexpected(std::move(added.error()));

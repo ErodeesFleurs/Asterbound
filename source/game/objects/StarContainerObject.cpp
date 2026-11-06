@@ -265,7 +265,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    for (auto const& item : take(m_lostItems)) {
+    for (auto const& item : std::exchange(m_lostItems, {})) {
       auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
@@ -332,7 +332,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       }
       m_ageItemsTimer.setElapsedTime(0.0);
     }
-    if (take(m_runUpdatedCallback)) {
+    if (std::exchange(m_runUpdatedCallback, false)) {
       auto operation4 = m_scriptComponent.invoke("containerCallback");
       if (!operation4)
         return std::unexpected(std::move(operation4.error()));
@@ -1157,7 +1157,7 @@ std::expected<void, StarException> ContainerObject::setNetStates() {
   auto operation1 = Object::setNetStates();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  if (take(m_itemsUpdated)) {
+  if (std::exchange(m_itemsUpdated, false)) {
     DataStreamBuffer ds;
     auto operation2 = m_items->write(ds);
     if (!operation2)

@@ -1611,10 +1611,12 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
     
         if (filterHaveMaterials)
           {
-            auto availableItemsResult552 = m_player->inventory()->availableItems();
-            if (!availableItemsResult552)
-              return std::unexpected(std::move(availableItemsResult552.error()));
-            recipes.addAll(itemDb->recipesFromSubset(std::move(*availableItemsResult552), m_player->inventory()->availableCurrencies(), take(recipes), m_filter));
+          auto availableItems = m_player->inventory()->availableItems();
+          if (!availableItems)
+            return std::unexpected(std::move(availableItems.error()));
+          recipes.addAll(itemDb->recipesFromSubset(std::move(*availableItems),
+                                                   m_player->inventory()->availableCurrencies(),
+                                                   std::exchange(recipes, {}), m_filter));
           }
       } else {
         if (filterHaveMaterials)
@@ -1639,7 +1641,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
       condition555 = static_cast<bool>(std::move(*getBoolResult554));
     }
     if (condition555) {
-      auto tempRecipes = take(recipes);
+      auto tempRecipes = std::exchange(recipes, {});
       for (auto const& recipe : tempRecipes) {
         if (m_blueprints->isKnown(recipe.output))
           recipes.add(recipe);
@@ -1648,7 +1650,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
   }
 
   if (!categoryFilter.empty()) {
-    auto temprecipes = take(recipes);
+    auto temprecipes = std::exchange(recipes, {});
     for (auto const& recipe : temprecipes) {
       if (recipe.groups.hasIntersection(categoryFilter))
         recipes.add(recipe);
@@ -1656,7 +1658,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
   }
 
   if (!rarityFilter.empty()) {
-    auto temprecipes = take(recipes);
+    auto temprecipes = std::exchange(recipes, {});
     for (auto const& recipe : temprecipes) {
       if (recipe.output) {
         if (rarityFilter.contains(recipe.outputRarity))
@@ -1673,7 +1675,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
     if (!splitAnyResult557)
       return std::unexpected(std::move(splitAnyResult557.error()));
     auto bits = std::move(*splitAnyResult557);
-    auto temprecipes = take(recipes);
+    auto temprecipes = std::exchange(recipes, {});
     for (auto const& recipe : temprecipes) {
       if (recipe.output) {
         bool match = true;

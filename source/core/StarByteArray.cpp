@@ -109,8 +109,8 @@ void ByteArray::resize(std::size_t size, char f) {
 
   std::size_t oldSize = m_size;
   resize(size);
-  for (std::size_t i = oldSize; i < m_size; ++i)
-    (*this)[i] = f;
+  if (m_size > oldSize)
+    std::memset(m_data + oldSize, f, m_size - oldSize);
 }
 
 void ByteArray::fill(std::size_t s, char c) {
@@ -177,40 +177,13 @@ std::size_t ByteArray::diffChar(const ByteArray& b) const {
 }
 
 int ByteArray::compare(const ByteArray& b) const {
-  if (m_size == 0 && b.m_size == 0)
-    return 0;
-
-  if (m_size == 0)
-    return -1;
-
-  if (b.m_size == 0)
-    return 1;
-
-  std::size_t d = diffChar(b);
-  if (d == m_size) {
-    if (d != b.m_size)
-      return -1;
-    else
-      return 0;
+  auto commonSize = std::min(m_size, b.m_size);
+  if (commonSize != 0) {
+    int comparison = std::memcmp(m_data, b.m_data, commonSize);
+    if (comparison != 0)
+      return (comparison > 0) - (comparison < 0);
   }
-
-  if (d == b.m_size) {
-    if (d != m_size)
-      return 1;
-    else
-      return 0;
-  }
-
-  unsigned char c1 = (*this)[d];
-  unsigned char c2 = b[d];
-
-  if (c1 < c2) {
-    return -1;
-  } else if (c1 > c2) {
-    return 1;
-  } else {
-    return 0;
-  }
+  return (m_size > b.m_size) - (m_size < b.m_size);
 }
 
 ByteArray ByteArray::andWith(ByteArray const& rhs, bool extend) {

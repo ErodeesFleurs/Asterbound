@@ -134,7 +134,7 @@ void NetElementMapWrapper<BaseMap>::initNetVersion(std::optional<std::reference_
   m_changeData.clear();
   m_changeDataLastVersion = 0;
 
-  for (auto& change : Star::take(m_pendingChangeData))
+  for (auto& change : std::exchange(m_pendingChangeData, {}))
     applyChange(std::move(change.second));
 
   addChangeData(ClearChange());
@@ -151,7 +151,7 @@ template <typename BaseMap>
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::disableNetInterpolation() {
   m_interpolationEnabled = false;
-  for (auto& change : Star::take(m_pendingChangeData))
+  for (auto& change : std::exchange(m_pendingChangeData, {}))
     applyChange(std::move(change.second));
   return {};
 }
@@ -500,7 +500,7 @@ void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
 template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::addPendingChangeData(ElementChange change, float interpolationTime) {
   if (!m_pendingChangeData.empty() && interpolationTime < m_pendingChangeData.back().first) {
-    for (auto& change : Star::take(m_pendingChangeData))
+    for (auto& change : std::exchange(m_pendingChangeData, {}))
       applyChange(std::move(change.second));
   }
   m_pendingChangeData.append({interpolationTime, std::move(change)});

@@ -422,7 +422,7 @@ List<std::shared_ptr<AudioInstance>> NetworkedAnimator::DynamicTarget::pullNewAu
     currentAudioBasePositions[ptr] = audioBasePosition;
     ptr->setPosition(position + audioBasePosition);
   });
-  return take(pendingAudios);
+  return std::exchange(pendingAudios, {});
 }
 
 List<Particle> NetworkedAnimator::DynamicTarget::pullNewParticles() {
@@ -430,7 +430,7 @@ List<Particle> NetworkedAnimator::DynamicTarget::pullNewParticles() {
     particle.position += position;
     return particle;
   });
-  return take(pendingParticles);
+  return std::exchange(pendingParticles, {});
 }
 
 void NetworkedAnimator::DynamicTarget::stopAudio() {
@@ -2099,7 +2099,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
 
       for (auto signal : soundEntry.signals.receive()) {
         if (signal == SoundSignal::StopAll) {
-          for (auto& sound : take(dynamicTarget->get().independentSounds[soundName]))
+          for (auto& sound : std::exchange(dynamicTarget->get().independentSounds[soundName], {}))
             sound->stop(soundEntry.volumeRampTime.get());
         } else if (signal == SoundSignal::Play) {
           String soundFile = m_root.get().random().randValueFrom(soundEntry.soundPool.get());

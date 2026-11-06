@@ -748,8 +748,8 @@ auto result1222 = result1220->get().sendEntityMessage(entityId(), "aim", {std::m
 if (!result1222) return std::unexpected(std::move(result1222.error()));
 }
 
-      p.second.slaveOldControls = take(p.second.slaveNewControls);
-      p.second.slaveOldAimPosition = p.second.slaveNewAimPosition;
+p.second.slaveOldControls = std::exchange(p.second.slaveNewControls, {});
+p.second.slaveOldAimPosition = p.second.slaveNewAimPosition;
     }
   }
 

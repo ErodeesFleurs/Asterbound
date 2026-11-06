@@ -588,7 +588,8 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
   }
   if (!std::holds_alternative<std::monostate>(m_pendingWarp) &&
       ((m_warping && !m_mainPlayer->isTeleportingOut()) || (!m_warping && m_warpDelay.tick(dt)))) {
-    auto operation44 = m_connection->pushSingle(std::make_shared<PlayerWarpPacket>(take(m_pendingWarp), m_mainPlayer->isDeploying()));
+    auto operation44 = m_connection->pushSingle(
+      std::make_shared<PlayerWarpPacket>(std::exchange(m_pendingWarp, {}), m_mainPlayer->isDeploying()));
     if (!operation44)
       return std::unexpected(std::move(operation44.error()));
     m_warpDelay.reset();
@@ -1118,9 +1119,7 @@ std::expected<void, StarException> UniverseClient::sendChat(String const& text, 
   return m_connection->pushSingle(std::move(packet));
 }
 
-List<ChatReceivedMessage> UniverseClient::pullChatMessages() {
-  return take(m_pendingMessages);
-}
+List<ChatReceivedMessage> UniverseClient::pullChatMessages() { return std::exchange(m_pendingMessages, {}); }
 
 std::uint16_t UniverseClient::players() {
   return m_serverInfo.transform([](auto const& info) { return info.players; }).value_or(1);

@@ -423,7 +423,7 @@ std::expected<void, StarException> SystemWorldServer::update(float dt) {
   auto queued = queueUpdatePackets();
   if (!queued)
     return std::unexpected(std::move(queued.error()));
-  for (auto uuid : take(m_objectDestroyQueue)) {
+  for (auto uuid : std::exchange(m_objectDestroyQueue, {})) {
     for (auto& entry : m_clientNetVersions) {
       entry.second.objects.remove(uuid);
       m_outgoingPackets[entry.first].append(std::make_shared<SystemObjectDestroyPacket>(uuid));
@@ -431,7 +431,7 @@ std::expected<void, StarException> SystemWorldServer::update(float dt) {
     m_objects.remove(uuid);
     m_triggerStorage = true;
   }
-  for (auto uuid : take(m_shipDestroyQueue)) {
+  for (auto uuid : std::exchange(m_shipDestroyQueue, {})) {
     for (auto& entry : m_clientNetVersions) {
       entry.second.ships.remove(uuid);
       m_outgoingPackets[entry.first].append(std::make_shared<SystemShipDestroyPacket>(uuid));
@@ -454,9 +454,7 @@ std::shared_ptr<SystemObject> SystemWorldServer::getObject(Uuid const& uuid) con
   return m_objects.maybe(uuid).value_or(std::shared_ptr<SystemObject>{});
 }
 
-List<ConnectionId> SystemWorldServer::pullShipFlights() {
-  return take(m_shipFlights);
-}
+List<ConnectionId> SystemWorldServer::pullShipFlights() { return std::exchange(m_shipFlights, {}); }
 
 std::expected<void, StarException> SystemWorldServer::queueUpdatePackets() {
   for (auto clientId : m_clientNetVersions.keys()) {
@@ -506,7 +504,7 @@ std::expected<void, StarException> SystemWorldServer::handleIncomingPacket(Conne
 }
 
 List<std::shared_ptr<Packet>> SystemWorldServer::pullOutgoingPackets(ConnectionId clientId) {
-  return take(m_outgoingPackets[clientId]);
+  return std::exchange(m_outgoingPackets[clientId], {});
 }
 
 bool SystemWorldServer::triggeredStorage() {

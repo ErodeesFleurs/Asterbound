@@ -191,13 +191,9 @@ Vec2I CanvasWidget::mousePosition() const {
   return m_mousePosition;
 }
 
-List<CanvasWidget::ClickEvent> CanvasWidget::pullClickEvents() {
-  return take(m_clickEvents);
-}
+List<CanvasWidget::ClickEvent> CanvasWidget::pullClickEvents() { return std::exchange(m_clickEvents, {}); }
 
-List<CanvasWidget::KeyEvent> CanvasWidget::pullKeyEvents() {
-  return take(m_keyEvents);
-}
+List<CanvasWidget::KeyEvent> CanvasWidget::pullKeyEvents() { return std::exchange(m_keyEvents, {}); }
 
 std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& event) {
   if (!m_visible)

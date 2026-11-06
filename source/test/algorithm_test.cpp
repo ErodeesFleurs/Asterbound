@@ -15,6 +15,37 @@ import star.vector;
 import star.static_vector;
 using namespace Star;
 
+TEST(Take, DefaultConstructionFollowsOwnershipTransfer) {
+  struct Value {
+    static int& sequence() {
+      static int value = 0;
+      return value;
+    }
+
+    Value() : defaultOrder(++sequence()) {}
+    explicit Value(int value) : owner(std::make_unique<int>(value)) {}
+    Value(Value&& rhs)
+        : owner(std::move(rhs.owner)), defaultOrder(rhs.defaultOrder),
+          moveOrder(rhs.moveOrder ? rhs.moveOrder : ++sequence()) {}
+    Value& operator=(Value&&) = default;
+
+    std::unique_ptr<int> owner;
+    int defaultOrder = 0;
+    int moveOrder = 0;
+  };
+
+  Value::sequence() = 0;
+  Value source(42);
+  auto* identity = source.owner.get();
+  auto taken = take(source);
+  EXPECT_EQ(taken.owner.get(), identity);
+  ASSERT_TRUE(taken.owner);
+  EXPECT_EQ(*taken.owner, 42);
+  EXPECT_FALSE(source.owner);
+  EXPECT_EQ(taken.moveOrder, 1);
+  EXPECT_EQ(source.defaultOrder, 2);
+}
+
 TEST(ListPredicates, MembershipConvertsToElementType) {
   auto expectMembership = [](auto const& values) {
     EXPECT_TRUE(values.contains(1));

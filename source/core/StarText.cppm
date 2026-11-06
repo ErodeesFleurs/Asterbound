@@ -38,8 +38,10 @@ namespace Text {
   inline constexpr unsigned char EndEsc = ';';
   inline constexpr unsigned char CmdEsc = '^';
   inline constexpr unsigned char SpecialCharLimit = ' ';
-  extern std::string const AllEsc;
-  extern std::string const AllEscEnd;
+  inline constexpr std::array<char, 3> EscapeCharacters{static_cast<char>(CmdEsc), static_cast<char>(StartEsc),
+                                                        static_cast<char>(EndEsc)};
+  inline constexpr std::string_view AllEsc{EscapeCharacters.data(), 2};
+  inline constexpr std::string_view AllEscEnd{EscapeCharacters.data(), EscapeCharacters.size()};
 
   String stripEscapeCodes(String const& s);
   inline bool isEscapeCode(Utf32Type c) { return c == CmdEsc || c == StartEsc; }

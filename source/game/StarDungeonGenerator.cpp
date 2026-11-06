@@ -1348,7 +1348,7 @@ namespace Dungeon {
         // the unpressurized set to the new open set and to the total contiguous
         // region, taking them from the unpressurized set.
         while (!openSet.empty()) {
-          auto oldOpenSet = take(openSet);
+          auto oldOpenSet = std::exchange(openSet, {});
           for (auto const& p : oldOpenSet) {
             for (auto dir : {Vec2I(1, 0), Vec2I(-1, 0), Vec2I(0, 1), Vec2I(0, -1)}) {
               Vec2I pos = p + dir;

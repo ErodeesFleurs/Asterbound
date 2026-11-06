@@ -186,13 +186,9 @@ std::shared_ptr<JsonRpcInterface> ClientContext::rpcInterface() const {
   return m_rpc;
 }
 
-WorldChunks ClientContext::newShipUpdates() {
-  return take(m_newShipUpdates);
-}
+WorldChunks ClientContext::newShipUpdates() { return std::exchange(m_newShipUpdates, {}); }
 
-StringMap<WorldChunks> ClientContext::newCustomWorldUpdates() {
-  return take(m_newCustomWorldUpdates);
-}
+StringMap<WorldChunks> ClientContext::newCustomWorldUpdates() { return std::exchange(m_newCustomWorldUpdates, {}); }
 
 ShipUpgrades ClientContext::shipUpgrades() const {
   return m_shipUpgrades.get();

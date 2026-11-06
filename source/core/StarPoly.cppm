@@ -190,7 +190,7 @@ Polygon<DataType> Polygon<DataType>::convexHull(VertexList points) {
 
   upper.erase(upper.end() - 1);
   lower.erase(lower.end() - 1);
-  lower.appendAll(take(upper));
+  lower.appendAll(std::exchange(upper, {}));
   return Polygon<DataType>(std::move(lower));
 }
 
@@ -203,13 +203,13 @@ Polygon<DataType> Polygon<DataType>::clip(Polygon inputPoly, Polygon convexClipP
     return ((edge.max() - edge.min()) ^ (p - edge.min())) > 0;
   };
 
-  VertexList outputVertexes = take(inputPoly.m_vertexes);
+  VertexList outputVertexes = std::exchange(inputPoly.m_vertexes, {});
   for (std::size_t i = 0; i < convexClipPoly.sides(); ++i) {
     if (outputVertexes.empty())
       break;
 
     Line clipEdge = convexClipPoly.sideAt(i);
-    VertexList inputVertexes = take(outputVertexes);
+    VertexList inputVertexes = std::exchange(outputVertexes, {});
     Vertex s = inputVertexes[inputVertexes.size() - 1];
     for (Vertex e : inputVertexes) {
       if (insideEdge(clipEdge, e)) {

@@ -1104,9 +1104,9 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   auto rejectMessages = [&]() {
     std::unique_lock messageLocker(m_messageLock, std::defer_lock);
     lockWithDiagnostics(messageLocker);
-    auto messages = take(m_universeMessages);
-    auto responses = take(m_universeMessageResponses);
-    auto promises = take(m_universeMessagePromises);
+    auto messages = std::exchange(m_universeMessages, {});
+    auto responses = std::exchange(m_universeMessageResponses, {});
+    auto promises = std::exchange(m_universeMessagePromises, {});
     messageLocker.unlock();
     auto rejectRemote = [&](ConnectionId clientId, Uuid const& uuid) {
       if (m_connectionServer && m_connectionServer->hasConnection(clientId))
@@ -1217,7 +1217,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   {
     std::unique_lock locker(m_mainLock, std::defer_lock);
     lockWithDiagnostics(locker);
-    auto messages = take(m_pendingWorldMessages);
+    auto messages = std::exchange(m_pendingWorldMessages, {});
     locker.unlock();
     for (auto& worldMessages : messages) {
       for (auto& message : worldMessages.second)
@@ -1588,7 +1588,7 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
   }
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  auto pending = take(m_pendingDisconnections);
+  auto pending = std::exchange(m_pendingDisconnections, {});
   locker.unlock();
   for (auto const& connection : pending) {
     if (auto disconnected = doDisconnection(connection.first, connection.second); !disconnected)
@@ -2122,8 +2122,8 @@ std::expected<void, StarException> UniverseServer::processChat() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
   std::shared_lock clientsLocker(m_clientsLock);
-  
-  for (auto const& p : take(m_pendingChat)) {
+
+  for (auto const& p : std::exchange(m_pendingChat, {})) {
     auto context = m_clients.get(p.first);
     if (!context)
       return std::unexpected(std::move(context.error()));
@@ -2255,7 +2255,7 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
   }
   std::unique_lock locker(m_messageLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  auto messages = take(m_universeMessages);
+  auto messages = std::exchange(m_universeMessages, {});
   locker.unlock();
   std::optional<StarException> error;
   for (auto& message : messages) {

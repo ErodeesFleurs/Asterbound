@@ -125,7 +125,7 @@ std::expected<void, StarException> Blackboard::setOutput(ActionNode const& node,
   }
   return {};
 }
-Set<std::pair<NodeParameterType, String>> Blackboard::takeEphemerals() { return take(m_ephemeral); }
+Set<std::pair<NodeParameterType, String>> Blackboard::takeEphemerals() { return std::exchange(m_ephemeral, {}); }
 std::expected<void, StarException> Blackboard::clearEphemerals(Set<std::pair<NodeParameterType, String>> ephemerals) {
   for (auto const& p : ephemerals) {
     if (!m_ephemeral.contains(p)) {

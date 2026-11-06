@@ -272,14 +272,14 @@ void PcP2PNetworkingService::setAcceptingP2PConnections(bool acceptingP2PConnect
     std::lock_guard serviceLocker(m_mutex);
     m_acceptingP2PConnections = acceptingP2PConnections;
     if (!m_acceptingP2PConnections)
-      rejectedConnections = take(m_pendingIncomingConnections);
+      rejectedConnections = std::exchange(m_pendingIncomingConnections, {});
   }
   // Socket destructors acquire SDK/service/socket locks in that order.
 }
 
 List<std::unique_ptr<P2PSocket>> PcP2PNetworkingService::acceptP2PConnections() {
   std::lock_guard serviceLocker(m_mutex);
-  return take(m_pendingIncomingConnections);
+  return std::exchange(m_pendingIncomingConnections, {});
 }
 
 std::expected<void, StarException> Star::PcP2PNetworkingService::update() {
@@ -808,7 +808,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
   ++m_discordLobbyGeneration;
   if (m_state->discordAvailable && m_state->discordCurrentUser && m_discordLobbiesAvailable) {
     if (m_discordServerLobby) {
-      auto lobby = take(m_discordServerLobby);
+      auto lobby = std::exchange(m_discordServerLobby, {});
       auto res = m_state->discordCore->LobbyManager().DisconnectNetwork(lobby->first);
       if (res != discord::Result::Ok)
         recordDiscordCallbackError(*m_state, ApplicationException::format("Could not disconnect Discord lobby network {} (err {})", lobby->first, (int)res));

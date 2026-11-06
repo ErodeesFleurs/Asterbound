@@ -336,7 +336,7 @@ std::expected<float, StarException> InspectionTool::inspectionHighlightLevel(std
 }
 
 List<InspectionTool::InspectionResult> InspectionTool::pullInspectionResults() {
-  return Star::take(m_inspectionResults);
+  return std::exchange(m_inspectionResults, {});
 }
 
 std::expected<float, StarException> InspectionTool::inspectionLevel(std::shared_ptr<InspectableEntity> const& inspectable) const {

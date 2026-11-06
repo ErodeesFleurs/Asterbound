@@ -804,8 +804,9 @@ HumanoidIdentity const& Humanoid::identity() const {
 
 std::expected<void, StarException> Humanoid::setHumanoidParameters(JsonObject parameters){
   m_baseConfig = jsonMerge(m_baseConfig, parameters);
-  auto checked100 = loadConfig(take(m_mergeConfig), true);
-if (!checked100) return std::unexpected(std::move(checked100.error()));
+  auto checked100 = loadConfig(std::exchange(m_mergeConfig, {}), true);
+  if (!checked100)
+    return std::unexpected(std::move(checked100.error()));
 
   return {};
 }

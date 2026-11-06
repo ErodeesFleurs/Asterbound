@@ -424,7 +424,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
     return std::unexpected(std::move(rpcUpdate.error()));
   ByteArray shipChunksUpdate;
   if (!m_shipChunksUpdate.empty()) {
-    auto serialized = DataStreamBuffer::serialize(take(m_shipChunksUpdate));
+    auto serialized = DataStreamBuffer::serialize(std::exchange(m_shipChunksUpdate, {}));
     if (!serialized)
       return std::unexpected(std::move(serialized.error()));
     shipChunksUpdate = std::move(*serialized);
@@ -437,7 +437,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
   StringMap<ByteArray> customWorldChunksUpdate;
   for (auto& p : m_customWorlds) {
     if (!p.second.chunksUpdate.empty()) {
-      auto serialized = DataStreamBuffer::serialize(take(p.second.chunksUpdate));
+      auto serialized = DataStreamBuffer::serialize(std::exchange(p.second.chunksUpdate, {}));
       if (!serialized)
         return std::unexpected(std::move(serialized.error()));
       customWorldChunksUpdate[p.first] = std::move(*serialized);

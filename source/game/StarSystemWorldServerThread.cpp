@@ -203,12 +203,12 @@ void SystemWorldServerThread::stop() {
 std::expected<void, StarException> SystemWorldServerThread::update() {
   std::unique_lock queueLocker(m_queueMutex);
   std::unique_lock locker(m_mutex);
-  for (auto const& packet : take(m_incomingPacketQueue)) {
+  for (auto const& packet : std::exchange(m_incomingPacketQueue, {})) {
     auto handled = m_systemWorld->handleIncomingPacket(packet.first, packet.second);
     if (!handled)
       return std::unexpected(std::move(handled.error()));
   }
-  for (auto const& entry : take(m_clientShipActions)) {
+  for (auto const& entry : std::exchange(m_clientShipActions, {})) {
     auto ship = m_systemWorld->clientShip(entry.first);
     auto acted = entry.second(optionalRef(ship));
     if (!acted)
@@ -220,7 +220,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
       return std::unexpected(std::move(updated.error()));
   }
   m_triggerStorage = m_systemWorld->triggeredStorage();
-  for (auto const& destination : take(m_clientShipDestinations)) {
+  for (auto const& destination : std::exchange(m_clientShipDestinations, {})) {
     auto set = m_systemWorld->setClientDestination(destination.first, destination.second);
     if (!set)
       return std::unexpected(std::move(set.error()));
@@ -309,7 +309,7 @@ void SystemWorldServerThread::pushIncomingPacket(ConnectionId clientId, std::sha
 
 List<std::shared_ptr<Packet>> SystemWorldServerThread::pullOutgoingPackets(ConnectionId clientId) {
   std::unique_lock locker(m_queueMutex);
-  return take(m_outgoingPacketQueue[clientId]);
+  return std::exchange(m_outgoingPacketQueue[clientId], {});
 }
 
 std::expected<void, StarException> SystemWorldServerThread::store() {

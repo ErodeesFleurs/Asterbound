@@ -100,19 +100,19 @@ public:
   List<key_type> keys() const {
     List<key_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.first);
+    std::ranges::copy(keyView(), std::back_inserter(result));
     return result;
   }
   List<mapped_type> values() const {
     List<mapped_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.second);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   List<std::pair<key_type, mapped_type>> pairs() const {
     List<std::pair<key_type, mapped_type>> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry);
+    std::ranges::copy(*this, std::back_inserter(result));
     return result;
   }
   auto keyView() const& { return std::views::keys(m_storage); }
@@ -333,19 +333,19 @@ public:
   List<key_type> keys() const {
     List<key_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.first);
+    std::ranges::copy(keyView(), std::back_inserter(result));
     return result;
   }
   List<mapped_type> values() const {
     List<mapped_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.second);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   List<std::pair<key_type, mapped_type>> pairs() const {
     List<std::pair<key_type, mapped_type>> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry);
+    std::ranges::copy(*this, std::back_inserter(result));
     return result;
   }
   auto keyView() const& { return std::views::keys(m_storage); }
@@ -554,19 +554,19 @@ public:
   List<key_type> keys() const {
     List<key_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.first);
+    std::ranges::copy(keyView(), std::back_inserter(result));
     return result;
   }
   List<mapped_type> values() const {
     List<mapped_type> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry.second);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   List<std::pair<key_type, mapped_type>> pairs() const {
     List<std::pair<key_type, mapped_type>> result;
     result.reserve(size());
-    for (auto const& entry : *this) result.push_back(entry);
+    std::ranges::copy(*this, std::back_inserter(result));
     return result;
   }
   auto keyView() const& { return std::views::keys(m_storage); }

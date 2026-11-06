@@ -297,7 +297,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
   lockWithDiagnostics(queueLocker);
   List<std::shared_ptr<Packet>> incomingPackets;
   if (auto queued = m_incomingPacketQueue.maybeRef(clientId))
-    incomingPackets = take(queued->get());
+    incomingPackets = std::exchange(queued->get(), {});
   std::optional<StarException> error;
   if (m_worldServer->hasClient(clientId)) {
     m_clients.add(clientId);
@@ -311,7 +311,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
   }
   List<std::shared_ptr<Packet>> outgoingPackets;
   if (auto queued = m_outgoingPacketQueue.maybeRef(clientId))
-    outgoingPackets = take(queued->get());
+    outgoingPackets = std::exchange(queued->get(), {});
   if (m_worldServer->hasClient(clientId)) {
     auto removed = m_worldServer->removeClient(clientId);
     if (!removed) {
@@ -377,7 +377,7 @@ void WorldServerThread::pushIncomingPackets(ConnectionId clientId, List<std::sha
 List<std::shared_ptr<Packet>> WorldServerThread::pullOutgoingPackets(ConnectionId clientId) {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
-  return take(m_outgoingPacketQueue[clientId]);
+  return std::exchange(m_outgoingPacketQueue[clientId], {});
 }
 
 std::expected<std::optional<Vec2F>, StarException> WorldServerThread::playerRevivePosition(ConnectionId clientId) const {
@@ -575,7 +575,7 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
   for (auto clientId : m_worldServer->clientIds()) {
     std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
     lockWithDiagnostics(queueLocker);
-    auto incomingPackets = take(m_incomingPacketQueue[clientId]);
+    auto incomingPackets = std::exchange(m_incomingPacketQueue[clientId], {});
     queueLocker.unlock();
     auto handled = m_worldServer->handleIncomingPackets(clientId, std::move(incomingPackets));
     if (!handled) {

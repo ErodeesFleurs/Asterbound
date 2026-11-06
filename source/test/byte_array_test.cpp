@@ -42,3 +42,31 @@ TEST(ByteArrayTest, All) {
   EXPECT_EQ(g->xorWith(*h, true), *i);
   EXPECT_EQ(h->xorWith(*g, true), *i);
 }
+
+TEST(ByteArrayTest, CompareNormalizesUnsignedBinaryAndPrefixOrdering) {
+  std::array<ByteArray, 7> const ordered{ByteArray{},
+                                         ByteArray::fromCString("a"),
+                                         ByteArray(std::span<char const>("a\0", 2)),
+                                         ByteArray(std::span<char const>("a\0b", 3)),
+                                         ByteArray(std::span<char const>("\x7f", 1)),
+                                         ByteArray(std::span<char const>("\x80", 1)),
+                                         ByteArray(std::span<char const>("\xff", 1))};
+  for (std::size_t i = 0; i < ordered.size(); ++i)
+    for (std::size_t j = 0; j < ordered.size(); ++j)
+      EXPECT_EQ(ordered[i].compare(ordered[j]), (i > j) - (i < j));
+}
+
+TEST(ByteArrayTest, ResizeFillPreservesPrefixAndOnlyInitializesGrowth) {
+  auto bytes = ByteArray::fromCString("ab");
+  bytes.reserve(16);
+  bytes.resize(5, static_cast<char>(0x80));
+  EXPECT_EQ(bytes, ByteArray(std::span<char const>("ab\x80\x80\x80", 5)));
+  bytes.resize(1, static_cast<char>(0xff));
+  EXPECT_EQ(bytes, ByteArray::fromCString("a"));
+  bytes.resize(3, 'z');
+  EXPECT_EQ(bytes, ByteArray::fromCString("azz"));
+  bytes.resize(0, 'x');
+  EXPECT_TRUE(bytes.empty());
+  bytes.resize(2, 'q');
+  EXPECT_EQ(bytes, ByteArray::fromCString("qq"));
+}

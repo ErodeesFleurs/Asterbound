@@ -271,7 +271,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> LocalPacketSocket::r
 
   std::lock_guard locker(incomingPipe->mutex);
   List<std::shared_ptr<Packet>> packets;
-  packets.appendAll(take(incomingPipe->queue));
+  packets.appendAll(std::exchange(incomingPipe->queue, {}));
   return packets;
 }
 
@@ -746,7 +746,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
 std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::receivePackets() {
   List<std::shared_ptr<Packet>> packets;
   auto parse = [&]() -> std::expected<void, StarException> {
-    for (auto& inputMessage : take(m_inputMessages)) {
+    for (auto& inputMessage : std::exchange(m_inputMessages, {})) {
       DataStreamBuffer ds(std::move(inputMessage));
       auto type = ds.read<PacketType>();
       if (!type)

@@ -116,9 +116,9 @@ UniverseConnection::~UniverseConnection() {
 
 UniverseConnection& UniverseConnection::operator=(UniverseConnection&& rhs) {
   std::lock_guard locker(m_mutex);
-  m_sendQueue = take(rhs.m_sendQueue);
-  m_receiveQueue = take(rhs.m_receiveQueue);
-  m_packetSocket = take(rhs.m_packetSocket);
+  m_sendQueue = std::exchange(rhs.m_sendQueue, {});
+  m_receiveQueue = std::exchange(rhs.m_receiveQueue, {});
+  m_packetSocket = std::exchange(rhs.m_packetSocket, {});
   return *this;
 }
 
@@ -147,7 +147,7 @@ std::expected<void, StarException> UniverseConnection::pushSingle(std::shared_pt
 
 std::expected<List<std::shared_ptr<Packet>>, StarException> UniverseConnection::pull() {
   std::lock_guard locker(m_mutex);
-  return List<std::shared_ptr<Packet>>::from(take(m_receiveQueue));
+  return List<std::shared_ptr<Packet>>::from(std::exchange(m_receiveQueue, {}));
 }
 
 std::expected<std::shared_ptr<Packet>, StarException> UniverseConnection::pullSingle() {
@@ -161,7 +161,7 @@ std::expected<bool, StarException> UniverseConnection::send() {
   std::lock_guard locker(m_mutex);
   if (!m_packetSocket)
     return std::unexpected(UniverseConnectionException("Cannot send on an empty connection"));
-  auto queued = m_packetSocket->sendPackets(take(m_sendQueue));
+  auto queued = m_packetSocket->sendPackets(std::exchange(m_sendQueue, {}));
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   return m_packetSocket->writeData();
@@ -172,7 +172,7 @@ std::expected<bool, StarException> UniverseConnection::sendAll(unsigned timeout)
   std::unique_lock locker(m_mutex);
   if (!m_packetSocket)
     return std::unexpected(UniverseConnectionException("Cannot send on an empty connection"));
-  auto queued = m_packetSocket->sendPackets(take(m_sendQueue));
+  auto queued = m_packetSocket->sendPackets(std::exchange(m_sendQueue, {}));
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   while (true) {
@@ -315,7 +315,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
       if (!p.second->packetSocket || !p.second->packetSocket->isOpen())
         continue;
       auto transmit = [&]() -> std::expected<void, StarException> {
-        auto queued = p.second->packetSocket->sendPackets(take(p.second->sendQueue));
+        auto queued = p.second->packetSocket->sendPackets(std::exchange(p.second->sendQueue, {}));
         if (!queued)
           return std::unexpected(std::move(queued.error()));
         auto written = p.second->packetSocket->writeData();
@@ -346,7 +346,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
         continue;
       }
       if (!p.second->receiveQueue.empty()) {
-        auto toReceive = List<std::shared_ptr<Packet>>::from(take(p.second->receiveQueue));
+        auto toReceive = List<std::shared_ptr<Packet>>::from(std::exchange(p.second->receiveQueue, {}));
         connectionLocker.unlock();
         auto received = m_packetReceiver(*this, p.first, std::move(toReceive));
         if (!received) {
@@ -501,7 +501,7 @@ std::expected<UniverseConnection, StarException> UniverseConnectionServer::remov
   connectionsLocker.unlock();
 
   UniverseConnection uc;
-  uc.m_packetSocket = take(conn->packetSocket);
+  uc.m_packetSocket = std::exchange(conn->packetSocket, {});
   uc.m_sendQueue = std::move(conn->sendQueue);
   uc.m_receiveQueue = std::move(conn->receiveQueue);
   return uc;
@@ -515,7 +515,7 @@ List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
     for (auto& p : shard) {
       std::lock_guard connectionLocker(p.second->mutex);
       UniverseConnection uc;
-      uc.m_packetSocket = take(p.second->packetSocket);
+      uc.m_packetSocket = std::exchange(p.second->packetSocket, {});
       uc.m_sendQueue = std::move(p.second->sendQueue);
       uc.m_receiveQueue = std::move(p.second->receiveQueue);
       removedConnections.append(std::move(uc));
@@ -534,7 +534,7 @@ std::expected<void, StarException> UniverseConnectionServer::sendPackets(Connect
     conn->sendQueue.appendAll(std::move(packets));
 
     if (conn->packetSocket && conn->packetSocket->isOpen()) {
-      auto queued = conn->packetSocket->sendPackets(take(conn->sendQueue));
+      auto queued = conn->packetSocket->sendPackets(std::exchange(conn->sendQueue, {}));
       if (!queued)
         return std::unexpected(std::move(queued.error()));
       auto written = conn->packetSocket->writeData();

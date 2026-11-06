@@ -257,7 +257,7 @@ std::pair<Uuid, String> TeamClient::pullInvitation() {
 }
 
 List<std::variant<std::pair<String, bool>, StringList>> TeamClient::pullInviteResults() {
-  return take(m_pendingInviteResults);
+  return std::exchange(m_pendingInviteResults, {});
 }
 
 std::expected<void, StarException> TeamClient::update() {
@@ -355,7 +355,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
       auto leader = Uuid::create(*leaderText);
       if (!leader) return std::unexpected(std::move(leader.error()));
       self.m_teamLeader = *leader;
-      auto previousMembers = take(self.m_members);
+      auto previousMembers = std::exchange(self.m_members, {});
       auto entries = response.getArray("members");
       if (!entries) return std::unexpected(std::move(entries.error()));
       for (auto const& m : *entries) {

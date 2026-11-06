@@ -1054,9 +1054,7 @@ std::shared_ptr<Item> const& ToolUser::NetItem::get() const {
   return {};
 }
 
-bool ToolUser::NetItem::pullNewItem() {
-  return take(m_newItem);
-}
+bool ToolUser::NetItem::pullNewItem() { return std::exchange(m_newItem, false); }
 
 void ToolUser::NetItem::updateItemDescriptor() {
   if (m_item)

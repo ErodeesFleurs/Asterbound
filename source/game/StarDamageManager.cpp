@@ -217,21 +217,17 @@ std::expected<void, StarException> DamageManager::pushRemoteDamageNotification(R
   return {};
 }
 
-List<RemoteHitRequest> DamageManager::pullRemoteHitRequests() {
-  return take(m_pendingRemoteHitRequests);
-}
+List<RemoteHitRequest> DamageManager::pullRemoteHitRequests() { return std::exchange(m_pendingRemoteHitRequests, {}); }
 
 List<RemoteDamageRequest> DamageManager::pullRemoteDamageRequests() {
-  return take(m_pendingRemoteDamageRequests);
+  return std::exchange(m_pendingRemoteDamageRequests, {});
 }
 
 List<RemoteDamageNotification> DamageManager::pullRemoteDamageNotifications() {
-  return take(m_pendingRemoteNotifications);
+  return std::exchange(m_pendingRemoteNotifications, {});
 }
 
-List<DamageNotification> DamageManager::pullPendingNotifications() {
-  return take(m_pendingNotifications);
-}
+List<DamageNotification> DamageManager::pullPendingNotifications() { return std::exchange(m_pendingNotifications, {}); }
 
 std::expected<SmallList<std::pair<EntityId, HitType>, 4>, StarException> DamageManager::queryHit(DamageSource const& source, EntityId causingId) const {
   SmallList<std::pair<EntityId, HitType>, 4> resultList;

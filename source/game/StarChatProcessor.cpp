@@ -259,7 +259,7 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendi
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   if (auto client = m_clients.maybeRef(clientId))
-    return take(client->get().pendingMessages);
+    return std::exchange(client->get().pendingMessages, {});
   return List<ChatReceivedMessage>{};
 }
 

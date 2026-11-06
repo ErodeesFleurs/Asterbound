@@ -275,6 +275,9 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 - Qt connections use typed signals and an explicit receiver context. Keep `Q_OBJECT` and moc where custom signals or reflection require them, not merely for ordinary receiver methods.
 - Payload-free alternatives use `std::monostate`. Preserve JSON/Lua nil, variant ordering, and network/inventory marker tags and zero-byte payloads; named inventory wrappers still distinguish swap and trash slots.
 - Use `auto(expr)` for owning traversal snapshots and `std::views::zip` for synchronous read-only iteration over retained ranges. Pane dismissal callbacks may modify the original collection, so these snapshots must not become borrowed views.
+- Map/set snapshot accessors reserve the known size and use one `std::ranges::copy` traversal. Avoid blindly using `std::ranges::to<List>`: the iterator-pair constructor can add a distance traversal even for a sized range.
+- Use `std::exchange` for scalar flags and audited empty collection/optional resets. Keep `Star::take` when replacement construction is observable: `SkyParameters` must move its old state before allocating its default JSON object.
+- Text escape sets are bounded `constexpr std::string_view` values backed by static byte storage, not null-terminated strings. Preserve their explicit lengths when passing them to search or native APIs.
 - Typed sequence `contains` converts its argument to the element type before `std::ranges::contains`; replacing the member call with an untyped range query can change mixed-type membership.
 - Use `std::clamp` only with proven ordered bounds and value consumption. Legacy `Star::clamp` deliberately returns the upper bound for reversed ranges. Preserve vector interpolation, integer rounding, wrapped coordinates and fast-math-safe finite classification rather than replacing their arithmetic wholesale.
 

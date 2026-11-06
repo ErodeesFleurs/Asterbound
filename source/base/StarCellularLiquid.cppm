@@ -586,7 +586,7 @@ template <typename LiquidId>
 [[nodiscard]] std::expected<void, StarException> LiquidCellEngine<LiquidId>::finish() {
   m_currentActiveCells.clear();
 
-  auto workingCells = take(m_workingCells);
+  auto workingCells = std::exchange(m_workingCells, {});
   if (workingCells) for (auto& workingCellPair : workingCells->cells) {
     if (workingCellPair.second && !workingCellPair.second->sourceCell) {
       if (workingCellPair.second->liquid) {
@@ -608,17 +608,17 @@ template <typename LiquidId>
   }
   workingCells.reset();
 
-  for (auto const& interaction : take(m_liquidInteractions)) {
+  for (auto const& interaction : std::exchange(m_liquidInteractions, {})) {
     auto applied = m_cellWorld->liquidInteraction(std::get<0>(interaction), std::get<1>(interaction), std::get<2>(interaction), std::get<3>(interaction));
     if (!applied) return std::unexpected(std::move(applied.error()));
   }
 
-  for (auto const& interaction : take(m_liquidCollisions)) {
+  for (auto const& interaction : std::exchange(m_liquidCollisions, {})) {
     auto applied = m_cellWorld->liquidCollision(std::get<0>(interaction), std::get<1>(interaction), std::get<2>(interaction));
     if (!applied) return std::unexpected(std::move(applied.error()));
   }
 
-  for (auto const& c : take(m_nextActiveCells)) {
+  for (auto const& c : std::exchange(m_nextActiveCells, {})) {
     auto visit = [this](Vec2I p) -> std::expected<void, StarException> {
       auto found = workingCell(p);
       if (!found) return std::unexpected(std::move(found.error()));

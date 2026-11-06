@@ -307,9 +307,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
   return true;
 }
 
-List<std::shared_ptr<Packet>> SystemWorldClient::pullOutgoingPackets() {
-  return take(m_outgoingPackets);
-}
+List<std::shared_ptr<Packet>> SystemWorldClient::pullOutgoingPackets() { return std::exchange(m_outgoingPackets, {}); }
 
 std::expected<std::shared_ptr<SystemObject>, StarException> SystemWorldClient::netLoadObject(ByteArray netStore) {
   DataStreamBuffer ds(std::move(netStore));

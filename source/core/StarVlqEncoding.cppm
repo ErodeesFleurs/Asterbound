@@ -6,6 +6,8 @@ export module star.vlq;
 
 export namespace Star {
 
+inline std::size_t vlqUSize(std::uint64_t x) { return std::max(1, (std::bit_width(x) + 6) / 7); }
+
 // Write an unsigned integer as a VLQ (Variable Length Quantity).  Writes the
 // integer in 7 byte chunks, with the 8th bit of each octet indicates whether
 // another chunk follows.  Endianness independent, as the chunks are always
@@ -13,25 +15,12 @@ export namespace Star {
 // maximum of a 64 bit integer, so a maximum of 10)
 template <typename OutputIterator>
 std::size_t writeVlqU(std::uint64_t x, OutputIterator out) {
-  std::size_t i;
-  for (i = 9; i > 0; --i) {
-    if (x & ((std::uint64_t)(127) << (i * 7)))
-      break;
-  }
+  std::size_t i = vlqUSize(x) - 1;
 
   for (std::size_t j = 0; j < i; ++j)
     *out++ = (std::uint8_t)((x >> ((i - j) * 7)) & 127) | 128;
 
   *out++ = (std::uint8_t)(x & 127);
-  return i + 1;
-}
-
-inline std::size_t vlqUSize(std::uint64_t x) {
-  std::size_t i;
-  for (i = 9; i > 0; --i) {
-    if (x & ((std::uint64_t)(127) << (i * 7)))
-      break;
-  }
   return i + 1;
 }
 

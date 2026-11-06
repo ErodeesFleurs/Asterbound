@@ -559,7 +559,7 @@ void StatusController::damagedOther(DamageNotification damageNotification) {
 }
 
 List<DamageNotification> StatusController::pullSelfDamageNotifications() {
-  return take(m_pendingSelfDamageNotifications);
+  return std::exchange(m_pendingSelfDamageNotifications, {});
 }
 
 std::expected<void, StarException> StatusController::applySelfDamageRequest(DamageRequest dr) {

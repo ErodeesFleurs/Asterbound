@@ -128,8 +128,8 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
       return std::unexpected(std::move(movingCollisionResult.error()));
     auto movingCollision = std::move(*movingCollisionResult);
     collision.movingCollision = std::move(movingCollision);
-    collision.xPosition.set(take(collision.movingCollision.position[0]));
-    collision.yPosition.set(take(collision.movingCollision.position[1]));
+    collision.xPosition.set(std::exchange(collision.movingCollision.position[0], 0.0f));
+    collision.yPosition.set(std::exchange(collision.movingCollision.position[1], 0.0f));
     auto enabledResult = pair.second.getBool("enabled", true);
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));

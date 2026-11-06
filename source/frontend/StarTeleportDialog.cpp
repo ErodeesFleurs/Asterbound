@@ -397,7 +397,7 @@ std::expected<void, StarException> TeleportDialog::teleport() {
     if (!message) return std::unexpected(std::move(message.error()));
     bool deploy = selected.second;
     bool beam = std::holds_alternative<WarpAlias>(selected.first) && std::get<WarpAlias>(selected.first) == WarpAlias::OrbitedWorld;
-    auto action = take(selected).first;
+    auto action = std::exchange(selected, {}).first;
     auto warped = deploy ? m_client->warpPlayer(action, true, "deploy", true) : m_client->warpPlayer(action, true, beam ? String("beam") : String("default"));
     if (!warped) return std::unexpected(std::move(warped.error()));
     dismiss();

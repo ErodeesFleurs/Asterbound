@@ -344,11 +344,10 @@ template <typename OutContainer, typename InContainer, typename Function>
   }
 }
 
-// Moves the given value and into an rvalue.  Works whether or not the type has
-// a valid move constructor or not.  Always leaves the given value in its
-// default constructed state.
-// Default construction follows the move; std::exchange constructs its
-// replacement first, which differs if default construction throws.
+// Moves the value out, then resets it to its default-constructed state.
+// Unlike std::exchange, default construction follows the move. Keep this
+// sequencing for replacements with observable construction side effects,
+// including allocation; no-exceptions builds do not make those effects inert.
 template <typename T>
 T take(T& t) {
   T t2 = std::move(t);

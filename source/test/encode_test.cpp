@@ -91,3 +91,22 @@ TEST(EncodeTest, BorrowedSpans) {
   EXPECT_EQ((*result11), 1u);
   EXPECT_EQ(output[0], 'M');
 }
+
+TEST(EncodeTest, OwningEncodersPreserveEmptyBinaryAndPaddingBoundaries) {
+  struct Case {
+    std::string_view input;
+    std::string_view hex;
+    std::string_view base64;
+  };
+  Case const cases[]{{"", "", ""},
+                     {"M", "4d", "TQ=="},
+                     {"Ma", "4d61", "TWE="},
+                     {"Man", "4d616e", "TWFu"},
+                     {std::string_view("\0\x7f\x80\xff", 4), "007f80ff", "AH+A/w=="}};
+  for (auto const& test : cases) {
+    SCOPED_TRACE(test.hex);
+    auto input = std::span<char const>(test.input.data(), test.input.size());
+    EXPECT_EQ(hexEncode(input), String(test.hex));
+    EXPECT_EQ(base64Encode(input), String(test.base64));
+  }
+}

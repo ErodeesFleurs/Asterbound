@@ -193,23 +193,26 @@ std::expected<std::size_t, StarException> base64Decode(std::span<char const> src
 }
 
 String hexEncode(std::span<char const> data) {
-  std::string res(data.size() * 2, '\0');
-  std::size_t encoded = hexEncode(data, res);
-  ((void)(encoded));
-  if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((encoded == res.size()));
-  }
+  std::string res;
+  res.resize_and_overwrite(data.size() * 2, [data](char* output, std::size_t size) noexcept {
+    std::size_t encoded = hexEncode(data, {output, size});
+    if constexpr (Star::DebugEnabled) {
+      Star::starAssertFailed((encoded == size));
+    }
+    return encoded;
+  });
   return res;
 }
 
 String base64Encode(std::span<char const> data) {
-  std::string res(data.size() * 4 / 3 + 3, '\0');
-  std::size_t encoded = base64Encode(data, res);
-  ((void)(encoded));
-  if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((encoded <= res.size()));
-  }
-  res.resize(encoded);
+  std::string res;
+  res.resize_and_overwrite(data.size() * 4 / 3 + 3, [data](char* output, std::size_t size) noexcept {
+    std::size_t encoded = base64Encode(data, {output, size});
+    if constexpr (Star::DebugEnabled) {
+      Star::starAssertFailed((encoded <= size));
+    }
+    return encoded;
+  });
   return res;
 }
 

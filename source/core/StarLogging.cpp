@@ -230,7 +230,7 @@ void SpatialLogger::logText(std::string_view space, String text, Vec2F const& po
 Deque<SpatialLogger::Line> SpatialLogger::getLines(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_lines[space]);
+    return std::exchange(s_lines[space], {});
   else
     return s_lines[space];
 }
@@ -238,7 +238,7 @@ Deque<SpatialLogger::Line> SpatialLogger::getLines(std::string_view space, bool 
 Deque<SpatialLogger::Point> SpatialLogger::getPoints(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_points[space]);
+    return std::exchange(s_points[space], {});
   else
     return s_points[space];
 }
@@ -246,7 +246,7 @@ Deque<SpatialLogger::Point> SpatialLogger::getPoints(std::string_view space, boo
 Deque<SpatialLogger::LogText> SpatialLogger::getText(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_logText[space]);
+    return std::exchange(s_logText[space], {});
   else
     return s_logText[space];
 }

@@ -1268,7 +1268,7 @@ std::expected<List<Particle>, StarException> Player::particles() {
     return std::unexpected(std::move(splashResult.error()));
   auto splash = std::move(*splashResult);
   particles.appendAll(std::move(splash));
-  particles.appendAll(take(m_callbackParticles));
+  particles.appendAll(std::exchange(m_callbackParticles, {}));
   particles.appendAll(m_humanoidDynamicTarget.pullNewParticles());
   particles.appendAll(m_techController->pullNewParticles());
   particles.appendAll(m_statusController->pullNewParticles());
@@ -1995,7 +1995,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           return std::unexpected(std::move(result.error()));
       }
 
-      bool edgeTriggeredUse = take(m_edgeTriggeredUse);
+      bool edgeTriggeredUse = std::exchange(m_edgeTriggeredUse, false);
 
       {
         if (auto result = m_inventory->cleanup(); !result)
@@ -2511,7 +2511,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     m_presentationBars.clear();
   }
   if (!hidden) {
-    for (auto& audio : take(m_hiddenLoopAudios)) {
+    for (auto& audio : std::exchange(m_hiddenLoopAudios, {})) {
       if (!audio->finished()) {
         if (auto result = callback.addAudio(std::move(audio)); !result)
           return std::unexpected(std::move(result.error()));
@@ -2581,7 +2581,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     return std::unexpected(std::move(result.error()));
   if (auto result = renderCallback.addAudios(m_humanoidDynamicTarget.pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
-  for (auto const& pending : take(m_callbackSounds)) {
+  for (auto const& pending : std::exchange(m_callbackSounds, {})) {
     auto assetsResult = root().assets();
     if (!assetsResult)
       return std::unexpected(std::move(assetsResult.error()));
@@ -4454,13 +4454,9 @@ std::expected<void, StarException> Player::setIdentity(HumanoidIdentity identity
   return updateIdentity();
 }
 
-List<String> Player::pullQueuedMessages() {
-  return take(m_queuedMessages);
-}
+List<String> Player::pullQueuedMessages() { return std::exchange(m_queuedMessages, {}); }
 
-List<std::shared_ptr<Item>> Player::pullQueuedItemDrops() {
-  return take(m_queuedItemPickups);
-}
+List<std::shared_ptr<Item>> Player::pullQueuedItemDrops() { return std::exchange(m_queuedItemPickups, {}); }
 
 std::expected<void, StarException> Player::queueUIMessage(String const& message) {
   if (!isSlave())
@@ -4523,9 +4519,7 @@ Player::State Player::currentState() const {
   return m_state;
 }
 
-List<ChatAction> Player::pullPendingChatActions() {
-  return take(m_pendingChatActions);
-}
+List<ChatAction> Player::pullPendingChatActions() { return std::exchange(m_pendingChatActions, {}); }
 
 std::expected<std::optional<String>, StarException> Player::inspectionLogName() const {
   auto identifier = uniqueId();
@@ -4820,7 +4814,8 @@ std::expected<void, StarException> Player::dropSelectedItems(std::function<std::
     if (!angleResult)
       return std::unexpected(std::move(angleResult.error()));
     auto angle = std::move(*angleResult);
-    auto dropResult = ItemDrop::throwDrop(root(), take(item), position(), velocity(), Vec2F::withAngle(angle), true);
+    auto dropResult =
+      ItemDrop::throwDrop(root(), std::exchange(item, {}), position(), velocity(), Vec2F::withAngle(angle), true);
     if (!dropResult)
       return std::unexpected(std::move(dropResult.error()));
     auto drop = std::move(*dropResult);
@@ -4963,7 +4958,7 @@ std::expected<std::optional<Json>, StarException> Player::pullPendingCinematic()
     auto name = std::move(*nameResult);
     m_log->addCinematic(name);
   }
-  return take(m_pendingCinematic);
+  return std::exchange(m_pendingCinematic, {});
 }
 
 std::expected<void, StarException> Player::setPendingCinematic(Json const& cinematic, bool unique) {
@@ -4994,12 +4989,10 @@ std::expected<void, StarException> Player::setInCinematic(bool inCinematic) {
 }
 
 std::optional<std::pair<std::optional<std::pair<StringList, int>>, float>> Player::pullPendingAltMusic() {
-  return take(m_pendingAltMusic);
+  return std::exchange(m_pendingAltMusic, {});
 }
 
-std::optional<PlayerWarpRequest> Player::pullPendingWarp() {
-  return take(m_pendingWarp);
-}
+std::optional<PlayerWarpRequest> Player::pullPendingWarp() { return std::exchange(m_pendingWarp, {}); }
 
 void Player::setPendingWarp(String const& action, std::optional<String> const& animation, bool deploy) {
   m_pendingWarp = PlayerWarpRequest{action, animation, deploy};

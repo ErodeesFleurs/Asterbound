@@ -154,11 +154,11 @@ inline List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& LuaScr
 
 inline List<LightSource> const& LuaScriptAnimation::lightSources() { return m_lightSources; }
 
-inline List<Particle> LuaScriptAnimation::pullNewParticles() { return take(m_pendingParticles); }
+inline List<Particle> LuaScriptAnimation::pullNewParticles() { return std::exchange(m_pendingParticles, {}); }
 
 inline List<std::shared_ptr<AudioInstance>> LuaScriptAnimation::pullNewAudios() {
   m_activeAudio.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
-  return take(m_pendingAudios);
+  return std::exchange(m_pendingAudios, {});
 }
 
 inline void LuaScriptAnimation::contextShutdown() {

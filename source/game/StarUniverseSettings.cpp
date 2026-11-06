@@ -123,7 +123,7 @@ std::expected<void, StarException> UniverseSettings::setFlag(String const& flag)
 
 std::optional<List<UniverseFlagAction>> UniverseSettings::pullPendingFlagActions() {
   if (!m_pendingFlagActions.empty())
-    return take(m_pendingFlagActions);
+    return std::exchange(m_pendingFlagActions, {});
   return {};
 }
 

@@ -68,7 +68,7 @@ public:
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    for (auto const& value : *this) result.push_back(value);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   auto valueView() const& { return std::ranges::subrange(begin(), end()); }
@@ -257,7 +257,7 @@ public:
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    for (auto const& value : *this) result.push_back(value);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   auto valueView() const& { return std::ranges::subrange(begin(), end()); }
@@ -432,7 +432,7 @@ public:
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    for (auto const& value : *this) result.push_back(value);
+    std::ranges::copy(valueView(), std::back_inserter(result));
     return result;
   }
   auto valueView() const& { return std::ranges::subrange(begin(), end()); }

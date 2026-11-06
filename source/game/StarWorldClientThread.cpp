@@ -224,7 +224,7 @@ void WorldClientThread::pushIncomingPackets(List<std::shared_ptr<Packet>> packet
 List<std::shared_ptr<Packet>> WorldClientThread::pullOutgoingPackets() {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
-  return take(m_outgoingPacketQueue);
+  return std::exchange(m_outgoingPacketQueue, {});
 }
 
 std::expected<void, StarException> WorldClientThread::executeAction(WorldClientAction action) {
@@ -317,7 +317,7 @@ std::expected<void, StarException> WorldClientThread::update() {
   lockWithDiagnostics(locker);
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
-  auto incomingPackets = take(m_incomingPacketQueue);
+  auto incomingPackets = std::exchange(m_incomingPacketQueue, {});
   queueLocker.unlock();
   auto incoming = m_worldClient->handleIncomingPackets(std::move(incomingPackets));
   if (!incoming) {

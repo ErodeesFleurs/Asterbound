@@ -363,7 +363,7 @@ void WorldServer::setReferenceClock(std::shared_ptr<Clock> clock) {
 }
 
 std::expected<void, StarException> WorldServer::setupWeatherDomains(bool preserveNonSurface) {
-  auto previousDomains = take(m_weatherDomains);
+  auto previousDomains = std::exchange(m_weatherDomains, {});
   m_weatherDomains.clear();
 
   auto effectsActive = [&world = *this](Vec2I const& pos) -> std::expected<bool, StarException> {
@@ -386,7 +386,7 @@ std::expected<void, StarException> WorldServer::setupWeatherDomains(bool preserv
     auto weather = std::move(*result2);
     weather->setup(domain.pool, domain.effectsMinHeight, m_geometry, effectsActive);
     weather->setReferenceClock(m_referenceClock);
-    m_weatherDomains.set(domain.name, take(weather));
+    m_weatherDomains.set(domain.name, std::exchange(weather, {}));
   }
 
   auto result3 = ServerWeather::create(this->root());
@@ -905,7 +905,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
 
       // Need to send all sectors that are now in the client window but were not
       // in the old
-      HashSet<ServerTileSectorArray::Sector> oldSectors = take(clientInfo->activeSectors);
+      HashSet<ServerTileSectorArray::Sector> oldSectors = std::exchange(clientInfo->activeSectors, {});
 
       auto result70 = clientInfo->monitoringRegions(m_entityMap);
       if (!result70)

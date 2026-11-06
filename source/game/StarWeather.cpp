@@ -221,9 +221,7 @@ StringList ServerWeather::statusEffects() const {
   return {};
 }
 
-List<std::shared_ptr<Projectile>> ServerWeather::pullNewProjectiles() {
-  return take(m_newProjectiles);
-}
+List<std::shared_ptr<Projectile>> ServerWeather::pullNewProjectiles() { return std::exchange(m_newProjectiles, {}); }
 
 std::expected<std::optional<String>, StarException> ServerWeather::activeWeather() const {
   if (m_currentWeatherIndex == NPos) return std::optional<String>();
@@ -331,7 +329,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
     for (auto const& baseSpawnRegion : baseSpawnRegions) {
       List<Vec2I> regions = {baseSpawnRegion.first};
       for (auto splitPoint : splitPoints) {
-        auto prevRegions = take(regions);
+        auto prevRegions = std::exchange(regions, {});
         for (auto const& region : prevRegions) {
           if (splitPoint > region[0] && splitPoint < region[1]) {
             regions.append({region[0], splitPoint});
@@ -509,9 +507,7 @@ StringList ClientWeather::statusEffects() const {
   return {};
 }
 
-List<Particle> ClientWeather::pullNewParticles() {
-  return take(m_particles);
-}
+List<Particle> ClientWeather::pullNewParticles() { return std::exchange(m_particles, {}); }
 
 std::expected<std::optional<String>, StarException> ClientWeather::activeWeather() const {
   if (m_currentWeatherIndex == NPos) return std::optional<String>();

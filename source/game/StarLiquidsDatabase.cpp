@@ -186,7 +186,9 @@ StringList LiquidsDatabase::liquidNames() const {
 }
 
 List<std::shared_ptr<LiquidSettings const>> LiquidsDatabase::allLiquidSettings() const {
-  return filtered<List<std::shared_ptr<LiquidSettings const>>>(m_settings, std::mem_fn(&std::shared_ptr<LiquidSettings const>::operator bool));
+  List<std::shared_ptr<LiquidSettings const>> settings;
+  std::ranges::copy_if(m_settings, std::back_inserter(settings), [](auto const& entry) { return bool(entry); });
+  return settings;
 }
 
 std::expected<LiquidId, StarException> LiquidsDatabase::liquidId(String const& str) const {

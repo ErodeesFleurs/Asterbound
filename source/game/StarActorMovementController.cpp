@@ -974,7 +974,7 @@ std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovemen
     m_pathController->reset();
   }
 
-  return take(m_pathMoveResult);
+  return std::exchange(m_pathMoveResult, {});
 }
 
 std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovementController::controlPathMove(Vec2F const& position, bool run, std::optional<PlatformerAStar::Parameters> const& parameters) {
