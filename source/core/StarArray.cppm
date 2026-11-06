@@ -182,21 +182,42 @@ Element const* Array<Element, Size>::ptr() const {
 
 template <typename Element, std::size_t Size>
 bool Array<Element, Size>::operator==(Array const& a) const {
-  for (std::size_t i = 0; i < Size; ++i)
-    if ((*this)[i] != a[i])
-      return false;
-  return true;
+  if constexpr (std::is_floating_point_v<Element>) {
+    // Preserve the original comparison form under production fast-math.
+    for (std::size_t i = 0; i < Size; ++i)
+      if ((*this)[i] != a[i])
+        return false;
+    return true;
+  } else {
+    return std::equal(Base::begin(), Base::end(), a.begin(), [](Element const& left, Element const& right) {
+      if (left != right)
+        return false;
+      return true;
+    });
+  }
 }
 
 template <typename Element, std::size_t Size>
 std::weak_ordering Array<Element, Size>::operator<=>(Array const& a) const {
-  for (std::size_t i = 0; i < Size; ++i) {
-    if ((*this)[i] < a[i])
-      return std::weak_ordering::less;
-    if (a[i] < (*this)[i])
-      return std::weak_ordering::greater;
+  if constexpr (std::is_floating_point_v<Element>) {
+    // Standard lexicographic dispatch changes infinity/NaN results with fast-math.
+    for (std::size_t i = 0; i < Size; ++i) {
+      if ((*this)[i] < a[i])
+        return std::weak_ordering::less;
+      if (a[i] < (*this)[i])
+        return std::weak_ordering::greater;
+    }
+    return std::weak_ordering::equivalent;
+  } else {
+    return std::lexicographical_compare_three_way(Base::begin(), Base::end(), a.begin(), a.end(),
+                                                  [](Element const& left, Element const& right) {
+                                                    if (left < right)
+                                                      return std::weak_ordering::less;
+                                                    if (right < left)
+                                                      return std::weak_ordering::greater;
+                                                    return std::weak_ordering::equivalent;
+                                                  });
   }
-  return std::weak_ordering::equivalent;
 }
 
 template <typename Element, std::size_t Size>

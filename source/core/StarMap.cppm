@@ -210,12 +210,6 @@ public:
     if (position != end()) return position->first;
     return std::unexpected(mapDiagnosticError("Value '{}' not found in Map::keyOf()", "Map::keyOf: value not found while rendering its diagnostic", value));
   }
-  List<key_type> keysOf(mapped_type const& value) const {
-    List<key_type> result;
-    for (auto const& entry : *this)
-      if (entry.second == value) result.push_back(entry.first);
-    return result;
-  }
   bool hasValue(mapped_type const& value) const {
     return std::ranges::find(*this, value, &value_type::second) != end();
   }
@@ -442,12 +436,6 @@ public:
     if (position != end()) return position->first;
     return std::unexpected(mapDiagnosticError("Value '{}' not found in Map::keyOf()", "Map::keyOf: value not found while rendering its diagnostic", value));
   }
-  List<key_type> keysOf(mapped_type const& value) const {
-    List<key_type> result;
-    for (auto const& entry : *this)
-      if (entry.second == value) result.push_back(entry.first);
-    return result;
-  }
   bool hasValue(mapped_type const& value) const {
     return std::ranges::find(*this, value, &value_type::second) != end();
   }
@@ -662,12 +650,6 @@ public:
     auto position = std::ranges::find(*this, value, &value_type::second);
     if (position != end()) return position->first;
     return std::unexpected(mapDiagnosticError("Value '{}' not found in Map::keyOf()", "Map::keyOf: value not found while rendering its diagnostic", value));
-  }
-  List<key_type> keysOf(mapped_type const& value) const {
-    List<key_type> result;
-    for (auto const& entry : *this)
-      if (entry.second == value) result.push_back(entry.first);
-    return result;
   }
   bool hasValue(mapped_type const& value) const {
     return std::ranges::find(*this, value, &value_type::second) != end();

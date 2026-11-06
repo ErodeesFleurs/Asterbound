@@ -414,3 +414,69 @@ TEST(FixedContainerCopy, PreservesSinglePassInputPosition) {
   vectorInput >> next;
   EXPECT_EQ(next, 4);
 }
+
+TEST(ArrayComparison, EqualityUsesContextualInequalityAndStopsAtFirstDifference) {
+  struct Truth {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  struct Value {
+    int value = 0;
+    std::vector<int>* visited = nullptr;
+    Truth operator!=(Value const& other) const {
+      visited->push_back(value);
+      return {value != other.value};
+    }
+    bool operator==(Value const&) const = delete;
+  };
+  std::vector<int> visited;
+  Array<Value, 3> left{Value{1, &visited}, Value{2, &visited}, Value{3, &visited}};
+  Array<Value, 3> equal{Value{1, &visited}, Value{2, &visited}, Value{3, &visited}};
+  EXPECT_TRUE(left == equal);
+  EXPECT_EQ(visited, (std::vector<int>{1, 2, 3}));
+  visited.clear();
+  Array<Value, 3> different{Value{1, &visited}, Value{9, &visited}, Value{3, &visited}};
+  EXPECT_FALSE(left == different);
+  EXPECT_EQ(visited, (std::vector<int>{1, 2}));
+  visited.clear();
+  EXPECT_TRUE((Array<Value, 0>{} == Array<Value, 0>{}));
+  EXPECT_TRUE(visited.empty());
+}
+
+TEST(ArrayComparison, WeakOrderingUsesOnlyLessAndContinuesPastEquivalentElements) {
+  struct Value {
+    int value = 0;
+    std::vector<std::pair<int, int>>* visited = nullptr;
+    bool operator<(Value const& other) const {
+      visited->emplace_back(value, other.value);
+      return value / 10 < other.value / 10;
+    }
+  };
+  std::vector<std::pair<int, int>> visited;
+  Array<Value, 2> left{Value{7, &visited}, Value{20, &visited}};
+  Array<Value, 2> right{Value{9, &visited}, Value{30, &visited}};
+  static_assert(std::same_as<decltype(left <=> right), std::weak_ordering>);
+  EXPECT_TRUE((left <=> right) == std::weak_ordering::less);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{7, 9}, {9, 7}, {20, 30}}));
+  visited.clear();
+  EXPECT_TRUE((right <=> left) == std::weak_ordering::greater);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{9, 7}, {7, 9}, {30, 20}, {20, 30}}));
+  visited.clear();
+  EXPECT_TRUE((left <=> left) == std::weak_ordering::equivalent);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{7, 7}, {7, 7}, {20, 20}, {20, 20}}));
+  visited.clear();
+  EXPECT_TRUE((Array<Value, 0>{} <=> Array<Value, 0>{}) == std::weak_ordering::equivalent);
+  EXPECT_TRUE(visited.empty());
+}
+
+TEST(ArrayComparison, FloatingInfinityNanKeepsLegacyLexicographicContinuation) {
+  auto compare = [] [[gnu::noinline]] (Array<double, 2> const& left, Array<double, 2> const& right) {
+    return left <=> right;
+  };
+  volatile std::uint64_t infinityBits = 0x7ff0000000000000ull;
+  volatile std::uint64_t nanBits = 0x7ff8000000000001ull;
+  Array<double, 2> left{std::bit_cast<double>(std::uint64_t(infinityBits)), 2.0};
+  Array<double, 2> right{std::bit_cast<double>(std::uint64_t(nanBits)), 3.0};
+  EXPECT_TRUE(compare(left, right) == std::weak_ordering::less);
+}

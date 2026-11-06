@@ -80,9 +80,6 @@ public:
   // Finds the first matching value's key, or returns MapException.
   [[nodiscard]] std::expected<key_type, StarException> keyOf(mapped_type const& v) const;
 
-  // Finds all of the values matching the given value and returns their keys.
-  List<key_type> keysOf(mapped_type const& v) const;
-
   std::pair<iterator, bool> insert(value_type const& v);
   std::pair<iterator, bool> insert(key_type k, mapped_type v);
 
@@ -317,16 +314,6 @@ auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::keyOf(mapped_typ
       return i->first;
   }
   return std::unexpected(mapDiagnosticError("Value '{}' not found in OrderedMap::keyOf()", "OrderedMap::keyOf: value not found while rendering its diagnostic", v));
-}
-
-template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
-auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::keysOf(mapped_type const& v) const -> List<key_type> {
-  List<key_type> keys;
-  for (iterator i = begin(); i != end(); ++i) {
-    if (i->second == v)
-      keys.append(i->first);
-  }
-  return keys;
 }
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>

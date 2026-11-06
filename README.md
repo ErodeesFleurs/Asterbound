@@ -279,6 +279,8 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 - Use `std::exchange` for scalar flags and audited empty collection/optional resets. Keep `Star::take` when replacement construction is observable: `SkyParameters` must move its old state before allocating its default JSON object.
 - Text escape sets are bounded `constexpr std::string_view` values backed by static byte storage, not null-terminated strings. Preserve their explicit lengths when passing them to search or native APIs.
 - Typed sequence `contains` converts its argument to the element type before `std::ranges::contains`; replacing the member call with an untyped range query can change mixed-type membership.
+- Sequence `indexOf` retains element-type conversion and returns `NPos` for out-of-range starts before forming an iterator. Keep `lastIndexOf`'s exclusive prefix bound and original comparison order.
+- Non-floating `Array` comparisons use standard algorithms with explicit legacy predicates: equality needs only contextual `!=`, and weak lexicographic ordering needs only `<`. Floating arrays retain their original loops: production fast-math changed infinity/NaN ordering through standard lexicographic dispatch in a paired-module probe.
 - Use `std::clamp` only with proven ordered bounds and value consumption. Legacy `Star::clamp` deliberately returns the upper bound for reversed ranges. Preserve vector interpolation, integer rounding, wrapped coordinates and fast-math-safe finite classification rather than replacing their arithmetic wholesale.
 
 ### JSON values and formatting

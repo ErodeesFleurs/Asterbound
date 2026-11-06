@@ -426,19 +426,6 @@ public:
     return insertSorted(std::move(e), std::less<value_type>{});
   }
 
-  template <typename Comparator>
-  bool containsSorted(value_type const& e, Comparator&& comparator) {
-    static_assert(std::is_invocable_r_v<bool, Comparator&, const_reference, const_reference>,
-        "Sorted lookup requires a nonfallible bool comparator");
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e, std::forward<Comparator>(comparator));
-    return range.first != range.second;
-  }
-
-  bool containsSorted(value_type e) {
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e);
-    return range.first != range.second;
-  }
-
   template <typename Function>
   auto exec(Function&& function) {
     return SequenceAlgorithms::exec(*this, std::forward<Function>(function));
@@ -488,10 +475,11 @@ public:
   }
 
   std::size_t indexOf(const_reference e, std::size_t from = 0) const {
-    for (std::size_t i = from; i < m_storage.size(); ++i)
-      if (operator[](i) == e)
-        return i;
-    return NPos;
+    if (from >= m_storage.size())
+      return NPos;
+    auto end = m_storage.end();
+    auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
+    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
   std::size_t lastIndexOf(const_reference e, std::size_t til = NPos) const {
@@ -888,19 +876,6 @@ public:
     return insertSorted(std::move(e), std::less<value_type>{});
   }
 
-  template <typename Comparator>
-  bool containsSorted(value_type const& e, Comparator&& comparator) {
-    static_assert(std::is_invocable_r_v<bool, Comparator&, const_reference, const_reference>,
-        "Sorted lookup requires a nonfallible bool comparator");
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e, std::forward<Comparator>(comparator));
-    return range.first != range.second;
-  }
-
-  bool containsSorted(value_type e) {
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e);
-    return range.first != range.second;
-  }
-
   template <typename Function>
   auto exec(Function&& function) {
     return SequenceAlgorithms::exec(*this, std::forward<Function>(function));
@@ -950,10 +925,11 @@ public:
   }
 
   std::size_t indexOf(const_reference e, std::size_t from = 0) const {
-    for (std::size_t i = from; i < m_storage.size(); ++i)
-      if (operator[](i) == e)
-        return i;
-    return NPos;
+    if (from >= m_storage.size())
+      return NPos;
+    auto end = m_storage.end();
+    auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
+    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
   std::size_t lastIndexOf(const_reference e, std::size_t til = NPos) const {
@@ -1344,19 +1320,6 @@ public:
     return insertSorted(std::move(e), std::less<value_type>{});
   }
 
-  template <typename Comparator>
-  bool containsSorted(value_type const& e, Comparator&& comparator) {
-    static_assert(std::is_invocable_r_v<bool, Comparator&, const_reference, const_reference>,
-        "Sorted lookup requires a nonfallible bool comparator");
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e, std::forward<Comparator>(comparator));
-    return range.first != range.second;
-  }
-
-  bool containsSorted(value_type e) {
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e);
-    return range.first != range.second;
-  }
-
   template <typename Function>
   auto exec(Function&& function) {
     return SequenceAlgorithms::exec(*this, std::forward<Function>(function));
@@ -1406,10 +1369,11 @@ public:
   }
 
   std::size_t indexOf(const_reference e, std::size_t from = 0) const {
-    for (std::size_t i = from; i < m_storage.size(); ++i)
-      if (operator[](i) == e)
-        return i;
-    return NPos;
+    if (from >= m_storage.size())
+      return NPos;
+    auto end = m_storage.end();
+    auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
+    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
   std::size_t lastIndexOf(const_reference e, std::size_t til = NPos) const {
@@ -1804,19 +1768,6 @@ public:
     return insertSorted(std::move(e), std::less<value_type>{});
   }
 
-  template <typename Comparator>
-  bool containsSorted(value_type const& e, Comparator&& comparator) {
-    static_assert(std::is_invocable_r_v<bool, Comparator&, const_reference, const_reference>,
-        "Sorted lookup requires a nonfallible bool comparator");
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e, std::forward<Comparator>(comparator));
-    return range.first != range.second;
-  }
-
-  bool containsSorted(value_type e) {
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e);
-    return range.first != range.second;
-  }
-
   template <typename Function>
   auto exec(Function&& function) {
     return SequenceAlgorithms::exec(*this, std::forward<Function>(function));
@@ -1866,10 +1817,11 @@ public:
   }
 
   std::size_t indexOf(const_reference e, std::size_t from = 0) const {
-    for (std::size_t i = from; i < m_storage.size(); ++i)
-      if (operator[](i) == e)
-        return i;
-    return NPos;
+    if (from >= m_storage.size())
+      return NPos;
+    auto end = m_storage.end();
+    auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
+    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
   std::size_t lastIndexOf(const_reference e, std::size_t til = NPos) const {
@@ -2313,19 +2265,6 @@ public:
 
   auto insertSorted(value_type e) -> AppendResult {
     return insertSorted(std::move(e), std::less<value_type>{});
-  }
-
-  template <typename Comparator>
-  bool containsSorted(value_type const& e, Comparator&& comparator) {
-    static_assert(std::is_invocable_r_v<bool, Comparator&, const_reference, const_reference>,
-        "Sorted lookup requires a nonfallible bool comparator");
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e, std::forward<Comparator>(comparator));
-    return range.first != range.second;
-  }
-
-  bool containsSorted(value_type e) {
-    auto range = std::equal_range(m_storage.begin(), m_storage.end(), e);
-    return range.first != range.second;
   }
 
   template <typename Function>

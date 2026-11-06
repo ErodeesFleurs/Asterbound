@@ -1,6 +1,7 @@
 import std;
 import star.set;
 import star.list;
+import star.memory;
 import star.format;
 import star.string;
 import star.static_vector;
@@ -248,6 +249,31 @@ TEST(ListTest, IndexedQueriesRetainDefaultArguments) {
   auto bounded = StaticList<int, 3>::create({1, 2, 1});
   ASSERT_TRUE(bounded);
   expectDefaults(*bounded);
+}
+
+TEST(ListTest, IndexOfPreservesTypedFirstMatchAndBounds) {
+  auto expectSearch = []<typename Sequence>(Sequence const& input) {
+    double needle = 1.5;
+    EXPECT_EQ(input.indexOf(needle), 0u);
+    EXPECT_EQ(input.indexOf(needle, 1), 2u);
+    EXPECT_EQ(input.indexOf(needle, 2), 2u);
+    EXPECT_EQ(input.indexOf(2, 2), NPos);
+    EXPECT_EQ(input.indexOf(9), NPos);
+    EXPECT_EQ(input.indexOf(1, input.size()), NPos);
+    EXPECT_EQ(input.indexOf(1, input.size() + 1), NPos);
+    EXPECT_EQ(input.indexOf(1, NPos), NPos);
+
+    Sequence const empty;
+    EXPECT_EQ(empty.indexOf(1), NPos);
+    EXPECT_EQ(empty.indexOf(1, 1), NPos);
+    EXPECT_EQ(empty.indexOf(1, NPos), NPos);
+  };
+  expectSearch(List<int>{1, 2, 1});
+  expectSearch(SmallList<int, 2>{1, 2, 1});
+  expectSearch(Deque<int>{1, 2, 1});
+  auto bounded = StaticList<int, 3>::create({1, 2, 1});
+  ASSERT_TRUE(bounded);
+  expectSearch(*bounded);
 }
 
 TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {

@@ -19,10 +19,6 @@ struct AlgorithmResultInfo<std::expected<T, StarException>> {
   static constexpr bool Fallible = true;
 };
 
-// Function that does nothing and takes any number of arguments
-template <typename... T>
-void nothing(T&&...) {}
-
 // Functional constructor call / casting.
 template <typename ToType>
 struct construct {
@@ -31,36 +27,6 @@ struct construct {
     return ToType(std::forward<FromTypes>(fromTypes)...);
   }
 };
-
-template <typename Func>
-struct SwallowReturn {
-  template <typename... T>
-  [[nodiscard]] auto operator()(T&&... args) {
-    using Result = std::remove_cvref_t<std::invoke_result_t<Func&, T...>>;
-    constexpr bool nullable = requires { func == nullptr; };
-    if constexpr (nullable) {
-      if (func == nullptr)
-        return std::expected<void, StarException>(std::unexpected(StarException("Cannot invoke an empty callback")));
-    }
-    if constexpr (AlgorithmResultInfo<Result>::Fallible) {
-      auto result = std::invoke(func, std::forward<T>(args)...);
-      if (!result)
-        return std::expected<void, StarException>(std::unexpected(std::move(result.error())));
-      return std::expected<void, StarException>();
-    } else {
-      std::invoke(func, std::forward<T>(args)...);
-      if constexpr (nullable)
-        return std::expected<void, StarException>();
-    }
-  }
-
-  Func func;
-};
-
-template <typename Func>
-SwallowReturn<Func> swallow(Func f) {
-  return SwallowReturn<Func>{std::move(f)};
-}
 
 template <typename MapType1, typename MapType2>
 [[nodiscard]] auto mapMerge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
@@ -448,10 +414,7 @@ export module star.algorithm;
 
 export namespace Star {
   using ::Star::AlgorithmResultInfo;
-  using ::Star::nothing;
   using ::Star::construct;
-  using ::Star::SwallowReturn;
-  using ::Star::swallow;
   using ::Star::mapMerge;
   using ::Star::mapsEqual;
   using ::Star::filter;
