@@ -101,6 +101,21 @@ RenderPoly renderFlatPoly(PolyF const& poly, Vec4B color, float param1 = 0.0f);
 
 typedef std::variant<RenderTriangle, RenderQuad, RenderPoly> RenderPrimitive;
 
+// Thread transport owns the indexed vertices and numeric texture handles.
+// The backend borrows these spans and its main-owned texture table only during
+// synchronous packing; none of these references may outlive that call.
+struct DetachedRenderPrimitive {
+  std::uint64_t texture = 0;
+  std::size_t first = 0;
+  std::size_t count = 0;
+  std::uint8_t kind = 0; // triangle, quad, polygon
+};
+struct DetachedRenderGeometry {
+  std::span<DetachedRenderPrimitive const> primitives;
+  std::span<RenderVertex const> vertices;
+  std::unordered_map<std::uint64_t, TexturePtr> const& textures;
+};
+
 class Texture : public RefCounter {
 public:
   virtual ~Texture() = default;
@@ -169,7 +184,6 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> setEffectParameter(String const& parameterName, RenderEffectParameter const& parameter) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setEffectScriptableParameter(String const& effectName, String const& parameterName, RenderEffectParameter const& parameter) = 0;
   virtual std::optional<RenderEffectParameter> getEffectScriptableParameter(String const& effectName, String const& parameterName) = 0;
-  virtual std::optional<std::uint8_t> getEffectScriptableParameterType(String const& effectName, String const& parameterName) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setEffectTexture(String const& textureName, ImageView const& image) = 0;
   [[nodiscard]] virtual std::expected<bool, StarException> switchEffectConfig(String const& name) = 0;
 
@@ -220,5 +234,7 @@ export namespace Star {
   using ::Star::renderFlatRect;
   using ::Star::renderFlatPoly;
   using ::Star::RenderPrimitive;
+  using ::Star::DetachedRenderPrimitive;
+  using ::Star::DetachedRenderGeometry;
   using ::Star::RenderEffectParameter;
 }

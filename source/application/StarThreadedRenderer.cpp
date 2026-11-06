@@ -48,26 +48,45 @@ struct Command {
   Vec2U size;
   std::optional<RectI> rect;
   Mat3F transform = Mat3F::identity();
-  RenderEffectParameter parameter = 0.0f;
+  std::size_t payload = 0;
+};
+struct NamedValue {
   String name;
   String effect;
+  RenderEffectParameter parameter = 0.0f;
+};
+struct ShaderConfig {
+  String name;
   Json config;
   StringMap<String> shaders;
-  // Image is needed by the actual atlas API (which accepts Image, not a view).
-  // Reuse storage when the dimensions/format match instead of resetting it.
+};
+struct OwnedImage {
+  OwnedImage() = default;
+  explicit OwnedImage(Image const& source) : image(source) {}
+  OwnedImage(OwnedImage&&) = default;
+  OwnedImage& operator=(OwnedImage&&) = default;
+  OwnedImage(OwnedImage const&) = delete;
+  OwnedImage& operator=(OwnedImage const&) = delete;
   Image image;
 };
-struct DetachedPrimitive {
-  ResourceId texture = 0;
-  std::size_t first = 0;
-  std::size_t count = 0;
-  std::uint8_t kind = 0;
+struct EffectImage {
+  String name;
+  OwnedImage pixels;
 };
 struct CommandSlot {
   std::vector<Command> commands;
   std::size_t commandCount = 0;
-  std::vector<DetachedPrimitive> primitives;
+  std::vector<DetachedRenderPrimitive> primitives;
   std::vector<RenderVertex> vertices;
+  std::vector<NamedValue> namedValues;
+  std::size_t namedCount = 0;
+  std::vector<Json> configs;
+  std::vector<ShaderConfig> shaderConfigs;
+  // Creation uploads are released after consumption. Only recurring effect
+  // uploads retain pixel storage, independently of the command high-water mark.
+  std::vector<OwnedImage> creationImages;
+  std::vector<EffectImage> effectImages;
+  std::size_t effectImageCount = 0;
   std::uint64_t generation = 0;
   std::atomic<SlotStatus> status{SlotStatus::Available};
 
@@ -79,10 +98,27 @@ struct CommandSlot {
     command.synchronous = false;
     return command;
   }
+  NamedValue& named(Command& command) {
+    command.payload = namedCount++;
+    if (command.payload == namedValues.size())
+      namedValues.emplace_back();
+    return namedValues[command.payload];
+  }
+  EffectImage& effectImage(Command& command) {
+    command.payload = effectImageCount++;
+    if (command.payload == effectImages.size())
+      effectImages.emplace_back();
+    return effectImages[command.payload];
+  }
   void reset() {
     commandCount = 0;
     primitives.clear();
     vertices.clear();
+    namedCount = 0;
+    effectImageCount = 0;
+    configs.clear();
+    shaderConfigs.clear();
+    creationImages.clear();
   }
 };
 
@@ -104,9 +140,6 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   std::unordered_map<ResourceId, TexturePtr> textures;
   std::unordered_map<ResourceId, std::shared_ptr<TextureGroup>> groups;
   std::unordered_map<ResourceId, std::shared_ptr<RenderBuffer>> buffers;
-  List<RenderPrimitive> scratch;
-  std::vector<List<RenderVertex>> polygonScratch;
-  std::size_t usedPolygons = 0;
 
   std::array<CommandSlot, 2> slots;
   unsigned producer = 0;
@@ -161,12 +194,12 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
     immediate.clear();
     return {};
   }
-  std::expected<Command*, StarException> append(Operation operation) {
+  std::expected<std::reference_wrapper<Command>, StarException> append(Operation operation) {
     auto ready = status();
     if (!ready) return std::unexpected(std::move(ready.error()));
     auto captured = captureImmediate();
     if (!captured) return std::unexpected(std::move(captured.error()));
-    return &writing().append(operation);
+    return std::ref(writing().append(operation));
   }
   static void copyImage(Image& destination, ImageView source) {
     if (destination.size() != source.size || destination.pixelFormat() != source.format)
@@ -177,19 +210,10 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   std::expected<void, StarException> setBuffer(ResourceId resource, List<RenderPrimitive> const& primitives) {
     auto command = append(Operation::BufferSet);
     if (!command) return std::unexpected(std::move(command.error()));
-    (*command)->id = resource;
-    auto captured = capture(primitives, **command);
+    command->get().id = resource;
+    auto captured = capture(primitives, command->get());
     if (!captured) --writing().commandCount;
     return captured;
-  }
-  std::expected<void, StarException> decode(CommandSlot const& slot, Command const& command);
-  void clearScratch() {
-    std::size_t polygon = 0;
-    for (auto& primitive : scratch) {
-      if (auto poly = std::get_if<RenderPoly>(&primitive))
-        polygonScratch[polygon++].swap(poly->vertexes);
-    }
-    scratch.clear(); // real TexturePtr references are released only on main
   }
   std::expected<void, StarException> execute(CommandSlot& slot);
   std::expected<void, StarException> synchronize() {
@@ -275,7 +299,7 @@ std::expected<void, StarException> ThreadedRendererState::capture(List<RenderPri
       if constexpr (std::is_same_v<Shape, RenderPoly>) {
         // The backend ignores degenerate polygons before inspecting textures.
         if (shape.vertexes.size() <= 2) {
-          slot.primitives.push_back(DetachedPrimitive{0, 0, 0, 2});
+          slot.primitives.push_back(DetachedRenderPrimitive{0, 0, 0, 2});
           return {};
         }
       }
@@ -286,7 +310,7 @@ std::expected<void, StarException> ThreadedRendererState::capture(List<RenderPri
           return std::unexpected(RendererException("Render primitive uses a texture from another renderer"));
         textureId = proxy->get().resource;
       }
-      DetachedPrimitive detached;
+      DetachedRenderPrimitive detached;
       detached.texture = textureId;
       detached.first = slot.vertices.size();
       if constexpr (std::is_same_v<Shape, RenderTriangle>) {
@@ -320,62 +344,20 @@ std::expected<TexturePtr, StarException> ThreadedRendererState::texture(Image co
   auto command = append(group ? Operation::GroupTexture : Operation::Texture);
   if (!command) return std::unexpected(std::move(command.error()));
   ResourceId resource = nextResource++;
-  (*command)->id = resource;
-  (*command)->parent = group;
-  (*command)->addressing = addressing;
-  (*command)->filtering = filtering;
-  copyImage((*command)->image, ImageView(image));
+  command->get().id = resource;
+  command->get().parent = group;
+  command->get().addressing = addressing;
+  command->get().filtering = filtering;
+  command->get().payload = writing().creationImages.size();
+  writing().creationImages.emplace_back(image);
   return TexturePtr(make_ref<ProxyTexture>(shared_from_this(), resource, image.size(), addressing, filtering));
 }
 
-std::expected<void, StarException> ThreadedRendererState::decode(CommandSlot const& slot, Command const& command) {
-  usedPolygons = 0;
-  scratch.reserve(command.count);
-  for (std::size_t i = command.first; i != command.first + command.count; ++i) {
-    auto const& detached = slot.primitives[i];
-    if (detached.kind == 2 && detached.count <= 2) continue;
-    TexturePtr texture;
-    if (detached.texture) {
-      auto found = textures.find(detached.texture);
-      if (found == textures.end()) {
-        clearScratch();
-        return std::unexpected(RendererException("Detached primitive references a missing texture"));
-      }
-      texture = found->second;
-    }
-    auto const* vertices = slot.vertices.data() + detached.first;
-    if (detached.kind == 0) {
-      RenderTriangle triangle;
-      triangle.texture = std::move(texture);
-      triangle.a = vertices[0]; triangle.b = vertices[1]; triangle.c = vertices[2];
-      scratch.append(std::move(triangle));
-    } else if (detached.kind == 1) {
-      RenderQuad quad;
-      quad.texture = std::move(texture);
-      quad.a = vertices[0]; quad.b = vertices[1]; quad.c = vertices[2]; quad.d = vertices[3];
-      scratch.append(std::move(quad));
-    } else if (command.operation == Operation::Immediate) {
-      // Match the backend fan and its triangle-neighbor rounding exactly.
-      // No retained polygon allocation is lost in the backend immediate flush.
-      for (std::size_t vertex = 1; vertex + 1 < detached.count; ++vertex) {
-        RenderTriangle triangle;
-        triangle.texture = texture;
-        triangle.a = vertices[0];
-        triangle.b = vertices[vertex];
-        triangle.c = vertices[vertex + 1];
-        scratch.append(std::move(triangle));
-      }
-    } else {
-      if (usedPolygons == polygonScratch.size()) polygonScratch.emplace_back();
-      RenderPoly poly;
-      poly.texture = std::move(texture);
-      poly.vertexes.swap(polygonScratch[usedPolygons++]);
-      poly.vertexes.resize(detached.count);
-      std::copy_n(vertices, detached.count, poly.vertexes.begin());
-      scratch.append(std::move(poly));
-    }
-  }
-  return {};
+static DetachedRenderGeometry geometryView(ThreadedRendererState const& state, CommandSlot const& slot, Command const& command) {
+  return {
+      std::span(slot.primitives).subspan(command.first, command.count),
+      slot.vertices,
+      state.textures};
 }
 
 std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& slot) {
@@ -391,13 +373,25 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
       case Operation::Begin: return backend->startFrame();
       case Operation::End: return backend->finishFrame();
       case Operation::Resize: return backend->setScreenSize(command.size);
-      case Operation::Config: return backend->loadConfig(command.config);
-      case Operation::EffectConfig: return backend->loadEffectConfig(command.name, command.config, command.shaders);
-      case Operation::Parameter: return backend->setEffectParameter(command.name, command.parameter);
-      case Operation::Scriptable: return backend->setEffectScriptableParameter(command.effect, command.name, command.parameter);
-      case Operation::EffectTexture: return backend->setEffectTexture(command.name, ImageView(command.image));
+      case Operation::Config: return backend->loadConfig(slot.configs[command.payload]);
+      case Operation::EffectConfig: {
+        auto const& payload = slot.shaderConfigs[command.payload];
+        return backend->loadEffectConfig(payload.name, payload.config, payload.shaders);
+      }
+      case Operation::Parameter: {
+        auto const& payload = slot.namedValues[command.payload];
+        return backend->setEffectParameter(payload.name, payload.parameter);
+      }
+      case Operation::Scriptable: {
+        auto const& payload = slot.namedValues[command.payload];
+        return backend->setEffectScriptableParameter(payload.effect, payload.name, payload.parameter);
+      }
+      case Operation::EffectTexture: {
+        auto const& payload = slot.effectImages[command.payload];
+        return backend->setEffectTexture(payload.name, ImageView(payload.pixels.image));
+      }
       case Operation::Switch: {
-        auto switched = backend->switchEffectConfig(command.name);
+        auto switched = backend->switchEffectConfig(slot.namedValues[command.payload].name);
         if (!switched) return std::unexpected(std::move(switched.error()));
         return {};
       }
@@ -406,10 +400,10 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
       case Operation::GroupTexture: {
         auto created = [&]() -> std::expected<TexturePtr, StarException> {
           if (command.operation == Operation::Texture)
-            return backend->createTexture(command.image, command.addressing, command.filtering);
+            return backend->createTexture(slot.creationImages[command.payload].image, command.addressing, command.filtering);
           auto group = groups.find(command.parent);
           if (group == groups.end()) return std::unexpected(RendererException("Missing detached texture group"));
-          return group->second->create(command.image);
+          return group->second->create(slot.creationImages[command.payload].image);
         }();
         if (!created) return std::unexpected(std::move(created.error()));
         textures.emplace(command.id, std::move(*created));
@@ -429,25 +423,12 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
       }
       case Operation::BufferSet:
       case Operation::Immediate: {
-        auto decoded = decode(slot, command);
-        if (!decoded) return decoded;
-        auto result = [&]() -> std::expected<void, StarException> {
-          if (command.operation == Operation::Immediate) {
-            auto& destination = backend->immediatePrimitives();
-            destination.reserve(destination.size() + scratch.size());
-            for (auto& primitive : scratch) {
-              // Polygon fans were already expanded into triangles, so moving
-              // these primitives transfers no per-polygon allocation.
-              destination.append(std::move(primitive));
-            }
-            return {};
-          }
-          auto buffer = buffers.find(command.id);
-          if (buffer == buffers.end()) return std::unexpected(RendererException("Missing detached render buffer"));
-          return buffer->second->set(scratch);
-        }();
-        clearScratch();
-        return result;
+        auto geometry = geometryView(*this, slot, command);
+        if (command.operation == Operation::Immediate)
+          return backend->appendImmediate(geometry);
+        auto buffer = buffers.find(command.id);
+        if (buffer == buffers.end()) return std::unexpected(RendererException("Missing detached render buffer"));
+        return backend->setRenderBuffer(buffer->second, geometry);
       }
       case Operation::DrawBuffer: {
         auto buffer = buffers.find(command.id);
@@ -562,7 +543,6 @@ std::expected<void, StarException> ThreadedRenderer::releaseResources() {
     return std::unexpected(RendererException("Renderer release requires the main thread"));
   auto result = m_state->status();
   m_state->active.store(false, std::memory_order_release);
-  m_state->clearScratch();
   m_state->buffers.clear();
   m_state->textures.clear();
   m_state->groups.clear();
@@ -573,24 +553,31 @@ std::expected<void, StarException> ThreadedRenderer::releaseResources() {
 std::expected<void, StarException> ThreadedRenderer::setScreenSize(Vec2U size) {
   auto command = m_state->append(Operation::Resize);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->size = size;
+  command->get().size = size;
   m_state->screen = size;
   return {};
 }
 std::expected<void, StarException> ThreadedRenderer::loadConfig(Json const& config) {
   auto command = m_state->append(Operation::Config);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->config = config;
-  (*command)->synchronous = true;
-  return m_state->barrier();
+  command->get().payload = m_state->writing().configs.size();
+  m_state->writing().configs.push_back(config);
+  command->get().synchronous = true;
+  auto result = m_state->barrier();
+  // Config reload is an ordered, quiescent boundary for stale effect-upload
+  // caches. Do not shrink streaming storage during ordinary frames.
+  if (result)
+    for (auto& slot : m_state->slots)
+      slot.effectImages.clear();
+  return result;
 }
 std::expected<void, StarException> ThreadedRenderer::loadEffectConfig(String const& name, Json const& config, StringMap<String> const& shaders) {
   auto command = m_state->append(Operation::EffectConfig);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->name = name;
-  (*command)->config = config;
-  (*command)->shaders = shaders;
-  (*command)->synchronous = true;
+  auto& payloads = m_state->writing().shaderConfigs;
+  command->get().payload = payloads.size();
+  payloads.push_back(ShaderConfig{name, config, shaders});
+  command->get().synchronous = true;
   auto result = m_state->barrier();
   if (result) m_state->knownEffects[name] = true;
   return result;
@@ -598,18 +585,20 @@ std::expected<void, StarException> ThreadedRenderer::loadEffectConfig(String con
 std::expected<void, StarException> ThreadedRenderer::setEffectParameter(String const& name, RenderEffectParameter const& value) {
   auto command = m_state->append(Operation::Parameter);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->name = name;
-  (*command)->parameter = value;
+  auto& payload = m_state->writing().named(command->get());
+  payload.name = name;
+  payload.parameter = value;
   return {};
 }
 std::expected<void, StarException> ThreadedRenderer::setEffectScriptableParameter(String const& effect, String const& name, RenderEffectParameter const& value) {
   auto command = m_state->append(Operation::Scriptable);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->effect = effect;
-  (*command)->name = name;
-  (*command)->parameter = value;
+  auto& payload = m_state->writing().named(command->get());
+  payload.effect = effect;
+  payload.name = name;
+  payload.parameter = value;
   // Lua pcall must see authored type errors here, not as a later frame failure.
-  (*command)->synchronous = true;
+  command->get().synchronous = true;
   return m_state->barrier();
 }
 std::optional<RenderEffectParameter> ThreadedRenderer::getEffectScriptableParameter(String const& effect, String const& name) {
@@ -617,28 +606,26 @@ std::optional<RenderEffectParameter> ThreadedRenderer::getEffectScriptableParame
     return backend.getEffectScriptableParameter(effect, name);
   });
 }
-std::optional<std::uint8_t> ThreadedRenderer::getEffectScriptableParameterType(String const& effect, String const& name) {
-  return m_state->query([effect = String(effect), name = String(name)](OpenGlRenderer& backend) {
-    return backend.getEffectScriptableParameterType(effect, name);
-  });
-}
 std::expected<void, StarException> ThreadedRenderer::setEffectTexture(String const& name, ImageView const& image) {
   auto command = m_state->append(Operation::EffectTexture);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->name = name;
-  ThreadedRendererState::copyImage((*command)->image, image);
+  auto& payload = m_state->writing().effectImage(command->get());
+  payload.name = name;
+  ThreadedRendererState::copyImage(payload.pixels.image, image);
   return {};
 }
 std::expected<bool, StarException> ThreadedRenderer::switchEffectConfig(String const& name) {
   auto command = m_state->append(Operation::Switch);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->name = name;
+  m_state->writing().named(command->get()).name = name;
   return m_state->knownEffects.find(name) != m_state->knownEffects.end();
 }
 std::expected<void, StarException> ThreadedRenderer::setScissorRect(std::optional<RectI> const& rect) {
+  if (rect == m_state->scissor)
+    return m_state->status();
   auto command = m_state->append(Operation::Scissor);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->rect = rect;
+  command->get().rect = rect;
   m_state->scissor = rect;
   return {};
 }
@@ -648,41 +635,41 @@ std::expected<TexturePtr, StarException> ThreadedRenderer::createTexture(Image c
 void ThreadedRenderer::setSizeLimitEnabled(bool enabled) {
   auto command = m_state->append(Operation::SizeLimit);
   if (!command) { m_state->fail(std::move(command.error())); return; }
-  (*command)->flag = enabled;
+  command->get().flag = enabled;
 }
 void ThreadedRenderer::setMultiTexturingEnabled(bool enabled) {
   auto command = m_state->append(Operation::MultiTexture);
   if (!command) { m_state->fail(std::move(command.error())); return; }
-  (*command)->flag = enabled;
+  command->get().flag = enabled;
 }
 std::expected<void, StarException> ThreadedRenderer::setMultiSampling(unsigned samples) {
   auto command = m_state->append(Operation::MultiSampling);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->number = samples;
-  (*command)->synchronous = true;
+  command->get().number = samples;
+  command->get().synchronous = true;
   return m_state->barrier();
 }
 std::expected<void, StarException> ThreadedRenderer::setMainHDR(bool enabled) {
   auto command = m_state->append(Operation::HDR);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->flag = enabled;
-  (*command)->synchronous = true;
+  command->get().flag = enabled;
+  command->get().synchronous = true;
   return m_state->barrier();
 }
 std::expected<std::shared_ptr<TextureGroup>, StarException> ThreadedRenderer::createTextureGroup(TextureGroupSize size, TextureFiltering filtering) {
   auto command = m_state->append(Operation::Group);
   if (!command) return std::unexpected(std::move(command.error()));
   ResourceId resource = m_state->nextResource++;
-  (*command)->id = resource;
-  (*command)->groupSize = size;
-  (*command)->filtering = filtering;
+  command->get().id = resource;
+  command->get().groupSize = size;
+  command->get().filtering = filtering;
   return std::shared_ptr<TextureGroup>(std::make_shared<ProxyGroup>(m_state, resource, filtering));
 }
 std::expected<std::shared_ptr<RenderBuffer>, StarException> ThreadedRenderer::createRenderBuffer() {
   auto command = m_state->append(Operation::Buffer);
   if (!command) return std::unexpected(std::move(command.error()));
   ResourceId resource = m_state->nextResource++;
-  (*command)->id = resource;
+  command->get().id = resource;
   return std::shared_ptr<RenderBuffer>(std::make_shared<ProxyBuffer>(m_state, resource));
 }
 std::expected<void, StarException> ThreadedRenderer::renderBuffer(std::shared_ptr<RenderBuffer> const& buffer, Mat3F const& transform) {
@@ -692,14 +679,14 @@ std::expected<void, StarException> ThreadedRenderer::renderBuffer(std::shared_pt
     return std::unexpected(RendererException("Render buffer belongs to another renderer"));
   auto command = m_state->append(Operation::DrawBuffer);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->id = proxy->get().resource;
-  (*command)->transform = transform;
+  command->get().id = proxy->get().resource;
+  command->get().transform = transform;
   return {};
 }
 std::expected<void, StarException> ThreadedRenderer::flush(Mat3F const& transform) {
   auto command = m_state->append(Operation::Flush);
   if (!command) return std::unexpected(std::move(command.error()));
-  (*command)->transform = transform;
+  command->get().transform = transform;
   return {};
 }
 }

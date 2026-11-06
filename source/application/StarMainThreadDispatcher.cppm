@@ -27,27 +27,25 @@ public:
     struct Call : Task {
       Function& function;
       std::optional<Stored> result;
-      explicit Call(Function& f) : function(f) {
-        this->execute = [](Task& base) {
-          auto& call = static_cast<Call&>(base);
-          if constexpr (std::is_void_v<Result>) {
-            std::invoke(call.function);
-            call.result.emplace();
-          } else if constexpr (std::is_reference_v<Result>) {
-            auto&& value = std::invoke(call.function);
-            call.result.emplace(value);
-          } else {
-            call.result.emplace(std::invoke(call.function));
-          }
-        };
+      explicit Call(Function& f) : function(f) {}
+      void execute() override {
+        if constexpr (std::is_void_v<Result>) {
+          std::invoke(function);
+          result.emplace();
+        } else if constexpr (std::is_reference_v<Result>) {
+          auto&& value = std::invoke(function);
+          result.emplace(value);
+        } else {
+          result.emplace(std::invoke(function));
+        }
       }
     } call(function);
     std::unique_lock lock(m_mutex);
     if (m_last)
-      m_last->next = &call;
+      m_last->get().next = std::ref<Task>(call);
     else
-      m_first = &call;
-    m_last = &call;
+      m_first = std::ref<Task>(call);
+    m_last = std::ref<Task>(call);
     ++m_generation;
     m_changed.notify_all();
     m_changed.wait(lock, [&] { return call.completed; });
@@ -63,14 +61,14 @@ public:
     assert(isMainThread());
     std::unique_lock lock(m_mutex);
     while (m_first) {
-      Task* task = m_first;
-      m_first = task->next;
+      auto& task = m_first->get();
+      m_first = task.next;
       if (!m_first)
-        m_last = nullptr;
+        m_last.reset();
       lock.unlock();
-      task->execute(*task);
+      task.execute();
       lock.lock();
-      task->completed = true;
+      task.completed = true;
       ++m_generation;
       m_changed.notify_all();
     }
@@ -97,15 +95,18 @@ public:
 
 private:
   struct Task {
-    Task* next = nullptr;
-    void (*execute)(Task&) = nullptr;
+    std::optional<std::reference_wrapper<Task>> next;
+    virtual void execute() = 0;
     bool completed = false;
+
+  protected:
+    ~Task() = default;
   };
   std::thread::id const m_mainThread;
   mutable std::mutex m_mutex;
   std::condition_variable m_changed;
-  Task* m_first = nullptr;
-  Task* m_last = nullptr;
+  std::optional<std::reference_wrapper<Task>> m_first;
+  std::optional<std::reference_wrapper<Task>> m_last;
   std::uint64_t m_generation = 0;
 };
 

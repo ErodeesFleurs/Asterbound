@@ -38,13 +38,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRenderingCallbacks(C
     return std::unexpected(std::move(groups.error()));
 
   auto setParameter = callbacks.registerCallback("setEffectParameter", [&app](String const& effectName, String const& effectParameter, RenderEffectParameter const& value) -> std::expected<void, StarException> {
-    auto renderer = app.renderer();
-    auto type = renderer->getEffectScriptableParameterType(effectName, effectParameter);
-    if (!type)
-      return {};
-    if (*type == std::uint8_t{1} && std::holds_alternative<float>(value))
-      return renderer->setEffectScriptableParameter(effectName, effectParameter, (int)std::get<float>(value));
-    return renderer->setEffectScriptableParameter(effectName, effectParameter, value);
+    return app.renderer()->setEffectScriptableParameter(effectName, effectParameter, value);
   });
   if (!setParameter)
     return std::unexpected(std::move(setParameter.error()));

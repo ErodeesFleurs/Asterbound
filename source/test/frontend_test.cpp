@@ -185,6 +185,45 @@ TEST(MainThreadDispatcher, SimultaneousProducersRetainTheirStackTasks) {
       EXPECT_EQ(consumed[producer][index], producer * Calls + index + 1);
 }
 
+TEST(MainThreadDispatcher, AppendsWhileExecutingAndReusesDrainedQueue) {
+  MainThreadDispatcher dispatcher;
+  std::vector<unsigned> consumed;
+  dispatcher.drain();
+  for (unsigned round = 0; round != 2; ++round) {
+    std::binary_semaphore enqueueSecond(0);
+    std::binary_semaphore enqueueThird(0);
+    auto observed = dispatcher.generation();
+    std::thread first([&] {
+      dispatcher.invoke([&] {
+        consumed.push_back(round * 3);
+        // The sole queued task has been popped. Enqueue into the now-empty
+        // queue, then append to its tail before this execution completes.
+        auto queued = dispatcher.generation();
+        enqueueSecond.release();
+        dispatcher.wait(queued, std::chrono::hours(24));
+        queued = dispatcher.generation();
+        enqueueThird.release();
+        dispatcher.wait(queued, std::chrono::hours(24));
+      });
+    });
+    std::thread second([&] {
+      enqueueSecond.acquire();
+      dispatcher.invoke([&] { consumed.push_back(round * 3 + 1); });
+    });
+    std::thread third([&] {
+      enqueueThird.acquire();
+      dispatcher.invoke([&] { consumed.push_back(round * 3 + 2); });
+    });
+    dispatcher.wait(observed, std::chrono::hours(24));
+    dispatcher.drain();
+    first.join();
+    second.join();
+    third.join();
+  }
+  dispatcher.drain();
+  EXPECT_EQ(consumed, (std::vector<unsigned>{0, 1, 2, 3, 4, 5}));
+}
+
 TEST(MainThreadDispatcher, WakeBeforeWaitRemainsObservable) {
   MainThreadDispatcher dispatcher;
   auto observed = dispatcher.generation();

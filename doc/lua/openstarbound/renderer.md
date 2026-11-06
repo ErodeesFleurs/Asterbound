@@ -29,6 +29,8 @@ Returns every post process group. Identical to grabbing them from client.config 
 Sets the specified scriptable parameter of the specified shader effect to the provided value. 
 This is accessed from the shader as a uniform and must be defined in the effect's configuration.
 
+The setter resolves the declared type, converts numeric Lua values for `int` parameters (truncating fractions toward zero), and applies the value in one ordered main-thread transaction. Other type mismatches raise immediately and leave the previous value unchanged. Missing effects or parameters remain no-ops; their getters return `nil`.
+
 ---
 
 #### `Json` renderer.getEffectParameter(`String` effectName, `String` parameterName)

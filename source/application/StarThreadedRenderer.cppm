@@ -60,7 +60,6 @@ public:
   [[nodiscard]] std::expected<void, StarException> setEffectParameter(String const& name, RenderEffectParameter const& value) override;
   [[nodiscard]] std::expected<void, StarException> setEffectScriptableParameter(String const& effect, String const& name, RenderEffectParameter const& value) override;
   std::optional<RenderEffectParameter> getEffectScriptableParameter(String const& effect, String const& name) override;
-  std::optional<std::uint8_t> getEffectScriptableParameterType(String const& effect, String const& name) override;
   [[nodiscard]] std::expected<void, StarException> setEffectTexture(String const& name, ImageView const& image) override;
   [[nodiscard]] std::expected<bool, StarException> switchEffectConfig(String const& name) override;
   [[nodiscard]] std::expected<void, StarException> setScissorRect(std::optional<RectI> const& rect) override;

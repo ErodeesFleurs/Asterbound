@@ -3,7 +3,6 @@ module;
 import std;
 import star.format;
 import star.json;
-import star.byte_array;
 import star.string;
 import star.list;
 import star.set;
@@ -55,7 +54,6 @@ public:
   [[nodiscard]] std::expected<void, StarException> setEffectParameter(String const& parameterName, RenderEffectParameter const& parameter) override;
   [[nodiscard]] std::expected<void, StarException> setEffectScriptableParameter(String const& effectName, String const& parameterName, RenderEffectParameter const& parameter) override;
   std::optional<RenderEffectParameter> getEffectScriptableParameter(String const& effectName, String const& parameterName) override;
-  std::optional<std::uint8_t> getEffectScriptableParameterType(String const& effectName, String const& parameterName) override;
   [[nodiscard]] std::expected<void, StarException> setEffectTexture(String const& textureName, ImageView const& image) override;
 
   [[nodiscard]] std::expected<void, StarException> setScissorRect(std::optional<RectI> const& scissorRect) override;
@@ -73,6 +71,9 @@ public:
 
   List<RenderPrimitive>& immediatePrimitives() override;
   void render(RenderPrimitive primitive) override;
+  // Detached views are consumed synchronously into main-owned GPU-format bytes.
+  [[nodiscard]] std::expected<void, StarException> appendImmediate(DetachedRenderGeometry const& geometry);
+  [[nodiscard]] std::expected<void, StarException> setRenderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, DetachedRenderGeometry const& geometry);
   [[nodiscard]] std::expected<void, StarException> renderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, Mat3F const& transformation) override;
 
   [[nodiscard]] std::expected<void, StarException> flush(Mat3F const& transformation) override;
@@ -201,18 +202,36 @@ private:
     };
 
     struct GlVertexBuffer {
-      List<GlVertexBufferTexture> textures;
+      std::array<GlVertexBufferTexture, 4> textures;
+      std::size_t textureCount = 0;
       GLuint vertexBuffer = 0;
       std::size_t vertexCount = 0;
+      std::size_t vertexCapacity = 0;
     };
 
     GlRenderBuffer() = default;
     ~GlRenderBuffer();
 
     [[nodiscard]] std::expected<void, StarException> set(List<RenderPrimitive>& primitives) override;
+    [[nodiscard]] std::expected<void, StarException> set(DetachedRenderGeometry const& geometry);
+    [[nodiscard]] std::expected<void, StarException> append(List<RenderPrimitive> const& primitives);
+    [[nodiscard]] std::expected<void, StarException> append(DetachedRenderGeometry const& geometry);
+    [[nodiscard]] std::expected<void, StarException> upload();
+    void reset();
 
-    RefPtr<GlTexture> whiteTexture;
-    ByteArray accumulationBuffer;
+    template <typename VertexAt>
+    [[nodiscard]] std::expected<void, StarException> appendPrimitive(std::uint8_t kind, std::size_t count, TexturePtr const& texture, VertexAt const& vertexAt);
+
+    struct PackedBatch {
+      std::array<GlVertexBufferTexture, 4> textures;
+      std::size_t textureCount = 0;
+      std::size_t firstVertex = 0;
+      std::size_t vertexCount = 0;
+    };
+
+    TexturePtr whiteTexture;
+    List<GlRenderVertex> accumulationBuffer;
+    List<PackedBatch> packedBatches;
 
     HashSet<TexturePtr> usedTextures;
     List<GlVertexBuffer> vertexBuffers;

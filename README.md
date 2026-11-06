@@ -61,6 +61,10 @@ Lua pane `render()` may run several times without an intervening `update(dt)`, o
 
 Only one sealed command frame is in flight. Command storage owns copied pixels and vertices and uses numeric resource IDs; worker-side intrusive texture references never cross to main. Real graphics resources and platform SDK callbacks remain main-owned, including ImGui's clipboard and IME callbacks. Audio retains its existing callback-thread contract. Shutdown stops audio callbacks and client services first, releases SDK/GL owners while the Root logger is alive, destroys the application on its worker, then joins and tears down ImGui/SDL on main.
 
+Main packs detached geometry directly into owned, typed GPU vertices; legacy primitives use the same packing kernel. Immediate segments remain batched until a real renderer flush, even across ordered queries and transport-slot reuse. Texture pins protect atlas coordinates while batches are pending, and reusable GPU buffers retain their allocated capacity. Command headers are separate from names, shader/configuration payloads and images: creation uploads are released after consumption, while recurring effect-image storage is reused and cleared at configuration reload.
+
+Detached views borrow spans and a required typed reference to main's texture table, not an opaque context or lookup callback; the backend consumes them synchronously without retaining those references. Command builders return checked references. Synchronous main-thread requests remain stack-owned, linked through optional references and executed through a typed interface without queue heap allocations. GPU staging exposes data pointers only at the OpenGL upload boundary.
+
 
 ### Lua 5.5.1 migration
 

@@ -633,9 +633,15 @@ std::expected<void, StarException> OpenGlRenderer::setEffectScriptableParameter(
   Effect& effect = find->second;
   
   auto parameter = effect.scriptables.maybeRef(parameterName);
-  if (!parameter || (parameter->get().parameterValue && *parameter->get().parameterValue == value))
+  if (!parameter)
     return {};
 
+  // Lua numbers arrive as floats even for declared integer parameters. Keep
+  // this coercion beside validation so every caller gets the same semantics.
+  if (parameter->get().parameterType == 1 && std::holds_alternative<float>(value)) {
+    parameter->get().parameterValue = static_cast<int>(std::get<float>(value));
+    return {};
+  }
   if (parameter->get().parameterType != static_cast<std::uint8_t>(value.index()))
     return std::unexpected(RendererException::format("OpenGlRenderer::setEffectScriptableParameter '{}' parameter type mismatch", parameterName));
 
@@ -655,19 +661,6 @@ std::optional<RenderEffectParameter> OpenGlRenderer::getEffectScriptableParamete
     return {};
   
   return parameter->get().parameterValue;
-}
-std::optional<std::uint8_t> OpenGlRenderer::getEffectScriptableParameterType(String const& effectName, String const& parameterName) {
-  auto find = m_effects.find(effectName);
-  if (find == m_effects.end())
-    return {};
-
-  Effect& effect = find->second;
-
-  auto parameter = effect.scriptables.maybeRef(parameterName);
-  if (!parameter)
-    return {};
-  
-  return parameter->get().parameterType;
 }
 
 std::expected<void, StarException> OpenGlRenderer::setEffectTexture(String const& textureName, ImageView const& image) {
@@ -960,6 +953,29 @@ void OpenGlRenderer::render(RenderPrimitive primitive) {
   m_immediatePrimitives.append(std::move(primitive));
 }
 
+std::expected<void, StarException> OpenGlRenderer::appendImmediate(DetachedRenderGeometry const& geometry) {
+  auto legacy = m_immediateRenderBuffer->append(m_immediatePrimitives);
+  m_immediatePrimitives.clear();
+  if (!legacy) {
+    m_immediateRenderBuffer->reset();
+    return std::unexpected(std::move(legacy.error()));
+  }
+  auto appended = m_immediateRenderBuffer->append(geometry);
+  if (!appended) {
+    m_immediateRenderBuffer->reset();
+    return std::unexpected(std::move(appended.error()));
+  }
+  return {};
+}
+
+std::expected<void, StarException> OpenGlRenderer::setRenderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, DetachedRenderGeometry const& geometry) {
+  if (!renderBuffer)
+    return std::unexpected(RendererException("Cannot set a null render buffer"));
+  auto buffer = rconvert<GlRenderBuffer>(*renderBuffer);
+  if (!buffer) return std::unexpected(std::move(buffer.error()));
+  return buffer->get().set(geometry);
+}
+
 std::expected<void, StarException> OpenGlRenderer::renderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, Mat3F const& transformation) {
   if (!renderBuffer)
     return std::unexpected(RendererException("Cannot render a null render buffer"));
@@ -1081,9 +1097,7 @@ std::expected<void, StarException> OpenGlRenderer::finishFrame() {
   auto flushed = flushImmediatePrimitives();
   if (!flushed) return std::unexpected(std::move(flushed.error()));
   // Release immediate-buffer texture locks before moving atlas entries.
-  List<RenderPrimitive> empty;
-  auto cleared = m_immediateRenderBuffer->set(empty);
-  if (!cleared) return std::unexpected(std::move(cleared.error()));
+  m_immediateRenderBuffer->reset();
   for (auto& group : m_liveTextureGroups) {
     if (group.use_count() != 1 || group->textureAtlasSet.totalTextures() > 0) {
       auto compressed = group->textureAtlasSet.compressionPass(1);
@@ -1277,176 +1291,210 @@ OpenGlRenderer::GlRenderBuffer::~GlRenderBuffer() {
   glDeleteVertexArrays(1, &vertexArray);
 }
 
-std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::set(List<RenderPrimitive>& primitives) {
-  for (auto const& texture : usedTextures) {
-    if (auto gt = asRef<GlGroupedTexture>(*texture))
-      gt->get().decrementBufferUseCount();
-  }
+void OpenGlRenderer::GlRenderBuffer::reset() {
+  for (auto const& texture : usedTextures)
+    if (auto grouped = asRef<GlGroupedTexture>(*texture))
+      grouped->get().decrementBufferUseCount();
   usedTextures.clear();
+  accumulationBuffer.clear();
+  packedBatches.clear();
+  for (auto& vb : vertexBuffers)
+    vb.vertexCount = 0;
+}
 
-  auto oldVertexBuffers = take(vertexBuffers);
+template <typename VertexAt>
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::appendPrimitive(std::uint8_t kind, std::size_t count, TexturePtr const& texture, VertexAt const& vertexAt) {
+  if (kind == 2 && count <= 2)
+    return {};
+
+  TexturePtr const& selectedTexture = texture ? texture : whiteTexture;
+  auto glTexture = asRef<GlTexture>(*selectedTexture);
+  if (!glTexture)
+    return std::unexpected(RendererException("Render primitive uses a texture from another renderer"));
+
+  auto textureId = glTexture->get().glTextureId();
+  auto textureLimit = useMultiTexturing ? MultiTextureCount : 1;
+  if (packedBatches.empty())
+    packedBatches.emplace_back();
+  auto findTexture = [&](PackedBatch const& batch) {
+    std::size_t i = 0;
+    while (i < batch.textureCount && batch.textures[i].texture != textureId)
+      ++i;
+    return i;
+  };
+  auto textureIndex = findTexture(packedBatches.back());
+  if (textureIndex == packedBatches.back().textureCount && textureIndex >= textureLimit) {
+    packedBatches.emplace_back();
+    packedBatches.back().firstVertex = accumulationBuffer.size();
+    textureIndex = 0;
+  }
+  auto& batch = packedBatches.back();
+  if (textureIndex == batch.textureCount) {
+    batch.textures[textureIndex] = {textureId, glTexture->get().glTextureSize()};
+    ++batch.textureCount;
+  }
+  if (usedTextures.add(selectedTexture))
+    if (auto grouped = asRef<GlGroupedTexture>(*selectedTexture))
+      grouped->get().incrementBufferUseCount();
+
+  auto textureOffset = Vec2F(glTexture->get().glTextureCoordinateOffset());
+  auto outputCount = kind == 0 ? 3 : kind == 1 ? 6 : (count - 2) * 3;
+  auto offset = accumulationBuffer.size();
+  accumulationBuffer.resize(offset + outputCount);
+  auto appendVertex = [&](std::size_t index, std::size_t prev, std::size_t next) {
+    auto const& vertex = vertexAt(index);
+    auto& glv = accumulationBuffer[offset++];
+    glv.pos = vertex.screenCoordinate;
+    glv.uv = vertex.textureCoordinate + textureOffset;
+    glv.color = vertex.color;
+    glv.pack.vars.textureIndex = static_cast<std::uint8_t>(textureIndex);
+    glv.pack.vars.fullbright = vertex.param1 > 0.0f;
+    // Use the original outside neighbors, not a quad's triangulation diagonal.
+    glv.pack.vars.rX = std::min(std::abs(glv.pos.x() - vertexAt(prev).screenCoordinate.x()), std::abs(glv.pos.x() - vertexAt(next).screenCoordinate.x())) < 0.001f;
+    glv.pack.vars.rY = std::min(std::abs(glv.pos.y() - vertexAt(prev).screenCoordinate.y()), std::abs(glv.pos.y() - vertexAt(next).screenCoordinate.y())) < 0.001f;
+    glv.pack.vars.unused = 0;
+  };
+  if (kind == 0) {
+    appendVertex(0, 2, 1);
+    appendVertex(1, 0, 2);
+    appendVertex(2, 1, 0);
+  } else if (kind == 1) {
+    appendVertex(0, 3, 1);
+    appendVertex(1, 0, 2);
+    appendVertex(2, 1, 3);
+    appendVertex(0, 3, 1);
+    appendVertex(2, 1, 3);
+    appendVertex(3, 2, 0);
+  } else {
+    for (std::size_t i = 1; i < count - 1; ++i) {
+      appendVertex(0, i + 1, i);
+      appendVertex(i, 0, i + 1);
+      appendVertex(i + 1, i, 0);
+    }
+  }
+  batch.vertexCount += outputCount;
+  return {};
+}
+
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::append(List<RenderPrimitive> const& primitives) {
+  for (auto const& primitive : primitives) {
+    auto appended = std::visit([&](auto const& shape) -> std::expected<void, StarException> {
+      using T = std::remove_cvref_t<decltype(shape)>;
+      if constexpr (std::is_same_v<T, RenderPoly>) {
+        return appendPrimitive(2, shape.vertexes.size(), shape.texture, [&](std::size_t i) -> RenderVertex const& { return shape.vertexes[i]; });
+      } else {
+        constexpr bool quad = std::is_same_v<T, RenderQuad>;
+        return appendPrimitive(quad ? 1 : 0, quad ? 4 : 3, shape.texture, [&](std::size_t i) -> RenderVertex const& {
+          if (i == 0) return shape.a;
+          if (i == 1) return shape.b;
+          if constexpr (quad)
+            if (i == 3) return shape.d;
+          return shape.c;
+        });
+      }
+    }, primitive);
+    if (!appended) return std::unexpected(std::move(appended.error()));
+  }
+  return {};
+}
+
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::append(DetachedRenderGeometry const& geometry) {
+  for (auto const& primitive : geometry.primitives) {
+    if (primitive.kind > 2 || (primitive.kind == 0 && primitive.count != 3) || (primitive.kind == 1 && primitive.count != 4))
+      return std::unexpected(RendererException("Invalid detached render primitive"));
+    // Empty polygon fans never inspect their texture, just like legacy polys.
+    if (primitive.kind == 2 && primitive.count <= 2)
+      continue;
+    if (primitive.first > geometry.vertices.size() || primitive.count > geometry.vertices.size() - primitive.first)
+      return std::unexpected(RendererException("Detached render primitive vertices are out of range"));
+    auto texture = std::cref(whiteTexture);
+    if (primitive.texture) {
+      auto found = geometry.textures.find(primitive.texture);
+      if (found == geometry.textures.end() || !found->second)
+        return std::unexpected(RendererException("Detached render primitive uses an unknown texture"));
+      texture = std::cref(found->second);
+    }
+    auto appended = appendPrimitive(primitive.kind, primitive.count, texture.get(),
+        [&](std::size_t i) -> RenderVertex const& { return geometry.vertices[primitive.first + i]; });
+    if (!appended) return std::unexpected(std::move(appended.error()));
+  }
+  return {};
+}
+
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::set(List<RenderPrimitive>& primitives) {
+  reset();
+  auto appended = append(primitives);
+  if (!appended) {
+    reset();
+    return std::unexpected(std::move(appended.error()));
+  }
+  return upload();
+}
+
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::set(DetachedRenderGeometry const& geometry) {
+  reset();
+  auto appended = append(geometry);
+  if (!appended) {
+    reset();
+    return std::unexpected(std::move(appended.error()));
+  }
+  return upload();
+}
+
+std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::upload() {
   struct BufferGuard {
     GlRenderBuffer& buffer;
-    List<GlVertexBuffer>& old;
     GLint vertexArray = 0;
     GLint arrayBuffer = 0;
     bool committed = false;
     ~BufferGuard() {
-      for (auto const& vb : old)
-        glDeleteBuffers(1, &vb.vertexBuffer);
       if (!committed) {
         for (auto const& vb : buffer.vertexBuffers)
           glDeleteBuffers(1, &vb.vertexBuffer);
         buffer.vertexBuffers.clear();
-        for (auto const& texture : buffer.usedTextures)
-          if (auto grouped = asRef<GlGroupedTexture>(*texture))
-            grouped->get().decrementBufferUseCount();
-        buffer.usedTextures.clear();
-        buffer.accumulationBuffer.clear();
+        buffer.reset();
       }
       glBindVertexArray(vertexArray);
       glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
     }
-  } guard{*this, oldVertexBuffers};
+  } guard{*this};
   glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &guard.vertexArray);
   glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &guard.arrayBuffer);
-
-  List<GLuint> currentTextures;
-  List<Vec2U> currentTextureSizes;
-  std::size_t currentVertexCount = 0;
   glBindVertexArray(vertexArray);
-  auto finishCurrentBuffer = [&]() -> std::expected<void, StarException> {
-    if (currentVertexCount > 0) {
-      GlVertexBuffer vb;
-      for (std::size_t i = 0; i < currentTextures.size(); ++i) {
-        vb.textures.append(GlVertexBufferTexture{currentTextures[i], currentTextureSizes[i]});
-      }
-      vb.vertexCount = currentVertexCount;
-      if (!oldVertexBuffers.empty()) {
-        auto oldVb = std::move(oldVertexBuffers[oldVertexBuffers.size() - 1]);
-        oldVertexBuffers.pop_back();
-        vb.vertexBuffer = oldVb.vertexBuffer;
-        glBindBuffer(GL_ARRAY_BUFFER, vb.vertexBuffer);
-        if (oldVb.vertexCount >= vb.vertexCount)
-          glBufferSubData(GL_ARRAY_BUFFER, 0, accumulationBuffer.size(), accumulationBuffer.span().data());
-        else
-          glBufferData(GL_ARRAY_BUFFER, accumulationBuffer.size(), accumulationBuffer.span().data(), GL_STREAM_DRAW);
-      } else {
-        glGenBuffers(1, &vb.vertexBuffer);
-        auto created = checkGlError("vertex buffer creation");
-        if (!created) {
-          if (vb.vertexBuffer) glDeleteBuffers(1, &vb.vertexBuffer);
-          return std::unexpected(std::move(created.error()));
-        }
-        if (!vb.vertexBuffer)
-          return std::unexpected(RendererException("Could not create OpenGL vertex buffer"));
-        glBindBuffer(GL_ARRAY_BUFFER, vb.vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, accumulationBuffer.size(), accumulationBuffer.span().data(), GL_STREAM_DRAW);
-      }
-
-      vertexBuffers.emplace_back(std::move(vb));
-      auto status = checkGlError("vertex buffer upload");
-      if (!status) return std::unexpected(std::move(status.error()));
-
-      currentTextures.clear();
-      currentTextureSizes.clear();
-      accumulationBuffer.clear();
-      currentVertexCount = 0;
+  vertexBuffers.reserve(packedBatches.size());
+  for (std::size_t index = 0; index < packedBatches.size(); ++index) {
+    auto const& batch = packedBatches[index];
+    if (index == vertexBuffers.size())
+      vertexBuffers.emplace_back();
+    auto& vb = vertexBuffers[index];
+    vb.textureCount = batch.textureCount;
+    for (std::size_t i = 0; i < batch.textureCount; ++i)
+      vb.textures[i] = batch.textures[i];
+    vb.vertexCount = batch.vertexCount;
+    if (!vb.vertexBuffer) {
+      glGenBuffers(1, &vb.vertexBuffer);
+      auto created = checkGlError("vertex buffer creation");
+      if (!created) return std::unexpected(std::move(created.error()));
+      if (!vb.vertexBuffer)
+        return std::unexpected(RendererException("Could not create OpenGL vertex buffer"));
     }
-    return {};
-  };
-
-  auto textureCount = useMultiTexturing ? MultiTextureCount : 1;
-  auto addCurrentTexture = [&](TexturePtr texture) -> std::expected<std::pair<std::uint8_t, Vec2F>, StarException> {
-    if (!texture)
-      texture = whiteTexture;
-
-    auto glTexture = asRef<GlTexture>(*texture);
-    if (!glTexture)
-      return std::unexpected(RendererException("Render primitive uses a texture from another renderer"));
-    GLuint glTextureId = glTexture->get().glTextureId();
-
-    auto textureIndex = currentTextures.indexOf(glTextureId);
-    if (textureIndex == NPos) {
-      if (currentTextures.size() >= textureCount) {
-        auto finished = finishCurrentBuffer();
-        if (!finished) return std::unexpected(std::move(finished.error()));
-      }
-
-      textureIndex = currentTextures.size();
-      currentTextures.append(glTextureId);
-      currentTextureSizes.append(glTexture->get().glTextureSize());
+    glBindBuffer(GL_ARRAY_BUFFER, vb.vertexBuffer);
+    auto vertices = std::span(accumulationBuffer).subspan(batch.firstVertex, batch.vertexCount);
+    if (vb.vertexCapacity >= vb.vertexCount) {
+      glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size_bytes(), vertices.data());
+    } else {
+      glBufferData(GL_ARRAY_BUFFER, vertices.size_bytes(), vertices.data(), GL_STREAM_DRAW);
+      vb.vertexCapacity = vb.vertexCount;
     }
-
-    if (usedTextures.add(texture))
-      if (auto gt = asRef<GlGroupedTexture>(*texture))
-        gt->get().incrementBufferUseCount();
-
-    return std::pair{static_cast<std::uint8_t>(textureIndex), Vec2F(glTexture->get().glTextureCoordinateOffset())};
-  };
-
-  auto appendBufferVertex = [&](RenderVertex const& v, std::uint8_t textureIndex, Vec2F textureCoordinateOffset, RenderVertex const& prev, RenderVertex const& next) {
-    std::size_t off = accumulationBuffer.size();
-    accumulationBuffer.resize(accumulationBuffer.size() + sizeof(GlRenderVertex));
-    // Native GL vertex packing writes directly into the byte upload buffer.
-    GlRenderVertex& glv = *reinterpret_cast<GlRenderVertex*>(accumulationBuffer.span().data() + off);
-    glv.pos = v.screenCoordinate;
-    glv.uv = v.textureCoordinate + textureCoordinateOffset;
-    glv.color = v.color;
-    glv.pack.vars.textureIndex = textureIndex;
-    glv.pack.vars.fullbright = v.param1 > 0.0f;
-    // Tell the vertex shader to round to the nearest pixel if the vertices form a straight
-    // edge, to ensure sharpness with supersampling. If we rounded *all* vertex positions,
-    // it'd cause slight visual issues with sprites rotating around a point.
-    glv.pack.vars.rX = std::min(std::abs(glv.pos.x() - prev.screenCoordinate.x()), std::abs(glv.pos.x() - next.screenCoordinate.x())) < 0.001f;
-    glv.pack.vars.rY = std::min(std::abs(glv.pos.y() - prev.screenCoordinate.y()), std::abs(glv.pos.y() - next.screenCoordinate.y())) < 0.001f;
-    glv.pack.vars.unused = 0;
-    ++currentVertexCount;
-  };
-
-  std::uint8_t textureIndex = 0;
-  Vec2F textureOffset = {};
-  for (auto& primitive : primitives) {
-    auto appended = std::visit([&](auto& shape) -> std::expected<void, StarException> {
-      using T = std::remove_cvref_t<decltype(shape)>;
-      if constexpr (std::is_same_v<T, RenderPoly>) {
-        if (shape.vertexes.size() <= 2)
-          return {};
-      }
-      auto texture = addCurrentTexture(shape.texture);
-      if (!texture) return std::unexpected(std::move(texture.error()));
-      std::tie(textureIndex, textureOffset) = *texture;
-
-      if constexpr (std::is_same_v<T, RenderTriangle>) {
-        appendBufferVertex(shape.a, textureIndex, textureOffset, shape.c, shape.b);
-        appendBufferVertex(shape.b, textureIndex, textureOffset, shape.a, shape.c);
-        appendBufferVertex(shape.c, textureIndex, textureOffset, shape.b, shape.a);
-      } else if constexpr (std::is_same_v<T, RenderQuad>) {
-        // Use the outside edges, not the quad's diagonal, for vertex rounding.
-        appendBufferVertex(shape.a, textureIndex, textureOffset, shape.d, shape.b);
-        appendBufferVertex(shape.b, textureIndex, textureOffset, shape.a, shape.c);
-        appendBufferVertex(shape.c, textureIndex, textureOffset, shape.b, shape.d);
-        appendBufferVertex(shape.a, textureIndex, textureOffset, shape.d, shape.b);
-        appendBufferVertex(shape.c, textureIndex, textureOffset, shape.b, shape.d);
-        appendBufferVertex(shape.d, textureIndex, textureOffset, shape.c, shape.a);
-      } else {
-        for (std::size_t i = 1; i < shape.vertexes.size() - 1; ++i) {
-          auto const& a = shape.vertexes[0];
-          auto const& b = shape.vertexes[i];
-          auto const& c = shape.vertexes[i + 1];
-          appendBufferVertex(a, textureIndex, textureOffset, c, b);
-          appendBufferVertex(b, textureIndex, textureOffset, a, c);
-          appendBufferVertex(c, textureIndex, textureOffset, b, a);
-        }
-      }
-      return {};
-    }, primitive);
-    if (!appended) return std::unexpected(std::move(appended.error()));
+    auto status = checkGlError("vertex buffer upload");
+    if (!status) return std::unexpected(std::move(status.error()));
   }
-
-  vertexBuffers.reserve(primitives.size() * 6);
-  auto finished = finishCurrentBuffer();
-  if (!finished) return std::unexpected(std::move(finished.error()));
+  while (vertexBuffers.size() > packedBatches.size()) {
+    glDeleteBuffers(1, &vertexBuffers.back().vertexBuffer);
+    vertexBuffers.pop_back();
+  }
+  accumulationBuffer.clear();
+  packedBatches.clear();
   guard.committed = true;
   return {};
 }
@@ -1517,13 +1565,19 @@ std::expected<void, StarException> OpenGlRenderer::uploadTextureImage(PixelForma
 }
 
 std::expected<void, StarException> OpenGlRenderer::flushImmediatePrimitives(Mat3F const& transformation) {
-  if (m_immediatePrimitives.empty())
+  auto appended = m_immediateRenderBuffer->append(m_immediatePrimitives);
+  m_immediatePrimitives.clear();
+  if (!appended) {
+    m_immediateRenderBuffer->reset();
+    return std::unexpected(std::move(appended.error()));
+  }
+  if (m_immediateRenderBuffer->packedBatches.empty())
     return {};
-  auto prepared = m_immediateRenderBuffer->set(m_immediatePrimitives);
+  auto prepared = m_immediateRenderBuffer->upload();
   if (!prepared) return std::unexpected(std::move(prepared.error()));
   auto rendered = renderGlBuffer(*m_immediateRenderBuffer, transformation);
+  m_immediateRenderBuffer->reset();
   if (!rendered) return std::unexpected(std::move(rendered.error()));
-  m_immediatePrimitives.clear();
   return {};
 }
 
@@ -1602,10 +1656,12 @@ std::expected<void, StarException> OpenGlRenderer::renderGlBuffer(GlRenderBuffer
   } binding;
   glBindVertexArray(renderBuffer.vertexArray);
   for (auto const& vb : renderBuffer.vertexBuffers) {
+    if (vb.vertexCount == 0)
+      continue;
     glUniformMatrix3fv(m_vertexTransformUniform, 1, GL_TRUE, transformation.ptr());
 
     if (m_currentEffect->get().includeVBTextures) {
-      for (std::size_t i = 0; i < vb.textures.size(); ++i) {
+      for (std::size_t i = 0; i < vb.textureCount; ++i) {
         glUniform2f(m_textureSizeUniforms[i], vb.textures[i].size[0], vb.textures[i].size[1]);
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, vb.textures[i].texture);
