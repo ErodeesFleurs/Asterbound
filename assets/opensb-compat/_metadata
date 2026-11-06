@@ -2,7 +2,7 @@
   "author" : "OpenStarbound contributors",
   "name" : "opensb_compat",
   "friendlyName" : "OpenStarbound Mod Compatibility",
-  "version" : "1.1.0",
+  "version" : "1.1.1",
   "requires" : ["base", "opensb_base"],
   "includes" : [
     "SChinese", "Arcana", "advanced_teleporter_interface",

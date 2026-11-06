@@ -227,11 +227,16 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
       m_discordActivityStartTime = startTime;
       m_discordUpdatingActivity = true;
       m_state->discordCore->ActivityManager().UpdateActivity(activity, [lifetime = m_discordLifetime, &state = *m_state](discord::Result res) {
-          if (res != discord::Result::Ok)
-            recordDiscordCallbackError(state, ApplicationException::format("Failed to set Discord activity (err {})", (int)res));
+          // Rich Presence is optional; only a failure to report its diagnostic
+          // belongs at the platform's checked error boundary.
           if (auto service = lifetime->service) {
             std::lock_guard serviceLocker(service->get().m_mutex);
             service->get().m_discordUpdatingActivity = false;
+          }
+          if (res != discord::Result::Ok) {
+            if (auto logged = state.logger.warn("Failed to set Discord activity (err {})", (int)res); !logged)
+              state.discordError = StarException(strf("Discord activity failure logging failed: {}", logged.error().what()),
+                ExceptionDiagnostic(ApplicationException::format("Failed to set Discord activity (err {})", (int)res)));
           }
         });
     }

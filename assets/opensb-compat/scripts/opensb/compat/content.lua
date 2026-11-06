@@ -83,30 +83,43 @@ if upperBedSource and assets.origin(bunkbed .. "barracksbunkbedtop.lua") == uppe
   if scripts == 1 and pools == 1 then assets.add(upperBed, repaired) end
 end
 
--- The food maker uses the same configurable powered-machine contract as
--- Titancorp's foundry. Its accidentally copied ScriptPane testing.lua is not an
--- object implementation. Reuse Arcana's real assembler, keeping the authored
--- recipe config (including its industrial-component recipes) unchanged.
+-- Compare complete verified source bytes, allowing only CRLF/LF differences.
+local function knownBytes(bytes, size, expected)
+  local normalized = bytes:gsub("\r\n", "\n")
+  if #normalized ~= size then return false end
+  local fingerprint = 0xcbf29ce484222325
+  for i = 1, #normalized do
+    fingerprint = (fingerprint ~ normalized:byte(i)) * 0x100000001b3
+  end
+  return fingerprint == expected
+end
+
+-- Official Titancorp 2.4.4 and 2.4.5 have byte-identical food-maker object,
+-- recipe config and animation contracts. The missing testing.lua is not an
+-- object implementation; the bundled at_ext_foodmaker.lua is a ScriptPane.
+-- Reuse the same real Arcana assembler as Titancorp's foundry, preserving all
+-- authored recipes (including motors), power parameters and wire transfer.
+local titancorp = "[Arcana]Automation Extension"
 local assembler = "/scripts/automation/arcana_assembler.lua"
 local assemblerSource = provider(assembler, "Arcana", "1.4.2.10")
 if assemblerSource then
-  local implementation = assets.sourceBytes(assemblerSource, assembler):gsub("\r\n", "\n")
   -- Actual Workshop 2359135864; normalized SHA-256
   -- 84317c93ed548f273fc291faf4af680a6a97b3ea369ffa03460ad409aa208524.
-  local fingerprint = 0xcbf29ce484222325
-  for i = 1, #implementation do
-    fingerprint = (fingerprint ~ implementation:byte(i)) * 0x100000001b3
-  end
+  local implementation = assets.sourceBytes(assemblerSource, assembler)
   local foodmaker = "/objects/workshop/at_ext_foodmaker/at_ext_foodmaker.object"
-  local source = provider(foodmaker, "[Arcana]Automation Extension", "2.4.4")
-  if source and #implementation == 2981 and fingerprint == 0x1fa9542967ee1c06 then
-    local data = sb.parseJson(assets.sourceBytes(source, foodmaker))
-    if data.configPath == "/objects/workshop/at_ext_foodmaker/config.config"
-        and data.objectType == "container" and data.slotCount == 3
-        and data.maxPower == 30 and data.powerUseAmount == 15
-        and data.animation == "animation.animation" then
-      replace(foodmaker, "[Arcana]Automation Extension", "2.4.4",
-        '"scripts" : [ "testing.lua" ]', '"scripts" : [ "' .. assembler .. '" ]', 1)
+  local configPath = "/objects/workshop/at_ext_foodmaker/config.config"
+  local source = provider(foodmaker, titancorp, "2.4.4")
+    or provider(foodmaker, titancorp, "2.4.5")
+  if source and assets.origin(configPath) == source
+      and knownBytes(implementation, 2981, 0x1fa9542967ee1c06) then
+    local bytes = assets.sourceBytes(source, foodmaker)
+    -- Normalized SHA-256: object 615df2e30ad3f22a4e03354be2defb5da1e1e09356bf168c46928623f7eda324,
+    -- config 771662c5918823c2fb7cb8d28406f1bd4fe0bd2c24f0ba60b0464591feb448cd.
+    if knownBytes(bytes, 2493, 0xd95df6e101320667)
+        and knownBytes(assets.sourceBytes(source, configPath), 2300, 0x0a1cb4824ea2f3b2) then
+      local repaired, count = bytes:gsub('"scripts" : %[ "testing%.lua" %]',
+        '"scripts" : [ "' .. assembler .. '" ]')
+      if count == 1 then assets.add(foodmaker, repaired) end
     end
   end
 end
@@ -153,16 +166,19 @@ for _, entry in ipairs({
   end
 end
 
--- Titancorp 2.4.4 ships two byte-identical definitions of the same projectile.
--- Only the redundant filename is removed: the canonical projectile type and
--- every attack/explosion action remain unchanged. Both files are identical and
--- the mod's callers reference the type, never the redundant filename.
+-- Official Titancorp 2.4.4 and 2.4.5 ship the same byte-identical pair.
+-- Remove only the redundant filename, after checking the complete known source
+-- and raw equality of both effective providers. Callers use the projectile type;
+-- every attack/explosion action in the canonical definition stays unchanged.
 local primary = "/projectiles/loitering_munition_projectile/loitering_munition_projectile.projectile"
 local duplicate = "/projectiles/explosions/loitering_munition_projectile/loitering_munition_projectile.projectile"
-local source = provider(primary, "[Arcana]Automation Extension", "2.4.4")
+local source = provider(primary, titancorp, "2.4.4")
+  or provider(primary, titancorp, "2.4.5")
 if source and assets.origin(duplicate) == source then
   local bytes = assets.sourceBytes(source, primary)
-  if bytes == assets.sourceBytes(source, duplicate) then
+  -- Normalized SHA-256 651313c2738c270583d5ecf493dad57384d9e011e6d60cc9084bbf4bfa1d3529.
+  if knownBytes(bytes, 16519, 0x6763e6e661be3bb2)
+      and bytes == assets.sourceBytes(source, duplicate) then
     assets.erase(duplicate)
   end
 end
