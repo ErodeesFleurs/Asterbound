@@ -460,12 +460,12 @@ static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, Pixel
         continue;
       }
       Vec4B pixel;
-      std::memcpy(pixel.ptr(), &input, 4);
+      std::memcpy(pixel.data(), &input, 4);
       auto output = input;
       auto bit = bitFor(pixel);
       if ((bits[bit >> 6] >> (bit & 63)) & 1) {
         if (auto replacement = replaceMap.maybe(pixel)) {
-          std::memcpy(&output, replacement->ptr(), 4);
+          std::memcpy(&output, replacement->data(), 4);
           std::memcpy(destination, &output, 4);
         }
       }

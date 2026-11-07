@@ -184,12 +184,12 @@ auto Matrix3<T>::operator[](const std::size_t i) const -> Vec3 const & {
 
 template <typename T>
 T* Matrix3<T>::ptr() requires (sizeof(Vec3) == 3 * sizeof(T) && sizeof(Rows) == 3 * sizeof(Vec3)) {
-  return m_rows[0].ptr();
+  return m_rows[0].data();
 }
 
 template <typename T>
 T const* Matrix3<T>::ptr() const requires (sizeof(Vec3) == 3 * sizeof(T) && sizeof(Rows) == 3 * sizeof(Vec3)) {
-  return m_rows[0].ptr();
+  return m_rows[0].data();
 }
 
 template <typename T>

@@ -466,7 +466,7 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
           std::array<float, 2> levels;
           {
             std::lock_guard locker(speaker->mutex);
-            levels = speaker->channelVolumes;
+            std::ranges::copy(speaker->channelVolumes, levels.begin());
           }
           for (std::size_t i = 0; i != samples; ++i)
             sharedBuffer[i] += static_cast<std::int32_t>(speakerBuffer[i]) * levels[i % 2] * volume;

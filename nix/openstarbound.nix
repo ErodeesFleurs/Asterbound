@@ -153,6 +153,7 @@ let
     "core_benchmarks"
     "json_benchmarks"
     "file_benchmarks"
+    "array_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

@@ -402,7 +402,7 @@ TEST(ByteOrder, FloatingPayloadAndIntegerRepresentations) {
 
 TEST(FixedContainerCopy, PreservesSinglePassInputPosition) {
   std::istringstream arrayInput("1 2 3 4 5");
-  auto array = Array<int, 3>::copyFrom(std::istream_iterator<int>(arrayInput), 2);
+  auto array = Array<int, 3>::copy_from(std::istream_iterator<int>(arrayInput), 2);
   EXPECT_EQ(array, (Array<int, 3>{1, 2, 0}));
   int next = 0;
   arrayInput >> next;
