@@ -119,13 +119,13 @@ Json keyModsToJson(KeyMod mod) {
 }
 
 std::size_t hash<InputVariant>::operator()(InputVariant const& v) const {
-  std::size_t indexHash = hashOf(static_cast<std::uint8_t>(v.index()));
+  std::size_t indexHash = hash_of(static_cast<std::uint8_t>(v.index()));
   if (std::holds_alternative<Key>(v))
-    hashCombine(indexHash, hashOf(std::get<Key>(v)));
+    hash_combine(indexHash, hash_of(std::get<Key>(v)));
   else if (std::holds_alternative<MouseButton>(v))
-    hashCombine(indexHash, hashOf(std::get<MouseButton>(v)));
+    hash_combine(indexHash, hash_of(std::get<MouseButton>(v)));
   else if (std::holds_alternative<ControllerButton>(v))
-    hashCombine(indexHash, hashOf(std::get<ControllerButton>(v)));
+    hash_combine(indexHash, hash_of(std::get<ControllerButton>(v)));
 
   return indexHash;
 }

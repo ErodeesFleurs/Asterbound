@@ -4520,7 +4520,7 @@ List<ChatAction> Player::pullPendingChatActions() { return std::exchange(m_pendi
 std::expected<std::optional<String>, StarException> Player::inspectionLogName() const {
   auto identifier = uniqueId();
   if (identifier) {
-    auto hash = xxHash3_128(std::span<char const>(identifier->utf8()));
+    auto hash = xx_hash3_128(std::span<char const>(identifier->utf8()));
     return String("Player #") + hexEncode(std::span(reinterpret_cast<char const*>(&hash), sizeof(hash)));
   }
   return identifier;

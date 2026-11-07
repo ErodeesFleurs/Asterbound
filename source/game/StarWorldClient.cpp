@@ -626,7 +626,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
       if (entity->isMaster())
         return std::unexpected(std::move(collected.error()));
       auto issue = printException(collected.error(), true);
-      if (!m_entityExceptionsLogged.insert(hashOf(issue)).second)
+      if (!m_entityExceptionsLogged.insert(hash_of(issue)).second)
         issue = collected.error().what();
       auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events during removal: {}", entityId, issue);
       if (!logged)
@@ -1181,7 +1181,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         } else {
           // this is THEIR problem!!
           auto issue = printException(e, true);
-          auto hash = hashOf(issue);
+          auto hash = hash_of(issue);
           if (!self.m_entityExceptionsLogged.contains(hash)) {
             self.m_entityExceptionsLogged.insert(hash);
           } else {
@@ -2178,7 +2178,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         } else {
           // this is THEIR problem!!
           auto issue = printException(e, true);
-          auto hash = hashOf(issue);
+          auto hash = hash_of(issue);
           if (!self.m_entityExceptionsLogged.contains(hash)) {
             self.m_entityExceptionsLogged.insert(hash);
           } else {
@@ -2387,7 +2387,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         if (entity->isMaster())
           return std::unexpected(std::move(collected.error()));
         auto issue = printException(collected.error(), true);
-        if (!m_entityExceptionsLogged.insert(hashOf(issue)).second)
+        if (!m_entityExceptionsLogged.insert(hash_of(issue)).second)
           issue = collected.error().what();
         auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events: {}", entity->entityId(), issue);
         if (!logged)

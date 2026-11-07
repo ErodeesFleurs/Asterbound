@@ -422,7 +422,7 @@ std::expected<int, StarException> CelestialGraphics::worldRadialPosition(Root& r
   auto positions = parameters.coordinate().isPlanetaryBody() ? planetRadialPositions(root) : satelliteRadialPositions(root);
   if (!positions)
     return std::unexpected(std::move(positions.error()));
-  return static_cast<int>(staticRandomU32(parameters.seed(), "RadialNumber") % *positions);
+  return static_cast<int>(static_random_u32(parameters.seed(), "RadialNumber") % *positions);
 }
 
 std::expected<int, StarException> CelestialGraphics::planetRadialPositions(Root& root) {

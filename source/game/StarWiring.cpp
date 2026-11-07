@@ -18,7 +18,7 @@ bool WireConnection::operator==(WireConnection const& wireConnection) const {
 }
 
 std::size_t hash<WireConnection>::operator()(WireConnection const& wireConnection) const {
-  return hashOf(wireConnection.entityLocation, wireConnection.nodeIndex);
+  return hash_of(wireConnection.entityLocation, wireConnection.nodeIndex);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& wireConnection) {

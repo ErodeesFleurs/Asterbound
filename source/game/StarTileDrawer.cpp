@@ -214,8 +214,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
   if (materialRenderProfile) {
     occlude = materialRenderProfile->occludesBehind;
     auto materialColorVariant = materialRenderProfile->colorVariants > 0 ? colorVariant % materialRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]) + offset[0], pos[1] + offset[1],
-                                             static_cast<int>(variantLayer.value_or(terrainLayer)), "main");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]) + offset[0], pos[1] + offset[1],
+                                               static_cast<int>(variantLayer.value_or(terrainLayer)), "main");
     auto& drawList = drawables[materialZLevel(materialRenderProfile->zLevel, material, materialHue, materialColorVariant)];
 
     MaterialPieceResultList pieces;
@@ -248,8 +248,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
 
   if (modRenderProfile) {
     auto modColorVariant = modRenderProfile->colorVariants > 0 ? colorVariant % modRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]), pos[1],
-                                             static_cast<int>(variantLayer.value_or(terrainLayer)), "mod");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1],
+                                               static_cast<int>(variantLayer.value_or(terrainLayer)), "mod");
     auto& drawList = drawables[modZLevel(modRenderProfile->zLevel, mod, modHue, modColorVariant)];
 
     MaterialPieceResultList pieces;

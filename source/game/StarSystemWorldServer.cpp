@@ -533,7 +533,7 @@ std::expected<void, StarException> SystemWorldServer::placeInitialObjects() {
   auto config = (*assets)->json("/systemworld.config");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  RandomSource random(staticRandomU64("SystemWorldGeneration", toString(m_location)));
+  RandomSource random(static_random_u64("SystemWorldGeneration", toString(m_location)));
   auto poolData = config->getArray("initialObjectPools");
   if (!poolData)
     return std::unexpected(std::move(poolData.error()));
@@ -744,7 +744,7 @@ std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParame
         return std::unexpected(StarException("No celestial parameters for orbited planet"));
       if (auto visitable = (**parameters).visitableParameters()) {
         if (is<TerrestrialWorldParameters>(visitable)) {
-          std::uint64_t seed = staticRandomU64(toString(m_location));
+          std::uint64_t seed = static_random_u64(toString(m_location));
           List<CelestialParameters> worlds;
           auto planet = m_celestialDatabase->parameters(target);
           if (!planet)
@@ -763,7 +763,7 @@ std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParame
           }
           for (std::size_t i = 0; i < worlds.size(); ++i) {
             auto const& world = worlds[i];
-            Vec2F position{staticRandomFloat(seed, world.seed(), "x"), staticRandomFloat(seed, world.seed(), "y")};
+            Vec2F position{static_random_float(seed, world.seed(), "x"), static_random_float(seed, world.seed(), "y")};
             auto drawables = CelestialGraphics::drawWorld(root(), world, i > 0 ? worlds[0] : CelestialParameters());
             if (!drawables)
               return std::unexpected(std::move(drawables.error()));

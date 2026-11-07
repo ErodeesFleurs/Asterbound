@@ -10,14 +10,14 @@ using namespace Star;
 
 TEST(StaticRandomTest, FromEmptyContainerReturnsError) {
   // size() - 1 on an empty container used to wrap around to SIZE_MAX, which
-  // became -1 and then a division by zero inside staticRandomI32Range.
+  // became -1 and then a division by zero inside static_random_i32_range.
   std::vector<int> const empty;
-  auto rejected = staticRandomFrom(empty, 1);
+  auto rejected = static_random_from(empty, 1);
   ASSERT_FALSE(rejected);
   EXPECT_TRUE(rejected.error().is<StarException>());
 
   std::vector<int> const one{7};
-  auto selected = staticRandomFrom(one, 1);
+  auto selected = static_random_from(one, 1);
   ASSERT_TRUE(selected);
   EXPECT_EQ(selected->get(), 7);
 }
@@ -282,19 +282,19 @@ TEST(RandTest, All) {
 }
 
 TEST(StaticRandomTest, All) {
-  EXPECT_EQ(staticRandomU64("test1", 999, "test2"), 17057684957748924255u);
-  EXPECT_EQ(staticRandomU64("test1", 1000, "test2"), 17136762056491983648u);
-  EXPECT_EQ(staticRandomU64("test1", 1001, "test2"), 10826209999926048792u);
-  EXPECT_EQ(staticRandomU64("test1", 1002, "test2"), 10190371075442159783u);
-  EXPECT_EQ(staticRandomU64("test1", 1003, "test2"), 16325723287291511625u);
-  EXPECT_EQ(staticRandomU64("test1", 1004, "test2"), 6061201707788279217u);
-  EXPECT_EQ(staticRandomU64("test1", 1005, "test2"), 13034875300321135291u);
+  EXPECT_EQ(static_random_u64("test1", 999, "test2"), 17057684957748924255u);
+  EXPECT_EQ(static_random_u64("test1", 1000, "test2"), 17136762056491983648u);
+  EXPECT_EQ(static_random_u64("test1", 1001, "test2"), 10826209999926048792u);
+  EXPECT_EQ(static_random_u64("test1", 1002, "test2"), 10190371075442159783u);
+  EXPECT_EQ(static_random_u64("test1", 1003, "test2"), 16325723287291511625u);
+  EXPECT_EQ(static_random_u64("test1", 1004, "test2"), 6061201707788279217u);
+  EXPECT_EQ(static_random_u64("test1", 1005, "test2"), 13034875300321135291u);
 
-  EXPECT_EQ(staticRandomU32("test1", 999, "test2"), 3893169212u);
-  EXPECT_EQ(staticRandomU32("test1", 1000, "test2"), 1330274955u);
-  EXPECT_EQ(staticRandomU32("test1", 1001, "test2"), 2268597334u);
-  EXPECT_EQ(staticRandomU32("test1", 1002, "test2"), 1221477368u);
-  EXPECT_EQ(staticRandomU32("test1", 1003, "test2"), 271894555u);
-  EXPECT_EQ(staticRandomU32("test1", 1004, "test2"), 2464836468u);
-  EXPECT_EQ(staticRandomU32("test1", 1005, "test2"), 3808877030u);
+  EXPECT_EQ(static_random_u32("test1", 999, "test2"), 3893169212u);
+  EXPECT_EQ(static_random_u32("test1", 1000, "test2"), 1330274955u);
+  EXPECT_EQ(static_random_u32("test1", 1001, "test2"), 2268597334u);
+  EXPECT_EQ(static_random_u32("test1", 1002, "test2"), 1221477368u);
+  EXPECT_EQ(static_random_u32("test1", 1003, "test2"), 271894555u);
+  EXPECT_EQ(static_random_u32("test1", 1004, "test2"), 2464836468u);
+  EXPECT_EQ(static_random_u32("test1", 1005, "test2"), 3808877030u);
 }

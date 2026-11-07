@@ -195,7 +195,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
             return std::unexpected(std::move(weightings.error()));
           for (auto const& weighting : *weightings) {
             Color mixColor = Color::rgb(128, 0, 0);
-            mixColor.setHue(staticRandomFloat(reinterpret_cast<std::uintptr_t>(std::addressof(weighting.region.get()))));
+            mixColor.setHue(
+              static_random_float(reinterpret_cast<std::uintptr_t>(std::addressof(weighting.region.get()))));
             color = Color::rgbaf(color.toRgbaF() + mixColor.toRgbaF() * weighting.weight);
           }
           auto written = outputImage->set(x, y, color.toRgb());
@@ -231,15 +232,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
           auto const& blockInfo = *block;
           if (isRealMaterial(blockInfo.foreground)) {
             Color color = groundColor;
-            color.setHue(staticRandomFloat(blockInfo.foreground));
-            color.setSaturation(staticRandomFloat(blockInfo.foregroundMod));
+            color.setHue(static_random_float(blockInfo.foreground));
+            color.setSaturation(static_random_float(blockInfo.foregroundMod));
             auto written = outputImage->set(x, y, color.toRgb());
             if (!written)
               return std::unexpected(std::move(written.error()));
           } else if (isRealMaterial(blockInfo.background)) {
             Color color = caveColor;
-            color.setHue(staticRandomFloat(blockInfo.background));
-            color.setSaturation(staticRandomFloat(blockInfo.backgroundMod));
+            color.setHue(static_random_float(blockInfo.background));
+            color.setSaturation(static_random_float(blockInfo.backgroundMod));
             auto written = outputImage->set(x, y, color.toRgb());
             if (!written)
               return std::unexpected(std::move(written.error()));

@@ -69,7 +69,7 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
 
       auto points = m_cache.get(Point(x, y), [&](Point const&) -> std::expected<PointSet, StarException> {
           PointSet sectorResult;
-          RandomSource sectorRandomness(staticRandomU64(m_seed, x, y));
+          RandomSource sectorRandomness(static_random_u64(m_seed, x, y));
           auto count = sectorRandomness.randInt(m_densityRange[0], m_densityRange[1]);
           if (!count)
             return std::unexpected(std::move(count.error()));

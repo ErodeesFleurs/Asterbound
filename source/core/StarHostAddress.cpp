@@ -296,7 +296,7 @@ std::ostream& operator<<(std::ostream& os, HostAddressWithPort const& addressWit
 }
 
 std::size_t hash<HostAddressWithPort>::operator()(HostAddressWithPort const& addressWithPort) const {
-  return hashOf(addressWithPort.address(), addressWithPort.port());
+  return hash_of(addressWithPort.address(), addressWithPort.port());
 }
 
 }

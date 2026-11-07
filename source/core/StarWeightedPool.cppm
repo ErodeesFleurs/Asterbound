@@ -173,7 +173,7 @@ std::size_t WeightedPool<Item>::selectIndex(RandomService& rand) const {
 
 template <typename Item>
 std::size_t WeightedPool<Item>::selectIndex(std::uint64_t seed) const {
-  return selectIndex(staticRandomDouble(seed));
+  return selectIndex(static_random_double(seed));
 }
 
 template <typename Item>

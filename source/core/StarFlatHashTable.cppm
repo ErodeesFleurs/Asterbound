@@ -113,19 +113,37 @@ public:
   void clear();
 
   std::pair<iterator, bool> insert(Value value);
-  template <typename Factory> std::pair<iterator, bool> insert_with(Key const& key, Factory&& factory) {
-    auto position = find(key);
+  template <typename Factory>
+    requires requires(Factory&& factory) { Value(std::invoke(std::forward<Factory>(factory))); }
+  std::pair<iterator, bool> insert_with(Key const& key, Factory&& factory) {
+    std::size_t hash = m_hash(key) | FilledHashBit;
+    auto position = find_prehashed(key, hash);
     if (position != end())
       return {position, false};
-    return insert(std::invoke(std::forward<Factory>(factory)));
+
+    Value value(std::invoke(std::forward<Factory>(factory)));
+    // Growth invalidates probe positions, but not the marked hash.
+    if (m_buckets.empty() || m_filledCount + 1 > (m_buckets.size() - 1) * MaxFillLevel)
+      check_capacity(1);
+    return insert_prehashed(std::move(value), hash);
   }
 
   iterator erase(const_iterator pos);
   iterator erase(const_iterator first, const_iterator last);
 
   template <typename LookupKey>
+    requires requires(Hash& hash, GetKey& get_key, Equals& equal, Value& value, LookupKey const& query,
+                      std::size_t const& filled_hash_bit) {
+      requires std::is_convertible_v<decltype(hash(query) | filled_hash_bit), std::size_t>;
+      equal(get_key(value), query) ? 0 : 0;
+    }
   const_iterator find(LookupKey const& key) const;
   template <typename LookupKey>
+    requires requires(Hash& hash, GetKey& get_key, Equals& equal, Value& value, LookupKey const& query,
+                      std::size_t const& filled_hash_bit) {
+      requires std::is_convertible_v<decltype(hash(query) | filled_hash_bit), std::size_t>;
+      equal(get_key(value), query) ? 0 : 0;
+    }
   iterator find(LookupKey const& key);
 
   void reserve(std::size_t capacity);
@@ -147,6 +165,13 @@ private:
   std::size_t hash_bucket(std::size_t hash) const;
   std::size_t bucket_error(std::size_t current, std::size_t target) const;
   void check_capacity(std::size_t additionalCapacity);
+  // Accepts the stored hash including FilledHashBit; rehash must not call m_hash.
+  std::pair<iterator, bool> insert_prehashed(Value&& value, std::size_t hash);
+  template <typename LookupKey>
+    requires requires(GetKey& get_key, Equals& equal, Value& value, LookupKey const& query) {
+      equal(get_key(value), query) ? 0 : 0;
+    }
+  iterator find_prehashed(LookupKey const& key, std::size_t hash);
 
   Buckets m_buckets;
   std::size_t m_filledCount = 0;
@@ -401,7 +426,12 @@ auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::insert(Value va
   if (m_buckets.empty() || m_filledCount + 1 > (m_buckets.size() - 1) * MaxFillLevel)
     check_capacity(1);
 
-  std::size_t hash = m_hash(m_getKey(value)) | FilledHashBit;
+  return insert_prehashed(std::move(value), m_hash(m_getKey(value)) | FilledHashBit);
+}
+
+template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
+auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::insert_prehashed(Value&& value, std::size_t hash)
+  -> std::pair<iterator, bool> {
   std::size_t targetBucket = hash_bucket(hash);
   std::size_t currentBucket = targetBucket;
   std::size_t insertedBucket = NPos;
@@ -473,17 +503,38 @@ auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::erase(const_ite
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 template <typename LookupKey>
+  requires requires(Hash& hash, GetKey& get_key, Equals& equal, Value& value, LookupKey const& query,
+                    std::size_t const& filled_hash_bit) {
+    requires std::is_convertible_v<decltype(hash(query) | filled_hash_bit), std::size_t>;
+    equal(get_key(value), query) ? 0 : 0;
+  }
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find(LookupKey const& key) const -> const_iterator {
   return const_cast<FlatHashTable*>(this)->find(key);
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 template <typename LookupKey>
+  requires requires(Hash& hash, GetKey& get_key, Equals& equal, Value& value, LookupKey const& query,
+                    std::size_t const& filled_hash_bit) {
+    requires std::is_convertible_v<decltype(hash(query) | filled_hash_bit), std::size_t>;
+    equal(get_key(value), query) ? 0 : 0;
+  }
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find(LookupKey const& key) -> iterator {
   if (m_buckets.empty())
     return end();
+  return find_prehashed(key, m_hash(key) | FilledHashBit);
+}
 
-  std::size_t hash = m_hash(key) | FilledHashBit;
+template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
+template <typename LookupKey>
+  requires requires(GetKey& get_key, Equals& equal, Value& value, LookupKey const& query) {
+    equal(get_key(value), query) ? 0 : 0;
+  }
+auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find_prehashed(LookupKey const& key, std::size_t hash)
+  -> iterator {
+  if (m_buckets.empty())
+    return end();
+
   std::size_t targetBucket = hash_bucket(hash);
   std::size_t currentBucket = targetBucket;
   while (true) {
@@ -606,7 +657,7 @@ void FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::check_capacity(
 
   for (auto& entry : oldBuckets) {
     if (auto ptr = entry.value_ptr())
-      insert(std::move(*ptr));
+      insert_prehashed(std::move(*ptr), entry.hash);
   }
 }
 }

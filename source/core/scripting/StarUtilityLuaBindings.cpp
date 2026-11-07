@@ -232,14 +232,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
 
     for (auto const& value : values) {
       if (std::holds_alternative<LuaBoolean>(value))
-        xxHash64Push(hash, std::get<LuaBoolean>(value));
+        hash_append(hash, std::get<LuaBoolean>(value));
       else if (std::holds_alternative<LuaInt>(value))
-        xxHash64Push(hash, std::get<LuaInt>(value));
+        hash_append(hash, std::get<LuaInt>(value));
       else if (std::holds_alternative<LuaFloat>(value))
-        xxHash64Push(hash, std::get<LuaFloat>(value));
+        hash_append(hash, std::get<LuaFloat>(value));
       else if (std::holds_alternative<LuaString>(value)) {
         auto text = std::get<LuaString>(value).view().utf8();
-        xxHash64Push(hash, text.substr(0, text.find('\0')));
+        hash_append(hash, text.substr(0, text.find('\0')));
       }
       else
         return std::unexpected(LuaException("Unhashable lua type passed to staticRandomXX binding"));

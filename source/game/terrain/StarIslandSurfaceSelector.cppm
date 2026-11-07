@@ -72,7 +72,7 @@ std::expected<std::shared_ptr<IslandSurfaceSelector>, StarException> IslandSurfa
     auto functionConfig = config.getObject(name);
     if (!functionConfig)
       return std::unexpected(std::move(functionConfig.error()));
-    return PerlinF::create(*functionConfig, staticRandomU64(parameters.seed, parameters.baseHeight, name));
+    return PerlinF::create(*functionConfig, static_random_u64(parameters.seed, parameters.baseHeight, name));
   };
   auto height = readFunction("islandHeight");
   if (!height)

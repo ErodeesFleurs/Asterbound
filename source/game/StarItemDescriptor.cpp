@@ -244,7 +244,7 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 }
 
 std::size_t hash<ItemDescriptor>::operator()(ItemDescriptor const& v) const {
-  return hashOf(v.m_name, v.m_count, v.m_parametersHash);
+  return hash_of(v.m_name, v.m_count, v.m_parametersHash);
 }
 
 }

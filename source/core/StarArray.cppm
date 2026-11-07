@@ -26,7 +26,7 @@ concept array_copy_iterator = requires(Iterator iterator, std::size_t count, Ele
 
 template <typename Element>
 concept array_hashable = requires(Star::hash<Element> const& hasher, Element const& element, std::size_t& seed) {
-  hashCombine(seed, hasher(element));
+  hash_combine(seed, hasher(element));
 };
 
 template <typename Element>
@@ -239,7 +239,7 @@ template <typename DataT, std::size_t SizeT>
 struct hash<Array<DataT, SizeT>> {
   constexpr std::size_t operator()(Array<DataT, SizeT> const& array) const
       noexcept(SizeT == 0 || requires(Star::hash<DataT> const& hasher, DataT const& value, std::size_t& seed) {
-        { hashCombine(seed, hasher(value)) } noexcept;
+        { hash_combine(seed, hasher(value)) } noexcept;
       })
       requires (SizeT == 0 || array_hashable<DataT>);
   // Empty arrays do not need a usable element hasher.
@@ -353,13 +353,13 @@ std::ostream& operator<<(std::ostream& os, Array<Element, Size> const& a)
 template <typename DataT, std::size_t SizeT>
 constexpr std::size_t hash<Array<DataT, SizeT>>::operator()(Array<DataT, SizeT> const& a) const
     noexcept(SizeT == 0 || requires(Star::hash<DataT> const& hasher, DataT const& value, std::size_t& seed) {
-      { hashCombine(seed, hasher(value)) } noexcept;
+      { hash_combine(seed, hasher(value)) } noexcept;
     })
     requires (SizeT == 0 || array_hashable<DataT>) {
   std::size_t hashval = 0;
   if constexpr (SizeT != 0) {
     for (std::size_t i = 0; i < SizeT; ++i)
-      hashCombine(hashval, dataHasher(a[i]));
+      hash_combine(hashval, dataHasher(a[i]));
   }
   return hashval;
 }

@@ -84,7 +84,7 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 }
 
 std::size_t hash<ItemRecipe>::operator()(ItemRecipe const& v) const {
-  return hashOf(v.currencyInputs.keys(), v.currencyInputs.values(), v.inputs, v.output);
+  return hash_of(v.currencyInputs.keys(), v.currencyInputs.values(), v.inputs, v.output);
 }
 
 }

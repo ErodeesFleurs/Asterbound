@@ -421,7 +421,7 @@ namespace Dungeon {
 
   std::expected<void, StarException> RandomBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (m_brushes.empty()) return std::unexpected(DungeonException("Random brush has no options"));
-    std::size_t rnd = static_cast<std::size_t>(staticRandomI32(m_seed, position[0], position[1]));
+    std::size_t rnd = static_cast<std::size_t>(static_random_i32(m_seed, position[0], position[1]));
     return m_brushes[rnd % m_brushes.size()]->paint(position, phase, writer);
   }
 

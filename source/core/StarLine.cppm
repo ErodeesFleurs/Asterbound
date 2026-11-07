@@ -288,8 +288,8 @@ template <typename T, std::size_t N>
 struct hash<Line<T, N>> {
   std::size_t operator()(Line<T, N> const& line) const {
     std::size_t hashval = 0;
-    hashCombine(hashval, vectorHasher(line.min()));
-    hashCombine(hashval, vectorHasher(line.max()));
+    hash_combine(hashval, vectorHasher(line.min()));
+    hash_combine(hashval, vectorHasher(line.max()));
     return hashval;
   }
   Star::hash<typename Line<T, N>::VectorType> vectorHasher;

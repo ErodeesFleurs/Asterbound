@@ -85,6 +85,52 @@ TEST(JsonContractTest, UnchangedNumericHashDomainsKeepNativeBytes) {
   }
 }
 
+TEST(JsonContractTest, ObjectHashFastPathsPreserveHistoricalStreamAndEquivalentKeys) {
+  // Build the historical stream explicitly: object tag, sorted UTF-8 keys,
+  // then recursive value bytes, with no member counts or key lengths.
+  auto object_bytes = [] { return std::string(1, static_cast<char>(Json::Type::Object)); };
+  auto integer_bytes = [](std::int64_t value) {
+    std::string bytes(1, static_cast<char>(Json::Type::Int));
+    bytes.append(reinterpret_cast<char const*>(&value), sizeof(value));
+    return bytes;
+  };
+  auto empty_bytes = object_bytes();
+  auto singleton_bytes = object_bytes() + "value" + integer_bytes(0);
+  auto nested_bytes = object_bytes() + "child" + singleton_bytes;
+  auto multi_bytes = object_bytes() + "a" + nested_bytes + "empty" + empty_bytes + "z" + integer_bytes(1);
+
+  struct Case {
+    Json stored;
+    Json equivalent;
+    std::string historical_bytes;
+  };
+  for (auto const& entry : std::array<Case, 4>{
+         {{JsonObject{}, JsonObject{}, empty_bytes},
+          {JsonObject{{"value", 0}}, JsonObject{{"value", -0.0}}, singleton_bytes},
+          {JsonObject{{"child", JsonObject{{"value", 0}}}}, JsonObject{{"child", JsonObject{{"value", 0.0}}}},
+           nested_bytes},
+          {JsonObject{{"z", 1}, {"empty", JsonObject{}}, {"a", JsonObject{{"child", JsonObject{{"value", 0}}}}}},
+           JsonObject{{"a", JsonObject{{"child", JsonObject{{"value", -0.0}}}}}, {"empty", JsonObject{}}, {"z", 1.0}},
+           multi_bytes}}}) {
+    ASSERT_EQ(entry.stored, entry.equivalent);
+    XXHash3 historical;
+    historical.push(std::span<char const>(entry.historical_bytes));
+    EXPECT_EQ(Star::hash<Json>()(entry.stored), historical.digest());
+    EXPECT_EQ(Star::hash<Json>()(entry.equivalent), historical.digest());
+
+    std::unordered_map<Json, int, Star::hash<Json>> values;
+    values.emplace(entry.stored, 42);
+    auto found = values.find(entry.equivalent);
+    ASSERT_NE(found, values.end());
+    EXPECT_EQ(found->second, 42);
+    values.insert_or_assign(entry.equivalent, 43);
+    EXPECT_EQ(values.size(), 1u);
+    auto updated = values.find(entry.stored);
+    ASSERT_NE(updated, values.end());
+    EXPECT_EQ(updated->second, 43);
+  }
+}
+
 TEST(JsonContractTest, BorrowedLookupDistinguishesMissingNullAndWrongContainer) {
   Json object = JsonObject{{"null", Json()}, {"child", JsonObject{{"value", 7}}}};
   auto missing = object.find("missing");

@@ -54,7 +54,7 @@ Directives::Shared::Shared() = default;
 Directives::Shared::Shared(List<Entry>&& givenEntries, String&& givenString) {
   entries = std::move(givenEntries);
   string = std::move(givenString);
-  hash = string.empty() ? 0 : xxHash3(std::span<char const>(string.utf8()));
+  hash = string.empty() ? 0 : xx_hash3(std::span<char const>(string.utf8()));
 }
 
 Directives::Directives() = default;

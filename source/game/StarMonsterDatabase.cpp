@@ -554,7 +554,7 @@ std::expected<ColorReplaceMap, StarException> MonsterDatabase::colorSwap(String 
     {
   auto result75 = m_colorSwaps.get(setName);
   if (!result75) return std::unexpected(std::move(result75.error()));
-  auto result76 = staticRandomFrom(result75->get(), seed);
+  auto result76 = static_random_from(result75->get(), seed);
   if (!result76) return std::unexpected(std::move(result76.error()));
   return result76->get();
 }
@@ -563,7 +563,7 @@ std::expected<ColorReplaceMap, StarException> MonsterDatabase::colorSwap(String 
 if (!result77) return std::unexpected(std::move(result77.error()));
     auto result78 = m_colorSwaps.get("default");
 if (!result78) return std::unexpected(std::move(result78.error()));
-auto result79 = staticRandomFrom(result78->get(), seed);
+auto result79 = static_random_from(result78->get(), seed);
 if (!result79) return std::unexpected(std::move(result79.error()));
 return result79->get();
   }

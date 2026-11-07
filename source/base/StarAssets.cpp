@@ -1461,7 +1461,7 @@ bool Assets::AssetId::operator==(AssetId const& assetId) const {
 }
 
 std::size_t Assets::AssetIdHash::operator()(AssetId const& id) const {
-  return hashOf(id.type, id.path.basePath, id.path.subPath, id.path.directives);
+  return hash_of(id.type, id.path.basePath, id.path.subPath, id.path.directives);
 }
 
 bool Assets::JsonData::shouldPersist() const {

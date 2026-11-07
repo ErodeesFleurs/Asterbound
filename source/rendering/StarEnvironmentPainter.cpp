@@ -209,8 +209,10 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     if (!velocityJson) return std::unexpected(std::move(velocityJson.error()));
     auto velocityRange = jsonToVec2F(*velocityJson);
     if (!velocityRange) return std::unexpected(std::move(velocityRange.error()));
-    auto debrisXVel = staticRandomFloatRange((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldXVel");
-    auto debrisYVel = staticRandomFloatRange((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldYVel");
+    auto debrisXVel =
+      static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldXVel");
+    auto debrisYVel =
+      static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldYVel");
     Vec2D velocityOffset = -Vec2D(debrisXVel, debrisYVel) * sky.epochTime;
     auto imageOptions = debrisField.queryArray("list");
     if (!imageOptions) return std::unexpected(std::move(imageOptions.error()));
@@ -630,7 +632,7 @@ std::expected<void, StarException> EnvironmentPainter::setupStars(SkyRenderData 
     if (!countJson) return std::unexpected(std::move(countJson.error()));
     auto count = jsonToVec2I(*countJson);
     if (!count) return std::unexpected(std::move(count.error()));
-    std::uint64_t seed = staticRandomU64(sky.skyParameters.seed, i, "DebrisFieldSeed");
+    std::uint64_t seed = static_random_u64(sky.skyParameters.seed, i, "DebrisFieldSeed");
     debrisGenerators[i] = std::make_shared<Random2dPointGenerator<std::pair<String, float>, double>>(m_root.presentationRandom(), seed, *cellSize, *count);
   }
   m_starTextures = std::move(textures);

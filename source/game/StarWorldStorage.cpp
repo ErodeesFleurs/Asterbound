@@ -929,8 +929,9 @@ std::expected<ByteArray, StarException> WorldStorage::uniqueIndexKey(String cons
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = ds.write(xxHash32(uniqueId));
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
+    auto index_written = ds.write(xx_hash32(uniqueId));
+    if (!index_written)
+      return std::unexpected(std::move(index_written.error()));
   }
   return ds.takeData();
 }

@@ -1711,9 +1711,10 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
 
     if (std::holds_alternative<MicroDungeonNames>(placement.item)) {
       auto seed = worldTemplate->seedFor(placement.position[0], placement.position[1]);
-      auto autoconstdungeonNameResult1 = staticRandomFrom(std::get<MicroDungeonNames>(placement.item), seed);
-      if (!autoconstdungeonNameResult1) return std::unexpected(std::move(autoconstdungeonNameResult1.error()));
-      auto const& dungeonName = std::move(autoconstdungeonNameResult1->get());
+      auto selected_dungeon = static_random_from(std::get<MicroDungeonNames>(placement.item), seed);
+      if (!selected_dungeon)
+        return std::unexpected(std::move(selected_dungeon.error()));
+      auto const& dungeonName = std::move(selected_dungeon->get());
       std::optional<DungeonId> dungeonId;
       if constexpr (Star::DebugEnabled) {
         Star::starAssertFailed((!dungeonName.empty()));
@@ -2126,11 +2127,11 @@ std::expected<void, StarException> WorldGenerator::placeBiomeGrass(WorldStorage&
       // determine the proper grass mod or lack thereof
       ModId grassModId = NoModId;
       if (isFloor) {
-        auto grassChance = staticRandomFloat(worldTemplate->worldSeed(), position[0], position[1]);
+        auto grassChance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
         if (isRealMod(placeables.grassMod) && grassChance <= placeables.grassModDensity)
           grassModId = placeables.grassMod;
       } else if (isCeiling) {
-        auto grassChance = staticRandomFloat(worldTemplate->worldSeed(), position[0], position[1]);
+        auto grassChance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
         if (isRealMod(placeables.ceilingGrassMod) && grassChance <= placeables.ceilingGrassModDensity)
           grassModId = placeables.ceilingGrassMod;
       }
@@ -2279,11 +2280,11 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
             // determine the proper grass mod or lack thereof
             ModId grassModId = NoModId;
             if (isModFloor) {
-              auto grassChance = staticRandomFloat(worldTemplate->worldSeed(), position[0], position[1]);
+              auto grassChance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
               if (isRealMod(placeables.grassMod) && grassChance <= placeables.grassModDensity)
                 grassModId = placeables.grassMod;
             } else if (isModCeiling) {
-              auto grassChance = staticRandomFloat(worldTemplate->worldSeed(), position[0], position[1]);
+              auto grassChance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
               if (isRealMod(placeables.ceilingGrassMod) && grassChance <= placeables.ceilingGrassModDensity)
                 grassModId = placeables.ceilingGrassMod;
             }

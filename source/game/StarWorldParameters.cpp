@@ -1243,8 +1243,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto autothreatLevelRangeResult2 = jsonToVec2F((*autothreatLevelRangeResult1));
   if (!autothreatLevelRangeResult2) return std::unexpected(std::move(autothreatLevelRangeResult2.error()));
   auto threatLevelRange = std::move((*autothreatLevelRangeResult2));
-  auto threatLevel = std::move(static_cast<float>(staticRandomDouble(seed, "ThreatLevel") * (threatLevelRange[1] - threatLevelRange[0]) + threatLevelRange[0]));
-  auto surfaceBiomeSeed = std::move(staticRandomU64(seed, "SurfaceBiomeSeed"));
+  auto threatLevel = std::move(static_cast<float>(
+    static_random_double(seed, "ThreatLevel") * (threatLevelRange[1] - threatLevelRange[0]) + threatLevelRange[0]));
+  auto surfaceBiomeSeed = std::move(static_random_u64(seed, "SurfaceBiomeSeed"));
 
   auto readRegion = [liquidsDatabase, threatLevel, seed](Json const& regionConfig, String const& layerName, int layerBaseHeight) -> std::expected<TerrestrialWorldParameters::TerrestrialRegion, StarException> {
     auto layerNameSeed = std::string_view(layerName.utf8());
@@ -1258,56 +1259,81 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto autobiomeChoicesResult3 = jsonToStringList((*autobiomeChoicesResult2));
     if (!autobiomeChoicesResult3) return std::unexpected(std::move(autobiomeChoicesResult3.error()));
     auto biomeChoices = std::move((*autobiomeChoicesResult3));
-    auto regionbiomeResult1 = staticRandomValueFrom(biomeChoices, seed, layerNameSeed);
-    region.biome = std::move(regionbiomeResult1);
-    auto regionblockSelectorResult1 = regionConfig.getArray("blockSelector");
-    if (!regionblockSelectorResult1) return std::unexpected(std::move(regionblockSelectorResult1.error()));
-    auto regionblockSelectorResult2 = staticRandomFrom((*regionblockSelectorResult1), seed, "blockSelector", layerNameSeed);
-    if (!regionblockSelectorResult2) return std::unexpected(std::move(regionblockSelectorResult2.error()));
-    auto regionblockSelectorResult3 = regionblockSelectorResult2->get().toString();
-    if (!regionblockSelectorResult3) return std::unexpected(std::move(regionblockSelectorResult3.error()));
-    region.blockSelector = std::move((*regionblockSelectorResult3));
-    auto regionfgCaveSelectorResult1 = regionConfig.getArray("fgCaveSelector");
-    if (!regionfgCaveSelectorResult1) return std::unexpected(std::move(regionfgCaveSelectorResult1.error()));
-    auto regionfgCaveSelectorResult2 = staticRandomFrom((*regionfgCaveSelectorResult1), seed, "fgCaveSelector", layerNameSeed);
-    if (!regionfgCaveSelectorResult2) return std::unexpected(std::move(regionfgCaveSelectorResult2.error()));
-    auto regionfgCaveSelectorResult3 = regionfgCaveSelectorResult2->get().toString();
-    if (!regionfgCaveSelectorResult3) return std::unexpected(std::move(regionfgCaveSelectorResult3.error()));
-    region.fgCaveSelector = std::move((*regionfgCaveSelectorResult3));
-    auto regionbgCaveSelectorResult1 = regionConfig.getArray("bgCaveSelector");
-    if (!regionbgCaveSelectorResult1) return std::unexpected(std::move(regionbgCaveSelectorResult1.error()));
-    auto regionbgCaveSelectorResult2 = staticRandomFrom((*regionbgCaveSelectorResult1), seed, "bgCaveSelector", layerNameSeed);
-    if (!regionbgCaveSelectorResult2) return std::unexpected(std::move(regionbgCaveSelectorResult2.error()));
-    auto regionbgCaveSelectorResult3 = regionbgCaveSelectorResult2->get().toString();
-    if (!regionbgCaveSelectorResult3) return std::unexpected(std::move(regionbgCaveSelectorResult3.error()));
-    region.bgCaveSelector = std::move((*regionbgCaveSelectorResult3));
-    auto regionfgOreSelectorResult1 = regionConfig.getArray("fgOreSelector");
-    if (!regionfgOreSelectorResult1) return std::unexpected(std::move(regionfgOreSelectorResult1.error()));
-    auto regionfgOreSelectorResult2 = staticRandomFrom((*regionfgOreSelectorResult1), seed, "fgOreSelector", layerNameSeed);
-    if (!regionfgOreSelectorResult2) return std::unexpected(std::move(regionfgOreSelectorResult2.error()));
-    auto regionfgOreSelectorResult3 = regionfgOreSelectorResult2->get().toString();
-    if (!regionfgOreSelectorResult3) return std::unexpected(std::move(regionfgOreSelectorResult3.error()));
-    region.fgOreSelector = std::move((*regionfgOreSelectorResult3));
-    auto regionbgOreSelectorResult1 = regionConfig.getArray("bgOreSelector");
-    if (!regionbgOreSelectorResult1) return std::unexpected(std::move(regionbgOreSelectorResult1.error()));
-    auto regionbgOreSelectorResult2 = staticRandomFrom((*regionbgOreSelectorResult1), seed, "bgOreSelector", layerNameSeed);
-    if (!regionbgOreSelectorResult2) return std::unexpected(std::move(regionbgOreSelectorResult2.error()));
-    auto regionbgOreSelectorResult3 = regionbgOreSelectorResult2->get().toString();
-    if (!regionbgOreSelectorResult3) return std::unexpected(std::move(regionbgOreSelectorResult3.error()));
-    region.bgOreSelector = std::move((*regionbgOreSelectorResult3));
-    auto regionsubBlockSelectorResult1 = regionConfig.getArray("subBlockSelector");
-    if (!regionsubBlockSelectorResult1) return std::unexpected(std::move(regionsubBlockSelectorResult1.error()));
-    auto regionsubBlockSelectorResult2 = staticRandomFrom((*regionsubBlockSelectorResult1), seed, "subBlockSelector", layerNameSeed);
-    if (!regionsubBlockSelectorResult2) return std::unexpected(std::move(regionsubBlockSelectorResult2.error()));
-    auto regionsubBlockSelectorResult3 = regionsubBlockSelectorResult2->get().toString();
-    if (!regionsubBlockSelectorResult3) return std::unexpected(std::move(regionsubBlockSelectorResult3.error()));
-    region.subBlockSelector = std::move((*regionsubBlockSelectorResult3));
-    auto autocaveLiquidResult1 = regionConfig.getArray("caveLiquid", {});
-    if (!autocaveLiquidResult1) return std::unexpected(std::move(autocaveLiquidResult1.error()));
-    auto autocaveLiquidResult2 = staticRandomValueFrom((*autocaveLiquidResult1), seed, "caveLiquid");
-    auto autocaveLiquidResult3 = autocaveLiquidResult2.optString();
-    if (!autocaveLiquidResult3) return std::unexpected(std::move(autocaveLiquidResult3.error()));
-    auto caveLiquid = std::move((*autocaveLiquidResult3));
+    auto selected_biome = static_random_value_from(biomeChoices, seed, layerNameSeed);
+    region.biome = std::move(selected_biome);
+    auto block_selector_choices = regionConfig.getArray("blockSelector");
+    if (!block_selector_choices)
+      return std::unexpected(std::move(block_selector_choices.error()));
+    auto block_selector_choice = static_random_from((*block_selector_choices), seed, "blockSelector", layerNameSeed);
+    if (!block_selector_choice)
+      return std::unexpected(std::move(block_selector_choice.error()));
+    auto block_selector_name = block_selector_choice->get().toString();
+    if (!block_selector_name)
+      return std::unexpected(std::move(block_selector_name.error()));
+    region.blockSelector = std::move((*block_selector_name));
+    auto foreground_cave_selector_choices = regionConfig.getArray("fgCaveSelector");
+    if (!foreground_cave_selector_choices)
+      return std::unexpected(std::move(foreground_cave_selector_choices.error()));
+    auto foreground_cave_selector_choice =
+      static_random_from((*foreground_cave_selector_choices), seed, "fgCaveSelector", layerNameSeed);
+    if (!foreground_cave_selector_choice)
+      return std::unexpected(std::move(foreground_cave_selector_choice.error()));
+    auto foreground_cave_selector_name = foreground_cave_selector_choice->get().toString();
+    if (!foreground_cave_selector_name)
+      return std::unexpected(std::move(foreground_cave_selector_name.error()));
+    region.fgCaveSelector = std::move((*foreground_cave_selector_name));
+    auto background_cave_selector_choices = regionConfig.getArray("bgCaveSelector");
+    if (!background_cave_selector_choices)
+      return std::unexpected(std::move(background_cave_selector_choices.error()));
+    auto background_cave_selector_choice =
+      static_random_from((*background_cave_selector_choices), seed, "bgCaveSelector", layerNameSeed);
+    if (!background_cave_selector_choice)
+      return std::unexpected(std::move(background_cave_selector_choice.error()));
+    auto background_cave_selector_name = background_cave_selector_choice->get().toString();
+    if (!background_cave_selector_name)
+      return std::unexpected(std::move(background_cave_selector_name.error()));
+    region.bgCaveSelector = std::move((*background_cave_selector_name));
+    auto foreground_ore_selector_choices = regionConfig.getArray("fgOreSelector");
+    if (!foreground_ore_selector_choices)
+      return std::unexpected(std::move(foreground_ore_selector_choices.error()));
+    auto foreground_ore_selector_choice =
+      static_random_from((*foreground_ore_selector_choices), seed, "fgOreSelector", layerNameSeed);
+    if (!foreground_ore_selector_choice)
+      return std::unexpected(std::move(foreground_ore_selector_choice.error()));
+    auto foreground_ore_selector_name = foreground_ore_selector_choice->get().toString();
+    if (!foreground_ore_selector_name)
+      return std::unexpected(std::move(foreground_ore_selector_name.error()));
+    region.fgOreSelector = std::move((*foreground_ore_selector_name));
+    auto background_ore_selector_choices = regionConfig.getArray("bgOreSelector");
+    if (!background_ore_selector_choices)
+      return std::unexpected(std::move(background_ore_selector_choices.error()));
+    auto background_ore_selector_choice =
+      static_random_from((*background_ore_selector_choices), seed, "bgOreSelector", layerNameSeed);
+    if (!background_ore_selector_choice)
+      return std::unexpected(std::move(background_ore_selector_choice.error()));
+    auto background_ore_selector_name = background_ore_selector_choice->get().toString();
+    if (!background_ore_selector_name)
+      return std::unexpected(std::move(background_ore_selector_name.error()));
+    region.bgOreSelector = std::move((*background_ore_selector_name));
+    auto sub_block_selector_choices = regionConfig.getArray("subBlockSelector");
+    if (!sub_block_selector_choices)
+      return std::unexpected(std::move(sub_block_selector_choices.error()));
+    auto sub_block_selector_choice =
+      static_random_from((*sub_block_selector_choices), seed, "subBlockSelector", layerNameSeed);
+    if (!sub_block_selector_choice)
+      return std::unexpected(std::move(sub_block_selector_choice.error()));
+    auto sub_block_selector_name = sub_block_selector_choice->get().toString();
+    if (!sub_block_selector_name)
+      return std::unexpected(std::move(sub_block_selector_name.error()));
+    region.subBlockSelector = std::move((*sub_block_selector_name));
+    auto cave_liquid_choices = regionConfig.getArray("caveLiquid", {});
+    if (!cave_liquid_choices)
+      return std::unexpected(std::move(cave_liquid_choices.error()));
+    auto selected_cave_liquid = static_random_value_from((*cave_liquid_choices), seed, "caveLiquid");
+    auto cave_liquid_name = selected_cave_liquid.optString();
+    if (!cave_liquid_name)
+      return std::unexpected(std::move(cave_liquid_name.error()));
+    auto caveLiquid = std::move((*cave_liquid_name));
     if (caveLiquid) {
       auto autocaveLiquidSeedDensityRangeResult1 = regionConfig.get("caveLiquidSeedDensityRange");
       if (!autocaveLiquidSeedDensityRangeResult1) return std::unexpected(std::move(autocaveLiquidSeedDensityRangeResult1.error()));
@@ -1317,18 +1343,21 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       auto regioncaveLiquidResult1 = liquidsDatabase->liquidId(*caveLiquid);
       if (!regioncaveLiquidResult1) return std::unexpected(std::move(regioncaveLiquidResult1.error()));
       region.caveLiquid = std::move((*regioncaveLiquidResult1));
-      auto regioncaveLiquidSeedDensityResult1 = staticRandomFloatRange(caveLiquidSeedDensityRange[0], caveLiquidSeedDensityRange[1], seed, "caveLiquidSeedDensity", layerNameSeed);
-      region.caveLiquidSeedDensity = std::move(regioncaveLiquidSeedDensityResult1);
+      auto cave_liquid_density = static_random_float_range(caveLiquidSeedDensityRange[0], caveLiquidSeedDensityRange[1],
+                                                           seed, "caveLiquidSeedDensity", layerNameSeed);
+      region.caveLiquidSeedDensity = std::move(cave_liquid_density);
     } else {
       region.caveLiquid = EmptyLiquidId;
       region.caveLiquidSeedDensity = 0.0f;
     }
-    auto autooceanLiquidResult1 = regionConfig.getArray("oceanLiquid", {});
-    if (!autooceanLiquidResult1) return std::unexpected(std::move(autooceanLiquidResult1.error()));
-    auto autooceanLiquidResult2 = staticRandomValueFrom((*autooceanLiquidResult1), seed, "oceanLiquid", layerNameSeed);
-    auto autooceanLiquidResult3 = autooceanLiquidResult2.optString();
-    if (!autooceanLiquidResult3) return std::unexpected(std::move(autooceanLiquidResult3.error()));
-    auto oceanLiquid = std::move((*autooceanLiquidResult3));
+    auto ocean_liquid_choices = regionConfig.getArray("oceanLiquid", {});
+    if (!ocean_liquid_choices)
+      return std::unexpected(std::move(ocean_liquid_choices.error()));
+    auto selected_ocean_liquid = static_random_value_from((*ocean_liquid_choices), seed, "oceanLiquid", layerNameSeed);
+    auto ocean_liquid_name = selected_ocean_liquid.optString();
+    if (!ocean_liquid_name)
+      return std::unexpected(std::move(ocean_liquid_name.error()));
+    auto oceanLiquid = std::move((*ocean_liquid_name));
     if (oceanLiquid) {
       auto regionoceanLiquidResult1 = liquidsDatabase->liquidId(*oceanLiquid);
       if (!regionoceanLiquidResult1) return std::unexpected(std::move(regionoceanLiquidResult1.error()));
@@ -1381,11 +1410,13 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto layerNameSeed = std::string_view(layerName.utf8());
     // Match the historical C-text prefix without changing full-String seeds below.
     layerNameSeed = layerNameSeed.substr(0, layerNameSeed.find('\0'));
-    auto autoprimaryRegionConfigNameResult1 = staticRandomFrom(primaryRegionList, seed, layerNameSeed, "PrimaryRegionSelection");
-    if (!autoprimaryRegionConfigNameResult1) return std::unexpected(std::move(autoprimaryRegionConfigNameResult1.error()));
-    auto autoprimaryRegionConfigNameResult2 = autoprimaryRegionConfigNameResult1->get().toString();
-    if (!autoprimaryRegionConfigNameResult2) return std::unexpected(std::move(autoprimaryRegionConfigNameResult2.error()));
-    auto primaryRegionConfigName = std::move((*autoprimaryRegionConfigNameResult2));
+    auto primary_region_name = static_random_from(primaryRegionList, seed, layerNameSeed, "PrimaryRegionSelection");
+    if (!primary_region_name)
+      return std::unexpected(std::move(primary_region_name.error()));
+    auto primary_region_configuration_name = primary_region_name->get().toString();
+    if (!primary_region_configuration_name)
+      return std::unexpected(std::move(primary_region_configuration_name.error()));
+    auto primaryRegionConfigName = std::move((*primary_region_configuration_name));
     auto JsonprimaryRegionConfigResult1 = regionTypes.get(primaryRegionConfigName);
     if (!JsonprimaryRegionConfigResult1) return std::unexpected(std::move(JsonprimaryRegionConfigResult1.error()));
     Json primaryRegionConfig = jsonMerge(regionDefaults, (*JsonprimaryRegionConfigResult1));
@@ -1398,11 +1429,13 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       auto subRegionList = std::move((*autosubRegionListResult1));
       Json subRegionConfig;
       if (!subRegionList.empty()) {
-        auto StringsubRegionNameResult1 = staticRandomFrom(subRegionList, seed, layerName, primaryRegionConfigName);
-        if (!StringsubRegionNameResult1) return std::unexpected(std::move(StringsubRegionNameResult1.error()));
-        auto StringsubRegionNameResult2 = StringsubRegionNameResult1->get().toString();
-        if (!StringsubRegionNameResult2) return std::unexpected(std::move(StringsubRegionNameResult2.error()));
-        String subRegionName = std::move((*StringsubRegionNameResult2));
+        auto subregion_choice = static_random_from(subRegionList, seed, layerName, primaryRegionConfigName);
+        if (!subregion_choice)
+          return std::unexpected(std::move(subregion_choice.error()));
+        auto subregion_name = subregion_choice->get().toString();
+        if (!subregion_name)
+          return std::unexpected(std::move(subregion_name.error()));
+        String subRegionName = std::move((*subregion_name));
         auto subRegionConfigResult1 = regionTypes.get(subRegionName);
         if (!subRegionConfigResult1) return std::unexpected(std::move(subRegionConfigResult1.error()));
         subRegionConfig = jsonMerge(regionDefaults, (*subRegionConfigResult1));
@@ -1418,13 +1451,15 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto Vec2UsecondaryRegionCountRangeResult2 = jsonToVec2U((*Vec2UsecondaryRegionCountRangeResult1));
     if (!Vec2UsecondaryRegionCountRangeResult2) return std::unexpected(std::move(Vec2UsecondaryRegionCountRangeResult2.error()));
     Vec2U secondaryRegionCountRange = std::move((*Vec2UsecondaryRegionCountRangeResult2));
-    auto intsecondaryRegionCountResult1 = staticRandomI32Range(static_cast<int>(secondaryRegionCountRange[0]), static_cast<int>(secondaryRegionCountRange[1]), seed, layerName, "SecondaryRegionCount");
-    int secondaryRegionCount = std::move(intsecondaryRegionCountResult1);
+    auto secondary_region_count =
+      static_random_i32_range(static_cast<int>(secondaryRegionCountRange[0]),
+                              static_cast<int>(secondaryRegionCountRange[1]), seed, layerName, "SecondaryRegionCount");
+    int secondaryRegionCount = std::move(secondary_region_count);
     auto autosecondaryRegionListResult1 = layerConfig.getArray("secondaryRegions");
     if (!autosecondaryRegionListResult1) return std::unexpected(std::move(autosecondaryRegionListResult1.error()));
     auto secondaryRegionList = std::move((*autosecondaryRegionListResult1));
     if (!secondaryRegionList.empty()) {
-      staticRandomShuffle(secondaryRegionList, seed, layerName, "SecondaryRegionShuffle");
+      static_random_shuffle(secondaryRegionList, seed, layerName, "SecondaryRegionShuffle");
       for (auto const& regionName : secondaryRegionList) {
         if (secondaryRegionCount <= 0) break;
         auto JsonsecondaryRegionConfigResult1 = regionName.toString();
@@ -1441,13 +1476,16 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         auto subRegionList = std::move((*autosubRegionListResult1));
         Json subRegionConfig;
         if (!subRegionList.empty()) {
-          auto StringsubRegionNameResult1 = regionName.toString();
-          if (!StringsubRegionNameResult1) return std::unexpected(std::move(StringsubRegionNameResult1.error()));
-          auto StringsubRegionNameResult2 = staticRandomFrom(subRegionList, seed, layerName, (*StringsubRegionNameResult1));
-          if (!StringsubRegionNameResult2) return std::unexpected(std::move(StringsubRegionNameResult2.error()));
-          auto StringsubRegionNameResult3 = StringsubRegionNameResult2->get().toString();
-          if (!StringsubRegionNameResult3) return std::unexpected(std::move(StringsubRegionNameResult3.error()));
-          String subRegionName = std::move((*StringsubRegionNameResult3));
+          auto subregion_choice = regionName.toString();
+          if (!subregion_choice)
+            return std::unexpected(std::move(subregion_choice.error()));
+          auto subregion_name = static_random_from(subRegionList, seed, layerName, (*subregion_choice));
+          if (!subregion_name)
+            return std::unexpected(std::move(subregion_name.error()));
+          auto selected_subregion_name = subregion_name->get().toString();
+          if (!selected_subregion_name)
+            return std::unexpected(std::move(selected_subregion_name.error()));
+          String subRegionName = std::move((*selected_subregion_name));
           auto subRegionConfigResult1 = regionTypes.get(subRegionName);
           if (!subRegionConfigResult1) return std::unexpected(std::move(subRegionConfigResult1.error()));
           subRegionConfig = jsonMerge(regionDefaults, (*subRegionConfigResult1));
@@ -1484,9 +1522,11 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       if (!dungeonCountRangeResult1) return std::unexpected(std::move(dungeonCountRangeResult1.error()));
       dungeonCountRange = std::move((*dungeonCountRangeResult1));
     }
-    auto unsigneddungeonCountResult1 = staticRandomU32Range(dungeonCountRange[0], dungeonCountRange[1], seed, layerName, "DungeonCount");
-    unsigned dungeonCount = std::move(unsigneddungeonCountResult1);
-    layer.dungeons.appendAll(dungeonPool.selectUniques(dungeonCount, staticRandomHash64(seed, layerName, "DungeonChoice")));
+    auto dungeon_count =
+      static_random_u32_range(dungeonCountRange[0], dungeonCountRange[1], seed, layerName, "DungeonCount");
+    unsigned dungeonCount = std::move(dungeon_count);
+    layer.dungeons.appendAll(
+      dungeonPool.selectUniques(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
     auto layerdungeonXVarianceResult1 = layerConfig.getInt("dungeonXVariance", 0);
     if (!layerdungeonXVarianceResult1) return std::unexpected(std::move(layerdungeonXVarianceResult1.error()));
     layer.dungeonXVariance = std::move(static_cast<int>((*layerdungeonXVarianceResult1)));
@@ -1507,8 +1547,8 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto parametersworldSizeResult2 = jsonToVec2U((*parametersworldSizeResult1));
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
-  auto parametersgravityResult1 = staticRandomFloatRange(gravityRange[0], gravityRange[1], seed, "WorldGravity");
-  parameters->gravity = std::move(parametersgravityResult1);
+  auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
+  parameters->gravity = std::move(gravity_value);
   auto parametersairlessResult1 = biomeDatabase->biomeIsAirless(primaryBiome);
   if (!parametersairlessResult1) return std::unexpected(std::move(parametersairlessResult1.error()));
   parameters->airless = std::move((*parametersairlessResult1));
@@ -1562,8 +1602,8 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto parametersskyColoringResult1 = biomeDatabase->biomeSkyColoring(parameters->primaryBiome, seed);
   if (!parametersskyColoringResult1) return std::unexpected(std::move(parametersskyColoringResult1.error()));
   parameters->skyColoring = std::move((*parametersskyColoringResult1));
-  auto parametersdayLengthResult1 = staticRandomFloatRange(dayLengthRange[0], dayLengthRange[1], seed, "DayLength");
-  parameters->dayLength = std::move(parametersdayLengthResult1);
+  auto day_length_value = static_random_float_range(dayLengthRange[0], dayLengthRange[1], seed, "DayLength");
+  parameters->dayLength = std::move(day_length_value);
   auto parametersblockNoiseConfigResult1 = config.get("blockNoise");
   if (!parametersblockNoiseConfigResult1) return std::unexpected(std::move(parametersblockNoiseConfigResult1.error()));
   parameters->blockNoiseConfig = std::move((*parametersblockNoiseConfigResult1));
@@ -1629,15 +1669,16 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   auto autothreatLevelRangeResult2 = jsonToVec2F((*autothreatLevelRangeResult1));
   if (!autothreatLevelRangeResult2) return std::unexpected(std::move(autothreatLevelRangeResult2.error()));
   auto threatLevelRange = std::move((*autothreatLevelRangeResult2));
-  parameters->threatLevel = std::move(static_cast<float>(staticRandomDouble(seed, "ThreatLevel") * (threatLevelRange[1] - threatLevelRange[0]) + threatLevelRange[0]));
+  parameters->threatLevel = std::move(static_cast<float>(
+    static_random_double(seed, "ThreatLevel") * (threatLevelRange[1] - threatLevelRange[0]) + threatLevelRange[0]));
   parameters->typeName = std::move("asteroids");
   auto parametersworldSizeResult1 = asteroidsConfig.get("worldSize");
   if (!parametersworldSizeResult1) return std::unexpected(std::move(parametersworldSizeResult1.error()));
   auto parametersworldSizeResult2 = jsonToVec2U((*parametersworldSizeResult1));
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
-  auto parametersgravityResult1 = staticRandomFloatRange(gravityRange[0], gravityRange[1], seed, "WorldGravity");
-  parameters->gravity = std::move(parametersgravityResult1);
+  auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
+  parameters->gravity = std::move(gravity_value);
   auto parametersenvironmentStatusEffectsResult1 = asteroidsConfig.getArray("environmentStatusEffects", JsonArray());
   if (!parametersenvironmentStatusEffectsResult1) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult1.error()));
   auto parametersenvironmentStatusEffectsResult2 = jsonToStringList((*parametersenvironmentStatusEffectsResult1));

@@ -321,7 +321,9 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
           treasureItems.append(item);
       }
     } else {
-      float itemLevel = level + itemPool.levelVariance[0] + staticRandomFloat(seed, ++mix, "FillLevelVariance") * (itemPool.levelVariance[1] - itemPool.levelVariance[0]);
+      float itemLevel = level + itemPool.levelVariance[0]
+        + static_random_float(seed, ++mix, "FillLevelVariance")
+          * (itemPool.levelVariance[1] - itemPool.levelVariance[0]);
       auto fillItem = itemCatalog->get().item(std::get<ItemDescriptor>(fillEntry), itemLevel, seed + ++mix);
       if (!fillItem)
         return std::unexpected(std::move(fillItem.error()));
@@ -331,13 +333,15 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
   }
 
   if (!itemPool.pool.empty()) {
-    int poolRounds = itemPool.poolRounds.select(staticRandomU64(seed, "TreasurePoolRounds"));
+    int poolRounds = itemPool.poolRounds.select(static_random_u64(seed, "TreasurePoolRounds"));
 
     for (int i = 0; i < poolRounds; ++i) {
-      auto poolEntry = itemPool.pool.select(staticRandomU64(seed, i, "TreasureItem"));
+      auto poolEntry = itemPool.pool.select(static_random_u64(seed, i, "TreasureItem"));
 
       if (std::holds_alternative<String>(poolEntry)) {
-        auto poolContents = createTreasure(std::get<String>(poolEntry), level, staticRandomU64(seed, i, "TreasureSeedRecursion"), visitedPools, itemCatalog);
+        auto poolContents =
+          createTreasure(std::get<String>(poolEntry), level, static_random_u64(seed, i, "TreasureSeedRecursion"),
+                         visitedPools, itemCatalog);
         if (!poolContents)
           return std::unexpected(std::move(poolContents.error()));
         for (auto const& item : *poolContents) {
@@ -345,7 +349,9 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
             treasureItems.append(item);
         }
       } else {
-        float itemLevel = level + itemPool.levelVariance[0] + staticRandomFloat(staticRandomU64(seed, i, "TreasureLevelSeedMixer"), "PoolLevelVariance") * (itemPool.levelVariance[1] - itemPool.levelVariance[0]);
+        float itemLevel = level + itemPool.levelVariance[0]
+          + static_random_float(static_random_u64(seed, i, "TreasureLevelSeedMixer"), "PoolLevelVariance")
+            * (itemPool.levelVariance[1] - itemPool.levelVariance[0]);
         auto roundItem = std::get<ItemDescriptor>(poolEntry);
         if (itemPool.allowDuplication || previousDescriptors.add(roundItem.singular())) {
           auto item = itemCatalog->get().item(roundItem, itemLevel, seed + ++mix);
@@ -399,10 +405,10 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase:
   eraseWhere(boxSet, [&](TreasureChest const& chest) { return *level < chest.minimumLevel; });
   if (boxSet.empty())
     return std::shared_ptr<ContainerObject>();
-  auto chest = staticRandomFrom(boxSet, seed, "TreasureChest");
+  auto chest = static_random_from(boxSet, seed, "TreasureChest");
   if (!chest)
     return std::unexpected(std::move(chest.error()));
-  auto containerName = staticRandomFrom(chest->get().containers, seed, "ContainerName");
+  auto containerName = static_random_from(chest->get().containers, seed, "ContainerName");
   if (!containerName)
     return std::unexpected(std::move(containerName.error()));
   auto parameters = JsonObject{{"treasurePools", JsonArray{chest->get().treasurePool}}, {"treasureSeed", seed}};

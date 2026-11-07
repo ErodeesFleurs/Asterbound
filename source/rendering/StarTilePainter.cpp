@@ -280,9 +280,9 @@ void TilePainter::cleanup() {
 
 std::size_t TilePainter::TextureKeyHash::operator()(TextureKey const& key) const {
   if (std::holds_alternative<MaterialPieceTextureKey>(key))
-    return hashOf(static_cast<std::uint8_t>(key.index()), std::get<MaterialPieceTextureKey>(key));
+    return hash_of(static_cast<std::uint8_t>(key.index()), std::get<MaterialPieceTextureKey>(key));
   else
-    return hashOf(static_cast<std::uint8_t>(key.index()), std::get<AssetTextureKey>(key));
+    return hash_of(static_cast<std::uint8_t>(key.index()), std::get<AssetTextureKey>(key));
 }
 
 std::expected<std::pair<TilePainter::ChunkHash, TilePainter::ChunkHash>, StarException>
@@ -309,7 +309,7 @@ TilePainter::chunkHashes(WorldRenderData const& renderData, Vec2I chunkIndex) {
     });
   if (!traversed)
     return std::unexpected(std::move(traversed.error()));
-  return std::pair{xxHash3(terrainBuffer.first(terrainOffset)), xxHash3(liquidBuffer.first(liquidOffset))};
+  return std::pair{xx_hash3(terrainBuffer.first(terrainOffset)), xx_hash3(liquidBuffer.first(liquidOffset))};
 }
 
 std::expected<void, StarException> TilePainter::renderTerrainChunks(WorldCamera const& camera, TerrainLayer terrainLayer) {
@@ -503,7 +503,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
   if (materialRenderProfile) {
     occlude = materialRenderProfile->occludesBehind;
     auto materialColorVariant = materialRenderProfile->colorVariants > 0 ? colorVariant % materialRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "main");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "main");
     auto& quadList = primitives[materialZLevel(materialRenderProfile->zLevel, material, materialHue, materialColorVariant)];
 
     pieces.clear();
@@ -546,7 +546,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
 
   if (modRenderProfile) {
     auto modColorVariant = modRenderProfile->colorVariants > 0 ? colorVariant % modRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "mod");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "mod");
     auto& quadList = primitives[modZLevel(modRenderProfile->zLevel, mod, modHue, modColorVariant)];
 
     pieces.clear();

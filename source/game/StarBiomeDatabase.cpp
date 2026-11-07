@@ -137,7 +137,7 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
   auto weatherList = bin->optArray();
   if (!weatherList) return std::unexpected(std::move(weatherList.error()));
   if (*weatherList && !(*weatherList)->empty()) {
-    auto path = staticRandomFrom(**weatherList, seed, "WeatherPool");
+    auto path = static_random_from(**weatherList, seed, "WeatherPool");
     if (!path) return std::unexpected(std::move(path.error()));
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
@@ -161,7 +161,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
   auto options = config->get().parameters.optArray("skyOptions");
   if (!options) return std::unexpected(std::move(options.error()));
   if (*options) {
-    auto option = staticRandomFrom(**options, seed, "BiomeSkyOption");
+    auto option = static_random_from(**options, seed, "BiomeSkyOption");
     if (!option) return std::unexpected(std::move(option.error()));
     {
       auto colorConfig = option->get().get("mainColor");
@@ -453,7 +453,7 @@ std::expected<float, StarException> BiomeDatabase::pickHueShiftFromJson(Json sou
   auto options = jsonToFloatList(source);
   if (!options) return std::unexpected(std::move(options.error()));
   if (options->empty()) return 0;
-  auto t = staticRandomU32(seed, key);
+  auto t = static_random_u32(seed, key);
   return (*options)[t % options->size()];
 }
 

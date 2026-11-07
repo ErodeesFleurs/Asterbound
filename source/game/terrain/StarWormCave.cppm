@@ -121,7 +121,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   int sectorRadius = sectorSize * *configuredRadius;
   for (int x = sector[0] - sectorRadius; x <= sector[0] + sectorRadius; x += sectorSize)
     for (int y = sector[1] - sectorRadius; y <= sector[1] + sectorRadius; y += sectorSize) {
-      RandomSource rs(staticRandomU64(x, y, seed));
+      RandomSource rs(static_random_u64(x, y, seed));
       auto drawnCount = rs.randf(numberOfWormsPerSectorRange[0], numberOfWormsPerSectorRange[1]);
       if (!drawnCount)
         return std::unexpected(std::move(drawnCount.error()));
@@ -199,9 +199,9 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
       worm.length += thisSpeed;
 
       // maybe set new goal angle
-      if (staticRandomFloat(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
+      if (static_random_float(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
         worm.goalAngle = pfmod(
-            staticRandomFloatRange(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
+          static_random_float_range(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
       }
 
       if (worm.angle != worm.goalAngle) {

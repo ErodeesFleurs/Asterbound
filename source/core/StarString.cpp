@@ -542,5 +542,10 @@ std::ostream& operator<<(std::ostream& os, StringList const& list) {
   for (auto it = list.begin(); it != list.end(); ++it) { if (it != list.begin()) os << ", "; os << '\'' << *it << '\''; }
   return os << ")";
 }
-std::size_t hash<StringList>::operator()(StringList const& list) const { std::size_t hash = 0; for (auto const& text : list) hashCombine(hash, hashOf(text)); return hash; }
+std::size_t hash<StringList>::operator()(StringList const& list) const {
+  std::size_t hash = 0;
+  for (auto const& text : list)
+    hash_combine(hash, hash_of(text));
+  return hash;
+}
 }

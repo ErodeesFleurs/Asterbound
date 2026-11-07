@@ -65,7 +65,7 @@ bool InstanceWorldId::operator<(InstanceWorldId const& rhs) const {
 }
 
 std::size_t hash<InstanceWorldId>::operator()(InstanceWorldId const& id) const {
-  return hashOf(id.instance, id.uuid, id.level);
+  return hash_of(id.instance, id.uuid, id.level);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, InstanceWorldId& instanceWorldId) {
@@ -94,7 +94,7 @@ bool ClientCustomWorldId::operator<(ClientCustomWorldId const& rhs) const {
 }
 
 std::size_t hash<ClientCustomWorldId>::operator()(ClientCustomWorldId const& id) const {
-  return hashOf(id.uuid, id.name);
+  return hash_of(id.uuid, id.name);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ClientCustomWorldId& clientWorldId) {

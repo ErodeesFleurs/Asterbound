@@ -1741,7 +1741,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       initial = *character;
     }
     if (initial && *initial != ':' && *initial != '?') {
-      std::size_t hash = hashOf(usedImage);
+      std::size_t hash = hash_of(usedImage);
       auto find = m_cachedPartDrawables.find(partName);
       if (find == m_cachedPartDrawables.end() || find->second.first != hash) {
         String relativeImage;

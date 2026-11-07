@@ -211,7 +211,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterList(S
   auto array = parameter->toArray();
   if (!array)
     return std::unexpected(std::move(array.error()));
-  auto selected = staticRandomFrom(*array, mix, m_seed, name);
+  auto selected = static_random_from(*array, mix, m_seed, name);
   if (!selected)
     return std::unexpected(std::move(selected.error()));
   return selected->get();
@@ -241,7 +241,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     auto max = range[1].toInt();
     if (!max)
       return std::unexpected(std::move(max.error()));
-    return Json(staticRandomU64(mix, m_seed, name.value_or("")) % (*max - *min + 1) + *min);
+    return Json(static_random_u64(mix, m_seed, name.value_or("")) % (*max - *min + 1) + *min);
   } else {
     auto min = range[0].toDouble();
     if (!min)
@@ -249,7 +249,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     auto max = range[1].toDouble();
     if (!max)
       return std::unexpected(std::move(max.error()));
-    return Json(staticRandomDouble(mix, m_seed, name.value_or("")) * (*max - *min) + *min);
+    return Json(static_random_double(mix, m_seed, name.value_or("")) * (*max - *min) + *min);
   }
 }
 

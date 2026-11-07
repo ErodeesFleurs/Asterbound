@@ -425,7 +425,7 @@ std::expected<List<WorldTemplate::Dungeon>, StarException> WorldTemplate::dungeo
     auto addLayerDungeons = [&geometry = m_geometry, seed = m_seed, &dungeonList](TerrestrialWorldParameters::TerrestrialLayer const& layer) -> std::expected<void, StarException> {
       if (layer.dungeons.size() > 0) {
         int dungeonSpacing = std::floor(geometry.width() / layer.dungeons.size());
-        auto offset = staticRandomU32Range(0, geometry.width(), seed, layer.layerBaseHeight);
+        auto offset = static_random_u32_range(0, geometry.width(), seed, layer.layerBaseHeight);
         std::uint32_t dungeonOffset = offset;
         for (auto const& dungeon : layer.dungeons) {
           dungeonList.append({.dungeon = dungeon,
@@ -826,7 +826,7 @@ float WorldTemplate::threatLevel() const {
 }
 
 std::uint64_t WorldTemplate::seedFor(int x, int y) const {
-  return staticRandomU64(m_seed, m_geometry.xwrap(x), y, "Block");
+  return static_random_u64(m_seed, m_geometry.xwrap(x), y, "Block");
 }
 
 WorldTemplate::WorldTemplate(Root& root) : m_root(root) {}

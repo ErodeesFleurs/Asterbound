@@ -904,21 +904,23 @@ if (!result175) return std::unexpected(std::move(result175.error()));
 auto treasureDatabase = std::move(*result175);
     auto dropped = [&]() -> std::expected<void, StarException> {
       {
-  auto result176 = staticRandomFrom(m_dropPools.get(), m_npcVariant.seed);
-  if (!result176) return std::unexpected(std::move(result176.error()));
-  auto result177 = treasureDatabase->createTreasure(result176->get(), m_npcVariant.level);
-  if (!result177) return std::unexpected(std::move(result177.error()));
-  for (auto const& treasureItem :
-            std::move(*result177))
-          {
-    auto result178 = world();
-    if (!result178) return std::unexpected(std::move(result178.error()));
-    auto result179 = ItemDrop::createRandomizedDrop(this->root(), treasureItem, position());
-    if (!result179) return std::unexpected(std::move(result179.error()));
-    auto result180 = result178->get().addEntity(std::move(*result179));
-    if (!result180) return std::unexpected(std::move(result180.error()));
-
-  }
+        auto result176 = static_random_from(m_dropPools.get(), m_npcVariant.seed);
+        if (!result176)
+          return std::unexpected(std::move(result176.error()));
+        auto result177 = treasureDatabase->createTreasure(result176->get(), m_npcVariant.level);
+        if (!result177)
+          return std::unexpected(std::move(result177.error()));
+        for (auto const& treasureItem : std::move(*result177)) {
+          auto result178 = world();
+          if (!result178)
+            return std::unexpected(std::move(result178.error()));
+          auto result179 = ItemDrop::createRandomizedDrop(this->root(), treasureItem, position());
+          if (!result179)
+            return std::unexpected(std::move(result179.error()));
+          auto result180 = result178->get().addEntity(std::move(*result179));
+          if (!result180)
+            return std::unexpected(std::move(result180.error()));
+        }
 }
       return {};
     }();

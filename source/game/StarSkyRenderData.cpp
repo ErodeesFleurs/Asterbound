@@ -131,13 +131,13 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
     if (!list) return std::unexpected(std::move(list.error()));
     StringList cloudList = std::move(*list);
 
-    int numClouds = staticRandomI32Range(cloudCountRange[0], cloudCountRange[1], "HorizonCloudCount");
+    int numClouds = static_random_i32_range(cloudCountRange[0], cloudCountRange[1], "HorizonCloudCount");
     for (int i = 0; i < numClouds; ++i) {
-      auto image = staticRandomFrom(cloudList, i, "Cloud");
+      auto image = static_random_from(cloudList, i, "Cloud");
       if (!image) return std::unexpected(std::move(image.error()));
-      auto angle = staticRandomFloatRange(0, 2 * std::numbers::pi, i, "CloudStartAngle");
-      auto speed = staticRandomFloatRange(cloudSpeedRange[0], cloudSpeedRange[1], i, "CloudSpeed");
-      auto radius = staticRandomFloatRange(cloudRadiusRange[0], cloudRadiusRange[1], i, "CloudRadius");
+      auto angle = static_random_float_range(0, 2 * std::numbers::pi, i, "CloudStartAngle");
+      auto speed = static_random_float_range(cloudSpeedRange[0], cloudSpeedRange[1], i, "CloudSpeed");
+      auto radius = static_random_float_range(cloudRadiusRange[0], cloudRadiusRange[1], i, "CloudRadius");
       horizonClouds.append({angle, image->get(), speed, radius});
     }
   }

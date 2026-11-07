@@ -470,7 +470,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
     if (!type) return std::unexpected(std::move(type.error()));
     if (!type->spawnParameters.compatible(**cellParameters)) continue;
     if (root().random().randf() < type->spawnChance) {
-      std::uint64_t seed = staticRandomU64(type->seedMix, m_facade->spawnSeed());
+      std::uint64_t seed = static_random_u64(type->seedMix, m_facade->spawnSeed());
       auto groupSize = root().random().randInt(type->groupSize[0], type->groupSize[1]);
       if (!groupSize) return std::unexpected(std::move(groupSize.error()));
       for (int i = 0; i < *groupSize; ++i) {

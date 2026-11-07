@@ -2678,7 +2678,7 @@ template <typename List>
 std::size_t ListHasher<List>::operator()(List const& l) const {
   std::size_t h = 0;
   for (auto const& e : l)
-    hashCombine(h, elemHasher(e));
+    hash_combine(h, elemHasher(e));
   return h;
 }
 

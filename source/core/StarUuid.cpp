@@ -68,7 +68,7 @@ bool Uuid::operator>=(Uuid const& u) const {
 std::size_t hash<Uuid>::operator()(Uuid const& u) const {
   std::size_t hashval = 0;
   for (std::size_t i = 0; i < UuidSize; ++i)
-    hashCombine(hashval, u.span()[i]);
+    hash_combine(hashval, u.span()[i]);
   return hashval;
 }
 

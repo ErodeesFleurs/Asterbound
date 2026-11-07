@@ -279,7 +279,9 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
         return std::unexpected(std::move(added.error()));
     }
     {
-      auto value = config.get("systemTypePerlin").and_then([](Json const& value) { return PerlinD::create(value, staticRandomU64("SystemTypePerlin")); });
+      auto value = config.get("systemTypePerlin").and_then([](Json const& value) {
+        return PerlinD::create(value, static_random_u64("SystemTypePerlin"));
+      });
       if (!value)
         return std::unexpected(std::move(value.error()));
       m_generationInformation.systemTypePerlin = std::move(*value);
@@ -951,7 +953,7 @@ std::expected<CelestialChunk, StarException> CelestialMasterDatabase::produceChu
   RectI region = chunkRegion(chunkIndex);
   if (m_baseInformation.enforceCoordRange && !xyRange().contains(region, true))
     return chunk;
-  RandomSource random(staticRandomU64(chunkIndex[0], chunkIndex[1], "ChunkIndexMix"));
+  RandomSource random(static_random_u64(chunkIndex[0], chunkIndex[1], "ChunkIndexMix"));
   List<Vec3I> locations;
   for (int x = region.xMin(); x < region.xMax(); ++x) {
     for (int y = region.yMin(); y < region.yMax(); ++y) {

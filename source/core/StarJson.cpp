@@ -1046,6 +1046,16 @@ void Json::getHash(XXHash3& hasher) const {
     }
     else if (type == Json::Type::Object) {
       auto& object = *std::get<std::shared_ptr<JsonObject const>>(m_data);
+      // The type byte already represents an empty object; one member is
+      // already in key order and needs no iterator scratch storage.
+      if (object.empty())
+        return;
+      if (object.size() == 1) {
+        auto iter = object.begin();
+        hasher.push(std::span<char const>(iter->first.utf8()));
+        iter->second.getHash(hasher);
+        return;
+      }
       List<JsonObject::const_iterator> iterators;
       iterators.reserve(object.size());
       for (auto i = object.begin(); i != object.end(); ++i)

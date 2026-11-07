@@ -227,7 +227,7 @@ std::ostream& operator<<(std::ostream& os, AssetPath const& rhs) {
 }
 
 std::size_t hash<AssetPath>::operator()(AssetPath const& s) const {
-  return hashOf(s.basePath, s.subPath, s.directives);
+  return hash_of(s.basePath, s.subPath, s.directives);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, AssetPath& path) {

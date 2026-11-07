@@ -258,13 +258,7 @@ inline char ByteArray::operator[](std::size_t i) const {
   return std::cref(m_data[i]);
 }
 
-inline std::size_t hash<ByteArray>::operator()(ByteArray const& b) const {
-  PLHasher hash;
-  for (std::size_t i = 0; i < b.size(); ++i)
-    hash.put(b[i]);
-  return hash.hash();
-}
-
+inline std::size_t hash<ByteArray>::operator()(ByteArray const& b) const { return pl_hash_bytes(b.span()); }
 }
 
 export module star.byte_array;

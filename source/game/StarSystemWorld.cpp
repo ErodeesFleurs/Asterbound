@@ -373,7 +373,8 @@ std::expected<std::uint64_t, StarException> SystemWorld::coordinateSeed(Celestia
     // Preserve the original planetary seed's boolean orbit component.
     planet = bool(*orbit);
   }
-  return staticRandomU64(coordinate.location()[0], coordinate.location()[1], coordinate.location()[2], planet, satellite, seedMix);
+  return static_random_u64(coordinate.location()[0], coordinate.location()[1], coordinate.location()[2], planet,
+                           satellite, seedMix);
 }
 
 std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCoordinate const& coordinate) const {

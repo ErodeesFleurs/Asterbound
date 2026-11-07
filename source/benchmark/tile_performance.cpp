@@ -194,7 +194,7 @@ std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, Tile
   auto advanced = advanceNativeFrame(renderer);
   if (!advanced)
     return std::unexpected(std::move(advanced.error()));
-  return xxHash3(std::span<char const>(pixels));
+  return xx_hash3(std::span<char const>(pixels));
 }
 
 std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<Renderer> const& renderer) {

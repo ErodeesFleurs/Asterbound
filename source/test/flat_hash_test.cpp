@@ -2,6 +2,7 @@ import std;
 import star.format;
 import star.flat_hash_set;
 import star.flat_hash_map;
+import star.flat_hash_table;
 import star.random;
 import star.vector;
 import star.map;
@@ -111,6 +112,44 @@ struct FlatStatefulEqual {
   explicit FlatStatefulEqual(int value) : modulus(value) {}
   bool operator()(int left, int right) const { return left % modulus == right % modulus; }
 };
+
+struct FlatHashCounts {
+  std::array<int, 160> calls{};
+};
+
+struct FlatCountingHash {
+  FlatHashCounts* counts;
+  std::size_t salt;
+
+  std::size_t operator()(int key) const {
+    ++counts->calls[key];
+    return (6 + key % 2) ^ salt;
+  }
+};
+
+struct FlatPairKey {
+  int const& operator()(std::pair<int, int> const& value) const { return value.first; }
+};
+
+struct FlatContextualEqualResult {
+  bool matches;
+  explicit operator bool() const { return matches; }
+};
+
+struct FlatMutableEqual {
+  FlatContextualEqualResult operator()(int& left, int const& right) { return {left == right}; }
+};
+
+struct FlatMutableHash {
+  std::size_t operator()(int key) { return key; }
+};
+
+struct FlatMutablePairKey {
+  int& operator()(std::pair<int, int>& value) { return value.first; }
+};
+
+template <typename Table, typename Query>
+concept FlatLookupAvailable = requires(Table& table, Query const& query) { table.find(query); };
 }// namespace
 
 TEST(FlatHashMap, ProxyReferencesPreserveStructuredBindingsAndSnapshots) {
@@ -255,6 +294,124 @@ TEST(FlatHashMap, ReboundAllocatorsAndFunctorStateSurviveCopiesAndMoves) {
   EXPECT_FALSE(second_state.mismatched);
 }
 
+TEST(FlatHashMap, HashesEachInsertionOnceAndReusesStoredHashesAcrossGrowth) {
+  FlatHashCounts counts;
+  using MapType = FlatHashMap<int, int, FlatCountingHash>;
+  MapType values(0, FlatCountingHash{&counts, 0x1000});
+
+  // Keys share two target buckets and wrap at the initial capacity. The later
+  // insertions cross several growth boundaries and displace live entries.
+  for (int key = 0; key < 120; ++key) {
+    auto inserted = key < 80 ? values.try_emplace(key, key * 10) : values.insert(MapType::value_type{key, key * 10});
+    ASSERT_TRUE(inserted.second);
+    EXPECT_EQ(inserted.first->first, key);
+    EXPECT_EQ(inserted.first->second, key * 10);
+    for (int previous = 0; previous <= key; ++previous)
+      EXPECT_EQ(counts.calls[previous], 1);
+  }
+
+  auto before_reserve = counts.calls;
+  values.reserve(1000);
+  EXPECT_EQ(counts.calls, before_reserve);
+  EXPECT_EQ(values.hash_function().salt, 0x1000u);
+  EXPECT_EQ(values.size(), 120u);
+
+  for (int key = 0; key < 120; ++key) {
+    auto duplicate = values.try_emplace(key, -1);
+    EXPECT_FALSE(duplicate.second);
+    ASSERT_NE(duplicate.first, values.end());
+    EXPECT_EQ(duplicate.first->first, key);
+    EXPECT_EQ(duplicate.first->second, key * 10);
+    EXPECT_EQ(counts.calls[key], 2);
+  }
+  EXPECT_EQ(values.find(150), values.end());
+  EXPECT_EQ(counts.calls[150], 1);
+  for (int key = 0; key < 120; ++key) {
+    auto found = std::as_const(values).find(key);
+    ASSERT_NE(found, values.end());
+    EXPECT_EQ(found->second, key * 10);
+    EXPECT_EQ(counts.calls[key], 3);
+  }
+
+  // Backshift deletion followed by reinsertion must retain the Robin Hood
+  // lookup invariant as well as the mapped value attached to every key.
+  for (int key = 0; key < 120; key += 3)
+    values.erase(values.find(key));
+  for (int key = 0; key < 120; key += 3) {
+    auto before = counts.calls;
+    auto inserted = values.try_emplace(key, key * 10);
+    ASSERT_TRUE(inserted.second);
+    EXPECT_EQ(inserted.first->second, key * 10);
+    ++before[key];
+    EXPECT_EQ(counts.calls, before);
+  }
+  for (auto&& [key, value] : values)
+    EXPECT_EQ(value, key * 10);
+  EXPECT_EQ(values.size(), 120u);
+  for (int key = 0; key < 120; ++key) {
+    auto found = values.find(key);
+    ASSERT_NE(found, values.end());
+    EXPECT_EQ(found->second, key * 10);
+  }
+}
+
+TEST(FlatHashTable, InsertWithDoesNotConsumeFactoryOnDuplicate) {
+  using Value = std::pair<int, int>;
+  using Table = FlatHashTable<Value, int, FlatPairKey, FlatCountingHash, std::equal_to<int>, std::allocator<Value>>;
+  FlatHashCounts counts;
+  Table values(0, FlatPairKey{}, FlatCountingHash{&counts, 0x1000}, std::equal_to<int>{}, {});
+  int factory_calls = 0;
+
+  for (int key = 0; key < 40; ++key) {
+    auto inserted = values.insert_with(key, [&] {
+      ++factory_calls;
+      return Value{key, key * 10};
+    });
+    ASSERT_TRUE(inserted.second);
+    EXPECT_EQ(inserted.first->second, key * 10);
+    EXPECT_EQ(counts.calls[key], 1);
+  }
+  EXPECT_EQ(factory_calls, 40);
+
+  auto candidate = [owner = std::make_unique<int>(999), &factory_calls]() mutable {
+    ++factory_calls;
+    auto consumed = std::move(owner);
+    return Value{2, *consumed};
+  };
+  auto duplicate = values.insert_with(2, std::move(candidate));
+  EXPECT_FALSE(duplicate.second);
+  EXPECT_EQ(duplicate.first->second, 20);
+  EXPECT_EQ(factory_calls, 40);
+  EXPECT_EQ(counts.calls[2], 2);
+  auto unused = candidate();
+  EXPECT_EQ(unused.second, 999);
+  EXPECT_EQ(factory_calls, 41);
+
+  auto before_reserve = counts.calls;
+  values.reserve(1000);
+  EXPECT_EQ(counts.calls, before_reserve);
+  for (auto const& [key, value] : values)
+    EXPECT_EQ(value, key * 10);
+}
+
+TEST(FlatHashTable, LookupConstraintsMatchMutableCallsAndContextualEquality) {
+  using Value = std::pair<int, int>;
+  using Table = FlatHashTable<Value, int, FlatMutablePairKey, FlatMutableHash, FlatMutableEqual, std::allocator<Value>>;
+  static_assert(FlatLookupAvailable<Table, int>);
+  static_assert(FlatLookupAvailable<Table const, int>);
+  static_assert(!FlatLookupAvailable<Table, std::monostate>);
+  static_assert(!FlatLookupAvailable<Table const, std::monostate>);
+  Table values(0, {}, {}, {}, {});
+  ASSERT_TRUE(values.insert_with(7, [] { return Value{7, 70}; }).second);
+  auto found = values.find(7);
+  ASSERT_NE(found, values.end());
+  EXPECT_EQ(found->second, 70);
+  auto const_found = std::as_const(values).find(7);
+  ASSERT_NE(const_found, std::as_const(values).end());
+  EXPECT_EQ(const_found->second, 70);
+  EXPECT_EQ(values.find(8), values.end());
+}
+
 TEST(FlatHashMap, SinglePassInputPreservesEveryElement) {
   std::istringstream input("1 2 3 4");
   FlatHashMap<int, int> values;
@@ -338,6 +495,45 @@ TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {
   ASSERT_TRUE(insensitiveValue);
   EXPECT_EQ(insensitiveValue->get(), 10);
   EXPECT_EQ(Color::create(StringView("RED")), Color::Red);
+}
+
+TEST(StringSet, BorrowedLookupPreservesFullByteExtent) {
+  std::string bytes(192, 'x');
+  bytes[11] = '\0';
+  bytes[37] = static_cast<char>(0x80);
+  bytes[111] = static_cast<char>(0xff);
+  String key{std::string_view(bytes)};
+  StringSet values{key};
+  std::string padded = "!" + bytes + "?";
+  std::string_view query(padded.data() + 1, bytes.size());
+  StringView star_query(query);
+
+  auto found = values.find(query);
+  ASSERT_NE(found, values.end());
+  EXPECT_EQ(std::addressof(*found), std::addressof(*values.begin()));
+  EXPECT_EQ(found->utf8(), bytes);
+  EXPECT_TRUE(values.contains(query));
+  EXPECT_EQ(values.count(query), 1u);
+  EXPECT_NE(values.find(star_query), values.end());
+  EXPECT_TRUE(values.contains(star_query));
+  EXPECT_EQ(values.count(star_query), 1u);
+  auto const& const_values = values;
+  EXPECT_NE(const_values.find(query), const_values.end());
+  EXPECT_NE(const_values.find(star_query), const_values.end());
+  EXPECT_TRUE(const_values.contains(query));
+  EXPECT_TRUE(const_values.contains(star_query));
+  EXPECT_EQ(const_values.count(query), 1u);
+  EXPECT_EQ(const_values.count(star_query), 1u);
+
+  // A C-string prefix is not the explicit-length key. Neither NUL nor high
+  // bytes may terminate or normalize the hash/equality comparison.
+  EXPECT_FALSE(values.contains(query.substr(0, 11)));
+  padded[112] = static_cast<char>(0xfe);
+  EXPECT_EQ(values.find(query), values.end());
+  EXPECT_FALSE(const_values.contains(star_query));
+  EXPECT_EQ(const_values.count(star_query), 0u);
+  EXPECT_EQ(values.size(), 1u);
+  EXPECT_EQ(values.begin()->utf8(), bytes);
 }
 
 TEST(FlatHashSet, Preset) {

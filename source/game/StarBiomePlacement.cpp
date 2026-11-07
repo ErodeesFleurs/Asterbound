@@ -525,8 +525,8 @@ List<BiomeItem> BiomeItemDistribution::allItems() const {
 
 std::expected<std::optional<BiomeItemPlacement>, StarException> BiomeItemDistribution::itemToPlace(int x, int y) const {
   if (m_distribution == DistributionType::Random) {
-    if (staticRandomFloat(x, y, m_blockSeed) <= m_blockProbability) {
-      auto item = staticRandomValueFrom(m_randomItems, x, y, m_blockSeed);
+    if (static_random_float(x, y, m_blockSeed) <= m_blockProbability) {
+      auto item = static_random_value_from(m_randomItems, x, y, m_blockSeed);
       return BiomeItemPlacement{std::move(item), Vec2I(x, y), m_priority};
     }
 

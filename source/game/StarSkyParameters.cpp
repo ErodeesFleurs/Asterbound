@@ -66,7 +66,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
   auto systemParameters = celestialDatabase->parameters(*system);
   if (!systemParameters) return std::unexpected(std::move(systemParameters.error()));
   auto systemParams = *systemParameters;
-  sky.seed = staticRandomU64(params->seed(), "SkySeed");
+  sky.seed = static_random_u64(params->seed(), "SkySeed");
   auto selfCoordinate = params->coordinate();
   if (selfCoordinate.isSatelliteBody()) {
     auto parent = selfCoordinate.parent();
@@ -75,8 +75,8 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
     if (!planetResult) return std::unexpected(std::move(planetResult.error()));
     if (auto planet = *planetResult) {
       Vec2F pos;
-      pos[0] = staticRandomFloat(params->seed(), planet->seed(), "x");
-      pos[1] = staticRandomFloat(params->seed(), planet->seed(), "y");
+      pos[0] = static_random_float(params->seed(), planet->seed(), "x");
+      pos[1] = static_random_float(params->seed(), planet->seed(), "y");
       auto layers = CelestialGraphics::drawWorld(root, *planet, {});
       if (!layers) return std::unexpected(std::move(layers.error()));
       sky.nearbyPlanet = {{std::move(*layers), pos}};
@@ -92,8 +92,8 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
       if (!satelliteResult) return std::unexpected(std::move(satelliteResult.error()));
       if (auto satellite = *satelliteResult) {
         Vec2F pos;
-        pos[0] = staticRandomFloat(params->seed(), satellite->seed(), "x");
-        pos[1] = staticRandomFloat(params->seed(), satellite->seed(), "y");
+        pos[0] = static_random_float(params->seed(), satellite->seed(), "x");
+        pos[1] = static_random_float(params->seed(), satellite->seed(), "y");
         auto parent = satelliteCoordinate.parent();
         if (!parent) return std::unexpected(std::move(parent.error()));
         auto parentParameters = celestialDatabase->parameters(*parent);
@@ -144,8 +144,8 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
       auto seed = v.optUInt("seed");
       if (!seed) return std::unexpected(std::move(seed.error()));
       if (*seed) {
-        pos[0] = staticRandomFloat(selfSeed, **seed, "x");
-        pos[1] = staticRandomFloat(selfSeed, **seed, "y");
+        pos[0] = static_random_float(selfSeed, **seed, "x");
+        pos[1] = static_random_float(selfSeed, **seed, "y");
       }
     }
     auto layersJson = v.getArray("layers");

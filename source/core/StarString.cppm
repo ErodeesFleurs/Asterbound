@@ -360,15 +360,13 @@ struct hash<String> {
   using is_transparent = void;
   std::size_t operator()(String const& s) const;
   std::size_t operator()(StringView const& s) const;
-  std::size_t operator()(std::string_view s) const {
-    PLHasher value;
-    for (auto c : s)
-      value.put(c);
-    return value.hash();
+  constexpr std::size_t operator()(std::string_view s) const noexcept {
+    return pl_hash_bytes(std::span(s.data(), s.size()));
   }
-  template <std::size_t N>
-  std::size_t operator()(char const (&s)[N]) const { return (*this)(std::string_view(s)); }
-  std::size_t operator()(std::string const& s) const { return (*this)(std::string_view(s)); }
+  template <std::size_t N> constexpr std::size_t operator()(char const (&s)[N]) const noexcept {
+    return (*this)(std::string_view(s));
+  }
+  constexpr std::size_t operator()(std::string const& s) const noexcept { return (*this)(std::string_view(s)); }
 };
 
 class CaseInsensitiveString;
@@ -435,7 +433,7 @@ struct CaseInsensitiveStringCompare {
   bool operator()(CaseInsensitiveStringView const& lhs, CaseInsensitiveString const& rhs) const { return (*this)(lhs, rhs.view()); }
 };
 
-using StringSet = HashSet<String>;
+using StringSet = HashSet<String, hash<String>, std::equal_to<>>;
 
 using CaseInsensitiveStringSet =
   HashSet<CaseInsensitiveString, CaseInsensitiveStringHash, CaseInsensitiveStringCompare>;
@@ -573,12 +571,7 @@ String String::replaceTags(MapType const& tags, bool replaceWithDefault, String 
   });
 }
 
-inline std::size_t hash<String>::operator()(String const& s) const {
-  PLHasher hash;
-  for (auto c : s.utf8())
-    hash.put(c);
-  return hash.hash();
-}
+inline std::size_t hash<String>::operator()(String const& s) const { return (*this)(std::string_view(s.utf8())); }
 
 template <typename Container>
 StringList StringList::from(Container const& m) {
