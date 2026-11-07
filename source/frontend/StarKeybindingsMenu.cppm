@@ -22,6 +22,7 @@ import star.listener;
 import star.game_types;
 import star.set;
 import star.audio;
+import star.map;
 
 
 import star.font_texture_group;
@@ -74,7 +75,7 @@ private:
 
   std::weak_ptr<Widget> m_activeKeybinding;
 
-  std::map<std::weak_ptr<Widget>, InterfaceAction, std::owner_less<std::weak_ptr<Widget>>> m_childToAction;
+  Map<std::weak_ptr<Widget>, InterfaceAction, std::owner_less<std::weak_ptr<Widget>>> m_childToAction;
   std::shared_ptr<TabSetWidget> m_tabSet;
   std::shared_ptr<ListWidget> m_playerList;
   std::shared_ptr<ListWidget> m_toolBarList;

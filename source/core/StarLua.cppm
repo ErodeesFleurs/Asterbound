@@ -860,7 +860,7 @@ private:
   int m_scriptDefaultEnvRegistryId;
   int m_wrappedFunctionMetatableRegistryId;
   int m_requireFunctionMetatableRegistryId;
-  std::unordered_map<TypeKey, int, Star::hash<TypeKey>> m_registeredUserDataTypes;
+  HashMap<TypeKey, int> m_registeredUserDataTypes;
 
   List<int> m_handleFree;
 
@@ -1900,9 +1900,7 @@ namespace LuaDetail {
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     new (*storage) T(std::move(value));
-    auto registered = m_engine.m_registeredUserDataTypes.find(typeKey<T>());
-    int reference = registered != m_engine.m_registeredUserDataTypes.end() ? registered->second : LUA_NOREF;
-    lua_rawgeti(m_state, LUA_REGISTRYINDEX, reference);
+    lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_engine.m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF));
     lua_setmetatable(m_state, -2);
     return {};
   }
@@ -1910,8 +1908,7 @@ namespace LuaDetail {
     if (!is<LuaUserData>())
       return false;
     auto& engine = m_stack.engine();
-    auto registered = engine.m_registeredUserDataTypes.find(typeKey<T>());
-    int reference = registered != engine.m_registeredUserDataTypes.end() ? registered->second : LUA_NOREF;
+    int reference = engine.m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
     if (reference == LUA_NOREF)
       return false;
     auto state = m_stack.state();
@@ -2495,12 +2492,10 @@ template <typename T>
   auto reference = copyHandle(table->handleIndex());
   if (!reference)
     return std::unexpected(std::move(reference.error()));
-  auto added = m_registeredUserDataTypes.try_emplace(typeKey<T>(), *reference);
-  if (!added.second) {
+  auto added = m_registeredUserDataTypes.add(typeKey<T>(), *reference);
+  if (!added) {
     destroyHandle(*reference);
-    return std::unexpected(mapDiagnosticError("Entry with key '{}' already present.",
-                                              "Map::add: key already present while rendering its diagnostic",
-                                              added.first->first));
+    return std::unexpected(std::move(added.error()));
   }
   return {};
 }
@@ -2547,8 +2542,7 @@ template <typename T>
 
 template <typename T>
 [[nodiscard]] std::expected<bool, StarException> LuaEngine::userDataIsType(int handleIndex) {
-  auto registered = m_registeredUserDataTypes.find(typeKey<T>());
-  int typeRef = registered != m_registeredUserDataTypes.end() ? registered->second : LUA_NOREF;
+  int typeRef = m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
   if (typeRef == LUA_NOREF)
     return false;
   LuaDetail::LuaStackRestore restore(m_state);
@@ -2563,8 +2557,7 @@ template <typename T>
 
 template <typename T>
 [[nodiscard]] std::expected<std::reference_wrapper<T>, StarException> LuaEngine::getUserData(int handleIndex) {
-  auto registered = m_registeredUserDataTypes.find(typeKey<T>());
-  int typeRef = registered != m_registeredUserDataTypes.end() ? registered->second : LUA_NOREF;
+  int typeRef = m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
   if (typeRef == LUA_NOREF)
     return std::unexpected(LuaException::format("Cannot convert userdata type of {}, not registered", typeName<T>()));
   LuaDetail::LuaStackRestore restore(m_state);

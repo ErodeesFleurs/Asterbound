@@ -102,7 +102,7 @@ private:
 
   BubbleSeparator<Bubble> m_bubbles;
   float m_partSize;
-  std::map<EntityId, int> m_entityBubbleCounts;
+  Map<EntityId, int> m_entityBubbleCounts;
   float m_cachedInterfaceScale;
   Vec2F m_bubbleOffset;
   float m_maxAge;

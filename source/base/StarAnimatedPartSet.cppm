@@ -99,7 +99,7 @@ public:
     bool enabled;
     String defaultState;
     JsonObject stateTypeProperties;
-    std::map<String, std::shared_ptr<State const>> states;
+    OrderedHashMap<String, std::shared_ptr<State const>> states;
 
     // Lazily refreshed frame information; state changes still require nonconst access.
     mutable ActiveStateInformation activeState;
@@ -207,8 +207,9 @@ public:
   // ActivePartInformation for the active part.
   [[nodiscard]] std::expected<void, StarException> forEachActivePart(std::function<std::expected<void, StarException>(String const&, ActivePartInformation const&)> callback, Sample* sample = nullptr) const;
 
-  // Useful for serializing state changes.  States are ordered by name, so
-  // their indices are independent of configuration insertion order.
+  // Useful for serializing state changes.  Since each set of states for a
+  // state type is ordered, it is possible to simply serialize and deserialize
+  // the state index for that state type.
   [[nodiscard]] std::expected<std::size_t, StarException> activeStateIndex(String const& stateTypeName) const;
   [[nodiscard]] std::expected<bool, StarException> activeStateReverse(String const& stateTypeName) const;
   [[nodiscard]] std::expected<bool, StarException> setActiveStateIndex(String const& stateTypeName, std::size_t stateIndex, bool alwaysStart = false, bool reverse = false);
