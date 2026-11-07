@@ -107,7 +107,13 @@ enum class EntityHighlightEffectType {
   Interesting,
   Inspected
 };
-extern std::expected<EnumMap<EntityHighlightEffectType>, StarException> const EntityHighlightEffectTypeNames;
+inline constexpr auto EntityHighlightEffectTypeNames =
+  sortedEnumNames(std::to_array<std::pair<EntityHighlightEffectType, std::string_view>>(
+    {{EntityHighlightEffectType::None, "none"},
+     {EntityHighlightEffectType::Interactive, "interactive"},
+     {EntityHighlightEffectType::Inspectable, "inspectable"},
+     {EntityHighlightEffectType::Interesting, "interesting"},
+     {EntityHighlightEffectType::Inspected, "inspected"}}));
 
 struct EntityHighlightEffect {
   EntityHighlightEffectType type = EntityHighlightEffectType::None;

@@ -322,12 +322,14 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
   auto base = (*config)->get("bindings");
   if (!base)
     return std::unexpected(std::move(base.error()));
-  auto action = m_childToAction.get(m_activeKeybinding);
-  if (!action)
-    return std::unexpected(std::move(action.error()));
+  auto action = m_childToAction.find(m_activeKeybinding);
+  if (action == m_childToAction.end())
+    return std::unexpected(mapDiagnosticError("Key '{}' not found in Map::get()",
+                                              "Map::get: key not found while rendering its diagnostic",
+                                              m_activeKeybinding));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->getRight(action->second);
   if (!key)
     return std::unexpected(std::move(key.error()));
   auto storedBindings = base->get(key->get());
@@ -387,12 +389,14 @@ std::expected<void, StarException> KeybindingsMenu::clearActive() {
   auto base = bindings->toObject();
   if (!base)
     return std::unexpected(std::move(base.error()));
-  auto action = m_childToAction.get(m_activeKeybinding);
-  if (!action)
-    return std::unexpected(std::move(action.error()));
+  auto action = m_childToAction.find(m_activeKeybinding);
+  if (action == m_childToAction.end())
+    return std::unexpected(mapDiagnosticError("Key '{}' not found in Map::get()",
+                                              "Map::get: key not found while rendering its diagnostic",
+                                              m_activeKeybinding));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->getRight(action->second);
   if (!key)
     return std::unexpected(std::move(key.error()));
   (*base)[key->get()] = JsonArray{};

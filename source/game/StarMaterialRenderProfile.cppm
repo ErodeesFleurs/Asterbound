@@ -28,7 +28,9 @@ struct MaterialRenderProfileExceptionTag {
 using MaterialRenderProfileException = StarError<MaterialRenderProfileExceptionTag, StarException>;
 
 enum class MaterialJoinType : std::uint8_t { All, Any };
-extern std::expected<EnumMap<MaterialJoinType>, StarException> const MaterialJoinTypeNames;
+inline constexpr auto MaterialJoinTypeNames =
+  sortedEnumNames(std::to_array<std::pair<MaterialJoinType, std::string_view>>(
+    {{MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}}));
 
 struct MaterialRule {
   struct RuleEmpty {};

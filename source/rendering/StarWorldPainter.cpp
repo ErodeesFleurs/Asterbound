@@ -128,14 +128,13 @@ std::expected<void, StarException> WorldPainter::initialize() {
   auto entries = directives->iterateObject();
   if (!entries) return std::unexpected(std::move(entries.error()));
   for (auto const& p : *entries) {
-    if (!EntityHighlightEffectTypeNames) return std::unexpected(EntityHighlightEffectTypeNames.error());
-    auto type = EntityHighlightEffectTypeNames->getLeft(p.first);
+    auto type = enumValue<EntityHighlightEffectTypeNames>(p.first);
     if (!type) return std::unexpected(std::move(type.error()));
     auto underlay = p.second.getString("underlay", "");
     if (!underlay) return std::unexpected(std::move(underlay.error()));
     auto overlay = p.second.getString("overlay", "");
     if (!overlay) return std::unexpected(std::move(overlay.error()));
-    m_highlightDirectives.set(type->get(), {Directives(*underlay), Directives(*overlay)});
+    m_highlightDirectives.set(*type, {Directives(*underlay), Directives(*overlay)});
   }
   auto loadVector = [this](String const& path) -> std::expected<Vec2F, StarException> {
     auto json = m_assets->json(path);

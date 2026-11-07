@@ -34,15 +34,6 @@ import star.math_common;
 import star.world_geometry;
 namespace Star {
 
-std::expected<EnumMap<Particle::Type>, StarException> const Particle::TypeNames = EnumMap<Type>::create({{Type::Variance, "variance"},
-    {Type::Ember, "ember"}, {Type::Textured, "textured"}, {Type::Animated, "animated"}, {Type::Streak, "streak"}, {Type::Text, "text"}});
-
-std::expected<EnumMap<Particle::DestructionAction>, StarException> const Particle::DestructionActionNames = EnumMap<DestructionAction>::create({
-    {DestructionAction::None, "none"}, {DestructionAction::Image, "image"}, {DestructionAction::Fade, "fade"}, {DestructionAction::Shrink, "shrink"}});
-
-std::expected<EnumMap<Particle::Layer>, StarException> const Particle::LayerNames = EnumMap<Layer>::create({
-    {Layer::Back, "back"}, {Layer::Middle, "middle"}, {Layer::Front, "front"}});
-
 Particle::Particle() {
   type = Type::Variance;
   size = 0;
@@ -71,15 +62,13 @@ Particle::Particle() {
 
 std::expected<Particle, StarException> Particle::create(Root& root, Json const& config, String const& path) {
   Particle particle;
-  if (!TypeNames)
-    return std::unexpected(TypeNames.error());
   auto typeName = config.getString("type", "variance");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
-  auto type = TypeNames->getLeft(*typeName);
+  auto type = enumValue<TypeNames>(*typeName);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  particle.type = type->get();
+  particle.type = *type;
   particle.color = particle.type == Type::Variance ? Color::Clear : Color::White;
   auto size = config.getFloat("size", particle.type == Type::Variance ? 0.0f : 1.0f);
   if (!size)
@@ -196,15 +185,13 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   if (!length)
     return std::unexpected(std::move(length.error()));
   particle.length = *length;
-  if (!DestructionActionNames)
-    return std::unexpected(DestructionActionNames.error());
   auto actionName = config.getString("destructionAction", "None");
   if (!actionName)
     return std::unexpected(std::move(actionName.error()));
-  auto action = DestructionActionNames->getLeft(*actionName);
+  auto action = enumValue<DestructionActionNames>(*actionName);
   if (!action)
     return std::unexpected(std::move(action.error()));
-  particle.destructionAction = action->get();
+  particle.destructionAction = *action;
   auto destructionImage = config.getString("destructionImage", "");
   if (!destructionImage)
     return std::unexpected(std::move(destructionImage.error()));
@@ -219,15 +206,13 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   if (!timeToLive)
     return std::unexpected(std::move(timeToLive.error()));
   particle.timeToLive = *timeToLive;
-  if (!LayerNames)
-    return std::unexpected(LayerNames.error());
   auto layerName = config.getString("layer", "middle");
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
-  auto layer = LayerNames->getLeft(*layerName);
+  auto layer = enumValue<LayerNames>(*layerName);
   if (!layer)
     return std::unexpected(std::move(layer.error()));
-  particle.layer = layer->get();
+  particle.layer = *layer;
   auto underwaterOnly = config.getBool("underwaterOnly", false);
   if (!underwaterOnly)
     return std::unexpected(std::move(underwaterOnly.error()));
@@ -327,47 +312,41 @@ Particle& Particle::operator=(Particle&& other) {
 }
 
 std::expected<Json, StarException> Particle::toJson() const {
-  if (!TypeNames)
-    return std::unexpected(TypeNames.error());
-  auto typeName = TypeNames->getRight(type);
+  auto typeName = enumName<TypeNames>(type);
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
-  if (!DestructionActionNames)
-    return std::unexpected(DestructionActionNames.error());
-  auto actionName = DestructionActionNames->getRight(destructionAction);
+  auto actionName = enumName<DestructionActionNames>(destructionAction);
   if (!actionName)
     return std::unexpected(std::move(actionName.error()));
-  if (!LayerNames)
-    return std::unexpected(LayerNames.error());
-  auto layerName = LayerNames->getRight(layer);
+  auto layerName = enumName<LayerNames>(layer);
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
-  return JsonObject{{"type", typeName->get()},
-      {"size", size},
-      {"string", string},
-      {"color", jsonFromColor(color)},
-      {"light", jsonFromColor(light)},
-      {"fade", fade},
-      {"fullbright", fullbright},
-      {"position", jsonFromVec2F(position)},
-      {"velocity", jsonFromVec2F(velocity)},
-      {"finalVelocity", jsonFromVec2F(finalVelocity)},
-      {"approach", jsonFromVec2F(approach)},
-      {"flip", flip},
-      {"flippable", flippable},
-      {"rotation", rotation * 180.0f / std::numbers::pi},
-      {"angularVelocity", angularVelocity * 180.0f / std::numbers::pi},
-      {"length", length},
-      {"destructionAction", actionName->get()},
-      {"destructionImage", AssetPath::join(destructionImage)},
-      {"destructionTime", destructionTime},
-      {"timeToLive", timeToLive},
-      {"layer", layerName->get()},
-      {"collidesForeground", collidesForeground},
-      {"collidesLiquid", collidesLiquid},
-      {"underwaterOnly", underwaterOnly},
-      {"ignoreWind", ignoreWind},
-      {"trail", trail}};
+  return JsonObject{{"type", *typeName},
+                    {"size", size},
+                    {"string", string},
+                    {"color", jsonFromColor(color)},
+                    {"light", jsonFromColor(light)},
+                    {"fade", fade},
+                    {"fullbright", fullbright},
+                    {"position", jsonFromVec2F(position)},
+                    {"velocity", jsonFromVec2F(velocity)},
+                    {"finalVelocity", jsonFromVec2F(finalVelocity)},
+                    {"approach", jsonFromVec2F(approach)},
+                    {"flip", flip},
+                    {"flippable", flippable},
+                    {"rotation", rotation * 180.0f / std::numbers::pi},
+                    {"angularVelocity", angularVelocity * 180.0f / std::numbers::pi},
+                    {"length", length},
+                    {"destructionAction", *actionName},
+                    {"destructionImage", AssetPath::join(destructionImage)},
+                    {"destructionTime", destructionTime},
+                    {"timeToLive", timeToLive},
+                    {"layer", *layerName},
+                    {"collidesForeground", collidesForeground},
+                    {"collidesLiquid", collidesLiquid},
+                    {"underwaterOnly", underwaterOnly},
+                    {"ignoreWind", ignoreWind},
+                    {"trail", trail}};
 }
 
 void Particle::translate(Vec2F const& pos) {

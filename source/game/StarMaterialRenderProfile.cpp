@@ -36,9 +36,6 @@ import star.image_metadata_database;
 import star.math_common;
 namespace Star {
 
-extern std::expected<EnumMap<MaterialJoinType>, StarException> const MaterialJoinTypeNames = EnumMap<MaterialJoinType>::create({
-    {MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}});
-
 [[nodiscard]]
 std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchList(Json const& matchSpec, RuleMap const& ruleMap, PieceMap const& pieceMap, MatchMap const& matchMap) {
   MaterialRenderMatchList result;
@@ -210,12 +207,11 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   if (!rules) return std::unexpected(std::move(rules.error()));
   for (auto const& pair : *rules) {
     auto rule = std::make_shared<MaterialRule>();
-    if (!MaterialJoinTypeNames) return std::unexpected(MaterialJoinTypeNames.error());
     auto joinName = pair.second.getString("join", "all");
     if (!joinName) return std::unexpected(std::move(joinName.error()));
-    auto join = MaterialJoinTypeNames->getLeft(*joinName);
+    auto join = enumValue<MaterialJoinTypeNames>(*joinName);
     if (!join) return std::unexpected(std::move(join.error()));
-    rule->join = join->get();
+    rule->join = *join;
     auto entries = pair.second.getArray("entries", {});
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entryConfig : *entries) {

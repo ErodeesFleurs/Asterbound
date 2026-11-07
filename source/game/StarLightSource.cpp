@@ -9,12 +9,6 @@ import star.data_stream_extra;
 
 namespace Star {
 
-extern std::expected<EnumMap<LightType>, StarException> const LightTypeNames = EnumMap<LightType>::create({
-  {LightType::Spread, "Spread"},
-  {LightType::Point, "Point"},
-  {LightType::PointAsSpread, "PointAsSpread"}
-});
-
 void LightSource::translate(Vec2F const& pos) {
   position += pos;
 }

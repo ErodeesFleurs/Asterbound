@@ -190,12 +190,4 @@ std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) 
 OverheadBar::OverheadBar(std::optional<String> icon, float percentage, Color color, bool detailOnly)
   : icon(std::move(icon)), percentage(percentage), color(std::move(color)), detailOnly(detailOnly) {}
 
-extern std::expected<EnumMap<EntityHighlightEffectType>, StarException> const EntityHighlightEffectTypeNames = EnumMap<EntityHighlightEffectType>::create({
-  {EntityHighlightEffectType::None, "none"},
-  {EntityHighlightEffectType::Interactive, "interactive"},
-  {EntityHighlightEffectType::Inspectable, "inspectable"},
-  {EntityHighlightEffectType::Interesting, "interesting"},
-  {EntityHighlightEffectType::Inspected, "inspected"}
-});
-
 }

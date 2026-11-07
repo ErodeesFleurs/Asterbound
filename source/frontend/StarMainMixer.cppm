@@ -45,7 +45,7 @@ private:
   std::optional<std::reference_wrapper<WorldPainter>> m_worldPainter;
   std::shared_ptr<Mixer> m_mixer;
   Set<MixerGroup> m_mutedGroups;
-  Map<MixerGroup, float> m_groupVolumes;
+  std::map<MixerGroup, float> m_groupVolumes;
 };
 
 }

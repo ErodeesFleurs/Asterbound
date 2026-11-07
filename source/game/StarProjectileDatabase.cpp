@@ -289,10 +289,10 @@ projectileConfig->lightPosition = std::move(*result114);
 if (!result115) return std::unexpected(std::move(result115.error()));
 if (auto lightType = std::move(*result115))
     {
-if (!LightTypeNames) return std::unexpected(LightTypeNames.error());
-auto result116 = LightTypeNames->getLeft(*lightType);
-if (!result116) return std::unexpected(std::move(result116.error()));
-projectileConfig->lightType = result116->get();
+  auto result116 = enumValue<LightTypeNames>(*lightType);
+  if (!result116)
+    return std::unexpected(std::move(result116.error()));
+  projectileConfig->lightType = *result116;
 }
   else
     {

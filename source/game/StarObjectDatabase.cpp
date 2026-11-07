@@ -974,12 +974,10 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (*type) {
-    if (!LightTypeNames)
-      return std::unexpected(LightTypeNames.error());
-    auto namedType = LightTypeNames->getLeft(**type);
+    auto namedType = enumValue<LightTypeNames>(**type);
     if (!namedType)
       return std::unexpected(std::move(namedType.error()));
-    object.lightType = namedType->get();
+    object.lightType = *namedType;
   } else {
     auto pointLight = config.getBool("pointLight", false);
     if (!pointLight)
