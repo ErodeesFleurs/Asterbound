@@ -55,14 +55,6 @@ std::size_t const DefinitionsCacheSize = 20;
 
 namespace Dungeon {
 
-  extern std::expected<EnumMap<Dungeon::Direction>, StarException> const DungeonDirectionNames = EnumMap<Dungeon::Direction>::create({
-      {Dungeon::Direction::Left, "left"},
-      {Dungeon::Direction::Right, "right"},
-      {Dungeon::Direction::Up, "up"},
-      {Dungeon::Direction::Down, "down"},
-      {Dungeon::Direction::Unknown, "unknown"},
-      {Dungeon::Direction::Any, "any"},
-  });
 
   [[nodiscard]] std::expected<Direction, StarException> flipDirection(Direction direction) {
     if (direction == Direction::Left) return Direction::Right;

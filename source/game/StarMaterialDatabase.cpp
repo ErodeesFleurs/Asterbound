@@ -90,14 +90,13 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!logged) return std::unexpected(std::move(logged.error()));
         continue;
       }
-      if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
       auto collisionName = meta.getString("collisionKind");
       if (!collisionName) return std::unexpected(std::move(collisionName.error()));
-      auto collision = CollisionKindNames->getLeft(*collisionName);
+      auto collision = enumValue<CollisionKindNames>(*collisionName);
       if (!collision) return std::unexpected(std::move(collision.error()));
-      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(collision->get()));
+      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(*collision));
       if (!blocks) return std::unexpected(std::move(blocks.error()));
-      setMetaMaterial(matId, MetaMaterialInfo{matName, matId, collision->get(), *blocks});
+      setMetaMaterial(matId, MetaMaterialInfo{matName, matId, *collision, *blocks});
     }
     return {};
   };
@@ -230,12 +229,11 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!value) return std::unexpected(std::move(value.error()));
         material.damageParameters = std::move(*value);
       }
-      if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
       auto collisionName = config->getString("collisionKind", "block");
       if (!collisionName) return std::unexpected(std::move(collisionName.error()));
-      auto collision = CollisionKindNames->getLeft(*collisionName);
+      auto collision = enumValue<CollisionKindNames>(*collisionName);
       if (!collision) return std::unexpected(std::move(collision.error()));
-      material.collisionKind = collision->get();
+      material.collisionKind = *collision;
       {
         auto value = config->getBool("foregroundOnly", false);
         if (!value) return std::unexpected(std::move(value.error()));

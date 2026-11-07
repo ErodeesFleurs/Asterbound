@@ -363,10 +363,9 @@ namespace Tiled {
       auto direction = properties.opt<String>("connectDirection");
       if (!direction) return std::unexpected(std::move(direction.error()));
       if (*direction) {
-        if (!DungeonDirectionNames) return std::unexpected(DungeonDirectionNames.error());
-        auto parsed = DungeonDirectionNames->getLeft(**direction);
+        auto parsed = enumValue<DungeonDirectionNames>(**direction);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
-        configured.direction = parsed->get();
+        configured.direction = *parsed;
       }
       connector = std::move(configured);
     }

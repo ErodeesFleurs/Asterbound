@@ -563,7 +563,13 @@ namespace Dungeon {
     Unknown = 4,
     Any = 5
   };
-  extern std::expected<EnumMap<Dungeon::Direction>, StarException> const DungeonDirectionNames;
+  inline constexpr auto DungeonDirectionNames =
+    sortedEnumNames(std::to_array<std::pair<Direction, std::string_view>>({{Direction::Left, "left"},
+                                                                           {Direction::Right, "right"},
+                                                                           {Direction::Up, "up"},
+                                                                           {Direction::Down, "down"},
+                                                                           {Direction::Unknown, "unknown"},
+                                                                           {Direction::Any, "any"}}));
 
   class Connector {
   public:

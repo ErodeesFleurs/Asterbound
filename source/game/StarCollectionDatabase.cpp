@@ -43,11 +43,6 @@ import star.item_database;
 
 namespace Star {
 
-extern std::expected<EnumMap<CollectionType>, StarException> const CollectionTypeNames = EnumMap<CollectionType>::create({
-  {CollectionType::Generic, "generic"},
-  {CollectionType::Item, "item"},
-  {CollectionType::Monster, "monster"}
-});
 
 Collection::Collection() : name(), title(), type() {}
 
@@ -62,8 +57,6 @@ CollectionDatabase::CollectionDatabase(Root& root) : m_root(root) {}
 
 std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionDatabase::create(Root& root) {
   auto result = std::shared_ptr<CollectionDatabase>(new CollectionDatabase(root));
-  if (!CollectionTypeNames)
-    return std::unexpected(CollectionTypeNames.error());
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
@@ -88,12 +81,12 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
       auto typeName = config->getString("type", "generic");
       if (!typeName)
         return std::unexpected(std::move(typeName.error()));
-      auto type = CollectionTypeNames->maybeLeftRef(*typeName);
+      auto type = maybeEnumValue<CollectionTypeNames>(*typeName);
       if (!type)
         return std::unexpected(std::move(type.error()));
       if (!*type)
         return std::unexpected(CollectionDatabaseException(strf("Unknown collection type '{}'", *typeName)));
-      Collection collection(*name, (*type)->get(), *title);
+      Collection collection(*name, **type, *title);
       auto configs = config->get("collectables").and_then([](Json const& value) { return value.iterateObject(); });
       if (!configs)
         return std::unexpected(std::move(configs.error()));

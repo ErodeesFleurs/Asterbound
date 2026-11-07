@@ -811,8 +811,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
 
 std::expected<bool, StarException> MainInterface::paneIdAvailable(String const& id) {
   if (id.empty() || id == "$ui") return false;
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  return !MainInterfacePanesNames->getLeft(id).has_value();
+  return !enumValue<MainInterfacePanesNames>(id).has_value();
 }
 
 std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const {
@@ -870,10 +869,9 @@ std::expected<void, StarException> MainInterface::destroyPane(String const& id) 
 std::expected<std::shared_ptr<Pane>, StarException> MainInterface::findRegisteredPane(String const& id) {
   if (auto instance = m_paneInstances.maybeRef(id))
     return std::shared_ptr<Pane>(instance->get().first);
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) return std::shared_ptr<Pane>{};
-  auto pane = m_paneManager.maybeRegisteredPane(type->get());
+  auto pane = m_paneManager.maybeRegisteredPane(*type);
   if (!pane) return std::unexpected(std::move(pane.error()));
   return *pane;
 }
@@ -888,26 +886,24 @@ std::expected<void, StarException> MainInterface::displayRegisteredPane(String c
     }
     return m_paneManager.displayPane(layer, pane);
   }
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) {
     if (!m_uiController) return std::unexpected(std::move(type.error()));
     auto opened = m_uiController->invoke<Json>("open", id);
     if (!opened) return std::unexpected(std::move(opened.error()));
     return {};
   }
-  auto displayed = m_paneManager.displayRegisteredPane(type->get());
+  auto displayed = m_paneManager.displayRegisteredPane(*type);
   if (!displayed) return std::unexpected(std::move(displayed.error()));
   return {};
 }
 
 std::expected<void, StarException> MainInterface::togglePane(String const& id) {
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (type) {
-    if (type->get() == MainInterfacePanes::CraftingPlain)
+    if (*type == MainInterfacePanes::CraftingPlain)
       return togglePlainCraftingWindow();
-    auto toggled = m_paneManager.toggleRegisteredPane(type->get());
+    auto toggled = m_paneManager.toggleRegisteredPane(*type);
     if (!toggled) return std::unexpected(std::move(toggled.error()));
   } else {
     auto toggled = m_uiController->invoke<Json>("toggle", id);

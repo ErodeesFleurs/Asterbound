@@ -9,11 +9,6 @@ import star.chat_types;
 
 namespace Star {
 
-extern std::expected<EnumMap<ChatSendMode>, StarException> const ChatSendModeNames = EnumMap<ChatSendMode>::create({
-    {ChatSendMode::Broadcast, "Broadcast"},
-    {ChatSendMode::Local, "Local"},
-    {ChatSendMode::Party, "Party"}
-  });
 
 MessageContext::MessageContext() : mode() {}
 
@@ -21,15 +16,6 @@ MessageContext::MessageContext(Mode mode) : mode(mode) {}
 
 MessageContext::MessageContext(Mode mode, String const& channelName) : mode(mode), channelName(channelName) {}
 
-extern std::expected<EnumMap<MessageContext::Mode>, StarException> const MessageContextModeNames = EnumMap<MessageContext::Mode>::create({
-    {MessageContext::Mode::Local, "Local"},
-    {MessageContext::Mode::Party, "Party"},
-    {MessageContext::Mode::Broadcast, "Broadcast"},
-    {MessageContext::Mode::Whisper, "Whisper"},
-    {MessageContext::Mode::CommandResult, "CommandResult"},
-    {MessageContext::Mode::RadioMessage, "RadioMessage"},
-    {MessageContext::Mode::World, "World"}
-  });
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MessageContext& messageContext) {
   auto mode = ds.read(messageContext.mode);
@@ -63,12 +49,11 @@ std::expected<ChatReceivedMessage, StarException> ChatReceivedMessage::create(Js
   if (!context) return std::unexpected(std::move(context.error()));
   auto modeName = context->getString("mode");
   if (!modeName) return std::unexpected(std::move(modeName.error()));
-  if (!MessageContextModeNames) return std::unexpected(MessageContextModeNames.error());
-  auto mode = MessageContextModeNames->getLeft(*modeName);
+  auto mode = enumValue<MessageContextModeNames>(*modeName);
   if (!mode) return std::unexpected(std::move(mode.error()));
   auto channel = context->getString("channelName", "");
   if (!channel) return std::unexpected(std::move(channel.error()));
-  message.context = MessageContext(mode->get(), *channel);
+  message.context = MessageContext(*mode, *channel);
   auto from = json.getUInt("fromConnection", 0);
   if (!from) return std::unexpected(std::move(from.error()));
   message.fromConnection = *from;
@@ -88,20 +73,16 @@ std::expected<ChatReceivedMessage, StarException> ChatReceivedMessage::create(Js
 }
 
 std::expected<Json, StarException> ChatReceivedMessage::toJson() const {
-  if (!MessageContextModeNames) return std::unexpected(MessageContextModeNames.error());
-  auto mode = MessageContextModeNames->getRight(context.mode);
+  auto mode = enumName<MessageContextModeNames>(context.mode);
   if (!mode) return std::unexpected(std::move(mode.error()));
   return Json(JsonObject{
-    {"context", JsonObject{
-      {"mode", mode->get()},
-      {"channelName", context.channelName.empty() ? Json() : Json(context.channelName)}
-    }},
+    {"context",
+     JsonObject{{"mode", *mode}, {"channelName", context.channelName.empty() ? Json() : Json(context.channelName)}}},
     {"fromConnection", fromConnection},
     {"fromNick", fromNick.empty() ? Json() : fromNick},
     {"portrait", portrait.empty() ? Json() : portrait},
     {"text", text},
-    {"data", data}
-  });
+    {"data", data}});
 }
 
 

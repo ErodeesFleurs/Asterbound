@@ -1,5 +1,6 @@
 import star.json;
 import star.ordered_map;
+import star.map;
 import star.bi_map;
 import star.thread;
 import star.list;
@@ -262,6 +263,139 @@ const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "Symlink
   ASSERT_TRUE(loopSibling);
   EXPECT_FALSE(*loopSibling);
 });
+
+const GameTestRegistration
+  assetsAnimationStateNamesAndIndices("AssetsTest", "AnimationStateNamesAndIndices", [](GameTest&) {
+    auto config = Json::parse(R"({
+      "stateTypes":{"movement":{"states":{
+        "é":{},
+        "z":{"cycle":1,"mode":"transition","transition":"a"},
+        "a":{"frames":2,"cycle":1,"properties":{"value":7},"frameProperties":{"value":[10,20]}}
+      }}}
+    })");
+    ASSERT_TRUE(config);
+    auto animation = AnimatedPartSet::create(*config, 1);
+    ASSERT_TRUE(animation);
+    auto names = animation->states("movement");
+    ASSERT_TRUE(names);
+    EXPECT_EQ(*names, (StringList{"a", "z", "é"}));
+    auto initial = animation->activeState("movement");
+    ASSERT_TRUE(initial);
+    EXPECT_EQ(initial->get().stateName, "a");
+    auto initialIndex = animation->activeStateIndex("movement");
+    ASSERT_TRUE(initialIndex);
+    EXPECT_EQ(*initialIndex, 0u);
+    for (std::size_t index = 0; index < names->size(); ++index) {
+      auto changed = animation->setActiveStateIndex("movement", index);
+      ASSERT_TRUE(changed);
+      auto active = animation->activeState("movement");
+      ASSERT_TRUE(active);
+      EXPECT_EQ(active->get().stateName, (*names)[index]);
+      auto roundTrip = animation->activeStateIndex("movement");
+      ASSERT_TRUE(roundTrip);
+      EXPECT_EQ(*roundTrip, index);
+    }
+    for (auto index : {names->size(), std::numeric_limits<std::size_t>::max()}) {
+      auto invalid = animation->setActiveStateIndex("movement", index);
+      ASSERT_FALSE(invalid);
+      EXPECT_TRUE(invalid.error().is<MapException>());
+    }
+    auto unchanged = animation->activeStateIndex("movement");
+    ASSERT_TRUE(unchanged);
+    EXPECT_EQ(*unchanged, 2u);
+    auto state = animation->getState("movement", "a");
+    ASSERT_TRUE(state);
+    EXPECT_EQ(state->get().frames, 2u);
+    auto frame = animation->getStateFrameProperty("movement", "value", "a", 1);
+    ASSERT_TRUE(frame);
+    EXPECT_EQ(*frame, Json(20));
+    auto fallback = animation->getStateFrameProperty("movement", "value", "a", 2);
+    ASSERT_TRUE(fallback);
+    EXPECT_EQ(*fallback, Json(7));
+    auto negativeFrame = animation->getStateFrameProperty("movement", "value", "a", -1);
+    ASSERT_TRUE(negativeFrame);
+    EXPECT_EQ(*negativeFrame, Json(7));
+    ASSERT_TRUE(animation->setActiveStateIndex("movement", 1));
+    ASSERT_TRUE(animation->update(1.1f));
+    auto transitioned = animation->activeStateIndex("movement");
+    ASSERT_TRUE(transitioned);
+    EXPECT_EQ(*transitioned, 0u);
+    ASSERT_TRUE(animation->setActiveStateIndex("movement", 1));
+    ASSERT_TRUE(animation->finishAnimations());
+    auto finished = animation->activeState("movement");
+    ASSERT_TRUE(finished);
+    EXPECT_EQ(finished->get().stateName, "a");
+    EXPECT_FLOAT_EQ(finished->get().timer, 1);
+    auto repeated = animation->setActiveStateIndex("movement", 0);
+    ASSERT_TRUE(repeated);
+    EXPECT_FALSE(*repeated);
+    auto restarted = animation->setActiveStateIndex("movement", 0, true, true);
+    ASSERT_TRUE(restarted);
+    EXPECT_TRUE(*restarted);
+    auto reverse = animation->activeStateReverse("movement");
+    ASSERT_TRUE(reverse);
+    EXPECT_TRUE(*reverse);
+    AnimatedPartSet copy = *animation;
+    *animation = AnimatedPartSet();
+    ASSERT_TRUE(copy.update(0.75f));
+    auto retained = copy.activeState("movement");
+    ASSERT_TRUE(retained);
+    EXPECT_EQ(retained->get().stateName, "a");
+    EXPECT_EQ(retained->get().frame, 0u);
+    EXPECT_EQ(retained->get().properties.value("value"), Json(10));
+  });
+
+const GameTestRegistration
+  assetsAnimationMissingStatesStayChecked("AssetsTest", "AnimationMissingStatesStayChecked", [](GameTest&) {
+    auto config = Json::parse(R"({
+      "stateTypes":{"movement":{"default":"z","states":{
+        "a":{},
+        "z":{"mode":"transition","transition":"missing"}
+      }}}
+    })");
+    ASSERT_TRUE(config);
+    auto animation = AnimatedPartSet::create(*config, 1);
+    ASSERT_TRUE(animation);
+    auto index = animation->activeStateIndex("movement");
+    ASSERT_TRUE(index);
+    EXPECT_EQ(*index, 1u);
+    auto state = animation->getState("movement", "missing");
+    ASSERT_FALSE(state);
+    EXPECT_TRUE(state.error().is<MapException>());
+    auto changed = animation->setActiveState("movement", "missing");
+    ASSERT_FALSE(changed);
+    EXPECT_TRUE(changed.error().is<MapException>());
+    auto frame = animation->getStateFrameProperty("movement", "value", "missing", 0);
+    ASSERT_FALSE(frame);
+    EXPECT_TRUE(frame.error().is<MapException>());
+    AnimatedPartSet::Sample sample;
+    animation->prepareSample(sample, 1);
+    auto presentation = animation->setPresentationState("movement", "missing", false, false, sample);
+    ASSERT_FALSE(presentation);
+    EXPECT_TRUE(presentation.error().is<MapException>());
+    auto update = animation->update(1.1f);
+    ASSERT_FALSE(update);
+    EXPECT_TRUE(update.error().is<MapException>());
+    auto finish = animation->finishAnimations();
+    ASSERT_FALSE(finish);
+    EXPECT_TRUE(finish.error().is<MapException>());
+    auto unchanged = animation->activeStateIndex("movement");
+    ASSERT_TRUE(unchanged);
+    EXPECT_EQ(*unchanged, 1u);
+    auto missingType = animation->setActiveStateIndex("missing", 0);
+    ASSERT_FALSE(missingType);
+    EXPECT_TRUE(missingType.error().is<MapException>());
+    auto emptyConfig = Json::parse(R"({"stateTypes":{"movement":{"states":{}}}})");
+    ASSERT_TRUE(emptyConfig);
+    auto empty = AnimatedPartSet::create(*emptyConfig, 1);
+    ASSERT_FALSE(empty);
+    EXPECT_TRUE(empty.error().is<MapException>());
+    auto invalidDefaultConfig = Json::parse(R"({"stateTypes":{"movement":{"default":"missing","states":{"a":{}}}}})");
+    ASSERT_TRUE(invalidDefaultConfig);
+    auto invalidDefault = AnimatedPartSet::create(*invalidDefaultConfig, 1);
+    ASSERT_FALSE(invalidDefault);
+    EXPECT_TRUE(invalidDefault.error().is<MapException>());
+  });
 
 const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("AssetsTest", "ConstAnimationCachesRefreshFramesAndParts", [](GameTest&) {
   auto config = Json::parse(R"({

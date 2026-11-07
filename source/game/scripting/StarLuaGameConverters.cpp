@@ -104,15 +104,6 @@ template <typename Enum>
   return names->maybeLeft(value);
 }
 
-template <typename Enum>
-[[nodiscard]] std::expected<Enum, StarException> requiredEnum(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
-  if (!names)
-    return std::unexpected(names.error());
-  auto result = names->getLeft(value);
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return result->get();
-}
 
 }
 
@@ -165,27 +156,25 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
 }
 
 std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack stack, CollisionKind k) {
-  auto name = enumName(CollisionKindNames, k);
+  auto name = Star::enumName<CollisionKindNames>(k);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return stack.push(name->get());
+  return stack.push(*name);
 }
 
 std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
   if (v.is<LuaString>())
-    return enumValue(CollisionKindNames, v.toString());
+    return maybeEnumValue<CollisionKindNames>(v.toString());
   return std::nullopt;
 }
 
 std::expected<void, StarException> LuaConverter<CollisionSet>::from(LuaStack stack, CollisionSet const& s) {
-  if (!CollisionKindNames)
-    return std::unexpected(CollisionKindNames.error());
-  auto created = stack.createTable(static_cast<int>(CollisionKindNames->size()), 0);
+  auto created = stack.createTable(static_cast<int>(CollisionKindNames.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
   int i = 1;
-  for (auto const& value : *CollisionKindNames) {
+  for (auto const& value : CollisionKindNames) {
     if (s.contains(value.first)) {
       auto result = table.set(i++, value.second);
       if (!result)
@@ -747,10 +736,10 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
 }
 
 std::expected<void, StarException> LuaConverter<Collection>::from(LuaStack stack, Collection const& c) {
-  auto type = enumName(CollectionTypeNames, c.type);
+  auto type = Star::enumName<CollectionTypeNames>(c.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  return makeTable(stack, "name", c.name, "type", type->get(), "title", c.title);
+  return makeTable(stack, "name", c.name, "type", *type, "title", c.title);
 }
 
 std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>::to(LuaStackValue v) {
@@ -763,7 +752,7 @@ std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = enumValue(CollectionTypeNames, type);
+  auto converted = maybeEnumValue<CollectionTypeNames>(type);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
@@ -880,22 +869,27 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       return std::unexpected(StarException("Use of expired blackboard"));
     return locked->set(type, key, value);
   };
-  auto getMethod = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>("get",
-    [get](std::weak_ptr<Blackboard> const& board, String const& type, String const& key) -> std::expected<LuaValue, StarException> {
-      auto converted = requiredEnum(NodeParameterTypeNames, type);
+  auto getMethod = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
+    "get",
+    [get](std::weak_ptr<Blackboard> const& board, String const& type,
+          String const& key) -> std::expected<LuaValue, StarException> {
+      auto converted = Star::enumValue<NodeParameterTypeNames>(type);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       return get(board, *converted, key);
     });
   if (!getMethod)
     return std::unexpected(std::move(getMethod.error()));
-  auto setMethod = methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>("set",
-    [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key, LuaValue const& value) -> std::expected<void, StarException> {
-      auto converted = requiredEnum(NodeParameterTypeNames, type);
-      if (!converted)
-        return std::unexpected(std::move(converted.error()));
-      return set(board, *converted, key, value);
-    });
+  auto setMethod =
+    methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>(
+      "set",
+      [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key,
+            LuaValue const& value) -> std::expected<void, StarException> {
+        auto converted = Star::enumValue<NodeParameterTypeNames>(type);
+        if (!converted)
+          return std::unexpected(std::move(converted.error()));
+        return set(board, *converted, key, value);
+      });
   if (!setMethod)
     return std::unexpected(std::move(setMethod.error()));
   static constexpr std::array<std::tuple<std::string_view, std::string_view, NodeParameterType>, 8> typedMethods{{

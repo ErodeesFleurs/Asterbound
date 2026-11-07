@@ -7,6 +7,7 @@ import star.json;
 import star.lua;
 import star.lua_converters;
 import star.lexical_cast;
+import star.map;
 import star.rpc_promise;
 
 #include "gtest/gtest.h"
@@ -353,12 +354,36 @@ struct TestUserData2 {
   int field;
 };
 
+struct ReentrantUserData {
+  int field;
+  static inline std::function<std::expected<void, StarException>()> beforeRegistration;
+  static inline std::weak_ptr<int> failedRegistrationLifetime;
+};
+
 namespace Star {
 template <>
 struct LuaConverter<TestUserData1> : LuaUserDataConverter<TestUserData1> {};
 
 template <>
 struct LuaConverter<TestUserData2> : LuaUserDataConverter<TestUserData2> {};
+
+template <> struct LuaUserDataMethods<ReentrantUserData> {
+  static std::expected<LuaMethods<ReentrantUserData>, StarException> make() {
+    auto beforeRegistration = std::exchange(ReentrantUserData::beforeRegistration, {});
+    auto offset = std::make_shared<int>(0);
+    if (beforeRegistration) {
+      ReentrantUserData::failedRegistrationLifetime = offset;
+      if (auto prepared = beforeRegistration(); !prepared)
+        return std::unexpected(std::move(prepared.error()));
+    }
+    LuaMethods<ReentrantUserData> methods;
+    auto registered = methods.registerMethodWithSignature<int, ReentrantUserData const&>(
+      "field", [offset](ReentrantUserData const& data) { return data.field + *offset; });
+    if (!registered)
+      return std::unexpected(std::move(registered.error()));
+    return methods;
+  }
+};
 }
 
 TEST(LuaTest, UserDataTest) {
@@ -379,6 +404,13 @@ TEST(LuaTest, UserDataTest) {
   auto userdata1Result = luaEngine->createUserData(TestUserData1{1});
   ASSERT_TRUE(userdata1Result);
   auto userdata1 = std::move(*userdata1Result);
+  EXPECT_EQ(userdata1.is<TestUserData2>(), false);
+  auto unregistered = userdata1.get<TestUserData2>();
+  ASSERT_FALSE(unregistered);
+  EXPECT_TRUE(unregistered.error().is<LuaException>());
+  auto borrowedUnregistered = luaEngine->luaMaybeTo<TestUserData2>(LuaValue(userdata1));
+  ASSERT_TRUE(borrowedUnregistered);
+  EXPECT_FALSE(*borrowedUnregistered);
   auto userdata2Result = luaEngine->createUserData(TestUserData2{2});
   ASSERT_TRUE(userdata2Result);
   auto userdata2 = std::move(*userdata2Result);
@@ -426,6 +458,40 @@ TEST(LuaTest, UserDataTest) {
   auto rejectedUserdata = luaEngine->luaMaybeTo<TestUserData1>(notuserdata);
   ASSERT_TRUE(rejectedUserdata);
   EXPECT_FALSE(*rejectedUserdata);
+}
+
+TEST(LuaTest, RecursiveUserDataRegistrationRejectsDuplicateAndReleasesFailedMethods) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  std::optional<LuaUserData> nested;
+  ReentrantUserData::beforeRegistration = [&]() -> std::expected<void, StarException> {
+    auto created = (*engine)->createUserData(ReentrantUserData{7});
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    nested.emplace(std::move(*created));
+    return {};
+  };
+
+  auto failed = (*engine)->createUserData(ReentrantUserData{99});
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<MapException>());
+  ASSERT_TRUE(nested);
+  ASSERT_TRUE(context->set("nested", *nested));
+  EXPECT_EQ(context->eval<int>("nested:field()"), 7);
+
+  // The failed metatable owns native method captures until both registry
+  // references are released and its wrapped functions are collected.
+  ASSERT_TRUE((*engine)->collectGarbage());
+  ASSERT_TRUE((*engine)->collectGarbage());
+  ASSERT_TRUE((*engine)->collectGarbage());
+  EXPECT_TRUE(ReentrantUserData::failedRegistrationLifetime.expired());
+
+  auto repeated = (*engine)->createUserData(ReentrantUserData{11});
+  ASSERT_TRUE(repeated);
+  ASSERT_TRUE(context->set("repeated", *repeated));
+  EXPECT_EQ(context->eval<int>("nested:field() + repeated:field()"), 18);
 }
 
 namespace Star {

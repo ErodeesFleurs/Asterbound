@@ -337,9 +337,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto overrideName = config.getString("collisionOverride", "None");
   if (!overrideName)
     return std::unexpected(std::move(overrideName.error()));
-  if (!TileCollisionOverrideNames)
-    return std::unexpected(TileCollisionOverrideNames.error());
-  auto collisionOverride = TileCollisionOverrideNames->maybeLeft(*overrideName);
+  auto collisionOverride = maybeEnumValue<TileCollisionOverrideNames>(*overrideName);
   if (!collisionOverride)
     return std::unexpected(std::move(collisionOverride.error()));
   item->m_collisionOverride = collisionOverride->value_or(TileCollisionOverride::None);
@@ -434,12 +432,10 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
             if (collisionKindFromOverride(m_collisionOverride) != *baseKind)
               break;
           }
-          if (!TileCollisionOverrideNames)
-            return std::unexpected(TileCollisionOverrideNames.error());
-          auto name = TileCollisionOverrideNames->getRight(m_collisionOverride);
+          auto name = enumName<TileCollisionOverrideNames>(m_collisionOverride);
           if (!name)
             return std::unexpected(std::move(name.error()));
-          auto stored = player->get().setSecretProperty(CollisionOverridePropertyKey, name->get());
+          auto stored = player->get().setSecretProperty(CollisionOverridePropertyKey, *name);
           if (!stored)
             return std::unexpected(std::move(stored.error()));
         }
@@ -932,9 +928,7 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
     auto name = collision->toString();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (!TileCollisionOverrideNames)
-      return std::unexpected(TileCollisionOverrideNames.error());
-    auto value = TileCollisionOverrideNames->maybeLeft(*name);
+    auto value = maybeEnumValue<TileCollisionOverrideNames>(*name);
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_collisionOverride = value->value_or(TileCollisionOverride::None);

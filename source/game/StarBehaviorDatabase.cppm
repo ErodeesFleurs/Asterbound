@@ -36,7 +36,16 @@ enum class NodeParameterType : std::uint8_t {
   Table,
   String
 };
-extern std::expected<EnumMap<NodeParameterType>, StarException> const NodeParameterTypeNames;
+inline constexpr auto NodeParameterTypeNames = sortedEnumNames(
+  std::to_array<std::pair<NodeParameterType, std::string_view>>({{NodeParameterType::Json, "json"},
+                                                                 {NodeParameterType::Entity, "entity"},
+                                                                 {NodeParameterType::Position, "position"},
+                                                                 {NodeParameterType::Vec2, "vec2"},
+                                                                 {NodeParameterType::Number, "number"},
+                                                                 {NodeParameterType::Bool, "bool"},
+                                                                 {NodeParameterType::List, "list"},
+                                                                 {NodeParameterType::Table, "table"},
+                                                                 {NodeParameterType::String, "string"}}));
 
 using NodeParameterValue = std::variant<String, Json>;
 using NodeParameter = std::pair<NodeParameterType, NodeParameterValue>;
@@ -56,7 +65,11 @@ enum class BehaviorNodeType : std::uint16_t {
   Composite,
   Module
 };
-extern std::expected<EnumMap<BehaviorNodeType>, StarException> const BehaviorNodeTypeNames;
+inline constexpr auto BehaviorNodeTypeNames = sortedEnumNames(
+  std::to_array<std::pair<BehaviorNodeType, std::string_view>>({{BehaviorNodeType::Action, "Action"},
+                                                                {BehaviorNodeType::Decorator, "Decorator"},
+                                                                {BehaviorNodeType::Composite, "Composite"},
+                                                                {BehaviorNodeType::Module, "Module"}}));
 
 enum class CompositeType : std::uint16_t {
   Sequence,
@@ -65,7 +78,12 @@ enum class CompositeType : std::uint16_t {
   Dynamic,
   Randomize
 };
-extern std::expected<EnumMap<CompositeType>, StarException> const CompositeTypeNames;
+inline constexpr auto CompositeTypeNames =
+  sortedEnumNames(std::to_array<std::pair<CompositeType, std::string_view>>({{CompositeType::Sequence, "Sequence"},
+                                                                             {CompositeType::Selector, "Selector"},
+                                                                             {CompositeType::Parallel, "Parallel"},
+                                                                             {CompositeType::Dynamic, "Dynamic"},
+                                                                             {CompositeType::Randomize, "Randomize"}}));
 
 // replaces global tags in nodeParameters in place
 [[nodiscard]] std::expected<NodeParameterValue, StarException> replaceBehaviorTag(NodeParameterValue const& parameter, StringMap<NodeParameterValue> const& treeParameters);

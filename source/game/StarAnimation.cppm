@@ -55,7 +55,10 @@ private:
   explicit Animation(Root& root) : m_root(root) {}
   [[nodiscard]] std::expected<void, StarException> initialize(Json config, String const& directory);
   enum AnimationMode { Stop, EndAndDisappear, LoopForever };
-  static std::expected<EnumMap<AnimationMode>, StarException> const AnimationModeNames;
+  inline static constexpr auto AnimationModeNames = sortedEnumNames(
+    std::to_array<std::pair<AnimationMode, std::string_view>>({{AnimationMode::Stop, "Stop"},
+                                                               {AnimationMode::EndAndDisappear, "EndAndDisappear"},
+                                                               {AnimationMode::LoopForever, "LoopForever"}}));
   std::reference_wrapper<Root> m_root;
 
   AnimationMode m_mode;

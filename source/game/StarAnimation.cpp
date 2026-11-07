@@ -68,12 +68,10 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto modeName = config.getString("mode", "endAndDisappear");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
-  if (!AnimationModeNames)
-    return std::unexpected(AnimationModeNames.error());
-  auto mode = AnimationModeNames->getLeft(*modeName);
+  auto mode = enumValue<AnimationModeNames>(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
-  m_mode = mode->get();
+  m_mode = *mode;
   auto base = config.getString("frames", "");
   if (!base)
     return std::unexpected(std::move(base.error()));
@@ -231,7 +229,4 @@ void Animation::reset() {
   m_tagValues["index"] = "0";
 }
 
-std::expected<EnumMap<Animation::AnimationMode>, StarException> const Animation::AnimationModeNames = EnumMap<AnimationMode>::create({{AnimationMode::Stop, "Stop"},
-    {AnimationMode::EndAndDisappear, "EndAndDisappear"},
-    {AnimationMode::LoopForever, "LoopForever"}});
 }
