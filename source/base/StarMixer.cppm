@@ -176,7 +176,7 @@ private:
 
   List<std::int16_t> m_mixBuffer;
 
-  Map<MixerGroup, RampedValue> m_groupVolumes;
+  std::map<MixerGroup, RampedValue> m_groupVolumes;
   std::atomic<float> m_speed;
 };
 

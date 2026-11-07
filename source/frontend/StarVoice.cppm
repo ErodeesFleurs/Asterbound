@@ -32,10 +32,13 @@ struct VoiceExceptionTag {
 using VoiceException = StarError<VoiceExceptionTag, StarException>;
 
 enum class VoiceInputMode : std::uint8_t { VoiceActivity, PushToTalk };
-extern std::expected<EnumMap<VoiceInputMode>, StarException> const VoiceInputModeNames;
+inline constexpr auto VoiceInputModeNames = sortedEnumNames(std::to_array<std::pair<VoiceInputMode, std::string_view>>(
+  {{VoiceInputMode::VoiceActivity, "VoiceActivity"}, {VoiceInputMode::PushToTalk, "PushToTalk"}}));
 
 enum class VoiceChannelMode: std::uint8_t { Mono = 1, Stereo = 2 };
-extern std::expected<EnumMap<VoiceChannelMode>, StarException> const VoiceChannelModeNames;
+inline constexpr auto VoiceChannelModeNames =
+  sortedEnumNames(std::to_array<std::pair<VoiceChannelMode, std::string_view>>(
+    {{VoiceChannelMode::Mono, "Mono"}, {VoiceChannelMode::Stereo, "Stereo"}}));
 
 class VoiceAudioStream;
 class ApplicationController;

@@ -2,6 +2,7 @@ import std;
 import star.format;
 import star.json;
 import star.string;
+import star.hash;
 import star.list;
 import star.image;
 import star.renderer;
@@ -151,7 +152,7 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   String id;
   Vec2U screen;
   std::optional<RectI> scissor;
-  StringMap<bool> knownEffects;
+  std::unordered_map<String, bool, Star::hash<String>, std::equal_to<>> knownEffects;
   List<RenderPrimitive> immediate;
   mutable std::mutex errorMutex;
   std::optional<StarException> deviceError;

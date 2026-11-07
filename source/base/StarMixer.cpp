@@ -270,7 +270,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
   float volume;
   float volumeVelocity;
   float targetVolume;
-  Map<MixerGroup, RampedValue> groupVolumes;
+  std::map<MixerGroup, RampedValue> groupVolumes;
 
   {
     std::lock_guard locker(m_mutex);
@@ -290,7 +290,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
   float beginVolume = volume;
   float endVolume = approach(targetVolume, volume, volumeVelocity * time);
 
-  Map<MixerGroup, float> groupEndVolumes;
+  std::map<MixerGroup, float> groupEndVolumes;
   for (auto p : groupVolumes)
     groupEndVolumes[p.first] = approach(p.second.target, p.second.value, p.second.velocity * time);
 

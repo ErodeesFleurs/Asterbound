@@ -57,16 +57,6 @@ constexpr std::uint16_t VOICE_VERSION = 1;
 import star.math_common;
 namespace Star {
 
-extern std::expected<EnumMap<VoiceInputMode>, StarException> const VoiceInputModeNames = EnumMap<VoiceInputMode>::create({
-  {VoiceInputMode::VoiceActivity, "VoiceActivity"},
-  {VoiceInputMode::PushToTalk, "PushToTalk"}
-});
-
-extern std::expected<EnumMap<VoiceChannelMode>, StarException> const VoiceChannelModeNames = EnumMap<VoiceChannelMode>::create({
-  {VoiceChannelMode::Mono, "Mono"},
-  {VoiceChannelMode::Stereo, "Stereo"}
-});
-
 inline float getAudioChunkLoudness(std::span<std::int16_t const> data, float volume) {
   if (data.empty())
     return 0.f;
@@ -264,17 +254,15 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   if (!channelModeName) return std::unexpected(std::move(channelModeName.error()));
   auto inputMode = m_inputMode;
   if (*inputModeName) {
-    if (!VoiceInputModeNames) return std::unexpected(VoiceInputModeNames.error());
-    auto parsed = VoiceInputModeNames->getLeft(**inputModeName);
+    auto parsed = enumValue<VoiceInputModeNames>(**inputModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    inputMode = parsed->get();
+    inputMode = *parsed;
   }
   auto channelMode = m_channelMode;
   if (*channelModeName) {
-    if (!VoiceChannelModeNames) return std::unexpected(VoiceChannelModeNames.error());
-    auto parsed = VoiceChannelModeNames->getLeft(**channelModeName);
+    auto parsed = enumValue<VoiceChannelModeNames>(**channelModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    channelMode = parsed->get();
+    channelMode = *parsed;
   }
   auto bitrate = config.opt("bitrate");
   if (!bitrate) return std::unexpected(std::move(bitrate.error()));

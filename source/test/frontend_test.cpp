@@ -72,6 +72,8 @@ import star.poly;
 import star.json_extra;
 import star.main_thread_dispatcher;
 import star.fixed_scheduler;
+import star.voice;
+import star.unicode;
 
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -303,6 +305,69 @@ TEST(ChatBubbleSeparation, MixedSizesChainWithoutChangingDimensions) {
   EXPECT_EQ(result->size(), box.size());
   EXPECT_EQ(separateAgainst({{1, -5, 9, 50}}, box), box);
 }
+
+const GameTestRegistration
+  voiceSettings("VoiceSettings", "NamesPreserveSettingsRoundTripAndRejectBeforeMutation", [](GameTest& fixture) {
+    // Keep capture disabled: exercise real SDL streams, Opus encoders and the
+    // voice worker without opening a recording device.
+    auto created = Voice::create(fixture.root(), {});
+    ASSERT_TRUE(created) << created.error().what();
+    auto& voice = **created;
+    auto initialized = voice.init();
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto expectState = [&](String const& input, String const& channel, int channels) {
+      auto saved = voice.saveJson();
+      auto inputName = saved.getString("inputMode");
+      auto channelName = saved.getString("channelMode");
+      ASSERT_TRUE(inputName);
+      ASSERT_TRUE(channelName);
+      EXPECT_EQ(*inputName, input);
+      EXPECT_EQ(*channelName, channel);
+      EXPECT_EQ(voice.encoderChannels(), channels);
+    };
+    expectState("PushToTalk", "Mono", 1);
+    auto defaults = voice.saveJson();
+    ASSERT_TRUE(voice.loadJson(JsonObject{}, true));
+    EXPECT_EQ(voice.saveJson(), defaults);
+    ASSERT_TRUE(voice.loadJson(JsonObject{{"inputMode", Json()}, {"channelMode", Json()}}, true));
+    EXPECT_EQ(voice.saveJson(), defaults);
+
+    ASSERT_TRUE(voice.loadJson(JsonObject{{"inputMode", "vOiCeAcTiViTy"}, {"channelMode", "sTeReO"}}, true));
+    expectState("VoiceActivity", "Stereo", 2);
+    auto stereo = voice.saveJson();
+    ASSERT_TRUE(voice.loadJson(JsonObject{}, true));
+    EXPECT_EQ(voice.saveJson(), stereo);
+    ASSERT_TRUE(voice.loadJson(JsonObject{{"inputMode", Json()}, {"channelMode", Json()}}, true));
+    EXPECT_EQ(voice.saveJson(), stereo);
+    ASSERT_TRUE(voice.loadJson(JsonObject{{"inputMode", "pUsHtOtAlK"}, {"channelMode", "mOnO"}}, true));
+    expectState("PushToTalk", "Mono", 1);
+    ASSERT_TRUE(voice.loadJson(stereo, true));
+    expectState("VoiceActivity", "Stereo", 2);
+    EXPECT_EQ(voice.saveJson(), stereo);
+
+    for (String const& field : {String("inputMode"), String("channelMode")}) {
+      for (std::string_view name : {"", "unknown", "日本語", "Mono "}) {
+        auto result = voice.loadJson(JsonObject{{"enabled", false}, {field, String(name)}}, true);
+        ASSERT_FALSE(result);
+        EXPECT_TRUE(result.error().is<MapException>());
+        EXPECT_EQ(voice.saveJson(), stereo);
+        EXPECT_EQ(voice.encoderChannels(), 2);
+      }
+      auto embeddedNull =
+        voice.loadJson(JsonObject{{"enabled", false}, {field, String(std::string_view("Mono\0", 5))}}, true);
+      ASSERT_FALSE(embeddedNull);
+      EXPECT_TRUE(embeddedNull.error().is<MapException>());
+      EXPECT_EQ(voice.saveJson(), stereo);
+      for (std::string_view bytes : {std::string_view("\xff", 1), std::string_view("Mono\xff", 5),
+                                     std::string_view("zzzz\xc3", 5), std::string_view("\xc3\xa9\xff", 3)}) {
+        auto result = voice.loadJson(JsonObject{{"enabled", false}, {field, String(bytes)}}, true);
+        ASSERT_FALSE(result);
+        EXPECT_TRUE(result.error().is<UnicodeException>());
+        EXPECT_EQ(voice.saveJson(), stereo);
+        EXPECT_EQ(voice.encoderChannels(), 2);
+      }
+    }
+  });
 
 const GameTestRegistration keybindingSpecificity("KeyBindings", "MostSpecificModifiersAndEventTypes", [](GameTest& fixture) {
   auto config = Json::parseJson(R"JSON({

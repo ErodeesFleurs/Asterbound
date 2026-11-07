@@ -33,18 +33,16 @@ namespace Star {
 
 constexpr std::string_view InputBindingConfigRoot = "modBindings";
 
-std::expected<BiMap<Key, KeyMod>, StarException> const KeysToMods = BiMap<Key, KeyMod>::create({
-  {Key::LShift, KeyMod::LShift},
-  {Key::RShift, KeyMod::RShift},
-  {Key::LCtrl, KeyMod::LCtrl},
-  {Key::RCtrl, KeyMod::RCtrl},
-  {Key::LAlt, KeyMod::LAlt},
-  {Key::RAlt, KeyMod::RAlt},
-  {Key::LGui, KeyMod::LGui},
-  {Key::RGui, KeyMod::RGui},
-  {Key::AltGr, KeyMod::AltGr},
-  {Key::ScrollLock, KeyMod::Scroll}
-});
+constexpr std::array<std::pair<Key, KeyMod>, 10> KeysToMods{{{Key::LShift, KeyMod::LShift},
+                                                             {Key::RShift, KeyMod::RShift},
+                                                             {Key::LCtrl, KeyMod::LCtrl},
+                                                             {Key::RCtrl, KeyMod::RCtrl},
+                                                             {Key::LAlt, KeyMod::LAlt},
+                                                             {Key::RAlt, KeyMod::RAlt},
+                                                             {Key::LGui, KeyMod::LGui},
+                                                             {Key::RGui, KeyMod::RGui},
+                                                             {Key::AltGr, KeyMod::AltGr},
+                                                             {Key::ScrollLock, KeyMod::Scroll}}};
 
 const KeyMod KeyModOptional = KeyMod::Num | KeyMod::Caps | KeyMod::Scroll;
 
@@ -523,18 +521,17 @@ void Input::update() {
 }
 
 std::expected<bool, StarException> Input::handleInput(InputEvent const& input, bool gameProcessed) {
-  if (!KeysToMods) return std::unexpected(KeysToMods.error());
   m_inputEvents.emplace_back(input, gameProcessed);
   if (std::holds_alternative<KeyDownEvent>(input)) {
     auto const& keyDown = std::get<KeyDownEvent>(input);
-    auto keyToMod = KeysToMods->maybeRightRef(keyDown.key);
-    if (keyToMod)
-      m_pressedMods |= keyToMod->get();
+    auto keyToMod = std::ranges::find(KeysToMods, keyDown.key, &std::pair<Key, KeyMod>::first);
+    if (keyToMod != KeysToMods.end())
+      m_pressedMods |= keyToMod->second;
 
     if (!gameProcessed && !m_textInputActive) {
       auto& state = m_keyStates[keyDown.key];
-      if (keyToMod)
-        state.mods |= keyToMod->get();
+      if (keyToMod != KeysToMods.end())
+        state.mods |= keyToMod->second;
       state.press();
       
       if (auto binds = m_bindMappings.maybeRef(keyDown.key)) {
@@ -545,14 +542,14 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
   }
   else if (std::holds_alternative<KeyUpEvent>(input)) {
     auto const& keyUp = std::get<KeyUpEvent>(input);
-    auto keyToMod = KeysToMods->maybeRightRef(keyUp.key);
-    if (keyToMod)
-      m_pressedMods &= ~keyToMod->get();
+    auto keyToMod = std::ranges::find(KeysToMods, keyUp.key, &std::pair<Key, KeyMod>::first);
+    if (keyToMod != KeysToMods.end())
+      m_pressedMods &= ~keyToMod->second;
 
     // We need to be able to release input even when gameProcessed is true, but only if it's already down.
     if (auto state = m_keyStates.maybeRef(keyUp.key)) {
-      if (keyToMod)
-        state->get().mods &= ~keyToMod->get();
+      if (keyToMod != KeysToMods.end())
+        state->get().mods &= ~keyToMod->second;
       state->get().release();
     }
 
