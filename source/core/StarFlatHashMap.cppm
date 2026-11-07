@@ -8,6 +8,14 @@ import star.hash;
 
 namespace Star {
 
+template <typename Hash, typename Equal, typename Key, typename Query>
+concept transparent_hash_lookup = requires(Hash const& hash, Equal const& equal, Key const& key, Query const& query) {
+  typename Hash::is_transparent;
+  typename Equal::is_transparent;
+  { hash(query) } -> std::convertible_to<std::size_t>;
+  { equal(key, query) } -> std::convertible_to<bool>;
+};
+
 template <typename Key, typename Mapped, typename Hash = hash<Key>, typename Equals = std::equal_to<>, typename Allocator = std::allocator<Key>>
 class FlatHashMap {
 public:
@@ -193,22 +201,16 @@ public:
   iterator find(key_type const& key);
 
   template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
-    }
-  const_iterator find(LookupKey const& key) const { return const_iterator{m_table.find(key)}; }
+    requires transparent_hash_lookup<hasher, key_equal, key_type, LookupKey>
+  const_iterator find(LookupKey const& key) const {
+    return const_iterator{m_table.find(key)};
+  }
 
   template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
-    }
-  iterator find(LookupKey const& key) { return iterator{m_table.find(key)}; }
+    requires transparent_hash_lookup<hasher, key_equal, key_type, LookupKey>
+  iterator find(LookupKey const& key) {
+    return iterator{m_table.find(key)};
+  }
   std::pair<iterator, iterator> equal_range(key_type const& key);
   std::pair<const_iterator, const_iterator> equal_range(key_type const& key) const;
 

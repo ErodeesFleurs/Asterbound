@@ -21,6 +21,9 @@ template <typename T>
 concept MapContainer = requires { typename std::remove_cvref_t<T>::StarMapContainerTag; }
     && std::same_as<typename std::remove_cvref_t<T>::StarMapContainerTag, void>;
 
+template <typename Storage, typename Key>
+concept map_lookup = requires(Storage& storage, Key const& key) { storage.find(key); };
+
 template <typename T> [[nodiscard]] std::expected<std::string, StarException> map_diagnostic_value(T const& value) {
   if constexpr (std::is_enum_v<T>) {
     return strf("{}", std::to_underlying(value));
@@ -151,31 +154,35 @@ public:
   auto value_view() const&& = delete;
 
   template <typename LookupKey = key_type>
-    requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage, LookupKey>
   iterator find(LookupKey const& key) & {
     return m_storage.find(key);
   }
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage const, LookupKey>
   const_iterator find(LookupKey const& key) const& {
     return m_storage.find(key);
   }
   template <typename LookupKey = key_type> iterator find(LookupKey const&) && = delete;
   template <typename LookupKey = key_type> const_iterator find(LookupKey const&) const&& = delete;
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
-  bool contains(LookupKey const& key) const { return find(key) != end(); }
+    requires map_lookup<Storage const, LookupKey>
+  bool contains(LookupKey const& key) const {
+    return find(key) != end();
+  }
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
-  size_type count(LookupKey const& key) const { return contains(key) ? 1 : 0; }
+    requires map_lookup<Storage const, LookupKey>
+  size_type count(LookupKey const& key) const {
+    return contains(key) ? 1 : 0;
+  }
 
   template <typename LookupKey = key_type>
-    requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage, LookupKey>
   [[nodiscard]] auto get(LookupKey const& key) & {
     return get_impl(*this, key);
   }
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage const, LookupKey>
   [[nodiscard]] auto get(LookupKey const& key) const& {
     return get_impl(*this, key);
   }
@@ -186,13 +193,13 @@ public:
   void at(key_type const&) && = delete;
   void at(key_type const&) const&& = delete;
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage const, LookupKey>
   mapped_type value(LookupKey const& key, mapped_type fallback = mapped_type()) const {
     auto position = find(key);
     return position == end() ? std::move(fallback) : position->second;
   }
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage const, LookupKey>
   std::optional<mapped_type> maybe(LookupKey const& key) const {
     auto position = find(key);
     if (position == end()) return {};
@@ -200,12 +207,12 @@ public:
   }
   // Borrow the mapped slot itself, including when mapped_type is a reference_wrapper.
   template <typename LookupKey = key_type>
-    requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage, LookupKey>
   auto find_ref(LookupKey const& key) & {
     return find_ref_impl(*this, key);
   }
   template <typename LookupKey = key_type>
-    requires requires(Storage const& storage, LookupKey const& key) { storage.find(key); }
+    requires map_lookup<Storage const, LookupKey>
   auto find_ref(LookupKey const& key) const& {
     return find_ref_impl(*this, key);
   }
