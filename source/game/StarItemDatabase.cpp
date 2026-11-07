@@ -399,7 +399,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::itemShared(Ite
     return std::shared_ptr<Item>();
   ItemCacheEntry entry{descriptor, level, seed};
   std::unique_lock locker(m_cacheMutex);
-  auto cached = m_itemCache.maybeRef(entry);
+  auto cached = m_itemCache.find_ref(entry);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -850,7 +850,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
 }
 
 std::expected<std::reference_wrapper<ItemDatabase::ItemData const>, StarException> ItemDatabase::itemData(String const& name) const {
-  if (auto p = m_items.maybeRef(name))
+  if (auto p = m_items.find_ref(name))
     return *p;
   return std::unexpected(ItemException::format("No such item '{}'", name));
 }

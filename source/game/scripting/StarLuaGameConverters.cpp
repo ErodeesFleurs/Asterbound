@@ -94,14 +94,14 @@ template <typename Enum>
 [[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> enumName(std::expected<EnumMap<Enum>, StarException> const& names, Enum value) {
   if (!names)
     return std::unexpected(names.error());
-  return names->getRight(value);
+  return names->get_right(value);
 }
 
 template <typename Enum>
 [[nodiscard]] std::expected<std::optional<Enum>, StarException> enumValue(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
   if (!names)
     return std::unexpected(names.error());
-  return names->maybeLeft(value);
+  return names->maybe_left(value);
 }
 
 

@@ -149,7 +149,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
       auto animation = Animation::create(root, pair.second, "/ai/");
       if (!animation)
         return std::unexpected(std::move(animation.error()));
-      auto existing = result->m_animationConfig.aiAnimations.maybeRef(pair.first);
+      auto existing = result->m_animationConfig.aiAnimations.find_ref(pair.first);
       if (!existing)
         return std::unexpected(AiException("AI animation publication failed"));
       existing->get() = std::move(*animation);

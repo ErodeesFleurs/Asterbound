@@ -60,7 +60,7 @@ bool StatusEffectDatabase::isUniqueEffect(UniqueStatusEffect const& effect) cons
 }
 
 std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::uniqueEffectConfig(UniqueStatusEffect const& effect) const {
-  if (auto uniqueEffect = m_uniqueEffects.maybeRef(effect))
+  if (auto uniqueEffect = m_uniqueEffects.find_ref(effect))
     return uniqueEffect->get();
   return std::unexpected(StatusEffectDatabaseException::format("No such unique stat effect '{}'", effect));
 }

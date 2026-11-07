@@ -848,7 +848,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               return std::unexpected(StarException("ABC transposition is out of range"));
             note = static_cast<int>(transposed);
             bool tied = peek() == '-';
-            if (auto pending = pendingTies.maybeRef(note)) {
+            if (auto pending = pendingTies.find_ref(note)) {
               result[pending->get()].duration += noteDuration;
               if (!tied)
                 pendingTies.remove(note);

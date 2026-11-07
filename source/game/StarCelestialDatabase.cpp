@@ -524,7 +524,7 @@ std::expected<bool, StarException> CelestialMasterDatabase::coordinateValid(Cele
   auto chunk = getChunk(chunkIndexFor(coordinate));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
-  auto system = chunk->get().systemObjects.maybeRef(coordinate.location());
+  auto system = chunk->get().systemObjects.find_ref(coordinate.location());
   if (!system)
     return false;
   if (coordinate.isSystem())
@@ -535,7 +535,7 @@ std::expected<bool, StarException> CelestialMasterDatabase::coordinateValid(Cele
   auto planetaryOrbit = planetCoordinate->orbitNumber();
   if (!planetaryOrbit)
     return std::unexpected(std::move(planetaryOrbit.error()));
-  auto planet = system->get().maybeRef(*planetaryOrbit);
+  auto planet = system->get().find_ref(*planetaryOrbit);
   if (!planet)
     return false;
   if (coordinate.isPlanetaryBody())
@@ -1035,7 +1035,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
   for (auto [planetIndex, planetOrbit] : std::views::enumerate(planetaryOrbits)) {
     auto region = orbitRegion(type.orbitRegions, planetOrbit);
     auto planetaryTypeName = region->planetaryTypes.select(random);
-    if (auto planetType = m_generationInformation.planetaryTypes.maybeRef(planetaryTypeName)) {
+    if (auto planetType = m_generationInformation.planetaryTypes.find_ref(planetaryTypeName)) {
       auto planetaryParameters = jsonMerge(planetType->get().baseParameters, random.randValueFrom(planetType->get().variationParameters));
       CelestialCoordinate planetCoordinate(location, planetOrbit);
       std::uint64_t planetSeed = random.randu64();
@@ -1054,7 +1054,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
           satelliteOrbits.append(i);
       for (auto [satelliteIndex, satelliteOrbit] : std::views::enumerate(satelliteOrbits)) {
         auto satelliteTypeName = region->satelliteTypes.select(random);
-        if (auto satelliteType = m_generationInformation.satelliteTypes.maybeRef(satelliteTypeName)) {
+        if (auto satelliteType = m_generationInformation.satelliteTypes.find_ref(satelliteTypeName)) {
           auto variation = random.randValueFrom(satelliteType->get().variationParameters);
           auto orbitParameters = satelliteType->get().orbitParameters.value(region->regionName, JsonArray()).toArray();
           if (!orbitParameters)
@@ -1182,7 +1182,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::signalRegion(RectI co
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   for (auto const& location : chunkIndexesFor(region)) {
-    auto chunk = m_chunkCache.maybeRef(location);
+    auto chunk = m_chunkCache.find_ref(location);
     if (!chunk)
       return std::unexpected(std::move(chunk.error()));
     if (!*chunk && !m_pendingChunkRequests.contains(location))
@@ -1194,7 +1194,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::signalRegion(RectI co
 std::expected<void, StarException> CelestialSlaveDatabase::signalSystem(CelestialCoordinate const& system) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  auto chunk = m_chunkCache.maybeRef(chunkIndexFor(system));
+  auto chunk = m_chunkCache.find_ref(chunkIndexFor(system));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
   if (*chunk) {
@@ -1212,7 +1212,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   List<CelestialRequest> requests;
 
   for (auto chunkIt = m_pendingChunkRequests.begin(); chunkIt != m_pendingChunkRequests.end();) {
-    auto& pair = *chunkIt;
+    auto&& pair = *chunkIt;
     if (!pair.second.running()) {
       requests.append(makeLeft(pair.first));
       pair.second.restart(m_requestTimeout);
@@ -1225,7 +1225,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   }
 
   for (auto systemIt = m_pendingSystemRequests.begin(); systemIt != m_pendingSystemRequests.end();) {
-    auto& pair = *systemIt;
+    auto&& pair = *systemIt;
     if (!pair.second.running()) {
       requests.append(makeRight(pair.first));
       pair.second.restart(m_requestTimeout);
@@ -1251,7 +1251,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::pushResponses(List<Ce
         return std::unexpected(std::move(stored.error()));
     } else if (auto objects = response.maybeRightRef()) {
       m_pendingSystemRequests.remove(objects->get().systemLocation);
-      auto chunk = m_chunkCache.maybeRef(chunkIndexFor(objects->get().systemLocation));
+      auto chunk = m_chunkCache.find_ref(chunkIndexFor(objects->get().systemLocation));
       if (!chunk)
         return std::unexpected(std::move(chunk.error()));
       if (*chunk)
@@ -1276,13 +1276,13 @@ std::expected<std::optional<CelestialParameters>, StarException> CelestialSlaveD
       ? signalRegion(RectI::withSize(coordinate.location().vec2(), {1, 1})) : signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
-  auto chunk = m_chunkCache.maybeRef(chunkIndexFor(coordinate));
+  auto chunk = m_chunkCache.find_ref(chunkIndexFor(coordinate));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
   if (*chunk) {
     if (coordinate.isSystem())
       return (*chunk)->get().systemParameters.maybe(coordinate.location());
-    if (auto system = (*chunk)->get().systemObjects.maybeRef(coordinate.location())) {
+    if (auto system = (*chunk)->get().systemObjects.find_ref(coordinate.location())) {
       auto planetCoordinate = coordinate.planet();
       if (!planetCoordinate)
         return std::unexpected(std::move(planetCoordinate.error()));
@@ -1323,11 +1323,11 @@ std::expected<std::optional<bool>, StarException> CelestialSlaveDatabase::hasChi
   auto signaled = signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
-  auto chunk = m_chunkCache.maybeRef(chunkIndexFor(coordinate));
+  auto chunk = m_chunkCache.find_ref(chunkIndexFor(coordinate));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
   if (*chunk) {
-    if (auto system = (*chunk)->get().systemObjects.maybeRef(coordinate.location())) {
+    if (auto system = (*chunk)->get().systemObjects.find_ref(coordinate.location())) {
       if (coordinate.isSystem())
         return !system->get().empty();
       if (coordinate.isPlanetaryBody()) {
@@ -1368,11 +1368,11 @@ std::expected<List<int>, StarException> CelestialSlaveDatabase::childOrbits(Cele
   auto signaled = signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
-  auto chunk = m_chunkCache.maybeRef(chunkIndexFor(coordinate));
+  auto chunk = m_chunkCache.find_ref(chunkIndexFor(coordinate));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
   if (*chunk) {
-    if (auto system = (*chunk)->get().systemObjects.maybeRef(coordinate.location())) {
+    if (auto system = (*chunk)->get().systemObjects.find_ref(coordinate.location())) {
       if (coordinate.isSystem())
         return system->get().keys();
       if (coordinate.isPlanetaryBody()) {
@@ -1398,7 +1398,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialSlaveDatabase::
     return std::unexpected(std::move(signaled.error()));
   List<CelestialCoordinate> systems;
   for (auto const& location : chunkIndexesFor(region)) {
-    auto chunk = m_chunkCache.maybeRef(location);
+    auto chunk = m_chunkCache.find_ref(location);
     if (!chunk)
       return std::unexpected(std::move(chunk.error()));
     if (*chunk) {
@@ -1427,7 +1427,7 @@ std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialSlaveDataba
     return std::unexpected(std::move(signaled.error()));
   List<std::pair<Vec2I, Vec2I>> lines;
   for (auto const& location : chunkIndexesFor(region)) {
-    auto chunk = m_chunkCache.maybeRef(location);
+    auto chunk = m_chunkCache.find_ref(location);
     if (!chunk)
       return std::unexpected(std::move(chunk.error()));
     if (*chunk)
@@ -1446,7 +1446,7 @@ std::expected<bool, StarException> CelestialSlaveDatabase::scanRegionFullyLoaded
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
   for (auto const& location : chunkIndexesFor(region)) {
-    auto chunk = m_chunkCache.maybeRef(location);
+    auto chunk = m_chunkCache.find_ref(location);
     if (!chunk)
       return std::unexpected(std::move(chunk.error()));
     if (!*chunk)

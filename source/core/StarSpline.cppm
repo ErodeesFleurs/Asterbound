@@ -35,7 +35,7 @@ public:
       EmergencyLog::warn("Passed out of range time to Spline::pointAt");
     }
 
-    if (auto p = m_pointCache.maybeRef(t))
+    if (auto p = m_pointCache.find_ref(t))
       return p->get();
 
     PointData intermediates(*this);
@@ -73,7 +73,7 @@ public:
     }
 
     if (!begin) {
-      if (auto p = m_lengthCache.maybeRef(end))
+      if (auto p = m_lengthCache.find_ref(end))
         return p->get();
     }
 

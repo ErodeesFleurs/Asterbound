@@ -30,7 +30,7 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
 
   nick = makeNickUnique(nick);
 
-  for (auto& pair : m_clients) {
+  for (auto&& pair : m_clients) {
     pair.second.pendingMessages.append({
         {MessageContext::Broadcast},
         ServerConnectionId,
@@ -52,13 +52,13 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
   for (auto const& channel : clientChannels(clientId))
     leaveChannel(clientId, channel);
 
-  auto clientInfoResult = m_clients.take(clientId);
+  auto clientInfoResult = m_clients.extract_value(clientId);
   if (!clientInfoResult) return std::unexpected(std::move(clientInfoResult.error()));
   auto clientInfo = std::move(*clientInfoResult);
 
   m_nicks.remove(clientInfo.nick);
 
-  for (auto& pair : m_clients) {
+  for (auto&& pair : m_clients) {
     pair.second.pendingMessages.append({
         {MessageContext::Broadcast},
         ServerConnectionId,
@@ -174,7 +174,7 @@ std::expected<void, StarException> ChatProcessor::broadcast(ConnectionId sourceC
   if (!handled) return std::unexpected(std::move(handled.error()));
   if (*handled) return {};
 
-  for (auto& pair : m_clients)
+  for (auto&& pair : m_clients)
     pair.second.pendingMessages.append(message);
   return {};
 }
@@ -258,7 +258,7 @@ std::expected<void, StarException> ChatProcessor::adminWhisper(ConnectionId targ
 std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendingMessages(ConnectionId clientId) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto client = m_clients.maybeRef(clientId))
+  if (auto client = m_clients.find_ref(clientId))
     return std::exchange(client->get().pendingMessages, {});
   return List<ChatReceivedMessage>{};
 }
@@ -309,7 +309,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
   } else if (*command == "w") {
     auto target = commandLine.extract();
     if (!target) return std::unexpected(std::move(target.error()));
-    if (auto id = m_nicks.maybeRef(*target)) {
+    if (auto id = m_nicks.find_ref(*target)) {
       auto trimmed = commandLine.trim();
       if (!trimmed) return std::unexpected(std::move(trimmed.error()));
       auto sent = whisper(message.fromConnection, id->get(), *trimmed, {});

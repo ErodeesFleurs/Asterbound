@@ -866,7 +866,7 @@ public:
   }
 
   [[nodiscard]] std::expected<void, StarException> cleanup() {
-    if (auto result = m_cursorCache.maybeRef(m_currentCursor); !result)
+    if (auto result = m_cursorCache.find_ref(m_currentCursor); !result)
       return std::unexpected(std::move(result.error()));
     m_cursorCache.cleanup();
     return {};
@@ -2035,10 +2035,10 @@ private:
   bool setClipboardData(StringMap<ByteArray> data) {
     auto heldData = std::make_unique<StringMap<ByteArray>>(std::move(data));
     std::vector<const char*> types;
-    for (auto& entry : *heldData)
+    for (auto&& entry : *heldData)
       types.push_back(entry.first.utf8Ptr());
     auto request = [](void* userdata, const char* mime_type, std::size_t* size) -> const void* {
-      if (auto entry = static_cast<StringMap<ByteArray>*>(userdata)->maybeRef(String(std::string_view(mime_type)))) {
+      if (auto entry = static_cast<StringMap<ByteArray>*>(userdata)->find_ref(String(std::string_view(mime_type)))) {
         *size = entry->get().size();
         return entry->get().ptr();
       }

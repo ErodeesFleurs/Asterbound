@@ -434,16 +434,16 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
           if (!instanceValueResult30)
             return std::unexpected(std::move(instanceValueResult30.error()));
           if (auto actionTypeName = std::move(*instanceValueResult30)) {
-            auto const& enumResult31 = InteractActionTypeNames;
-            if (!enumResult31)
-              return std::unexpected(enumResult31.error());
-            auto toStringResult32 = actionTypeName.toString();
-            if (!toStringResult32)
-              return std::unexpected(std::move(toStringResult32.error()));
-            auto getLeftResult33 = (*enumResult31).getLeft(std::move(*toStringResult32));
-            if (!getLeftResult33)
-              return std::unexpected(std::move(getLeftResult33.error()));
-            auto actionType = getLeftResult33->get();
+            auto const& action_names = InteractActionTypeNames;
+            if (!action_names)
+              return std::unexpected(action_names.error());
+            auto action_name = actionTypeName.toString();
+            if (!action_name)
+              return std::unexpected(std::move(action_name.error()));
+            auto action_lookup = (*action_names).get_left(std::move(*action_name));
+            if (!action_lookup)
+              return std::unexpected(std::move(action_lookup.error()));
+            auto actionType = action_lookup->get();
             if (actionType >= InteractActionType::OpenCraftingInterface && actionType <= InteractActionType::ScriptPane) {
               auto instanceValueResult34 = sourceItem->instanceValue("interactData", Json());
               if (!instanceValueResult34)
@@ -540,14 +540,14 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       if (!toStringResult48)
         return std::unexpected(std::move(toStringResult48.error()));
       auto selected = std::move(*toStringResult48);
-      auto keyOfResult49 = m_tabButtonData.keyOf(selected);
-      if (!keyOfResult49)
-        return std::unexpected(std::move(keyOfResult49.error()));
-      auto selectTabResult50 = selectTab(std::move(*keyOfResult49));
-      if (!selectTabResult50)
-        return std::unexpected(std::move(selectTabResult50.error()));
-    
-  return {};
+      auto tab_lookup = m_tabButtonData.key_of(selected);
+      if (!tab_lookup)
+        return std::unexpected(std::move(tab_lookup.error()));
+      auto tab_selected = selectTab(std::move(*tab_lookup));
+      if (!tab_selected)
+        return std::unexpected(std::move(tab_selected.error()));
+
+      return {};
 });
 
   auto registerSlotCallbacks = [&](String name, InventorySlot slot)  -> std::expected<void, StarException> {

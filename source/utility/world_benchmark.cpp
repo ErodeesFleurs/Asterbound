@@ -122,7 +122,7 @@ using namespace Star;
 template <typename T>
 [[nodiscard]]
 static std::expected<T, StarException> numericOption(OptionParser::Options const& options, String const& name, T fallback) {
-  auto values = options.parameters.maybeRef(name);
+  auto values = options.parameters.find_ref(name);
   if (!values)
     return fallback;
   auto text = values->get().first();

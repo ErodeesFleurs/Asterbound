@@ -993,14 +993,14 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     workingSet.add(source);
 
     for (auto const& includeName : source->includes) {
-      if (auto include = namedSources.maybeRef(includeName)) {
+      if (auto include = namedSources.find_ref(includeName)) {
         auto visited = dependencySortVisit(include->get());
         if (!visited) return std::unexpected(std::move(visited.error()));
       }
     }
 
     for (auto const& requirementName : source->requires_) {
-      if (auto requirement = namedSources.maybeRef(requirementName)) {
+      if (auto requirement = namedSources.find_ref(requirementName)) {
         auto visited = dependencySortVisit(requirement->get());
         if (!visited) return std::unexpected(std::move(visited.error()));
       } else {

@@ -160,7 +160,8 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
 }
 List<String> QuestTemplateDatabase::allQuestTemplateIds() const { return m_templates.keys(); }
 std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplateDatabase::questTemplate(String const& id) const {
-  if (auto result = m_templates.maybeRef(id)) return result->get();
+  if (auto result = m_templates.find_ref(id))
+    return result->get();
   auto logged = m_logger.error("No quest template found for id '{}'", id);
   if (!logged) return std::unexpected(std::move(logged.error()));
   return std::shared_ptr<QuestTemplate>();

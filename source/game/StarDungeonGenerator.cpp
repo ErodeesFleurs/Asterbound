@@ -1310,7 +1310,7 @@ namespace Dungeon {
   }
 
   void DungeonGeneratorWriter::finishPart() {
-    for (auto& entries : m_openLocalWires)
+    for (auto&& entries : m_openLocalWires)
       m_localWires.append(entries.second);
     m_openLocalWires.clear();
 
@@ -1455,7 +1455,7 @@ namespace Dungeon {
       if (auto applied = m_facade->spawnStagehand(displaceF(stagehand.first), stagehand.second); !applied) return std::unexpected(std::move(applied.error()));
     }
 
-    for (auto& wires : m_globalWires) {
+    for (auto&& wires : m_globalWires) {
       List<Vec2I> wireGroup;
       for (auto& pos : wires.second)
         wireGroup.append(displace(pos));

@@ -310,7 +310,7 @@ std::expected<void, StarException> WorldServer::close() {
     else
       error = std::move(next);
   };
-  for (auto& p : m_scriptContexts) {
+  for (auto&& p : m_scriptContexts) {
     if (auto result = p.second->uninit(); !result)
       recordError(std::move(result.error()));
   }
@@ -450,7 +450,7 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
   auto result9 = std::move(*result8).toObject();
   if (!result9)
     return std::unexpected(std::move(result9.error()));
-  for (auto& p : std::move(*result9)) {
+  for (auto&& p : std::move(*result9)) {
     auto scriptComponent = std::make_shared<ScriptComponent>(this->root());
     auto result10 = p.second.toArray();
     if (!result10)
@@ -776,7 +776,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     return std::unexpected(std::move(result61.error()));
   clientInfo->outgoingPackets.append(std::make_shared<CentralStructureUpdatePacket>(std::move(*result61)));
 
-  for (auto& p : m_scriptContexts) {
+  for (auto&& p : m_scriptContexts) {
     auto result62 = p.second->invoke("addClient", clientId, isLocal);
     if (!result62)
       return std::unexpected(std::move(result62.error()));
@@ -791,7 +791,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
     return std::unexpected(std::move(result63.error()));
   auto const& info = result63->get();
 
-  for (auto& p : m_scriptContexts) {
+  for (auto&& p : m_scriptContexts) {
     auto result64 = p.second->invoke("removeClient", clientId);
     if (!result64)
       return std::unexpected(std::move(result64.error()));
@@ -1423,7 +1423,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (!result139)
           return std::unexpected(std::move(result139.error()));
       } else {
-        auto result140 = m_entityMessageResponses.take(entityMessageResponsePacket->uuid);
+        auto result140 = m_entityMessageResponses.extract_value(entityMessageResponsePacket->uuid);
         if (!result140)
           return std::unexpected(std::move(result140.error()));
         auto response = std::move(*result140).second;
@@ -1448,7 +1448,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       clientInfo->outgoingPackets.append(std::make_shared<PongPacket>(pingPacket->time));
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
-      for (auto& pair : updateWorldProperties->updatedProperties) {
+      for (auto&& pair : updateWorldProperties->updatedProperties) {
         if (pair.second.isNull())
           m_worldProperties.erase(pair.first); else {
           m_worldProperties[pair.first] = pair.second;
@@ -1476,7 +1476,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
     } else {
       if (!PacketTypeNames)
         return std::unexpected(PacketTypeNames.error());
-      auto result146 = (*PacketTypeNames).getRight(packet->type());
+      auto result146 = (*PacketTypeNames).get_right(packet->type());
       if (!result146)
         return std::unexpected(std::move(result146.error()));
       auto result147 = this->root().logger().warn("UniverseServer: Dropping unexpected {} packet from client",
@@ -1501,7 +1501,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::getOutg
 }
 
 bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> const& packet) {
-  if (auto clientInfo = m_clientInfo.maybeRef(clientId)) {
+  if (auto clientInfo = m_clientInfo.find_ref(clientId)) {
     clientInfo->get()->outgoingPackets.append(packet);
     return true;
   }
@@ -1510,7 +1510,7 @@ bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> cons
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
-  for (auto& p : m_scriptContexts) {
+  for (auto&& p : m_scriptContexts) {
     auto result149 = p.second->handleMessage(message, fromConnection == ServerConnectionId, args);
     if (!result149)
       return std::unexpected(std::move(result149.error()));
@@ -1536,7 +1536,7 @@ std::expected<void, StarException> WorldServer::setFidelity(WorldServerFidelity 
     return std::unexpected(std::move(result150.error()));
   if (!WorldServerFidelityNames)
     return std::unexpected(WorldServerFidelityNames.error());
-  auto result151 = (*WorldServerFidelityNames).getRight(m_fidelity);
+  auto result151 = (*WorldServerFidelityNames).get_right(m_fidelity);
   if (!result151)
     return std::unexpected(std::move(result151.error()));
   auto result152 = std::move(*result150).get(result151->get());
@@ -1648,7 +1648,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   if (!result162)
     return std::unexpected(std::move(result162.error()));
 
-  for (auto& pair : m_scriptContexts) {
+  for (auto&& pair : m_scriptContexts) {
     auto result163 = pair.second->update(pair.second->updateDt(dt));
     if (!result163)
       return std::unexpected(std::move(result163.error()));
@@ -2290,7 +2290,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               }
               if (!EntityTypeNames)
                 return std::unexpected(EntityTypeNames.error());
-              auto result240 = (*EntityTypeNames).getRight(entity->entityType());
+              auto result240 = (*EntityTypeNames).get_right(entity->entityType());
               if (!result240)
                 return std::unexpected(std::move(result240.error()));
               auto result241 = sendEntityMessage(*sourceEntity, "tileEntityBroken", {
@@ -3443,7 +3443,7 @@ std::expected<bool, StarException> WorldServer::regionActive(RectI const& region
 }
 
 std::shared_ptr<WorldServer::ScriptComponent> WorldServer::scriptContext(String const& contextName) {
-  if (auto context = m_scriptContexts.maybeRef(contextName))
+  if (auto context = m_scriptContexts.find_ref(contextName))
     return context->get();
   else
     return {};
@@ -3802,7 +3802,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     EntityId entityId = monitoredEntity->entityId();
     ConnectionId connectionId = connectionForEntity(entityId);
     if (connectionId != clientId) {
-      if (auto version = clientInfo->clientSlavesNetVersion.maybeRef(entityId)) {
+      if (auto version = clientInfo->clientSlavesNetVersion.find_ref(entityId)) {
         if (auto updateSetPacket = updateSetPackets.value(connectionId)) {
           auto pair = std::make_pair(entityId, version->get());
           auto& cache = m_netStateCache[netRules];
@@ -3836,7 +3836,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     }
   }
 
-  for (auto& p : updateSetPackets)
+  for (auto&& p : updateSetPackets)
     clientInfo->outgoingPackets.append(std::move(p.second));
   return {};
 }
@@ -4139,7 +4139,7 @@ std::expected<void, StarException> WorldServer::removeEntity(EntityId entityId, 
 
   for (auto const& pair : m_clientInfo) {
     auto& clientInfo = pair.second;
-    if (auto version = clientInfo->clientSlavesNetVersion.maybeTake(entity->entityId())) {
+    if (auto version = clientInfo->clientSlavesNetVersion.try_extract_value(entity->entityId())) {
       auto netRules = clientInfo->clientState->netCompatibilityRules();
       auto result442 = entity->writeNetState(*version, netRules);
       if (!result442)

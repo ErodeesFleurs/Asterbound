@@ -28,7 +28,7 @@ using namespace Star;
 namespace {
 
 std::expected<Json, StarException> invokeTeam(JsonRpcHandlers const& handlers, String const& method, Json const& args) {
-  auto handler = handlers.maybeRef(method);
+  auto handler = handlers.find_ref(method);
   if (!handler)
     return std::unexpected(StarException("Missing team handler in fixture", false));
   return handler->get()(args);

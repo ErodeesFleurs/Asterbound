@@ -198,7 +198,7 @@ std::expected<std::shared_ptr<Widget>, StarException> WidgetParser::makeSingle(S
   auto type = config.getString("type");
   if (!type)
     return std::unexpected(std::move(type.error()));
-  auto handler = m_constructors.maybeRef(*type);
+  auto handler = m_constructors.find_ref(*type);
   if (!handler || !handler->get())
     return std::unexpected(WidgetParserException::format("Unknown type in gui json. {}", *type));
   auto result = (handler->get())(name, config);
@@ -233,7 +233,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
         return std::unexpected(std::move(children.error()));
       widgets.appendAll(std::move(*children));
     } else {
-      auto handler = parser.m_constructors.maybeRef(*type);
+      auto handler = parser.m_constructors.find_ref(*type);
       if (!handler || !handler->get())
         return std::unexpected(WidgetParserException::format("Unknown type in gui json. {}", *type));
       auto result = (handler->get())(*name, memberConfig);
@@ -310,7 +310,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
   auto buttonResult = ButtonWidget::create(m_context, callbackFunc->get(), baseImage, *hover, *pressed, *disabledImage);
@@ -598,7 +598,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageStretchHa
     return std::unexpected(std::move(directionName.error()));
   if (!GuiDirectionNames)
     return std::unexpected(GuiDirectionNames.error());
-  auto direction = GuiDirectionNames->getLeft(*directionName);
+  auto direction = GuiDirectionNames->get_left(*directionName);
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   auto imageStretchResult = ImageStretchWidget::create(m_context, *stretchSet, direction->get());
@@ -622,8 +622,8 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackDown = m_callbacks.maybeRef(*callback + ".down");
-  auto callbackUp = m_callbacks.maybeRef(*callback + ".up");
+  auto callbackDown = m_callbacks.find_ref(*callback + ".down");
+  auto callbackUp = m_callbacks.find_ref(*callback + ".up");
   if (!callbackDown || !callbackDown->get())
     return std::unexpected(WidgetParserException::format("Failed to find spinner callback named: '{}.down'", *callback));
   if (!callbackUp || !callbackUp->get())
@@ -720,7 +720,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
   auto buttons = config.getArray("buttons");
@@ -934,7 +934,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
   auto initialText = config.getString("value", "");
@@ -954,7 +954,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
     auto blurCallback = config.getString("blur");
     if (!blurCallback)
       return std::unexpected(std::move(blurCallback.error()));
-    auto blurCallbackFunc = m_callbacks.maybeRef(*blurCallback);
+    auto blurCallbackFunc = m_callbacks.find_ref(*blurCallback);
     if (!blurCallbackFunc || !blurCallbackFunc->get())
       return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *blurCallback));
     textbox->setOnBlurCallback(blurCallbackFunc->get());
@@ -966,7 +966,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
     auto enterKeyCallback = config.getString("enterKey");
     if (!enterKeyCallback)
       return std::unexpected(std::move(enterKeyCallback.error()));
-    auto enterKeyCallbackFunc = m_callbacks.maybeRef(*enterKeyCallback);
+    auto enterKeyCallbackFunc = m_callbacks.find_ref(*enterKeyCallback);
     if (!enterKeyCallbackFunc || !enterKeyCallbackFunc->get())
       return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *enterKeyCallback));
     textbox->setOnEnterKeyCallback(enterKeyCallbackFunc->get());
@@ -978,7 +978,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
     auto escapeKeyCallback = config.getString("escapeKey");
     if (!escapeKeyCallback)
       return std::unexpected(std::move(escapeKeyCallback.error()));
-    auto escapeKeyCallbackFunc = m_callbacks.maybeRef(*escapeKeyCallback);
+    auto escapeKeyCallbackFunc = m_callbacks.find_ref(*escapeKeyCallback);
     if (!escapeKeyCallbackFunc || !escapeKeyCallbackFunc->get())
       return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *escapeKeyCallback));
     textbox->setOnEscapeKeyCallback(escapeKeyCallbackFunc->get());
@@ -1119,12 +1119,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
     return std::unexpected(std::move(vertical.error()));
   if (!HorizontalAnchorNames)
     return std::unexpected(HorizontalAnchorNames.error());
-  auto hAnchor = HorizontalAnchorNames->getLeft(*horizontal);
+  auto hAnchor = HorizontalAnchorNames->get_left(*horizontal);
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   if (!VerticalAnchorNames)
     return std::unexpected(VerticalAnchorNames.error());
-  auto vAnchor = VerticalAnchorNames->getLeft(*vertical);
+  auto vAnchor = VerticalAnchorNames->get_left(*vertical);
   if (!vAnchor)
     return std::unexpected(std::move(vAnchor.error()));
   auto labelResult = LabelWidget::create(m_context, *text, color, hAnchor->get(), vAnchor->get());
@@ -1228,15 +1228,15 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemSlotHandle
   if (!itemSlotResult)
     return std::unexpected(std::move(itemSlotResult.error()));
   auto itemSlot = std::move(*itemSlotResult);
-  auto leftCallback = m_callbacks.maybeRef(*callback);
+  auto leftCallback = m_callbacks.find_ref(*callback);
   if (!leftCallback || !leftCallback->get())
     return std::unexpected(WidgetParserException::format("Failed to find itemSlot callback named: '{}'", *callback));
   itemSlot->setCallback(leftCallback->get());
-  auto rightCallback = m_callbacks.maybeRef(*rightClickCallback);
+  auto rightCallback = m_callbacks.find_ref(*rightClickCallback);
   if (!rightCallback || !rightCallback->get())
     return std::unexpected(WidgetParserException::format("Failed to find itemSlot rightClickCallback named: '{}'", *rightClickCallback));
   itemSlot->setRightClickCallback(rightCallback->get());
-  if (auto middleCallback = m_callbacks.maybeRef(*middleClickCallback)) {
+  if (auto middleCallback = m_callbacks.find_ref(*middleClickCallback)) {
     if (!middleCallback->get())
       return std::unexpected(WidgetParserException::format("Empty itemSlot middleClickCallback named: '{}'", *middleClickCallback));
     itemSlot->setMiddleClickCallback(middleCallback->get());
@@ -1345,15 +1345,15 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
   auto showDurability = itemGrid->showDurability(*durability);
   if (!showDurability)
     return std::unexpected(std::move(showDurability.error()));
-  auto leftCallback = m_callbacks.maybeRef(*callback);
+  auto leftCallback = m_callbacks.find_ref(*callback);
   if (!leftCallback || !leftCallback->get())
     return std::unexpected(WidgetParserException::format("Failed to find itemGrid callback named: '{}'", *callback));
   itemGrid->setCallback(leftCallback->get());
-  auto rightCallback = m_callbacks.maybeRef(*rightClickCallback);
+  auto rightCallback = m_callbacks.find_ref(*rightClickCallback);
   if (!rightCallback || !rightCallback->get())
     return std::unexpected(WidgetParserException::format("Failed to find itemGrid rightClickCallback named: '{}'", *rightClickCallback));
   itemGrid->setRightClickCallback(rightCallback->get());
-  if (auto middleCallback = m_callbacks.maybeRef(*middleClickCallback)) {
+  if (auto middleCallback = m_callbacks.find_ref(*middleClickCallback)) {
     if (!middleCallback->get())
       return std::unexpected(WidgetParserException::format("Empty itemGrid middleClickCallback named: '{}'", *middleClickCallback));
     itemGrid->setMiddleClickCallback(middleCallback->get());
@@ -1381,7 +1381,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::listHandler(St
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (callbackFunc && callbackFunc->get())
     list->setCallback(callbackFunc->get());
   auto fillDown = config.getBool("fillDown", false);
@@ -1417,7 +1417,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (callbackFunc && callbackFunc->get())
     slider->setCallback(callbackFunc->get());
   auto hasRange = config.contains("range");
@@ -1482,7 +1482,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::largeCharPlate
   auto callback = config.getString("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
-  auto callbackFunc = m_callbacks.maybeRef(*callback);
+  auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
   auto charPlateResult = LargeCharPlateWidget::create(m_context, callbackFunc->get());
@@ -1639,12 +1639,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::layoutHandler(
       return std::unexpected(std::move(vName.error()));
     if (!HorizontalAnchorNames)
       return std::unexpected(HorizontalAnchorNames.error());
-    auto hAnchor = HorizontalAnchorNames->getLeft(*hName);
+    auto hAnchor = HorizontalAnchorNames->get_left(*hName);
     if (!hAnchor)
       return std::unexpected(std::move(hAnchor.error()));
     if (!VerticalAnchorNames)
       return std::unexpected(VerticalAnchorNames.error());
-    auto vAnchor = VerticalAnchorNames->getLeft(*vName);
+    auto vAnchor = VerticalAnchorNames->get_left(*vName);
     if (!vAnchor)
       return std::unexpected(std::move(vAnchor.error()));
     vert->setHorizontalAnchor(hAnchor->get());
@@ -1739,7 +1739,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
     return std::unexpected(std::move(directionName.error()));
   if (!GuiDirectionNames)
     return std::unexpected(GuiDirectionNames.error());
-  auto direction = GuiDirectionNames->getLeft(*directionName);
+  auto direction = GuiDirectionNames->get_left(*directionName);
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   auto progressResult = ProgressWidget::create(m_context, *background, *overlay, *progressSet, direction->get());

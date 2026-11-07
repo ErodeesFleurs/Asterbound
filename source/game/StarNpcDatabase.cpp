@@ -1005,7 +1005,7 @@ for (auto const& item : npcVariant.items) {
   {
     if (!EquipmentSlotNames)
       return std::unexpected(EquipmentSlotNames.error());
-    auto result210 = EquipmentSlotNames->maybeLeft(item.first);
+    auto result210 = EquipmentSlotNames->maybe_left(item.first);
     if (!result210)
       return std::unexpected(std::move(result210.error()));
     if (auto equipmentSlot = std::move(*result210)) {

@@ -1186,7 +1186,7 @@ for (auto const& pair : std::move(*checked205)) {
   }
   if (!StateNames)
     return std::unexpected(StateNames.error());
-  auto checked214 = StateNames->getLeft(pair.first);
+  auto checked214 = StateNames->get_left(pair.first);
   if (!checked214)
     return std::unexpected(std::move(checked214.error()));
   m_animationStates.set(checked214->get(), animations);
@@ -1229,7 +1229,7 @@ for (auto const& pair : std::move(*checked215)) {
   }
   if (!StateNames)
     return std::unexpected(StateNames.error());
-  auto checked224 = StateNames->getLeft(pair.first);
+  auto checked224 = StateNames->get_left(pair.first);
   if (!checked224)
     return std::unexpected(std::move(checked224.error()));
   m_animationStatesBackwards.set(checked224->get(), animations);
@@ -1272,7 +1272,7 @@ for (auto const& pair : std::move(*checked225)) {
   }
   if (!HumanoidEmoteFrameBaseNames)
     return std::unexpected(HumanoidEmoteFrameBaseNames.error());
-  auto checked234 = HumanoidEmoteFrameBaseNames->getLeft(pair.first);
+  auto checked234 = HumanoidEmoteFrameBaseNames->get_left(pair.first);
   if (!checked234)
     return std::unexpected(std::move(checked234.error()));
   m_emoteAnimationStates.set(checked234->get(), animations);
@@ -2077,7 +2077,7 @@ std::expected<void, StarException> Humanoid::prepareAnimatorPose(Animator& anima
   DanceStep const* danceStep = nullptr;
   if (*dance) {
     if (!StateNames) return std::unexpected(StateNames.error());
-    auto name = StateNames->getRight(m_state);
+    auto name = StateNames->get_right(m_state);
     if (!name) return std::unexpected(std::move(name.error()));
     if ((**dance)->states.contains(name->get()))
       danceStep = &(**dance)->steps[m_timing.danceSeq(lerp(interpolation, m_previousDanceTimer, m_danceTimer), **dance)];
@@ -2124,9 +2124,10 @@ std::optional<std::shared_ptr<Dance>> dance = std::move(*checked291);
   std::optional<DanceStep> danceStep = {};
   if (dance.has_value()) {
     if (!StateNames) return std::unexpected(StateNames.error());
-auto checked292 = StateNames->getRight(m_state);
-if (!checked292) return std::unexpected(std::move(checked292.error()));
-if (!(*dance)->states.contains(checked292->get()))
+    auto checked292 = StateNames->get_right(m_state);
+    if (!checked292)
+      return std::unexpected(std::move(checked292.error()));
+    if (!(*dance)->states.contains(checked292->get()))
       dance = {};
     else
       danceStep = (*dance)->steps[m_timing.danceSeq(lerp(interpolation, m_previousDanceTimer, m_danceTimer), *dance)];
@@ -3594,7 +3595,7 @@ std::expected<String, StarException> Humanoid::frameBase(State state) const {
     default:
       if (!StateNames) return std::unexpected(StateNames.error());
       {
-        auto name = StateNames->getRight(state);
+        auto name = StateNames->get_right(state);
         if (!name) return std::unexpected(std::move(name.error()));
         return std::unexpected(StarException(strf("No such state '{}'", name->get())));
       }
@@ -3635,7 +3636,7 @@ std::expected<String, StarException> Humanoid::emoteFrameBase(HumanoidEmote stat
     default:
       if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
       {
-        auto name = HumanoidEmoteNames->getRight(state);
+        auto name = HumanoidEmoteNames->get_right(state);
         if (!name) return std::unexpected(std::move(name.error()));
         return std::unexpected(StarException(strf("No such emote state '{}'", name->get())));
       }

@@ -56,7 +56,7 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
     auto array = binding.second.toArray();
     if (!array) return std::unexpected(std::move(array.error()));
     for (auto const& text : *array) {
-      auto emote = HumanoidEmoteNames->getLeft(binding.first);
+      auto emote = HumanoidEmoteNames->get_left(binding.first);
       if (!emote) return std::unexpected(std::move(emote.error()));
       auto string = text.toString();
       if (!string) return std::unexpected(std::move(string.error()));

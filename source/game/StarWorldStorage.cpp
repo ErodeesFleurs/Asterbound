@@ -311,13 +311,13 @@ SectorLoadLevel WorldStorage::sectorLoadLevel(Sector sector) const {
 }
 
 std::optional<SectorGenerationLevel> WorldStorage::sectorGenerationLevel(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector))
+  if (auto p = m_sectorMetadata.find_ref(sector))
     return p->get().generationLevel;
   return {};
 }
 
 bool WorldStorage::sectorActive(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     if (p->get().loadLevel == SectorLoadLevel::Loaded && p->get().generationLevel == SectorGenerationLevel::Complete)
       return true;
   }
@@ -357,7 +357,7 @@ std::expected<void, StarException> WorldStorage::activateSector(Sector sector) {
 }
 
 std::expected<void, StarException> WorldStorage::queueSectorActivation(Sector sector) {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     auto ptimeToLiveResult1 = randomizedSectorTTL();
     if (!ptimeToLiveResult1) return std::unexpected(std::move(ptimeToLiveResult1.error()));
     p->get().timeToLive = std::move((*ptimeToLiveResult1));
@@ -367,7 +367,7 @@ std::expected<void, StarException> WorldStorage::queueSectorActivation(Sector se
   }
 
   auto p = m_generationQueue.insert(sector, m_generationQueueTimeToLive);
-  m_generationQueue.toFront(p.first);
+  m_generationQueue.move_to_front(p.first);
   return {};
 }
 
@@ -377,7 +377,7 @@ std::expected<void, StarException> WorldStorage::triggerTerraformSector(Sector s
       auto operationResult1 = loadSectorToLevel(sector, SectorLoadLevel::Loaded);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
-    if (auto p = m_sectorMetadata.maybeRef(sector)) {
+    if (auto p = m_sectorMetadata.find_ref(sector)) {
       if (p->get().generationLevel < SectorGenerationLevel::Complete)
         {
           auto operationResult1 = generateSectorToLevel(sector, SectorGenerationLevel::Complete);
@@ -399,13 +399,13 @@ std::expected<RpcPromise<Vec2I>, StarException> WorldStorage::enqueuePlacement(L
 }
 
 std::optional<float> WorldStorage::sectorTimeToLive(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector))
+  if (auto p = m_sectorMetadata.find_ref(sector))
     return p->get().timeToLive;
   return {};
 }
 
 bool WorldStorage::setSectorTimeToLive(Sector sector, float newTimeToLive) {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     p->get().timeToLive = newTimeToLive;
     return true;
   }
@@ -457,7 +457,7 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
       if (sectorGenerationLevelLimit && *sectorGenerationLevelLimit == 0)
         break;
 
-      auto first = m_generationQueue.firstKey();
+      auto first = m_generationQueue.first_key();
       if (!first) return std::unexpected(std::move(first.error()));
       auto autopResult1 = generateSectorToLevel(first->get(), SectorGenerationLevel::Complete, sectorGenerationLevelLimit.value_or(NPos));
       if (!autopResult1) return std::unexpected(std::move(autopResult1.error()));
@@ -465,8 +465,9 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
 
       if (p.first)
         {
-          auto removed = m_generationQueue.removeFirst();
-          if (!removed) return std::unexpected(std::move(removed.error()));
+        auto removed = m_generationQueue.erase_front();
+        if (!removed)
+          return std::unexpected(std::move(removed.error()));
         }
       if (sectorGenerationLevelLimit)
         *sectorGenerationLevelLimit -= p.second;
@@ -1272,7 +1273,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
       auto position = entity->position();
       if (!belongsInSector(sector, position)) {
         if (auto entitySector = sectorForPosition(Vec2I(position))) {
-          if (auto p = m_sectorMetadata.maybeRef(*entitySector))
+          if (auto p = m_sectorMetadata.find_ref(*entitySector))
             entitiesOverlap |= p->get().timeToLive > 0.0f;
         }
         continue;

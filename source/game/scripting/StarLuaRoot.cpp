@@ -94,7 +94,7 @@ std::expected<void, StarException> LuaRoot::restart() {
   (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(m_root));
   auto sourceDiagnostics = std::make_shared<StringMap<String>>();
   (*engine)->setSourceResolver([sourceDiagnostics](String const& source) -> std::expected<String, StarException> {
-    if (auto diagnostic = sourceDiagnostics->maybeRef(source))
+    if (auto diagnostic = sourceDiagnostics->find_ref(source))
       return diagnostic->get();
     return String();
   });
@@ -315,7 +315,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
     std::lock_guard locker(mutex);
     if (m_revision != revision)
       return std::unexpected(stale());
-    if (auto cached = scripts.maybeRef(path))
+    if (auto cached = scripts.find_ref(path))
       return cached->get();
   }
   auto assets = m_root.assets();
@@ -336,7 +336,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   }
   auto bytes = (*assets)->bytes(path);
   if (!bytes) {
-    if (auto diagnostic = sourceDiagnostics.maybeRef(path)) {
+    if (auto diagnostic = sourceDiagnostics.find_ref(path)) {
       auto summary = *bytes.error().diagnosticSummary();
       bool found = false;
       for (auto& location : summary.locations) {

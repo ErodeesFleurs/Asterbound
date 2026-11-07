@@ -496,7 +496,7 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
   for (auto action : context().actions(event)) {
-    auto name = InterfaceActionNames->getRight(action);
+    auto name = InterfaceActionNames->get_right(action);
     if (!name)
       return std::unexpected(std::move(name.error()));
     actions.emplace_back(name->get());

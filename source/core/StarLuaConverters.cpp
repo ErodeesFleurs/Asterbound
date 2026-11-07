@@ -50,7 +50,7 @@ std::expected<void, StarException> LuaConverter<LuaCallbacks>::from(LuaStack sta
     if (!created)
       return std::unexpected(std::move(created.error()));
     auto table = std::move(*created);
-    for (auto& callback : callbacks.callbacks()) {
+    for (auto&& callback : callbacks.callbacks()) {
       auto function = stack.engine().createWrappedFunction(callback.second);
       if (!function)
         return std::unexpected(std::move(function.error()));

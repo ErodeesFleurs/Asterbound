@@ -48,13 +48,13 @@ public:
 
   [[nodiscard]] std::expected<std::reference_wrapper<Value const>, StarException> get(Key const& key) const;
   [[nodiscard]] std::expected<std::reference_wrapper<Value>, StarException> get(Key const& key);
-  std::optional<std::reference_wrapper<Value const>> maybeRef(Key const& key) const {
-    auto entry = m_entryMap.maybeRef(key);
+  std::optional<std::reference_wrapper<Value const>> find_ref(Key const& key) const {
+    auto entry = m_entryMap.find_ref(key);
     if (entry) return std::reference_wrapper<Value const>(entry->get().value);
     return std::nullopt;
   }
-  std::optional<std::reference_wrapper<Value>> maybeRef(Key const& key) {
-    auto entry = m_entryMap.maybeRef(key);
+  std::optional<std::reference_wrapper<Value>> find_ref(Key const& key) {
+    auto entry = m_entryMap.find_ref(key);
     if (entry) return std::reference_wrapper<Value>(entry->get().value);
     return std::nullopt;
   }

@@ -570,10 +570,10 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::createTooltip(
   for (std::size_t i = 0; i < m_guiList->numChildren(); ++i) {
     auto entry = m_guiList->itemAt(i);
     if (entry->getChildAt(screenPosition)) {
-      auto getLeftResult397 = m_recipesWidgetMap.getLeft(entry);
-      if (!getLeftResult397)
-        return std::unexpected(std::move(getLeftResult397.error()));
-      auto& recipe = getLeftResult397->get();
+      auto recipe_lookup = m_recipesWidgetMap.get_left(entry);
+      if (!recipe_lookup)
+        return std::unexpected(std::move(recipe_lookup.error()));
+      auto& recipe = recipe_lookup->get();
       auto setupTooltipResult398 = setupTooltip(recipe);
       if (!setupTooltipResult398)
         return std::unexpected(std::move(setupTooltipResult398.error()));
@@ -913,10 +913,10 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
   ItemRecipe selectedRecipe;
   if (m_guiList->selectedWidget())
     {
-      auto getLeftResult446 = m_recipesWidgetMap.getLeft(m_guiList->selectedWidget());
-      if (!getLeftResult446)
-        return std::unexpected(std::move(getLeftResult446.error()));
-      selectedRecipe = getLeftResult446->get();
+    auto selected_recipe_lookup = m_recipesWidgetMap.get_left(m_guiList->selectedWidget());
+    if (!selected_recipe_lookup)
+      return std::unexpected(std::move(selected_recipe_lookup.error()));
+    selectedRecipe = selected_recipe_lookup->get();
     }
 
   auto availableItemsResult447 = m_player->inventory()->availableItems();
@@ -929,7 +929,7 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
     return std::unexpected(std::move(clearResult448.error()));
 
   for (auto const& recipe : m_recipes) {
-    auto widget = m_recipesWidgetMap.valueRight(recipe);
+    auto widget = m_recipesWidgetMap.value_right(recipe);
     if (widget) {
       auto addItemResult449 = m_guiList->addItem(widget);
       if (!addItemResult449)
@@ -1372,13 +1372,11 @@ std::expected<void, StarException> CraftingPane::craft(int count) {
       if (!giveItemResult520)
         return std::unexpected(std::move(giveItemResult520.error()));
 
-      for (auto& collectable : recipe.collectables)
-        {
-          auto addCollectableResult521 = m_player->addCollectable(collectable.first, collectable.second);
-          if (!addCollectableResult521)
-            return std::unexpected(std::move(addCollectableResult521.error()));
-          
-        }
+      for (auto&& collectable : recipe.collectables) {
+        auto collectable_added = m_player->addCollectable(collectable.first, collectable.second);
+        if (!collectable_added)
+          return std::unexpected(std::move(collectable_added.error()));
+      }
     }
 
     m_blueprints->markAsRead(recipe.output.singular());
@@ -1738,11 +1736,11 @@ std::expected<int, StarException> CraftingPane::maxCraft() {
 
 std::expected<ItemRecipe, StarException> CraftingPane::recipeFromSelectedWidget() const {
   auto pane = m_guiList->selectedWidget();
-  if (pane && m_recipesWidgetMap.hasRightValue(pane)) {
-    auto getLeftResult567 = m_recipesWidgetMap.getLeft(pane);
-    if (!getLeftResult567)
-      return std::unexpected(std::move(getLeftResult567.error()));
-    return getLeftResult567->get();
+  if (pane && m_recipesWidgetMap.contains_right(pane)) {
+    auto recipe_lookup = m_recipesWidgetMap.get_left(pane);
+    if (!recipe_lookup)
+      return std::unexpected(std::move(recipe_lookup.error()));
+    return recipe_lookup->get();
   }
   return ItemRecipe();
 }

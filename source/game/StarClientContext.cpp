@@ -218,7 +218,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
     auto customWorldUpdates = ds.read<StringMap<ByteArray>>();
     if (!customWorldUpdates)
       return std::unexpected(std::move(customWorldUpdates.error()));
-    for (auto& p : *customWorldUpdates) {
+    for (auto&& p : *customWorldUpdates) {
       auto decoded = DataStreamBuffer::deserialize<WorldChunks>(std::move(p.second));
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));

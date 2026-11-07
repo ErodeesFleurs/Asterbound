@@ -69,7 +69,7 @@ namespace Tiled {
     auto value = properties.get<String>("layer");
     if (!value) return std::unexpected(std::move(value.error()));
     if (!LayerNames) return std::unexpected(LayerNames.error());
-    auto layer = LayerNames->getLeft(*value);
+    auto layer = LayerNames->get_left(*value);
     if (!layer) return std::unexpected(std::move(layer.error()));
     return layer->get();
   }
@@ -287,7 +287,7 @@ namespace Tiled {
     if (!hasLayer) return std::unexpected(std::move(hasLayer.error()));
     if (!*hasLayer) {
       if (!LayerNames) return std::unexpected(LayerNames.error());
-      auto name = LayerNames->getRight(layer);
+      auto name = LayerNames->get_right(layer);
       if (!name) return std::unexpected(std::move(name.error()));
       computed["layer"] = name->get();
     } else {

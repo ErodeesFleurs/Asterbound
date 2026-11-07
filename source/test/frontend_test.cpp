@@ -1552,27 +1552,37 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
   ASSERT_TRUE(controller.setLuaRoot(*luaRoot));
   LuaCallbacks callbacks;
   ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(callbacks.registerCallback("bindRegisteredPane", [&](String const& id) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-    auto instance = instances.maybeRef(id);
-    if (!instance) return std::optional<LuaCallbacks>{};
-    auto bound = instance->get()->makePaneCallbacks();
-    if (!bound) return std::unexpected(std::move(bound.error()));
-    return std::optional<LuaCallbacks>(std::move(*bound));
-  }));
-  ASSERT_TRUE(callbacks.registerCallback("callPane", [&](String const& id, String const& method, JsonArray const& args) -> std::expected<std::optional<Json>, StarException> {
-    auto instance = instances.maybeRef(id);
-    if (!instance) return std::unexpected(GuiException("Missing test pane"));
-    return instance->get()->call(method, args);
-  }));
-  ASSERT_TRUE(callbacks.registerCallback("displayRegisteredPane", [&](String const& id) -> std::expected<void, StarException> {
-    auto instance = instances.maybeRef(id);
-    if (!instance) return std::unexpected(GuiException("Missing test pane"));
-    if (panes.isDisplayed(instance->get())) return instance->get()->show();
-    return panes.displayPane(PaneLayer::Window, instance->get(), {});
-  }));
+  ASSERT_TRUE(callbacks.registerCallback(
+    "bindRegisteredPane", [&](String const& id) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+      auto instance = instances.find_ref(id);
+      if (!instance)
+        return std::optional<LuaCallbacks>{};
+      auto bound = instance->get()->makePaneCallbacks();
+      if (!bound)
+        return std::unexpected(std::move(bound.error()));
+      return std::optional<LuaCallbacks>(std::move(*bound));
+    }));
+  ASSERT_TRUE(callbacks.registerCallback("callPane",
+                                         [&](String const& id, String const& method, JsonArray const& args)
+                                           -> std::expected<std::optional<Json>, StarException> {
+                                           auto instance = instances.find_ref(id);
+                                           if (!instance)
+                                             return std::unexpected(GuiException("Missing test pane"));
+                                           return instance->get()->call(method, args);
+                                         }));
+  ASSERT_TRUE(
+    callbacks.registerCallback("displayRegisteredPane", [&](String const& id) -> std::expected<void, StarException> {
+      auto instance = instances.find_ref(id);
+      if (!instance)
+        return std::unexpected(GuiException("Missing test pane"));
+      if (panes.isDisplayed(instance->get()))
+        return instance->get()->show();
+      return panes.displayPane(PaneLayer::Window, instance->get(), {});
+    }));
   ASSERT_TRUE(callbacks.registerCallback("destroyPane", [&](String const& id) -> std::expected<void, StarException> {
-    auto instance = instances.maybeRef(id);
-    if (!instance) return {};
+    auto instance = instances.find_ref(id);
+    if (!instance)
+      return {};
     if (panes.isDisplayed(instance->get())) {
       if (auto dismissed = panes.dismissPane(instance->get()); !dismissed)
         return std::unexpected(std::move(dismissed.error()));

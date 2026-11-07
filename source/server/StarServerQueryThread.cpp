@@ -329,7 +329,7 @@ bool ServerQueryThread::validChallenge(HostAddressWithPort const& address, std::
     return false;
   }
 
-  auto knownChallenge = m_validChallenges.maybeRef(address.address());
+  auto knownChallenge = m_validChallenges.find_ref(address.address());
   if (!knownChallenge) {
     // Don't know this source address ignore
     return false;

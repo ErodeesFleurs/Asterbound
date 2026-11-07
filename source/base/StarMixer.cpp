@@ -304,7 +304,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
   {
     std::lock_guard locker(m_queueMutex);
     // Mix all active sounds
-    for (auto& p : m_audios) {
+    for (auto&& p : m_audios) {
       auto& audioInstance = p.first;
       auto& audioState = p.second;
 
@@ -552,7 +552,7 @@ std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFun
     eraseWhere(m_audios, [](auto const& p) {
       return p.first->m_finished;
     });
-    for (auto& p : m_audios) {
+    for (auto&& p : m_audios) {
       if (positionalAttenuationFunction && p.first->m_position) {
         for (unsigned c = 0; c < m_channels; ++c) {
           auto attenuation = positionalAttenuationFunction(c, *p.first->m_position, p.first->m_rangeMultiplier);

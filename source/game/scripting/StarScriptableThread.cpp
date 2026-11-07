@@ -102,7 +102,7 @@ std::expected<void, StarException> ScriptableThread::addCallbacks(String const& 
 }
 
 std::expected<void, StarException> ScriptableThread::removeCallbacks(String const& group) {
-  auto callbacks = m_threadCallbacks.maybeRef(group);
+  auto callbacks = m_threadCallbacks.find_ref(group);
   if (!callbacks)
     return {};
   struct RemovedCallbacks {

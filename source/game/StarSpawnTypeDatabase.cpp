@@ -50,7 +50,7 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
     if (**areaName == "all")
       result.areas = {Area::Surface, Area::Ceiling, Area::Air, Area::Liquid, Area::Solid};
     else {
-      auto area = AreaNames->getLeft(**areaName);
+      auto area = AreaNames->get_left(**areaName);
       if (!area) return std::unexpected(std::move(area.error()));
       result.areas.add(area->get());
     }
@@ -61,7 +61,7 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
       for (auto const& entry : **areaNames) {
         auto name = entry.toString();
         if (!name) return std::unexpected(std::move(name.error()));
-        auto area = AreaNames->getLeft(*name);
+        auto area = AreaNames->get_left(*name);
         if (!area) return std::unexpected(std::move(area.error()));
         result.areas.add(area->get());
       }
@@ -69,12 +69,12 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
   }
   auto regionName = config.getString("region");
   if (!regionName) return std::unexpected(std::move(regionName.error()));
-  auto region = RegionNames->getLeft(*regionName);
+  auto region = RegionNames->get_left(*regionName);
   if (!region) return std::unexpected(std::move(region.error()));
   result.region = region->get();
   auto timeName = config.getString("time");
   if (!timeName) return std::unexpected(std::move(timeName.error()));
-  auto time = TimeNames->getLeft(*timeName);
+  auto time = TimeNames->get_left(*timeName);
   if (!time) return std::unexpected(std::move(time.error()));
   result.time = time->get();
   return result;

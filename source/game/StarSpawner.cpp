@@ -272,7 +272,7 @@ std::expected<void, StarException> Spawner::update(float dt) {
       if (!activated) return std::unexpected(std::move(activated.error()));
     }
   }
-  eraseWhere(m_activeSpawnCells, [dt](auto& p) { return (p.second -= dt) < 0.0f; });
+  eraseWhere(m_activeSpawnCells, [dt](auto&& p) { return (p.second -= dt) < 0.0f; });
   for (auto it = m_spawnedEntities.begin(); it != m_spawnedEntities.end();) {
     auto entity = m_facade->getEntity(*it);
     if (!entity) it = m_spawnedEntities.erase(it);
@@ -516,7 +516,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
 }
 
 std::expected<void, StarException> Spawner::debugShowSpawnCells() {
-  eraseWhere(m_debugSpawnInfo, [&cells = m_activeSpawnCells](auto& p) { return !cells.contains(p.first); });
+  eraseWhere(m_debugSpawnInfo, [&cells = m_activeSpawnCells](auto&& p) { return !cells.contains(p.first); });
   auto visible = [&facade = *m_facade](RectF const& region) -> std::expected<bool, StarException> {
     for (auto const& window : facade.clientWindows()) {
       auto intersects = facade.geometry().rectIntersectsRect(window, region);
@@ -534,7 +534,7 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
       StringList areas;
       if (!SpawnParameters::AreaNames) return std::unexpected(SpawnParameters::AreaNames.error());
       for (auto area : info.second.spawnParameters.areas) {
-        auto name = SpawnParameters::AreaNames->getRight(area);
+        auto name = SpawnParameters::AreaNames->get_right(area);
         if (!name) return std::unexpected(std::move(name.error()));
         auto shortName = name->get().slice(0, 3);
         if (!shortName) return std::unexpected(std::move(shortName.error()));
@@ -542,11 +542,11 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
       }
       root().spatialLogger().logText("world", strf("Areas: {}", areas.join(", ")), region.min() + Vec2F(0.5, 2.5), {255, 255, 255, 255});
       if (!SpawnParameters::RegionNames) return std::unexpected(SpawnParameters::RegionNames.error());
-      auto regionName = SpawnParameters::RegionNames->getRight(info.second.spawnParameters.region);
+      auto regionName = SpawnParameters::RegionNames->get_right(info.second.spawnParameters.region);
       if (!regionName) return std::unexpected(std::move(regionName.error()));
       root().spatialLogger().logText("world", strf("Region: {}", regionName->get()), region.min() + Vec2F(0.5, 1.5), {255, 255, 255, 255});
       if (!SpawnParameters::TimeNames) return std::unexpected(SpawnParameters::TimeNames.error());
-      auto timeName = SpawnParameters::TimeNames->getRight(info.second.spawnParameters.time);
+      auto timeName = SpawnParameters::TimeNames->get_right(info.second.spawnParameters.time);
       if (!timeName) return std::unexpected(std::move(timeName.error()));
       root().spatialLogger().logText("world", strf("Time: {}", timeName->get()), region.min() + Vec2F(0.5, 0.5), {255, 255, 255, 255});
       if (info.second.spawnAttempts > 0)

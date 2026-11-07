@@ -441,7 +441,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       auto packetName = [&]() -> std::expected<String, StarException> {
         if (!PacketTypeNames)
           return std::unexpected(PacketTypeNames.error());
-        auto name = PacketTypeNames->getRight(*type);
+        auto name = PacketTypeNames->get_right(*type);
         if (!name)
           return std::unexpected(std::move(name.error()));
         return name->get();

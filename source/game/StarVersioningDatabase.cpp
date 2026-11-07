@@ -272,10 +272,12 @@ std::expected<void, StarException> VersioningDatabase::init() {
     if (lhs.fromVersion != rhs.fromVersion) return lhs.fromVersion < rhs.fromVersion;
     return lhs.toVersion < rhs.toVersion;
   };
-  for (auto& pair : m_versionUpdateScripts) pair.second.sort(order);
-  for (auto& pair : m_subVersionUpdateScripts)
-    for (auto& version : pair.second)
-      for (auto& scripts : version.second) scripts.second.sort(order);
+  for (auto&& pair : m_versionUpdateScripts)
+    pair.second.sort(order);
+  for (auto&& pair : m_subVersionUpdateScripts)
+    for (auto&& version : pair.second)
+      for (auto&& scripts : version.second)
+        scripts.second.sort(order);
   return {};
 }
 std::expected<VersionedJson, StarException> VersioningDatabase::makeCurrentVersionedJson(String const& identifier, Json const& content) const {

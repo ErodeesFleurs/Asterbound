@@ -95,7 +95,7 @@ std::expected<void, StarException> QuestManager::init(Player& player, World& wor
   }
   m_trackOnWorldQuests = true;
   if (m_trackedQuestId) {
-    if (auto quest = m_quests.maybeRef(*m_trackedQuestId)) {
+    if (auto quest = m_quests.find_ref(*m_trackedQuestId)) {
       if (quest->get()->hideCrossServer() && quest->get()->serverUuid() && *quest->get()->serverUuid() != m_player->get().clientContext()->serverUuid()) m_trackedQuestId.reset();
     }
   }
@@ -133,7 +133,9 @@ std::expected<bool, StarException> QuestManager::canStart(QuestArcDescriptor con
     auto config = (*database)->questTemplate(descriptor.templateId);
     if (!config) return std::unexpected(std::move(config.error()));
     if (!*config) return false;
-    if (auto quest = m_quests.maybeRef(descriptor.questId)) if (quest->get()->state() != QuestState::Failed) return false;
+    if (auto quest = m_quests.find_ref(descriptor.questId))
+      if (quest->get()->state() != QuestState::Failed)
+        return false;
     for (auto const& prerequisite : (*config)->prerequisiteQuests) if (!hasCompleted(prerequisite)) return false;
     for (auto const& item : (*config)->requiredItems) if (!m_player->get().inventory()->hasItem(item)) return false;
     if ((*config)->requiredShipLevel && m_player->get().shipUpgrades().shipLevel < *(*config)->requiredShipLevel) return false;
@@ -161,11 +163,11 @@ std::expected<std::shared_ptr<Quest>, StarException> QuestManager::getQuest(Stri
 }
 bool QuestManager::hasQuest(String const& id) const { return m_quests.contains(id); }
 bool QuestManager::hasAcceptedQuest(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() != QuestState::New && quest->get()->state() != QuestState::Offer;
 }
 bool QuestManager::isActive(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Active;
 }
 bool QuestManager::isCurrent(String const& id) const { return (m_onWorldQuestId ? m_onWorldQuestId : m_trackedQuestId) == id; }
@@ -176,13 +178,16 @@ void QuestManager::setAsTracked(std::optional<String> const& id) {
     if (m_onWorldQuestId) { m_onWorldQuestId.reset(); m_trackOnWorldQuests = false; }
   } else { m_trackedQuestId.reset(); m_trackOnWorldQuests = true; }
 }
-void QuestManager::markAsRead(String const& id) { if (auto quest = m_quests.maybeRef(id)) quest->get()->markAsRead(); }
+void QuestManager::markAsRead(String const& id) {
+  if (auto quest = m_quests.find_ref(id))
+    quest->get()->markAsRead();
+}
 bool QuestManager::hasCompleted(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Complete;
 }
 bool QuestManager::canTurnIn(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Active && quest->get()->canTurnIn();
 }
 std::optional<std::shared_ptr<Quest>> QuestManager::getFirstNewQuest() {
@@ -275,7 +280,7 @@ bool QuestManager::dialogValid(std::uint64_t token) const {
   auto const& lease = found->second;
   if (lease.preview) return true;
   if (lease.stateRevision != lease.quest->stateRevision()) return false;
-  auto current = m_quests.maybeRef(lease.quest->questId());
+  auto current = m_quests.find_ref(lease.quest->questId());
   if (current && current->get() != lease.quest) return false;
   if (!current && !(lease.acknowledged && lease.quest->ephemeral() && lease.kind != "offer")) return false;
   auto state = lease.quest->state();
@@ -365,14 +370,18 @@ std::optional<String> QuestManager::currentQuestId() const { return m_trackedQue
 std::optional<std::shared_ptr<Quest>> QuestManager::currentQuest() const {
   auto id = m_onWorldQuestId ? m_onWorldQuestId : m_trackedQuestId;
   if (id && isActive(*id)) {
-    if (auto quest = m_quests.maybeRef(*id)) if (quest->get()->showInLog()) return quest->get();
+    if (auto quest = m_quests.find_ref(*id))
+      if (quest->get()->showInLog())
+        return quest->get();
   }
   return {};
 }
 std::optional<String> QuestManager::trackedQuestId() const { return m_trackedQuestId; }
 std::optional<std::shared_ptr<Quest>> QuestManager::trackedQuest() const {
   if (m_trackedQuestId && isActive(*m_trackedQuestId)) {
-    if (auto quest = m_quests.maybeRef(*m_trackedQuestId)) if (quest->get()->showInLog()) return quest->get();
+    if (auto quest = m_quests.find_ref(*m_trackedQuestId))
+      if (quest->get()->showInLog())
+        return quest->get();
   }
   return {};
 }

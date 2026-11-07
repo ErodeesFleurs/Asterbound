@@ -873,7 +873,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
 
       locker.unlock();
       for (auto& index : tileDrawables.keys()) {
-        auto taken = tileDrawables.take(index);
+        auto taken = tileDrawables.extract_value(index);
         if (!taken)
           return std::unexpected(std::move(taken.error()));
         drawables.appendAll(std::move(*taken));

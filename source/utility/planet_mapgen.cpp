@@ -119,14 +119,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(celestialDatabase.error()));
 
     std::optional<CelestialCoordinate> coordinate;
-    if (auto coordinateOption = options.parameters.maybeRef("coordinate"); coordinateOption && !coordinateOption->get().empty()) {
+    if (auto coordinateOption = options.parameters.find_ref("coordinate");
+        coordinateOption && !coordinateOption->get().empty()) {
       auto parsed = CelestialCoordinate::create(Json(coordinateOption->get()[0]));
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       coordinate = std::move(*parsed);
     } else {
       std::optional<std::uint64_t> seed;
-      if (auto seedOption = options.parameters.maybeRef("coordseed"); seedOption && !seedOption->get().empty()) {
+      if (auto seedOption = options.parameters.find_ref("coordseed"); seedOption && !seedOption->get().empty()) {
         auto parsed = lexicalCast<std::uint64_t>(seedOption->get()[0]);
         if (!parsed)
           return std::unexpected(std::move(parsed.error()));
@@ -147,7 +148,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto& worldTemplate = **createdTemplate;
     auto size = worldTemplate.size();
 
-    if (auto sizeOption = options.parameters.maybeRef("size"); sizeOption && !sizeOption->get().empty()) {
+    if (auto sizeOption = options.parameters.find_ref("size"); sizeOption && !sizeOption->get().empty()) {
       auto components = sizeOption->get()[0].split(",");
       if (!components)
         return std::unexpected(std::move(components.error()));

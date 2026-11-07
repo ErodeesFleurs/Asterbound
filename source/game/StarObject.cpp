@@ -130,7 +130,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
     auto objectParameters = std::move(*objectParametersResult);
     m_parameters.reset(std::move(objectParameters));
   }
-  auto jOrientations = m_parameters.maybeRef("customOrientations");
+  auto jOrientations = m_parameters.find_ref("customOrientations");
   if (jOrientations && jOrientations->get().isType(Json::Type::Array)) {
     auto baseResult = m_config->config.getArray("orientations");
     if (!baseResult)
@@ -398,7 +398,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   auto modeName = std::move(*modeNameResult);
   if (!ClientEntityModeNames)
     return std::unexpected(ClientEntityModeNames.error());
-  auto modeResult = ClientEntityModeNames->getLeft(modeName);
+  auto modeResult = ClientEntityModeNames->get_left(modeName);
   if (!modeResult)
     return std::unexpected(std::move(modeResult.error()));
   auto mode = std::move(*modeResult);
@@ -503,7 +503,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
         auto value = std::move(*valueResult);
         setImageKey(pair.first, value);
       }
-      if (auto light = m_config->lightColors.maybeRef(colorName)) {
+      if (auto light = m_config->lightColors.find_ref(colorName)) {
         m_lightSourceColor.set(light->get());
       } else {
         m_lightSourceColor.set(Color::Clear);
@@ -1766,7 +1766,7 @@ void Object::setImageKey(String const& name, String const& value) {
   if (!isSlave())
     m_netImageKeys.set(name, value);
 
-  if (auto p = m_imageKeys.maybeRef(name)) {
+  if (auto p = m_imageKeys.find_ref(name)) {
     if (p->get() != value) {
       p->get() = value;
       m_orientationDrawablesCache.reset();

@@ -161,7 +161,7 @@ private:
   bool m_interpolationEnabled = false;
   float m_extrapolationHint = 0.0f;
 
-  ElementMap m_idMap = ElementMap::template withRange<1, std::numeric_limits<ElementId>::max()>();
+  ElementMap m_idMap = ElementMap::template with_range<1, std::numeric_limits<ElementId>::max()>();
 
   Deque<std::pair<std::uint64_t, ElementChange>> m_changeData;
   std::uint64_t m_changeDataLastVersion = 0;
@@ -313,7 +313,7 @@ template <typename Element>
       if (p.first >= fromVersion) {
         if (std::holds_alternative<ElementAddition>(p.second)) {
           ElementId id = std::get<ElementAddition>(p.second).first;
-          if (auto element = m_idMap.maybeRef(id)) {
+          if (auto element = m_idMap.find_ref(id)) {
             { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
             { auto result = ds.writeVlqU(1); if (!result) return std::unexpected(std::move(result.error())); }
             DataStreamBuffer storeBuffer;

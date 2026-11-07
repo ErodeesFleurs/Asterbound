@@ -302,7 +302,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     auto orientationName = std::move(*orientationNameResult);
     if (!LoungeOrientationNames)
       return std::unexpected(LoungeOrientationNames.error());
-    auto orientationResult = LoungeOrientationNames->getLeft(orientationName);
+    auto orientationResult = LoungeOrientationNames->get_left(orientationName);
     if (!orientationResult)
       return std::unexpected(std::move(orientationResult.error()));
     auto orientation = std::move(*orientationResult);

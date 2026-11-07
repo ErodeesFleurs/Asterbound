@@ -927,7 +927,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
   if (auto added = callbacks.registerCallback("emote", [this](String const& name) -> std::expected<void, StarException> {
       if (!HumanoidEmoteNames)
         return std::unexpected(HumanoidEmoteNames.error());
-      auto emote = HumanoidEmoteNames->getLeft(name);
+      auto emote = HumanoidEmoteNames->get_left(name);
       if (!emote)
         return std::unexpected(std::move(emote.error()));
       auto itemOwner = owner();

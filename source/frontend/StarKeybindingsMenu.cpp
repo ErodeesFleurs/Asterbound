@@ -227,7 +227,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
         return std::unexpected(std::move(actionString.error()));
       if (!InterfaceActionNames)
         return std::unexpected(InterfaceActionNames.error());
-      auto action = InterfaceActionNames->getLeft(*actionString);
+      auto action = InterfaceActionNames->get_left(*actionString);
       if (!action)
         return std::unexpected(std::move(action.error()));
       List<KeyChord> inputDesc;
@@ -327,7 +327,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
     return std::unexpected(std::move(action.error()));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->get_right(action->get());
   if (!key)
     return std::unexpected(std::move(key.error()));
   auto storedBindings = base->get(key->get());
@@ -392,7 +392,7 @@ std::expected<void, StarException> KeybindingsMenu::clearActive() {
     return std::unexpected(std::move(action.error()));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->get_right(action->get());
   if (!key)
     return std::unexpected(std::move(key.error()));
   (*base)[key->get()] = JsonArray{};

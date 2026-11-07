@@ -126,7 +126,7 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
   if (entityId == NullEntityId)
     return std::unexpected(EntityMapException::format("Null entity id in EntityMap::addEntity"));
 
-  if (uniqueId && m_uniqueMap.hasLeftValue(*uniqueId))
+  if (uniqueId && m_uniqueMap.contains_left(*uniqueId))
     return std::unexpected(EntityMapException::format("Duplicate entity unique id ({}) on entity id ({}) in EntityMap::addEntity", *uniqueId, entityId));
 
   auto rects = m_geometry.splitRect(boundBox, position);
@@ -141,7 +141,7 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
 
 std::shared_ptr<Entity> EntityMap::removeEntity(EntityId entityId) {
   if (auto entity = m_spatialMap.remove(entityId)) {
-    m_uniqueMap.removeRight(entityId);
+    m_uniqueMap.erase_right(entityId);
     return std::move(*entity);
   }
   return {};
@@ -181,16 +181,16 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
 
     auto uniqueId = entity->uniqueId();
     if (uniqueId) {
-      if (auto existingEntityId = m_uniqueMap.maybeRight(*uniqueId)) {
+      if (auto existingEntityId = m_uniqueMap.maybe_right(*uniqueId)) {
         if (entityId != *existingEntityId)
           return std::unexpected(EntityMapException::format("Duplicate entity unique id on entity ids ({}) and ({})", *existingEntityId, entityId));
       } else {
-        m_uniqueMap.removeRight(entityId);
+        m_uniqueMap.erase_right(entityId);
         auto result = m_uniqueMap.add(*uniqueId, entityId);
         if (!result) return std::unexpected(std::move(result.error()));
       }
     } else {
-      m_uniqueMap.removeRight(entityId);
+      m_uniqueMap.erase_right(entityId);
     }
     return {};
   };
@@ -219,7 +219,7 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
 }
 
 EntityId EntityMap::uniqueEntityId(String const& uniqueId) const {
-  return m_uniqueMap.maybeRight(uniqueId).value_or(NullEntityId);
+  return m_uniqueMap.maybe_right(uniqueId).value_or(NullEntityId);
 }
 
 std::shared_ptr<Entity> EntityMap::entity(EntityId entityId) const {
@@ -331,7 +331,7 @@ std::expected<void, StarException> EntityMap::forAllEntities(EntityCallback cons
     auto result = callback(entity);
     if (!result) {
       if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-      auto type = EntityTypeNames->getRight(entity->entityType());
+      auto type = EntityTypeNames->get_right(entity->entityType());
       if (!type) return std::unexpected(std::move(type.error()));
       auto name = entity->name();
       if (!name) return std::unexpected(std::move(name.error()));

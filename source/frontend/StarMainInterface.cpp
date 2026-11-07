@@ -473,7 +473,7 @@ std::expected<void, StarException> MainInterface::handleInventoryDismissed() {
     if (auto closed = m_containerInteractor->closeContainer(); !closed)
       return std::unexpected(std::move(closed.error()));
   }
-  for (EntityId id : m_interactionScriptPanes.keyView()) {
+  for (EntityId id : m_interactionScriptPanes.key_view()) {
     auto pane = as<ScriptPane>(m_interactionScriptPanes[id]);
     if (m_paneManager.isDisplayed(pane)) {
       auto withInventory = pane->openWithInventory();
@@ -831,7 +831,7 @@ std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const 
 
 std::expected<bool, StarException> MainInterface::paneLayerOccupied(String const& layer) const {
   if (!PaneLayerNames) return std::unexpected(PaneLayerNames.error());
-  auto parsed = PaneLayerNames->getLeft(layer);
+  auto parsed = PaneLayerNames->get_left(layer);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   return static_cast<bool>(m_paneManager.topPane({parsed->get()}));
 }
@@ -842,7 +842,7 @@ std::expected<void, StarException> MainInterface::createPane(String const& id, J
   if (!*available || m_paneInstances.contains(id))
     return std::unexpected(GuiException(strf("Pane id '{}' is already registered", id)));
   if (!PaneLayerNames) return std::unexpected(PaneLayerNames.error());
-  auto parsed = PaneLayerNames->getLeft(layer);
+  auto parsed = PaneLayerNames->get_left(layer);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto pane = BaseScriptPane::create(context(), std::move(config));
   if (!pane) return std::unexpected(std::move(pane.error()));
@@ -853,7 +853,7 @@ std::expected<void, StarException> MainInterface::createPane(String const& id, J
 }
 
 std::expected<void, StarException> MainInterface::destroyPane(String const& id) {
-  auto instance = m_paneInstances.maybeRef(id);
+  auto instance = m_paneInstances.find_ref(id);
   if (!instance) return {};
   auto pane = instance->get().first;
   if (m_paneManager.isDisplayed(pane)) {
@@ -867,7 +867,7 @@ std::expected<void, StarException> MainInterface::destroyPane(String const& id) 
 }
 
 std::expected<std::shared_ptr<Pane>, StarException> MainInterface::findRegisteredPane(String const& id) {
-  if (auto instance = m_paneInstances.maybeRef(id))
+  if (auto instance = m_paneInstances.find_ref(id))
     return std::shared_ptr<Pane>(instance->get().first);
   auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) return std::shared_ptr<Pane>{};
@@ -877,7 +877,7 @@ std::expected<std::shared_ptr<Pane>, StarException> MainInterface::findRegistere
 }
 
 std::expected<void, StarException> MainInterface::displayRegisteredPane(String const& id) {
-  if (auto instance = m_paneInstances.maybeRef(id)) {
+  if (auto instance = m_paneInstances.find_ref(id)) {
     auto [pane, layer] = instance->get();
     if (m_paneManager.isDisplayed(pane)) {
       if (auto shown = pane->show(); !shown)
@@ -1201,7 +1201,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     if (!InterfaceActionNames) return std::unexpected(InterfaceActionNames.error());
     JsonArray actions;
     for (auto action : context().actions(event)) {
-      auto name = InterfaceActionNames->getRight(action);
+      auto name = InterfaceActionNames->get_right(action);
       if (!name) return std::unexpected(std::move(name.error()));
       actions.append(name->get());
     }
@@ -1321,7 +1321,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
       player->endTrigger();
   }
   bool captured = false;
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     auto consumed = pair.second->sendEvent(event);
     if (!consumed)
       return std::unexpected(std::move(consumed.error()));
@@ -1834,7 +1834,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
     }
   }
 
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     pair.second->setPosition(Vec2I());
     auto size = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
     if (!size)
@@ -1876,7 +1876,7 @@ std::expected<void, StarException> MainInterface::render() {
   if (!size)
     return std::unexpected(std::move(size.error()));
   RectI screenRect = RectI::withSize(Vec2I(), Vec2I(*size));
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     pair.second->setPosition(Vec2I());
     auto canvasSize = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
     if (!canvasSize)
@@ -1988,7 +1988,7 @@ std::expected<void, StarException> MainInterface::warpTo(WarpAction const& warpA
 }
 
 std::expected<std::shared_ptr<CanvasWidget>, StarException> MainInterface::fetchCanvas(String const& canvasName, bool ignoreInterfaceScale) {
-  if (auto existing = m_canvases.maybeRef(canvasName)) {
+  if (auto existing = m_canvases.find_ref(canvasName)) {
     existing->get()->setIgnoreInterfaceScale(ignoreInterfaceScale);
     return existing->get();
   }
@@ -2256,7 +2256,7 @@ std::expected<void, StarException> MainInterface::displayScriptPane(std::shared_
   if (*layerName) {
     if (!PaneLayerNames)
       return std::unexpected(PaneLayerNames.error());
-    auto parsed = PaneLayerNames->getLeft(**layerName);
+    auto parsed = PaneLayerNames->get_left(**layerName);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     layer = parsed->get();

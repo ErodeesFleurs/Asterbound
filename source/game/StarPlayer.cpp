@@ -337,7 +337,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   m_armor = std::move(armor);
   m_companions = std::make_shared<PlayerCompanions>(root(), m_config->companionsConfig);
 
-  for (auto& p : m_config->genericScriptContexts) {
+  for (auto&& p : m_config->genericScriptContexts) {
     auto scriptComponent = std::make_shared<GenericScriptComponent>(root());
     if (auto result = scriptComponent->setScript(p.second); !result)
       return std::unexpected(std::move(result.error()));
@@ -766,7 +766,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   auto modeName = std::move(*modeNameResult);
   if (!PlayerModeNames)
     return std::unexpected(PlayerModeNames.error());
-  auto modeResult = PlayerModeNames->getLeft(modeName);
+  auto modeResult = PlayerModeNames->get_left(modeName);
   if (!modeResult)
     return std::unexpected(std::move(modeResult.error()));
   auto const& mode = modeResult->get();
@@ -939,11 +939,10 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
     return std::unexpected(std::move(aiStateResult.error()));
   auto aiState = std::move(*aiStateResult);
   m_aiState = std::move(aiState);
-  for (auto& script : m_genericScriptContexts)
-    {
-      if (auto result = script.second->setScriptStorage({}); !result)
-        return std::unexpected(std::move(result.error()));
-    }
+  for (auto&& script : m_genericScriptContexts) {
+    if (auto result = script.second->setScriptStorage({}); !result)
+      return std::unexpected(std::move(result.error()));
+  }
   auto storageJsonResult = diskStore.get("genericScriptStorage", JsonObject{});
   if (!storageJsonResult)
     return std::unexpected(std::move(storageJsonResult.error()));
@@ -952,7 +951,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!storageResult)
     return std::unexpected(std::move(storageResult.error()));
   auto storage = std::move(*storageResult);
-  for (auto& p : storage) {
+  for (auto&& p : storage) {
     if (auto script = m_genericScriptContexts.maybe(p.first).value_or(std::shared_ptr<GenericScriptComponent>{})) {
       auto objectResult = p.second.toObject();
       if (!objectResult)
@@ -1044,7 +1043,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     m_missionRadioMessages.clear();
     if (auto result = m_statusController->setPersistentEffects("species", speciesDefinition->statusEffects()); !result)
       return std::unexpected(std::move(result.error()));
-    for (auto& p : m_genericScriptContexts) {
+    for (auto&& p : m_genericScriptContexts) {
       if (auto result = p.second->addActorMovementCallbacks(*m_movementController); !result)
         return std::unexpected(std::move(result.error()));
       auto playerCallbacksResult = LuaBindings::makePlayerCallbacks(root(), *this);
@@ -1151,7 +1150,7 @@ std::expected<void, StarException> Player::uninit() {
     remember(m_questManager->uninit());
     remember(m_companions->uninit());
     remember(m_deployment->uninit());
-    for (auto& p : m_genericScriptContexts) {
+    for (auto&& p : m_genericScriptContexts) {
       remember(p.second->uninit());
       for (auto group : std::array<std::string_view, 7>{"animator", "entity", "player", "mcontroller", "status", "songbook", "world"})
         remember(p.second->removeCallbacks(group));
@@ -1904,7 +1903,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
       if (response)
         return response;
     }
-    for (auto& script : m_genericScriptContexts) {
+    for (auto&& script : m_genericScriptContexts) {
       auto responseResult = script.second->handleMessage(message, localMessage, args);
       if (!responseResult)
         return std::unexpected(std::move(responseResult.error()));
@@ -2087,7 +2086,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           return std::unexpected(std::move(result.error()));
       }
 
-      for (auto& p : m_genericScriptContexts) {
+      for (auto&& p : m_genericScriptContexts) {
         if (auto result = p.second->update(p.second->updateDt(dt)); !result)
           return std::unexpected(std::move(result.error()));
       }
@@ -2470,7 +2469,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   }
   
   if (isMaster()) {
-    for (auto& p : m_genericScriptContexts) {
+    for (auto&& p : m_genericScriptContexts) {
       if (auto result = p.second->invoke("postUpdate"); !result)
         return std::unexpected(std::move(result.error()));
     }
@@ -3921,7 +3920,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
   }
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
-  auto emoteResult = HumanoidEmoteNames->getLeft(m_emoteNetState.get());
+  auto emoteResult = HumanoidEmoteNames->get_left(m_emoteNetState.get());
   if (!emoteResult)
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
@@ -3968,7 +3967,7 @@ std::expected<void, StarException> Player::setNetStates() {
   }
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
-  auto emoteResult = HumanoidEmoteNames->getRight(m_emoteState);
+  auto emoteResult = HumanoidEmoteNames->get_right(m_emoteState);
   if (!emoteResult)
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
@@ -3980,7 +3979,7 @@ std::expected<void, StarException> Player::setNetStates() {
 std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot, std::shared_ptr<ArmorItem> const& armor, bool visible) {
   if (!EquipmentSlotNames)
     return std::unexpected(EquipmentSlotNames.error());
-  auto slotNameResult = EquipmentSlotNames->getRight(slot);
+  auto slotNameResult = EquipmentSlotNames->get_right(slot);
   if (!slotNameResult)
     return std::unexpected(std::move(slotNameResult.error()));
   auto const& slotName = slotNameResult->get();
@@ -4031,7 +4030,7 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
       return std::unexpected(EquipmentSlotNames.error());
     for (std::uint8_t i = 0; i != 12; ++i) {
       auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
-      auto slotNameResult = EquipmentSlotNames->getRight(slot);
+      auto slotNameResult = EquipmentSlotNames->get_right(slot);
       if (!slotNameResult)
         return std::unexpected(std::move(slotNameResult.error()));
       auto const& slotName = slotNameResult->get();
@@ -4111,7 +4110,7 @@ bool Player::isDeployed() const {
 std::expected<void, StarException> Player::setBusyState(PlayerBusyState busyState) {
   if (!PlayerBusyStateNames)
     return std::unexpected(PlayerBusyStateNames.error());
-  auto nameResult = PlayerBusyStateNames->getRight(busyState);
+  auto nameResult = PlayerBusyStateNames->get_right(busyState);
   if (!nameResult)
     return std::unexpected(std::move(nameResult.error()));
   auto const& name = nameResult->get();
@@ -4220,7 +4219,7 @@ std::expected<void, StarException> Player::setModeType(PlayerMode mode) {
   auto config = std::move(*configResult);
   if (!PlayerModeNames)
     return std::unexpected(PlayerModeNames.error());
-  auto nameResult = PlayerModeNames->getRight(mode);
+  auto nameResult = PlayerModeNames->get_right(mode);
   if (!nameResult)
     return std::unexpected(std::move(nameResult.error()));
   auto const& name = nameResult->get();
@@ -4569,7 +4568,7 @@ std::expected<void, StarException> Player::addEffectEmitters(StringSet const& em
 std::expected<void, StarException> Player::requestEmote(String const& emote) {
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
-  auto stateResult = HumanoidEmoteNames->getLeft(emote);
+  auto stateResult = HumanoidEmoteNames->get_left(emote);
   if (!stateResult)
     return std::unexpected(std::move(stateResult.error()));
   auto const& state = stateResult->get();
@@ -4613,7 +4612,7 @@ std::shared_ptr<QuestManager> Player::questManager() const {
 
 std::expected<Json, StarException> Player::diskStore() {
   JsonObject storage;
-  for (auto& script : m_genericScriptContexts) {
+  for (auto&& script : m_genericScriptContexts) {
     auto entryResult = script.second->getScriptStorage();
     if (!entryResult)
       return std::unexpected(std::move(entryResult.error()));
@@ -4626,7 +4625,7 @@ std::expected<Json, StarException> Player::diskStore() {
     return std::unexpected(PlayerException("Player has no unique id"));
   if (!PlayerModeNames)
     return std::unexpected(PlayerModeNames.error());
-  auto modeResult = PlayerModeNames->getRight(m_modeType);
+  auto modeResult = PlayerModeNames->get_right(m_modeType);
   if (!modeResult)
     return std::unexpected(std::move(modeResult.error()));
   auto const& mode = modeResult->get();
@@ -5161,7 +5160,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
     return std::unexpected(std::move(result.error()));
   if (inWorld()) {
     if (isMaster()) {
-      for (auto& script : m_genericScriptContexts) {
+      for (auto&& script : m_genericScriptContexts) {
         if (script.second->initialized()) {
           if (auto result = script.second->removeCallbacks("animator"); !result)
             return std::unexpected(std::move(result.error()));

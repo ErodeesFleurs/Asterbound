@@ -26,7 +26,7 @@ Node Node::withVelocity(Vec2F velocity) const {
 std::expected<std::reference_wrapper<String const>, StarException> actionName(Action action) {
   if (!ActionNames)
     return std::unexpected(ActionNames.error());
-  return ActionNames->getRight(action);
+  return ActionNames->get_right(action);
 }
 
 std::expected<String, StarException> printEdge(Edge const& edge) {

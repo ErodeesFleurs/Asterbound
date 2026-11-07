@@ -185,7 +185,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
     [&](std::shared_ptr<Entity> const& entity, LuaEngine& engine) -> std::expected<LuaString, StarException> {
         if (!EntityTypeNames)
             return std::unexpected(EntityTypeNames.error());
-        auto name = EntityTypeNames->getRight(entity->entityType());
+        auto name = EntityTypeNames->get_right(entity->entityType());
         if (!name)
           return std::unexpected(std::move(name.error()));
         return engine.createString(name->get());

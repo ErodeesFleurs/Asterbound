@@ -70,7 +70,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
 }
 
 std::expected<RadioMessage, StarException> RadioMessageDatabase::radioMessage(String const& messageName) const {
-  if (auto message = m_radioMessages.maybeRef(messageName))
+  if (auto message = m_radioMessages.find_ref(messageName))
     return message->get();
   return std::unexpected(RadioMessageDatabaseException(strf("Unknown radio message {}", messageName)));
 }
@@ -103,7 +103,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   auto typeName = mergedConfig.getString("type");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
-  auto type = RadioMessageTypeNames->maybeLeftRef(*typeName);
+  auto type = RadioMessageTypeNames->find_left_ref(*typeName);
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (!*type)

@@ -55,7 +55,7 @@ ImageMetadataDatabase::ImageMetadataDatabase(Root& root)
 
 std::expected<Vec2U, StarException> ImageMetadataDatabase::imageSize(AssetPath const& path) const {
   std::unique_lock locker(m_mutex);
-  auto cached = m_sizeCache.maybeRef(path);
+  auto cached = m_sizeCache.find_ref(path);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -75,7 +75,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   SpacesEntry key = std::make_tuple(path, Vec2I::round(position), fillLimit, flip);
 
   std::unique_lock locker(m_mutex);
-  auto cached = m_spacesCache.maybeRef(key);
+  auto cached = m_spacesCache.find_ref(key);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -84,7 +84,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   auto filteredPath = filterProcessing(path);
   SpacesEntry filteredKey = std::make_tuple(filteredPath, Vec2I::round(position), fillLimit, flip);
 
-  auto filteredCached = m_spacesCache.maybeRef(filteredKey);
+  auto filteredCached = m_spacesCache.find_ref(filteredKey);
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
@@ -153,15 +153,15 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
 
 std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetPath const& path) const {
   std::unique_lock locker(m_mutex);
-  
-  auto cached = m_regionCache.maybeRef(path);
+
+  auto cached = m_regionCache.find_ref(path);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
     return (*cached)->get();
 
   auto filteredPath = filterProcessing(path);
-  auto filteredCached = m_regionCache.maybeRef(filteredPath);
+  auto filteredCached = m_regionCache.find_ref(filteredPath);
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
@@ -257,7 +257,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return fallback();
   } else {
     std::unique_lock locker(m_mutex);
-    auto size = m_sizeCache.maybeRef(path.basePath);
+    auto size = m_sizeCache.find_ref(path.basePath);
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size) {

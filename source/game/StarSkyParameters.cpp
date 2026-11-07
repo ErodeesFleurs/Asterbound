@@ -193,7 +193,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
   auto typeName = config.getString("skyType", "barren");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   if (!SkyTypeNames) return std::unexpected(SkyTypeNames.error());
-  auto type = SkyTypeNames->getLeft(*typeName);
+  auto type = SkyTypeNames->get_left(*typeName);
   if (!type) return std::unexpected(std::move(type.error()));
   sky.skyType = type->get();
   auto colors = config.opt("skyColoring");
@@ -230,7 +230,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
 
 std::expected<Json, StarException> SkyParameters::toJson() const {
   if (!SkyTypeNames) return std::unexpected(SkyTypeNames.error());
-  auto typeName = SkyTypeNames->getRight(skyType);
+  auto typeName = SkyTypeNames->get_right(skyType);
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   auto layerJson = [](std::pair<List<std::pair<String, float>>, Vec2F> const& planet) -> Json {
     JsonArray layers;

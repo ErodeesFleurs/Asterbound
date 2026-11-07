@@ -1468,7 +1468,7 @@ res.offset = std::move(*result366);
       auto result367 = v.getString("rotationType");
 if (!result367) return std::unexpected(std::move(result367.error()));
 if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-auto result368 = RotationTypeNames->getLeft(std::move(*result367));
+auto result368 = RotationTypeNames->get_left(std::move(*result367));
 if (!result368) return std::unexpected(std::move(result368.error()));
 res.rotationType = result368->get();
       auto result369 = v.getFloat("rotationOffset");
@@ -1503,9 +1503,10 @@ if (!result598) return std::unexpected(std::move(result598.error()));
 std::expected<Json, StarException> Plant::writePiecesToJson() const {
   auto result596 = jsonFromList<PlantPiece>(m_pieces, [](PlantPiece const& piece) -> std::expected<Json, StarException> {
       if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-auto result363 = RotationTypeNames->getRight(piece.rotationType);
-if (!result363) return std::unexpected(std::move(result363.error()));
-return JsonObject{
+      auto result363 = RotationTypeNames->get_right(piece.rotationType);
+      if (!result363)
+        return std::unexpected(std::move(result363.error()));
+      return JsonObject{
         {"image", piece.image},
         {"offset", jsonFromVec2F(piece.offset)},
         {"rotationType", result363->get()},

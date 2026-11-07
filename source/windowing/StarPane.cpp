@@ -711,7 +711,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
   auto anchorCallback = registerPaneCallback("anchor", [](Pane& pane) -> std::expected<String, StarException> {
     if (!PaneAnchorNames)
       return std::unexpected(PaneAnchorNames.error());
-    auto name = PaneAnchorNames->getRight(pane.anchor());
+    auto name = PaneAnchorNames->get_right(pane.anchor());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();
@@ -721,7 +721,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
   auto setAnchorCallback = registerPaneCallback("setAnchor", [](Pane& pane, String const& name) -> std::expected<void, StarException> {
     if (!PaneAnchorNames)
       return std::unexpected(PaneAnchorNames.error());
-    auto value = PaneAnchorNames->getLeft(name);
+    auto value = PaneAnchorNames->get_left(name);
     if (!value)
       return std::unexpected(std::move(value.error()));
     pane.setAnchor(value->get());

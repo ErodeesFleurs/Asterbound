@@ -49,7 +49,7 @@ InteractAction::InteractAction(InteractActionType type, EntityId entityId, Json 
 
 std::expected<InteractAction, StarException> InteractAction::create(String const& typeName, EntityId entityId, Json data) {
   if (!InteractActionTypeNames) return std::unexpected(InteractActionTypeNames.error());
-  auto type = InteractActionTypeNames->getLeft(typeName);
+  auto type = InteractActionTypeNames->get_left(typeName);
   if (!type) return std::unexpected(std::move(type.error()));
   return InteractAction(type->get(), entityId, std::move(data));
 }

@@ -215,7 +215,7 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
   if (!name) return std::unexpected(std::move(name.error()));
   result->m_name = std::move(*name);
   if (!Tiled::LayerNames) return std::unexpected(Tiled::LayerNames.error());
-  auto tileLayer = Tiled::LayerNames->getLeft(result->m_name);
+  auto tileLayer = Tiled::LayerNames->get_left(result->m_name);
   if (!tileLayer) return std::unexpected(std::move(tileLayer.error()));
   result->m_layer = tileLayer->get();
   auto compressed = layer.contains("compression");
@@ -534,7 +534,7 @@ std::expected<TileLayer, StarException> TMXObject::getLayer(std::optional<Json> 
         auto layer = properties->getString("layer");
         if (!layer) return std::unexpected(std::move(layer.error()));
         if (!Tiled::LayerNames) return std::unexpected(Tiled::LayerNames.error());
-        auto value = Tiled::LayerNames->getLeft(*layer);
+        auto value = Tiled::LayerNames->get_left(*layer);
         if (!value) return std::unexpected(std::move(value.error()));
         return value->get();
       }

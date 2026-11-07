@@ -664,7 +664,7 @@ std::expected<String, StarException> ClientCommandProcessor::suicide() {
 std::expected<String, StarException> ClientCommandProcessor::naked() {
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
   auto inventory = m_universeClient->mainPlayer()->inventory();
-  for (auto slot : EquipmentSlotNames->leftValues()) {
+  for (auto slot : EquipmentSlotNames->left_values()) {
     auto item = inventory->takeSlot(slot);
     if (!item) return std::unexpected(std::move(item.error()));
     auto remaining = inventory->addToBags(std::move(*item));
@@ -711,7 +711,7 @@ std::expected<String, StarException> ClientCommandProcessor::giveEssentialItem(S
   auto item = (*database)->item(*descriptor);
   if (!item) return std::unexpected(std::move(item.error()));
   if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-  auto slot = EssentialItemNames->getLeft((*arguments)[1]);
+  auto slot = EssentialItemNames->get_left((*arguments)[1]);
   if (!slot) {
     if (slot.error().is<MapException>()) return strf("Invalid essential item slot {}.", (*arguments)[1]);
     return std::unexpected(std::move(slot.error()));
@@ -919,7 +919,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     if (frames.empty())
       return "^red;Failed to save image^reset;";
 
-    for (auto& entry : frames) {
+    for (auto&& entry : frames) {
       framePath.subPath = entry.first;
       auto frame = (*assets)->image(framePath);
       if (!frame) return std::unexpected(std::move(frame.error()));
@@ -933,7 +933,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     if (imageSize.min() == 0)
       return "^red;Resulting image is empty^reset;";
 
-    for (auto& frame : frames) {
+    for (auto&& frame : frames) {
       RectU& box = frame.second.first;
       box.setXMin((box.xMin() / frameSize[0]) * imageSize[0]);
       box.setYMin(((sheet->height() - box.yMin() - box.height()) / frameSize[1]) * imageSize[1]);
@@ -947,7 +947,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       sheet->reset(sheetWidth, sheetHeight, PixelFormat::RGBA32);
     }
 
-    for (auto& entry : frames) {
+    for (auto&& entry : frames) {
       auto copied = sheet->copyInto(entry.second.first.min(), *entry.second.second);
       if (!copied) return std::unexpected(std::move(copied.error()));
     }

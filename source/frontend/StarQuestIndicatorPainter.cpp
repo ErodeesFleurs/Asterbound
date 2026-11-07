@@ -191,7 +191,7 @@ std::expected<void, StarException> QuestIndicatorPainter::update(float dt, std::
     auto const& indicator = **found;
     foundIndicators.insert(entity->entityId());
 
-    if (auto currentIndicator = m_indicators.maybeRef(entity->entityId())) {
+    if (auto currentIndicator = m_indicators.find_ref(entity->entityId())) {
       currentIndicator->get().worldPosition = indicator.worldPosition;
       if (currentIndicator->get().indicatorName == indicator.indicatorImage) {
         currentIndicator->get().animation->update(dt);

@@ -109,25 +109,25 @@ bool ProjectileDatabase::isProjectile(String const& projectileName) const {
 }
 
 std::expected<Json, StarException> ProjectileDatabase::projectileConfig(String const& type) const {
-  auto config = m_configs.maybeRef(type);
+  auto config = m_configs.find_ref(type);
   if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
   return config->get()->config;
 }
 
 std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::createProjectile(String const& type, Json const& parameters) const {
-  auto config = m_configs.maybeRef(type);
+  auto config = m_configs.find_ref(type);
   if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
   return Projectile::create(m_root, config->get(), parameters);
 }
 
 std::expected<String, StarException> ProjectileDatabase::damageKindImage(String const& type) const {
-  auto config = m_configs.maybeRef(type);
+  auto config = m_configs.find_ref(type);
   if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
   return config->get()->damageKindImage;
 }
 
 std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String const& type) const {
-  auto config = m_configs.maybeRef(type);
+  auto config = m_configs.find_ref(type);
   if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
   return config->get()->movementSettings.getFloat("gravityMultiplier", 1);
 }
@@ -137,7 +137,7 @@ std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::ne
   ds.setStreamCompatibilityVersion(rules);
   auto typeName = ds.read<String>();
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto config = m_configs.maybeRef(*typeName);
+  auto config = m_configs.find_ref(*typeName);
   if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", *typeName)));
   return Projectile::create(m_root, config->get(), ds, rules);
 }
@@ -379,7 +379,7 @@ projectileConfig->onlyHitTerrain = std::move(*result135);
   auto result136 = config.getString("clientEntityMode", "ClientMasterAllowed");
 if (!result136) return std::unexpected(std::move(result136.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
-auto result137 = ClientEntityModeNames->getLeft(std::move(*result136));
+auto result137 = ClientEntityModeNames->get_left(std::move(*result136));
 if (!result137) return std::unexpected(std::move(result137.error()));
 projectileConfig->clientEntityMode = result137->get();
   auto result138 = config.getBool("masterOnly", false);

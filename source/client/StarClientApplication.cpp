@@ -1101,7 +1101,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!shaderConfig)
       return std::unexpected(std::move(shaderConfig.error()));
     StringMap<String> shaders;
-    for (auto& entry : *shaderConfig) {
+    for (auto&& entry : *shaderConfig) {
       if (!entry.second.isType(Json::Type::String))
         continue;
       auto shader = entry.second.toString();
@@ -1147,7 +1147,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   auto groups = assets->json("/client.config:postProcessGroups").and_then([](Json j) { return j.toObject(); });
   if (!groups)
     return std::unexpected(std::move(groups.error()));
-  for (auto& [name, definition] : *groups) {
+  for (auto&& [name, definition] : *groups) {
     auto groupConfig = groupsConfig->opt(name);
     if (!groupConfig)
       return std::unexpected(std::move(groupConfig.error()));

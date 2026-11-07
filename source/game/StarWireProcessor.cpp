@@ -118,7 +118,7 @@ std::expected<void, StarException> WireProcessor::process() {
 }
 
 std::expected<bool, StarException> WireProcessor::readInputConnection(WireConnection const& connection) {
-  if (auto wes = m_workingWireEntities.maybeRef(connection.entityLocation)) {
+  if (auto wes = m_workingWireEntities.find_ref(connection.entityLocation)) {
     return wes->get().outputStates.get(connection.nodeIndex);
   }
   return false;
@@ -175,7 +175,7 @@ std::expected<void, StarException> WireProcessor::loadNetwork(Vec2I tilePosition
       if (!populated) return std::unexpected(std::move(populated.error()));
     }
 
-    auto wes = m_workingWireEntities.maybeRef(pos);
+    auto wes = m_workingWireEntities.find_ref(pos);
     if (!wes)
       return false;
     if (wes->get().networkLoaded)

@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<PlayerTech>, StarException> PlayerTech::create(Roo
     if (!techName)
       return std::unexpected(std::move(techName.error()));
     if ((*techDatabase)->contains(*techName)) {
-      auto type = TechTypeNames->getLeft(entry.first);
+      auto type = TechTypeNames->get_left(entry.first);
       if (!type)
         return std::unexpected(std::move(type.error()));
       playerTech->m_equippedTechs[type->get()] = std::move(*techName);
@@ -81,7 +81,7 @@ std::expected<Json, StarException> PlayerTech::toJson() const {
     return std::unexpected(TechTypeNames.error());
   JsonObject equipped;
   for (auto const& entry : m_equippedTechs) {
-    auto type = TechTypeNames->getRight(entry.first);
+    auto type = TechTypeNames->get_right(entry.first);
     if (!type)
       return std::unexpected(std::move(type.error()));
     equipped[type->get()] = entry.second;

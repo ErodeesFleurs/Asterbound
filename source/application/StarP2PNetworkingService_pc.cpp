@@ -457,7 +457,7 @@ std::expected<std::optional<ByteArray>, StarException> PcP2PNetworkingService::S
 }
 
 auto PcP2PNetworkingService::createSteamP2PSocket(CSteamID steamId) -> std::unique_ptr<SteamP2PSocket> {
-  if (auto oldSocket = m_steamOpenSockets.maybeRef(steamId.ConvertToUint64())) {
+  if (auto oldSocket = m_steamOpenSockets.find_ref(steamId.ConvertToUint64())) {
     std::lock_guard socketLocker(oldSocket->get().get().mutex);
     steamCloseSocket(oldSocket->get().get());
   }
@@ -474,7 +474,7 @@ auto PcP2PNetworkingService::createSteamP2PSocket(CSteamID steamId) -> std::uniq
 std::expected<void, StarException> PcP2PNetworkingService::steamOnConnectionFailure(P2PSessionConnectFail_t& callback) {
   std::lock_guard serviceLocker(m_mutex);
   auto logged = m_state->logger.warn("Connection with Steam user {} failed (error code: {})", callback.m_steamIDRemote.ConvertToUint64(), callback.m_eP2PSessionError);
-  if (auto socket = m_steamOpenSockets.maybeRef(callback.m_steamIDRemote.ConvertToUint64())) {
+  if (auto socket = m_steamOpenSockets.find_ref(callback.m_steamIDRemote.ConvertToUint64())) {
     std::lock_guard socketLocker(socket->get().get().mutex);
     socket->get().get().error = ApplicationException::format("Connection with Steam user {} failed (error code: {})", callback.m_steamIDRemote.ConvertToUint64(), callback.m_eP2PSessionError);
     steamCloseSocket(socket->get().get());
@@ -529,7 +529,7 @@ std::expected<void, StarException> PcP2PNetworkingService::steamReceiveAll() {
         &messageSize, &messageRemoteUser, 0))
       return std::unexpected(ApplicationException("SteamNetworking::ReadP2PPacket returned false"));
     data.resize(messageSize);
-    if (auto openSocket = m_steamOpenSockets.maybeRef(messageRemoteUser.ConvertToUint64())) {
+    if (auto openSocket = m_steamOpenSockets.find_ref(messageRemoteUser.ConvertToUint64())) {
       std::lock_guard socketLocker(openSocket->get().get().mutex);
       openSocket->get().get().incoming.append(std::move(data));
     }
@@ -611,7 +611,7 @@ void PcP2PNetworkingService::discordCloseSocket(DiscordP2PSocket& socket) {
 std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService::discordConnectRemote(discord::UserId remoteUserId, discord::LobbyId lobbyId, String const& lobbySecret) {
   if (auto logged = m_state->logger.info("Connecting to Discord lobby {}", lobbyId); !logged)
     return std::unexpected(std::move(logged.error()));
-  if (auto oldSocket = m_discordOpenSockets.maybeRef(remoteUserId)) {
+  if (auto oldSocket = m_discordOpenSockets.find_ref(remoteUserId)) {
     std::lock_guard socketLocker(oldSocket->get().get().mutex);
     discordCloseSocket(oldSocket->get().get());
   }
@@ -637,7 +637,7 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
         return;
       }
       std::lock_guard serviceLocker(service->get().m_mutex);
-      auto socketRef = service->get().m_discordOpenSockets.maybeRef(remoteUserId);
+      auto socketRef = service->get().m_discordOpenSockets.find_ref(remoteUserId);
       if (!socketRef || socketRef->get().get().connectionGeneration != generation) {
         if (res == discord::Result::Ok) {
           // A replacement connection to this lobby owns the shared membership.
@@ -693,16 +693,19 @@ void PcP2PNetworkingService::discordOnReceiveMessage(discord::LobbyId lobbyId, d
     return;
   }
 
-  if (auto socket = m_discordOpenSockets.maybeRef(userId)) {
-      if (channel == DiscordMainNetworkChannel) {
-        std::lock_guard socketLocker(socket->get().get().mutex);
-        socket->get().get().incoming.append(ByteArray(std::span(reinterpret_cast<char const*>(data.data()), data.size())));
-      } else {
-        recordDiscordCallbackError(*m_state, ApplicationException::format("Received Discord message on unexpected channel {}, ignoring", channel));
-      }
+  if (auto socket = m_discordOpenSockets.find_ref(userId)) {
+    if (channel == DiscordMainNetworkChannel) {
+      std::lock_guard socketLocker(socket->get().get().mutex);
+      socket->get().get().incoming.append(
+        ByteArray(std::span(reinterpret_cast<char const*>(data.data()), data.size())));
     } else {
-    recordDiscordCallbackError(*m_state, ApplicationException::format("Could not find associated Discord socket for user id {}", userId));
+      recordDiscordCallbackError(
+        *m_state, ApplicationException::format("Received Discord message on unexpected channel {}, ignoring", channel));
     }
+  } else {
+    recordDiscordCallbackError(
+      *m_state, ApplicationException::format("Could not find associated Discord socket for user id {}", userId));
+  }
   }
 
 void PcP2PNetworkingService::discordOnLobbyMemberConnect(discord::LobbyId lobbyId, discord::UserId userId) {
@@ -741,7 +744,7 @@ void PcP2PNetworkingService::discordOnLobbyMemberDisconnect(discord::LobbyId lob
   }
 
   if (m_discordServerLobby && m_discordServerLobby->first == lobbyId && m_state->discordCurrentUser && userId != m_state->discordCurrentUser->GetId()) {
-    if (auto socket = m_discordOpenSockets.maybeRef(userId)) {
+    if (auto socket = m_discordOpenSockets.find_ref(userId)) {
       std::lock_guard socketLocker(socket->get().get().mutex);
       discordCloseSocket(socket->get().get());
     }

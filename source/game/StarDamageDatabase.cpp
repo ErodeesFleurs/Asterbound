@@ -137,13 +137,13 @@ DamageDatabase::damageKind(String const& kind) const {
   auto key = CaseInsensitiveStringView::create(name);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  if (auto found = m_damageKinds.maybeRef(*key))
+  if (auto found = m_damageKinds.find_ref(*key))
     return *found;
   return std::unexpected(StarException(strf("Unknown damage definition with kind '{}'.", name)));
 }
 
 std::expected<std::reference_wrapper<ElementalType const>, StarException> DamageDatabase::elementalType(String const& name) const {
-  if (auto found = m_elementalTypes.maybeRef(name))
+  if (auto found = m_elementalTypes.find_ref(name))
     return *found;
   return std::unexpected(StarException(strf("Unknown elemental type with name '{}'.", name)));
 }

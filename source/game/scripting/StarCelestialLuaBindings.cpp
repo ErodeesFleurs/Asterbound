@@ -339,7 +339,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (auto registration = callbacks.registerCallback("skyFlyingType", [client]() -> std::expected<String, StarException> {
     if (!FlyingTypeNames)
       return std::unexpected(FlyingTypeNames.error());
-    auto name = FlyingTypeNames->getRight(client->get().currentSky()->flyingType());
+    auto name = FlyingTypeNames->get_right(client->get().currentSky()->flyingType());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();
@@ -348,7 +348,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (auto registration = callbacks.registerCallback("skyWarpPhase", [client]() -> std::expected<String, StarException> {
     if (!WarpPhaseNames)
       return std::unexpected(WarpPhaseNames.error());
-    auto name = WarpPhaseNames->getRight(client->get().currentSky()->warpPhase());
+    auto name = WarpPhaseNames->get_right(client->get().currentSky()->warpPhase());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();

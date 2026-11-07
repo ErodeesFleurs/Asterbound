@@ -222,7 +222,7 @@ std::expected<void, StarException> ItemDrop::initializeItem(std::shared_ptr<Item
     return std::unexpected(std::move(modeName.error()));
   if (!ClientEntityModeNames)
     return std::unexpected(ClientEntityModeNames.error());
-  auto mode = ClientEntityModeNames->getLeft(*modeName);
+  auto mode = ClientEntityModeNames->get_left(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   m_clientEntityMode = mode->get();
@@ -264,7 +264,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
     return std::unexpected(std::move(modeName.error()));
   if (!ModeNames)
     return std::unexpected(ModeNames.error());
-  auto mode = ModeNames->getLeft(*modeName);
+  auto mode = ModeNames->get_left(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   drop->m_mode.set(mode->get());
@@ -319,7 +319,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
     return std::unexpected(std::move(stored.error()));
   if (!ModeNames)
     return std::unexpected(ModeNames.error());
-  auto mode = ModeNames->getRight(m_mode.get());
+  auto mode = ModeNames->get_right(m_mode.get());
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   return Json(JsonObject{
@@ -910,7 +910,7 @@ std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
     }
     if (!ModeNames)
       return std::unexpected(ModeNames.error());
-    auto value = ModeNames->getLeft(*mode);
+    auto value = ModeNames->get_left(*mode);
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_overrideMode = value->get();
@@ -922,7 +922,7 @@ std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
       return std::optional<String>();
     if (!ModeNames)
       return std::unexpected(ModeNames.error());
-    auto value = ModeNames->getRight(*m_overrideMode);
+    auto value = ModeNames->get_right(*m_overrideMode);
     if (!value)
       return std::unexpected(std::move(value.error()));
     return std::optional<String>(value->get());

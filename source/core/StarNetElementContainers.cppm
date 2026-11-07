@@ -41,7 +41,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<std::reference_wrapper<mapped_type const>, StarException> get(key_type const& key) const;
-  std::optional<std::reference_wrapper<mapped_type const>> maybeRef(key_type const& key) const;
+  std::optional<std::reference_wrapper<mapped_type const>> find_ref(key_type const& key) const;
 
   const_iterator begin() const;
   const_iterator end() const;
@@ -70,8 +70,8 @@ public:
 
   const_iterator erase(const_iterator i);
 
-  [[nodiscard]] std::expected<mapped_type, StarException> take(key_type const& k);
-  std::optional<mapped_type> maybeTake(key_type const& k);
+  [[nodiscard]] std::expected<mapped_type, StarException> extract_value(key_type const& k);
+  std::optional<mapped_type> try_extract_value(key_type const& k);
 
   void clear();
 
@@ -279,8 +279,9 @@ template <typename BaseMap>
 }
 
 template <typename BaseMap>
-auto NetElementMapWrapper<BaseMap>::maybeRef(key_type const& key) const -> std::optional<std::reference_wrapper<mapped_type const>> {
-  return BaseMap::maybeRef(key);
+auto NetElementMapWrapper<BaseMap>::find_ref(key_type const& key) const
+  -> std::optional<std::reference_wrapper<mapped_type const>> {
+  return BaseMap::find_ref(key);
 }
 
 template <typename BaseMap>
@@ -365,17 +366,18 @@ auto NetElementMapWrapper<BaseMap>::erase(const_iterator i) -> const_iterator {
 }
 
 template <typename BaseMap>
-[[nodiscard]] auto NetElementMapWrapper<BaseMap>::take(key_type const& k) -> std::expected<mapped_type, StarException> {
+[[nodiscard]] auto NetElementMapWrapper<BaseMap>::extract_value(key_type const& k)
+  -> std::expected<mapped_type, StarException> {
   auto i = BaseMap::find(k);
   if (i == BaseMap::end())
-    return std::unexpected(MapException::format("Key '{}' not found in Map::take()", outputAny(k)));
+    return std::unexpected(MapException::format("Key '{}' not found in Map::extract_value()", outputAny(k)));
   auto m = std::move(i->second);
   erase(i);
   return m;
 }
 
 template <typename BaseMap>
-auto NetElementMapWrapper<BaseMap>::maybeTake(key_type const& k) -> std::optional<mapped_type> {
+auto NetElementMapWrapper<BaseMap>::try_extract_value(key_type const& k) -> std::optional<mapped_type> {
   auto i = BaseMap::find(k);
   if (i == BaseMap::end())
     return {};
@@ -408,7 +410,7 @@ void NetElementMapWrapper<BaseMap>::reset(BaseMap values) {
   }
 
   for (auto const& p : values) {
-    auto v = maybeRef(p.first);
+    auto v = find_ref(p.first);
     if (!v || !(v->get() == p.second)) {
       addChangeData(SetChange{p.first, p.second});
       m_updated = true;

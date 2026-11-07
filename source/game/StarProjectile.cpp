@@ -806,9 +806,10 @@ std::size_t Projectile::movingCollisionCount() const {
 }
 
 std::expected<std::optional<PhysicsMovingCollision>, StarException> Projectile::movingCollision(std::size_t positionIndex) const {
-  auto result893 = m_physicsCollisions.valueAt(positionIndex);
-if (!result893) return std::unexpected(std::move(result893.error()));
-auto const& mc = result893->get();
+  auto result893 = m_physicsCollisions.value_at(positionIndex);
+  if (!result893)
+    return std::unexpected(std::move(result893.error()));
+  auto const& mc = result893->get();
   if (!mc.enabled.get())
     return {};
   PhysicsMovingCollision collision = mc.movingCollision;
@@ -1349,7 +1350,7 @@ float explosiveDamageAmount = std::move(*result832);
     auto result833 = parameters.getString("tileDamageType", "explosive");
 if (!result833) return std::unexpected(std::move(result833.error()));
 if (!TileDamageTypeNames) return std::unexpected(TileDamageTypeNames.error());
-auto result834 = TileDamageTypeNames->getLeft(std::move(*result833));
+auto result834 = TileDamageTypeNames->get_left(std::move(*result833));
 if (!result834) return std::unexpected(std::move(result834.error()));
 auto damageType = result834->get();
     auto result835 = parameters.getUInt("harvestLevel", 0);
@@ -1749,18 +1750,18 @@ if (!result713) return std::unexpected(std::move(result713.error()));
 forceConfig.enabled.set(std::move(*result713));
   }
 
-  m_physicsForces.sortByKey();
+  m_physicsForces.sort_by_key();
   for (auto& p : m_physicsForces)
     {
 auto result714 = m_netGroup.addNetElement(p.second.enabled);
 if (!result714) return std::unexpected(std::move(result714.error()));
 }
 
-  m_physicsCollisions.sortByKey();
-  for (auto& p : m_physicsCollisions)
-    {
-auto result715 = m_netGroup.addNetElement(p.second.enabled);
-if (!result715) return std::unexpected(std::move(result715.error()));
+m_physicsCollisions.sort_by_key();
+for (auto& p : m_physicsCollisions) {
+  auto result715 = m_netGroup.addNetElement(p.second.enabled);
+  if (!result715)
+    return std::unexpected(std::move(result715.error()));
 }
 
   auto result716 = m_netGroup.addNetElement(m_collisionEvent);

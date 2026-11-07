@@ -1127,7 +1127,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
         rejectRemote(remote.second, remote.first);
       }
     }
-    for (auto& response : responses) {
+    for (auto&& response : responses) {
       if (std::holds_alternative<RpcPromiseKeeper<Json>>(response.second.second))
         record(std::get<RpcPromiseKeeper<Json>>(response.second.second).fail("ServerShutdown"));
       else if (std::holds_alternative<ConnectionId>(response.second.second))
@@ -1540,7 +1540,7 @@ std::expected<void, StarException> UniverseServer::sendClientContextUpdates() {
   if (!m_isLocal)
     m_root.logMap().clear();
 
-  for (auto& update : contextUpdates) {
+  for (auto&& update : contextUpdates) {
     if (auto sent = m_connectionServer->sendPackets(update.first, {std::make_shared<ClientContextUpdatePacket>(std::move(update.second))}); !sent)
       return std::unexpected(std::move(sent.error()));
   }
@@ -2012,78 +2012,80 @@ std::expected<void, StarException> UniverseServer::arriveShips() {
 
   for (auto it = m_pendingArrivals.begin(); it != m_pendingArrivals.end();) {
     auto process = [&]() -> std::expected<bool, StarException> {
-    auto& p = *it;
-    auto& clientId = p.first;
-    auto& coordinate = p.second;
+      auto&& p = *it;
+      auto& clientId = p.first;
+      auto& coordinate = p.second;
 
-    if (!coordinate) {
-      auto starter = nextStarterWorld();
-      if (!starter)
-        return std::unexpected(std::move(starter.error()));
-      coordinate = starter->value_or(CelestialCoordinate{});
-    }
-
-    if (!coordinate)
-      return false;
-
-    auto clientContext = m_clients.value(clientId);
-    if (!clientContext)
-      return true;
-
-    auto clientSystem = clientContext->systemWorld();
-    if (!clientSystem) {
-      auto created = createSystemWorld(coordinate.location());
-      if (!created)
-        return std::unexpected(std::move(created.error()));
-      clientSystem = std::move(*created);
-      auto added = clientSystem->addClient(clientId, clientContext->playerUuid(), clientContext->shipUpgrades().shipSpeed,
-          coordinate.isSystem() ? SystemLocation{} : SystemLocation{coordinate});
-      if (!added)
-        return std::unexpected(std::move(added.error()));
-
-      clientContext->setSystemWorld(clientSystem);
-    }
-
-    auto location = clientSystem->clientShipLocation(clientId);
-    if (!location)
-      return std::unexpected(std::move(location.error()));
-    if (std::holds_alternative<std::monostate>(*location))
-      return false;
-    if (!coordinate.isSystem()) {
-      auto created = triggerWorldCreation(CelestialWorldId(coordinate));
-      if (!created)
-        return std::unexpected(std::move(created.error()));
-      if (!*created)
-        return false;
-    }
-    if (auto logged = m_root.logger().info("UniverseServer: Arriving ship for player {} at {}", clientId, coordinate); !logged)
-      return std::unexpected(std::move(logged.error()));
-
-    // world is loaded, ship has arrived
-    clientContext->setShipCoordinate(coordinate);
-    clientContext->setShipLocation(*location);
-    auto clientShip = createWorld(ClientShipWorldId(clientContext->playerUuid()));
-    if (!clientShip)
-      return std::unexpected(std::move(clientShip.error()));
-    if (*clientShip) {
-      auto skyParameters = clientSystem->clientSkyParameters(clientId);
-      if (!skyParameters)
-        return std::unexpected(std::move(skyParameters.error()));
-      locker.unlock();
-      auto action = (*clientShip)->executeAction([&](WorldServerThread&, WorldServer& worldServer) {
-        return worldServer.stopFlyingSkyAt(*skyParameters);
-      });
-      auto clients = (*clientShip)->clients();
-      lockWithDiagnostics(locker);
-      if (!action)
-        return std::unexpected(std::move(action.error()));
-
-      for (auto shipClientId : clients) {
-        if (auto clientContext = m_clients.value(shipClientId))
-          clientContext->setOrbitWarpAction(clientSystem->clientWarpAction(clientId));
+      if (!coordinate) {
+        auto starter = nextStarterWorld();
+        if (!starter)
+          return std::unexpected(std::move(starter.error()));
+        coordinate = starter->value_or(CelestialCoordinate{});
       }
-    }
-    return true;
+
+      if (!coordinate)
+        return false;
+
+      auto clientContext = m_clients.value(clientId);
+      if (!clientContext)
+        return true;
+
+      auto clientSystem = clientContext->systemWorld();
+      if (!clientSystem) {
+        auto created = createSystemWorld(coordinate.location());
+        if (!created)
+          return std::unexpected(std::move(created.error()));
+        clientSystem = std::move(*created);
+        auto added =
+          clientSystem->addClient(clientId, clientContext->playerUuid(), clientContext->shipUpgrades().shipSpeed,
+                                  coordinate.isSystem() ? SystemLocation{} : SystemLocation{coordinate});
+        if (!added)
+          return std::unexpected(std::move(added.error()));
+
+        clientContext->setSystemWorld(clientSystem);
+      }
+
+      auto location = clientSystem->clientShipLocation(clientId);
+      if (!location)
+        return std::unexpected(std::move(location.error()));
+      if (std::holds_alternative<std::monostate>(*location))
+        return false;
+      if (!coordinate.isSystem()) {
+        auto created = triggerWorldCreation(CelestialWorldId(coordinate));
+        if (!created)
+          return std::unexpected(std::move(created.error()));
+        if (!*created)
+          return false;
+      }
+      if (auto logged = m_root.logger().info("UniverseServer: Arriving ship for player {} at {}", clientId, coordinate);
+          !logged)
+        return std::unexpected(std::move(logged.error()));
+
+      // world is loaded, ship has arrived
+      clientContext->setShipCoordinate(coordinate);
+      clientContext->setShipLocation(*location);
+      auto clientShip = createWorld(ClientShipWorldId(clientContext->playerUuid()));
+      if (!clientShip)
+        return std::unexpected(std::move(clientShip.error()));
+      if (*clientShip) {
+        auto skyParameters = clientSystem->clientSkyParameters(clientId);
+        if (!skyParameters)
+          return std::unexpected(std::move(skyParameters.error()));
+        locker.unlock();
+        auto action = (*clientShip)->executeAction([&](WorldServerThread&, WorldServer& worldServer) {
+          return worldServer.stopFlyingSkyAt(*skyParameters);
+        });
+        auto clients = (*clientShip)->clients();
+        lockWithDiagnostics(locker);
+        if (!action)
+          return std::unexpected(std::move(action.error()));
+
+        for (auto shipClientId : clients) {
+          if (auto clientContext = m_clients.value(shipClientId))
+            clientContext->setOrbitWarpAction(clientSystem->clientWarpAction(clientId));
+        }
+      }
+      return true;
     }();
     if (!process)
       return std::unexpected(std::move(process.error()));
@@ -2099,7 +2101,7 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
   std::shared_lock clientsLocker(m_clientsLock);
-  for (auto& entry : m_pendingCelestialRequests) {
+  for (auto&& entry : m_pendingCelestialRequests) {
     List<CelestialResponse> responses;
     for (auto it = entry.second.begin(); it != entry.second.end();) {
       auto ready = it->poll();
@@ -3298,7 +3300,7 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
           if (auto logged = m_root.logger().warn("UniverseServer: UniverseMessageResponse received for unknown context [{}]!", universeMessageResponse->uuid.hex()); !logged)
             return std::unexpected(std::move(logged.error()));
         } else {
-          auto entry = m_universeMessageResponses.take(universeMessageResponse->uuid);
+          auto entry = m_universeMessageResponses.extract_value(universeMessageResponse->uuid);
           if (!entry)
             return std::unexpected(std::move(entry.error()));
           auto response = std::move(entry->second);
@@ -3404,12 +3406,12 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return std::unexpected(std::move(name.error()));
       if (!NetCompressionModeNames)
         return std::unexpected(NetCompressionModeNames.error());
-      auto modeResult = NetCompressionModeNames->maybeLeft(*name);
+      auto modeResult = NetCompressionModeNames->maybe_left(*name);
       if (!modeResult)
         return std::unexpected(std::move(modeResult.error()));
       auto mode = modeResult->value_or(NetCompressionMode::None);
       compressionStream = mode == NetCompressionMode::Zstd;
-      auto modeName = NetCompressionModeNames->getRight(mode);
+      auto modeName = NetCompressionModeNames->get_right(mode);
       if (!modeName)
         return std::unexpected(std::move(modeName.error()));
       response->info = JsonObject{{"compression", modeName->get()}, {"openProtocolVersion", OpenProtocolVersion}};
@@ -3589,10 +3591,10 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     }
     if (m_clients.size() + 1 > m_maxPlayers && !administrator)
       return fail("Max player connections");
-    auto nextId = m_clients.nextId();
-    if (!nextId)
-      return std::unexpected(std::move(nextId.error()));
-    auto clientId = *nextId;
+    auto next_id = m_clients.next_id();
+    if (!next_id)
+      return std::unexpected(std::move(next_id.error()));
+    auto clientId = *next_id;
     StringSet species;
     for (auto const& entry : m_speciesShips)
       species.add(entry.first);
@@ -3745,7 +3747,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (auto sent = m_connectionServer->sendPackets(id, {std::make_shared<ServerInfoPacket>(players, static_cast<std::uint16_t>(m_maxPlayers))}); !sent)
         return std::unexpected(std::move(sent.error()));
     }
-    for (auto& script : m_scriptContexts) {
+    for (auto&& script : m_scriptContexts) {
       if (auto invoked = script.second->invoke("acceptConnection", clientId); !invoked)
         return std::unexpected(std::move(invoked.error()));
     }
@@ -3889,7 +3891,7 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
     return false;
   };
   if (m_disconnectingClients.add(clientId)) {
-    for (auto& script : m_scriptContexts)
+    for (auto&& script : m_scriptContexts)
       record(script.second->invoke("doDisconnection", clientId));
     m_teamManager->playerDisconnected(client->playerUuid());
   }
@@ -4407,7 +4409,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         return std::unexpected(std::move(beam.error()));
       if (!BeamUpRuleNames)
         return std::unexpected(BeamUpRuleNames.error());
-      auto rule = BeamUpRuleNames->getLeft(*beam);
+      auto rule = BeamUpRuleNames->get_left(*beam);
       if (!rule)
         return std::unexpected(std::move(rule.error()));
       parameters->beamUpRule = rule->get();
@@ -4899,7 +4901,7 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
 }
 
 std::expected<void, StarException> UniverseServer::updateLua() {
-  for (auto& context : m_scriptContexts) {
+  for (auto&& context : m_scriptContexts) {
     if (auto updated = context.second->update(); !updated)
       return std::unexpected(std::move(updated.error()));
   }
@@ -4908,7 +4910,7 @@ std::expected<void, StarException> UniverseServer::updateLua() {
 
 std::expected<void, StarException> UniverseServer::stopLua() {
   std::optional<StarException> error;
-  for (auto& context : m_scriptContexts) {
+  for (auto&& context : m_scriptContexts) {
     if (auto stopped = context.second->uninit(); !stopped) {
       if (error)
         *error = error->withRelated(stopped.error(), "Additional universe Lua shutdown failure");
@@ -4959,7 +4961,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> UniverseServer::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
-  for (auto& context : m_scriptContexts) {
+  for (auto&& context : m_scriptContexts) {
     auto response = context.second->handleMessage(message, local, args);
     if (!response)
       return std::unexpected(std::move(response.error()));

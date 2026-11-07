@@ -282,7 +282,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
       if (!processed) {
         std::unique_lock connectionsLocker(server.m_connectionsMutex, std::defer_lock);
         lockWithDiagnostics(connectionsLocker);
-        for (auto& p : server.m_connections[i]) {
+        for (auto&& p : server.m_connections[i]) {
           std::lock_guard connectionLocker(p.second->mutex);
           if (p.second->packetSocket)
             p.second->packetSocket->close();
@@ -410,7 +410,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
   lockWithDiagnostics(connectionsLocker);
   for (auto& shard : m_connections) {
-    for (auto& entry : shard) {
+    for (auto&& entry : shard) {
       std::lock_guard connectionLocker(entry.second->mutex);
       if (entry.second->packetSocket)
         entry.second->packetSocket->close();
@@ -493,7 +493,7 @@ std::expected<UniverseConnection, StarException> UniverseConnectionServer::remov
   if (!shard.contains(clientId))
     return std::unexpected(UniverseConnectionException::format("Client '{}' does not exist in UniverseConnectionServer::removeConnection", clientId));
 
-  auto taken = shard.take(clientId);
+  auto taken = shard.extract_value(clientId);
   if (!taken)
     return std::unexpected(std::move(taken.error()));
   auto conn = std::move(*taken);
@@ -512,7 +512,7 @@ List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
   lockWithDiagnostics(connectionsLocker);
   for (auto& shard : m_connections) {
-    for (auto& p : shard) {
+    for (auto&& p : shard) {
       std::lock_guard connectionLocker(p.second->mutex);
       UniverseConnection uc;
       uc.m_packetSocket = std::exchange(p.second->packetSocket, {});

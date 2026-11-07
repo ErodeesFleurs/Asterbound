@@ -207,7 +207,7 @@ std::expected<Json, StarException> PlayerCompanions::diskStore() const {
 }
 
 List<std::shared_ptr<Companion>> PlayerCompanions::getCompanions(String const& category) const {
-  if (auto companions = m_companions.maybeRef(category))
+  if (auto companions = m_companions.find_ref(category))
     return companions->get();
   return {};
 }

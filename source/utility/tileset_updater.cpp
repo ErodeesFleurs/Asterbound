@@ -120,15 +120,15 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   auto indexed = indexExistingTiles(root);
   if (!indexed)
     return std::unexpected(std::move(indexed.error()));
-  auto& [existingTiles, nextId] = *indexed;
-  auto updated = updateTiles(tileProperties, tileImages, existingTiles, nextId, tilesetPath);
+  auto& [existingTiles, next_id] = *indexed;
+  auto updated = updateTiles(tileProperties, tileImages, existingTiles, next_id, tilesetPath);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   auto invalidTiles = StringSet::from(existingTiles.keys()).difference(*updated);
   auto invalidated = invalidateTiles(invalidTiles, existingTiles, tileProperties, tileImages, tilesetPath);
   if (!invalidated)
     return std::unexpected(std::move(invalidated.error()));
-  for (std::size_t id = 0; id < nextId; ++id) {
+  for (std::size_t id = 0; id < next_id; ++id) {
     String idKey = toString(id);
     if (!tileProperties.contains(idKey))
       tileProperties[idKey] = JsonObject{{"invalid", "true"}};
@@ -141,7 +141,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   auto withProperties = withImages->set("tileproperties", tileProperties);
   if (!withProperties)
     return std::unexpected(std::move(withProperties.error()));
-  auto complete = withProperties->set("tilecount", nextId);
+  auto complete = withProperties->set("tilecount", next_id);
   if (!complete)
     return std::unexpected(std::move(complete.error()));
   auto text = complete->printJson(Indentation, true);
@@ -261,7 +261,7 @@ std::expected<Json, StarException> Tileset::getTilesetJson(String const& tileset
 
 std::expected<std::pair<StringMap<std::size_t>, std::size_t>, StarException> Tileset::indexExistingTiles(Json tileset) const {
   StringMap<std::size_t> existingTiles;
-  std::size_t nextId = 0;
+  std::size_t next_id = 0;
   auto properties = tileset.getObject("tileproperties");
   if (!properties)
     return std::unexpected(std::move(properties.error()));
@@ -277,27 +277,25 @@ std::expected<std::pair<StringMap<std::size_t>, std::size_t>, StarException> Til
       if (!name)
         return std::unexpected(std::move(name.error()));
       existingTiles[*name] = *id;
-      nextId = std::max(*id + 1, nextId);
+      next_id = std::max(*id + 1, next_id);
     }
   }
-  return std::make_pair(existingTiles, nextId);
+  return std::make_pair(existingTiles, next_id);
 }
 
-std::expected<StringSet, StarException> Tileset::updateTiles(JsonObject& tileProperties,
-    JsonObject& tileImages,
-    StringMap<std::size_t> const& existingTiles,
-    std::size_t& nextId,
-    String const& tilesetPath) const {
+std::expected<StringSet, StarException> Tileset::updateTiles(JsonObject& tileProperties, JsonObject& tileImages,
+                                                             StringMap<std::size_t> const& existingTiles,
+                                                             std::size_t& next_id, String const& tilesetPath) const {
   StringSet updatedTiles;
   for (std::shared_ptr<::Star::Tile> const& tile : m_tiles) {
     Json properties = tile->properties;
     std::size_t id = 0;
 
-    if (auto existing = existingTiles.maybeRef(tile->name)) {
+    if (auto existing = existingTiles.find_ref(tile->name)) {
       id = existing->get();
     } else {
       coutf("Adding '{}' to {}\n", tile->name, tilesetPath);
-      id = nextId++;
+      id = next_id++;
     }
 
     tileProperties[toString(id)] = std::move(properties);

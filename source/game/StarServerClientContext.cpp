@@ -433,7 +433,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
   auto& [netGroupUpdate, version] = *netState;
   m_netVersion = version;
   StringMap<ByteArray> customWorldChunksUpdate;
-  for (auto& p : m_customWorlds) {
+  for (auto&& p : m_customWorlds) {
     if (!p.second.chunksUpdate.empty()) {
       auto serialized = DataStreamBuffer::serialize(std::exchange(p.second.chunksUpdate, {}));
       if (!serialized)
@@ -581,7 +581,7 @@ std::expected<void, StarException> ServerClientContext::customWorldRequested(Str
 std::expected<void, StarException> ServerClientContext::customWorldReceived(String name, WorldChunks chunks) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto promise = m_worldRequests.maybeTake(name)) {
+  if (auto promise = m_worldRequests.try_extract_value(name)) {
     auto fulfilled = promise->fulfill(chunks);
     if (!fulfilled)
       return std::unexpected(std::move(fulfilled.error()));
@@ -596,7 +596,7 @@ std::expected<void, StarException> ServerClientContext::failWorldRequests() {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   std::optional<StarException> firstError;
-  for (auto& p : m_worldRequests) {
+  for (auto&& p : m_worldRequests) {
     auto failed = p.second.fail("Client disconnected");
     if (!failed && !firstError)
       firstError = std::move(failed.error());
@@ -610,7 +610,7 @@ std::expected<void, StarException> ServerClientContext::failWorldRequests() {
 std::optional<WorldChunks> ServerClientContext::customWorldChunks(String name) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto world = m_customWorlds.maybeRef(name))
+  if (auto world = m_customWorlds.find_ref(name))
     return world->get().chunks;
   return {};
 }
@@ -626,7 +626,7 @@ void ServerClientContext::updateCustomWorldChunks(String name, WorldChunks newWo
 void ServerClientContext::setCustomWorldActive(String name, bool active) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto world = m_customWorlds.maybeRef(name))
+  if (auto world = m_customWorlds.find_ref(name))
     world->get().active = active;
 }
 
@@ -640,7 +640,7 @@ std::expected<void, StarException> ServerClientContext::cleanInactiveCustomWorld
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   for (auto const& worldName : m_customWorlds.keys()) {
-    if (auto world = m_customWorlds.maybeRef(worldName)) {
+    if (auto world = m_customWorlds.find_ref(worldName)) {
       if (!world->get().active && world->get().chunksUpdate.empty()) {
         auto logged = m_root.logger().info("Removing inactive custom world '{}' for client '{}'", worldName, m_playerUuid.hex());
         if (!logged)

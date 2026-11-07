@@ -477,7 +477,7 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
   auto maxLevel = m_highlightConfig.getFloat("maxHighlightLevel", 1.0);
   if (!maxLevel) return std::unexpected(std::move(maxLevel.error()));
   highlightEffect.level *= *maxLevel;
-  if (auto directives = m_highlightDirectives.maybeRef(highlightEffect.type); directives && highlightEffect.level > 0) {
+  if (auto directives = m_highlightDirectives.find_ref(highlightEffect.type); directives && highlightEffect.level > 0) {
     auto const& underlayDirectives = directives->get().first;
     auto const& overlayDirectives = directives->get().second;
     auto drawHighlight = [&](Drawable const& drawable,

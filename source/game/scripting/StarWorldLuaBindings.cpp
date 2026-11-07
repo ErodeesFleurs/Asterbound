@@ -428,7 +428,7 @@ namespace LuaBindings {
         } else {
           if (!EntityTypeNames)
             return std::unexpected(EntityTypeNames.error());
-          auto entityTypeResult = EntityTypeNames->getLeft(type.toString());
+          auto entityTypeResult = EntityTypeNames->get_left(type.toString());
           if (!entityTypeResult)
             return std::unexpected(std::move(entityTypeResult.error()));
           auto entityType = std::move(*entityTypeResult);
@@ -488,7 +488,7 @@ namespace LuaBindings {
     auto boundModeName = std::move(*boundModeNameResult);
     if (!EntityBoundModeNames)
       return std::unexpected(EntityBoundModeNames.error());
-    auto boundModePointerResult = EntityBoundModeNames->getLeft(boundModeName.value_or("CollisionArea"));
+    auto boundModePointerResult = EntityBoundModeNames->get_left(boundModeName.value_or("CollisionArea"));
     if (!boundModePointerResult)
       return std::unexpected(std::move(boundModePointerResult.error()));
     auto boundModePointer = std::move(*boundModePointerResult);
@@ -1164,7 +1164,7 @@ namespace LuaBindings {
       if (auto result = callbacks.registerCallback("flyingType", [serverWorld]() -> std::expected<String, StarException> {
         if (!FlyingTypeNames)
           return std::unexpected(FlyingTypeNames.error());
-        auto namePointerResult = FlyingTypeNames->getRight(serverWorld->get().sky()->flyingType());
+        auto namePointerResult = FlyingTypeNames->get_right(serverWorld->get().sky()->flyingType());
         if (!namePointerResult)
           return std::unexpected(std::move(namePointerResult.error()));
         auto namePointer = std::move(*namePointerResult);
@@ -1175,7 +1175,7 @@ namespace LuaBindings {
       if (auto result = callbacks.registerCallback("warpPhase", [serverWorld]() -> std::expected<String, StarException> {
         if (!WarpPhaseNames)
           return std::unexpected(WarpPhaseNames.error());
-        auto namePointerResult = WarpPhaseNames->getRight(serverWorld->get().sky()->warpPhase());
+        auto namePointerResult = WarpPhaseNames->get_right(serverWorld->get().sky()->warpPhase());
         if (!namePointerResult)
           return std::unexpected(std::move(namePointerResult.error()));
         auto namePointer = std::move(*namePointerResult);
@@ -1306,7 +1306,7 @@ namespace LuaBindings {
     // interpolation belong to the caller, not to the world service.
     auto damageBarView = [](DamageBarEntity const& entity, bool details) -> std::expected<Json, StarException> {
       if (!DamageBarTypeNames) return std::unexpected(DamageBarTypeNames.error());
-      auto type = DamageBarTypeNames->getRight(entity.damageBar());
+      auto type = DamageBarTypeNames->get_right(entity.damageBar());
       if (!type) return std::unexpected(std::move(type.error()));
       JsonObject view;
       view.reserve(details ? 7 : 4);
@@ -1338,7 +1338,7 @@ namespace LuaBindings {
       std::optional<DamageBarType> type;
       if (typeName) {
         if (!DamageBarTypeNames) return std::unexpected(DamageBarTypeNames.error());
-        auto parsed = DamageBarTypeNames->getLeft(*typeName);
+        auto parsed = DamageBarTypeNames->get_left(*typeName);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         type = parsed->get();
       }
@@ -2921,7 +2921,7 @@ namespace LuaBindings {
     else {
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
-      auto typePointerResult = EntityTypeNames->getRight(entity->entityType());
+      auto typePointerResult = EntityTypeNames->get_right(entity->entityType());
       if (!typePointerResult)
         return std::unexpected(std::move(typePointerResult.error()));
       auto typePointer = std::move(*typePointerResult);
@@ -2960,7 +2960,7 @@ namespace LuaBindings {
   std::expected<LuaString, StarException> ServerWorldCallbacks::fidelity(WorldServer& world, LuaEngine& engine) {
     if (!WorldServerFidelityNames)
       return std::unexpected(WorldServerFidelityNames.error());
-    auto namePointerResult = WorldServerFidelityNames->getRight(world.fidelity());
+    auto namePointerResult = WorldServerFidelityNames->get_right(world.fidelity());
     if (!namePointerResult)
       return std::unexpected(std::move(namePointerResult.error()));
     auto namePointer = std::move(*namePointerResult);
@@ -2978,7 +2978,7 @@ namespace LuaBindings {
   std::expected<bool, StarException> ServerWorldCallbacks::sendPacket(WorldServer& world, ConnectionId clientId, String const& packetType, Json const& packetData) {
     if (!PacketTypeNames)
       return std::unexpected(PacketTypeNames.error());
-    auto typePointerResult = PacketTypeNames->getLeft(packetType);
+    auto typePointerResult = PacketTypeNames->get_left(packetType);
     if (!typePointerResult)
       return std::unexpected(std::move(typePointerResult.error()));
     auto typePointer = std::move(*typePointerResult);
@@ -3158,7 +3158,7 @@ namespace LuaBindings {
     if (auto entity = world.entity(entityId)) {
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
-      auto namePointerResult = EntityTypeNames->getRight(entity->entityType());
+      auto namePointerResult = EntityTypeNames->get_right(entity->entityType());
       if (!namePointerResult)
         return std::unexpected(std::move(namePointerResult.error()));
       auto namePointer = std::move(*namePointerResult);
@@ -4027,7 +4027,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
 
     if (!TileDamageTypeNames)
       return std::unexpected(TileDamageTypeNames.error());
-    auto damageTypePointerResult = TileDamageTypeNames->getLeft(arg4);
+    auto damageTypePointerResult = TileDamageTypeNames->get_left(arg4);
     if (!damageTypePointerResult)
       return std::unexpected(std::move(damageTypePointerResult.error()));
     auto damageTypePointer = std::move(*damageTypePointerResult);

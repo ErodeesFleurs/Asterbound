@@ -117,7 +117,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto beamUpRuleValue1 = store.getString("beamUpRule", "Surface");
   if (!beamUpRuleValue1) return std::unexpected(std::move(beamUpRuleValue1.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
-  auto beamUpRuleValue2 = BeamUpRuleNames->getLeft((*beamUpRuleValue1));
+  auto beamUpRuleValue2 = BeamUpRuleNames->get_left((*beamUpRuleValue1));
   if (!beamUpRuleValue2) return std::unexpected(std::move(beamUpRuleValue2.error()));
   beamUpRule = beamUpRuleValue2->get();
   auto disableDeathDropsValue1 = store.getBool("disableDeathDrops", false);
@@ -129,7 +129,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto worldEdgeForceRegionsValue1 = store.getString("worldEdgeForceRegions", "None");
   if (!worldEdgeForceRegionsValue1) return std::unexpected(std::move(worldEdgeForceRegionsValue1.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto worldEdgeForceRegionsValue2 = WorldEdgeForceRegionTypeNames->getLeft((*worldEdgeForceRegionsValue1));
+  auto worldEdgeForceRegionsValue2 = WorldEdgeForceRegionTypeNames->get_left((*worldEdgeForceRegionsValue1));
   if (!worldEdgeForceRegionsValue2) return std::unexpected(std::move(worldEdgeForceRegionsValue2.error()));
   worldEdgeForceRegions = worldEdgeForceRegionsValue2->get();
   return {};
@@ -139,10 +139,10 @@ std::expected<Json, StarException> VisitableWorldParameters::store() const {
   auto weather = jsonFromWeightedPool<String>(weatherPool);
   if (!weather) return std::unexpected(std::move(weather.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
-  auto beam = BeamUpRuleNames->getRight(beamUpRule);
+  auto beam = BeamUpRuleNames->get_right(beamUpRule);
   if (!beam) return std::unexpected(std::move(beam.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto edge = WorldEdgeForceRegionTypeNames->getRight(worldEdgeForceRegions);
+  auto edge = WorldEdgeForceRegionTypeNames->get_right(worldEdgeForceRegions);
   if (!edge) return std::unexpected(std::move(edge.error()));
   return JsonObject{{"typeName", typeName},
       {"threatLevel", threatLevel},
@@ -1134,7 +1134,7 @@ std::expected<Json, StarException> diskStoreVisitableWorldParameters(std::shared
   auto stored = parameters->store();
   if (!stored) return std::unexpected(std::move(stored.error()));
   if (!WorldParametersTypeNames) return std::unexpected(WorldParametersTypeNames.error());
-  auto type = WorldParametersTypeNames->getRight(parameters->type());
+  auto type = WorldParametersTypeNames->get_right(parameters->type());
   if (!type) return std::unexpected(std::move(type.error()));
   return stored->setAll({{"type", type->get()}});
 }
@@ -1146,7 +1146,7 @@ std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> diskLoad
   auto typeName = store.getString("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   if (!WorldParametersTypeNames) return std::unexpected(WorldParametersTypeNames.error());
-  auto parsedType = WorldParametersTypeNames->getLeft(*typeName);
+  auto parsedType = WorldParametersTypeNames->get_left(*typeName);
   if (!parsedType) return std::unexpected(std::move(parsedType.error()));
   auto type = parsedType->get();
   if (type == WorldParametersType::TerrestrialWorldParameters)
@@ -1529,21 +1529,25 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->globalDirectives = std::move(*value);
   }
-  auto parametersbeamUpRuleResult1 = config.getString("beamUpRule", "Surface");
-  if (!parametersbeamUpRuleResult1) return std::unexpected(std::move(parametersbeamUpRuleResult1.error()));
+  auto beam_rule_name = config.getString("beamUpRule", "Surface");
+  if (!beam_rule_name)
+    return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
-  auto parametersbeamUpRuleResult2 = BeamUpRuleNames->getLeft((*parametersbeamUpRuleResult1));
-  if (!parametersbeamUpRuleResult2) return std::unexpected(std::move(parametersbeamUpRuleResult2.error()));
-  parameters->beamUpRule = parametersbeamUpRuleResult2->get();
+  auto beam_rule = BeamUpRuleNames->get_left((*beam_rule_name));
+  if (!beam_rule)
+    return std::unexpected(std::move(beam_rule.error()));
+  parameters->beamUpRule = beam_rule->get();
   auto parametersdisableDeathDropsResult1 = config.getBool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto parametersworldEdgeForceRegionsResult1 = config.getString("worldEdgeForceRegions", "Top");
-  if (!parametersworldEdgeForceRegionsResult1) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult1.error()));
+  auto edge_region_name = config.getString("worldEdgeForceRegions", "Top");
+  if (!edge_region_name)
+    return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto parametersworldEdgeForceRegionsResult2 = WorldEdgeForceRegionTypeNames->getLeft((*parametersworldEdgeForceRegionsResult1));
-  if (!parametersworldEdgeForceRegionsResult2) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult2.error()));
-  parameters->worldEdgeForceRegions = parametersworldEdgeForceRegionsResult2->get();
+  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!edge_region)
+    return std::unexpected(std::move(edge_region.error()));
+  parameters->worldEdgeForceRegions = edge_region->get();
   auto parametersweatherPoolResult1 = biomeDatabase->biomeWeathers(primaryBiome, seed, threatLevel);
   if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
   parameters->weatherPool = std::move((*parametersweatherPoolResult1));
@@ -1653,21 +1657,25 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->globalDirectives = std::move(*value);
   }
-  auto parametersbeamUpRuleResult1 = asteroidsConfig.getString("beamUpRule", "Surface");
-  if (!parametersbeamUpRuleResult1) return std::unexpected(std::move(parametersbeamUpRuleResult1.error()));
+  auto beam_rule_name = asteroidsConfig.getString("beamUpRule", "Surface");
+  if (!beam_rule_name)
+    return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
-  auto parametersbeamUpRuleResult2 = BeamUpRuleNames->getLeft((*parametersbeamUpRuleResult1));
-  if (!parametersbeamUpRuleResult2) return std::unexpected(std::move(parametersbeamUpRuleResult2.error()));
-  parameters->beamUpRule = parametersbeamUpRuleResult2->get();
+  auto beam_rule = BeamUpRuleNames->get_left((*beam_rule_name));
+  if (!beam_rule)
+    return std::unexpected(std::move(beam_rule.error()));
+  parameters->beamUpRule = beam_rule->get();
   auto parametersdisableDeathDropsResult1 = asteroidsConfig.getBool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto parametersworldEdgeForceRegionsResult1 = asteroidsConfig.getString("worldEdgeForceRegions", "TopAndBottom");
-  if (!parametersworldEdgeForceRegionsResult1) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult1.error()));
+  auto edge_region_name = asteroidsConfig.getString("worldEdgeForceRegions", "TopAndBottom");
+  if (!edge_region_name)
+    return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto parametersworldEdgeForceRegionsResult2 = WorldEdgeForceRegionTypeNames->getLeft((*parametersworldEdgeForceRegionsResult1));
-  if (!parametersworldEdgeForceRegionsResult2) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult2.error()));
-  parameters->worldEdgeForceRegions = parametersworldEdgeForceRegionsResult2->get();
+  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!edge_region)
+    return std::unexpected(std::move(edge_region.error()));
+  parameters->worldEdgeForceRegions = edge_region->get();
 
   auto parametersasteroidTopLevelResult1 = asteroidsConfig.getInt("asteroidsTop");
   if (!parametersasteroidTopLevelResult1) return std::unexpected(std::move(parametersasteroidTopLevelResult1.error()));
@@ -1742,21 +1750,25 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
     if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
     parameters->weatherPool = std::move((*parametersweatherPoolResult1));
   }
-  auto parametersbeamUpRuleResult1 = worldConfig.getString("beamUpRule", "Surface");
-  if (!parametersbeamUpRuleResult1) return std::unexpected(std::move(parametersbeamUpRuleResult1.error()));
+  auto beam_rule_name = worldConfig.getString("beamUpRule", "Surface");
+  if (!beam_rule_name)
+    return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
-  auto parametersbeamUpRuleResult2 = BeamUpRuleNames->getLeft((*parametersbeamUpRuleResult1));
-  if (!parametersbeamUpRuleResult2) return std::unexpected(std::move(parametersbeamUpRuleResult2.error()));
-  parameters->beamUpRule = parametersbeamUpRuleResult2->get();
+  auto beam_rule = BeamUpRuleNames->get_left((*beam_rule_name));
+  if (!beam_rule)
+    return std::unexpected(std::move(beam_rule.error()));
+  parameters->beamUpRule = beam_rule->get();
   auto parametersdisableDeathDropsResult1 = worldConfig.getBool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto parametersworldEdgeForceRegionsResult1 = worldConfig.getString("worldEdgeForceRegions", "Top");
-  if (!parametersworldEdgeForceRegionsResult1) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult1.error()));
+  auto edge_region_name = worldConfig.getString("worldEdgeForceRegions", "Top");
+  if (!edge_region_name)
+    return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto parametersworldEdgeForceRegionsResult2 = WorldEdgeForceRegionTypeNames->getLeft((*parametersworldEdgeForceRegionsResult1));
-  if (!parametersworldEdgeForceRegionsResult2) return std::unexpected(std::move(parametersworldEdgeForceRegionsResult2.error()));
-  parameters->worldEdgeForceRegions = parametersworldEdgeForceRegionsResult2->get();
+  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!edge_region)
+    return std::unexpected(std::move(edge_region.error()));
+  parameters->worldEdgeForceRegions = edge_region->get();
 
   auto parametersdungeonBaseHeightResult1 = worldConfig.getInt("dungeonBaseHeight");
   if (!parametersdungeonBaseHeightResult1) return std::unexpected(std::move(parametersdungeonBaseHeightResult1.error()));

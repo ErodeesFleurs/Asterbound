@@ -258,7 +258,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
     return std::unexpected(std::move(clientModeName.error()));
   if (!ClientEntityModeNames)
     return std::unexpected(ClientEntityModeNames.error());
-  auto clientMode = ClientEntityModeNames->getLeft(*clientModeName);
+  auto clientMode = ClientEntityModeNames->get_left(*clientModeName);
   if (!clientMode)
     return std::unexpected(std::move(clientMode.error()));
   m_clientEntityMode = clientMode->get();

@@ -674,7 +674,7 @@ std::expected<Json, StarException> Json::setAll(JsonObject values) const {
   auto map = toObject();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  for (auto& p : values)
+  for (auto&& p : values)
     (*map)[std::move(p.first)] = std::move(p.second);
   return Json(std::move(*map));
 }
@@ -1082,7 +1082,7 @@ std::expected<std::optional<std::reference_wrapper<Json const>>, StarException> 
     return std::unexpected(JsonException::format("Cannot call get with key on Json type {}, must be Object type", typeName()));
   auto const& map = std::get<std::shared_ptr<JsonObject const>>(m_data);
 
-  return map->maybeRef(key);
+  return map->find_ref(key);
 }
 
 Json jsonMerge(Json const& base, Json const& merger) {

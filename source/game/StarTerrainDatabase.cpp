@@ -136,7 +136,7 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
 }
 
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::createNamedSelector(String const& name, TerrainSelectorParameters const& parameters) const {
-  if (auto config = m_terrainSelectors.maybeRef(name))
+  if (auto config = m_terrainSelectors.find_ref(name))
     return createSelectorType(config->get().type, config->get().parameters, parameters);
   return std::unexpected(TerrainException(strf("No such terrain selector '{}'", name)));
 }

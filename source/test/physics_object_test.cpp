@@ -76,7 +76,7 @@ const GameTestRegistration
       SCOPED_TRACE(enabled ? "enabled" : "disabled");
       auto forces = forceConfig->toObject();
       ASSERT_TRUE(forces) << forces.error().what();
-      for (auto& pair : *forces) {
+      for (auto&& pair : *forces) {
         auto changed = pair.second.set("enabled", enabled);
         ASSERT_TRUE(changed) << changed.error().what();
         pair.second = std::move(*changed);

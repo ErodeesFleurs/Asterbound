@@ -139,9 +139,9 @@ NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float inter
   presentation.partTransforms.resize(presentation.parts.parts.size());
   presentation.invalidatePartTransforms();
   presentation.groups.resize(animator.m_transformationGroups.size());
-  for (auto& tag : presentation.tags)
+  for (auto&& tag : presentation.tags)
     tag.second.active = false;
-  for (auto& drawables : presentation.drawables)
+  for (auto&& drawables : presentation.drawables)
     drawables.second.active = false;
   std::size_t index = 0;
   for (auto const& pair : animator.m_transformationGroups) {
@@ -404,10 +404,10 @@ std::expected<Mat3F, StarException> NetworkedAnimator::Sample::getLocalTransform
 
 List<Drawable> const* NetworkedAnimator::partDrawables(String const& name, Sample const* sample) const {
   if (sample) {
-    if (auto override = sample->m_presentation->drawables.maybeRef(name); override && override->get().active)
+    if (auto override = sample->m_presentation->drawables.find_ref(name); override && override->get().active)
       return override->get().drawables;
   }
-  if (auto drawables = m_partDrawables.maybeRef(name))
+  if (auto drawables = m_partDrawables.find_ref(name))
     return &drawables->get();
   return nullptr;
 }
@@ -443,22 +443,22 @@ void NetworkedAnimator::DynamicTarget::stopAudio() {
 void NetworkedAnimator::DynamicTarget::updatePosition(Vec2F const& p) {
   clearFinishedAudio();
   position = p;
-  for (auto& audioPair : currentAudioBasePositions)
+  for (auto&& audioPair : currentAudioBasePositions)
     audioPair.first->setPosition(audioPair.second + p);
 }
 
 void NetworkedAnimator::DynamicTarget::clearFinishedAudio() {
-  for (auto& p : statePersistentSounds) {
+  for (auto&& p : statePersistentSounds) {
     if (p.second.audio && p.second.audio->finished())
       p.second.audio.reset();
   }
 
-  for (auto& p : stateImmediateSounds) {
+  for (auto&& p : stateImmediateSounds) {
     if (p.second.audio && p.second.audio->finished())
       p.second.audio.reset();
   }
 
-  for (auto& p : independentSounds)
+  for (auto&& p : independentSounds)
     p.second.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
 
   eraseWhere(currentAudioBasePositions, [](std::pair<std::shared_ptr<AudioInstance>, Vec2F> const& pair) {
@@ -780,15 +780,15 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     if (!directives) return std::unexpected(std::move(directives.error()));
     effect.directives = *directives;
   }
-  m_transformationGroups.sortByKey();
-  m_rotationGroups.sortByKey();
-  m_particleEmitters.sortByKey();
-  m_lights.sortByKey();
-  m_sounds.sortByKey();
-  m_effects.sortByKey();
+  m_transformationGroups.sort_by_key();
+  m_rotationGroups.sort_by_key();
+  m_particleEmitters.sort_by_key();
+  m_lights.sort_by_key();
+  m_sounds.sort_by_key();
+  m_effects.sort_by_key();
   for (auto const& stateType : m_animatedParts.stateTypes())
     m_stateInfo[stateType].wasUpdated = true;
-  m_stateInfo.sortByKey();
+  m_stateInfo.sort_by_key();
   return setupNetStates();
 }
 
@@ -963,11 +963,11 @@ std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformat
     auto state = m_animatedParts.activeState(stateType, sample ? &sample->m_presentation->parts : nullptr);
     if (!state) return std::unexpected(std::move(state.error()));
     auto const& active = state->get();
-    if (auto transforms = active.properties.maybeRef(name)) {
+    if (auto transforms = active.properties.find_ref(name)) {
       auto matrix = processTransforms(base, transforms->get(), active.properties);
       if (!matrix) return std::unexpected(std::move(matrix.error()));
       if (group.interpolated) {
-        if (auto next = active.nextProperties.maybeRef(name)) {
+        if (auto next = active.nextProperties.find_ref(name)) {
           auto nextMatrix = processTransforms(base, next->get(), active.nextProperties);
           if (!nextMatrix) return std::unexpected(std::move(nextMatrix.error()));
           return sampleAffine(active.frameProgress, *matrix, *nextMatrix);
@@ -1038,7 +1038,7 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
     float angle = sample ? angleLerp(sample->interpolation(), value.previousAngle, value.currentAngle) : value.currentAngle;
     transformation = Mat3F::rotation(angle, center) * transformation;
   }
-  if (auto anchorJson = part.properties.maybeRef("anchorPart")) {
+  if (auto anchorJson = part.properties.find_ref("anchorPart")) {
     auto anchorName = anchorJson->get().toString();
     if (!anchorName) return std::unexpected(std::move(anchorName.error()));
     auto anchor = queryPartTransformation(*anchorName, sample);
@@ -1095,7 +1095,7 @@ void NetworkedAnimator::removeGlobalTag(String const& tagName) {
 }
 
 std::optional<std::reference_wrapper<String const>> NetworkedAnimator::globalTag(String const& tagName) const {
-  return m_globalTags.maybeRef(tagName);
+  return m_globalTags.find_ref(tagName);
 }
 
 
@@ -1166,7 +1166,7 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
       }
       animationTags.set(stateTypeName + "_state", activeState.stateName);
 
-      if (auto p = activeState.properties.maybeRef("animationTags")) {
+      if (auto p = activeState.properties.find_ref("animationTags")) {
         auto tags = p->get().iterateObject();
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
@@ -1188,11 +1188,11 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
     } else if (tag == "frameIndex") {
       if (frame)
         return frameIndexStr;
-    } else if (auto p = animationTags.maybeRef(tag)) {
+    } else if (auto p = animationTags.find_ref(tag)) {
       return StringView(p->get());
-    } else if (auto p = partTags.maybeRef(tag)) {
+    } else if (auto p = partTags.find_ref(tag)) {
       return StringView(p->get());
-    } else if (auto p = m_globalTags.maybeRef(tag)) {
+    } else if (auto p = m_globalTags.find_ref(tag)) {
       return StringView(p->get());
     }
 
@@ -1587,7 +1587,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       }
       animationTags.set(stateTypeName + "_state", activeState.stateName);
 
-      if (auto p = activeState.properties.maybeRef("animationTags")) {
+      if (auto p = activeState.properties.find_ref("animationTags")) {
         auto tags = p->get().iterateObject();
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
@@ -1667,11 +1667,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     if (auto directives = *partDirectives) {
       if (version() > 0){
         directives = directives->maybeLookupTagsView([&](StringView tag) -> StringView {
-          if (auto p = animationTags.maybeRef(tag)) {
+          if (auto p = animationTags.find_ref(tag)) {
             return StringView(p->get());
-          } else if (auto p = partTags.maybeRef(tag)) {
+          } else if (auto p = partTags.find_ref(tag)) {
             return StringView(p->get());
-          } else if (auto p = m_globalTags.maybeRef(tag)) {
+          } else if (auto p = m_globalTags.find_ref(tag)) {
             return StringView(p->get());
           }
           return StringView("default");
@@ -1695,11 +1695,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       if (auto directives = *stateDirectives) {
         if (version() > 0){
           directives = directives->maybeLookupTagsView([&](StringView tag) -> StringView {
-            if (auto p = animationTags.maybeRef(tag)) {
+            if (auto p = animationTags.find_ref(tag)) {
               return StringView(p->get());
-            } else if (auto p = partTags.maybeRef(tag)) {
+            } else if (auto p = partTags.find_ref(tag)) {
               return StringView(p->get());
-            } else if (auto p = m_globalTags.maybeRef(tag)) {
+            } else if (auto p = m_globalTags.find_ref(tag)) {
               return StringView(p->get());
             }
             return StringView("default");
@@ -1717,11 +1717,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       } else if (tag == "frameIndex") {
         if (frame)
           return frameIndexStr;
-      } else if (auto p = animationTags.maybeRef(tag)) {
+      } else if (auto p = animationTags.find_ref(tag)) {
         return StringView(p->get());
-      } else if (auto p = partTags.maybeRef(tag)) {
+      } else if (auto p = partTags.find_ref(tag)) {
         return StringView(p->get());
-      } else if (auto p = m_globalTags.maybeRef(tag)) {
+      } else if (auto p = m_globalTags.find_ref(tag)) {
         return StringView(p->get());
       }
 
@@ -1938,7 +1938,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
 
-      if (auto lightsOn = activeState.properties.maybeRef("lightsOn")) {
+      if (auto lightsOn = activeState.properties.find_ref("lightsOn")) {
         auto entries = lightsOn->get().iterateArray();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
@@ -1949,7 +1949,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           entry->get().active.set(true);
         }
       }
-      if (auto lightsOff = activeState.properties.maybeRef("lightsOff")) {
+      if (auto lightsOff = activeState.properties.find_ref("lightsOff")) {
         auto entries = lightsOff->get().iterateArray();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
@@ -1961,7 +1961,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
 
-      if (auto particleEmittersOn = activeState.properties.maybeRef("particleEmittersOn")) {
+      if (auto particleEmittersOn = activeState.properties.find_ref("particleEmittersOn")) {
         auto entries = particleEmittersOn->get().iterateArray();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
@@ -1972,7 +1972,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           entry->get().active.set(true);
         }
       }
-      if (auto particleEmittersOff = activeState.properties.maybeRef("particleEmittersOff")) {
+      if (auto particleEmittersOff = activeState.properties.find_ref("particleEmittersOff")) {
         auto entries = particleEmittersOff->get().iterateArray();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
@@ -2126,7 +2126,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
 
       // Update all still active independent sounds position, volume, and speed
       for (auto const& activeIndependentSound : dynamicTarget->get().independentSounds.value(soundName)) {
-        if (auto basePosition = dynamicTarget->get().currentAudioBasePositions.maybeRef(activeIndependentSound))
+        if (auto basePosition = dynamicTarget->get().currentAudioBasePositions.find_ref(activeIndependentSound))
           basePosition->get() = globalTransformation().transformVec2(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get()));
         activeIndependentSound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
         activeIndependentSound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());

@@ -121,7 +121,7 @@ std::expected<std::shared_ptr<VehicleDatabase>, StarException> VehicleDatabase::
 }
 
 std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::create(String const& vehicleName, Json const& extraConfig) const {
-  auto configPair = m_vehicles.maybeRef(vehicleName);
+  auto configPair = m_vehicles.find_ref(vehicleName);
   if (!configPair)
     return std::unexpected(VehicleDatabaseException::format("No such vehicle named '{}'", vehicleName));
   return Vehicle::create(m_root, configPair->get().second, configPair->get().first, extraConfig);

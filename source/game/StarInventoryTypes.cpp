@@ -41,7 +41,7 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
     auto name = location->toString();
     if (!name) return std::unexpected(std::move(name.error()));
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->getLeft(*name);
+    auto slot = EquipmentSlotNames->get_left(*name);
     if (!slot) return std::unexpected(std::move(slot.error()));
     return InventorySlot(slot->get());
   } else if (*type == "swap") {
@@ -58,7 +58,7 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
 [[nodiscard]] std::expected<Json, StarException> jsonFromInventorySlot(InventorySlot const& slot) {
   if (std::holds_alternative<EquipmentSlot>(slot)) {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto name = EquipmentSlotNames->getRight(std::get<EquipmentSlot>(slot));
+    auto name = EquipmentSlotNames->get_right(std::get<EquipmentSlot>(slot));
     if (!name) return std::unexpected(std::move(name.error()));
     return JsonObject{{"type", "equipment"}, {"location", name->get()}};
   } else if (std::holds_alternative<SwapSlot>(slot)) {
@@ -74,7 +74,7 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
 [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& stream, InventorySlot const& slot) {
   if (std::holds_alternative<EquipmentSlot>(slot)) {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto name = EquipmentSlotNames->getRight(std::get<EquipmentSlot>(slot));
+    auto name = EquipmentSlotNames->get_right(std::get<EquipmentSlot>(slot));
     if (!name) return std::unexpected(std::move(name.error()));
     format(stream, "InventorySlot{{type: equipment, location: {}}}", name->get());
   }
@@ -101,7 +101,7 @@ extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemN
     auto name = json.toString();
     if (!name) return std::unexpected(std::move(name.error()));
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto item = EssentialItemNames->getLeft(*name);
+    auto item = EssentialItemNames->get_left(*name);
     if (!item) return std::unexpected(std::move(item.error()));
     return SelectedActionBarLocation(item->get());
   } else if (json.isNull()) {
@@ -118,7 +118,7 @@ extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemN
     return Json(std::get<CustomBarIndex>(location));
   if (std::holds_alternative<EssentialItem>(location)) {
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto name = EssentialItemNames->getRight(std::get<EssentialItem>(location));
+    auto name = EssentialItemNames->get_right(std::get<EssentialItem>(location));
     if (!name) return std::unexpected(std::move(name.error()));
     return Json(name->get());
   }

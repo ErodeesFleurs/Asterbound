@@ -536,7 +536,7 @@ void WorldStructure::translate(Vec2I const& distance) {
   for (auto& object : m_objects)
     object.position += distance;
 
-  for (auto& flagPair : m_flaggedBlocks) {
+  for (auto&& flagPair : m_flaggedBlocks) {
     for (auto& pos : flagPair.second)
       pos += distance;
   }

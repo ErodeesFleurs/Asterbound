@@ -78,11 +78,11 @@ std::expected<void, StarException> FontTextureGroup::setFixedFonts(String const&
   auto emojiKey = CaseInsensitiveStringView::create(emojiFontName);
   if (!emojiKey)
     return std::unexpected(std::move(emojiKey.error()));
-  if (auto defaultFont = m_fonts.maybeRef(*defaultKey))
+  if (auto defaultFont = m_fonts.find_ref(*defaultKey))
     m_defaultFont = m_activeFont = defaultFont->get();
-  if (auto fallbackFont = m_fonts.maybeRef(*fallbackKey))
+  if (auto fallbackFont = m_fonts.find_ref(*fallbackKey))
     m_fallbackFont = fallbackFont->get();
-  if (auto emojiFont = m_fonts.maybeRef(*emojiKey))
+  if (auto emojiFont = m_fonts.find_ref(*emojiKey))
     m_emojiFont = emojiFont->get();
   return {};
 }
@@ -95,7 +95,7 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
   if (m_emojiFont && std::addressof(font) == std::addressof(*m_emojiFont))
     processingDirectives.reset();
   GlyphDescriptor descriptor{c, size, processingDirectives ? processingDirectives->get().hash() : 0, std::ref(font)};
-  if (auto cached = m_glyphs.maybeRef(descriptor)) {
+  if (auto cached = m_glyphs.find_ref(descriptor)) {
     cached->get().time = std::chrono::time_point_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     return std::cref(cached->get());

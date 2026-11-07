@@ -380,7 +380,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
         auto warpText = m.getString("warpMode");
         if (!warpText) return std::unexpected(std::move(warpText.error()));
         if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
-        auto warp = WarpModeNames->getLeft(*warpText);
+        auto warp = WarpModeNames->get_left(*warpText);
         if (!warp) return std::unexpected(std::move(warp.error()));
         auto portraitJson = m.get("portrait");
         if (!portraitJson) return std::unexpected(std::move(portraitJson.error()));
@@ -549,7 +549,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
       mode = player->isDeployed() ? WarpMode::DeployOnly : WarpMode::BeamOnly;
   }
   if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
-  auto warp = WarpModeNames->getRight(mode);
+  auto warp = WarpModeNames->get_right(mode);
   if (!warp) return std::unexpected(std::move(warp.error()));
   request["warpMode"] = warp->get();
 

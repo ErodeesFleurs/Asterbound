@@ -748,7 +748,7 @@ std::expected<LuaCallbacks, StarException> TechController::makeTechCallbacks(Tec
         if (state) {
           if (!ParentStateNames)
             return std::unexpected(ParentStateNames.error());
-          auto value = ParentStateNames->getLeft(*state);
+          auto value = ParentStateNames->get_left(*state);
           if (!value)
             return std::unexpected(std::move(value.error()));
           m_parentState.set(value->get());

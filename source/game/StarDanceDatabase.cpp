@@ -47,12 +47,12 @@ std::expected<std::shared_ptr<DanceDatabase>, StarException> DanceDatabase::crea
 }
 
 std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::getDance(String const& name) const {
-  if (auto dance = m_dances.maybeRef(name))
+  if (auto dance = m_dances.find_ref(name))
     return dance->get();
   auto logged = m_logger.error("Invalid dance '{}', using default", name);
   if (!logged)
     return std::unexpected(std::move(logged.error()));
-  if (auto fallback = m_dances.maybeRef("assetmissing"))
+  if (auto fallback = m_dances.find_ref("assetmissing"))
     return fallback->get();
   return std::unexpected(StarException("Missing fallback dance 'assetmissing'"));
 }

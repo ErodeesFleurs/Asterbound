@@ -178,7 +178,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
     auto sourceName = meta.getString("source");
     if (!sourceName)
       return std::unexpected(std::move(sourceName.error()));
-    auto source = m_markovSources.maybeRef(*sourceName);
+    auto source = m_markovSources.find_ref(*sourceName);
     if (!source)
       return std::unexpected(NameGeneratorException::format("Unknown name source '{}'", *sourceName));
     auto range = meta.get("targetLength").and_then([](Json const& value) { return value.arrayPtr(); });
@@ -215,7 +215,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
         auto link = piece.slice(*length - source->get().prefixSize, *length);
         if (!link)
           return std::unexpected(std::move(link.error()));
-        auto chain = source->get().chains.maybeRef(*link);
+        auto chain = source->get().chains.find_ref(*link);
         if (!chain)
           break;
         auto next = random.randFrom(chain->get());

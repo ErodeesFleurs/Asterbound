@@ -89,7 +89,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
       newState->stateFrameProperties = std::move(*frameProperties);
       newStateType.states[stateName] = std::move(newState);
     }
-    newStateType.states.sortByKey();
+    newStateType.states.sort_by_key();
     newStateType.activeState.stateTypeName = stateTypeName;
     newStateType.activeState.reverse = false;
     newStateType.activeStateDirty = true;
@@ -161,7 +161,7 @@ std::expected<void, StarException> AnimatedPartSet::setStateTypeEnabled(String c
   if (!stateType) return std::unexpected(std::move(stateType.error()));
   if (stateType->get().enabled != enabled) {
     stateType->get().enabled = enabled;
-    for (auto& pair : m_parts)
+    for (auto&& pair : m_parts)
       pair.second.activePartDirty = true;
   }
   return {};
@@ -175,7 +175,7 @@ std::expected<void, StarException> AnimatedPartSet::setEnabledStateTypes(StringL
     if (!stateType) return std::unexpected(std::move(stateType.error()));
     stateType->get().enabled = true;
   }
-  for (auto& pair : m_parts)
+  for (auto&& pair : m_parts)
     pair.second.activePartDirty = true;
   return {};
 }
@@ -257,7 +257,7 @@ std::expected<bool, StarException> AnimatedPartSet::setActiveState(String const&
     stateType.activeState.reverse = reverse;
     stateType.activeStateReference = std::cref(*state->get());
     stateType.activeStateDirty = true;
-    for (auto& pair : m_parts)
+    for (auto&& pair : m_parts)
       pair.second.activePartDirty = true;
     return true;
   }
@@ -270,7 +270,7 @@ std::expected<void, StarException> AnimatedPartSet::restartState(String const& n
   stateType->get().activeState.timer = 0.0f;
   stateType->get().previousTimer = stateType->get().timerAdvance = 0;
   stateType->get().activeStateDirty = true;
-  for (auto& pair : m_parts)
+  for (auto&& pair : m_parts)
     pair.second.activePartDirty = true;
   return {};
 }
@@ -339,7 +339,7 @@ std::expected<void, StarException> AnimatedPartSet::forEachActivePart(std::funct
 std::expected<std::size_t, StarException> AnimatedPartSet::activeStateIndex(String const& name) const {
   auto stateType = m_stateTypes.get(name);
   if (!stateType) return std::unexpected(std::move(stateType.error()));
-  auto index = stateType->get().states.indexOf(stateType->get().activeState.stateName);
+  auto index = stateType->get().states.index_of(stateType->get().activeState.stateName);
   if (!index) return std::unexpected(AnimatedPartSetException("Active animation state is missing"));
   return *index;
 }
@@ -353,7 +353,7 @@ std::expected<bool, StarException> AnimatedPartSet::activeStateReverse(String co
 std::expected<bool, StarException> AnimatedPartSet::setActiveStateIndex(String const& name, std::size_t index, bool alwaysStart, bool reverse) {
   auto stateType = m_stateTypes.get(name);
   if (!stateType) return std::unexpected(std::move(stateType.error()));
-  auto stateName = stateType->get().states.keyAt(index);
+  auto stateName = stateType->get().states.key_at(index);
   if (!stateName) return std::unexpected(std::move(stateName.error()));
   return setActiveState(name, stateName->get(), alwaysStart, reverse);
 }
@@ -384,7 +384,7 @@ std::expected<void, StarException> AnimatedPartSet::update(float dt) {
     stateType.activeStateDirty = true;
   }
 
-  for (auto& pair : m_parts)
+  for (auto&& pair : m_parts)
     pair.second.activePartDirty = true;
   return {};
 }
@@ -414,7 +414,7 @@ std::expected<void, StarException> AnimatedPartSet::finishAnimations() {
     stateType.activeStateDirty = true;
   }
 
-  for (auto& pair : m_parts)
+  for (auto&& pair : m_parts)
     pair.second.activePartDirty = true;
   return {};
 }
@@ -531,12 +531,12 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       auto const& stateType = stateTypePair.second;
       if (!stateType.enabled)
         continue;
-      auto partStateType = part.partStates.maybeRef(stateTypeName);
+      auto partStateType = part.partStates.find_ref(stateTypeName);
       if (!partStateType)
         continue;
       auto stateResult = activeState(stateTypeName, sample);
       if (!stateResult) return std::unexpected(std::move(stateResult.error()));
-      auto partState = partStateType->get().maybeRef(stateResult->get().stateName);
+      auto partState = partStateType->get().find_ref(stateResult->get().stateName);
       if (!partState)
         continue;
       sampledState = &stateResult->get();
@@ -603,7 +603,7 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
             if (!translation) return std::unexpected(std::move(translation.error()));
             mat.translate(*translation);
           } else if (*action == "rotate" || *action == "rotateDegrees" || *action == "scale") {
-            auto centerProperty = properties.maybeRef(*action == "scale" ? std::string_view("scalingCenter")
+            auto centerProperty = properties.find_ref(*action == "scale" ? std::string_view("scalingCenter")
                                                                          : std::string_view("rotationCenter"));
             // Preserve validation of a supplied default even when an explicit center wins.
             if (centerProperty) {
@@ -642,14 +642,13 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
         return mat;
       };
 
-
-      if (auto transforms = activePart.properties.maybeRef("transforms")) {
+      if (auto transforms = activePart.properties.find_ref("transforms")) {
         auto mat = processTransforms(activePart.animationAffineTransform(), transforms->get(), activePart.properties);
         if (!mat) return std::unexpected(std::move(mat.error()));
         auto interpolated = activePart.properties.maybe("interpolated").value_or(false).toBool();
         if (!interpolated) return std::unexpected(std::move(interpolated.error()));
         if (*interpolated) {
-          if (auto nextTransforms = activePart.nextProperties.maybeRef("transforms")) {
+          if (auto nextTransforms = activePart.nextProperties.find_ref("transforms")) {
             auto nextMat = processTransforms(activePart.animationAffineTransform(), nextTransforms->get(), activePart.nextProperties);
             if (!nextMat) return std::unexpected(std::move(nextMat.error()));
             activePart.setAnimationAffineTransform(*mat, *nextMat, activePart.activeState ? activePart.activeState->frameProgress : 1);
@@ -703,7 +702,7 @@ std::expected<Json, StarException> AnimatedPartSet::getStateFrameProperty(String
   if (!type) return std::unexpected(std::move(type.error()));
   auto state = type->get().states.get(stateName);
   if (!state) return std::unexpected(std::move(state.error()));
-  if (auto property = state->get()->stateFrameProperties.maybeRef(propertyName)) {
+  if (auto property = state->get()->stateFrameProperties.find_ref(propertyName)) {
     auto size = property->get().size();
     if (!size) return std::unexpected(std::move(size.error()));
     if (frame >= 0 && static_cast<std::size_t>(frame) < *size)
@@ -719,7 +718,7 @@ std::expected<Json, StarException> AnimatedPartSet::getPartStateFrameProperty(St
   if (!type) return std::unexpected(std::move(type.error()));
   auto state = type->get().get(stateName);
   if (!state) return std::unexpected(std::move(state.error()));
-  if (auto property = state->get().partStateFrameProperties.maybeRef(propertyName)) {
+  if (auto property = state->get().partStateFrameProperties.find_ref(propertyName)) {
     auto size = property->get().size();
     if (!size) return std::unexpected(std::move(size.error()));
     if (frame >= 0 && static_cast<std::size_t>(frame) < *size)

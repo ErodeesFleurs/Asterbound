@@ -231,8 +231,9 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       directives = selected->get();
     }
     for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.maybeRef(materialColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(materialColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)
@@ -264,8 +265,9 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       directives = selected->get();
     }
     for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.maybeRef(modColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(modColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)

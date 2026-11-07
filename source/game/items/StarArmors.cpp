@@ -204,7 +204,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
         return std::unexpected(std::move(name.error()));
       if (!ArmorTypeNames)
         return std::unexpected(ArmorTypeNames.error());
-      auto type = ArmorTypeNames->maybeLeftRef(*name);
+      auto type = ArmorTypeNames->find_left_ref(*name);
       if (!type)
         return std::unexpected(std::move(type.error()));
       if (*type)

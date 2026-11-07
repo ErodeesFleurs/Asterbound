@@ -184,7 +184,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
   if (!debrisSkyTypes) return std::unexpected(std::move(debrisSkyTypes.error()));
   if (*debrisSkyTypes) {
     if (!SkyTypeNames) return std::unexpected(SkyTypeNames.error());
-    auto skyType = SkyTypeNames->getRight(sky.type);
+    auto skyType = SkyTypeNames->get_right(sky.type);
     if (!skyType) return std::unexpected(std::move(skyType.error()));
     StringList allowedTypes;
     for (auto const& type : **debrisSkyTypes) {

@@ -208,7 +208,7 @@ m_questIndicatorOffset = std::move(*result9);
   auto result10 = npcVariant.overrides.getString("clientEntityMode", "ClientSlaveOnly");
   if (!result10) return std::unexpected(std::move(result10.error()));
   if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
-  auto result11 = ClientEntityModeNames->getLeft(std::move(*result10));
+  auto result11 = ClientEntityModeNames->get_left(std::move(*result10));
   if (!result11) return std::unexpected(std::move(result11.error()));
   m_clientEntityMode = result11->get();
 }
@@ -325,7 +325,7 @@ if (!result38) return std::unexpected(std::move(result38.error()));
 auto result39 = diskStore.getString("humanoidState");
 if (!result39) return std::unexpected(std::move(result39.error()));
 if (!Humanoid::StateNames) return std::unexpected(Humanoid::StateNames.error());
-auto result40 = Humanoid::StateNames->getLeft(std::move(*result39));
+auto result40 = Humanoid::StateNames->get_left(std::move(*result39));
 if (!result40) return std::unexpected(std::move(result40.error()));
 auto result41 = std::move(*result38)->setState(result40->get());
 if (!result41) return std::unexpected(std::move(result41.error()));
@@ -335,7 +335,7 @@ if (!result42) return std::unexpected(std::move(result42.error()));
 auto result43 = diskStore.getString("humanoidEmoteState");
 if (!result43) return std::unexpected(std::move(result43.error()));
 if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result44 = HumanoidEmoteNames->getLeft(std::move(*result43));
+auto result44 = HumanoidEmoteNames->get_left(std::move(*result43));
 if (!result44) return std::unexpected(std::move(result44.error()));
 auto result45 = std::move(*result42)->setEmoteState(result44->get());
 if (!result45) return std::unexpected(std::move(result45.error()));
@@ -426,12 +426,12 @@ if (!result71) return std::unexpected(std::move(result71.error()));
 auto result72 = humanoid();
 if (!result72) return std::unexpected(std::move(result72.error()));
 if (!Humanoid::StateNames) return std::unexpected(Humanoid::StateNames.error());
-auto result73 = Humanoid::StateNames->getRight(std::move(*result72)->state());
+auto result73 = Humanoid::StateNames->get_right(std::move(*result72)->state());
 if (!result73) return std::unexpected(std::move(result73.error()));
 auto result74 = humanoid();
 if (!result74) return std::unexpected(std::move(result74.error()));
 if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result75 = HumanoidEmoteNames->getRight(std::move(*result74)->emoteState());
+auto result75 = HumanoidEmoteNames->get_right(std::move(*result74)->emoteState());
 if (!result75) return std::unexpected(std::move(result75.error()));
 auto result76 = m_effectEmitter->toJson();
 if (!result76) return std::unexpected(std::move(result76.error()));
@@ -1831,9 +1831,11 @@ if (!result385) return std::unexpected(std::move(result385.error()));
 if (!result386) return std::unexpected(std::move(result386.error()));
 
   auto result388 = callbacks.registerCallback("emote", [this](String const& arg1) -> std::expected<void, StarException> { if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result387 = HumanoidEmoteNames->getLeft(arg1);
-if (!result387) return std::unexpected(std::move(result387.error()));
-addEmote(result387->get());   return {};
+    auto result387 = HumanoidEmoteNames->get_left(arg1);
+    if (!result387)
+      return std::unexpected(std::move(result387.error()));
+    addEmote(result387->get());
+    return {};
 });
 if (!result388) return std::unexpected(std::move(result388.error()));
 
@@ -1920,7 +1922,7 @@ if (!result407) return std::unexpected(std::move(result407.error()));
   auto result412 = callbacks.registerCallback("getItemSlot", [this](String const& entry) -> std::expected<Json, StarException> {
       {
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result408 = EquipmentSlotNames->maybeLeftRef(entry);
+  auto result408 = EquipmentSlotNames->find_left_ref(entry);
   if (!result408) return std::unexpected(std::move(result408.error()));
   if (auto equipmentSlot = std::move(*result408)) {
     return m_armor->itemDescriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
@@ -2337,7 +2339,7 @@ auto item = std::move(*result491);
 
   {
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result492 = EquipmentSlotNames->maybeLeftRef(slot);
+  auto result492 = EquipmentSlotNames->find_left_ref(slot);
   if (!result492) return std::unexpected(std::move(result492.error()));
   if (auto equipmentSlot = std::move(*result492)) {
     m_armor->setItem(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
@@ -2570,9 +2572,10 @@ std::expected<void, StarException> Npc::addEffectEmitters(StringSet const& emitt
 std::expected<void, StarException> Npc::requestEmote(String const& emote) {
   if (!emote.empty()) {
     if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result514 = HumanoidEmoteNames->getLeft(emote);
-if (!result514) return std::unexpected(std::move(result514.error()));
-auto state = result514->get();
+    auto result514 = HumanoidEmoteNames->get_left(emote);
+    if (!result514)
+      return std::unexpected(std::move(result514.error()));
+    auto state = result514->get();
     if (state != HumanoidEmote::Idle && (m_emoteState == HumanoidEmote::Idle || m_emoteState == HumanoidEmote::Blink))
       addEmote(state);
   }

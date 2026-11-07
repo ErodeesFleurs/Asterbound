@@ -70,13 +70,13 @@ std::expected<void, StarException> Statistics::writeStatistics() {
 }
 
 Json Statistics::stat(String const& name, Json def) const {
-  if (auto value = m_stats.maybeRef(name))
+  if (auto value = m_stats.find_ref(name))
     return value->get().value;
   return def;
 }
 
 std::optional<String> Statistics::statType(String const& name) const {
-  if (auto value = m_stats.maybeRef(name))
+  if (auto value = m_stats.find_ref(name))
     return value->get().type;
   return {};
 }

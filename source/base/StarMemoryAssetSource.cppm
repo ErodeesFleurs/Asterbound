@@ -132,7 +132,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> MemoryAssetSource::open(
     String name;
   };
 
-  auto p = m_files.maybeRef(path);
+  auto p = m_files.find_ref(path);
   if (!p)
     return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in memory", path));
   else if (std::holds_alternative<ByteArray>(p->get())) {
@@ -175,7 +175,7 @@ void MemoryAssetSource::set(String const& path, Image&& image) {
 }
 
 std::expected<ByteArray, StarException> MemoryAssetSource::read(String const& path) {
-  auto p = m_files.maybeRef(path);
+  auto p = m_files.find_ref(path);
   if (!p)
     return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in memory", path));
   else if (std::holds_alternative<ByteArray>(p->get()))
@@ -191,7 +191,7 @@ std::expected<ByteArray, StarException> MemoryAssetSource::read(String const& pa
 }
 
 std::expected<std::shared_ptr<Image const>, StarException> MemoryAssetSource::image(String const& path) {
-  auto p = m_files.maybeRef(path);
+  auto p = m_files.find_ref(path);
   if (!p)
     return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in memory", path));
   else if (std::holds_alternative<std::shared_ptr<Image>>(p->get()))

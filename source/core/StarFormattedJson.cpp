@@ -478,14 +478,14 @@ std::expected<FormattedJson, StarException> FormattedJson::prepend(String const&
 }
 
 std::expected<FormattedJson, StarException> FormattedJson::insertBefore(String const& key, FormattedJson const& value, String const& beforeKey) const {
-  auto entry = m_objectEntryLocations.maybeRef(beforeKey);
+  auto entry = m_objectEntryLocations.find_ref(beforeKey);
   if (!entry)
     return std::unexpected(JsonException::format("Cannot insert before key \"{}\", which does not exist", beforeKey));
   return objectInsert(key, value, entry->get().first);
 }
 
 std::expected<FormattedJson, StarException> FormattedJson::insertAfter(String const& key, FormattedJson const& value, String const& afterKey) const {
-  auto entry = m_objectEntryLocations.maybeRef(afterKey);
+  auto entry = m_objectEntryLocations.find_ref(afterKey);
   if (!entry)
     return std::unexpected(JsonException::format("Cannot insert after key \"{}\", which does not exist", afterKey));
   return objectInsert(key, value, entry->get().second + 1);

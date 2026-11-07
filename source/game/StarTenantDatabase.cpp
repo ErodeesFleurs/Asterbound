@@ -82,15 +82,16 @@ void TenantDatabase::cleanup() {
 
 std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::getTenant(String const& name) const {
   std::lock_guard locker(m_cacheMutex);
-  auto result = m_tenantCache.get(name, [&database = *this](String const& name) -> std::expected<std::shared_ptr<Tenant>, StarException> {
-    auto path = database.m_paths.maybeRef(name);
-    if (!path)
-      return std::unexpected(TenantException::format("No such tenant named '{}'", name));
-    auto assets = database.m_root.assets();
-    if (!assets)
-      return std::unexpected(std::move(assets.error()));
-    return readTenant(**assets, path->get());
-  });
+  auto result = m_tenantCache.get(
+    name, [&database = *this](String const& name) -> std::expected<std::shared_ptr<Tenant>, StarException> {
+      auto path = database.m_paths.find_ref(name);
+      if (!path)
+        return std::unexpected(TenantException::format("No such tenant named '{}'", name));
+      auto assets = database.m_root.assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      return readTenant(**assets, path->get());
+    });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return result->get();

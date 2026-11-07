@@ -73,7 +73,7 @@ StringMap<std::shared_ptr<Codex const>> CodexDatabase::codexes() const {
 }
 
 std::shared_ptr<Codex const> CodexDatabase::codex(String const& codexId) const {
-  if (auto codex = m_codexes.maybeRef(codexId))
+  if (auto codex = m_codexes.find_ref(codexId))
     return codex->get();
   return {};
 }

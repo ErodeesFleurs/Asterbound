@@ -219,7 +219,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     if (*beamUpRule) {
       if (!BeamUpRuleNames)
         return std::unexpected(BeamUpRuleNames.error());
-      auto rule = BeamUpRuleNames->getLeft(**beamUpRule);
+      auto rule = BeamUpRuleNames->get_left(**beamUpRule);
       if (!rule)
         return std::unexpected(std::move(rule.error()));
       (*worldParameters)->beamUpRule = rule->get();

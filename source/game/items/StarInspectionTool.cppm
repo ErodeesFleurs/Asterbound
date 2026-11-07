@@ -243,7 +243,7 @@ std::expected<std::shared_ptr<InspectionTool>, StarException> InspectionTool::cr
         return std::unexpected(std::move(name.error()));
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
-      auto type = EntityTypeNames->maybeLeftRef(*name);
+      auto type = EntityTypeNames->find_left_ref(*name);
       if (!type)
         return std::unexpected(std::move(type.error()));
       if (*type)

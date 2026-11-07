@@ -394,7 +394,7 @@ std::expected<void, StarException> LuaHttpSession::stop() {
   }
   for (auto& request : pending)
     remember(request.rpcKeeper.cancel("HTTP session stopped"));
-  for (auto& [id, request] : active)
+  for (auto&& [id, request] : active)
     remember(request.rpcKeeper.cancel("HTTP session stopped"));
   remember(m_impl->httpClient->stop());
   if (error)

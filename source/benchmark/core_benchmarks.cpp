@@ -70,8 +70,8 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
     return false;
   }
   for (auto const& [value, spelling] : FixedPerlinNames) {
-    auto dynamicOptional = dynamic.maybeRight(value);
-    auto dynamicChecked = dynamic.getRight(value);
+    auto dynamicOptional = dynamic.maybe_right(value);
+    auto dynamicChecked = dynamic.get_right(value);
     auto fixedChecked = Star::enumName<FixedPerlinNames>(value);
     auto fixedOptional = arrayPerlinName(value);
     if (!dynamicOptional || !dynamicChecked || !fixedChecked || !fixedOptional
@@ -82,13 +82,13 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
     }
   }
   for (auto value : queries.misses) {
-    if (dynamic.maybeRight(value) || arrayPerlinName(value)) {
+    if (dynamic.maybe_right(value) || arrayPerlinName(value)) {
       state.SkipWithError("Perlin optional forward miss unexpectedly matched");
       return false;
     }
   }
   for (std::size_t i = 0; i < queries.reverseHits.size(); ++i) {
-    auto dynamicValue = dynamic.maybeLeft(queries.reverseHits[i]);
+    auto dynamicValue = dynamic.maybe_left(queries.reverseHits[i]);
     auto fixedValue = Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(queries.reverseHits[i]));
     auto expected = queries.hits[i % queries.hits.size()];
     if (!dynamicValue || !fixedValue || !*dynamicValue || !*fixedValue
@@ -98,7 +98,7 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
     }
   }
   for (auto const& text : queries.reverseMisses) {
-    auto dynamicValue = dynamic.maybeLeft(text);
+    auto dynamicValue = dynamic.maybe_left(text);
     auto fixedValue = Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(text));
     if (!dynamicValue || !fixedValue || *dynamicValue || *fixedValue) {
       state.SkipWithError("Perlin reverse optional miss returned an error or a match");
@@ -130,7 +130,7 @@ void BM_PerlinForwardOptional(benchmark::State& state) {
         auto result = arrayPerlinName(value);
         benchmark::DoNotOptimize(result);
       } else {
-        auto result = dynamic.maybeRight(value);
+        auto result = dynamic.maybe_right(value);
         benchmark::DoNotOptimize(result);
       }
     }
@@ -150,7 +150,7 @@ void BM_PerlinForwardCheckedHit(benchmark::State& state) {
   if (!validatePerlin(state, dynamic, queries))
     return;
   state.SetLabel(Fixed ? "checked borrowed string_view; enumName helper"
-                       : "checked borrowed String reference; EnumMap::getRight");
+                       : "checked borrowed String reference; EnumMap::get_right");
   for (auto _ : state) {
     (void)_;
     for (auto value : queries.hits) {
@@ -163,9 +163,9 @@ void BM_PerlinForwardCheckedHit(benchmark::State& state) {
         }
         benchmark::DoNotOptimize(*result);
       } else {
-        auto result = dynamic.getRight(value);
+        auto result = dynamic.get_right(value);
         if (!result) {
-          state.SkipWithError("EnumMap::getRight failed for a validated hit");
+          state.SkipWithError("EnumMap::get_right failed for a validated hit");
           return;
         }
         benchmark::DoNotOptimize(result->get().utf8());
@@ -202,7 +202,7 @@ void BM_PerlinReverseOptional(benchmark::State& state) {
         if constexpr (Fixed)
           return Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(text));
         else
-          return dynamic.maybeLeft(text);
+          return dynamic.maybe_left(text);
       }();
       if (!result) {
         state.SkipWithError("Perlin reverse lookup failed for validated UTF-8");

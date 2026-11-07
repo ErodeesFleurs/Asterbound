@@ -139,7 +139,7 @@ StringList PlayerLog::collections() const {
 }
 
 StringSet PlayerLog::collectables(String const& collection) const {
-  if (auto collectables = m_collections.maybeRef(collection))
+  if (auto collectables = m_collections.find_ref(collection))
     return collectables->get();
   return {};
 }

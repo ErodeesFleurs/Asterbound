@@ -791,7 +791,7 @@ variant.healthLevelFunction = std::move(*result129);
   auto result130 = variant.parameters.getString("clientEntityMode", "ClientSlaveOnly");
 if (!result130) return std::unexpected(std::move(result130.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
-auto result131 = ClientEntityModeNames->getLeft(std::move(*result130));
+auto result131 = ClientEntityModeNames->get_left(std::move(*result130));
 if (!result131) return std::unexpected(std::move(result131.error()));
 variant.clientEntityMode = result131->get();
   auto result132 = variant.parameters.getBool("persistent", false);

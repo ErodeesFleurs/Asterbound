@@ -86,7 +86,7 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
 }
 
 std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPath const& imagePath, bool tryTexture) {
-  if (auto p = m_textureMap.maybeRef(imagePath)) {
+  if (auto p = m_textureMap.find_ref(imagePath)) {
     p->get().second = std::chrono::time_point_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     return p->get().first;

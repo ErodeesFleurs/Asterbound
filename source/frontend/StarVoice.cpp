@@ -352,7 +352,7 @@ std::shared_ptr<Voice::Speaker> Voice::localSpeaker() {
 std::expected<std::shared_ptr<Voice::Speaker>, StarException> Voice::speaker(SpeakerId speakerId) {
   if (m_speakerId == speakerId)
     return m_clientSpeaker;
-  if (auto speaker = m_speakers.maybeRef(speakerId))
+  if (auto speaker = m_speakers.find_ref(speakerId))
     return speaker->get();
   auto created = Speaker::create(speakerId);
   if (!created)
@@ -374,7 +374,7 @@ List<std::shared_ptr<Voice::Speaker>> Voice::sortedSpeakers(bool onlyPlaying) {
       return a->speakerId < b->speakerId;
   };
 
-  for (auto& p : m_speakers) {
+  for (auto&& p : m_speakers) {
     if (!onlyPlaying || p.second->playing)
       result.insertSorted(p.second, sorter);
   }
@@ -495,7 +495,7 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
 }
 
 std::expected<void, StarException> Voice::update(float, PositionalAttenuationFunction positionalAttenuationFunction) {
-  for (auto& entry : m_speakers) {
+  for (auto&& entry : m_speakers) {
     if (std::shared_ptr<Speaker>& speaker = entry.second) {
       Vec2F newChannelVolumes{1.0f, 1.0f};
       if (positionalAttenuationFunction) {

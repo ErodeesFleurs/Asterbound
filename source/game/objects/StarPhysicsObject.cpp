@@ -136,13 +136,13 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
     auto enabled = std::move(*enabledResult);
     collision.enabled.set(enabled);
   }
-  object->m_physicsForces.sortByKey();
+  object->m_physicsForces.sort_by_key();
   for (auto& pair : object->m_physicsForces) {
     auto operation2 = object->m_netGroup.addNetElement(pair.second.enabled);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
   }
-  object->m_physicsCollisions.sortByKey();
+  object->m_physicsCollisions.sort_by_key();
   for (auto& pair : object->m_physicsCollisions) {
     auto operation3 = object->m_netGroup.addNetElement(pair.second.xPosition);
     if (!operation3)
@@ -256,7 +256,7 @@ std::size_t PhysicsObject::movingCollisionCount() const {
 }
 
 std::expected<std::optional<PhysicsMovingCollision>, StarException> PhysicsObject::movingCollision(std::size_t positionIndex) const {
-  auto config = m_physicsCollisions.valueAt(positionIndex);
+  auto config = m_physicsCollisions.value_at(positionIndex);
   if (!config)
     return std::unexpected(std::move(config.error()));
   if (!config->get().enabled.get())

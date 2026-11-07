@@ -99,7 +99,7 @@ std::expected<std::shared_ptr<ParticleConfig>, StarException> ParticleDatabase::
   auto key = kind.toLower();
   if (!key)
     return std::unexpected(std::move(key.error()));
-  if (auto config = m_configs.maybeRef(*key))
+  if (auto config = m_configs.find_ref(*key))
     return config->get();
   return std::unexpected(StarException(strf("Unknown particle definition with kind {}.", kind)));
 }

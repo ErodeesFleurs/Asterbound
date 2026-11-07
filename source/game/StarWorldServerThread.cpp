@@ -294,7 +294,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
   List<std::shared_ptr<Packet>> incomingPackets;
-  if (auto queued = m_incomingPacketQueue.maybeRef(clientId))
+  if (auto queued = m_incomingPacketQueue.find_ref(clientId))
     incomingPackets = std::exchange(queued->get(), {});
   std::optional<StarException> error;
   if (m_worldServer->hasClient(clientId)) {
@@ -308,7 +308,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
     }
   }
   List<std::shared_ptr<Packet>> outgoingPackets;
-  if (auto queued = m_outgoingPacketQueue.maybeRef(clientId))
+  if (auto queued = m_outgoingPacketQueue.find_ref(clientId))
     outgoingPackets = std::exchange(queued->get(), {});
   if (m_worldServer->hasClient(clientId)) {
     auto removed = m_worldServer->removeClient(clientId);
@@ -516,7 +516,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
     return std::unexpected(WorldServerFidelityNames.error());
   std::optional<WorldServerFidelity> lockedFidelity;
   if (!*automatic) {
-    auto fidelity = WorldServerFidelityNames->getLeft(*serverFidelityMode);
+    auto fidelity = WorldServerFidelityNames->get_left(*serverFidelityMode);
     if (!fidelity)
       return std::unexpected(std::move(fidelity.error()));
     lockedFidelity = fidelity->get();
@@ -531,7 +531,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
   WorldServerFidelity automaticFidelity = WorldServerFidelity::Medium;
   while (!stopToken.stop_requested() && !m_errorOccurred) {
     auto fidelity = lockedFidelity.value_or(automaticFidelity);
-    auto fidelityName = WorldServerFidelityNames->getRight(fidelity);
+    auto fidelityName = WorldServerFidelityNames->get_right(fidelity);
     if (!fidelityName)
       return std::unexpected(std::move(fidelityName.error()));
     root.logMap().set(strf("server_{}_fidelity", m_worldName), fidelityName->get());

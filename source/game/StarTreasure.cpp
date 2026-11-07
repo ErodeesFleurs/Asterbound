@@ -290,7 +290,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
 }
 
 std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::createTreasure(String const& treasurePool, float level, std::uint64_t seed, StringSet visitedPools, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  auto pool = m_treasurePools.maybeRef(treasurePool);
+  auto pool = m_treasurePools.find_ref(treasurePool);
   if (!pool)
     return std::unexpected(TreasureException::format("Unknown treasure pool '{}'", treasurePool));
   if (!visitedPools.add(treasurePool))
@@ -389,7 +389,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase:
   auto objectDatabase = m_root.objectDatabase();
   if (!objectDatabase)
     return std::unexpected(std::move(objectDatabase.error()));
-  auto set = m_treasureChestSets.maybeRef(treasureChestSet);
+  auto set = m_treasureChestSets.find_ref(treasureChestSet);
   if (!set)
     return std::unexpected(StarException::format("Unknown treasure chest set '{}'", treasureChestSet));
   auto level = world.threatLevel();

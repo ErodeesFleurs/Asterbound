@@ -716,7 +716,7 @@ namespace Star {
 
   [[nodiscard]] auto BTreeDatabase::BTreeImpl::loadIndex(Pointer pointer) -> std::expected<Index, StarException> {
     std::unique_lock lock(parent.m_indexCacheSpinLock);
-    if (auto index = parent.m_indexCache.maybeRef(pointer)) {
+    if (auto index = parent.m_indexCache.find_ref(pointer)) {
       return index->get();
     }
     lock.unlock();
@@ -1206,7 +1206,7 @@ namespace Star {
       return {};
     }
 
-    if (auto buffer = m_uncommittedWrites.maybeRef(blockIndex)) {
+    if (auto buffer = m_uncommittedWrites.find_ref(blockIndex)) {
       buffer->get().copyTo(block, blockOffset);
     } else {
       return m_device->readFullAbsolute(HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize) + blockOffset,

@@ -116,7 +116,7 @@ List<Collection> CollectionDatabase::collections() const {
 }
 
 std::expected<Collection, StarException> CollectionDatabase::collection(String const& collectionName) const {
-  if (auto result = m_collections.maybeRef(collectionName))
+  if (auto result = m_collections.find_ref(collectionName))
     return result->get();
   return std::unexpected(CollectionDatabaseException(strf("Collection '{}' not found", collectionName)));
 }
@@ -126,7 +126,7 @@ std::expected<List<Collectable>, StarException> CollectionDatabase::collectables
 }
 
 std::expected<List<Collectable>, StarException> CollectionDatabase::collectables(String const& collectionName, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  auto configs = m_collectableConfigs.maybeRef(collectionName);
+  auto configs = m_collectableConfigs.find_ref(collectionName);
   if (!configs)
     return std::unexpected(CollectionDatabaseException(strf("Collection '{}' not found", collectionName)));
   List<Collectable> result;
@@ -145,15 +145,15 @@ std::expected<Collectable, StarException> CollectionDatabase::collectable(String
 }
 
 std::expected<Collectable, StarException> CollectionDatabase::collectable(String const& collectionName, String const& collectableName, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  auto configs = m_collectableConfigs.maybeRef(collectionName);
-  auto config = configs ? configs->get().maybeRef(collectableName) : std::nullopt;
-  auto definition = m_collections.maybeRef(collectionName);
+  auto configs = m_collectableConfigs.find_ref(collectionName);
+  auto config = configs ? configs->get().find_ref(collectableName) : std::nullopt;
+  auto definition = m_collections.find_ref(collectionName);
   if (!config || !definition)
     return std::unexpected(CollectionDatabaseException(strf("Collectable '{}' not found in collection '{}'", collectableName, collectionName)));
   {
     std::lock_guard locker(m_collectablesMutex);
-    if (auto published = m_collectables.maybeRef(collectionName))
-      if (auto cached = published->get().maybeRef(collectableName))
+    if (auto published = m_collectables.find_ref(collectionName))
+      if (auto cached = published->get().find_ref(collectableName))
         return cached->get();
   }
   auto result = [&, &database = *this]() -> std::expected<Collectable, StarException> {
@@ -174,14 +174,14 @@ std::expected<Collectable, StarException> CollectionDatabase::collectable(String
   }
   std::lock_guard locker(m_collectablesMutex);
   auto& published = m_collectables[collectionName];
-  if (auto cached = published.maybeRef(collectableName))
+  if (auto cached = published.find_ref(collectableName))
     return cached->get();
   published[collectableName] = *result;
   return std::move(*result);
 }
 
 bool CollectionDatabase::hasCollectable(String const& collectionName, String const& collectableName) const {
-  auto configs = m_collectableConfigs.maybeRef(collectionName);
+  auto configs = m_collectableConfigs.find_ref(collectionName);
   return m_collections.contains(collectionName) && configs && configs->get().contains(collectableName);
 }
 

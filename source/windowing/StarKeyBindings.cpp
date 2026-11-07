@@ -195,7 +195,7 @@ std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json c
   if (!entries)
     return std::unexpected(entries.error().withContext("Could not set keybindings from configuration"));
   for (auto const& entry : *entries) {
-    auto action = InterfaceActionNames->getLeft(entry.first);
+    auto action = InterfaceActionNames->get_left(entry.first);
     if (!action)
       return std::unexpected(action.error().withContext("Could not set keybindings from configuration"));
     auto inputs = entry.second.iterateArray();
@@ -229,7 +229,7 @@ Set<InterfaceAction> KeyBindings::actions(InputEvent const& event) const {
 Set<InterfaceAction> KeyBindings::actions(KeyChord chord) const {
   std::size_t mostMatchedMods = 0;
   Set<InterfaceAction> matching;
-  auto bindings = m_actions.maybeRef(chord.key);
+  auto bindings = m_actions.find_ref(chord.key);
   if (!bindings)
     return matching;
   for (auto const& pair : bindings->get()) {
@@ -254,7 +254,7 @@ Set<InterfaceAction> KeyBindings::actions(KeyChord chord) const {
 
 Set<InterfaceAction> KeyBindings::actionsForKey(Key key) const {
   Set<InterfaceAction> matching;
-  if (auto bindings = m_actions.maybeRef(key)) {
+  if (auto bindings = m_actions.find_ref(key)) {
     for (auto const& pair : bindings->get())
       matching.add(pair.second);
   }

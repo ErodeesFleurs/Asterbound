@@ -298,7 +298,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
         return std::unexpected(std::move(damageTypeName.error()));
       if (!TileDamageTypeNames)
         return std::unexpected(TileDamageTypeNames.error());
-      auto damageType = TileDamageTypeNames->getLeft(*damageTypeName);
+      auto damageType = TileDamageTypeNames->get_left(*damageTypeName);
       if (!damageType)
         return std::unexpected(std::move(damageType.error()));
       damage.type = damageType->get();

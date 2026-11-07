@@ -284,9 +284,9 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
     result.identity.personality = personalityResult->get();
 
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto chestSlot = EquipmentSlotNames->getRight(EquipmentSlot::Chest);
+    auto chestSlot = EquipmentSlotNames->get_right(EquipmentSlot::Chest);
     if (!chestSlot) return std::unexpected(std::move(chestSlot.error()));
-    auto legSlot = EquipmentSlotNames->getRight(EquipmentSlot::Legs);
+    auto legSlot = EquipmentSlotNames->get_right(EquipmentSlot::Legs);
     if (!legSlot) return std::unexpected(std::move(legSlot.error()));
     auto chest = ItemDescriptor::create(shirt->get(), 1, JsonObject{{"colorIndex", shirtColor}});
     if (!chest) return std::unexpected(std::move(chest.error()));

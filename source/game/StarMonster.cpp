@@ -1268,9 +1268,10 @@ if (!result205) return std::unexpected(std::move(result205.error()));
 
   auto result207 = callbacks.registerCallback("setDamageBar", [this](String const& damageBarType) -> std::expected<void, StarException> {
       if (!DamageBarTypeNames) return std::unexpected(DamageBarTypeNames.error());
-auto result206 = DamageBarTypeNames->getLeft(damageBarType);
-if (!result206) return std::unexpected(std::move(result206.error()));
-m_damageBar.set(result206->get());
+      auto result206 = DamageBarTypeNames->get_left(damageBarType);
+      if (!result206)
+        return std::unexpected(std::move(result206.error()));
+      m_damageBar.set(result206->get());
       return {};
 });
 if (!result207) return std::unexpected(std::move(result207.error()));

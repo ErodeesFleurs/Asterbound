@@ -760,12 +760,12 @@ bool ObjectDatabase::isObject(String const& objectName) const {
 
 std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::getConfig(String const& objectName) const {
   std::lock_guard locker(m_cacheMutex);
-  auto result = m_configCache.get(objectName,
-      [&database = *this](String const& name) -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
-        if (auto path = database.m_paths.maybeRef(name))
-          return database.readConfig(path->get());
-        return std::unexpected(ObjectException::format("No such object named '{}'", name));
-      });
+  auto result = m_configCache.get(
+    objectName, [&database = *this](String const& name) -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
+      if (auto path = database.m_paths.find_ref(name))
+        return database.readConfig(path->get());
+      return std::unexpected(ObjectException::format("No such object named '{}'", name));
+    });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return result->get();

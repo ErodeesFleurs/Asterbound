@@ -79,7 +79,7 @@ List<PlayerCodexes::CodexEntry> PlayerCodexes::codexes() const {
 }
 
 std::shared_ptr<Codex const> PlayerCodexes::codex(String const& codexId) const {
-  if (auto entry = m_codexes.maybeRef(codexId))
+  if (auto entry = m_codexes.find_ref(codexId))
     return entry->get().first;
   return {};
 }
@@ -102,7 +102,7 @@ std::expected<std::shared_ptr<Codex const>, StarException> PlayerCodexes::learnC
 }
 
 bool PlayerCodexes::codexRead(String const& codexId) const {
-  auto entry = m_codexes.maybeRef(codexId);
+  auto entry = m_codexes.find_ref(codexId);
   return entry && entry->get().second;
 }
 

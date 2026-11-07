@@ -66,7 +66,7 @@ bool TechDatabase::contains(String const& techName) const {
 }
 
 std::expected<TechConfig, StarException> TechDatabase::tech(String const& techName) const {
-  if (auto tech = m_tech.maybeRef(techName))
+  if (auto tech = m_tech.find_ref(techName))
     return tech->get();
   return std::unexpected(TechDatabaseException::format("No such tech '{}'", techName));
 }
@@ -85,7 +85,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto typeName = config.getString("type");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
-    auto type = TechTypeNames->maybeLeftRef(*typeName);
+    auto type = TechTypeNames->find_left_ref(*typeName);
     if (!type)
       return std::unexpected(std::move(type.error()));
     if (!*type)

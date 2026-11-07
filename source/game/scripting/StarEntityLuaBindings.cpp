@@ -139,7 +139,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeEntityCallbacks(Enti
   if (auto registration = callbacks.registerCallback("entityType", [&entity]() -> std::expected<String, StarException> {
     if (!EntityTypeNames)
       return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(entity.entityType());
+    auto name = EntityTypeNames->get_right(entity.entityType());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();

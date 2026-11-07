@@ -78,9 +78,9 @@ std::expected<StoredFunction::SearchResult, StarException> StoredFunction::searc
   auto firstIndex = m_function.index(0);
   if (!firstIndex)
     return std::unexpected(std::move(firstIndex.error()));
-  auto firstValue = m_function.value(0);
-  if (!firstValue)
-    return std::unexpected(std::move(firstValue.error()));
+  auto first_value = m_function.value(0);
+  if (!first_value)
+    return std::unexpected(std::move(first_value.error()));
   auto lastIndex = m_function.index(m_function.size() - 1);
   if (!lastIndex)
     return std::unexpected(std::move(lastIndex.error()));
@@ -88,7 +88,7 @@ std::expected<StoredFunction::SearchResult, StarException> StoredFunction::searc
   if (!lastValue)
     return std::unexpected(std::move(lastValue.error()));
   double minIndex = firstIndex->get();
-  double minValue = firstValue->get();
+  double minValue = first_value->get();
   double maxIndex = lastIndex->get();
   double maxValue = lastValue->get();
   if (maxValue < minValue) {

@@ -93,7 +93,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
         auto name = request.getString("handler");
         if (!name)
           return std::unexpected(std::move(name.error()));
-        auto handler = m_handlers.maybeRef(*name);
+        auto handler = m_handlers.find_ref(*name);
         if (!handler)
           return std::unexpected(JsonRpcException::format("Unknown handler '{}'", *name));
         auto arguments = request.get("arguments");
@@ -115,7 +115,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
         auto id = request.getUInt("id");
         if (!id)
           return std::unexpected(std::move(id.error()));
-        auto keeper = m_pendingResponse.take(*id);
+        auto keeper = m_pendingResponse.extract_value(*id);
         if (!keeper)
           return std::unexpected(std::move(keeper.error()));
         if (*command == "fail")

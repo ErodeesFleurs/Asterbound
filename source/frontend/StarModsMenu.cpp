@@ -113,7 +113,7 @@ std::expected<void, StarException> ModsMenu::init() {
       return std::unexpected(std::move(name.error()));
     if (auto result = (*modName)->setText(*name); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto iconImage = metadata->maybeRef("icon")) {
+    if (auto iconImage = metadata->find_ref("icon")) {
       auto image = iconImage->get().toString();
       if (!image)
         return std::unexpected(std::move(image.error()));
@@ -220,9 +220,9 @@ std::expected<void, StarException> ModsMenu::update(float dt) {
 }
 
 std::expected<String, StarException> ModsMenu::bestModName(JsonObject const& metadata, String const& sourcePath) {
-  if (auto value = metadata.maybeRef("friendlyName"))
+  if (auto value = metadata.find_ref("friendlyName"))
     return value->get().toString();
-  if (auto value = metadata.maybeRef("name"))
+  if (auto value = metadata.find_ref("name"))
     return value->get().toString();
   String baseName = File::baseName(sourcePath);
   auto contains = baseName.contains(".");

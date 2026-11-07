@@ -315,7 +315,7 @@ TilePainter::chunkHashes(WorldRenderData const& renderData, Vec2I chunkIndex) {
 std::expected<void, StarException> TilePainter::renderTerrainChunks(WorldCamera const& camera, TerrainLayer terrainLayer) {
   Map<QuadZLevel, List<std::shared_ptr<RenderBuffer>>> zOrderBuffers;
   for (auto const& chunk : m_pendingTerrainChunks) {
-    if (auto layer = chunk->maybeRef(terrainLayer)) {
+    if (auto layer = chunk->find_ref(terrainLayer)) {
       for (auto const& pair : layer->get())
         zOrderBuffers[pair.first].append(pair.second);
     }
@@ -371,8 +371,8 @@ TilePainter::getTerrainChunk(WorldRenderData& renderData, Vec2I chunkIndex, Chun
 
       auto chunk = std::make_shared<TerrainChunk>();
 
-      for (auto& layerPair : terrainPrimitives) {
-        for (auto& zLevelPair : layerPair.second) {
+      for (auto&& layerPair : terrainPrimitives) {
+        for (auto&& zLevelPair : layerPair.second) {
           auto rb = m_renderer->createRenderBuffer();
           if (!rb)
             return std::unexpected(std::move(rb.error()));
@@ -407,7 +407,7 @@ TilePainter::getLiquidChunk(WorldRenderData& renderData, Vec2I chunkIndex, Chunk
 
       auto chunk = std::make_shared<LiquidChunk>();
 
-      for (auto& p : liquidPrimitives) {
+      for (auto&& p : liquidPrimitives) {
         auto rb = m_renderer->createRenderBuffer();
         if (!rb)
           return std::unexpected(std::move(rb.error()));
@@ -522,8 +522,9 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
       auto texture = getPieceTexture(material, piecePair.first, materialHue, directives, false);
       if (!texture)
         return std::unexpected(std::move(texture.error()));
-      auto variant = piecePair.first->variants.maybeRef(materialColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(materialColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto selectedCoords = variant->get().wrap(variance);
       if (!selectedCoords)
@@ -564,8 +565,9 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
       auto texture = getPieceTexture(mod, piecePair.first, modHue, directives, true);
       if (!texture)
         return std::unexpected(std::move(texture.error()));
-      auto variant = piecePair.first->variants.maybeRef(modColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(modColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto selectedCoords = variant->get().wrap(variance);
       if (!selectedCoords)

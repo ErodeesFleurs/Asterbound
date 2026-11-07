@@ -112,7 +112,7 @@ std::expected<void, StarException> PaneManager::initializePaneManager() {
 }
 
 std::expected<void, StarException> PaneManager::displayPane(PaneLayer paneLayer, std::shared_ptr<Pane> const& pane, DismissCallback onDismiss) {
-  if (!m_displayedPanes[paneLayer].insertFront(pane, std::move(onDismiss)).second)
+  if (!m_displayedPanes[paneLayer].insert_front(pane, std::move(onDismiss)).second)
     return std::unexpected(GuiException("Pane displayed twice in PaneManager::displayPane"));
 
   if (!pane->hasDisplayed() && pane->anchor() == PaneAnchor::None) {
@@ -184,7 +184,7 @@ std::shared_ptr<Pane> PaneManager::topPane() const {
 std::expected<void, StarException> PaneManager::bringToTop(std::shared_ptr<Pane> const& pane) {
   for (auto& layerPair : m_displayedPanes) {
     if (layerPair.second.contains(pane))
-      return layerPair.second.toFront(pane);
+      return layerPair.second.move_to_front(pane);
   }
 
   return std::unexpected(GuiException("Pane was not displayed in PaneManager::bringToTop"));
@@ -415,7 +415,7 @@ std::expected<bool, StarException> PaneManager::sendInputEvent(InputEvent const&
       if (*consumed) {
         if (std::holds_alternative<MouseButtonDownEvent>(event)
             && (layerPair.first == PaneLayer::Window || layerPair.first == PaneLayer::ModalWindow)) {
-          auto raised = layerPair.second.toFront(panePair.first);
+          auto raised = layerPair.second.move_to_front(panePair.first);
           if (!raised)
             return std::unexpected(std::move(raised.error()));
         }
@@ -642,7 +642,7 @@ std::expected<Vec2I, StarException> PaneManager::calculateNewInterfacePosition(s
 std::expected<bool, StarException> PaneManager::dismiss(std::shared_ptr<Pane> const& pane) {
   bool dismissed = false;
   for (auto& layerPair : m_displayedPanes) {
-    if (auto panePair = layerPair.second.maybeTake(pane)) {
+    if (auto panePair = layerPair.second.try_extract_value(pane)) {
       dismissed = true;
       auto hidden = panePair->first->dismissed();
       if (!hidden)

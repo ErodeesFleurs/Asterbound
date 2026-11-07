@@ -29,7 +29,7 @@ struct construct {
 };
 
 template <typename MapType1, typename MapType2>
-[[nodiscard]] auto mapMerge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
+[[nodiscard]] auto map_merge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
   using Insertion = std::remove_cvref_t<decltype(targetMap.insert(*sourceMap.begin()))>;
   constexpr bool fallible = AlgorithmResultInfo<Insertion>::Fallible;
   using Result = std::conditional_t<fallible, std::expected<bool, StarException>, bool>;
@@ -55,8 +55,7 @@ template <typename MapType1, typename MapType2>
   return Result(noCommonKeys);
 }
 
-template <typename MapType1, typename MapType2>
-bool mapsEqual(MapType1 const& m1, MapType2 const& m2) {
+template <typename MapType1, typename MapType2> bool maps_equal(MapType1 const& m1, MapType2 const& m2) {
   if (&m1 == &m2)
     return true;
 
@@ -414,18 +413,18 @@ export module star.algorithm;
 export namespace Star {
   using ::Star::AlgorithmResultInfo;
   using ::Star::construct;
-  using ::Star::mapMerge;
-  using ::Star::mapsEqual;
+  using ::Star::eraseWhere;
   using ::Star::filter;
   using ::Star::filtered;
-  using ::Star::eraseWhere;
-  using ::Star::sorted;
-  using ::Star::sortByComputedValue;
-  using ::Star::stableSortByComputedValue;
-  using ::Star::transformInto;
-  using ::Star::transform;
-  using ::Star::take;
-  using ::Star::FinallyGuard;
   using ::Star::finally;
+  using ::Star::FinallyGuard;
   using ::Star::FunctionTraits;
+  using ::Star::map_merge;
+  using ::Star::maps_equal;
+  using ::Star::sortByComputedValue;
+  using ::Star::sorted;
+  using ::Star::stableSortByComputedValue;
+  using ::Star::take;
+  using ::Star::transform;
+  using ::Star::transformInto;
 }

@@ -242,7 +242,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(
     StreamOffset assetSize;
     StreamOffset assetPos = 0;
   };
-  auto entry = m_index.maybeRef(path);
+  auto entry = m_index.find_ref(path);
   if (!entry)
     return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path));
   auto fileSize = m_packedFile->size();

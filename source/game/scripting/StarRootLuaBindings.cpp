@@ -391,14 +391,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
 
   if (auto r = callbacks.registerCallback("materialVariant", [getVariant](Vec2U const& tilePosition, String const& layer, unsigned variants) -> std::expected<unsigned, StarException> {
     if (!VariantTerrainLayerNames) return std::unexpected(VariantTerrainLayerNames.error());
-    auto terrainLayer = VariantTerrainLayerNames->getLeft(layer);
+    auto terrainLayer = VariantTerrainLayerNames->get_left(layer);
     if (!terrainLayer) return std::unexpected(std::move(terrainLayer.error()));
     return getVariant(tilePosition.x(), tilePosition.y(), false, terrainLayer->get(), variants);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.registerCallback("modVariant", [getVariant](Vec2U const& tilePosition, String const& layer, unsigned variants) -> std::expected<unsigned, StarException> {
     if (!VariantTerrainLayerNames) return std::unexpected(VariantTerrainLayerNames.error());
-    auto terrainLayer = VariantTerrainLayerNames->getLeft(layer);
+    auto terrainLayer = VariantTerrainLayerNames->get_left(layer);
     if (!terrainLayer) return std::unexpected(std::move(terrainLayer.error()));
     return getVariant(tilePosition.x(), tilePosition.y(), true, terrainLayer->get(), variants);
   }); !r) return std::unexpected(std::move(r.error()));
@@ -625,7 +625,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     auto tech = (*database)->tech(techName);
     if (!tech) return std::unexpected(std::move(tech.error()));
     if (!TechTypeNames) return std::unexpected(TechTypeNames.error());
-    auto name = TechTypeNames->getRight(tech->type);
+    auto name = TechTypeNames->get_right(tech->type);
     if (!name) return std::unexpected(std::move(name.error()));
     return name->get();
   }); !r) return std::unexpected(std::move(r.error()));

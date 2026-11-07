@@ -214,7 +214,7 @@ std::expected<void, StarException> OpenGlRenderer::initialize() {
 }
 
 OpenGlRenderer::~OpenGlRenderer() {
-  for (auto& effect : m_effects)
+  for (auto&& effect : m_effects)
     glDeleteProgram(effect.second.program);
 
   m_frameBuffers.clear();
@@ -378,8 +378,8 @@ std::expected<void, StarException> OpenGlRenderer::loadConfig(Json const& config
   }
   m_currentFrameBuffer.reset();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  for (auto& effect : m_effects)
-    for (auto& texture : effect.second.textures)
+  for (auto&& effect : m_effects)
+    for (auto&& texture : effect.second.textures)
       texture.second.textureValue.reset();
   m_config = config;
   return {};
@@ -421,8 +421,8 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     }
     return std::pair{*vertex, *fragment};
   };
-  auto vertexSource = shaders.maybeRef("vertex");
-  auto fragmentSource = shaders.maybeRef("fragment");
+  auto vertexSource = shaders.find_ref("vertex");
+  auto fragmentSource = shaders.find_ref("fragment");
   auto compiled = compilePair(
       vertexSource ? std::optional<std::string_view>{vertexSource->get().utf8()} : std::nullopt,
       fragmentSource ? std::optional<std::string_view>{fragmentSource->get().utf8()} : std::nullopt);
@@ -597,7 +597,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     }
     return std::unexpected(std::move(glStatus.error()));
   }
-  if (auto old = m_effects.maybeRef(name))
+  if (auto old = m_effects.find_ref(name))
     glDeleteProgram(old->get().program);
   m_effects[name] = std::move(effect);
   m_currentEffect = std::ref(m_effects[name]);
@@ -607,7 +607,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
 }
 
 std::expected<void, StarException> OpenGlRenderer::setEffectParameter(String const& parameterName, RenderEffectParameter const& value) {
-  auto parameter = m_currentEffect->get().parameters.maybeRef(parameterName);
+  auto parameter = m_currentEffect->get().parameters.find_ref(parameterName);
   if (!parameter || (parameter->get().parameterValue && *parameter->get().parameterValue == value))
     return {};
 
@@ -631,8 +631,8 @@ std::expected<void, StarException> OpenGlRenderer::setEffectScriptableParameter(
     return {};
 
   Effect& effect = find->second;
-  
-  auto parameter = effect.scriptables.maybeRef(parameterName);
+
+  auto parameter = effect.scriptables.find_ref(parameterName);
   if (!parameter)
     return {};
 
@@ -656,7 +656,7 @@ std::optional<RenderEffectParameter> OpenGlRenderer::getEffectScriptableParamete
 
   Effect& effect = find->second;
 
-  auto parameter = effect.scriptables.maybeRef(parameterName);
+  auto parameter = effect.scriptables.find_ref(parameterName);
   if (!parameter)
     return {};
   
@@ -664,7 +664,7 @@ std::optional<RenderEffectParameter> OpenGlRenderer::getEffectScriptableParamete
 }
 
 std::expected<void, StarException> OpenGlRenderer::setEffectTexture(String const& textureName, ImageView const& image) {
-  auto textureParameter = m_currentEffect->get().textures.maybeRef(textureName);
+  auto textureParameter = m_currentEffect->get().textures.find_ref(textureName);
   if (!textureParameter)
     return {};
   auto& parameter = textureParameter->get();
@@ -724,7 +724,7 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
       if (!*framebuffer) continue;
       auto textureName = input.getString("texture");
       if (!textureName) return std::unexpected(std::move(textureName.error()));
-      if (auto texture = effect.textures.maybeRef(*textureName)) {
+      if (auto texture = effect.textures.find_ref(*textureName)) {
         auto buffer = getGlFrameBuffer(**framebuffer);
         if (!buffer) return std::unexpected(std::move(buffer.error()));
         inputBuffers.emplace_back(*texture, *buffer);
@@ -1014,7 +1014,7 @@ std::expected<void, StarException> OpenGlRenderer::setScreenSize(Vec2U screenSiz
   GlTextureBindingGuard textureBinding;
   GlFramebufferBindingGuard framebufferBinding;
 
-  for (auto& frameBuffer : m_frameBuffers) {
+  for (auto&& frameBuffer : m_frameBuffers) {
     if (frameBuffer.second->overrideSize) {
       continue; // don't resize this one
     }
@@ -1069,8 +1069,8 @@ std::expected<void, StarException> OpenGlRenderer::setScreenSize(Vec2U screenSiz
 std::expected<void, StarException> OpenGlRenderer::startFrame() {
   if (m_scissorRect)
     glDisable(GL_SCISSOR_TEST);
-  
-  for (auto& frameBuffer : m_frameBuffers) {
+
+  for (auto&& frameBuffer : m_frameBuffers) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer.second->id);
     if (frameBuffer.second->clear)
       glClear(GL_COLOR_BUFFER_BIT);
@@ -1745,7 +1745,7 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
 }
 
 std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> OpenGlRenderer::getGlFrameBuffer(String const& id) {
-  if (auto framebuffer = m_frameBuffers.maybeRef(id))
+  if (auto framebuffer = m_frameBuffers.find_ref(id))
     return framebuffer->get();
   else
     return std::unexpected(RendererException::format("Frame buffer '{}' does not exist", id));

@@ -121,7 +121,7 @@ void TeamManager::playerDisconnected(Uuid const& playerUuid) {
   purgeInvitationsFrom(playerUuid);
 
   for (auto teamUuid : m_teams.keys()) {
-    auto& team = m_teams.maybeRef(teamUuid)->get();
+    auto& team = m_teams.find_ref(teamUuid)->get();
     if (team.members.contains(playerUuid))
       removeFromTeam(playerUuid, teamUuid);
   }
@@ -223,7 +223,7 @@ bool TeamManager::addToTeam(Uuid const& playerUuid, Uuid const& teamUuid) {
   if (!m_teams.contains(teamUuid))
     return false;
 
-  auto& team = m_teams.maybeRef(teamUuid)->get();
+  auto& team = m_teams.find_ref(teamUuid)->get();
 
   if (team.members.contains(playerUuid))
     return false;
@@ -253,7 +253,7 @@ bool TeamManager::removeFromTeam(Uuid const& playerUuid, Uuid const& teamUuid) {
   if (!m_teams.contains(teamUuid))
     return false;
 
-  auto& team = m_teams.maybeRef(teamUuid)->get();
+  auto& team = m_teams.find_ref(teamUuid)->get();
 
   if (!team.members.contains(playerUuid))
     return false;
@@ -297,8 +297,8 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
   JsonObject result;
   result["version"] = TeamManagerVersion;
   if (auto teamUuid = getTeam(playerUuid)) {
-    auto& team = m_teams.maybeRef(*teamUuid)->get();
-    auto& playerMem = team.members.maybeRef(playerUuid)->get();
+    auto& team = m_teams.find_ref(*teamUuid)->get();
+    auto& playerMem = team.members.find_ref(playerUuid)->get();
 
     result["teamUuid"] = teamUuid->hex();
     result["leader"] = team.leaderUuid.hex();
@@ -323,7 +323,7 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
         member["world"] = *world;
       }
       if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
-      auto warp = WarpModeNames->getRight(mem.warpMode);
+      auto warp = WarpModeNames->get_right(mem.warpMode);
       if (!warp) return std::unexpected(std::move(warp.error()));
       member["warpMode"] = warp->get();
       auto portrait = jsonFromList(mem.portrait, std::mem_fn(&Drawable::toJson));
@@ -359,8 +359,8 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
   }
 
   if (auto teamUuid = getTeam(playerUuid)) {
-    auto& team = m_teams.maybeRef(*teamUuid)->get();
-    auto& entry = team.members.maybeRef(playerUuid)->get();
+    auto& team = m_teams.find_ref(*teamUuid)->get();
+    auto& entry = team.members.find_ref(playerUuid)->get();
     auto hasName = arguments.contains("name");
     if (!hasName) return std::unexpected(std::move(hasName.error()));
     if (*hasName) {
@@ -390,7 +390,7 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
     auto warpText = arguments.getString("warpMode");
     if (!warpText) return std::unexpected(std::move(warpText.error()));
     if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
-    auto warp = WarpModeNames->getLeft(*warpText);
+    auto warp = WarpModeNames->get_left(*warpText);
     if (!warp) return std::unexpected(std::move(warp.error()));
     entry.warpMode = warp->get();
     auto hasWorld = arguments.contains("world");
@@ -456,7 +456,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
   }
 
   JsonArray invited;
-  for (auto& entry : m_connectedPlayers) {
+  for (auto&& entry : m_connectedPlayers) {
     auto matches = Text::stripEscapeCodes(entry.first).beginsWith(inviteeName, String::CaseInsensitive);
     if (!matches) return std::unexpected(std::move(matches.error()));
     if (!*matches) continue;
@@ -504,7 +504,7 @@ std::expected<Json, StarException> TeamManager::pollInvitation(Json const& argum
   expirePolledInvitations();
 
   if (m_invitations.contains(playerUuid)) {
-    auto invitation = m_invitations.take(playerUuid);
+    auto invitation = m_invitations.extract_value(playerUuid);
     if (!invitation) return std::unexpected(std::move(invitation.error()));
     auto invite = std::move(*invitation);
     m_polledInvitations.try_emplace(playerUuid, m_root.random()).first->second = PolledInvitation{invite.inviterUuid, std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now())};
@@ -590,7 +590,7 @@ std::expected<Json, StarException> TeamManager::removeFromTeam(Json const& argum
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != playerUuid) {
-      if (!m_teams.contains(teamUuid) || m_teams.maybeRef(teamUuid)->get().leaderUuid != callerUuid) {
+      if (!m_teams.contains(teamUuid) || m_teams.find_ref(teamUuid)->get().leaderUuid != callerUuid) {
         auto logged = m_root.logger().warn("TeamManager: Rejected removeFromTeam by non-leader {} targeting {}", callerUuid.hex(), playerUuid.hex());
         if (!logged) return std::unexpected(std::move(logged.error()));
         return Json("unauthorized");
@@ -619,7 +619,7 @@ std::expected<Json, StarException> TeamManager::makeLeader(Json const& arguments
   if (!m_teams.contains(teamUuid))
     return Json("noSuchTeam");
 
-  auto& team = m_teams.maybeRef(teamUuid)->get();
+  auto& team = m_teams.find_ref(teamUuid)->get();
 
   auto callerHexResult = arguments.optString("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));

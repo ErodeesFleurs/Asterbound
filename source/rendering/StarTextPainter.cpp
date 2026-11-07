@@ -95,14 +95,14 @@ std::expected<TextPositioning, StarException> TextPositioning::create(Json const
   auto horizontal = v.getString("horizontalAnchor", "left");
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
-  auto hAnchor = HorizontalAnchorNames->getLeft(*horizontal);
+  auto hAnchor = HorizontalAnchorNames->get_left(*horizontal);
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   result.hAnchor = hAnchor->get();
   auto vertical = v.getString("verticalAnchor", "top");
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
-  auto vAnchor = VerticalAnchorNames->getLeft(*vertical);
+  auto vAnchor = VerticalAnchorNames->get_left(*vertical);
   if (!vAnchor)
     return std::unexpected(std::move(vAnchor.error()));
   result.vAnchor = vAnchor->get();
@@ -122,10 +122,10 @@ std::expected<Json, StarException> TextPositioning::toJson() const {
     return std::unexpected(HorizontalAnchorNames.error());
   if (!VerticalAnchorNames)
     return std::unexpected(VerticalAnchorNames.error());
-  auto horizontal = HorizontalAnchorNames->getRight(hAnchor);
+  auto horizontal = HorizontalAnchorNames->get_right(hAnchor);
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
-  auto vertical = VerticalAnchorNames->getRight(vAnchor);
+  auto vertical = VerticalAnchorNames->get_right(vAnchor);
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   return JsonObject{

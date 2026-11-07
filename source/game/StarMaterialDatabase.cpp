@@ -390,7 +390,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         return std::unexpected(MaterialException(strf("Mod id {} does not fall in the valid range\n", mod.id)));
       if (database.containsMod(mod.id))
         return std::unexpected(MaterialException(strf("Duplicate mod id {} found for mod {}", mod.id, mod.name)));
-      if (database.m_modIndex.contains(mod.name) || database.m_metaModIndex.hasLeftValue(mod.name))
+      if (database.m_modIndex.contains(mod.name) || database.m_metaModIndex.contains_left(mod.name))
         return std::unexpected(MaterialException(strf("Duplicate mod name '{}' found", mod.name)));
       database.setMod(mod.id, mod);
       database.m_modIndex[mod.name] = mod.id;
@@ -513,7 +513,7 @@ std::expected<String, StarException> MaterialDatabase::materialCategory(Material
 
 StringList MaterialDatabase::modNames() const {
   StringList modNames = m_modIndex.keys();
-  modNames.appendAll(m_metaModIndex.leftValues());
+  modNames.appendAll(m_metaModIndex.left_values());
   return modNames;
 }
 
@@ -525,18 +525,20 @@ bool MaterialDatabase::isValidModId(ModId mod) const {
   if (isRealMod(mod))
     return mod < m_mods.size() && static_cast<bool>(m_mods[mod]);
   else
-    return m_metaModIndex.hasRightValue(mod);
+    return m_metaModIndex.contains_right(mod);
 }
 
 std::expected<ModId, StarException> MaterialDatabase::modId(String const& name) const {
-  if (auto id = m_metaModIndex.maybeRight(name)) return *id;
+  if (auto id = m_metaModIndex.maybe_right(name))
+    return *id;
   auto id = m_modIndex.get(name);
   if (!id) return std::unexpected(std::move(id.error()));
   return id->get();
 }
 
 std::expected<std::reference_wrapper<String const>, StarException> MaterialDatabase::modName(ModId id) const {
-  if (!isRealMod(id)) return m_metaModIndex.getLeft(id);
+  if (!isRealMod(id))
+    return m_metaModIndex.get_left(id);
   auto info = getModInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
   return std::cref(info->get().name);

@@ -459,7 +459,7 @@ std::expected<void, StarException> StatusController::addEphemeralEffect(Ephemera
 
 std::expected<void, StarException> StatusController::addEphemeralEffects(List<EphemeralStatusEffect> const& effectList, std::optional<EntityId> sourceEntityId) {
   for (auto const& effect : effectList) {
-    if (auto existingEffect = m_uniqueEffects.maybeRef(effect.uniqueEffect)) {
+    if (auto existingEffect = m_uniqueEffects.find_ref(effect.uniqueEffect)) {
       auto metadata = m_uniqueEffectMetadata.getNetElement(existingEffect->get().metadataId);
       if (!metadata) return std::unexpected(std::move(metadata.error()));
       if ((*metadata)->duration) {
@@ -483,7 +483,7 @@ std::expected<void, StarException> StatusController::addEphemeralEffects(List<Ep
 }
 
 std::expected<bool, StarException> StatusController::removeEphemeralEffect(UniqueStatusEffect const& effect) {
-  if (auto uniqueEffect = m_uniqueEffects.maybeRef(effect)) {
+  if (auto uniqueEffect = m_uniqueEffects.find_ref(effect)) {
     auto metadata = m_uniqueEffectMetadata.getNetElement(uniqueEffect->get().metadataId);
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     if ((*metadata)->duration) {
@@ -591,7 +591,7 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
   if (m_parentEntity->get().isMaster()) {
     if (auto result = initPrimaryScript(); !result) return std::unexpected(std::move(result.error()));
     for (auto& p : m_uniqueEffects.keys())
-      if (auto effect = m_uniqueEffects.maybeRef(p))
+      if (auto effect = m_uniqueEffects.find_ref(p))
         if (auto result = initUniqueEffectScript(effect->get()); !result) return std::unexpected(std::move(result.error()));
   }
 
@@ -602,7 +602,7 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
 std::expected<void, StarException> StatusController::uninit() {
   std::optional<StarException> error;
   for (auto const& key : m_uniqueEffects.keys()) {
-    if (auto effect = m_uniqueEffects.maybeRef(key)) {
+    if (auto effect = m_uniqueEffects.find_ref(key)) {
       auto result = uninitUniqueEffectScript(effect->get());
       if (!result && !error) error = std::move(result.error());
     }
@@ -942,10 +942,10 @@ std::expected<void, StarException> StatusController::updateAnimators(float dt) {
 
 std::expected<void, StarException> StatusController::updatePersistentUniqueEffects() {
   Set<UniqueStatusEffect> active;
-  for (auto& category : m_persistentEffects) {
+  for (auto&& category : m_persistentEffects) {
     for (auto it = category.second.uniqueEffects.begin(); it != category.second.uniqueEffects.end();) {
       auto const& name = *it++;
-      if (auto existing = m_uniqueEffects.maybeRef(name)) {
+      if (auto existing = m_uniqueEffects.find_ref(name)) {
         auto metadata = m_uniqueEffectMetadata.getNetElement(existing->get().metadataId);
         if (!metadata) return std::unexpected(std::move(metadata.error()));
         (*metadata)->duration.reset();

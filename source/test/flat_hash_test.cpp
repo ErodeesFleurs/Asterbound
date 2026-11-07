@@ -30,6 +30,229 @@ struct ParsedMapEntry {
 struct CollisionHash {
   std::size_t operator()(int) const { return 0; }
 };
+
+template <std::size_t Alignment> struct alignas(Alignment) FlatMoveOnly {
+  inline static int live_count = 0;
+  int id;
+  std::unique_ptr<int> ownership;
+
+  explicit FlatMoveOnly(int value) : id(value), ownership(std::make_unique<int>(value)) { ++live_count; }
+  FlatMoveOnly(FlatMoveOnly&& other) noexcept : id(other.id), ownership(std::move(other.ownership)) { ++live_count; }
+  FlatMoveOnly(FlatMoveOnly const&) = delete;
+  FlatMoveOnly& operator=(FlatMoveOnly const&) = delete;
+  FlatMoveOnly& operator=(FlatMoveOnly&&) = delete;
+  ~FlatMoveOnly() { --live_count; }
+};
+
+using FlatMoveKey = FlatMoveOnly<64>;
+using FlatMoveValue = FlatMoveOnly<128>;
+
+struct FlatWrapHash {
+  using is_transparent = void;
+  std::size_t operator()(int key) const { return 6 + key % 2; }
+  std::size_t operator()(FlatMoveKey const& key) const { return (*this)(key.id); }
+};
+
+struct FlatMoveEqual {
+  using is_transparent = void;
+  bool operator()(FlatMoveKey const& left, FlatMoveKey const& right) const { return left.id == right.id; }
+  bool operator()(FlatMoveKey const& left, int right) const { return left.id == right; }
+};
+
+struct FlatAllocatorState {
+  int outstanding = 0;
+  bool mismatched = false;
+};
+
+auto& flat_allocations() {
+  static std::unordered_map<void*, FlatAllocatorState*> allocations;
+  return allocations;
+}
+
+template <typename T> struct FlatTrackingAllocator {
+  using value_type = T;
+  using propagate_on_container_move_assignment = std::true_type;
+  FlatAllocatorState* state = nullptr;
+
+  FlatTrackingAllocator() = default;
+  explicit FlatTrackingAllocator(FlatAllocatorState& owner) : state(&owner) {}
+  template <typename U> FlatTrackingAllocator(FlatTrackingAllocator<U> const& other) : state(other.state) {}
+
+  T* allocate(std::size_t count) {
+    auto result = std::allocator<T>{}.allocate(count);
+    flat_allocations().emplace(result, state);
+    if (state)
+      ++state->outstanding;
+    return result;
+  }
+  void deallocate(T* memory, std::size_t count) {
+    auto found = flat_allocations().find(memory);
+    EXPECT_NE(found, flat_allocations().end());
+    if (found != flat_allocations().end()) {
+      if (auto owner = found->second) {
+        owner->mismatched |= owner != state;
+        --owner->outstanding;
+      }
+      flat_allocations().erase(found);
+    }
+    std::allocator<T>{}.deallocate(memory, count);
+  }
+  template <typename U> bool operator==(FlatTrackingAllocator<U> const& other) const { return state == other.state; }
+};
+
+struct FlatStatefulHash {
+  int salt;
+  explicit FlatStatefulHash(int value) : salt(value) {}
+  std::size_t operator()(int value) const { return std::hash<int>{}(value % 1000) ^ salt; }
+};
+
+struct FlatStatefulEqual {
+  int modulus;
+  explicit FlatStatefulEqual(int value) : modulus(value) {}
+  bool operator()(int left, int right) const { return left % modulus == right % modulus; }
+};
+}// namespace
+
+TEST(FlatHashMap, ProxyReferencesPreserveStructuredBindingsAndSnapshots) {
+  using MapType = FlatHashMap<int, int, CollisionHash>;
+  static_assert(std::forward_iterator<MapType::iterator>);
+  static_assert(std::forward_iterator<MapType::const_iterator>);
+  static_assert(std::ranges::forward_range<MapType>);
+  static_assert(std::ranges::forward_range<MapType const>);
+  static_assert(std::same_as<std::iter_value_t<MapType::iterator>, MapType::value_type>);
+  static_assert(std::same_as<std::iter_reference_t<MapType::iterator>, std::pair<int const&, int&>>);
+  static_assert(std::same_as<std::iter_reference_t<MapType::const_iterator>, std::pair<int const&, int const&>>);
+  static_assert(!std::is_assignable_v<decltype((std::declval<MapType::reference>().first)), int>);
+
+  MapType values{{1, 10}, {2, 20}, {3, 30}};
+  auto first = values.begin();
+  auto position = first;
+  ++position;
+  EXPECT_EQ(first->second, 10);
+  for (auto&& [key, value] : values)
+    value += key;
+  auto borrowed = *values.find(2);
+  borrowed.second = 99;
+  EXPECT_EQ(values.find(2)->second, 99);
+  EXPECT_EQ(std::as_const(values).find(2)->second, 99);
+
+  std::vector<MapType::value_type> snapshot;
+  std::ranges::copy(std::as_const(values), std::back_inserter(snapshot));
+  std::vector<int> keys;
+  std::ranges::copy(values | std::views::keys, std::back_inserter(keys));
+  std::vector<int> mapped;
+  std::ranges::copy(std::as_const(values) | std::views::values, std::back_inserter(mapped));
+  values.clear();
+  ASSERT_EQ(snapshot.size(), 3u);
+  EXPECT_EQ(snapshot[0].second, 11);
+  EXPECT_EQ(snapshot[1].second, 99);
+  EXPECT_EQ(snapshot[2].second, 33);
+  EXPECT_EQ(keys, (std::vector<int>{1, 2, 3}));
+  EXPECT_EQ(mapped, (std::vector<int>{11, 99, 33}));
+}
+
+TEST(FlatHashMap, NonassignableAlignedOwnershipSurvivesDisplacementRehashAndErase) {
+  using MapType = FlatHashMap<FlatMoveKey, FlatMoveValue, FlatWrapHash, FlatMoveEqual>;
+  static_assert(std::forward_iterator<MapType::iterator>);
+  static_assert(std::forward_iterator<MapType::const_iterator>);
+  EXPECT_EQ(FlatMoveKey::live_count, 0);
+  EXPECT_EQ(FlatMoveValue::live_count, 0);
+  {
+    MapType values;
+    for (int key : {1, 0, 2, 3})
+      ASSERT_TRUE(values.try_emplace(FlatMoveKey(key), key * 10).second);
+    values.reserve(100);
+    for (int key = 4; key < 40; ++key)
+      ASSERT_TRUE(values.try_emplace(FlatMoveKey(key), key * 10).second);
+    FlatMoveKey duplicate_key(2);
+    FlatMoveValue duplicate_value(999);
+    auto duplicate = values.try_emplace(std::move(duplicate_key), std::move(duplicate_value));
+    EXPECT_FALSE(duplicate.second);
+    EXPECT_TRUE(duplicate_key.ownership);
+    EXPECT_TRUE(duplicate_value.ownership);
+    EXPECT_EQ(duplicate.first->second.id, 20);
+    for (auto&& [key, value] : values) {
+      EXPECT_EQ(reinterpret_cast<std::uintptr_t>(std::addressof(key)) % alignof(FlatMoveKey), 0u);
+      EXPECT_EQ(reinterpret_cast<std::uintptr_t>(std::addressof(value)) % alignof(FlatMoveValue), 0u);
+      ASSERT_TRUE(key.ownership);
+      ASSERT_TRUE(value.ownership);
+      EXPECT_EQ(*key.ownership, key.id);
+      EXPECT_EQ(*value.ownership, key.id * 10);
+    }
+    for (int key = 0; key < 40; key += 2) {
+      auto found = values.find(key);
+      ASSERT_NE(found, values.end());
+      values.erase(found);
+    }
+    for (int key = 0; key < 40; ++key)
+      EXPECT_EQ(values.find(key) != values.end(), key % 2 != 0);
+    MapType moved(std::move(values));
+    EXPECT_TRUE(values.empty());
+    EXPECT_EQ(values.begin(), values.end());
+    EXPECT_EQ(moved.size(), 20u);
+    moved.clear();
+    EXPECT_EQ(FlatMoveKey::live_count, 1);
+    EXPECT_EQ(FlatMoveValue::live_count, 1);
+  }
+  EXPECT_EQ(FlatMoveKey::live_count, 0);
+  EXPECT_EQ(FlatMoveValue::live_count, 0);
+}
+
+TEST(FlatHashSet, NonassignableAlignedKeysSurviveCollisionRelocation) {
+  EXPECT_EQ(FlatMoveKey::live_count, 0);
+  {
+    FlatHashSet<FlatMoveKey, FlatWrapHash, FlatMoveEqual> values;
+    for (int key : {1, 0, 2, 3})
+      ASSERT_TRUE(values.insert(FlatMoveKey(key)).second);
+    values.erase(values.find(0));
+    values.reserve(100);
+    for (int key : {1, 2, 3}) {
+      auto found = values.find(key);
+      ASSERT_NE(found, values.end());
+      ASSERT_TRUE(found->ownership);
+      EXPECT_EQ(*found->ownership, key);
+    }
+    values.clear();
+  }
+  EXPECT_EQ(FlatMoveKey::live_count, 0);
+}
+
+TEST(FlatHashMap, ReboundAllocatorsAndFunctorStateSurviveCopiesAndMoves) {
+  FlatAllocatorState first_state;
+  FlatAllocatorState second_state;
+  using Allocator = FlatTrackingAllocator<int>;
+  using MapType = FlatHashMap<int, int, FlatStatefulHash, FlatStatefulEqual, Allocator>;
+  {
+    MapType original(0, FlatStatefulHash(17), FlatStatefulEqual(1000), Allocator(first_state));
+    for (int key = 0; key < 40; ++key)
+      original.try_emplace(key, key * 10);
+    original.reserve(200);
+    MapType copy(original, Allocator(second_state));
+    EXPECT_EQ(copy.get_allocator().state, &second_state);
+    EXPECT_EQ(copy.hash_function().salt, 17);
+    EXPECT_EQ(copy.key_eq().modulus, 1000);
+    EXPECT_EQ(copy.find(1003)->second, 30);
+    copy = copy;
+    EXPECT_EQ(copy.size(), 40u);
+    MapType moved(std::move(copy), Allocator(first_state));
+    EXPECT_EQ(moved.get_allocator().state, &first_state);
+    EXPECT_TRUE(copy.empty());
+    EXPECT_EQ(copy.begin(), copy.end());
+    EXPECT_EQ(moved.find(1003)->second, 30);
+    MapType assigned(0, FlatStatefulHash(9), FlatStatefulEqual(1000), Allocator(second_state));
+    assigned = original;
+    EXPECT_EQ(assigned.get_allocator().state, &second_state);
+    EXPECT_EQ(assigned.hash_function().salt, 17);
+    EXPECT_EQ(assigned.find(1003)->second, 30);
+    assigned = std::move(moved);
+    EXPECT_EQ(assigned.get_allocator().state, &first_state);
+    EXPECT_TRUE(moved.empty());
+    EXPECT_EQ(assigned.find(1003)->second, 30);
+  }
+  EXPECT_EQ(first_state.outstanding, 0);
+  EXPECT_EQ(second_state.outstanding, 0);
+  EXPECT_FALSE(first_state.mismatched);
+  EXPECT_FALSE(second_state.mismatched);
 }
 
 TEST(FlatHashMap, SinglePassInputPreservesEveryElement) {
@@ -53,11 +276,11 @@ TEST(FlatHashMap, RemoveAllValuesAcrossCollisionShift) {
   HashMap<int, int, CollisionHash> values;
   for (int key = 0; key < 40; ++key)
     values.set(key, key % 2);
-  EXPECT_TRUE(values.removeValues(0));
+  EXPECT_TRUE(values.erase_values(0));
   EXPECT_EQ(values.size(), 20u);
   for (int key = 0; key < 40; ++key)
     EXPECT_EQ(values.contains(key), key % 2 != 0);
-  EXPECT_TRUE(values.removeValues(1));
+  EXPECT_TRUE(values.erase_values(1));
   EXPECT_TRUE(values.empty());
 }
 
@@ -98,7 +321,7 @@ TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {
   auto stableValue = stable.get(query);
   ASSERT_TRUE(stableValue);
   EXPECT_EQ(stableValue->get(), 8);
-  values.maybeRef(query)->get() = 9;
+  values.find_ref(query)->get() = 9;
   EXPECT_EQ(values.value(query), 9);
   auto maybeValue = values.maybe(query);
   ASSERT_TRUE(maybeValue);
@@ -442,27 +665,40 @@ void expectMapOwnershipContract() {
   auto const& constValues = values;
   static_assert(std::same_as<decltype(constValues.get(1)), std::expected<std::reference_wrapper<int const>, StarException>>);
   static_assert(std::same_as<decltype(values.get(1)), std::expected<std::reference_wrapper<int>, StarException>>);
+  using Container = MapType<int, int>;
+  static_assert(!requires(Container&& owner) { std::move(owner).get(1); });
+  static_assert(!requires(Container const&& owner) { std::move(owner).get(1); });
+  static_assert(!requires(Container&& owner) { std::move(owner).at(1); });
+  static_assert(!requires(Container&& owner) { std::move(owner).find(1); });
+  static_assert(!requires(Container&& owner) { std::move(owner).find_ref(1); });
+  static_assert(!requires(Container&& owner) { std::move(owner).key_view(); });
+  static_assert(!requires(Container&& owner) { std::move(owner).value_view(); });
   auto copied = values.maybe(1);
   auto keys = values.keys();
   auto snapshot = values.values();
   auto pairs = values.pairs();
-  for (auto& value : values.valueView())
+  for (auto& value : values.value_view())
     ++value;
   EXPECT_EQ(borrowed->get(), 11);
   ASSERT_TRUE(copied);
   EXPECT_EQ(*copied, 10);
   EXPECT_EQ(std::ranges::count(snapshot, 10), 1);
   EXPECT_EQ(std::ranges::count(pairs, 10, &std::pair<int, int>::second), 1);
-  EXPECT_EQ(std::ranges::count(values.keyView(), 1), 1);
+  EXPECT_EQ(std::ranges::count(values.key_view(), 1), 1);
   EXPECT_EQ(keys.size(), 2u);
   EXPECT_EQ(values.value(9, 42), 42);
   EXPECT_FALSE(values.get(9));
   EXPECT_FALSE(values.at(9));
-  EXPECT_FALSE(values.take(9));
+  EXPECT_FALSE(values.extract_value(9));
   EXPECT_FALSE(values.maybe(9));
-  EXPECT_FALSE(values.maybeTake(9));
+  EXPECT_FALSE(values.try_extract_value(9));
   EXPECT_FALSE(values.add(1, 90));
   EXPECT_EQ(values.value(1), 11);
+  EXPECT_TRUE(values.contains_value(11));
+  EXPECT_FALSE(values.contains_value(99));
+  auto key = values.key_of(11);
+  ASSERT_TRUE(key);
+  EXPECT_EQ(*key, 1);
 
   MapType<int, int> incoming{{1, 50}, {3, 30}};
   EXPECT_FALSE(values.merge(incoming));
@@ -470,7 +706,7 @@ void expectMapOwnershipContract() {
   EXPECT_EQ(values.value(3), 30);
   EXPECT_FALSE(values.merge(incoming, true));
   EXPECT_EQ(values.value(1), 50);
-  auto taken = values.take(1);
+  auto taken = values.extract_value(1);
   ASSERT_TRUE(taken);
   EXPECT_EQ(*taken, 50);
   EXPECT_FALSE(values.contains(1));
@@ -481,7 +717,7 @@ void expectMapOwnershipContract() {
   EXPECT_FALSE(owners.try_emplace(1, std::move(candidate)).second);
   ASSERT_TRUE(candidate);
   EXPECT_EQ(*candidate, 8);
-  auto extracted = owners.take(1);
+  auto extracted = owners.extract_value(1);
   ASSERT_TRUE(extracted);
   ASSERT_TRUE(*extracted);
   EXPECT_EQ(**extracted, 7);
@@ -494,6 +730,88 @@ void expectMapOwnershipContract() {
   EXPECT_EQ(std::format("{}", printed), stream.str());
 }
 
+template <template <typename...> class MapType> void expect_map_reference_slots() {
+  int first = 10;
+  int second = 20;
+  using Slot = std::reference_wrapper<int>;
+  MapType<int, Slot> values{{1, std::ref(first)}};
+  auto slot = values.get(1);
+  auto optional_slot = values.find_ref(1);
+  ASSERT_TRUE(slot);
+  ASSERT_TRUE(optional_slot);
+  static_assert(std::same_as<decltype(slot), std::expected<std::reference_wrapper<Slot>, StarException>>);
+  auto const& constant = values;
+  static_assert(
+    std::same_as<decltype(constant.get(1)), std::expected<std::reference_wrapper<Slot const>, StarException>>);
+  static_assert(std::same_as<decltype(constant.find_ref(1)), std::optional<std::reference_wrapper<Slot const>>>);
+  EXPECT_EQ(std::addressof(slot->get()), std::addressof(optional_slot->get()));
+  auto snapshot = values.values();
+  optional_slot->get() = std::ref(second);
+  EXPECT_EQ(std::addressof(slot->get().get()), std::addressof(second));
+  EXPECT_EQ(std::addressof(snapshot[0].get()), std::addressof(first));
+  values.clear();
+  EXPECT_EQ(snapshot[0].get(), 10);
+}
+
+template <typename T> struct CompositionAllocator {
+  using value_type = T;
+  int identity = 0;
+  CompositionAllocator() = default;
+  explicit CompositionAllocator(int identity) : identity(identity) {}
+  template <typename U> CompositionAllocator(CompositionAllocator<U> const& other) : identity(other.identity) {}
+  T* allocate(std::size_t count) { return std::allocator<T>{}.allocate(count); }
+  void deallocate(T* pointer, std::size_t count) { std::allocator<T>{}.deallocate(pointer, count); }
+  template <typename U> bool operator==(CompositionAllocator<U> const& other) const {
+    return identity == other.identity;
+  }
+};
+
+struct CompositionCompare {
+  bool descending = false;
+  bool operator()(int left, int right) const { return descending ? left > right : left < right; }
+};
+struct CompositionHash {
+  int salt = 0;
+  std::size_t operator()(int key) const { return hash<int>{}(key) ^ hash<int>{}(salt); }
+};
+struct CompositionEqual {
+  int identity = 0;
+  bool operator()(int left, int right) const { return left == right; }
+};
+
+template <typename Container> void expect_map_allocator_construction(Container const& original) {
+  using Allocator = typename Container::allocator_type;
+  Container copied(original, Allocator(2));
+  EXPECT_EQ(copied, original);
+  EXPECT_EQ(copied.get_allocator().identity, 2);
+  Container moved(std::move(copied), Allocator(3));
+  EXPECT_EQ(moved, original);
+  EXPECT_EQ(moved.get_allocator().identity, 3);
+  if constexpr (requires { moved.key_comp(); }) {
+    EXPECT_TRUE(moved.key_comp().descending);
+    EXPECT_EQ(moved.begin()->first, 2);
+  } else {
+    EXPECT_EQ(moved.hash_function().salt, 91);
+    EXPECT_EQ(moved.key_eq().identity, 7);
+  }
+  moved = {{4, 40}};
+  EXPECT_EQ(moved.size(), 1u);
+  EXPECT_EQ(moved.value(4), 40);
+  EXPECT_EQ(moved.get_allocator().identity, 3);
+  Container allocated({{5, 50}}, Allocator(4));
+  EXPECT_EQ(allocated.value(5), 50);
+  EXPECT_EQ(allocated.get_allocator().identity, 4);
+  if constexpr (requires { original.key_comp(); }) {
+    Container ranged(original.begin(), original.end(), original.key_comp(), Allocator(5));
+    EXPECT_EQ(ranged, original);
+    EXPECT_EQ(ranged.get_allocator().identity, 5);
+  } else {
+    Container ranged(original.begin(), original.end(), 0, original.hash_function(), original.key_eq(), Allocator(5));
+    EXPECT_EQ(ranged, original);
+    EXPECT_EQ(ranged.get_allocator().identity, 5);
+  }
+}
+
 template <typename Container>
 void expectSetAlgebraContract() {
   Container values{1, 2, 3, 4};
@@ -504,7 +822,7 @@ void expectSetAlgebraContract() {
   EXPECT_TRUE(values.hasIntersection(other));
   EXPECT_FALSE(values.hasIntersection(Container{9}));
   auto snapshot = values.values();
-  EXPECT_EQ(std::ranges::distance(values.valueView()), 4);
+  EXPECT_EQ(std::ranges::distance(values.value_view()), 4);
   EXPECT_FALSE(values.add(1));
   EXPECT_TRUE(values.remove(1));
   EXPECT_EQ(snapshot.size(), 4u);
@@ -600,13 +918,31 @@ TEST(MapComposition, OwnsStorageAndSeparatesBorrowedLookupFromSnapshots) {
   expectMapOwnershipContract<StableHashMap>();
 }
 
+TEST(MapComposition, BorrowingReferenceWrappersKeepsSlotIdentity) {
+  expect_map_reference_slots<Map>();
+  expect_map_reference_slots<HashMap>();
+  expect_map_reference_slots<StableHashMap>();
+}
+
+TEST(MapComposition, ConstructorsPreserveAllocatorAndComparisonPolicies) {
+  using Allocator = CompositionAllocator<std::pair<int const, int>>;
+  Map<int, int, CompositionCompare, Allocator> ordered({{1, 10}, {2, 20}}, CompositionCompare{true}, Allocator(1));
+  HashMap<int, int, CompositionHash, CompositionEqual, Allocator> flat({{1, 10}, {2, 20}}, 8, CompositionHash{91},
+                                                                       CompositionEqual{7}, Allocator(1));
+  StableHashMap<int, int, CompositionHash, CompositionEqual, Allocator> stable(
+    {{1, 10}, {2, 20}}, 8, CompositionHash{91}, CompositionEqual{7}, Allocator(1));
+  expect_map_allocator_construction(ordered);
+  expect_map_allocator_construction(flat);
+  expect_map_allocator_construction(stable);
+}
+
 TEST(MapComposition, StableStorageKeepsBorrowedValuesAcrossRehash) {
   StableHashMap<int, int> values{{1, 10}};
-  auto borrowed = values.maybeRef(1);
+  auto borrowed = values.find_ref(1);
   for (int key = 2; key < 200; ++key)
     values.set(key, key);
   values.reserve(1000);
-  EXPECT_EQ(std::addressof(values.maybeRef(1)->get()), std::addressof(borrowed->get()));
+  EXPECT_EQ(std::addressof(values.find_ref(1)->get()), std::addressof(borrowed->get()));
   EXPECT_EQ(borrowed->get(), 10);
 }
 

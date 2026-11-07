@@ -59,7 +59,7 @@ std::expected<NodeOutput, StarException> jsonToNodeOutput(Json const& json) {
   return NodeOutput{*type, {*key, ephemeral->value_or(false)}};
 }
 std::expected<void, StarException> applyTreeParameters(StringMap<NodeParameter>& parameters, StringMap<NodeParameterValue> const& treeParameters) {
-  for (auto& p : parameters) {
+  for (auto&& p : parameters) {
     auto value = replaceBehaviorTag(p.second.second, treeParameters);
     if (!value) return std::unexpected(std::move(value.error()));
     p.second.second = std::move(*value);
@@ -195,7 +195,7 @@ std::expected<void, StarException> BehaviorDatabase::loadTree(String const& name
   if (!config) return std::unexpected(std::move(config.error()));
   auto tree = buildTree(*config, {});
   if (!tree) {
-    if (auto path = m_configPaths.maybeRef(name))
+    if (auto path = m_configPaths.find_ref(name))
       return std::unexpected(m_assets->withAssetContext(std::move(tree.error()), path->get(), "Building behavior tree"));
     return std::unexpected(std::move(tree.error()));
   }
@@ -289,7 +289,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!moduleConfig) return std::unexpected(std::move(moduleConfig.error()));
     auto module = buildTree(*moduleConfig, parameters);
     if (!module) {
-      if (auto path = m_configPaths.maybeRef(*name))
+      if (auto path = m_configPaths.find_ref(*name))
         return std::unexpected(m_assets->withAssetContext(std::move(module.error()), path->get(), "Building behavior tree"));
       return std::unexpected(std::move(module.error()));
     }
@@ -300,7 +300,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
   auto defaults = m_nodeParameters.get(*name);
   if (!defaults) return std::unexpected(std::move(defaults.error()));
   auto parameters = defaults->get();
-  for (auto& p : parameters) {
+  for (auto&& p : parameters) {
     if (auto configured = config->maybe(p.first)) {
       auto value = nodeParameterValueFromJson(*configured);
       if (!value) return std::unexpected(std::move(value.error()));
@@ -317,7 +317,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!defaults) return std::unexpected(std::move(defaults.error()));
     auto output = defaults->get();
     Json outputConfig(*outputs);
-    for (auto& p : output) {
+    for (auto&& p : output) {
       auto configured = outputConfig.optString(p.first);
       if (!configured) return std::unexpected(std::move(configured.error()));
       auto replacement = replaceOutputBehaviorTag(*configured ? *configured : p.second.second.first, treeParameters);

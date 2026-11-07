@@ -64,15 +64,15 @@ public:
   void clear() { m_storage.clear(); }
   void swap(Set& other) noexcept(std::is_nothrow_swappable_v<Storage>) { std::swap(m_storage, other.m_storage); }
 
-  // values() is an owning snapshot. valueView() borrows, with storage invalidation rules.
+  // values() is an owning snapshot. value_view() borrows, with storage invalidation rules.
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    std::ranges::copy(valueView(), std::back_inserter(result));
+    std::ranges::copy(value_view(), std::back_inserter(result));
     return result;
   }
-  auto valueView() const& { return std::ranges::subrange(begin(), end()); }
-  auto valueView() const&& = delete;
+  auto value_view() const& { return std::ranges::subrange(begin(), end()); }
+  auto value_view() const&& = delete;
   template <typename LookupKey = key_type>
     requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
   iterator find(LookupKey const& key) { return m_storage.find(key); }
@@ -253,15 +253,15 @@ public:
   void clear() { m_storage.clear(); }
   void swap(HashSet& other) noexcept(std::is_nothrow_swappable_v<Storage>) { std::swap(m_storage, other.m_storage); }
 
-  // values() is an owning snapshot. valueView() borrows, with storage invalidation rules.
+  // values() is an owning snapshot. value_view() borrows, with storage invalidation rules.
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    std::ranges::copy(valueView(), std::back_inserter(result));
+    std::ranges::copy(value_view(), std::back_inserter(result));
     return result;
   }
-  auto valueView() const& { return std::ranges::subrange(begin(), end()); }
-  auto valueView() const&& = delete;
+  auto value_view() const& { return std::ranges::subrange(begin(), end()); }
+  auto value_view() const&& = delete;
   template <typename LookupKey = key_type>
     requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
   iterator find(LookupKey const& key) { return m_storage.find(key); }
@@ -428,15 +428,15 @@ public:
   void clear() { m_storage.clear(); }
   void swap(StableHashSet& other) noexcept(std::is_nothrow_swappable_v<Storage>) { std::swap(m_storage, other.m_storage); }
 
-  // values() is an owning snapshot. valueView() borrows, with storage invalidation rules.
+  // values() is an owning snapshot. value_view() borrows, with storage invalidation rules.
   List<value_type> values() const {
     List<value_type> result;
     result.reserve(size());
-    std::ranges::copy(valueView(), std::back_inserter(result));
+    std::ranges::copy(value_view(), std::back_inserter(result));
     return result;
   }
-  auto valueView() const& { return std::ranges::subrange(begin(), end()); }
-  auto valueView() const&& = delete;
+  auto value_view() const& { return std::ranges::subrange(begin(), end()); }
+  auto value_view() const&& = delete;
   template <typename LookupKey = key_type>
     requires requires(Storage& storage, LookupKey const& key) { storage.find(key); }
   iterator find(LookupKey const& key) { return m_storage.find(key); }

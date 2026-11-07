@@ -285,7 +285,7 @@ FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(InputIt first, InputIt la
 
 template <typename Key, typename Hash, typename Equals, typename Allocator>
 FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet const& other)
-  : FlatHashSet(other, other.m_table.getAllocator()) {}
+    : FlatHashSet(other, other.m_table.get_allocator()) {}
 
 template <typename Key, typename Hash, typename Equals, typename Allocator>
 FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet const& other, allocator_type const& alloc)
@@ -295,7 +295,7 @@ FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet const& other,
 
 template <typename Key, typename Hash, typename Equals, typename Allocator>
 FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet&& other)
-  : FlatHashSet(std::move(other), other.m_table.getAllocator()) {}
+    : FlatHashSet(std::move(other), other.m_table.get_allocator()) {}
 
 template <typename Key, typename Hash, typename Equals, typename Allocator>
 FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet&& other, allocator_type const& alloc)

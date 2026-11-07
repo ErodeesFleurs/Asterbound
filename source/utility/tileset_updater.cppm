@@ -66,11 +66,10 @@ private:
 
   // Update existing and insert new tile definitions in the tileProperties and
   // tileImages objects.
-  [[nodiscard]] std::expected<StringSet, StarException> updateTiles(JsonObject& tileProperties,
-      JsonObject& tileImages,
-      StringMap<std::size_t> const& existingTiles,
-      std::size_t& nextId,
-      String const& tilesetPath) const;
+  [[nodiscard]] std::expected<StringSet, StarException> updateTiles(JsonObject& tileProperties, JsonObject& tileImages,
+                                                                    StringMap<std::size_t> const& existingTiles,
+                                                                    std::size_t& next_id,
+                                                                    String const& tilesetPath) const;
 
   // Mark the given tiles as 'invalid' so they can't be used. (Actually removing
   // them from the tileset would cause the tile indices to change and break

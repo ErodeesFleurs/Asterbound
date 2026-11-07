@@ -77,7 +77,7 @@ std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceDa
   auto key = kind.toLower();
   if (!key)
     return std::unexpected(std::move(key.error()));
-  if (auto config = m_sourceConfigs.maybeRef(*key))
+  if (auto config = m_sourceConfigs.find_ref(*key))
     return config->get();
   return std::unexpected(StarException(strf("Unknown effect source definition with kind '{}'.", kind)));
 }

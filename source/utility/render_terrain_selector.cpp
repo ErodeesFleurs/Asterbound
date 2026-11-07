@@ -45,7 +45,7 @@ using namespace Star;
 template <typename T>
 [[nodiscard]]
 static std::expected<T, StarException> numericOption(OptionParser::Options const& options, String const& name, T fallback) {
-  auto values = options.parameters.maybeRef(name);
+  auto values = options.parameters.find_ref(name);
   if (!values || values->get().empty())
     return fallback;
   return lexicalCast<T>(values->get()[0]);
@@ -119,11 +119,11 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   if (!requestedScale)
     return std::unexpected(std::move(requestedScale.error()));
   float scale = *requestedScale;
-  auto scaleValues = options.parameters.maybeRef("scale");
+  auto scaleValues = options.parameters.find_ref("scale");
   bool autoScale = !scaleValues || scaleValues->get().empty();
 
   String mode = "heatmap";
-  if (auto modeValues = options.parameters.maybeRef("mode"); modeValues && !modeValues->get().empty())
+  if (auto modeValues = options.parameters.find_ref("mode"); modeValues && !modeValues->get().empty())
     mode = modeValues->get()[0];
 
   auto selectorParameters = TerrainSelectorParameters::create(JsonObject{

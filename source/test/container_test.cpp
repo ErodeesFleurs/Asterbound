@@ -7,6 +7,11 @@ import star.string;
 import star.static_vector;
 import star.map;
 import star.optional;
+import star.id_map;
+import star.bi_map;
+import star.data_stream;
+import star.data_stream_devices;
+import star.byte_array;
 
 #include "gtest/gtest.h"
 
@@ -290,7 +295,7 @@ TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {
   ASSERT_TRUE(checked);
   checked->get() = std::ref(original);
   EXPECT_EQ(entries.begin()->second.get(), 10);
-  auto nullable = entries.maybeRef(1);
+  auto nullable = entries.find_ref(1);
   ASSERT_TRUE(nullable);
   nullable->get() = std::ref(replacement);
   replacement = 21;
@@ -298,12 +303,12 @@ TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {
   auto observed = constEntries.at(1);
   ASSERT_TRUE(observed);
   EXPECT_EQ(observed->get().get(), 21);
-  auto nullableObserved = constEntries.maybeRef(1);
+  auto nullableObserved = constEntries.find_ref(1);
   ASSERT_TRUE(nullableObserved);
   EXPECT_EQ(nullableObserved->get().get(), 21);
   EXPECT_EQ(original, 10);
-  EXPECT_FALSE(entries.maybeRef(2));
-  EXPECT_FALSE(constEntries.maybeRef(2));
+  EXPECT_FALSE(entries.find_ref(2));
+  EXPECT_FALSE(constEntries.find_ref(2));
   auto missing = entries.get(2);
   ASSERT_FALSE(missing);
   EXPECT_TRUE(missing.error().is<MapException>());
@@ -340,4 +345,316 @@ TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {
   optional.reset();
   EXPECT_FALSE(optionalRef(optional));
   EXPECT_FALSE(optionalRef(constOptional));
+}
+
+TEST(IdMapTest, InclusiveNarrowRangesExhaustAndRecycleWithoutNarrowing) {
+  auto check = []<typename Id, template <typename, typename> typename Container>() {
+    Container<Id, int> map;
+    for (int value = std::numeric_limits<Id>::lowest(); value <= std::numeric_limits<Id>::max(); ++value) {
+      auto added = map.add(value);
+      ASSERT_TRUE(added);
+      EXPECT_EQ(*added, static_cast<Id>(value));
+    }
+    auto full = map.next_id();
+    ASSERT_FALSE(full);
+    EXPECT_TRUE(full.error().template is<IdMapException>());
+    EXPECT_TRUE(map.remove(static_cast<Id>(0)));
+    auto recycled = map.add(999);
+    ASSERT_TRUE(recycled);
+    EXPECT_EQ(*recycled, static_cast<Id>(0));
+    EXPECT_FALSE(map.add(1000));
+    map.clear();
+    EXPECT_TRUE(map.empty());
+    auto reset = map.next_id();
+    ASSERT_TRUE(reset);
+    EXPECT_EQ(*reset, std::numeric_limits<Id>::lowest());
+  };
+  check.template operator()<std::uint8_t, IdMap>();
+  check.template operator()<std::int8_t, IdMap>();
+  check.template operator()<std::uint8_t, IdHashMap>();
+  check.template operator()<std::int8_t, IdHashMap>();
+}
+
+TEST(IdMapTest, ExplicitIdsOutsideRangeRemainValidAndDoNotConsumeCursor) {
+  auto created = IdMap<int, int>::create(1, 2);
+  ASSERT_TRUE(created);
+  auto& map = *created;
+  ASSERT_TRUE(map.add(-1, 10));
+  ASSERT_TRUE(map.add(8, 20));
+  ASSERT_TRUE(map.add(9, 30));
+  auto duplicate = map.add(8, 99);
+  ASSERT_FALSE(duplicate);
+  EXPECT_TRUE(duplicate.error().is<IdMapException>());
+  EXPECT_EQ(map.value(8), 20);
+  auto first = map.add(40);
+  auto second = map.add(50);
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  EXPECT_EQ(*first, 1);
+  EXPECT_EQ(*second, 2);
+  EXPECT_FALSE(map.next_id());
+  EXPECT_EQ(map.size(), 5u);
+  map.clear();
+  auto cursor = map.next_id();
+  auto advanced = map.next_id();
+  ASSERT_TRUE(cursor);
+  ASSERT_TRUE(advanced);
+  EXPECT_EQ(*cursor, 1);
+  EXPECT_EQ(*advanced, 2);
+  EXPECT_FALSE((IdMap<int, int>::create(2, 2)));
+  EXPECT_FALSE((IdMap<int, int>::create(3, 2)));
+}
+
+TEST(IdMapTest, FullWidthSignedAndUnsignedEndpointsWrapSafely) {
+  auto check = []<typename Id>() {
+    constexpr auto min_id = std::numeric_limits<Id>::lowest();
+    constexpr auto max_id = std::numeric_limits<Id>::max();
+    IdMap<Id, std::uint8_t> map;
+    auto first = map.next_id();
+    ASSERT_TRUE(first);
+    EXPECT_EQ(*first, min_id);
+    auto advanced = map.next_id();
+    ASSERT_TRUE(advanced);
+    EXPECT_EQ(*advanced, min_id + 1);
+
+    DataStreamBuffer stream;
+    Map<Id, std::uint8_t> entries{{min_id, 7}};
+    ASSERT_TRUE(stream.writeMapContainer(entries));
+    ASSERT_TRUE(stream.write(min_id));
+    ASSERT_TRUE(stream.write(max_id));
+    ASSERT_TRUE(stream.write(max_id));
+    ASSERT_TRUE(stream.write<std::uint8_t>(0xa5));
+    ASSERT_TRUE(stream.seek(0));
+    ASSERT_TRUE(stream >> map);
+    auto sentinel = stream.read<std::uint8_t>();
+    ASSERT_TRUE(sentinel);
+    EXPECT_EQ(*sentinel, 0xa5);
+    auto last = map.add(8);
+    ASSERT_TRUE(last);
+    EXPECT_EQ(*last, max_id);
+    auto wrapped = map.add(9);
+    ASSERT_TRUE(wrapped);
+    EXPECT_EQ(*wrapped, min_id + 1);
+  };
+  check.template operator()<std::int64_t>();
+  check.template operator()<std::uint64_t>();
+}
+
+TEST(IdMapTest, WireOrderAndLegacyEntriesPreserveFollowingSentinel) {
+  auto created = IdMap<std::uint8_t, std::uint8_t>::create(1, 3);
+  ASSERT_TRUE(created);
+  ASSERT_TRUE(created->add(9, 0x99));
+  ASSERT_TRUE(created->add(0x11));
+  DataStreamBuffer stream;
+  ASSERT_TRUE(stream << *created);
+  ASSERT_TRUE(stream.write<std::uint8_t>(0xa5));
+  EXPECT_EQ(stream.data(), ByteArray({"\x02\x01\x11\x09\x99\x01\x03\x02\xa5", 9}));
+  ASSERT_TRUE(stream.seek(0));
+  IdMap<std::uint8_t, std::uint8_t> decoded;
+  ASSERT_TRUE(stream >> decoded);
+  EXPECT_EQ(decoded, *created);
+  auto next = decoded.add(0x22);
+  ASSERT_TRUE(next);
+  EXPECT_EQ(*next, 2);
+  auto sentinel = stream.read<std::uint8_t>();
+  ASSERT_TRUE(sentinel);
+  EXPECT_EQ(*sentinel, 0xa5);
+
+  DataStreamBuffer duplicates(ByteArray({"\x02\x09\x11\x09\x22\x01\x03\x03\xa5", 9}));
+  ASSERT_TRUE(duplicates >> decoded);
+  EXPECT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded.value(9), 0x11);
+  auto legacy_cursor = decoded.next_id();
+  ASSERT_TRUE(legacy_cursor);
+  EXPECT_EQ(*legacy_cursor, 3);
+  auto duplicate_sentinel = duplicates.read<std::uint8_t>();
+  ASSERT_TRUE(duplicate_sentinel);
+  EXPECT_EQ(*duplicate_sentinel, 0xa5);
+}
+
+TEST(IdMapTest, MalformedDecodeRetainsExistingEntriesRangeAndCursor) {
+  auto created = IdMap<std::uint8_t, std::uint8_t>::create(4, 6);
+  ASSERT_TRUE(created);
+  ASSERT_TRUE(created->add(0x44));
+  auto original = DataStreamBuffer::serialize(*created);
+  ASSERT_TRUE(original);
+  for (auto const& bytes : {ByteArray({"\x01\x01", 2}), ByteArray({"\x01\x01\x11", 3}),
+                            ByteArray({"\x01\x01\x11\x01", 4}), ByteArray({"\x01\x01\x11\x01\x03", 5}),
+                            ByteArray({"\x01\x01\x11\x03\x03\x03", 6}), ByteArray({"\x01\x01\x11\x03\x01\x03", 6}),
+                            ByteArray({"\x01\x01\x11\x01\x03\x00", 6}), ByteArray({"\x01\x01\x11\x01\x03\x04", 6})}) {
+    auto read = DataStreamBuffer::deserialize(*created, bytes);
+    EXPECT_FALSE(read);
+    auto retained = DataStreamBuffer::serialize(*created);
+    ASSERT_TRUE(retained);
+    EXPECT_EQ(*retained, *original);
+  }
+  auto next = created->next_id();
+  ASSERT_TRUE(next);
+  EXPECT_EQ(*next, 5);
+}
+
+TEST(BiMapTest, DuplicateEitherSideLeavesBothIndexesConsistent) {
+  auto check = []<typename MapType>() {
+    MapType map;
+    ASSERT_TRUE(map.add(1, 11));
+    ASSERT_TRUE(map.add(2, 22));
+    auto duplicate_right = map.insert(typename MapType::value_type{3, 22});
+    EXPECT_FALSE(duplicate_right.second);
+    EXPECT_EQ((*duplicate_right.first).first, 2);
+    EXPECT_EQ((*duplicate_right.first).second, 22);
+    EXPECT_FALSE(map.insert(1, 33));
+    EXPECT_FALSE(map.add(4, 22));
+    EXPECT_EQ(map.size(), 2u);
+    EXPECT_FALSE(map.contains_left(3));
+    EXPECT_FALSE(map.contains_left(4));
+    EXPECT_FALSE(map.contains_right(33));
+    EXPECT_EQ(map.maybe_right(1), 11);
+    EXPECT_EQ(map.maybe_right(2), 22);
+    EXPECT_EQ(map.maybe_left(11), 1);
+    EXPECT_EQ(map.maybe_left(22), 2);
+  };
+  check.template operator()<BiMap<int, int>>();
+  check.template operator()<BiHashMap<int, int>>();
+}
+
+TEST(BiMapTest, CopiesOwnTheirCrossIndexesAndSelfAssignmentRetainsBorrows) {
+  auto check = []<typename MapType>() {
+    MapType assigned;
+    std::optional<MapType> copied;
+    {
+      MapType original;
+      ASSERT_TRUE(original.add(1, 11));
+      ASSERT_TRUE(original.add(2, 22));
+      copied.emplace(original);
+      ASSERT_TRUE(assigned.add(9, 99));
+      assigned = original;
+      original.clear();
+      ASSERT_TRUE(original.add(3, 33));
+    }
+    for (auto* map : {&assigned, &*copied}) {
+      EXPECT_EQ(map->maybe_right(1), 11);
+      EXPECT_EQ(map->maybe_left(22), 2);
+      EXPECT_FALSE(map->contains_left(9));
+      auto left = map->find_left_ref(11);
+      auto right = map->find_right_ref(1);
+      ASSERT_TRUE(left);
+      ASSERT_TRUE(right);
+      auto left_address = &left->get();
+      auto right_address = &right->get();
+      *map = std::as_const(*map);
+      EXPECT_EQ(&map->find_left_ref(11)->get(), left_address);
+      EXPECT_EQ(&map->find_right_ref(1)->get(), right_address);
+      for (int value = 4; value != 256; ++value)
+        ASSERT_TRUE(map->add(value, value + 1000));
+      EXPECT_EQ(&map->find_left_ref(11)->get(), left_address);
+      EXPECT_EQ(&map->find_right_ref(1)->get(), right_address);
+      EXPECT_TRUE(map->erase_right(22));
+      EXPECT_FALSE(map->contains_left(2));
+      auto taken = map->extract_right(1);
+      ASSERT_TRUE(taken);
+      EXPECT_EQ(*taken, 11);
+      EXPECT_FALSE(map->contains_right(11));
+    }
+  };
+  check.template operator()<BiMap<int, int>>();
+  check.template operator()<BiHashMap<int, int>>();
+}
+
+TEST(BiMapTest, AliasedOverwriteAndErasePreserveSurvivingNodeAddresses) {
+  auto check = []<typename MapType>() {
+    MapType map;
+    ASSERT_TRUE(map.add(1, 11));
+    ASSERT_TRUE(map.add(2, 22));
+    ASSERT_TRUE(map.add(3, 33));
+    auto left = map.find_left_ref(11);
+    auto right = map.find_right_ref(2);
+    ASSERT_TRUE(left);
+    ASSERT_TRUE(right);
+    auto left_address = &left->get();
+    auto right_address = &right->get();
+    map.overwrite(left->get(), right->get());
+    EXPECT_EQ(map.size(), 2u);
+    EXPECT_EQ(map.maybe_right(1), 22);
+    EXPECT_EQ(map.maybe_left(22), 1);
+    EXPECT_FALSE(map.contains_left(2));
+    EXPECT_FALSE(map.contains_right(11));
+    EXPECT_EQ(&map.find_left_ref(22)->get(), left_address);
+    EXPECT_EQ(&map.find_right_ref(1)->get(), right_address);
+    map.overwrite(*left_address, *right_address);
+    EXPECT_EQ(&map.find_left_ref(22)->get(), left_address);
+    EXPECT_EQ(&map.find_right_ref(1)->get(), right_address);
+    map.overwrite(*left_address, 44);
+    EXPECT_EQ(&map.find_left_ref(44)->get(), left_address);
+    EXPECT_FALSE(map.contains_right(22));
+    auto surviving_right = map.find_right_ref(1);
+    ASSERT_TRUE(surviving_right);
+    auto surviving_address = &surviving_right->get();
+    map.overwrite(5, surviving_right->get());
+    EXPECT_EQ(&map.find_right_ref(5)->get(), surviving_address);
+    EXPECT_FALSE(map.contains_left(1));
+    // Arguments may borrow the opposite index, which is erased first.
+    ASSERT_TRUE(map.add(6, 6));
+    auto aliased_left = map.find_right_ref(6);
+    ASSERT_TRUE(aliased_left);
+    EXPECT_TRUE(map.erase_left(aliased_left->get()));
+    EXPECT_FALSE(map.contains_left(6));
+    EXPECT_FALSE(map.contains_right(6));
+    ASSERT_TRUE(map.add(7, 7));
+    auto aliased_right = map.find_left_ref(7);
+    ASSERT_TRUE(aliased_right);
+    EXPECT_TRUE(map.erase_right(aliased_right->get()));
+    EXPECT_FALSE(map.contains_left(7));
+    EXPECT_FALSE(map.contains_right(7));
+    EXPECT_EQ(map.maybe_right(3), 33);
+    EXPECT_EQ(map.maybe_left(33), 3);
+  };
+  check.template operator()<BiMap<int, int>>();
+  check.template operator()<BiHashMap<int, int>>();
+}
+
+namespace {
+
+bool bimap_reverse_order = false;
+
+struct BiMapStatefulOrder {
+  bool reverse = bimap_reverse_order;
+
+  bool operator()(int left, int right) const { return reverse ? left > right : left < right; }
+};
+
+}// namespace
+
+TEST(BiMapTest, CopyPreservesSourceIndexComparisonPolicies) {
+  using Index = Map<int, int const*, BiMapStatefulOrder>;
+  using MapType = BiMap<int, int, Index, Index>;
+  MapType original;
+  ASSERT_TRUE(original.add(1, 11));
+  ASSERT_TRUE(original.add(2, 22));
+  bimap_reverse_order = true;
+  MapType copied(original);
+  MapType assigned;
+  assigned = original;
+  bimap_reverse_order = false;
+  EXPECT_EQ(copied.left_values(), (List<int>{1, 2}));
+  EXPECT_EQ(copied.right_values(), (List<int>{11, 22}));
+  EXPECT_EQ(assigned.left_values(), (List<int>{1, 2}));
+  EXPECT_EQ(assigned.right_values(), (List<int>{11, 22}));
+  original.clear();
+  EXPECT_EQ(copied.maybe_left(22), 2);
+  EXPECT_EQ(assigned.maybe_right(1), 11);
+}
+
+TEST(IdMapTest, HashDecodeAcceptsAnOccupiedCursorAndKeepsFraming) {
+  DataStreamBuffer stream(ByteArray({"\x01\x01\x11\x01\x03\x01\xa5", 7}));
+  IdHashMap<std::uint8_t, std::uint8_t> decoded;
+  ASSERT_TRUE(decoded.add(9, 0x99));
+  ASSERT_TRUE(stream >> decoded);
+  EXPECT_FALSE(decoded.contains(9));
+  EXPECT_EQ(decoded.value(1), 0x11);
+  auto next = decoded.add(0x22);
+  ASSERT_TRUE(next);
+  EXPECT_EQ(*next, 2);
+  auto sentinel = stream.read<std::uint8_t>();
+  ASSERT_TRUE(sentinel);
+  EXPECT_EQ(*sentinel, 0xa5);
 }

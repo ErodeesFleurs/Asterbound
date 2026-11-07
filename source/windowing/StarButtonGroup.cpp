@@ -61,7 +61,7 @@ void ButtonGroup::setCallback(WidgetCallbackFunc callback) {
 }
 
 std::optional<std::reference_wrapper<ButtonWidget>> ButtonGroup::button(int id) const {
-  auto link = m_buttons.maybeRef(id);
+  auto link = m_buttons.find_ref(id);
   if (!link)
     return {};
   auto owner = link->get().lock();
@@ -104,14 +104,14 @@ int ButtonGroup::addButton(ButtonWidget& button, int id) {
 
 void ButtonGroup::removeButton(ButtonWidget& button) {
   auto link = button.weak_from_this();
-  if (auto id = m_buttonIds.maybeRef(link)) {
+  if (auto id = m_buttonIds.find_ref(link)) {
     m_buttons.remove(id->get());
     m_buttonIds.remove(link);
   }
 }
 
 int ButtonGroup::id(ButtonWidget const& button) const {
-  if (auto id = m_buttonIds.maybeRef(button.weak_from_this()))
+  if (auto id = m_buttonIds.find_ref(button.weak_from_this()))
     return id->get();
   return NoButton;
 }
