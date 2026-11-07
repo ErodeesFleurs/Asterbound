@@ -214,7 +214,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     if (!BaseAssetsSettings) return std::unexpected(BaseAssetsSettings.error());
     if (!BaseDefaultConfiguration) return std::unexpected(BaseDefaultConfiguration.error());
     String bootConfigFile = options.parameters.value("bootconfig").maybeFirst().value_or("sbinit.config");
-    auto contents = File::readFileString(bootConfigFile);
+    auto contents = File::read_file_string(bootConfigFile);
     if (!contents) return std::unexpected(std::move(contents.error()));
     auto boot = Json::parseJson(*contents);
     if (!boot) return std::unexpected(std::move(boot.error()));

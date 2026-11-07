@@ -82,7 +82,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 
 template <>
 std::expected<Uuid, StarException> DataStream::read<Uuid>() {
-  auto bytes = readBytes(UuidSize);
+  auto bytes = read_bytes(UuidSize);
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   return Uuid::create(*bytes);

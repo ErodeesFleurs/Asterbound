@@ -29,7 +29,7 @@ std::expected<void, StarException> writeJsonPatchFixture(String const& directory
          std::pair{String("preload.config"), String("[]")},
          std::pair{String("target.json"), String(R"({"base":true})")}, std::pair{String("target.json") + suffix, patch},
          std::pair{String("target.json.patch1"), String(R"({"later":true})")}}) {
-    auto written = File::writeFile(contents, File::relativeTo(directory, name));
+    auto written = File::write_file(contents, File::relative_to(directory, name));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -46,7 +46,7 @@ std::expected<std::shared_ptr<Assets>, StarException> patchTestAssets(GameTest& 
 
 std::expected<void, StarException> writeImagePatchFixture(GameTest& fixture, String const& directory,
                                                           String const& patch) {
-  auto written = File::writeFile(String("[]"), File::relativeTo(directory, "preload.config"));
+  auto written = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
   if (!written)
     return std::unexpected(std::move(written.error()));
   Image image(2, 1, PixelFormat::RGBA32);
@@ -60,28 +60,28 @@ std::expected<void, StarException> writeImagePatchFixture(GameTest& fixture, Str
   auto encoded = image.writePng(fixture.root().logger(), buffer);
   if (!encoded)
     return std::unexpected(std::move(encoded.error()));
-  written = File::writeFile(buffer->takeData(), File::relativeTo(directory, "target.png"));
+  written = File::write_file(buffer->takeData(), File::relative_to(directory, "target.png"));
   if (!written)
     return std::unexpected(std::move(written.error()));
-  written = File::writeFile(patch, File::relativeTo(directory, "target.png.patch.lua"));
+  written = File::write_file(patch, File::relative_to(directory, "target.png.patch.lua"));
   if (!written)
     return std::unexpected(std::move(written.error()));
-  written = File::writeFile(String("function patch(image) return image:process('?flipx') end"),
-                            File::relativeTo(directory, "later.lua"));
+  written = File::write_file(String("function patch(image) return image:process('?flipx') end"),
+                             File::relative_to(directory, "later.lua"));
   if (!written)
     return std::unexpected(std::move(written.error()));
   // The patch list sorts after the target and its automatically indexed Lua patch.
-  return File::writeFile(String(R"([{"paths":["/target.png"],"patches":["/later.lua"]}])"),
-                         File::relativeTo(directory, "zz-later.patchlist"));
+  return File::write_file(String(R"([{"paths":["/target.png"],"patches":["/later.lua"]}])"),
+                          File::relative_to(directory, "zz-later.patchlist"));
 }
 
 std::expected<void, StarException> writePatchProvider(String const& directory,
     std::initializer_list<std::pair<String, String>> files) {
-  auto created = File::makeDirectory(directory);
+  auto created = File::create_directory(directory);
   if (!created)
     return std::unexpected(std::move(created.error()));
   for (auto const& [path, contents] : files) {
-    auto written = File::writeFile(contents, File::relativeTo(directory, path));
+    auto written = File::write_file(contents, File::relative_to(directory, path));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -93,9 +93,9 @@ const GameTestRegistration assetsRemovedLooseJsonPatches(
   "AssetsPatchReadTest", "RemovedLooseJsonPatchesKeepBaseAndLaterPatch", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       auto patch = suffix == ".patch" ? String(R"({"removed":true})")
                                       : String("function patch(data) data.removed = true return data end");
       ASSERT_TRUE(writeJsonPatchFixture(*directory, suffix, patch));
@@ -103,7 +103,7 @@ const GameTestRegistration assetsRemovedLooseJsonPatches(
       auto assets = patchTestAssets(fixture, *directory, logger);
       ASSERT_TRUE(assets) << assets.error().what();
       // Removal happens only after Assets has indexed the genuine loose patch.
-      ASSERT_TRUE(File::remove(File::relativeTo(*directory, "target.json" + suffix)));
+      ASSERT_TRUE(File::remove(File::relative_to(*directory, "target.json" + suffix)));
       auto loaded = (*assets)->json("/target.json");
       ASSERT_TRUE(loaded) << loaded.error().what();
       EXPECT_EQ(*loaded, Json(JsonObject{{"base", true}, {"later", true}}));
@@ -112,9 +112,9 @@ const GameTestRegistration assetsRemovedLooseJsonPatches(
 
 const GameTestRegistration
   assetsNestedPatchGroups("AssetsPatchReadTest", "NestedGroupsCommitOnlySuccessfulGroups", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeJsonPatchFixture(*directory, ".patch", R"([
       {"op":"add","path":"/before","value":true},
       [
@@ -139,21 +139,21 @@ const GameTestRegistration
 
 const GameTestRegistration assetsRemovedCachedLuaPatch(
   "AssetsPatchReadTest", "RemovedCachedLuaPatchIsNotInvokedForAnotherTarget", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(
       writeJsonPatchFixture(*directory, ".patch.lua", "function patch(data) data.removed = true return data end"));
-    ASSERT_TRUE(File::writeFile(String(R"({"warmup":true})"), File::relativeTo(*directory, "warmup.json")));
-    ASSERT_TRUE(File::writeFile(String(R"([{"paths":["/warmup.json"],"patches":["/target.json.patch.lua"]}])"),
-                                File::relativeTo(*directory, "zz-warmup.patchlist")));
+    ASSERT_TRUE(File::write_file(String(R"({"warmup":true})"), File::relative_to(*directory, "warmup.json")));
+    ASSERT_TRUE(File::write_file(String(R"([{"paths":["/warmup.json"],"patches":["/target.json.patch.lua"]}])"),
+                                 File::relative_to(*directory, "zz-warmup.patchlist")));
     Logger logger;
     auto assets = patchTestAssets(fixture, *directory, logger);
     ASSERT_TRUE(assets) << assets.error().what();
     auto warmup = (*assets)->json("/warmup.json");
     ASSERT_TRUE(warmup) << warmup.error().what();
     EXPECT_EQ(*warmup, Json(JsonObject{{"warmup", true}, {"removed", true}}));
-    ASSERT_TRUE(File::remove(File::relativeTo(*directory, "target.json.patch.lua")));
+    ASSERT_TRUE(File::remove(File::relative_to(*directory, "target.json.patch.lua")));
     // This target is uncached, while the same source/path Lua context is already cached.
     auto loaded = (*assets)->json("/target.json");
     ASSERT_TRUE(loaded) << loaded.error().what();
@@ -167,9 +167,9 @@ const GameTestRegistration assetsPatchSyntaxAndRuntimeErrors(
            std::pair{String(".patch.lua"), String("function patch(data) this is not Lua end")},
            std::pair{String(".patch.lua"), String("function patch(data) error('deliberate patch failure') end")}}) {
       SCOPED_TRACE(patch.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(*directory, suffix, patch));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
@@ -184,15 +184,15 @@ const GameTestRegistration assetsPatchReplacedWithDirectory(
   "AssetsPatchReadTest", "PatchReplacedWithDirectoryRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
       ASSERT_TRUE(assets) << assets.error().what();
-      auto patchPath = File::relativeTo(*directory, "target.json" + suffix);
+      auto patchPath = File::relative_to(*directory, "target.json" + suffix);
       ASSERT_TRUE(File::remove(patchPath));
       std::error_code ec;
       ASSERT_TRUE(std::filesystem::create_directory(patchFsPath(patchPath), ec)) << ec.message();
@@ -206,18 +206,18 @@ const GameTestRegistration assetsPatchReplacedWithBrokenSymlink(
   "AssetsPatchReadTest", "PatchReplacedWithBrokenSymlinkRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
       ASSERT_TRUE(assets) << assets.error().what();
-      auto patchPath = File::relativeTo(*directory, "target.json" + suffix);
+      auto patchPath = File::relative_to(*directory, "target.json" + suffix);
       ASSERT_TRUE(File::remove(patchPath));
       std::error_code ec;
-      std::filesystem::create_symlink(patchFsPath(File::relativeTo(*directory, "absent-link-target")),
+      std::filesystem::create_symlink(patchFsPath(File::relative_to(*directory, "absent-link-target")),
                                       patchFsPath(patchPath), ec);
       if (ec)
         GTEST_SKIP() << "cannot create symlinks here: " << ec.message();
@@ -234,15 +234,15 @@ const GameTestRegistration
   assetsUnreadablePatch("AssetsPatchReadTest", "UnreadablePatchRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
       ASSERT_TRUE(assets) << assets.error().what();
-      auto path = patchFsPath(File::relativeTo(*directory, "target.json" + suffix));
+      auto path = patchFsPath(File::relative_to(*directory, "target.json" + suffix));
       std::error_code ec;
       auto original = std::filesystem::status(path, ec).permissions();
       ASSERT_FALSE(ec) << ec.message();
@@ -255,7 +255,7 @@ const GameTestRegistration
       if (ec)
         GTEST_SKIP() << "cannot remove file read permissions here: " << ec.message();
       // Root/CAP_DAC_OVERRIDE and some filesystems can still read a mode-000 file.
-      if (File::readFile(File::relativeTo(*directory, "target.json" + suffix)))
+      if (File::read_file(File::relative_to(*directory, "target.json" + suffix)))
         GTEST_SKIP() << "this process can still read a mode-000 patch";
       auto loaded = (*assets)->json("/target.json");
       ASSERT_FALSE(loaded);
@@ -265,15 +265,15 @@ const GameTestRegistration
 
 const GameTestRegistration assetsRemovedLooseImageLuaPatch(
   "AssetsPatchReadTest", "RemovedLooseImageLuaPatchKeepsPixelsAndLaterPatch", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(
       writeImagePatchFixture(fixture, *directory, "function patch(image) return image:process('?flipx') end"));
     Logger logger;
     auto assets = patchTestAssets(fixture, *directory, logger);
     ASSERT_TRUE(assets) << assets.error().what();
-    ASSERT_TRUE(File::remove(File::relativeTo(*directory, "target.png.patch.lua")));
+    ASSERT_TRUE(File::remove(File::relative_to(*directory, "target.png.patch.lua")));
     auto loaded = (*assets)->image("/target.png");
     ASSERT_TRUE(loaded) << loaded.error().what();
     EXPECT_EQ((*loaded)->size(), Vec2U(2, 1));
@@ -290,9 +290,9 @@ const GameTestRegistration assetsImageLuaPatchErrors(
     for (String const& patch : {String("function patch(image) this is not Lua end"),
                                 String("function patch(image) error('deliberate image patch failure') end")}) {
       SCOPED_TRACE(patch.utf8());
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeImagePatchFixture(fixture, *directory, patch));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
@@ -308,24 +308,24 @@ const GameTestRegistration assetsLuaPatchProvider(
       for (bool syntax : {false, true}) {
         SCOPED_TRACE(image ? "image" : "json");
         SCOPED_TRACE(syntax ? "compile" : "invoke");
-        auto target = File::temporaryDirectory(fixture.root().random());
-        auto failing = File::temporaryDirectory(fixture.root().random());
-        auto shadow = File::temporaryDirectory(fixture.root().random());
+        auto target = File::temporary_directory(fixture.root().random());
+        auto failing = File::temporary_directory(fixture.root().random());
+        auto shadow = File::temporary_directory(fixture.root().random());
         ASSERT_TRUE(target);
         ASSERT_TRUE(failing);
         ASSERT_TRUE(shadow);
         auto cleanup = finally([&] {
-          EXPECT_TRUE(File::removeDirectoryRecursive(*target));
-          EXPECT_TRUE(File::removeDirectoryRecursive(*failing));
-          EXPECT_TRUE(File::removeDirectoryRecursive(*shadow));
+          EXPECT_TRUE(File::remove_all(*target));
+          EXPECT_TRUE(File::remove_all(*failing));
+          EXPECT_TRUE(File::remove_all(*shadow));
         });
-        ASSERT_TRUE(File::writeFile(String(R"({"name":"diagnostic_target"})"), File::relativeTo(*target, "_metadata")));
-        ASSERT_TRUE(File::writeFile(
-          String(R"({"name":"diagnostic_failure","friendlyName":"Failing patch provider"})"),
-          File::relativeTo(*failing, "_metadata")));
-        ASSERT_TRUE(File::writeFile(
-          String(R"({"name":"diagnostic_shadow","friendlyName":"Unexecuted shadow provider"})"),
-          File::relativeTo(*shadow, "_metadata")));
+        ASSERT_TRUE(
+          File::write_file(String(R"({"name":"diagnostic_target"})"), File::relative_to(*target, "_metadata")));
+        ASSERT_TRUE(File::write_file(String(R"({"name":"diagnostic_failure","friendlyName":"Failing patch provider"})"),
+                                     File::relative_to(*failing, "_metadata")));
+        ASSERT_TRUE(
+          File::write_file(String(R"({"name":"diagnostic_shadow","friendlyName":"Unexecuted shadow provider"})"),
+                           File::relative_to(*shadow, "_metadata")));
         String pass = "function patch(value) return value end";
         if (image) {
           ASSERT_TRUE(writeImagePatchFixture(fixture, *target, pass));
@@ -336,14 +336,14 @@ const GameTestRegistration assetsLuaPatchProvider(
         String patchPath = "/" + patchFile;
         String failure = syntax ? String("function patch(value) invalid syntax end")
                                 : String("function patch(value) error('provider_runtime_failure') end");
-        ASSERT_TRUE(File::writeFile(failure, File::relativeTo(*failing, patchFile)));
-        ASSERT_TRUE(File::writeFile(pass, File::relativeTo(*shadow, patchFile)));
+        ASSERT_TRUE(File::write_file(failure, File::relative_to(*failing, patchFile)));
+        ASSERT_TRUE(File::write_file(pass, File::relative_to(*shadow, patchFile)));
         String targetPath = image ? String("/target.png") : String("/target.json");
-        ASSERT_TRUE(File::writeFile(String("{}"), File::relativeTo(*target, "caller.json")));
-        ASSERT_TRUE(File::writeFile(
-          image ? String("function patch(value) assets.image('/target.png') return value end")
-                : String("function patch(value) assets.json('/target.json') return value end"),
-          File::relativeTo(*target, "caller.json.patch.lua")));
+        ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*target, "caller.json")));
+        ASSERT_TRUE(File::write_file(image
+                                       ? String("function patch(value) assets.image('/target.png') return value end")
+                                       : String("function patch(value) assets.json('/target.json') return value end"),
+                                     File::relative_to(*target, "caller.json.patch.lua")));
         Logger logger;
         Assets::Settings settings{};
         settings.workerPoolSize = 1;
@@ -401,10 +401,10 @@ const GameTestRegistration assetsLuaPatchProvider(
 
 const GameTestRegistration assetsMissingResourceSummary(
   "AssetsPatchReadTest", "MissingResourceKeepsUnderlyingReasonInStructuredSummary", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     Logger logger;
     auto assets = patchTestAssets(fixture, *directory, logger);
     ASSERT_TRUE(assets) << assets.error().what();
@@ -421,13 +421,13 @@ const GameTestRegistration assetsMissingResourceSummary(
 
 const GameTestRegistration assetsSourceSpecificPatchReplacement(
   "AssetsPatchReadTest", "SourceSpecificReplacementPreservesOrderAndSameContextReads", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto base = File::relativeTo(*directory, "base");
-    auto original = File::relativeTo(*directory, "original");
-    auto shadow = File::relativeTo(*directory, "shadow");
-    auto repair = File::relativeTo(*directory, "repair");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    auto original = File::relative_to(*directory, "original");
+    auto shadow = File::relative_to(*directory, "shadow");
+    auto repair = File::relative_to(*directory, "repair");
     ASSERT_TRUE(writePatchProvider(base, {
       {"preload.config", "[]"}, {"target.json", R"({"trace":[]})"},
       {"target.json.patch", R"([{"op":"add","path":"/trace/-","value":"before"}])"}
@@ -501,11 +501,11 @@ const GameTestRegistration assetsSourceSpecificPatchReplacement(
 
 const GameTestRegistration assetsReplacePreviouslyFailedPatch(
   "AssetsPatchReadTest", "SourceSpecificReplacementInvalidatesEarlierFailure", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto base = File::relativeTo(*directory, "base");
-    auto repair = File::relativeTo(*directory, "repair");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    auto repair = File::relative_to(*directory, "repair");
     ASSERT_TRUE(writePatchProvider(base, {
       {"preload.config", "[]"}, {"target.json", R"({"base":true})"},
       {"target.json.patch.lua", "function patch(data) error('replace_cached_failure') end"}
@@ -534,12 +534,12 @@ const GameTestRegistration assetsReplacePreviouslyFailedPatch(
 
 const GameTestRegistration assetsReplacementPatchProvider(
   "AssetsPatchReadTest", "ReplacementFailureUsesHeldReplacementProvider", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto base = File::relativeTo(*directory, "base");
-    auto replacement = File::relativeTo(*directory, "replacement");
-    auto shadow = File::relativeTo(*directory, "shadow");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    auto replacement = File::relative_to(*directory, "replacement");
+    auto shadow = File::relative_to(*directory, "shadow");
     ASSERT_TRUE(writePatchProvider(base, {
       {"preload.config", "[]"}, {"target.json", R"({"base":true})"}
     }));
@@ -585,11 +585,11 @@ const GameTestRegistration assetsReplacementPatchProvider(
 
 const GameTestRegistration assetsSourceBytesReadFailure(
   "AssetsPatchReadTest", "SourceBytesReadFailureKeepsRequestedProvider", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto original = File::relativeTo(*directory, "original");
-    auto shadow = File::relativeTo(*directory, "shadow");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    auto shadow = File::relative_to(*directory, "shadow");
     ASSERT_TRUE(writePatchProvider(original, {
       {"_metadata", R"({"name":"raw_original","friendlyName":"Raw original provider"})"},
       {"preload.config", "[]"}, {"raw.txt", "original bytes"},
@@ -613,7 +613,7 @@ const GameTestRegistration assetsSourceBytesReadFailure(
     settings.workerPoolSize = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {original, shadow});
     ASSERT_TRUE(assets) << assets.error().what();
-    ASSERT_TRUE(File::remove(File::relativeTo(original, "raw.txt")));
+    ASSERT_TRUE(File::remove(File::relative_to(original, "raw.txt")));
     auto loaded = (*assets)->json("/caller.json");
     ASSERT_FALSE(loaded);
     auto const& summary = loaded.error().diagnosticSummary();
@@ -630,13 +630,13 @@ const GameTestRegistration assetsSourceBytesReadFailure(
 
 const GameTestRegistration assetsRetargetSourceSpecificPatch(
   "AssetsPatchReadTest", "SourceSpecificRetargetAppendsAndPreservesForeignPatches", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto base = File::relativeTo(*directory, "base");
-    auto original = File::relativeTo(*directory, "original");
-    auto foreign = File::relativeTo(*directory, "foreign");
-    auto repair = File::relativeTo(*directory, "repair");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    auto original = File::relative_to(*directory, "original");
+    auto foreign = File::relative_to(*directory, "foreign");
+    auto repair = File::relative_to(*directory, "repair");
     ASSERT_TRUE(writePatchProvider(base, {
       {"preload.config", "[]"},
       {"old.json", R"({"weights":{"old":1},"trace":[]})"},
@@ -698,12 +698,12 @@ const GameTestRegistration assetsRetargetSourceSpecificPatch(
 
 const GameTestRegistration assetsLoadScriptReplacement(
   "AssetsPatchReadTest", "LoadScriptReplacementPreservesDeclarationsAndProviderIsolation", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto original = File::relativeTo(*directory, "original");
-    auto shadow = File::relativeTo(*directory, "shadow");
-    auto repair = File::relativeTo(*directory, "repair");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    auto shadow = File::relative_to(*directory, "shadow");
+    auto repair = File::relative_to(*directory, "repair");
     ASSERT_TRUE(writePatchProvider(original, {
       {"_metadata", R"({"name":"load_original","scripts":{"onLoad":["/already.lua"],"postLoad":["/first.lua","/shared-load.lua","/last.lua"]}})"},
       {"preload.config", "[]"},
@@ -772,12 +772,12 @@ const GameTestRegistration assetsLoadScriptReplacementProvider(
   "AssetsPatchReadTest", "LoadScriptReplacementFailureUsesHeldProviderAndKeepsFailurePolicy", [](GameTest& fixture) {
     for (bool syntax : {false, true}) {
       SCOPED_TRACE(syntax ? "compile" : "invoke");
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-      auto original = File::relativeTo(*directory, "original");
-      auto replacement = File::relativeTo(*directory, "replacement");
-      auto shadow = File::relativeTo(*directory, "shadow");
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto original = File::relative_to(*directory, "original");
+      auto replacement = File::relative_to(*directory, "replacement");
+      auto shadow = File::relative_to(*directory, "shadow");
       ASSERT_TRUE(writePatchProvider(original, {
         {"_metadata", R"({"name":"load_target","scripts":{"postLoad":["/shared-load.lua","/skipped.lua"]}})"},
         {"preload.config", "[]"},
@@ -845,12 +845,12 @@ const GameTestRegistration assetsLoadScriptReplacementProvider(
 
 const GameTestRegistration assetsPackedSourceBytes(
   "AssetsPatchReadTest", "SourceBytesPreservesExactPackedMembershipAndRawBinary", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto original = File::relativeTo(*directory, "original");
-    auto shadow = File::relativeTo(*directory, "shadow");
-    auto packed = File::relativeTo(*directory, "original.pak");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    auto shadow = File::relative_to(*directory, "shadow");
+    auto packed = File::relative_to(*directory, "original.pak");
     ASSERT_TRUE(writePatchProvider(original, {
       {"_metadata", R"({"name":"packed_original"})"}, {"preload.config", "[]"},
       {"CaseSensitive.txt", String(std::string_view("one\0two", 7))}

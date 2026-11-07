@@ -226,7 +226,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 
   std::chrono::duration<double> sumTime = std::chrono::duration<double>::zero();
   for (std::uint64_t i = 0; i < *times; ++i) {
-    auto storage = File::ephemeralFile(root->random());
+    auto storage = File::ephemeral_file(root->random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto server = WorldServer::create(*root, *worldTemplate, *storage);

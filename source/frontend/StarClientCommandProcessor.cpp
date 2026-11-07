@@ -961,11 +961,11 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   if (image->size().min() == 0)
     return "^red;Resulting image is empty^reset;";
   auto outputDirectory = m_context.root().toStoragePath("output");
-  auto outputPath = File::relativeTo(outputDirectory, strf("{}.png", outputName));
-  auto directoryExists = File::isDirectory(outputDirectory);
+  auto outputPath = File::relative_to(outputDirectory, strf("{}.png", outputName));
+  auto directoryExists = File::is_directory(outputDirectory);
   if (!directoryExists) return std::unexpected(std::move(directoryExists.error()));
   if (!*directoryExists) {
-    if (auto created = File::makeDirectory(outputDirectory); !created)
+    if (auto created = File::create_directory(outputDirectory); !created)
       return std::unexpected(std::move(created.error()));
   }
   auto buffer = std::make_shared<Buffer>();
@@ -975,7 +975,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   if (!file) return std::unexpected(std::move(file.error()));
   auto size = buffer->size();
   if (!size) return std::unexpected(std::move(size.error()));
-  auto written = (*file)->writeFull(buffer->span().first(static_cast<std::size_t>(*size)));
+  auto written = (*file)->write_full(buffer->span().first(static_cast<std::size_t>(*size)));
   auto closed = (*file)->close();
   if (!written) {
     if (!closed)
@@ -983,7 +983,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     return std::unexpected(std::move(written.error()));
   }
   if (!closed) return std::unexpected(std::move(closed.error()));
-  auto fullPath = File::fullPath(outputPath);
+  auto fullPath = File::full_path(outputPath);
   if (!fullPath) return std::unexpected(std::move(fullPath.error()));
   auto copied = m_context.setClipboardImage(*image, std::ref(buffer->data()), std::cref(*fullPath));
   if (!copied) return std::unexpected(std::move(copied.error()));

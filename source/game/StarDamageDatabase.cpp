@@ -73,7 +73,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
     return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
     auto const& path = file.string();
-    auto readFile = [&]() -> std::expected<void, StarException> {
+    auto read_file = [&]() -> std::expected<void, StarException> {
       auto config = assets->json(path);
       if (!config)
         return std::unexpected(std::move(config.error()));
@@ -124,7 +124,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       database->m_damageKinds.set(std::move(*key), std::move(kind));
       return {};
     };
-    auto loaded = readFile();
+    auto loaded = read_file();
     if (!loaded)
       return std::unexpected(assets->withAssetContext(std::move(loaded.error()), path, "Loading damage kind"));
   }

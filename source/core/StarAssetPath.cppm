@@ -58,7 +58,7 @@ struct AssetPath {
   // is an absolute path, it is returned unchanged.  If it is a relative path,
   // then it is computed as relative to the directory component of the
   // sourcePath.
-  static String relativeTo(String const& sourcePath, String const& givenPath);
+  static String relative_to(String const& sourcePath, String const& givenPath);
 
   AssetPath() = default;
   AssetPath(AssetPath const&) = default;

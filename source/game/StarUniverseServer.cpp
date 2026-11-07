@@ -180,13 +180,13 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   if (!clients)
     return std::unexpected(std::move(clients.error()));
   m_clients = std::move(*clients);
-  auto directory = File::isDirectory(storageDir);
+  auto directory = File::is_directory(storageDir);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory) {
     if (auto result = m_root.logger().info("UniverseServer: Creating universe storage directory"); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = File::makeDirectory(storageDir); !result)
+    if (auto result = File::create_directory(storageDir); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto assetsResult = m_root.assets();
@@ -217,7 +217,7 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
     return std::unexpected(std::move(result.error()));
   if (auto result = m_root.logger().info("UniverseServer: Acquiring universe lock file"); !result)
     return std::unexpected(std::move(result.error()));
-  auto lock = LockFile::acquireLock(File::relativeTo(storageDir, lockFile));
+  auto lock = LockFile::acquireLock(File::relative_to(storageDir, lockFile));
   if (!lock)
     return std::unexpected(std::move(lock.error()));
   m_storageDirectoryLock = std::move(*lock);
@@ -232,17 +232,17 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   if (*clear) {
     if (auto result = m_root.logger().info("UniverseServer: Clearing all universe files"); !result)
       return std::unexpected(std::move(result.error()));
-    auto files = File::dirList(storageDir);
+    auto files = File::directory_entries(storageDir);
     if (!files)
       return std::unexpected(std::move(files.error()));
     for (auto const& file : *files) {
       if (!file.second && file.first != lockFile) {
-        if (auto result = File::remove(File::relativeTo(storageDir, file.first)); !result)
+        if (auto result = File::remove(File::relative_to(storageDir, file.first)); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
   }
-  auto celestial = CelestialMasterDatabase::create(m_root, File::relativeTo(storageDir, "universe.chunks"));
+  auto celestial = CelestialMasterDatabase::create(m_root, File::relative_to(storageDir, "universe.chunks"));
   if (!celestial)
     return std::unexpected(std::move(celestial.error()));
   m_celestialDatabase = std::move(*celestial);
@@ -2496,7 +2496,7 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
       if (auto logged = m_root.logger().info("UniverseServer: Expiring temporary world {}", *name); !logged)
         return std::unexpected(std::move(logged.error()));
       auto path = tempWorldFile(entry.first);
-      auto exists = File::isFile(path);
+      auto exists = File::is_regular_file(path);
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (*exists) {
@@ -2572,8 +2572,8 @@ std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
     auto versioned = (*database)->makeCurrentVersionedJson("ClientContext", *store);
     if (!versioned)
       return std::unexpected(std::move(versioned.error()));
-    auto file = File::relativeTo(m_storageDirectory, strf("{}.clientcontext", client->playerUuid().hex()));
-    if (auto saved = VersionedJson::writeFile(*versioned, file); !saved)
+    auto file = File::relative_to(m_storageDirectory, strf("{}.clientcontext", client->playerUuid().hex()));
+    if (auto saved = VersionedJson::write_file(*versioned, file); !saved)
       return std::unexpected(std::move(saved.error()));
   }
   lockWithDiagnostics(locker);
@@ -2603,7 +2603,7 @@ std::expected<void, StarException> UniverseServer::saveSettings() {
   auto versioned = (*database)->makeCurrentVersionedJson("UniverseSettings", *settings);
   if (!versioned)
     return std::unexpected(std::move(versioned.error()));
-  return VersionedJson::writeFile(*versioned, File::relativeTo(m_storageDirectory, "universe.dat"));
+  return VersionedJson::write_file(*versioned, File::relative_to(m_storageDirectory, "universe.dat"));
 }
 
 std::expected<void, StarException> UniverseServer::loadSettings() {
@@ -2620,13 +2620,13 @@ std::expected<void, StarException> UniverseServer::loadSettings() {
   auto database = m_root.versioningDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto file = File::relativeTo(m_storageDirectory, "universe.dat");
-  auto exists = File::isFile(file);
+  auto file = File::relative_to(m_storageDirectory, "universe.dat");
+  auto exists = File::is_regular_file(file);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (*exists) {
     auto loaded = [&]() -> std::expected<void, StarException> {
-      auto versioned = VersionedJson::readFile(file);
+      auto versioned = VersionedJson::read_file(file);
       if (!versioned)
         return std::unexpected(std::move(versioned.error()));
       auto json = (*database)->loadVersionedJson(*versioned, "UniverseSettings");
@@ -2794,14 +2794,14 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
   auto database = m_root.versioningDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto storageFile = File::relativeTo(m_storageDirectory, "tempworlds.index");
-  auto exists = File::isFile(storageFile);
+  auto storageFile = File::relative_to(m_storageDirectory, "tempworlds.index");
+  auto exists = File::is_regular_file(storageFile);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (*exists) {
     auto loaded = [&]() -> std::expected<void, StarException> {
       m_tempWorldIndex.clear();
-      auto versioned = VersionedJson::readFile(storageFile);
+      auto versioned = VersionedJson::read_file(storageFile);
       if (!versioned)
         return std::unexpected(std::move(versioned.error()));
       auto settings = (*database)->loadVersionedJson(*versioned, "TempWorldIndex");
@@ -2844,7 +2844,7 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
   indexed.reserve(m_tempWorldIndex.size());
   for (auto const& entry : m_tempWorldIndex)
     indexed.append(tempWorldFile(entry.first));
-  auto files = File::dirList(m_storageDirectory);
+  auto files = File::directory_entries(m_storageDirectory);
   if (!files)
     return std::unexpected(std::move(files.error()));
   for (auto const& file : *files) {
@@ -2854,7 +2854,7 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
     if (!temporary)
       return std::unexpected(std::move(temporary.error()));
     if (*temporary) {
-      String path = File::relativeTo(m_storageDirectory, file.first);
+      String path = File::relative_to(m_storageDirectory, file.first);
       if (!indexed.contains(path)) {
         if (auto logged = m_root.logger().info("UniverseServer: Removing unindexed temporary world {}", file.first); !logged)
           return std::unexpected(std::move(logged.error()));
@@ -2880,7 +2880,7 @@ std::expected<void, StarException> UniverseServer::saveTempWorldIndex() {
   auto versioned = (*database)->makeCurrentVersionedJson("TempWorldIndex", index);
   if (!versioned)
     return std::unexpected(std::move(versioned.error()));
-  return VersionedJson::writeFile(*versioned, File::relativeTo(m_storageDirectory, "tempworlds.index"));
+  return VersionedJson::write_file(*versioned, File::relative_to(m_storageDirectory, "tempworlds.index"));
 }
 
 String UniverseServer::tempWorldFile(InstanceWorldId const& worldId) const {
@@ -2889,7 +2889,7 @@ String UniverseServer::tempWorldFile(InstanceWorldId const& worldId) const {
     identifier = strf("{}-{}", identifier, worldId.uuid->hex());
   if (worldId.level)
     identifier = strf("{}-{}", identifier, worldId.level.value_or(0.0f));
-  return File::relativeTo(m_storageDirectory, strf("{}.tempworld", identifier));
+  return File::relative_to(m_storageDirectory, strf("{}.tempworld", identifier));
 }
 
 std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser(std::optional<HostAddress> hostAddress, Uuid playerUuid) const {
@@ -3605,13 +3605,13 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     auto client = std::move(*created);
     if (auto handlers = client->registerRpcHandlers(m_teamManager->authenticatedRpcHandlers(client->playerUuid())); !handlers)
       return std::unexpected(std::move(handlers.error()));
-    auto path = File::relativeTo(m_storageDirectory, strf("{}.clientcontext", connect->playerUuid.hex()));
-    auto exists = File::isFile(path);
+    auto path = File::relative_to(m_storageDirectory, strf("{}.clientcontext", connect->playerUuid.hex()));
+    auto exists = File::is_regular_file(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists) {
       auto loaded = [&]() -> std::expected<void, StarException> {
-        auto versioned = VersionedJson::readFile(path);
+        auto versioned = VersionedJson::read_file(path);
         if (!versioned)
           return std::unexpected(std::move(versioned.error()));
         auto store = database->loadVersionedJson(*versioned, "ClientContext");
@@ -4014,7 +4014,8 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
     auto versioned = (*database)->makeCurrentVersionedJson("ClientContext", *store);
     if (!versioned)
       return std::unexpected(std::move(versioned.error()));
-    return VersionedJson::writeFile(*versioned, File::relativeTo(m_storageDirectory, strf("{}.clientcontext", client->playerUuid().hex())));
+    return VersionedJson::write_file(
+      *versioned, File::relative_to(m_storageDirectory, strf("{}.clientcontext", client->playerUuid().hex())));
   }();
   bool persisted = record(saved);
   clientsLocker.lock();
@@ -4200,7 +4201,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
           return std::unexpected(std::move(parsed.error()));
         size = *parsed;
       }
-      auto storage = File::ephemeralFile(m_root.random());
+      auto storage = File::ephemeral_file(m_root.random());
       if (!storage)
         return std::unexpected(std::move(storage.error()));
       auto created = WorldServer::create(m_root, size, *storage);
@@ -4283,8 +4284,8 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     return std::nullopt;
   return WorldServerPromise(m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, directory = m_storageDirectory, database = m_celestialDatabase, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     std::shared_ptr<WorldServer> world;
-    auto path = File::relativeTo(directory, strf("{}.world", id.filename()));
-    auto exists = File::isFile(path);
+    auto path = File::relative_to(directory, strf("{}.world", id.filename()));
+    auto exists = File::is_regular_file(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists) {
@@ -4448,8 +4449,8 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         identifier = strf("{}-{}", identifier, id.uuid->hex());
       if (id.level)
         identifier = strf("{}-{}", identifier, *id.level);
-      auto path = File::relativeTo(directory, strf("unique-{}.world", identifier));
-      auto exists = File::isFile(path);
+      auto path = File::relative_to(directory, strf("unique-{}.world", identifier));
+      auto exists = File::is_regular_file(path);
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (*exists) {
@@ -4488,7 +4489,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       if (!expiry)
         return std::unexpected(std::move(expiry.error()));
       std::uint64_t deleteTime = expiry->value_or(0);
-      auto exists = File::isFile(path);
+      auto exists = File::is_regular_file(path);
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       auto worldName = printWorldId(id);
@@ -4573,8 +4574,8 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     }
     if (upward)
       return std::unexpected(UniverseServerException(strf("UniverseServer: Custom world '{}' contains upwards paths!\n", id)));
-    auto path = File::relativeTo(directory, strf("custom_{}.world", id));
-    auto exists = File::isFile(path);
+    auto path = File::relative_to(directory, strf("custom_{}.world", id));
+    auto exists = File::is_regular_file(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     std::shared_ptr<WorldServer> world;
@@ -4650,7 +4651,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       } else if (worldTemplate) {
         if (auto logged = m_root.logger().info("UniverseServer: Creating client custom world '{}' for '{}'", id.name, id.uuid.hex()); !logged)
           return std::unexpected(std::move(logged.error()));
-        auto file = File::ephemeralFile(m_root.random());
+        auto file = File::ephemeral_file(m_root.random());
         if (!file)
           return std::unexpected(std::move(file.error()));
         auto created = WorldServer::create(m_root, *worldTemplate, *file);
@@ -4774,8 +4775,8 @@ std::expected<void, StarException> UniverseServer::createCustomWorld(CustomWorld
 std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseServer::createSystemWorld(Vec3I const& location) {
   if (!m_systemWorlds.contains(location)) {
     std::shared_ptr<SystemWorldServer> world;
-    auto path = File::relativeTo(m_storageDirectory, strf("{}_{}_{}.system", location[0], location[1], location[2]));
-    auto exists = File::isFile(path);
+    auto path = File::relative_to(m_storageDirectory, strf("{}_{}_{}.system", location[0], location[1], location[2]));
+    auto exists = File::is_regular_file(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists) {
@@ -4785,7 +4786,7 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
         auto database = m_root.versioningDatabase();
         if (!database)
           return std::unexpected(std::move(database.error()));
-        auto versioned = VersionedJson::readFile(path);
+        auto versioned = VersionedJson::read_file(path);
         if (!versioned)
           return std::unexpected(std::move(versioned.error()));
         auto store = (*database)->loadVersionedJson(*versioned, "System");
@@ -4827,7 +4828,7 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
 std::expected<bool, StarException> UniverseServer::instanceWorldStoredOrActive(InstanceWorldId const& worldId) const {
   if (m_worlds.value(worldId).has_value() || m_tempWorldIndex.contains(worldId))
     return true;
-  return File::isFile(File::relativeTo(m_storageDirectory, strf("unique-{}.world", worldId.instance)));
+  return File::is_regular_file(File::relative_to(m_storageDirectory, strf("unique-{}.world", worldId.instance)));
 }
 
 std::expected<void, StarException> UniverseServer::worldDiedWithError(WorldId world) {

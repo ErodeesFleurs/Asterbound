@@ -253,6 +253,20 @@ nix build .#benchmarks
 
 Native presets need `STAR_BUILD_BENCHMARKS=ON` and `VCPKG_MANIFEST_FEATURES="qt-tools;benchmarks"`; see [benchmark targets](source/benchmark/CMakeLists.txt). Asset-backed cases need owned assets and a private `-bootconfig`; **never use your saves**. GUI cases require a real display. Compare identical inputs/build flags with repeated samples, not shared-CI timing thresholds.
 
+`file_benchmarks` covers open-handle size/positioned reads, whole-file byte/String reads, directory/pak/memory asset-length batches, real file-backed BTree stage/rollback/commit batches and overwrite-with-rename. It creates only private temporary files; no commercial assets or saves are needed. Linux `ReadBytesEvictAdvised` applies per-file `POSIX_FADV_DONTNEED` outside timing, not global cache dropping or guaranteed physical cold-disk reads. Read buffer destruction is timed; fixture construction, readback and BTree snapshot reset are not. BTree labels give the mutation batch size. Overwrite counters report per-operation p50/p95/p99 from the first up to 4096 writes per repetition; do not mistake percentiles of batch means for write-tail latency. Compare the legacy overwrite path separately from the newer file/parent-directory durability guarantee.
+
+```sh
+./dist/file_benchmarks --benchmark_filter='File/' \
+  --benchmark_repetitions=7 --benchmark_min_time=0.2s \
+  --benchmark_enable_random_interleaving=true \
+  --benchmark_out=file.json --benchmark_out_format=json
+# Fixed operation counts give slow durable writes enough tail samples.
+./dist/file_benchmarks --benchmark_filter='File/OverwriteRename/' \
+  --benchmark_repetitions=7 --benchmark_min_time=256x \
+  --benchmark_enable_random_interleaving=true \
+  --benchmark_out=file-tail.json --benchmark_out_format=json
+```
+
 Use `--benchmark_filter='Lua/'` for invocation, callback, return-arity, context and coroutine cases. Asset workers share one Lua VM; additional workers do not parallelize Lua execution.
 
 `json_benchmarks` covers parsing, format-preserving construction, path updates and patches. Reported times include destruction; labels give the batch size, so divide batch CPU times by that count for per-document results. Path/patch cases also include sorted serialization. Use identical fixtures and repeated CPU medians rather than attributing the whole batch to one stage.
@@ -294,6 +308,17 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 - Non-floating `Array`, `SmallVector` and `StaticVector` comparisons use standard algorithms with explicit legacy predicates: equality needs only contextual `!=`, and lexicographic ordering needs only `<`. Keep existing identity/size shortcuts. Floating containers retain their original loops: production fast-math changed infinity/NaN ordering through standard Array lexicographic dispatch in a paired-module probe.
 - Small-vector fixed assignment overlaps use `std::copy_n` or three-argument `std::move`. Keep live-size erase loops and reverse tail destruction: an element's move assignment can append without reallocating and extend the shift interval.
 - Use `std::clamp` only with proven ordered bounds and value consumption. Legacy `Star::clamp` deliberately returns the upper bound for reversed ranges. Preserve vector interpolation, integer rounding, wrapped coordinates and fast-math-safe finite classification rather than replacing their arithmetic wholesale.
+
+### Files and durable storage
+
+- `File` owns a native handle and is neither copyable nor movable; share an instance through `std::shared_ptr<File>`. `clone()` opens an independent existing handle and restores its cursor without repeating truncate/append acquisition flags. An unnamed open ephemeral file cannot be cloned. Append means initial positioning at EOF, not atomic append.
+- File and byte-stream operations use `snake_case`, including `read_file`, `file_size`, `read_absolute`, `read_full`, `is_open` and `at_end`. Keep unrelated socket and database lifecycle APIs distinct.
+- Filesystem status queries return false for missing paths or incompatible path types, but propagate real status errors through `std::expected`. Native transfers retry `EINTR`, not `EAGAIN`; a consumed close is never retried. Ordinary-file sizes use the descriptor without changing its cursor.
+- Whole-file readers treat size as a bounded allocation hint and read to actual EOF, including files that grow or report no regular-file size. The internal `whole_file_buffer` concept describes the required owning-buffer operations; integral conversions retain checked bounds rather than imposing broader container concepts.
+- Do not race `open`, `close` or `set_filename` with I/O. Unix positioned operations use `pread`/`pwrite` without a global File lock. Windows synchronous cursor operations share a per-file recursive mutex, including the complete save/positioned-I/O/restore sequence.
+- `overwrite_file_with_rename` exclusively acquires its suffix staging file, writes and syncs it, checks close, then renames it. Never overwrite an existing stage or fall back to directly truncating the destination; clean up only a stage acquired by the operation. Unix also syncs the parent directory, so a directory-sync failure can be reported after the replacement is visible. Windows uses its native write-through rename and does not claim parent-directory `fsync` equivalence.
+- Asset digest lengths come from `AssetSource::file_size`, not allocated readers. Directory lengths still acquire a readable native handle, preserving permission failures without a payload read. Packed lengths validate their indexed extent against the current backing size; memory lengths use the retained bytes. Do not introduce stale length caches.
+- Complete BTree block writes stage new bytes without reading the old payload and reuse an already staged buffer with overlap-safe copying. Partial read/modify/write, copy-on-write allocation, commit ordering and sync failure handling remain unchanged.
 
 ### JSON values and formatting
 

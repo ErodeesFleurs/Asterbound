@@ -6,6 +6,7 @@ import star.string;
 import star.format;
 import std;
 import star.byte_array;
+import star.algorithm;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
 import star.string_windows;
 #endif
@@ -13,7 +14,7 @@ import star.string_windows;
 namespace Star {
 
 namespace {
-  std::expected<std::filesystem::path, StarException> filesystemPath(String const& path) {
+std::expected<std::filesystem::path, StarException> filesystem_path(String const& path) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
     auto native = stringToUtf16(path);
     if (!native)
@@ -22,10 +23,92 @@ namespace {
 #else
     return std::filesystem::path(path.utf8Ptr());
 #endif
-  }
 }
 
-std::expected<String, StarException> File::currentDirectory() {
+std::expected<std::size_t, StarException> read_file_tail(File& file, ByteArray& bytes, std::size_t amount, char first) {
+  auto offset = bytes.size();
+  bytes.resize(offset + amount);
+  bytes.span()[offset] = first;
+  auto count = file.read(bytes.span().subspan(offset + 1, amount - 1));
+  bytes.resize(offset + 1 + (count ? *count : 0));
+  if (!count)
+    return std::unexpected(std::move(count.error()));
+  return 1 + *count;
+}
+
+std::expected<std::size_t, StarException> read_file_tail(File& file, std::string& text, std::size_t amount,
+                                                         char first) {
+  auto offset = text.size();
+  std::expected<std::size_t, StarException> count = 0;
+  text.resize_and_overwrite(offset + amount, [&](char* storage, std::size_t) {
+    storage[offset] = first;
+    count = file.read(std::span<char>(storage + offset + 1, amount - 1));
+    return offset + 1 + (count ? *count : 0);
+  });
+  if (!count)
+    return std::unexpected(std::move(count.error()));
+  return 1 + *count;
+}
+
+template <typename Buffer>
+concept whole_file_buffer = std::default_initializable<Buffer> && std::movable<Buffer>
+  && requires(Buffer& buffer, File& file, std::size_t amount) {
+       { buffer.size() } -> std::same_as<std::size_t>;
+       { read_file_tail(file, buffer, amount, char{}) } -> std::same_as<std::expected<std::size_t, StarException>>;
+     };
+
+template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_file_contents(String const& filename) {
+  File file(filename);
+  auto opened = file.open(IOMode::Read);
+  if (!opened)
+    return std::unexpected(std::move(opened.error()));
+
+  auto read_all = [&]() -> std::expected<Buffer, StarException> {
+    Buffer buffer;
+    constexpr std::size_t chunk_size = 4 * 1024;
+    constexpr std::size_t maximum_chunk = 1024 * 1024;
+    std::size_t amount = chunk_size;
+    // Metadata is not EOF, and some readable devices have no usable size.
+    // Bound even a device's misleading size before converting or allocating.
+    auto hint = file.size();
+    if (hint && *hint > 0)
+      amount = static_cast<std::size_t>(std::clamp<StreamOffset>(*hint, 1, maximum_chunk));
+
+    auto limit = static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
+    if constexpr (requires { buffer.max_size(); })
+      limit = std::min(limit, buffer.max_size());
+    while (true) {
+      // Probe EOF before growing the owning buffer, including after the size hint.
+      char first;
+      auto prefix = file.read(std::span<char>(&first, 1));
+      if (!prefix)
+        return std::unexpected(std::move(prefix.error()));
+      if (*prefix == 0)
+        return buffer;
+      auto offset = buffer.size();
+      if (amount > limit - offset)
+        return std::unexpected(IOException::format("File '{}' is too large to read into memory", filename));
+      auto count = read_file_tail(file, buffer, amount, first);
+      if (!count)
+        return std::unexpected(std::move(count.error()));
+      amount = std::clamp(buffer.size(), chunk_size, maximum_chunk);
+    }
+  };
+  auto contents = read_all();
+  auto closed = file.close();
+  if (!contents) {
+    if (!closed)
+      std::fprintf(stderr, "Error closing file '%s' after failed read: %s\n", filename.utf8Ptr(),
+                   closed.error().what());
+    return std::unexpected(std::move(contents.error()));
+  }
+  if (!closed)
+    return std::unexpected(std::move(closed.error()));
+  return contents;
+}
+}
+
+std::expected<String, StarException> File::current_directory() {
   std::error_code error;
   auto path = std::filesystem::current_path(error);
   if (error)
@@ -37,8 +120,8 @@ std::expected<String, StarException> File::currentDirectory() {
 #endif
 }
 
-std::expected<void, StarException> File::changeDirectory(String const& dirName) {
-  auto path = filesystemPath(dirName);
+std::expected<void, StarException> File::change_directory(String const& dirName) {
+  auto path = filesystem_path(dirName);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -48,8 +131,8 @@ std::expected<void, StarException> File::changeDirectory(String const& dirName) 
   return {};
 }
 
-std::expected<void, StarException> File::makeDirectory(String const& dirName) {
-  auto path = filesystemPath(dirName);
+std::expected<void, StarException> File::create_directory(String const& dirName) {
+  auto path = filesystem_path(dirName);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -62,8 +145,8 @@ std::expected<void, StarException> File::makeDirectory(String const& dirName) {
   return {};
 }
 
-std::expected<void, StarException> File::makeDirectoryRecursive(String const& fileName) {
-  auto path = filesystemPath(fileName);
+std::expected<void, StarException> File::create_directories(String const& fileName) {
+  auto path = filesystem_path(fileName);
   if (!path)
     return std::unexpected(std::move(path.error()));
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
@@ -79,7 +162,7 @@ std::expected<void, StarException> File::makeDirectoryRecursive(String const& fi
 }
 
 std::expected<void, StarException> File::remove(String const& fileName) {
-  auto path = filesystemPath(fileName);
+  auto path = filesystem_path(fileName);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -92,8 +175,8 @@ std::expected<void, StarException> File::remove(String const& fileName) {
   return {};
 }
 
-std::expected<void, StarException> File::removeDirectoryRecursive(String const& fileName) {
-  auto path = filesystemPath(fileName);
+std::expected<void, StarException> File::remove_all(String const& fileName) {
+  auto path = filesystem_path(fileName);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -120,10 +203,10 @@ std::expected<void, StarException> File::removeDirectoryRecursive(String const& 
 }
 
 std::expected<void, StarException> File::copy(String const& source, String const& target) {
-  auto sourcePath = filesystemPath(source);
+  auto sourcePath = filesystem_path(source);
   if (!sourcePath)
     return std::unexpected(std::move(sourcePath.error()));
-  auto targetPath = filesystemPath(target);
+  auto targetPath = filesystem_path(target);
   if (!targetPath)
     return std::unexpected(std::move(targetPath.error()));
   std::error_code error;
@@ -141,85 +224,95 @@ std::expected<std::shared_ptr<File>, StarException> File::open(String const& fil
   return file;
 }
 
-std::expected<ByteArray, StarException> File::readFile(String const& filename) {
-  auto file = File::open(filename, IOMode::Read);
-  if (!file)
-    return std::unexpected(std::move(file.error()));
-  ByteArray bytes;
-  while (true) {
-    auto end = (*file)->atEnd();
-    if (!end)
-      return std::unexpected(std::move(end.error()));
-    if (*end)
-      break;
-    char buffer[1024];
-    auto count = (*file)->read(buffer);
-    if (!count)
-      return std::unexpected(std::move(count.error()));
-    bytes.append(std::span{buffer, *count});
-  }
-  auto closed = (*file)->close();
-  if (!closed)
-    return std::unexpected(std::move(closed.error()));
-  return bytes;
+std::expected<ByteArray, StarException> File::read_file(String const& filename) {
+  return read_file_contents<ByteArray>(filename);
 }
 
-std::expected<String, StarException> File::readFileString(String const& filename) {
-  auto file = File::open(filename, IOMode::Read);
-  if (!file)
-    return std::unexpected(std::move(file.error()));
-  std::string text;
-  while (true) {
-    auto end = (*file)->atEnd();
-    if (!end)
-      return std::unexpected(std::move(end.error()));
-    if (*end)
-      break;
-    char buffer[1024];
-    auto count = (*file)->read(buffer);
-    if (!count)
-      return std::unexpected(std::move(count.error()));
-    text.append(buffer, *count);
-  }
-  auto closed = (*file)->close();
-  if (!closed)
-    return std::unexpected(std::move(closed.error()));
-  return String(std::move(text));
+std::expected<String, StarException> File::read_file_string(String const& filename) {
+  auto text = read_file_contents<std::string>(filename);
+  if (!text)
+    return std::unexpected(std::move(text.error()));
+  return String(std::move(*text));
 }
 
-std::expected<void, StarException> File::writeFile(std::span<char const> data, String const& filename) {
+std::expected<void, StarException> File::write_file(std::span<char const> data, String const& filename) {
   auto file = File::open(filename, IOMode::Write | IOMode::Truncate);
   if (!file)
     return std::unexpected(std::move(file.error()));
-  auto written = (*file)->writeFull(data);
+  auto written = (*file)->write_full(data);
   if (!written)
     return std::unexpected(std::move(written.error()));
   return (*file)->close();
 }
 
-std::expected<void, StarException> File::writeFile(ByteArray const& data, String const& filename) {
-  return writeFile(data.span(), filename);
+std::expected<void, StarException> File::write_file(ByteArray const& data, String const& filename) {
+  return write_file(data.span(), filename);
 }
 
-std::expected<void, StarException> File::writeFile(String const& data, String const& filename) {
-  return writeFile(std::span<char const>(data.utf8()), filename);
+std::expected<void, StarException> File::write_file(String const& data, String const& filename) {
+  return write_file(std::span<char const>(data.utf8()), filename);
 }
 
-std::expected<void, StarException> File::overwriteFileWithRename(ByteArray const& data, String const& filename, String const& newSuffix) {
-  return overwriteFileWithRename(data.span(), filename, newSuffix);
+std::expected<void, StarException> File::overwrite_file_with_rename(std::span<char const> data, String const& filename,
+                                                                    String const& new_suffix) {
+  auto new_file = filename + new_suffix;
+  auto acquired = fopen(new_file.utf8Ptr(), IOMode::Write, true, true);
+  if (!acquired)
+    return std::unexpected(std::move(acquired.error()));
+  File staging(new_file);
+  staging.m_file = *acquired;
+  staging.set_mode(IOMode::Write);
+  bool owns_stage = true;
+  auto cleanup = finally([&] {
+    if (!owns_stage)
+      return;
+    auto closed = staging.close();
+    if (!closed)
+      std::fprintf(stderr, "Error closing staging file '%s': %s\n", new_file.utf8Ptr(), closed.error().what());
+    auto removed = remove(new_file);
+    if (!removed)
+      std::fprintf(stderr, "Error removing staging file '%s': %s\n", new_file.utf8Ptr(), removed.error().what());
+  });
+  auto written = staging.write_full(data);
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  auto synced = staging.sync();
+  if (!synced)
+    return std::unexpected(std::move(synced.error()));
+  auto closed = staging.close();
+  if (!closed)
+    return std::unexpected(std::move(closed.error()));
+  auto replaced = rename(new_file, filename);
+  if (!replaced)
+    return std::unexpected(std::move(replaced.error()));
+  owns_stage = false;
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  // Native rename requests write-through; Windows has no directory-fsync equivalent.
+  return {};
+#else
+  return sync_directory(dir_name(filename));
+#endif
 }
 
-std::expected<void, StarException> File::overwriteFileWithRename(String const& data, String const& filename, String const& newSuffix) {
-  return overwriteFileWithRename(std::span<char const>(data.utf8()), filename, newSuffix);
+std::expected<void, StarException> File::overwrite_file_with_rename(ByteArray const& data, String const& filename,
+                                                                    String const& newSuffix) {
+  return overwrite_file_with_rename(data.span(), filename, newSuffix);
 }
 
-std::expected<void, StarException> File::backupFileInSequence(String const& initialFile, String const& targetFile, unsigned maximumBackups, String const& backupExtensionPrefix) {
+std::expected<void, StarException> File::overwrite_file_with_rename(String const& data, String const& filename,
+                                                                    String const& newSuffix) {
+  return overwrite_file_with_rename(std::span<char const>(data.utf8()), filename, newSuffix);
+}
+
+std::expected<void, StarException> File::backup_file_in_sequence(String const& initialFile, String const& targetFile,
+                                                                 unsigned maximumBackups,
+                                                                 String const& backupExtensionPrefix) {
   for (unsigned i = maximumBackups; i > 0; --i) {
     bool initial = i == 1;
     String const& sourceFile = initial ? initialFile : targetFile;
     String curExtension = initial ? "" : strf("{}{}", backupExtensionPrefix, i - 1);
     String nextExtension = strf("{}{}", backupExtensionPrefix, i);
-    auto sourceExists = File::isFile(sourceFile + curExtension);
+    auto sourceExists = File::is_regular_file(sourceFile + curExtension);
     if (!sourceExists)
       return std::unexpected(std::move(sourceExists.error()));
     if (*sourceExists) {
@@ -231,8 +324,9 @@ std::expected<void, StarException> File::backupFileInSequence(String const& init
   return {};
 }
 
-std::expected<void, StarException> File::backupFileInSequence(String const& targetFile, unsigned maximumBackups, String const& backupExtensionPrefix) {
-  return backupFileInSequence(targetFile, targetFile, maximumBackups, backupExtensionPrefix);
+std::expected<void, StarException> File::backup_file_in_sequence(String const& targetFile, unsigned maximumBackups,
+                                                                 String const& backupExtensionPrefix) {
+  return backup_file_in_sequence(targetFile, targetFile, maximumBackups, backupExtensionPrefix);
 }
 
 File::File() : IODevice(IOMode::Closed), m_file(nullptr) {}
@@ -247,24 +341,36 @@ File::~File() noexcept {
 }
 
 std::expected<StreamOffset, StarException> File::pos() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("pos called on closed File"));
   return ftell(m_file);
 }
 
 std::expected<void, StarException> File::seek(StreamOffset offset, IOSeek seekMode) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("seek called on closed File"));
   return fseek(m_file, offset, seekMode);
 }
 
 std::expected<StreamOffset, StarException> File::size() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("size called on closed File"));
   return fsize(m_file);
 }
 
-std::expected<bool, StarException> File::atEnd() {
+std::expected<bool, StarException> File::at_end() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   auto position = pos();
   if (!position)
     return std::unexpected(std::move(position.error()));
@@ -275,40 +381,50 @@ std::expected<bool, StarException> File::atEnd() {
 }
 
 std::expected<std::size_t, StarException> File::read(std::span<char> data) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("read called on closed File"));
-  if (!isReadable())
+  if (!is_readable())
     return std::unexpected(IOException("read called on non-readable File"));
   return fread(m_file, data.data(), data.size());
 }
 
 std::expected<std::size_t, StarException> File::write(std::span<char const> data) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("write called on closed File"));
-  if (!isWritable())
+  if (!is_writable())
     return std::unexpected(IOException("write called on non-writable File"));
   return fwrite(m_file, data.data(), data.size());
 }
 
-std::expected<std::size_t, StarException> File::readAbsolute(StreamOffset position, std::span<char> data) {
-  if (!m_file || !isReadable())
-    return std::unexpected(IOException("readAbsolute called on closed or non-readable File"));
+std::expected<std::size_t, StarException> File::read_absolute(StreamOffset position, std::span<char> data) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
+  if (!m_file || !is_readable())
+    return std::unexpected(IOException("read_absolute called on closed or non-readable File"));
   return pread(m_file, data.data(), data.size(), position);
 }
 
-std::expected<std::size_t, StarException> File::writeAbsolute(StreamOffset position, std::span<char const> data) {
-  if (!m_file || !isWritable())
-    return std::unexpected(IOException("writeAbsolute called on closed or non-writable File"));
+std::expected<std::size_t, StarException> File::write_absolute(StreamOffset position, std::span<char const> data) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
+  if (!m_file || !is_writable())
+    return std::unexpected(IOException("write_absolute called on closed or non-writable File"));
   return pwrite(m_file, data.data(), data.size(), position);
 }
 
-String File::fileName() const {
-  return m_filename;
-}
+String File::file_name() const { return m_filename; }
 
-std::expected<void, StarException> File::setFilename(String filename) {
-  if (isOpen())
-    return std::unexpected(IOException("Cannot call setFilename while File is open"));
+std::expected<void, StarException> File::set_filename(String filename) {
+  if (is_open())
+    return std::unexpected(IOException("Cannot call set_filename while File is open"));
   m_filename = std::move(filename);
   return {};
 }
@@ -323,31 +439,29 @@ std::expected<void, StarException> File::remove() {
 }
 
 std::expected<void, StarException> File::resize(StreamOffset length) {
-  bool tempOpen = !isOpen();
-  if (tempOpen) {
-    auto opened = open(mode());
-    if (!opened)
-      return std::unexpected(std::move(opened.error()));
-  }
-  auto result = File::resize(m_file, length);
-  if (tempOpen) {
-    auto closed = close();
-    if (!closed) {
-      if (result)
-        return std::unexpected(std::move(closed.error()));
-      std::fprintf(stderr, "Error closing file '%s' after failed resize: %s\n", m_filename.utf8Ptr(), closed.error().what());
-    }
-  }
-  return result;
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
+  if (!m_file)
+    return std::unexpected(IOException("resize called on closed File"));
+  if (!is_writable())
+    return std::unexpected(IOException("resize called on non-writable File"));
+  return File::resize(m_file, length);
 }
 
 std::expected<void, StarException> File::sync() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   if (!m_file)
     return std::unexpected(IOException("sync called on closed File"));
   return fsync(m_file);
 }
 
 std::expected<void, StarException> File::open(IOMode mode) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   auto closed = close();
   if (!closed)
     return std::unexpected(std::move(closed.error()));
@@ -357,29 +471,41 @@ std::expected<void, StarException> File::open(IOMode mode) {
   if (!opened)
     return std::unexpected(std::move(opened.error()));
   m_file = *opened;
-  setMode(mode);
+  set_mode(mode);
   return {};
 }
 
 std::expected<void, StarException> File::close() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
   // Consume first: a failed close must never later close a reused descriptor.
   auto file = std::exchange(m_file, nullptr);
-  setMode(IOMode::Closed);
+  set_mode(IOMode::Closed);
   if (file)
     return fclose(file);
   return {};
 }
 
-std::expected<String, StarException> File::deviceName() const {
+std::expected<String, StarException> File::device_name() const {
   return m_filename.empty() ? String("<unnamed temp file>") : m_filename;
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> File::clone() {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  std::lock_guard lock(m_cursor_mutex);
+#endif
+  if (is_open() && m_filename.empty())
+    return std::unexpected(IOException("Cannot clone open File without a filename"));
   auto cloned = std::make_shared<File>(m_filename);
-  if (isOpen()) {
-    auto opened = cloned->open(mode());
+  if (is_open()) {
+    auto clone_mode = static_cast<IOMode>(static_cast<std::uint8_t>(mode())
+                                          & ~static_cast<std::uint8_t>(IOMode::Truncate | IOMode::Append));
+    auto opened = fopen(m_filename.utf8Ptr(), clone_mode, false);
     if (!opened)
       return std::unexpected(std::move(opened.error()));
+    cloned->m_file = *opened;
+    cloned->set_mode(clone_mode);
     auto position = pos();
     if (!position)
       return std::unexpected(std::move(position.error()));

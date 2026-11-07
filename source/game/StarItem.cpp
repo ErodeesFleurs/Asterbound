@@ -95,7 +95,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
         if (!image)
           return std::unexpected(std::move(image.error()));
         if (*image) {
-          auto relative = imageConfig.set("image", AssetPath::relativeTo(m_directory, **image));
+          auto relative = imageConfig.set("image", AssetPath::relative_to(m_directory, **image));
           if (!relative)
             return std::unexpected(std::move(relative.error()));
           imageConfig = std::move(*relative);
@@ -109,7 +109,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
       auto image = icon.toString();
       if (!image)
         return std::unexpected(std::move(image.error()));
-      auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(m_directory, *image), 1.0f, true, Vec2F());
+      auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(m_directory, *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawables.append(std::move(*drawable));
@@ -164,7 +164,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
     auto image = largeImage->toString();
     if (!image)
       return std::unexpected(std::move(image.error()));
-    m_largeImage = AssetPath::relativeTo(m_directory, *image);
+    m_largeImage = AssetPath::relative_to(m_directory, *image);
   }
   auto category = instanceValue("category", "").and_then([](Json const& value) { return value.toString(); });
   if (!category)

@@ -64,7 +64,7 @@ std::expected<StringList, StarException> AugmentItem::augmentScripts() const {
     return std::unexpected(std::move(scripts.error()));
   StringList result;
   for (auto const& script : *scripts) {
-    result.append(AssetPath::relativeTo(directory(), script));
+    result.append(AssetPath::relative_to(directory(), script));
   }
   return result;
 }

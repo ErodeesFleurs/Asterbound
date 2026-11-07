@@ -54,7 +54,7 @@ std::expected<std::shared_ptr<Statistics>, StarException> Statistics::create(Roo
 std::expected<void, StarException> Statistics::writeStatistics() {
   auto versioningDatabase = m_root.versioningDatabase();
   if (!versioningDatabase) return std::unexpected(std::move(versioningDatabase.error()));
-  String filename = File::relativeTo(m_storageDirectory, "statistics");
+  String filename = File::relative_to(m_storageDirectory, "statistics");
 
   JsonObject stats;
   for (auto const& entry : m_stats)
@@ -66,7 +66,7 @@ std::expected<void, StarException> Statistics::writeStatistics() {
 
   auto versionedStorage = (*versioningDatabase)->makeCurrentVersionedJson("Statistics", storage);
   if (!versionedStorage) return std::unexpected(std::move(versionedStorage.error()));
-  return VersionedJson::writeFile(*versionedStorage, filename);
+  return VersionedJson::write_file(*versionedStorage, filename);
 }
 
 Json Statistics::stat(String const& name, Json def) const {
@@ -223,27 +223,35 @@ std::expected<void, StarException> Statistics::readStatistics() {
   auto database = m_root.versioningDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   auto loaded = [&]() -> std::expected<void, StarException> {
-    String filename = File::relativeTo(m_storageDirectory, "statistics");
+    String filename = File::relative_to(m_storageDirectory, "statistics");
     auto exists = File::exists(filename);
-    if (!exists) return std::unexpected(std::move(exists.error()));
-    if (!*exists) return {};
-    auto versioned = VersionedJson::readFile(filename);
-    if (!versioned) return std::unexpected(std::move(versioned.error()));
+    if (!exists)
+      return std::unexpected(std::move(exists.error()));
+    if (!*exists)
+      return {};
+    auto versioned = VersionedJson::read_file(filename);
+    if (!versioned)
+      return std::unexpected(std::move(versioned.error()));
     auto storage = (*database)->loadVersionedJson(*versioned, "Statistics");
-    if (!storage) return std::unexpected(std::move(storage.error()));
+    if (!storage)
+      return std::unexpected(std::move(storage.error()));
     auto stats = storage->getObject("stats", {});
-    if (!stats) return std::unexpected(std::move(stats.error()));
+    if (!stats)
+      return std::unexpected(std::move(stats.error()));
     StringMap<Stat> parsedStats;
     for (auto const& entry : *stats) {
       auto stat = Stat::fromJson(entry.second);
-      if (!stat) return std::unexpected(std::move(stat.error()));
+      if (!stat)
+        return std::unexpected(std::move(stat.error()));
       parsedStats[entry.first] = std::move(*stat);
     }
     m_stats = std::move(parsedStats);
     auto achievementsJson = storage->get("achievements", JsonArray{});
-    if (!achievementsJson) return std::unexpected(std::move(achievementsJson.error()));
+    if (!achievementsJson)
+      return std::unexpected(std::move(achievementsJson.error()));
     auto achievements = jsonToStringSet(*achievementsJson);
-    if (!achievements) return std::unexpected(std::move(achievements.error()));
+    if (!achievements)
+      return std::unexpected(std::move(achievements.error()));
     m_achievements = std::move(*achievements);
     return {};
   }();

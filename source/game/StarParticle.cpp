@@ -88,7 +88,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
     return std::unexpected(std::move(image.error()));
   particle.string = std::move(*image);
   if (particle.type == Type::Textured || particle.type == Type::Animated)
-    particle.string = AssetPath::relativeTo(path, particle.string);
+    particle.string = AssetPath::relative_to(path, particle.string);
   particle.image = particle.string;
   if (particle.type == Type::Animated) {
     auto pathEnd = particle.string.find('?');
@@ -196,7 +196,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   if (!destructionImage)
     return std::unexpected(std::move(destructionImage.error()));
   if (particle.destructionAction == DestructionAction::Image)
-    *destructionImage = AssetPath::relativeTo(path, *destructionImage);
+    *destructionImage = AssetPath::relative_to(path, *destructionImage);
   particle.destructionImage = std::move(*destructionImage);
   auto destructionTime = config.getFloat("destructionTime", 0.0f);
   if (!destructionTime)

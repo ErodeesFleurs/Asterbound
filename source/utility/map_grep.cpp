@@ -91,7 +91,7 @@ std::expected<void, StarException> grepObjectGroup(SearchParameters const& searc
 
 [[nodiscard]]
 std::expected<void, StarException> grepMap(Root& root, SearchParameters const& search, String const& file) {
-  auto contents = File::readFileString(file);
+  auto contents = File::read_file_string(file);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
   auto json = Json::parseJson(*contents);
@@ -119,14 +119,14 @@ std::expected<void, StarException> grepMap(Root& root, SearchParameters const& s
 
 [[nodiscard]]
 std::expected<void, StarException> grepDirectory(Root& root, SearchParameters const& search, String const& directory) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    String path = File::relativeTo(directory, entry.first);
+    String path = File::relative_to(directory, entry.first);
     // A symlinked directory may escape the tree or revisit a parent.
     if (entry.second) {
-      auto symlink = File::isSymlink(path);
+      auto symlink = File::is_symlink(path);
       if (!symlink)
         return std::unexpected(std::move(symlink.error()));
       if (*symlink) {
@@ -156,12 +156,12 @@ std::expected<void, StarException> grepDirectory(Root& root, SearchParameters co
 
 [[nodiscard]]
 std::expected<void, StarException> grepPath(Root& root, SearchParameters const& search, String const& path) {
-  auto file = File::isFile(path);
+  auto file = File::is_regular_file(path);
   if (!file)
     return std::unexpected(std::move(file.error()));
   if (*file)
     return grepMap(root, search, path);
-  auto directory = File::isDirectory(path);
+  auto directory = File::is_directory(path);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (*directory)

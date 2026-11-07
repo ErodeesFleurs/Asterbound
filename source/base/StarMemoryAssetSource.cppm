@@ -30,6 +30,7 @@ public:
   String name() const;
   JsonObject metadata() const override;
   StringList assetPaths() const override;
+  [[nodiscard]] std::expected<StreamOffset, StarException> file_size(String const& path) override;
 
   // do not use the returned IODevice after the file is gone or bad things will happen
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) override;
@@ -69,13 +70,30 @@ StringList MemoryAssetSource::assetPaths() const {
   return m_files.keys();
 }
 
+std::expected<StreamOffset, StarException> MemoryAssetSource::file_size(String const& path) {
+  auto entry = m_files.find_ref(path);
+  if (!entry)
+    return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in memory", path));
+  if (auto bytes = std::get_if<ByteArray>(&entry->get())) {
+    if (bytes->size() > static_cast<std::uint64_t>(std::numeric_limits<StreamOffset>::max()))
+      return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to open", path));
+    return static_cast<StreamOffset>(bytes->size());
+  }
+  auto const& image = *std::get<std::shared_ptr<Image>>(entry->get());
+  std::uint64_t pixels = static_cast<std::uint64_t>(image.width()) * image.height();
+  auto bpp = image.bytesPerPixel();
+  if (bpp && pixels > static_cast<std::uint64_t>(std::numeric_limits<StreamOffset>::max()) / bpp)
+    return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to open", path));
+  return static_cast<StreamOffset>(pixels * bpp);
+}
+
 std::expected<std::shared_ptr<IODevice>, StarException> MemoryAssetSource::open(String const& path) {
   struct AssetReader : public IODevice {
     AssetReader(std::span<char const> assetData, String name) {
       this->assetData = assetData;
       this->assetSize = assetData.size();
       this->name = std::move(name);
-      setMode(IOMode::Read);
+      set_mode(IOMode::Read);
     }
 
     [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override {
@@ -92,9 +110,9 @@ std::expected<std::shared_ptr<IODevice>, StarException> MemoryAssetSource::open(
     [[nodiscard]] std::expected<StreamOffset, StarException> size() override { return assetSize; }
     [[nodiscard]] std::expected<StreamOffset, StarException> pos() override { return assetPos; }
 
-    [[nodiscard]] std::expected<String, StarException> deviceName() const override { return name; }
+    [[nodiscard]] std::expected<String, StarException> device_name() const override { return name; }
 
-    [[nodiscard]] std::expected<bool, StarException> atEnd() override {
+    [[nodiscard]] std::expected<bool, StarException> at_end() override {
       return assetPos >= static_cast<StreamOffset>(assetSize);
     }
 

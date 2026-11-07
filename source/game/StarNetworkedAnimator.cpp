@@ -490,7 +490,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     if (relativePath.empty()) relativePath = *path;
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto loaded = (*assets)->json(AssetPath::relativeTo(relativePath, *path));
+    auto loaded = (*assets)->json(AssetPath::relative_to(relativePath, *path));
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     config = std::move(*loaded);
   } else if (relativePath.empty()) {
@@ -725,7 +725,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       auto pool = jsonToStringList(soundConfig);
       if (!pool) return std::unexpected(std::move(pool.error()));
       sound.soundPool.set(pool->transformed(
-        [relativePath = m_relativePath](String const& path) { return AssetPath::relativeTo(relativePath, path); }));
+        [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
       sound.volumeTarget.set(1.0f);
       sound.volumeRampTime.set(0.0f);
       sound.pitchMultiplierTarget.set(1.0f);
@@ -761,7 +761,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       auto pool = jsonToStringList(*poolJson);
       if (!pool) return std::unexpected(std::move(pool.error()));
       sound.soundPool.set(pool->transformed(
-        [relativePath = m_relativePath](String const& path) { return AssetPath::relativeTo(relativePath, path); }));
+        [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
     }
   }
   auto effectsConfig = config.get("effects", JsonObject());
@@ -1746,7 +1746,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       if (find == m_cachedPartDrawables.end() || find->second.first != hash) {
         String relativeImage;
         if (*initial != '/')
-          relativeImage = AssetPath::relativeTo(m_relativePath, usedImage);
+          relativeImage = AssetPath::relative_to(m_relativePath, usedImage);
 
         auto metadata = m_root.get().imageMetadataDatabase();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
@@ -1866,7 +1866,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
 
         if (!persistentSoundFile.empty())
-          persistentSoundFile = AssetPath::relativeTo(m_relativePath, persistentSoundFile);
+          persistentSoundFile = AssetPath::relative_to(m_relativePath, persistentSoundFile);
 
         auto& activePersistentSound = dynamicTarget->get().statePersistentSounds[stateTypeName];
 
@@ -1914,7 +1914,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
 
         if (!immediateSoundFile.empty())
-          immediateSoundFile = AssetPath::relativeTo(m_relativePath, immediateSoundFile);
+          immediateSoundFile = AssetPath::relative_to(m_relativePath, immediateSoundFile);
 
         auto& activeImmediateSound = dynamicTarget->get().stateImmediateSounds[stateTypeName];
 
@@ -2348,7 +2348,7 @@ std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, 
     if (!name) return std::unexpected(std::move(name.error()));
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto loaded = (*assets)->json(AssetPath::relativeTo(relativePath, *name));
+    auto loaded = (*assets)->json(AssetPath::relative_to(relativePath, *name));
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     Json includeConfig = std::move(*loaded);
     auto hasIncludes = includeConfig.contains("includes");

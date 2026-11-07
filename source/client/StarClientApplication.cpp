@@ -1111,7 +1111,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
       if (!multiline)
         return std::unexpected(std::move(multiline.error()));
       if (!*multiline) {
-        auto relative = AssetPath::relativeTo(path, *shader);
+        auto relative = AssetPath::relative_to(path, *shader);
         auto bytes = assets->bytes(relative);
         if (!bytes)
           return std::unexpected(std::move(bytes.error()));

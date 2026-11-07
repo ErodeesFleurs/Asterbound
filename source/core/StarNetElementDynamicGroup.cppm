@@ -335,7 +335,11 @@ template <typename Element>
       if (*written) {
         { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
         { auto result = ds.writeVlqU(p.first + 1); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = ds.writeBytes(m_buffer.data()); if (!result) return std::unexpected(std::move(result.error())); }
+        {
+          auto result = ds.write_bytes(m_buffer.data());
+          if (!result)
+            return std::unexpected(std::move(result.error()));
+        }
         m_buffer.clear();
       }
     }

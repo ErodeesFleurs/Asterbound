@@ -37,9 +37,9 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> readData(std::span<char> data) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> writeData(std::span<char const> data) = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> atEnd() { return false; }
-  [[nodiscard]] std::expected<ByteArray, StarException> readBytes(std::size_t len);
-  [[nodiscard]] std::expected<void, StarException> writeBytes(ByteArray const& ba);
+  [[nodiscard]] virtual std::expected<bool, StarException> at_end() { return false; }
+  [[nodiscard]] std::expected<ByteArray, StarException> read_bytes(std::size_t len);
+  [[nodiscard]] std::expected<void, StarException> write_bytes(ByteArray const& ba);
 
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(bool d);
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(char d);

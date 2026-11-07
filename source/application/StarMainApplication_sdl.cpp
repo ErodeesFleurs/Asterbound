@@ -544,7 +544,7 @@ public:
         return std::unexpected(std::move(contextScope.error()));
 
       if (auto basePath = SDL_GetBasePath()) {
-        auto result = File::changeDirectory(String(std::string_view(basePath)));
+        auto result = File::change_directory(String(std::string_view(basePath)));
         if (!result)
           return std::unexpected(std::move(result.error()));
       }
@@ -630,7 +630,7 @@ public:
 #endif
     
 #ifdef STAR_SYSTEM_LINUX
-    auto iconExists = File::isFile(".icon/openstarbound.png");
+    auto iconExists = File::is_regular_file(".icon/openstarbound.png");
     if (!iconExists)
       return std::unexpected(std::move(iconExists.error()));
     if (*iconExists) {
@@ -693,7 +693,7 @@ public:
       // Install Icon if not Installed
       std::expected<bool, StarException> iconsDirectoryExists = false;
       if (!XdgIconsPath.empty())
-        iconsDirectoryExists = File::isDirectory(XdgIconsPath);
+        iconsDirectoryExists = File::is_directory(XdgIconsPath);
       if (!iconsDirectoryExists)
         return std::unexpected(std::move(iconsDirectoryExists.error()));
       if (*iconsDirectoryExists) {
@@ -701,7 +701,7 @@ public:
         if (!icon)
           return std::unexpected(std::move(icon.error()));
         const String XdgIcon = std::move(*icon);
-        auto installed = File::isFile(XdgIcon);
+        auto installed = File::is_regular_file(XdgIcon);
         if (!installed)
           return std::unexpected(std::move(installed.error()));
         if (!*installed) {

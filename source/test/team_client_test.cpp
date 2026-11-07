@@ -36,22 +36,22 @@ std::expected<Json, StarException> invokeTeam(JsonRpcHandlers const& handlers, S
 
 const GameTestRegistration teamStatusSynchronization(
   "TeamClientTest", "AppearanceSyncRetainsDynamicStatusAndPendingForceAcrossReplies", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectoryRecursive(overlay));
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
     // Drive each RPC explicitly; ordinary polling must not add unrelated requests.
     String intervalPatch = R"([
       {"op":"replace","path":"/invitationPollInterval","value":1000000000000},
       {"op":"replace","path":"/fullUpdateInterval","value":1000000000000},
       {"op":"replace","path":"/statusUpdateInterval","value":1000000000000}
     ])";
-    auto intervalPath = File::relativeTo(overlay, "interface.config.patch");
-    ASSERT_TRUE(File::writeFile(intervalPatch, intervalPath));
+    auto intervalPath = File::relative_to(overlay, "interface.config.patch");
+    ASSERT_TRUE(File::write_file(intervalPatch, intervalPath));
     auto settings = fixture.rootSettings();
     settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
@@ -207,16 +207,14 @@ const GameTestRegistration teamStatusSynchronization(
     checkPacket(*changedTeam, true, "changed team");
     ASSERT_TRUE(exchange(*changedTeam));
 
-    ASSERT_TRUE(File::writeFile(
-        String(R"([{"op":"remove","path":"/invitationPollInterval"}])"), intervalPath));
+    ASSERT_TRUE(File::write_file(String(R"([{"op":"remove","path":"/invitationPollInterval"}])"), intervalPath));
     ASSERT_TRUE((*root)->hotReload());
     auto invalidInterval = team.update();
     ASSERT_FALSE(invalidInterval);
     EXPECT_TRUE(invalidInterval.error().is<AssetException>());
     EXPECT_EQ(invalidInterval.error().diagnosticSummary()->asset, "/interface.config:invitationPollInterval");
-    ASSERT_TRUE(File::writeFile(intervalPatch, intervalPath));
+    ASSERT_TRUE(File::write_file(intervalPatch, intervalPath));
     ASSERT_TRUE((*root)->hotReload());
     ASSERT_TRUE(team.update());
   });
-
 }

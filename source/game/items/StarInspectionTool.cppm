@@ -182,7 +182,7 @@ std::expected<std::shared_ptr<InspectionTool>, StarException> InspectionTool::cr
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  item->m_image = AssetPath::relativeTo(directory, *image);
+  item->m_image = AssetPath::relative_to(directory, *image);
   for (auto const& [key, target] : {std::pair{std::string_view("handPosition"), std::ref(item->m_handPosition)}, std::pair{std::string_view("lightPosition"), std::ref(item->m_lightPosition)}}) {
     auto value = item->instanceValue(key).and_then(jsonToVec2F);
     if (!value)

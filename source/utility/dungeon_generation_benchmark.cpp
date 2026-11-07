@@ -196,7 +196,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto worldTemplate = WorldTemplate::create(*root, *worldParameters, SkyParameters(), 1234);
     if (!worldTemplate)
       return std::unexpected(std::move(worldTemplate.error()));
-    auto storage = File::ephemeralFile(root->random());
+    auto storage = File::ephemeral_file(root->random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto server = WorldServer::create(*root, std::move(*worldTemplate), *storage);

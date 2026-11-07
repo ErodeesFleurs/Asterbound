@@ -14,30 +14,40 @@ import star.string_windows;
 
 namespace Star {
 namespace {
-  OVERLAPPED makeOverlapped(StreamOffset offset) {
-    OVERLAPPED overlapped = {};
-    overlapped.Offset = static_cast<DWORD>(offset);
-    overlapped.OffsetHigh = static_cast<DWORD>(static_cast<std::uint64_t>(offset) >> 32);
-    return overlapped;
-  }
-
-  void closeAfterFailure(HANDLE file) {
-    if (!CloseHandle(file))
-      std::fprintf(stderr, "Error closing file after failed acquisition: %lu\n", GetLastError());
-  }
-
-  std::expected<String, StarException> temporaryRoot() {
-    WCHAR path[MAX_PATH];
-    auto length = GetTempPathW(MAX_PATH, path);
-    if (!length)
-      return std::unexpected(IOException::format("Could not call GetTempPath: {}", GetLastError()));
-    if (length >= MAX_PATH)
-      return std::unexpected(IOException("GetTempPath exceeds path buffer"));
-    return utf16ToString(path);
-  }
+OVERLAPPED make_overlapped(StreamOffset offset) {
+  OVERLAPPED overlapped = {};
+  overlapped.Offset = static_cast<DWORD>(offset);
+  overlapped.OffsetHigh = static_cast<DWORD>(static_cast<std::uint64_t>(offset) >> 32);
+  return overlapped;
 }
 
-String File::convertDirSeparators(String const& path) {
+void close_after_failure(HANDLE file) {
+  if (!CloseHandle(file))
+    std::fprintf(stderr, "Error closing file after failed acquisition: %lu\n", GetLastError());
+}
+
+std::expected<String, StarException> temporary_root() {
+  WCHAR path[MAX_PATH];
+  auto length = GetTempPathW(MAX_PATH, path);
+  if (!length)
+    return std::unexpected(IOException::format("Could not call GetTempPath: {}", GetLastError()));
+  if (length >= MAX_PATH)
+    return std::unexpected(IOException("GetTempPath exceeds path buffer"));
+  return utf16ToString(path);
+}
+
+bool missing_path_error(DWORD error) {
+  return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND || error == ERROR_DIRECTORY;
+}
+
+std::expected<StreamOffset, StarException> checked_size(std::uint64_t size) {
+  if (!std::in_range<StreamOffset>(size))
+    return std::unexpected(IOException("File size cannot be represented as a stream offset"));
+  return static_cast<StreamOffset>(size);
+}
+}// namespace
+
+String File::convert_dir_separators(String const& path) {
   auto bytes = path.utf8();
   std::replace(bytes.begin(), bytes.end(), '/', '\\');
   return String(std::move(bytes));
@@ -51,52 +61,98 @@ std::expected<bool, StarException> File::exists(String const& path) {
     return std::unexpected(std::move(native.error()));
   WIN32_FIND_DATAW data;
   auto handle = FindFirstFileW(native->get(), &data);
-  if (handle == INVALID_HANDLE_VALUE)
-    return false;
+  if (handle == INVALID_HANDLE_VALUE) {
+    auto error = GetLastError();
+    if (missing_path_error(error))
+      return false;
+    return std::unexpected(IOException::format("Could not inspect path '{}': {}", path, error));
+  }
   if (!FindClose(handle))
     return std::unexpected(IOException::format("FindClose failed: {}", GetLastError()));
   return true;
 }
 
-std::expected<bool, StarException> File::isFile(String const& path) {
+std::expected<bool, StarException> File::is_regular_file(String const& path) {
   auto native = stringToUtf16(path);
   if (!native)
     return std::unexpected(std::move(native.error()));
   WIN32_FIND_DATAW data;
   auto handle = FindFirstFileW(native->get(), &data);
-  if (handle == INVALID_HANDLE_VALUE)
-    return false;
+  if (handle == INVALID_HANDLE_VALUE) {
+    auto error = GetLastError();
+    if (missing_path_error(error))
+      return false;
+    return std::unexpected(IOException::format("Could not inspect path '{}': {}", path, error));
+  }
   if (!FindClose(handle))
     return std::unexpected(IOException::format("FindClose failed: {}", GetLastError()));
   return !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 }
 
-std::expected<bool, StarException> File::isDirectory(String const& path) {
+std::expected<bool, StarException> File::is_directory(String const& path) {
   auto bytes = path.utf8();
-  while (!bytes.empty() && (bytes.back() == '\\' || bytes.back() == '/'))
+  while (bytes.size() > 1 && (bytes.back() == '\\' || bytes.back() == '/') && !(bytes.size() == 3 && bytes[1] == ':'))
     bytes.pop_back();
   auto native = stringToUtf16(String(std::move(bytes)));
   if (!native)
     return std::unexpected(std::move(native.error()));
   auto attributes = GetFileAttributesW(native->get());
-  return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    auto error = GetLastError();
+    if (missing_path_error(error))
+      return false;
+    return std::unexpected(IOException::format("Could not inspect directory '{}': {}", path, error));
+  }
+  return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
-std::expected<bool, StarException> File::isSymlink(String const& path) {
+std::expected<bool, StarException> File::is_symlink(String const& path) {
   auto native = stringToUtf16(path);
   if (!native)
     return std::unexpected(std::move(native.error()));
   WIN32_FIND_DATAW data;
   auto handle = FindFirstFileW(native->get(), &data);
-  if (handle == INVALID_HANDLE_VALUE)
-    return false;
+  if (handle == INVALID_HANDLE_VALUE) {
+    auto error = GetLastError();
+    if (missing_path_error(error))
+      return false;
+    return std::unexpected(IOException::format("Could not inspect symlink '{}': {}", path, error));
+  }
   if (!FindClose(handle))
     return std::unexpected(IOException::format("FindClose failed: {}", GetLastError()));
   return (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) && data.dwReserved0 == IO_REPARSE_TAG_SYMLINK;
 }
 
+std::expected<StreamOffset, StarException> File::file_size(String const& path) {
+  auto native = stringToUtf16(path);
+  if (!native)
+    return std::unexpected(std::move(native.error()));
+  auto handle = CreateFileW(native->get(), GENERIC_READ | FILE_READ_ATTRIBUTES,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                            FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (handle == INVALID_HANDLE_VALUE)
+    return std::unexpected(IOException::format("Could not inspect file '{}': {}", path, GetLastError()));
+  BY_HANDLE_FILE_INFORMATION info;
+  if (!GetFileInformationByHandle(handle, &info)) {
+    auto error = GetLastError();
+    close_after_failure(handle);
+    return std::unexpected(IOException::format("Could not inspect file '{}': {}", path, error));
+  }
+  if ((info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || GetFileType(handle) != FILE_TYPE_DISK) {
+    close_after_failure(handle);
+    return std::unexpected(IOException::format("Cannot query regular file size for '{}'", path));
+  }
+  auto size = checked_size((static_cast<std::uint64_t>(info.nFileSizeHigh) << 32) | info.nFileSizeLow);
+  auto closed = fclose(handle);
+  if (!size)
+    return std::unexpected(std::move(size.error()));
+  if (!closed)
+    return std::unexpected(std::move(closed.error()));
+  return size;
+}
+
 // GetFullPathName is lexical on Windows and accepts paths that do not exist.
-std::expected<String, StarException> File::fullPath(String const& path) {
+std::expected<String, StarException> File::full_path(String const& path) {
   auto native = stringToUtf16(path);
   if (!native)
     return std::unexpected(std::move(native.error()));
@@ -109,8 +165,9 @@ std::expected<String, StarException> File::fullPath(String const& path) {
   return utf16ToString(buffer);
 }
 
-std::expected<List<std::pair<String, bool>>, StarException> File::dirList(String const& dirName, bool skipDots) {
-  auto native = stringToUtf16(relativeTo(dirName, "*"));
+std::expected<List<std::pair<String, bool>>, StarException> File::directory_entries(String const& dirName,
+                                                                                    bool skipDots) {
+  auto native = stringToUtf16(relative_to(dirName, "*"));
   if (!native)
     return std::unexpected(std::move(native.error()));
   std::error_code error;
@@ -118,7 +175,7 @@ std::expected<List<std::pair<String, bool>>, StarException> File::dirList(String
   path.remove_filename();
   std::filesystem::directory_iterator entry(path, error);
   if (error)
-    return std::unexpected(IOException::format("dirList failed on dir '{}': {}", dirName, error.message()));
+    return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));
   List<std::pair<String, bool>> files;
   // Windows root directories do not expose the special dot entries.
   if (!skipDots && path != path.root_path()) {
@@ -127,7 +184,7 @@ std::expected<List<std::pair<String, bool>>, StarException> File::dirList(String
   }
   for (std::filesystem::directory_iterator end; entry != end; entry.increment(error)) {
     if (error)
-      return std::unexpected(IOException::format("dirList failed on dir '{}': {}", dirName, error.message()));
+      return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));
     auto name = utf16ToString(entry->path().filename().c_str());
     if (!name)
       return std::unexpected(std::move(name.error()));
@@ -136,11 +193,11 @@ std::expected<List<std::pair<String, bool>>, StarException> File::dirList(String
     files.append({std::move(*name), attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)});
   }
   if (error)
-    return std::unexpected(IOException::format("dirList failed on dir '{}': {}", dirName, error.message()));
+    return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));
   return files;
 }
 
-String File::baseName(String const& fileName) {
+String File::base_name(String const& fileName) {
   auto const& bytes = fileName.utf8();
   auto end = bytes.find_last_not_of("\\/");
   if (end == std::string::npos)
@@ -150,7 +207,7 @@ String File::baseName(String const& fileName) {
   return String(bytes.substr(start, end + 1 - start));
 }
 
-String File::dirName(String const& fileName) {
+String File::dir_name(String const& fileName) {
   if (fileName == "\\" || fileName == "/")
     return "\\";
   auto const& bytes = fileName.utf8();
@@ -164,7 +221,7 @@ String File::dirName(String const& fileName) {
   return parentEnd == std::string::npos ? String(".") : String(bytes.substr(0, parentEnd + 1));
 }
 
-String File::relativeTo(String const& relativeTo, String const& path) {
+String File::relative_to(String const& relativeTo, String const& path) {
   auto const& suffix = path.utf8();
   if ((!suffix.empty() && (suffix[0] == '/' || suffix[0] == '\\'))
       || (suffix.size() >= 2 && ((suffix[0] >= 'a' && suffix[0] <= 'z') || (suffix[0] >= 'A' && suffix[0] <= 'Z')) && suffix[1] == ':'))
@@ -179,42 +236,66 @@ String File::relativeTo(String const& relativeTo, String const& path) {
   return String(std::move(bytes));
 }
 
-std::expected<String, StarException> File::temporaryFileName(RandomService& random) {
-  auto root = temporaryRoot();
+std::expected<String, StarException> File::temporary_file_name(RandomService& random) {
+  auto root = temporary_root();
   if (!root)
     return std::unexpected(std::move(root.error()));
-  return relativeTo(*root, strf("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
+  return relative_to(*root, strf("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
 }
 
-std::expected<std::shared_ptr<File>, StarException> File::temporaryFile(RandomService& random) {
-  auto name = temporaryFileName(random);
-  if (!name)
-    return std::unexpected(std::move(name.error()));
-  return open(*name, IOMode::ReadWrite);
+std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomService& random) {
+  for (;;) {
+    auto name = temporary_file_name(random);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto path = stringToUtf16(*name);
+    if (!path)
+      return std::unexpected(std::move(path.error()));
+    auto handle =
+      CreateFileW(path->get(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+      auto error = GetLastError();
+      if (error == ERROR_FILE_EXISTS || error == ERROR_ALREADY_EXISTS)
+        continue;
+      return std::unexpected(IOException::format("Could not create temporary file '{}': {}", *name, error));
+    }
+    auto file = std::make_shared<File>(std::move(*name));
+    file->m_file = handle;
+    file->set_mode(IOMode::ReadWrite);
+    return file;
+  }
 }
 
-std::expected<std::shared_ptr<File>, StarException> File::ephemeralFile(RandomService& random) {
-  auto file = temporaryFile(random);
+std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomService& random) {
+  auto file = temporary_file(random);
   if (!file)
     return std::unexpected(std::move(file.error()));
-  auto path = stringToUtf16((*file)->fileName());
+  auto path = stringToUtf16((*file)->file_name());
   if (!path)
     return std::unexpected(std::move(path.error()));
   if (!DeleteFileW(path->get()))
-    return std::unexpected(IOException::format("Could not delete ephemeral file '{}': {}", (*file)->fileName(), GetLastError()));
+    return std::unexpected(
+      IOException::format("Could not delete ephemeral file '{}': {}", (*file)->file_name(), GetLastError()));
   (*file)->m_filename = "";
   return std::move(*file);
 }
 
-std::expected<String, StarException> File::temporaryDirectory(RandomService& random) {
-  auto root = temporaryRoot();
+std::expected<String, StarException> File::temporary_directory(RandomService& random) {
+  auto root = temporary_root();
   if (!root)
     return std::unexpected(std::move(root.error()));
-  auto directory = relativeTo(*root, strf("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
-  auto made = makeDirectory(directory);
-  if (!made)
-    return std::unexpected(std::move(made.error()));
-  return directory;
+  for (;;) {
+    auto directory = relative_to(*root, strf("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
+    auto path = stringToUtf16(directory);
+    if (!path)
+      return std::unexpected(std::move(path.error()));
+    if (CreateDirectoryW(path->get(), nullptr))
+      return directory;
+    auto error = GetLastError();
+    if (error != ERROR_ALREADY_EXISTS && error != ERROR_FILE_EXISTS)
+      return std::unexpected(IOException::format("Could not create temporary directory '{}': {}", directory, error));
+  }
 }
 
 std::expected<void, StarException> File::rename(String const& source, String const& target) {
@@ -224,59 +305,16 @@ std::expected<void, StarException> File::rename(String const& source, String con
   auto targetPath = stringToUtf16(target);
   if (!targetPath)
     return std::unexpected(std::move(targetPath.error()));
-  auto temp = target + ".tmp";
-  auto tempPath = stringToUtf16(temp);
-  if (!tempPath)
-    return std::unexpected(std::move(tempPath.error()));
-  auto replace = exists(target);
-  if (!replace)
-    return std::unexpected(std::move(replace.error()));
-  if (*replace) {
-    if (!DeleteFileW(tempPath->get())) {
-      auto error = GetLastError();
-      if (error != ERROR_FILE_NOT_FOUND)
-        return std::unexpected(IOException::format("error deleting existing temp file: {}", error));
-    }
-    if (!MoveFileExW(targetPath->get(), tempPath->get(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH))
-      return std::unexpected(IOException::format("error temporary file '{}': {}", temp, GetLastError()));
-  }
-  if (!MoveFileExW(sourcePath->get(), targetPath->get(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH))
+  // Do not move or remove the old target before the replacement succeeds.
+  // Omitting COPY_ALLOWED also prevents a cross-volume copy/delete fallback.
+  if (!MoveFileExW(sourcePath->get(), targetPath->get(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     return std::unexpected(IOException::format("Rename error: {}", GetLastError()));
-  if (*replace && !DeleteFileW(tempPath->get()))
-    return std::unexpected(IOException::format("error deleting temp file '{}': {}", temp, GetLastError()));
   return {};
 }
 
-std::expected<void, StarException> File::overwriteFileWithRename(std::span<char const> data, String const& filename, String const& newSuffix) {
-  auto newFile = filename + newSuffix;
-  auto atomicWrite = [&]() -> std::expected<void, StarException> {
-    auto file = open(newFile, IOMode::Write | IOMode::Truncate);
-    if (!file)
-      return std::unexpected(std::move(file.error()));
-    auto written = (*file)->writeFull(data);
-    if (!written)
-      return std::unexpected(std::move(written.error()));
-    auto synced = (*file)->sync();
-    if (!synced)
-      return std::unexpected(std::move(synced.error()));
-    auto closed = (*file)->close();
-    if (!closed)
-      return std::unexpected(std::move(closed.error()));
-    return rename(newFile, filename);
-  };
-  auto result = atomicWrite();
-  if (result || !result.error().is<IOException>())
-    return result;
-  // Preserve the existing Windows recovery boundary: IO failures in the
-  // write/flush/move sequence retry a non-atomic write. Removal is best effort.
-  auto path = stringToUtf16(newFile);
-  if (!path)
-    return std::unexpected(std::move(path.error()));
-  ::_wremove(path->get());
-  return writeFile(data, filename);
-}
-
-std::expected<void*, StarException> File::fopen(char const* filename, IOMode mode) {
+std::expected<void*, StarException> File::fopen(char const* filename, IOMode mode, bool create, bool exclusive) {
+  if (exclusive && !create)
+    return std::unexpected(IOException("Exclusive file creation requires create mode"));
   auto path = stringToUtf16(String(std::string_view(filename)));
   if (!path)
     return std::unexpected(std::move(path.error()));
@@ -287,25 +325,26 @@ std::expected<void*, StarException> File::fopen(char const* filename, IOMode mod
     access |= GENERIC_WRITE;
   if (!access)
     return std::unexpected(IOException("Cannot open file with closed IO mode"));
-  auto file = CreateFileW(path->get(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-      nullptr, mode & IOMode::Write ? OPEN_ALWAYS : OPEN_EXISTING, 0, nullptr);
+  auto disposition = exclusive ? CREATE_NEW : create && mode & IOMode::Write ? OPEN_ALWAYS : OPEN_EXISTING;
+  auto file = CreateFileW(path->get(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                          disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE)
     return std::unexpected(IOException::format("could not open file '{}' {}", filename, GetLastError()));
   LARGE_INTEGER zero = {};
   if (!SetFilePointerEx(file, zero, nullptr, FILE_BEGIN)) {
     auto error = GetLastError();
-    closeAfterFailure(file);
+    close_after_failure(file);
     return std::unexpected(IOException::format("could not set file pointer in fopen '{}' {}", filename, error));
   }
   if (mode & IOMode::Truncate && !SetEndOfFile(file)) {
     auto error = GetLastError();
-    closeAfterFailure(file);
+    close_after_failure(file);
     return std::unexpected(IOException::format("could not set end of file in fopen '{}' {}", filename, error));
   }
   if (mode & IOMode::Append) {
     if (!SetFilePointerEx(file, zero, nullptr, FILE_END)) {
       auto error = GetLastError();
-      closeAfterFailure(file);
+      close_after_failure(file);
       return std::unexpected(IOException::format("could not set file pointer in fopen '{}' {}", filename, error));
     }
   }
@@ -333,11 +372,8 @@ std::expected<std::size_t, StarException> File::fread(void* file, char* data, st
   if (!len)
     return 0;
   DWORD count = 0;
-  if (!ReadFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, nullptr)) {
-    auto error = GetLastError();
-    if (error != ERROR_IO_PENDING)
-      return std::unexpected(IOException::format("read error {}", error));
-  }
+  if (!ReadFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, nullptr))
+    return std::unexpected(IOException::format("read error {}", GetLastError()));
   return count;
 }
 
@@ -345,11 +381,8 @@ std::expected<std::size_t, StarException> File::fwrite(void* file, char const* d
   if (!len)
     return 0;
   DWORD count = 0;
-  if (!WriteFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, nullptr)) {
-    auto error = GetLastError();
-    if (error != ERROR_IO_PENDING)
-      return std::unexpected(IOException::format("write error {}", error));
-  }
+  if (!WriteFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, nullptr))
+    return std::unexpected(IOException::format("write error {}", GetLastError()));
   return count;
 }
 
@@ -369,19 +402,25 @@ std::expected<StreamOffset, StarException> File::fsize(void* file) {
   LARGE_INTEGER size;
   if (!GetFileSizeEx(file, &size))
     return std::unexpected(IOException::format("could not get file size in fsize {}", GetLastError()));
-  return size.QuadPart;
+  if (size.QuadPart < 0)
+    return std::unexpected(IOException("File size cannot be represented as a stream offset"));
+  return checked_size(static_cast<std::uint64_t>(size.QuadPart));
 }
 
 std::expected<std::size_t, StarException> File::pread(void* file, char* data, std::size_t len, StreamOffset position) {
+  if (position < 0)
+    return std::unexpected(IOException("Cannot read at a negative file position"));
+  if (!len)
+    return 0;
   auto cursor = ftell(file);
   if (!cursor)
     return std::unexpected(std::move(cursor.error()));
   DWORD count = 0;
-  auto overlapped = makeOverlapped(position);
+  auto overlapped = make_overlapped(position);
   bool read = ReadFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, &overlapped);
   auto error = read ? ERROR_SUCCESS : GetLastError();
   auto restored = fseek(file, *cursor, IOSeek::Absolute);
-  if (!read && error != ERROR_IO_PENDING) {
+  if (!read && error != ERROR_HANDLE_EOF) {
     if (!restored)
       std::fprintf(stderr, "Error restoring file cursor after failed pread: %s\n", restored.error().what());
     return std::unexpected(IOException::format("pread error {}", error));
@@ -392,15 +431,19 @@ std::expected<std::size_t, StarException> File::pread(void* file, char* data, st
 }
 
 std::expected<std::size_t, StarException> File::pwrite(void* file, char const* data, std::size_t len, StreamOffset position) {
+  if (position < 0)
+    return std::unexpected(IOException("Cannot write at a negative file position"));
+  if (!len)
+    return 0;
   auto cursor = ftell(file);
   if (!cursor)
     return std::unexpected(std::move(cursor.error()));
   DWORD count = 0;
-  auto overlapped = makeOverlapped(position);
+  auto overlapped = make_overlapped(position);
   bool written = WriteFile(file, data, static_cast<DWORD>(std::min<std::size_t>(len, MAXDWORD)), &count, &overlapped);
   auto error = written ? ERROR_SUCCESS : GetLastError();
   auto restored = fseek(file, *cursor, IOSeek::Absolute);
-  if (!written && error != ERROR_IO_PENDING) {
+  if (!written) {
     if (!restored)
       std::fprintf(stderr, "Error restoring file cursor after failed pwrite: %s\n", restored.error().what());
     return std::unexpected(IOException::format("pwrite error {}", error));
@@ -411,12 +454,23 @@ std::expected<std::size_t, StarException> File::pwrite(void* file, char const* d
 }
 
 std::expected<void, StarException> File::resize(void* file, StreamOffset size) {
+  if (size < 0)
+    return std::unexpected(IOException("Cannot resize a file to a negative size"));
+  auto cursor = ftell(file);
+  if (!cursor)
+    return std::unexpected(std::move(cursor.error()));
   auto moved = fseek(file, size, IOSeek::Absolute);
   if (!moved)
     return std::unexpected(std::move(moved.error()));
-  if (!SetEndOfFile(file))
-    return std::unexpected(IOException::format("resize error {}", GetLastError()));
-  return {};
+  auto resized = SetEndOfFile(file);
+  auto error = resized ? ERROR_SUCCESS : GetLastError();
+  auto restored = fseek(file, *cursor, IOSeek::Absolute);
+  if (!resized) {
+    if (!restored)
+      std::fprintf(stderr, "Error restoring file cursor after failed resize: %s\n", restored.error().what());
+    return std::unexpected(IOException::format("resize error {}", error));
+  }
+  return restored;
 }
 
 }

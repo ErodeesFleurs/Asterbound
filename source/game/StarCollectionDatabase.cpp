@@ -68,7 +68,7 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
     auto const& file = assetFile.string();
-    auto readFile = [&]() -> std::expected<void, StarException> {
+    auto read_file = [&]() -> std::expected<void, StarException> {
       auto config = (*assets)->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
@@ -104,7 +104,7 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
       result->m_collections[collection.name] = std::move(collection);
       return {};
     };
-    auto loaded = readFile();
+    auto loaded = read_file();
     if (!loaded)
       return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading collection"));
   }
@@ -260,7 +260,7 @@ std::expected<Collectable, StarException> CollectionDatabase::parseItemCollectab
       auto icon = inventoryIcon->toString();
       if (!icon)
         return std::unexpected(std::move(icon.error()));
-      collectable->icon = AssetPath::relativeTo(itemConfig->directory, *icon);
+      collectable->icon = AssetPath::relative_to(itemConfig->directory, *icon);
     }
   }
   return std::move(*collectable);

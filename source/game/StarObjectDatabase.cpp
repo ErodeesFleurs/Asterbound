@@ -260,7 +260,7 @@ std::expected<Json, StarException> ObjectDatabase::parseTouchDamage(Root& root, 
     auto damagePathResult = touchDamage.toString();
     if (!damagePathResult)
       return std::unexpected(std::move(damagePathResult.error()));
-    auto damagePath = AssetPath::relativeTo(path, std::move(*damagePathResult));
+    auto damagePath = AssetPath::relative_to(path, std::move(*damagePathResult));
     auto damage = assets->json(damagePath);
     if (!damage)
       return std::unexpected(assets->withAssetContext(std::move(damage.error()), damagePath, "Loading object touch damage"));
@@ -334,7 +334,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!imageNameResult)
             return std::unexpected(std::move(imageNameResult.error()));
           auto imageName = std::move(*imageNameResult);
-          auto resolvedLayerResult = layer.set("image", AssetPath::relativeTo(path, imageName));
+          auto resolvedLayerResult = layer.set("image", AssetPath::relative_to(path, imageName));
           if (!resolvedLayerResult)
             return std::unexpected(std::move(resolvedLayerResult.error()));
           auto resolvedLayer = std::move(*resolvedLayerResult);
@@ -360,7 +360,8 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!imageResult)
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
-      auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relativeTo(path, image), 1.0 / TilePixels, false, {});
+      auto drawableResult =
+        Drawable::makeImage(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / TilePixels, false, {});
       if (!drawableResult)
         return std::unexpected(std::move(drawableResult.error()));
       auto drawable = std::move(*drawableResult);
@@ -1059,12 +1060,12 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     auto scripts = config.get("scripts", JsonArray()).and_then(jsonToStringList);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    std::ranges::for_each(*scripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    std::ranges::for_each(*scripts, [&](String& script) { script = AssetPath::relative_to(path, script); });
     objectConfig->scripts = std::move(*scripts);
     auto animationScripts = config.get("animationScripts", JsonArray()).and_then(jsonToStringList);
     if (!animationScripts)
       return std::unexpected(std::move(animationScripts.error()));
-    std::ranges::for_each(*animationScripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    std::ranges::for_each(*animationScripts, [&](String& script) { script = AssetPath::relative_to(path, script); });
     objectConfig->animationScripts = std::move(*animationScripts);
     auto priceResult = config.getInt("price", 0);
     if (!priceResult)
@@ -1184,7 +1185,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field13Result)
       return std::unexpected(std::move(field13Result.error()));
     auto field13 = std::move(*field13Result);
-      objectConfig->smashSoundOptions.append(AssetPath::relativeTo(path, field13));
+    objectConfig->smashSoundOptions.append(AssetPath::relative_to(path, field13));
     }
     if (auto containsResult = config.contains("smashParticles"); !containsResult)
       return std::unexpected(std::move(containsResult.error()));
@@ -1301,7 +1302,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       auto reference = value.toString();
       if (!reference)
         return std::unexpected(std::move(reference.error()));
-      auto animationPath = AssetPath::relativeTo(path, *reference);
+      auto animationPath = AssetPath::relative_to(path, *reference);
       auto animation = assets->json(animationPath);
       if (!animation)
         return std::unexpected(assets->withAssetContext(std::move(animation.error()), animationPath, "Loading object animation"));
@@ -1410,7 +1411,8 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relativeTo(config->path, *placementImage), 1.0 / TilePixels, false, Vec2F(position) + imagePosition / TilePixels);
+    auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
+                                              1.0 / TilePixels, false, Vec2F(position) + imagePosition / TilePixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
     auto drawable = std::move(*drawableResult);

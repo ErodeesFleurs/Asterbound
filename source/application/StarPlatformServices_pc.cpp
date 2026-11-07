@@ -76,7 +76,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
 
   bool steamFlatpakInstalled = false;
 
-  auto flatpakDirectory = File::isDirectory("/var/lib/flatpak/app/com.valvesoftware.Steam");
+  auto flatpakDirectory = File::is_directory("/var/lib/flatpak/app/com.valvesoftware.Steam");
   if (!flatpakDirectory)
     return std::unexpected(std::move(flatpakDirectory.error()));
   if (*flatpakDirectory) {
@@ -89,7 +89,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
   if (!steamRoot)
     return std::unexpected(std::move(steamRoot.error()));
   String steamRootPath = std::move(*steamRoot);
-  auto steamDirectory = File::isDirectory(steamRootPath);
+  auto steamDirectory = File::is_directory(steamRootPath);
   if (!steamDirectory)
     return std::unexpected(std::move(steamDirectory.error()));
   if (!*steamDirectory) {
@@ -105,7 +105,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
     // and normal.
     if (steamFlatpakInstalled) {
       // Check if ~/.steam points to a flatpak installation
-      auto steamAbsRootPath = File::fullPath(steamRootPath);
+      auto steamAbsRootPath = File::full_path(steamRootPath);
       if (!steamAbsRootPath)
         return std::unexpected(std::move(steamAbsRootPath.error()));
       auto isFlatpak = steamAbsRootPath->contains("com.valvesoftware.Steam");

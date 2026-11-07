@@ -967,7 +967,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
     deltaWritten = true;
     auto code = ds.write<std::uint8_t>(1);
     if (!code) return std::unexpected(std::move(code.error()));
-    auto bytes = ds.writeBytes(m_buffer.data());
+    auto bytes = ds.write_bytes(m_buffer.data());
     if (!bytes) return std::unexpected(std::move(bytes.error()));
     if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
       auto code = ds.write<std::uint8_t>(2);
@@ -984,7 +984,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
       deltaWritten = true;
       auto code = ds.write<std::uint8_t>(3);
       if (!code) return std::unexpected(std::move(code.error()));
-      auto bytes = ds.writeBytes(m_buffer.data());
+      auto bytes = ds.write_bytes(m_buffer.data());
       if (!bytes) return std::unexpected(std::move(bytes.error()));
     }
   }

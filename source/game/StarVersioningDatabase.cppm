@@ -34,8 +34,9 @@ struct VersionedJson {
   // Writes and reads a binary file containing a versioned json with a magic
   // header marking it as a starbound versioned json file.  Writes using a
   // safe write/flush/swap.
-  [[nodiscard]] static std::expected<VersionedJson, StarException> readFile(String const& filename);
-  [[nodiscard]] static std::expected<void, StarException> writeFile(VersionedJson const& versionedJson, String const& filename);
+  [[nodiscard]] static std::expected<VersionedJson, StarException> read_file(String const& filename);
+  [[nodiscard]] static std::expected<void, StarException> write_file(VersionedJson const& versionedJson,
+                                                                     String const& filename);
   [[nodiscard]] static std::expected<void, StarException> writeSubVersioning(DataStream& ds, VersionedJson const& versionedJson);
   [[nodiscard]] static std::expected<void, StarException> readSubVersioning(DataStream& ds, VersionedJson& versionedJson);
 

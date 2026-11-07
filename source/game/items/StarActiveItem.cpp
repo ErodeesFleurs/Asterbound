@@ -185,7 +185,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     auto configured = m_script.setScripts(scripts->transformed(
-      [directory = directory()](String const& script) { return AssetPath::relativeTo(directory, script); }));
+      [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -251,7 +251,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
       auto configured = m_scriptedAnimator.setScripts(scripts->transformed(
-        [directory = directory()](String const& script) { return AssetPath::relativeTo(directory, script); }));
+        [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -856,7 +856,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         if (*image) {
-          auto updated = config.set("image", AssetPath::relativeTo(directory(), **image));
+          auto updated = config.set("image", AssetPath::relative_to(directory(), **image));
           if (!updated)
             return std::unexpected(std::move(updated.error()));
           config = std::move(*updated);
@@ -873,7 +873,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory(), *image), 1.0f, true, Vec2F());
+      auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawables.append(std::move(*drawable));

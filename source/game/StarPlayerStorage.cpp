@@ -140,15 +140,15 @@ std::expected<std::shared_ptr<PlayerStorage>, StarException> PlayerStorage::crea
 
 std::expected<void, StarException> PlayerStorage::initialize(String const& storageDir) {
   m_storageDirectory = storageDir;
-  m_backupDirectory = File::relativeTo(m_storageDirectory, "backup");
-  auto directory = File::isDirectory(m_storageDirectory);
+  m_backupDirectory = File::relative_to(m_storageDirectory, "backup");
+  auto directory = File::is_directory(m_storageDirectory);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory) {
     auto logged = m_root.logger().info("Creating player storage directory");
     if (!logged)
       return std::unexpected(std::move(logged.error()));
-    return File::makeDirectory(m_storageDirectory);
+    return File::create_directory(m_storageDirectory);
   }
 
   auto configuration = m_root.configuration();
@@ -160,7 +160,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
   auto clearPlayerFiles = clearSetting->toBool();
   if (!clearPlayerFiles)
     return std::unexpected(std::move(clearPlayerFiles.error()));
-  auto files = File::dirList(m_storageDirectory);
+  auto files = File::directory_entries(m_storageDirectory);
   if (!files)
     return std::unexpected(std::move(files.error()));
   if (*clearPlayerFiles) {
@@ -169,7 +169,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
       return std::unexpected(std::move(logged.error()));
     for (auto const& file : *files) {
       if (!file.second) {
-        auto removed = File::remove(File::relativeTo(m_storageDirectory, file.first));
+        auto removed = File::remove(File::relative_to(m_storageDirectory, file.first));
         if (!removed)
           return std::unexpected(std::move(removed.error()));
       }
@@ -187,10 +187,10 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
       if (!*playerSuffix)
         continue;
 
-      String filename = File::relativeTo(m_storageDirectory, file.first);
+      String filename = File::relative_to(m_storageDirectory, file.first);
       std::optional<std::pair<Uuid, std::reference_wrapper<String const>>> duplicate;
       auto loaded = [&]() -> std::expected<void, StarException> {
-        auto json = VersionedJson::readFile(filename);
+        auto json = VersionedJson::read_file(filename);
         if (!json)
           return std::unexpected(std::move(json.error()));
         auto uuidText = json->content.getString("uuid");
@@ -270,7 +270,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
   }
 
   auto metadata = [&]() -> std::expected<void, StarException> {
-    auto contents = File::readFileString(File::relativeTo(m_storageDirectory, "metadata"));
+    auto contents = File::read_file_string(File::relative_to(m_storageDirectory, "metadata"));
     if (!contents)
       return std::unexpected(std::move(contents.error()));
     auto json = Json::parseJson(*contents);
@@ -413,7 +413,7 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
     if (!basename)
       return std::unexpected(std::move(basename.error()));
     auto fileName = strf("{}.player", basename->get());
-    auto written = VersionedJson::writeFile(*versionedJson, File::relativeTo(m_storageDirectory, fileName));
+    auto written = VersionedJson::write_file(*versionedJson, File::relative_to(m_storageDirectory, fileName));
     if (!written)
       return std::unexpected(std::move(written.error()));
     auto playerName = player->name();
@@ -481,8 +481,8 @@ std::expected<void, StarException> PlayerStorage::deletePlayer(Uuid const& uuid)
     return std::unexpected(PlayerException(strf("No such stored player with uuid '{}'", uuid.hex())));
   m_savedPlayersCache.remove(uuid);
   auto uuidHex = uuid.hex();
-  auto storagePrefix = File::relativeTo(m_storageDirectory, uuidHex);
-  auto backupPrefix = File::relativeTo(m_backupDirectory, uuidHex);
+  auto storagePrefix = File::relative_to(m_storageDirectory, uuidHex);
+  auto backupPrefix = File::relative_to(m_backupDirectory, uuidHex);
   auto removeIfExists = [](String const& prefix, String const& suffix) -> std::expected<void, StarException> {
     auto exists = File::exists(prefix + suffix);
     if (!exists)
@@ -523,7 +523,7 @@ std::expected<WorldChunks, StarException> PlayerStorage::loadShipData(Uuid const
   auto basename = uuidFileName(uuid);
   if (!basename)
     return std::unexpected(std::move(basename.error()));
-  String filename = File::relativeTo(m_storageDirectory, strf("{}.shipworld", basename->get()));
+  String filename = File::relative_to(m_storageDirectory, strf("{}.shipworld", basename->get()));
   auto exists = File::exists(filename);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
@@ -551,7 +551,7 @@ std::expected<void, StarException> PlayerStorage::applyShipUpdates(Uuid const& u
   auto basename = uuidFileName(uuid);
   if (!basename)
     return std::unexpected(std::move(basename.error()));
-  String filePath = File::relativeTo(m_storageDirectory, strf("{}.shipworld", basename->get()));
+  String filePath = File::relative_to(m_storageDirectory, strf("{}.shipworld", basename->get()));
   return WorldStorage::applyWorldChunksUpdateToFile(m_root.logger(), filePath, updates);
 }
 
@@ -578,19 +578,20 @@ std::expected<void, StarException> PlayerStorage::backupCycle(Uuid const& uuid) 
   if (!fileName)
     return std::unexpected(std::move(fileName.error()));
   auto path = [&](String const& dir, String const& extension) {
-    return File::relativeTo(dir, strf("{}.{}", fileName->get(), extension));
+    return File::relative_to(dir, strf("{}.{}", fileName->get(), extension));
   };
-  auto directory = File::isDirectory(m_backupDirectory);
+  auto directory = File::is_directory(m_backupDirectory);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory) {
-    auto created = File::makeDirectory(m_backupDirectory);
+    auto created = File::create_directory(m_backupDirectory);
     if (!created)
       return std::unexpected(std::move(created.error()));
   }
   for (auto const& extension : std::initializer_list<std::string_view>{"player", "shipworld", "metadata"}) {
-    auto backedUp = File::backupFileInSequence(path(m_storageDirectory, extension), path(m_backupDirectory, extension),
-        static_cast<unsigned>(*playerBackupFileCount), ".bak");
+    auto backedUp =
+      File::backup_file_in_sequence(path(m_storageDirectory, extension), path(m_backupDirectory, extension),
+                                    static_cast<unsigned>(*playerBackupFileCount), ".bak");
     if (!backedUp)
       return std::unexpected(std::move(backedUp.error()));
   }
@@ -624,11 +625,11 @@ std::expected<void, StarException> PlayerStorage::writeMetadata() {
   for (auto const& p : m_savedPlayersCache)
     order.append(p.first.hex());
   m_metadata["order"] = std::move(order);
-  String filename = File::relativeTo(m_storageDirectory, "metadata");
+  String filename = File::relative_to(m_storageDirectory, "metadata");
   auto contents = Json(m_metadata).printJson(0);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
-  return File::overwriteFileWithRename(*contents, filename);
+  return File::overwrite_file_with_rename(*contents, filename);
 }
 
 }

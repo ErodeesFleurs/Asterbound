@@ -50,7 +50,7 @@ std::expected<AmbientTrackGroup, StarException> AmbientTrackGroup::create(Json c
     return std::unexpected(std::move(values.error()));
   AmbientTrackGroup group;
   for (auto const& track : *values)
-    group.tracks.append(AssetPath::relativeTo(directory, track));
+    group.tracks.append(AssetPath::relative_to(directory, track));
   return group;
 }
 

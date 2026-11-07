@@ -237,8 +237,8 @@ projectileConfig->periodicActions.append(std::make_tuple(std::move(*result96), s
 
   auto result98 = config.getString("image");
 if (!result98) return std::unexpected(std::move(result98.error()));
-projectileConfig->image = AssetPath::relativeTo(path, std::move(*result98));
-  auto result99 = config.getUInt("frameNumber", 1);
+projectileConfig->image = AssetPath::relative_to(path, std::move(*result98));
+auto result99 = config.getUInt("frameNumber", 1);
 if (!result99) return std::unexpected(std::move(result99.error()));
 projectileConfig->frameNumber = std::move(*result99);
   auto result100 = config.getFloat("animationCycle", 1.0);
@@ -342,7 +342,7 @@ projectileConfig->damageRepeatTimeout = std::move(*result126);
 
   if (!projectileConfig->damageKindImage.empty())
     projectileConfig->damageKindImage =
-        AssetPath::relativeTo(projectileConfig->directory, projectileConfig->damageKindImage);
+      AssetPath::relative_to(projectileConfig->directory, projectileConfig->damageKindImage);
 
   auto result127 = config.getArray("statusEffects", {});
 if (!result127) return std::unexpected(std::move(result127.error()));
@@ -390,7 +390,7 @@ projectileConfig->masterOnly = std::move(*result138);
 if (!result139) return std::unexpected(std::move(result139.error()));
 auto result140 = jsonToStringList(std::move(*result139));
 if (!result140) return std::unexpected(std::move(result140.error()));
-std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relative_to(path, script); });
 projectileConfig->scripts = std::move(*result140);
 
   auto result141 = config.get("physicsForces", JsonObject());

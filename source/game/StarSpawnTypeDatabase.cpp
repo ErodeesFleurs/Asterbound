@@ -208,25 +208,29 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
   std::uint64_t seedMix = 0;
   for (auto const& path : files->get()) {
     auto const& file = path.string();
-    auto readFile = [&]() -> std::expected<void, StarException> {
+    auto read_file = [&]() -> std::expected<void, StarException> {
       auto config = assets->json(file);
-      if (!config) return std::unexpected(std::move(config.error()));
+      if (!config)
+        return std::unexpected(std::move(config.error()));
       auto entries = config->iterateArray();
-      if (!entries) return std::unexpected(std::move(entries.error()));
+      if (!entries)
+        return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {
         auto type = spawnTypeFromJson(entry);
-        if (!type) return std::unexpected(std::move(type.error()));
+        if (!type)
+          return std::unexpected(std::move(type.error()));
         if (result->m_spawnTypes.contains(type->typeName))
           return std::unexpected(SpawnTypeDatabaseException::format("Duplicate spawnType named '{}' in config file '{}'", type->typeName, file));
         auto hasSeedMix = entry.contains("seedMix");
-        if (!hasSeedMix) return std::unexpected(std::move(hasSeedMix.error()));
+        if (!hasSeedMix)
+          return std::unexpected(std::move(hasSeedMix.error()));
         if (!*hasSeedMix)
           type->seedMix = ++seedMix;
         result->m_spawnTypes[type->typeName] = std::move(*type);
       }
       return {};
     };
-    auto loaded = readFile();
+    auto loaded = read_file();
     if (!loaded)
       return std::unexpected(SpawnTypeDatabaseException(strf("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
   }

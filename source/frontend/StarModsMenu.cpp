@@ -224,7 +224,7 @@ std::expected<String, StarException> ModsMenu::bestModName(JsonObject const& met
     return value->get().toString();
   if (auto value = metadata.find_ref("name"))
     return value->get().toString();
-  String baseName = File::baseName(sourcePath);
+  String baseName = File::base_name(sourcePath);
   auto contains = baseName.contains(".");
   if (!contains)
     return std::unexpected(std::move(contains.error()));

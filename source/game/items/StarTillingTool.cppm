@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  item->m_image = AssetPath::relativeTo(directory, *image);
+  item->m_image = AssetPath::relative_to(directory, *image);
   auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.toInt(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));

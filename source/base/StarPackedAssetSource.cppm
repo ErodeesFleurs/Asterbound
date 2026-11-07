@@ -38,6 +38,7 @@ public:
   JsonObject metadata() const override;
   StringList assetPaths() const override;
   bool contains(String const& path) const override;
+  [[nodiscard]] std::expected<StreamOffset, StarException> file_size(String const& path) override;
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) override;
   [[nodiscard]] std::expected<ByteArray, StarException> read(String const& path) override;
 
@@ -122,7 +123,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
     auto added = index.add(assetPath, {static_cast<std::uint64_t>(*position), contents->size()});
     if (!added)
       return std::unexpected(std::move(added.error()));
-    auto written = ds.writeBytes(*contents);
+    auto written = ds.write_bytes(*contents);
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -155,7 +156,7 @@ std::expected<std::shared_ptr<PackedAssetSource>, StarException> PackedAssetSour
   auto source = std::shared_ptr<PackedAssetSource>(new PackedAssetSource());
   source->m_packedFile = std::move(*opened);
   DataStreamIODevice ds(*source->m_packedFile);
-  auto magic = ds.readBytes(8);
+  auto magic = ds.read_bytes(8);
   if (!magic)
     return std::unexpected(std::move(magic.error()));
   if (*magic != ByteArray(std::span("SBAsset6", 8)))
@@ -171,7 +172,7 @@ std::expected<std::shared_ptr<PackedAssetSource>, StarException> PackedAssetSour
   auto sought = ds.seek(static_cast<StreamOffset>(*indexStart));
   if (!sought)
     return std::unexpected(std::move(sought.error()));
-  auto header = ds.readBytes(5);
+  auto header = ds.read_bytes(5);
   if (!header)
     return std::unexpected(std::move(header.error()));
   if (*header != ByteArray(std::span("INDEX", 5)))
@@ -189,15 +190,30 @@ JsonObject PackedAssetSource::metadata() const { return m_metadata; }
 StringList PackedAssetSource::assetPaths() const { return m_index.keys(); }
 bool PackedAssetSource::contains(String const& path) const { return m_index.contains(path); }
 
+std::expected<StreamOffset, StarException> PackedAssetSource::file_size(String const& path) {
+  auto entry = m_index.find_ref(path);
+  if (!entry)
+    return std::unexpected(
+      AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path));
+  auto fileSize = m_packedFile->size();
+  if (!fileSize)
+    return std::unexpected(std::move(fileSize.error()));
+  if (*fileSize < 0 || entry->get().first > static_cast<std::uint64_t>(*fileSize)
+      || entry->get().second > static_cast<std::uint64_t>(*fileSize) - entry->get().first)
+    return std::unexpected(
+      AssetSourceException::format("Requested file '{}' has an out of range size in the packed assets file", path));
+  return static_cast<StreamOffset>(entry->get().second);
+}
+
 std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(String const& path) {
   struct AssetReader : public IODevice {
     AssetReader(std::shared_ptr<File> file, String path, StreamOffset offset, StreamOffset size)
       : file(std::move(file)), path(std::move(path)), fileOffset(offset), assetSize(size) {
-      setMode(IOMode::Read);
+      set_mode(IOMode::Read);
     }
     [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override {
       auto len = std::min<std::uint64_t>(data.size(), assetSize - assetPos);
-      auto result = file->readFullAbsolute(fileOffset + assetPos, data.first(len));
+      auto result = file->read_full_absolute(fileOffset + assetPos, data.first(len));
       if (!result)
         return std::unexpected(std::move(result.error()));
       assetPos += len;
@@ -208,13 +224,13 @@ std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(
     }
     [[nodiscard]] std::expected<StreamOffset, StarException> size() override { return assetSize; }
     [[nodiscard]] std::expected<StreamOffset, StarException> pos() override { return assetPos; }
-    [[nodiscard]] std::expected<String, StarException> deviceName() const override {
-      auto name = file->deviceName();
+    [[nodiscard]] std::expected<String, StarException> device_name() const override {
+      auto name = file->device_name();
       if (!name)
         return std::unexpected(std::move(name.error()));
       return strf("{}:{}", *name, path);
     }
-    [[nodiscard]] std::expected<bool, StarException> atEnd() override { return assetPos >= assetSize; }
+    [[nodiscard]] std::expected<bool, StarException> at_end() override { return assetPos >= assetSize; }
     [[nodiscard]] std::expected<void, StarException> seek(StreamOffset p, IOSeek mode) override {
       if (mode == IOSeek::Absolute) {
         if (p < 0 || p > assetSize)
@@ -242,16 +258,11 @@ std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(
     StreamOffset assetSize;
     StreamOffset assetPos = 0;
   };
+  auto size = file_size(path);
+  if (!size)
+    return std::unexpected(std::move(size.error()));
   auto entry = m_index.find_ref(path);
-  if (!entry)
-    return std::unexpected(AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path));
-  auto fileSize = m_packedFile->size();
-  if (!fileSize)
-    return std::unexpected(std::move(fileSize.error()));
-  if (*fileSize < 0 || entry->get().first > static_cast<std::uint64_t>(*fileSize)
-      || entry->get().second > static_cast<std::uint64_t>(*fileSize) - entry->get().first)
-    return std::unexpected(AssetSourceException::format("Requested file '{}' has an out of range size in the packed assets file", path));
-  return std::make_shared<AssetReader>(m_packedFile, path, entry->get().first, entry->get().second);
+  return std::make_shared<AssetReader>(m_packedFile, path, static_cast<StreamOffset>(entry->get().first), *size);
 }
 
 std::expected<ByteArray, StarException> PackedAssetSource::read(String const& path) {
@@ -263,6 +274,6 @@ std::expected<ByteArray, StarException> PackedAssetSource::read(String const& pa
     return std::unexpected(std::move(size.error()));
   if (static_cast<std::uint64_t>(*size) > std::numeric_limits<std::size_t>::max())
     return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to read", path));
-  return (*device)->readBytes(static_cast<std::size_t>(*size));
+  return (*device)->read_bytes(static_cast<std::size_t>(*size));
 }
 }

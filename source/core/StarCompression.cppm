@@ -41,12 +41,12 @@ public:
   CompressedFile(String filename);
   ~CompressedFile() override;
 
-  [[nodiscard]] std::expected<void, StarException> setFilename(String filename);
+  [[nodiscard]] std::expected<void, StarException> set_filename(String filename);
   [[nodiscard]] std::expected<void, StarException> setCompression(CompressionLevel compression);
   [[nodiscard]] std::expected<StreamOffset, StarException> pos() override;
   // Only forward seeks are supported on writes; reads emulate seeks slowly.
   [[nodiscard]] std::expected<void, StarException> seek(StreamOffset pos, IOSeek seek = IOSeek::Absolute) override;
-  [[nodiscard]] std::expected<bool, StarException> atEnd() override;
+  [[nodiscard]] std::expected<bool, StarException> at_end() override;
   [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override;
   [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const> data) override;
   [[nodiscard]] std::expected<void, StarException> open(IOMode mode) override;
@@ -260,7 +260,7 @@ std::expected<void, StarException> CompressedFile::seek(StreamOffset offset, IOS
   return {};
 }
 
-std::expected<bool, StarException> CompressedFile::atEnd() {
+std::expected<bool, StarException> CompressedFile::at_end() {
   if (!m_file)
     return std::unexpected(IOException("Cannot query end of closed compressed file"));
   int status;
@@ -273,7 +273,7 @@ std::expected<bool, StarException> CompressedFile::atEnd() {
 std::expected<std::size_t, StarException> CompressedFile::read(std::span<char> data) {
   if (data.empty())
     return 0;
-  if (!m_file || !isReadable())
+  if (!m_file || !is_readable())
     return std::unexpected(IOException("Compressed file is not open for reading"));
   int result = zng_gzread(static_cast<gzFile>(m_file), data.data(), std::min(data.size(), std::size_t(std::numeric_limits<int>::max())));
   int status;
@@ -288,7 +288,7 @@ std::expected<std::size_t, StarException> CompressedFile::read(std::span<char> d
 std::expected<std::size_t, StarException> CompressedFile::write(std::span<char const> data) {
   if (data.empty())
     return 0;
-  if (!m_file || !isWritable())
+  if (!m_file || !is_writable())
     return std::unexpected(IOException("Compressed file is not open for writing"));
   int result = zng_gzwrite(static_cast<gzFile>(m_file), data.data(), std::min(data.size(), std::size_t(std::numeric_limits<int>::max())));
   if (!result)
@@ -296,15 +296,15 @@ std::expected<std::size_t, StarException> CompressedFile::write(std::span<char c
   return static_cast<std::size_t>(result);
 }
 
-std::expected<void, StarException> CompressedFile::setFilename(String filename) {
-  if (isOpen())
+std::expected<void, StarException> CompressedFile::set_filename(String filename) {
+  if (is_open())
     return std::unexpected(IOException("Cannot call setFilename while CompressedFile is open"));
   m_filename = std::move(filename);
   return {};
 }
 
 std::expected<void, StarException> CompressedFile::setCompression(CompressionLevel compression) {
-  if (isOpen())
+  if (is_open())
     return std::unexpected(IOException("Cannot call setCompression while CompressedFile is open"));
   if (compression < 0 || compression > 9)
     return std::unexpected(IOException::format("Invalid compression level {}", compression));
@@ -332,7 +332,7 @@ std::expected<void, StarException> CompressedFile::sync() {
 }
 
 std::expected<void, StarException> CompressedFile::open(IOMode mode) {
-  if (isOpen())
+  if (is_open())
     return std::unexpected(IOException("CompressedFile is already open"));
   String modeString;
   if (mode & IOMode::Append)
@@ -351,13 +351,13 @@ std::expected<void, StarException> CompressedFile::open(IOMode mode) {
     int status = errno;
     return std::unexpected(IOException::format("Cannot open filename '{}' (errno {}): {}", m_filename, status, strerror(status)));
   }
-  setMode(mode);
+  set_mode(mode);
   return {};
 }
 
 std::expected<void, StarException> CompressedFile::close() {
   auto file = static_cast<gzFile>(std::exchange(m_file, nullptr));
-  setMode(IOMode::Closed);
+  set_mode(IOMode::Closed);
   if (!file)
     return {};
   int status = zng_gzclose(file);
@@ -372,7 +372,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> CompressedFile::clone() 
   auto configured = cloned->setCompression(m_compression);
   if (!configured)
     return std::unexpected(std::move(configured.error()));
-  if (isOpen()) {
+  if (is_open()) {
     auto opened = cloned->open(mode());
     if (!opened)
       return std::unexpected(std::move(opened.error()));

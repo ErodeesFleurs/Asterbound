@@ -291,7 +291,7 @@ std::expected<AiMission, StarException> AiDatabase::parseMission(Json const& vm)
   mission.missionUniqueWorld = std::move(*world);
   mission.warpAnimation = std::move(*warpAnimation);
   mission.warpDeploy = *warpDeploy;
-  mission.icon = AssetPath::relativeTo("/ai/", *icon);
+  mission.icon = AssetPath::relative_to("/ai/", *icon);
   auto texts = vm.get("speciesText").and_then([](Json const& value) { return value.iterateObject(); });
   if (!texts)
     return std::unexpected(std::move(texts.error()));

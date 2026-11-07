@@ -466,7 +466,7 @@ public:
       return std::unexpected(std::move(parsed.error()));
     auto& settings = parsed->first;
     for (std::string_view directory : {"player", "universe"}) {
-      auto exists = File::exists(File::relativeTo(settings.storageDirectory, directory));
+      auto exists = File::exists(File::relative_to(settings.storageDirectory, directory));
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (*exists)

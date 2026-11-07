@@ -64,7 +64,7 @@ public:
 
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
   for (std::string_view name : {"player", "universe"}) {
-    auto exists = File::exists(File::relativeTo(storage, name));
+    auto exists = File::exists(File::relative_to(storage, name));
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists)

@@ -152,6 +152,7 @@ let
   ++ lib.optionals withBenchmarks [
     "core_benchmarks"
     "json_benchmarks"
+    "file_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

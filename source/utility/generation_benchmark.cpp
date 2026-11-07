@@ -229,7 +229,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 
     auto rand = RandomSource(worldTemplate->worldSeed());
 
-    auto storage = File::ephemeralFile(root->random());
+    auto storage = File::ephemeral_file(root->random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto server = WorldServer::create(*root, std::move(worldTemplate), *storage);

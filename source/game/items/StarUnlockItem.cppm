@@ -170,7 +170,8 @@ std::expected<std::shared_ptr<UnlockItem>, StarException> UnlockItem::create(Roo
   auto metadata = root.imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory, *image), 1.0f / TilePixels, true, Vec2F());
+  auto drawable =
+    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, Vec2F());
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables = {std::move(*drawable)};

@@ -43,7 +43,7 @@ std::expected<ByteArray, StarException> secureRandomBytes(std::size_t size) {
   auto file = File::open("/dev/urandom", IOMode::Read);
   if (!file)
     return std::unexpected(std::move(file.error()));
-  return (*file)->readBytes(size);
+  return (*file)->read_bytes(size);
 #endif
 }
 

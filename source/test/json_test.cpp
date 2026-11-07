@@ -138,16 +138,16 @@ TEST(JsonTest, UnicodeFile) {
   ASSERT_TRUE(result27);
   Json v = (*result27);
   RandomService random(0);
-  auto result31 = File::temporaryFileName(random);
+  auto result31 = File::temporary_file_name(random);
   ASSERT_TRUE(result31);
   String file = (*result31);
   auto finallyGuard = finally([&file]() { EXPECT_TRUE(File::remove(file)); });
 
   auto result32 = v.printJson();
   ASSERT_TRUE(result32);
-  auto result33 = File::writeFile((*result32), file);
+  auto result33 = File::write_file((*result32), file);
   ASSERT_TRUE(result33);
-  auto result34 = File::readFileString(file);
+  auto result34 = File::read_file_string(file);
   ASSERT_TRUE(result34);
   auto result35 = Json::parseJson((*result34));
   ASSERT_TRUE(result35);

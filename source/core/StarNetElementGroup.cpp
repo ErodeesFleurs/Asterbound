@@ -130,7 +130,7 @@ std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds
         deltaWritten = true;
         auto indexResult = ds.writeVlqU(i);
         if (!indexResult) { m_buffer.clear(); return std::unexpected(std::move(indexResult.error())); }
-        auto bytesResult = ds.writeBytes(m_buffer.data());
+        auto bytesResult = ds.write_bytes(m_buffer.data());
         m_buffer.clear();
         if (!bytesResult) return std::unexpected(std::move(bytesResult.error()));
       }

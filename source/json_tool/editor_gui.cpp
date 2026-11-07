@@ -142,7 +142,7 @@ bool JsonEditor::saveChanges() {
     m_errorDialog->showMessage(repr.error().what());
     return false;
   }
-  auto saved = File::overwriteFileWithRename(*repr, m_files[m_fileIndex]);
+  auto saved = File::overwrite_file_with_rename(*repr, m_files[m_fileIndex]);
   if (!saved) {
     m_errorDialog->showMessage(saved.error().what());
     return false;
@@ -169,7 +169,7 @@ void JsonEditor::displayCurrentFile() {
   m_valueEditor->setText("");
 
   auto load = [&]() -> std::expected<void, StarException> {
-    auto contents = File::readFileString(file);
+    auto contents = File::read_file_string(file);
     if (!contents)
       return std::unexpected(std::move(contents.error()));
     auto parsed = FormattedJson::parse(*contents);
@@ -247,7 +247,7 @@ void JsonEditor::updateImagePreview() {
       m_errorDialog->showMessage(imageFile.error().what());
       return;
     }
-    String imageName = File::relativeTo(File::dirName(file), *imageFile);
+    String imageName = File::relative_to(File::dir_name(file), *imageFile);
     QPixmap pixmap = QPixmap(imageName.utf8Ptr()).scaledToWidth(ImagePreviewWidth);
     if (pixmap.height() > ImagePreviewHeight)
       pixmap = pixmap.scaledToHeight(ImagePreviewHeight);

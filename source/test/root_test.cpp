@@ -140,7 +140,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
 [[nodiscard]] std::expected<void, StarException> writeIsolationAssets(String const& overlay, String const& owner) {
   auto config = Json(JsonObject{{"owner", owner}}).repr();
   if (!config) return std::unexpected(std::move(config.error()));
-  auto writeConfig = File::writeFile(*config, File::relativeTo(overlay, "root-isolation.config"));
+  auto writeConfig = File::write_file(*config, File::relative_to(overlay, "root-isolation.config"));
   if (!writeConfig) return std::unexpected(std::move(writeConfig.error()));
   auto tech = Json(JsonObject{
       {"name", "root-isolation"},
@@ -152,19 +152,19 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
       {"icon", "/interface/missing.png"}
     }).repr();
   if (!tech) return std::unexpected(std::move(tech.error()));
-  auto writeTech = File::writeFile(*tech, File::relativeTo(overlay, "root-isolation.tech"));
+  auto writeTech = File::write_file(*tech, File::relative_to(overlay, "root-isolation.tech"));
   if (!writeTech) return std::unexpected(std::move(writeTech.error()));
   auto quotedOwner = Json(owner).repr();
   if (!quotedOwner) return std::unexpected(std::move(quotedOwner.error()));
-  return File::writeFile("function isolationScriptOwner() return " + *quotedOwner + " end",
-      File::relativeTo(overlay, "root-isolation.lua"));
+  return File::write_file("function isolationScriptOwner() return " + *quotedOwner + " end",
+                          File::relative_to(overlay, "root-isolation.lua"));
 }
 
 [[nodiscard]] std::expected<Root::Settings, StarException> isolationSettings(
     Root::Settings const& base, String const& directory, String const& owner) {
   auto settings = base;
-  auto overlay = File::relativeTo(directory, "assets");
-  auto makeOverlay = File::makeDirectory(overlay);
+  auto overlay = File::relative_to(directory, "assets");
+  auto makeOverlay = File::create_directory(overlay);
   if (!makeOverlay) return std::unexpected(std::move(makeOverlay.error()));
   auto writeAssets = writeIsolationAssets(overlay, owner);
   if (!writeAssets) return std::unexpected(std::move(writeAssets.error()));
@@ -174,7 +174,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   // Isolate explicit reload invalidation from maintenance-thread TTL eviction
   // while loading the real pak on slower test hosts.
   settings.assetsSettings.assetTimeToLive = std::numeric_limits<float>::max();
-  settings.storageDirectory = File::relativeTo(directory, "storage");
+  settings.storageDirectory = File::relative_to(directory, "storage");
   settings.runtimeConfigFile = String("root-isolation.config");
   settings.logDirectory = {};
   settings.logFile = {};
@@ -224,13 +224,13 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
 }
 
 [[nodiscard]] std::expected<bool, StarException> isolationLogContains(String const& path, String const& text) {
-  auto content = File::readFileString(path);
+  auto content = File::read_file_string(path);
   if (!content) return std::unexpected(std::move(content.error()));
   return content->contains(text);
 }
 
 [[nodiscard]] std::expected<String, StarException> isolationStoredOwner(String const& directory) {
-  auto content = File::readFileString(File::relativeTo(directory, "root-isolation.config"));
+  auto content = File::read_file_string(File::relative_to(directory, "root-isolation.config"));
   if (!content) return std::unexpected(std::move(content.error()));
   auto json = Json::parseJson(*content);
   if (!json) return std::unexpected(std::move(json.error()));
@@ -263,9 +263,9 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
 });
 
 const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
+  auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto settings = isolationSettings(fixture.rootSettings(), *directory, "http");
   ASSERT_TRUE(settings) << settings.error().what();
   auto root = Root::create(std::move(*settings));
@@ -449,7 +449,7 @@ const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation"
 [[nodiscard]] std::expected<void, StarException>
 writeIsolationModules(String const& overlay, std::initializer_list<std::pair<String, String>> modules) {
   for (auto const& [name, source] : modules) {
-    auto written = File::writeFile(source, File::relativeTo(overlay, name));
+    auto written = File::write_file(source, File::relative_to(overlay, name));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -504,12 +504,12 @@ const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplat
 });
 
 const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
+  auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto settings = isolationSettings(fixture.rootSettings(), *directory, "bush-shapes");
   ASSERT_TRUE(settings) << settings.error().what();
-  auto overlay = File::relativeTo(*directory, "assets");
+  auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(
     overlay,
     {{"borrowed-no-mods.bush", R"JSON({"name":"borrowed-no-mods","shapes":[{"base":"base.png"}]})JSON"},
@@ -629,12 +629,12 @@ void expectIsolationModuleError(Json const& result, String const& field, String 
 
 const GameTestRegistration
   luaModulesExecuteOncePerContext("RootTest", "LuaModulesExecuteOncePerContext", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "modules");
     ASSERT_TRUE(settings) << settings.error().what();
-    auto overlay = File::relativeTo(*directory, "assets");
+    auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay,
                                       {{"p5-top.lua", R"LUA(
       topRuns = (topRuns or 0) + 1
@@ -687,12 +687,12 @@ const GameTestRegistration
 
 const GameTestRegistration
   luaModulesRetryFailuresAndCycles("RootTest", "LuaModulesRetryFailuresAndCycles", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-retries");
     ASSERT_TRUE(settings) << settings.error().what();
-    auto overlay = File::relativeTo(*directory, "assets");
+    auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay,
                                       {{"p5-dependency.lua", "dependencyRuns = (dependencyRuns or 0) + 1"},
                                        {"p5-failure.lua", R"LUA(
@@ -799,12 +799,12 @@ const GameTestRegistration
 
 const GameTestRegistration
   luaModulesRejectStaleContexts("RootTest", "LuaModulesRejectStaleContexts", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-revisions");
     ASSERT_TRUE(settings) << settings.error().what();
-    auto overlay = File::relativeTo(*directory, "assets");
+    auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(
       overlay,
       {{"p5-version.lua", "versionRuns = (versionRuns or 0) + 1; function version() return 1 end"},
@@ -873,12 +873,12 @@ const GameTestRegistration
 
 const GameTestRegistration
   luaModulesRejectReentrantInvalidation("RootTest", "LuaModulesRejectReentrantInvalidation", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-reentrancy");
     ASSERT_TRUE(settings) << settings.error().what();
-    auto overlay = File::relativeTo(*directory, "assets");
+    auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay, {{"p5-reentrant.lua", R"LUA(
       moduleRuns = (moduleRuns or 0) + 1
       if invalidateDuringLoad then test.invalidate() end
@@ -931,20 +931,20 @@ const GameTestRegistration
   });
 
 const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", [](GameTest& fixture) {
-  auto directoryA = File::temporaryDirectory(fixture.root().random());
+  auto directoryA = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();
-  auto cleanupA = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directoryA)); });
-  auto directoryB = File::temporaryDirectory(fixture.root().random());
+  auto cleanupA = finally([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
+  auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
-  auto cleanupB = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directoryB)); });
+  auto cleanupB = finally([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
   auto settingsResultA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsResultA) << settingsResultA.error().what();
   auto settingsA = std::move(*settingsResultA);
   auto settingsResultB = isolationSettings(fixture.rootSettings(), *directoryB, "B");
   ASSERT_TRUE(settingsResultB) << settingsResultB.error().what();
   auto settingsB = std::move(*settingsResultB);
-  auto overlayA = File::relativeTo(*directoryA, "assets");
-  auto overlayB = File::relativeTo(*directoryB, "assets");
+  auto overlayA = File::relative_to(*directoryA, "assets");
+  auto overlayB = File::relative_to(*directoryB, "assets");
   auto createdA = Root::create(settingsA);
   ASSERT_TRUE(createdA) << createdA.error().what();
   auto rootA = std::move(*createdA);
@@ -953,8 +953,8 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
   ASSERT_TRUE(createdB) << createdB.error().what();
   auto rootB = std::move(*createdB);
   rootB->logger().addSink(std::make_shared<RootIsolationErrorSink>());
-  auto logPathA = File::relativeTo(*directoryA, "isolation.log");
-  auto logPathB = File::relativeTo(*directoryB, "isolation.log");
+  auto logPathA = File::relative_to(*directoryA, "isolation.log");
+  auto logPathB = File::relative_to(*directoryB, "isolation.log");
   auto sinkA = FileLogSink::create(logPathA, LogLevel::Info, true);
   ASSERT_TRUE(sinkA) << sinkA.error().what();
   auto sinkB = FileLogSink::create(logPathB, LogLevel::Info, true);
@@ -998,12 +998,12 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     // A real filesystem failure must leave both live owners usable and must
     // not prevent a subsequent successful Root construction.
     auto failedSettings = settingsA;
-    failedSettings.storageDirectory = File::relativeTo(*directoryA, "not-a-directory");
-    ASSERT_TRUE(File::writeFile(String("regular file"), failedSettings.storageDirectory));
+    failedSettings.storageDirectory = File::relative_to(*directoryA, "not-a-directory");
+    ASSERT_TRUE(File::write_file(String("regular file"), failedSettings.storageDirectory));
     auto failedRoot = Root::create(failedSettings);
     EXPECT_FALSE(failedRoot);
     auto recoveredSettings = settingsA;
-    recoveredSettings.storageDirectory = File::relativeTo(*directoryA, "recovered-storage");
+    recoveredSettings.storageDirectory = File::relative_to(*directoryA, "recovered-storage");
     {
       auto recovered = Root::create(recoveredSettings);
       ASSERT_TRUE(recovered) << recovered.error().what();
@@ -1104,7 +1104,7 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
       {"collisionKind", collisionKind}
     }).repr();
   if (!content) return std::unexpected(std::move(content.error()));
-  return File::writeFile(*content, File::relativeTo(overlay, "root-isolation.material"));
+  return File::write_file(*content, File::relative_to(overlay, "root-isolation.material"));
 }
 
 [[nodiscard]] std::expected<void, StarException> placeIsolationMaterial(
@@ -1143,18 +1143,18 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
     ++material;
   ASSERT_LT(material, FirstMetaMaterialId);
 
-  auto directoryA = File::temporaryDirectory(fixture.root().random());
+  auto directoryA = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();
-  auto cleanupA = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directoryA)); });
-  auto directoryB = File::temporaryDirectory(fixture.root().random());
+  auto cleanupA = finally([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
+  auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
-  auto cleanupB = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directoryB)); });
+  auto cleanupB = finally([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
   auto settingsA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsA) << settingsA.error().what();
   auto settingsB = isolationSettings(fixture.rootSettings(), *directoryB, "B");
   ASSERT_TRUE(settingsB) << settingsB.error().what();
-  auto overlayA = File::relativeTo(*directoryA, "assets");
-  auto overlayB = File::relativeTo(*directoryB, "assets");
+  auto overlayA = File::relative_to(*directoryA, "assets");
+  auto overlayB = File::relative_to(*directoryB, "assets");
   ASSERT_TRUE(writeIsolationMaterial(overlayA, material, "block"));
   ASSERT_TRUE(writeIsolationMaterial(overlayB, material, "none"));
 
@@ -1166,13 +1166,13 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   ASSERT_TRUE(createdB) << createdB.error().what();
   auto rootB = std::move(*createdB);
   rootB->logger().addSink(std::make_shared<RootIsolationErrorSink>());
-  auto storageA = File::ephemeralFile(rootA->random());
+  auto storageA = File::ephemeral_file(rootA->random());
   ASSERT_TRUE(storageA) << storageA.error().what();
   auto createdWorldA = WorldServer::create(*rootA, Vec2U(2048, 2048), *storageA);
   ASSERT_TRUE(createdWorldA) << createdWorldA.error().what();
   auto worldA = std::move(*createdWorldA);
   auto closeWorldA = finally([&] { if (worldA) EXPECT_TRUE(worldA->close()); });
-  auto storageB = File::ephemeralFile(rootB->random());
+  auto storageB = File::ephemeral_file(rootB->random());
   ASSERT_TRUE(storageB) << storageB.error().what();
   auto createdWorldB = WorldServer::create(*rootB, Vec2U(2048, 2048), *storageB);
   ASSERT_TRUE(createdWorldB) << createdWorldB.error().what();
@@ -1459,7 +1459,7 @@ const GameTestRegistration hudRadioDequeue("HudDomainTest", "RadioUniqueAccounti
 
 const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFollowNativeEntityIdentity", [](GameTest& fixture) {
   auto& root = fixture.root();
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   ASSERT_TRUE(storage) << storage.error().what();
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(world) << world.error().what();

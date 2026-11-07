@@ -825,7 +825,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       if (!scriptGroup)
         return std::unexpected(std::move(scriptGroup.error()));
       if (*scriptGroup) {
-        auto sourceName = metadata.value("name", File::baseName(sourcePath)).repr();
+        auto sourceName = metadata.value("name", File::base_name(sourcePath)).repr();
         if (!sourceName)
           return std::unexpected(std::move(sourceName.error()));
         auto memoryName = strf("{}::{}", *sourceName, groupName);
@@ -915,7 +915,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     std::shared_ptr<AssetSource> source;
-    auto isDirectory = File::isDirectory(sourcePath);
+    auto isDirectory = File::is_directory(sourcePath);
     if (!isDirectory)
       return std::unexpected(std::move(isDirectory.error()));
     if (*isDirectory) {
@@ -974,10 +974,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       return std::unexpected(std::move(descriptor.error()));
     if (digestFile) {
       digest.push(assetPath);
-      auto device = descriptor->get().source->open(descriptor->get().sourceName);
-      if (!device)
-        return std::unexpected(std::move(device.error()));
-      auto size = (*device)->size();
+      auto size = descriptor->get().source->file_size(descriptor->get().sourceName);
       if (!size)
         return std::unexpected(std::move(size.error()));
       auto serialized = DataStreamBuffer::serialize(*size);
@@ -985,10 +982,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         return std::unexpected(std::move(serialized.error()));
       digest.push(*serialized);
       for (auto const& pair : descriptor->get().patchSources) {
-        auto patchDevice = pair.second->open(AssetPath::removeSubPath(pair.first));
-        if (!patchDevice)
-          return std::unexpected(std::move(patchDevice.error()));
-        auto patchSize = (*patchDevice)->size();
+        auto patchSize = pair.second->file_size(AssetPath::removeSubPath(pair.first));
         if (!patchSize)
           return std::unexpected(std::move(patchSize.error()));
         auto serializedPatchSize = DataStreamBuffer::serialize(*patchSize);
@@ -1219,7 +1213,7 @@ std::expected<Json, StarException> Assets::fetchJson(Json const& v, String const
   auto path = v.toString();
   if (!path)
     return std::unexpected(std::move(path.error()));
-  return json(AssetPath::relativeTo(dir, *path));
+  return json(AssetPath::relative_to(dir, *path));
 }
 
 std::expected<void, StarException> Assets::queueJsons(StringList const& paths) const {

@@ -45,10 +45,10 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   String bTreePath = inputArgument->get();
   String outputFilename = opts.arguments.get(1, bTreePath + ".repack");
 
-  auto outputDirectory = File::fullPath(File::dirName(outputFilename));
+  auto outputDirectory = File::full_path(File::dir_name(outputFilename));
   if (!outputDirectory)
     return std::unexpected(std::move(outputDirectory.error()));
-  outputFilename = File::relativeTo(*outputDirectory, File::baseName(outputFilename));
+  outputFilename = File::relative_to(*outputDirectory, File::base_name(outputFilename));
   // Open the old database.
   BTreeDatabase db(logger);
   auto inputFile = File::open(bTreePath, IOMode::Read);

@@ -263,7 +263,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     if (!defaultTexture) return std::unexpected(std::move(defaultTexture.error()));
     auto texture = pair.second.getString("texture", *defaultTexture);
     if (!texture) return std::unexpected(std::move(texture.error()));
-    piece->texture = AssetPath::relativeTo(relativePath, *texture);
+    piece->texture = AssetPath::relative_to(relativePath, *texture);
     auto defaultVariants = spec.getUInt("variants", 1);
     if (!defaultVariants) return std::unexpected(std::move(defaultVariants.error()));
     auto variants = pair.second.getUInt("variants", *defaultVariants);

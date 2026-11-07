@@ -177,8 +177,8 @@ monsterType.partTypes = std::move(*result17);
 
       auto result18 = config.getString("animation");
 if (!result18) return std::unexpected(std::move(result18.error()));
-monsterType.animationConfigPath = AssetPath::relativeTo(file, std::move(*result18));
-      auto result19 = config.getString("colors", "default");
+monsterType.animationConfigPath = AssetPath::relative_to(file, std::move(*result18));
+auto result19 = config.getString("colors", "default");
 if (!result19) return std::unexpected(std::move(result19.error()));
 monsterType.colors = std::move(*result19);
 
@@ -209,20 +209,24 @@ monsterType.baseParameters = std::move(*result23);
   if (std::move(*result24)) {
           auto result25 = config.getString("partParameters");
   if (!result25) return std::unexpected(std::move(result25.error()));
-          auto partParametersPath = AssetPath::relativeTo(file, std::move(*result25));
-          auto partParameters = [&]() -> std::expected<void, StarException> {
-            auto source = assets->json(partParametersPath);
-            if (!source) return std::unexpected(std::move(source.error()));
-            auto description = source->getObject("partParameterDescription");
-            if (!description) return std::unexpected(std::move(description.error()));
-            monsterType.partParameterDescription = std::move(*description);
-            auto overrides = source->getObject("partParameters");
-            if (!overrides) return std::unexpected(std::move(overrides.error()));
-            monsterType.partParameterOverrides = std::move(*overrides);
-            return {};
-          }();
-          if (!partParameters)
-            return std::unexpected(assets->withAssetContext(std::move(partParameters.error()), partParametersPath, "Loading monster part parameters"));
+  auto partParametersPath = AssetPath::relative_to(file, std::move(*result25));
+  auto partParameters = [&]() -> std::expected<void, StarException> {
+    auto source = assets->json(partParametersPath);
+    if (!source)
+      return std::unexpected(std::move(source.error()));
+    auto description = source->getObject("partParameterDescription");
+    if (!description)
+      return std::unexpected(std::move(description.error()));
+    monsterType.partParameterDescription = std::move(*description);
+    auto overrides = source->getObject("partParameters");
+    if (!overrides)
+      return std::unexpected(std::move(overrides.error()));
+    monsterType.partParameterOverrides = std::move(*overrides);
+    return {};
+  }();
+  if (!partParameters)
+    return std::unexpected(assets->withAssetContext(std::move(partParameters.error()), partParametersPath,
+                                                    "Loading monster part parameters"));
         } else {
           // outdated monsters still have partParameterDescription defined
           // directly in the
@@ -916,7 +920,7 @@ auto selectedPart = std::move(*result152);
       {
   auto result156 = pair.second.toString();
   if (!result156) return std::unexpected(std::move(result156.error()));
-  monsterVariant.animatorPartTags[pair.first] = AssetPath::relativeTo(partConfig.path, std::move(*result156));
+  monsterVariant.animatorPartTags[pair.first] = AssetPath::relative_to(partConfig.path, std::move(*result156));
 }
   }
   JsonArray partParameterList;

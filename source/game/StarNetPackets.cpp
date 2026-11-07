@@ -404,7 +404,7 @@ std::expected<void, StarException> ProtocolResponsePacket::read(DataStream& ds) 
     auto externalBuffer = asRef<DataStreamExternalBuffer>(ds);
     bool readInfo = !externalBuffer;
     if (externalBuffer) {
-      auto ended = externalBuffer->get().atEnd();
+      auto ended = externalBuffer->get().at_end();
       if (!ended)
         return std::unexpected(std::move(ended.error()));
       readInfo = !*ended;

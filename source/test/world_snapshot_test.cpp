@@ -220,16 +220,16 @@ const GameTestRegistration worldMessageBatchDrainsAfterFailure(
 
 const GameTestRegistration terrainNamedSelector(
   "TerrainDatabaseTest", "UnknownNamesAndSeededNamedSelectorsPreserveSampling", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
-    ASSERT_TRUE(File::writeFile(String(R"({
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(R"({
       "name":"seeded","type":"perlin","function":"perlin","octaves":3,"freq":0.03,"amp":5
     })"),
-                                File::relativeTo(*directory, "seeded.terrain")));
-    ASSERT_TRUE(File::writeFile(String(R"({"name":"badType","type":"unknown-selector-type"})"),
-                                File::relativeTo(*directory, "bad.terrain")));
+                                 File::relative_to(*directory, "seeded.terrain")));
+    ASSERT_TRUE(File::write_file(String(R"({"name":"badType","type":"unknown-selector-type"})"),
+                                 File::relative_to(*directory, "bad.terrain")));
     Assets::Settings settings{};
     settings.workerPoolSize = 1;
     settings.assetTimeToLive = 10;
@@ -274,7 +274,7 @@ const GameTestRegistration terrainNamedSelector(
 
 const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
   "WorldTimers", "PreserveOrderAndDeferReentrantActions", [](GameTest& fixture) {
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();
@@ -312,66 +312,69 @@ const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
 // runs and machines and can be compared to a constant.  When world generation
 // changes on purpose, rerun with --gtest_filter='WorldSnapshot.*'; the new hash
 // is printed to stderr.
-const GameTestRegistration fixedCoordinateGenerationIsDeterministic("WorldSnapshot", "FixedCoordinateGenerationIsDeterministic", [](GameTest& fixture) {
-  auto storagePath = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(storagePath) << storagePath.error().what();
-  auto finallyGuard = finally([&storagePath]() { EXPECT_TRUE(File::removeDirectoryRecursive(*storagePath)); });
-  auto celestialDatabase = CelestialMasterDatabase::create(fixture.root(), File::relativeTo(*storagePath, "universe.chunks"));
-  ASSERT_TRUE(celestialDatabase) << celestialDatabase.error().what();
-  auto closeDatabase = finally([&]() { EXPECT_TRUE((*celestialDatabase)->close()); });
+const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
+  "WorldSnapshot", "FixedCoordinateGenerationIsDeterministic", [](GameTest& fixture) {
+    auto storagePath = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(storagePath) << storagePath.error().what();
+    auto finallyGuard = finally([&storagePath]() { EXPECT_TRUE(File::remove_all(*storagePath)); });
+    auto celestialDatabase =
+      CelestialMasterDatabase::create(fixture.root(), File::relative_to(*storagePath, "universe.chunks"));
+    ASSERT_TRUE(celestialDatabase) << celestialDatabase.error().what();
+    auto closeDatabase = finally([&]() { EXPECT_TRUE((*celestialDatabase)->close()); });
 
-  // Find a real planet: the celestial generator places systems sparsely, and a
-  // hand picked coordinate is most likely empty.
-  auto systems = (*celestialDatabase)->scanSystems(RectI::withSize(Vec2I(0, 0), Vec2I(32, 32)));
-  ASSERT_TRUE(systems) << systems.error().what();
-  ASSERT_FALSE(systems->empty());
-  std::optional<CelestialCoordinate> coordinate;
-  for (auto const& system : *systems) {
-    auto children = (*celestialDatabase)->children(system);
-    ASSERT_TRUE(children) << children.error().what();
-    for (auto const& child : *children) {
-      auto parameters = (*celestialDatabase)->parameters(child);
-      ASSERT_TRUE(parameters) << parameters.error().what();
-      if (child.isPlanetaryBody() && *parameters) {
-        coordinate = child;
-        break;
+    // Find a real planet: the celestial generator places systems sparsely, and a
+    // hand picked coordinate is most likely empty.
+    auto systems = (*celestialDatabase)->scanSystems(RectI::withSize(Vec2I(0, 0), Vec2I(32, 32)));
+    ASSERT_TRUE(systems) << systems.error().what();
+    ASSERT_FALSE(systems->empty());
+    std::optional<CelestialCoordinate> coordinate;
+    for (auto const& system : *systems) {
+      auto children = (*celestialDatabase)->children(system);
+      ASSERT_TRUE(children) << children.error().what();
+      for (auto const& child : *children) {
+        auto parameters = (*celestialDatabase)->parameters(child);
+        ASSERT_TRUE(parameters) << parameters.error().what();
+        if (child.isPlanetaryBody() && *parameters) {
+          coordinate = child;
+          break;
+        }
       }
+      if (coordinate)
+        break;
     }
-    if (coordinate)
-      break;
-  }
-  ASSERT_TRUE(coordinate.has_value()) << "no planetary body found in the scanned region";
-  // A separate template for the surface level: a template handed to a WorldServer
-  // is modified by world generation.
-  auto surfaceTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
-  ASSERT_TRUE(surfaceTemplate) << surfaceTemplate.error().what();
-  auto surfaceLevel = (*surfaceTemplate)->surfaceLevel();
+    ASSERT_TRUE(coordinate.has_value()) << "no planetary body found in the scanned region";
+    // A separate template for the surface level: a template handed to a WorldServer
+    // is modified by world generation.
+    auto surfaceTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
+    ASSERT_TRUE(surfaceTemplate) << surfaceTemplate.error().what();
+    auto surfaceLevel = (*surfaceTemplate)->surfaceLevel();
 
-  auto makeWorld = [&]() -> std::expected<std::shared_ptr<WorldServer>, StarException> {
-    auto worldTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
-    if (!worldTemplate)
-      return std::unexpected(std::move(worldTemplate.error()));
-    auto storage = File::ephemeralFile(fixture.root().random());
-    if (!storage)
-      return std::unexpected(std::move(storage.error()));
-    return WorldServer::create(fixture.root(), *worldTemplate, *storage);
-  };
-  auto firstWorld = makeWorld();
-  ASSERT_TRUE(firstWorld) << firstWorld.error().what();
-  auto closeFirst = finally([&]() { EXPECT_TRUE((*firstWorld)->close()); });
-  auto secondWorld = makeWorld();
-  ASSERT_TRUE(secondWorld) << secondWorld.error().what();
-  auto closeSecond = finally([&]() { EXPECT_TRUE((*secondWorld)->close()); });
+    auto makeWorld = [&]() -> std::expected<std::shared_ptr<WorldServer>, StarException> {
+      auto worldTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
+      if (!worldTemplate)
+        return std::unexpected(std::move(worldTemplate.error()));
+      auto storage = File::ephemeral_file(fixture.root().random());
+      if (!storage)
+        return std::unexpected(std::move(storage.error()));
+      return WorldServer::create(fixture.root(), *worldTemplate, *storage);
+    };
+    auto firstWorld = makeWorld();
+    ASSERT_TRUE(firstWorld) << firstWorld.error().what();
+    auto closeFirst = finally([&]() { EXPECT_TRUE((*firstWorld)->close()); });
+    auto secondWorld = makeWorld();
+    ASSERT_TRUE(secondWorld) << secondWorld.error().what();
+    auto closeSecond = finally([&]() { EXPECT_TRUE((*secondWorld)->close()); });
 
-  auto firstHash = sampleWorld(**firstWorld, surfaceLevel);
-  ASSERT_TRUE(firstHash) << firstHash.error().what();
-  auto secondHash = sampleWorld(**secondWorld, surfaceLevel);
-  ASSERT_TRUE(secondHash) << secondHash.error().what();
-  std::cerr << "WorldSnapshot: " << coordinate->id() << " hashes to 0x" << std::hex << *firstHash << std::dec << std::endl;
+    auto firstHash = sampleWorld(**firstWorld, surfaceLevel);
+    ASSERT_TRUE(firstHash) << firstHash.error().what();
+    auto secondHash = sampleWorld(**secondWorld, surfaceLevel);
+    ASSERT_TRUE(secondHash) << secondHash.error().what();
+    std::cerr << "WorldSnapshot: " << coordinate->id() << " hashes to 0x" << std::hex << *firstHash << std::dec
+              << std::endl;
 
-  EXPECT_EQ(*firstHash, *secondHash);
-  EXPECT_EQ(*firstHash, 0x801745d507acfcaaull) << "update the expected hash (printed above)";
-});
+    EXPECT_EQ(*firstHash, *secondHash);
+    EXPECT_EQ(*firstHash, 0x801745d507acfcaaull) << "update the expected hash (printed above)";
+  });
 
 const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldIsDeterministic", [](GameTest& fixture) {
   // The ship world does not depend on celestial parameters, so it has its own
@@ -397,7 +400,7 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
   }
 
   auto makeWorld = [&]() -> std::expected<std::shared_ptr<WorldServer>, StarException> {
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto world = WorldServer::create(fixture.root(), worldSize, *storage);
@@ -444,98 +447,99 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
   EXPECT_EQ(firstHash, 0x96a3df5c62832b0bull) << "update the expected hash (printed above)";
 });
 
-const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks("WorldSnapshot", "StoppedWorldRetainsClientsAndExportsRecoverableChunks", [](GameTest& fixture) {
-  auto storageResult = File::temporaryFile(fixture.root().random());
-  ASSERT_TRUE(storageResult) << storageResult.error().what();
-  auto storage = *storageResult;
-  auto path = storage->fileName();
-  auto cleanup = finally([&]() {
-    EXPECT_TRUE(storage->close());
-    EXPECT_TRUE(File::remove(path));
+const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks(
+  "WorldSnapshot", "StoppedWorldRetainsClientsAndExportsRecoverableChunks", [](GameTest& fixture) {
+    auto storageResult = File::temporary_file(fixture.root().random());
+    ASSERT_TRUE(storageResult) << storageResult.error().what();
+    auto storage = *storageResult;
+    auto path = storage->file_name();
+    auto cleanup = finally([&]() {
+      EXPECT_TRUE(storage->close());
+      EXPECT_TRUE(File::remove(path));
+    });
+    auto worldResult = WorldServer::create(fixture.root(), Vec2U(2048, 2048), storage);
+    ASSERT_TRUE(worldResult) << worldResult.error().what();
+    auto world = *worldResult;
+    auto closeWorld = finally([&]() { EXPECT_TRUE(world->close()); });
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto speciesShips = (*assets)->json("/universe_server.config:speciesShips");
+    ASSERT_TRUE(speciesShips) << speciesShips.error().what();
+    auto humanShips = speciesShips->get("human");
+    ASSERT_TRUE(humanShips) << humanShips.error().what();
+    auto shipPaths = jsonToStringList(*humanShips);
+    ASSERT_TRUE(shipPaths) << shipPaths.error().what();
+    ASSERT_FALSE(shipPaths->empty());
+    auto structure = WorldStructure::create(fixture.root(), (*shipPaths)[0]);
+    ASSERT_TRUE(structure) << structure.error().what();
+    ASSERT_TRUE(world->setCentralStructure(*structure));
+    ASSERT_TRUE(world->setProperty("stopSaveRegression", Json(42)));
+
+    auto threadResult = WorldServerThread::create(world, ClientShipWorldId(Uuid(fixture.root().random())));
+    ASSERT_TRUE(threadResult) << threadResult.error().what();
+    auto& thread = **threadResult;
+    auto added = thread.addClient(MinClientConnectionId, SpawnTargetPosition(Vec2F(1024, 1024)), true, false,
+                                  NetCompatibilityRules{}, MainClientWorldId);
+    ASSERT_TRUE(added) << added.error().what();
+    ASSERT_TRUE(*added);
+    ASSERT_TRUE(thread.start());
+    ASSERT_TRUE(thread.stop());
+
+    // UniverseServer still needs this list to migrate players after joining.
+    ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
+    EXPECT_EQ(thread.clients().size(), 1u);
+    EXPECT_FALSE(thread.serverErrorOccurred());
+    auto descriptor = ItemDescriptor::create("money", 7, Json());
+    ASSERT_TRUE(descriptor) << descriptor.error().what();
+    auto finalItem = std::make_shared<GiveItemPacket>(std::move(*descriptor));
+    auto sent = world->sendPacket(MinClientConnectionId, finalItem);
+    ASSERT_TRUE(sent);
+
+    // An asynchronous warp may wait for its destination.  Merely queueing it
+    // must leave the stopped source alive, with its final outgoing queue intact.
+    auto waitingChunks = thread.readChunks();
+    ASSERT_TRUE(waitingChunks) << waitingChunks.error().what();
+    ASSERT_FALSE(waitingChunks->empty());
+    ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
+    ASSERT_TRUE(storage->is_open());
+
+    // Ship/custom-world snapshots are exported after stop, before final close.
+    ASSERT_TRUE(thread.unloadAll(true));
+    auto chunks = thread.readChunks();
+    ASSERT_TRUE(chunks) << chunks.error().what();
+    ASSERT_FALSE(chunks->empty());
+    ASSERT_FALSE(thread.serverErrorOccurred());
+    auto finalPackets = thread.removeClient(MinClientConnectionId);
+    ASSERT_TRUE(finalPackets) << finalPackets.error().what();
+    ASSERT_FALSE(finalPackets->empty());
+    auto transport = LocalPacketSocket::openPair();
+    ASSERT_TRUE(transport.first->sendPackets(std::move(*finalPackets)));
+    auto delivered = transport.second->receivePackets();
+    ASSERT_TRUE(delivered) << delivered.error().what();
+    EXPECT_TRUE(delivered->contains(finalItem));
+    ASSERT_FALSE(delivered->empty());
+    EXPECT_EQ(delivered->back()->type(), PacketType::WorldStop);
+    EXPECT_TRUE(thread.noClients());
+    ASSERT_TRUE(thread.close());
+    ASSERT_TRUE(thread.close());
+    EXPECT_FALSE(thread.serverErrorOccurred());
+
+    auto fromChunks = WorldServer::create(fixture.root(), *chunks);
+    ASSERT_TRUE(fromChunks) << fromChunks.error().what();
+    EXPECT_EQ((*fromChunks)->getProperty("stopSaveRegression", Json()), Json(42));
+    EXPECT_TRUE((*fromChunks)->close());
+
+    auto reopened = File::open(path, IOMode::ReadWrite);
+    ASSERT_TRUE(reopened) << reopened.error().what();
+    auto fromFile = WorldServer::create(fixture.root(), *reopened);
+    ASSERT_TRUE(fromFile) << fromFile.error().what();
+    EXPECT_EQ((*fromFile)->getProperty("stopSaveRegression", Json()), Json(42));
+    EXPECT_TRUE((*fromFile)->close());
   });
-  auto worldResult = WorldServer::create(fixture.root(), Vec2U(2048, 2048), storage);
-  ASSERT_TRUE(worldResult) << worldResult.error().what();
-  auto world = *worldResult;
-  auto closeWorld = finally([&]() { EXPECT_TRUE(world->close()); });
-  auto assets = fixture.root().assets();
-  ASSERT_TRUE(assets) << assets.error().what();
-  auto speciesShips = (*assets)->json("/universe_server.config:speciesShips");
-  ASSERT_TRUE(speciesShips) << speciesShips.error().what();
-  auto humanShips = speciesShips->get("human");
-  ASSERT_TRUE(humanShips) << humanShips.error().what();
-  auto shipPaths = jsonToStringList(*humanShips);
-  ASSERT_TRUE(shipPaths) << shipPaths.error().what();
-  ASSERT_FALSE(shipPaths->empty());
-  auto structure = WorldStructure::create(fixture.root(), (*shipPaths)[0]);
-  ASSERT_TRUE(structure) << structure.error().what();
-  ASSERT_TRUE(world->setCentralStructure(*structure));
-  ASSERT_TRUE(world->setProperty("stopSaveRegression", Json(42)));
-
-  auto threadResult = WorldServerThread::create(world, ClientShipWorldId(Uuid(fixture.root().random())));
-  ASSERT_TRUE(threadResult) << threadResult.error().what();
-  auto& thread = **threadResult;
-  auto added = thread.addClient(MinClientConnectionId, SpawnTargetPosition(Vec2F(1024, 1024)),
-      true, false, NetCompatibilityRules{}, MainClientWorldId);
-  ASSERT_TRUE(added) << added.error().what();
-  ASSERT_TRUE(*added);
-  ASSERT_TRUE(thread.start());
-  ASSERT_TRUE(thread.stop());
-
-  // UniverseServer still needs this list to migrate players after joining.
-  ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
-  EXPECT_EQ(thread.clients().size(), 1u);
-  EXPECT_FALSE(thread.serverErrorOccurred());
-  auto descriptor = ItemDescriptor::create("money", 7, Json());
-  ASSERT_TRUE(descriptor) << descriptor.error().what();
-  auto finalItem = std::make_shared<GiveItemPacket>(std::move(*descriptor));
-  auto sent = world->sendPacket(MinClientConnectionId, finalItem);
-  ASSERT_TRUE(sent);
-
-  // An asynchronous warp may wait for its destination.  Merely queueing it
-  // must leave the stopped source alive, with its final outgoing queue intact.
-  auto waitingChunks = thread.readChunks();
-  ASSERT_TRUE(waitingChunks) << waitingChunks.error().what();
-  ASSERT_FALSE(waitingChunks->empty());
-  ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
-  ASSERT_TRUE(storage->isOpen());
-
-  // Ship/custom-world snapshots are exported after stop, before final close.
-  ASSERT_TRUE(thread.unloadAll(true));
-  auto chunks = thread.readChunks();
-  ASSERT_TRUE(chunks) << chunks.error().what();
-  ASSERT_FALSE(chunks->empty());
-  ASSERT_FALSE(thread.serverErrorOccurred());
-  auto finalPackets = thread.removeClient(MinClientConnectionId);
-  ASSERT_TRUE(finalPackets) << finalPackets.error().what();
-  ASSERT_FALSE(finalPackets->empty());
-  auto transport = LocalPacketSocket::openPair();
-  ASSERT_TRUE(transport.first->sendPackets(std::move(*finalPackets)));
-  auto delivered = transport.second->receivePackets();
-  ASSERT_TRUE(delivered) << delivered.error().what();
-  EXPECT_TRUE(delivered->contains(finalItem));
-  ASSERT_FALSE(delivered->empty());
-  EXPECT_EQ(delivered->back()->type(), PacketType::WorldStop);
-  EXPECT_TRUE(thread.noClients());
-  ASSERT_TRUE(thread.close());
-  ASSERT_TRUE(thread.close());
-  EXPECT_FALSE(thread.serverErrorOccurred());
-
-  auto fromChunks = WorldServer::create(fixture.root(), *chunks);
-  ASSERT_TRUE(fromChunks) << fromChunks.error().what();
-  EXPECT_EQ((*fromChunks)->getProperty("stopSaveRegression", Json()), Json(42));
-  EXPECT_TRUE((*fromChunks)->close());
-
-  auto reopened = File::open(path, IOMode::ReadWrite);
-  ASSERT_TRUE(reopened) << reopened.error().what();
-  auto fromFile = WorldServer::create(fixture.root(), *reopened);
-  ASSERT_TRUE(fromFile) << fromFile.error().what();
-  EXPECT_EQ((*fromFile)->getProperty("stopSaveRegression", Json()), Json(42));
-  EXPECT_TRUE((*fromFile)->close());
-});
 
 const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions", "DelayedExplosionOutlivesProjectile", [](GameTest& fixture) {
   auto& root = fixture.root();
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   ASSERT_TRUE(storage) << storage.error().what();
   auto worldResult = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(worldResult) << worldResult.error().what();
@@ -589,7 +593,7 @@ const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions
 
 const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileActions", "FirstContactTriggersCollisionActionOnce", [](GameTest& fixture) {
   auto& root = fixture.root();
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   ASSERT_TRUE(storage) << storage.error().what();
   auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(created) << created.error().what();
@@ -697,7 +701,7 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
 const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
   "WorldSnapshot", "ClientSnapshotsRetainPresenceAcrossCameraTransitions", [](GameTest& fixture) {
     auto& root = fixture.root();
-    auto storage = File::ephemeralFile(root.random());
+    auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();
@@ -780,7 +784,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           ASSERT_TRUE(decoded) << decoded.error().what();
           ASSERT_TRUE(wire.seek(0));
           ASSERT_TRUE((*decoded)->read(wire, rules));
-          auto atEnd = wire.atEnd();
+          auto atEnd = wire.at_end();
           ASSERT_TRUE(atEnd);
           EXPECT_TRUE(*atEnd);
           DataStreamBuffer encodedAgain;

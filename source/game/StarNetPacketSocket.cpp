@@ -417,7 +417,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
     DataStreamExternalBuffer ds{std::span<char const>(m_inputBuffer)};
     std::size_t trimPos = 0;
     while (true) {
-      auto atEnd = ds.atEnd();
+      auto atEnd = ds.at_end();
       if (!atEnd)
         return std::unexpected(std::move(atEnd.error()));
       if (*atEnd)
@@ -495,7 +495,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
         if (!read)
           return std::unexpected(std::move(read.error()));
         packets.append(std::move(packet));
-        auto ended = packetStream.atEnd();
+        auto ended = packetStream.at_end();
         if (!ended)
           return std::unexpected(std::move(ended.error()));
         if (*ended)
@@ -758,7 +758,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
       if (!position)
         return std::unexpected(std::move(position.error()));
       std::size_t packetSize = ds.size() - *position;
-      auto readBytes = ds.readBytes(packetSize);
+      auto readBytes = ds.read_bytes(packetSize);
       if (!readBytes)
         return std::unexpected(std::move(readBytes.error()));
       ByteArray packetBytes = std::move(*readBytes);
@@ -781,7 +781,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
         if (!read)
           return std::unexpected(std::move(read.error()));
         packets.append(std::move(packet));
-        auto ended = packetStream.atEnd();
+        auto ended = packetStream.at_end();
         if (!ended)
           return std::unexpected(std::move(ended.error()));
         if (*ended)

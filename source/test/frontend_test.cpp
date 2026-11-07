@@ -255,7 +255,7 @@ TEST(FixedScheduler, InFlightFrameWaitUsesOnlyLogicDeadline) {
 auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, String const& overlay,
                               String runtimeConfig) {
   settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(directory, "storage");
+  settings.storageDirectory = File::relative_to(directory, "storage");
   settings.runtimeConfigFile = std::move(runtimeConfig);
   settings.logDirectory = {};
   settings.logFile = {};
@@ -2135,161 +2135,165 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   ASSERT_TRUE(panes.dismissAllPanes());
 });
 
-const GameTestRegistration songbookPresentation("LuaSongbook", "NativeListLiteralFilteringResourceBytesBandAndReload", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "songs")));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "songs/Nested")));
-  String resource = "/songs/zzsongbook[A].Café[A].abc";
-  std::string bytes = "X:1\nT:Songbook bytes\nK:C\nCDEF|\n";
-  bytes.append("\0tail", 5);
-  String abc{std::string_view(bytes)};
-  ASSERT_TRUE(File::writeFile(abc, File::relativeTo(overlay, "songs/zzsongbook[A].Café[A].abc")));
-  ASSERT_TRUE(File::writeFile(String("X:2\nK:C\nC|\n"), File::relativeTo(overlay, "songs/Nested/zzsongbookB.abc")));
-  ASSERT_TRUE(File::writeFile(String("X:3\nK:C\nD|\n"), File::relativeTo(overlay, "songs/zzsongbookZ.abc")));
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "songbook.config");
-  ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-  auto& root = **createdRoot;
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration) << configuration.error().what();
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{
-      {"GuiClose", JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto assets = root.assets();
-  ASSERT_TRUE(assets) << assets.error().what();
-  auto config = (*assets)->json("/interface/opensb/songbook/songbook.config");
-  ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
-  ASSERT_TRUE(paneConfig) << paneConfig.error().what();
-  // Use production Lua, real asset services, ListWidget and TextBox bindings.
-  // Renderer-only imagery/labels stay in the GUI smoke; row text uses TextBox.
-  paneConfig->set("gui", JsonObject{});
-  auto created = BaseScriptPane::create(**context, *paneConfig);
-  ASSERT_TRUE(created) << created.error().what();
-  auto pane = std::move(*created);
-  pane->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-  for (auto const& name : {String("group"), String("search")}) {
-    auto textbox = textEditor(**context, "");
-    ASSERT_TRUE(textbox) << textbox.error().what();
-    (*textbox)->setMaxWidth(-1);
-    ASSERT_TRUE(pane->addChild(name, *textbox));
-  }
-  auto songs = std::make_shared<Widget>(**context);
-  auto schema = Json::parseJson(R"JSON({
+const GameTestRegistration
+  songbookPresentation("LuaSongbook", "NativeListLiteralFilteringResourceBytesBandAndReload", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "songs")));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "songs/Nested")));
+    String resource = "/songs/zzsongbook[A].Café[A].abc";
+    std::string bytes = "X:1\nT:Songbook bytes\nK:C\nCDEF|\n";
+    bytes.append("\0tail", 5);
+    String abc{std::string_view(bytes)};
+    ASSERT_TRUE(File::write_file(abc, File::relative_to(overlay, "songs/zzsongbook[A].Café[A].abc")));
+    ASSERT_TRUE(File::write_file(String("X:2\nK:C\nC|\n"), File::relative_to(overlay, "songs/Nested/zzsongbookB.abc")));
+    ASSERT_TRUE(File::write_file(String("X:3\nK:C\nD|\n"), File::relative_to(overlay, "songs/zzsongbookZ.abc")));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "songbook.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration) << configuration.error().what();
+    ASSERT_TRUE((*configuration)
+                  ->set("bindings",
+                        JsonObject{{"GuiClose",
+                                    JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto assets = root.assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto config = (*assets)->json("/interface/opensb/songbook/songbook.config");
+    ASSERT_TRUE(config) << config.error().what();
+    auto paneConfig = config->toObject();
+    ASSERT_TRUE(paneConfig) << paneConfig.error().what();
+    // Use production Lua, real asset services, ListWidget and TextBox bindings.
+    // Renderer-only imagery/labels stay in the GUI smoke; row text uses TextBox.
+    paneConfig->set("gui", JsonObject{});
+    auto created = BaseScriptPane::create(**context, *paneConfig);
+    ASSERT_TRUE(created) << created.error().what();
+    auto pane = std::move(*created);
+    pane->setAnchor(PaneAnchor::BottomLeft);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    for (auto const& name : {String("group"), String("search")}) {
+      auto textbox = textEditor(**context, "");
+      ASSERT_TRUE(textbox) << textbox.error().what();
+      (*textbox)->setMaxWidth(-1);
+      ASSERT_TRUE(pane->addChild(name, *textbox));
+    }
+    auto songs = std::make_shared<Widget>(**context);
+    auto schema = Json::parseJson(R"JSON({
     "spacing":[0,0], "memberSize":[200,12],
     "listTemplate":{"songName":{"type":"textbox","position":[0,0],"maxWidth":-1}}
   })JSON");
-  ASSERT_TRUE(schema) << schema.error().what();
-  auto list = ListWidget::create(**context, *schema);
-  ASSERT_TRUE(list) << list.error().what();
-  (*list)->registerMemberCallback("songName", [](Widget&) -> std::expected<void, StarException> { return {}; });
-  ASSERT_TRUE(songs->addChild("list", *list));
-  ASSERT_TRUE(pane->addChild("songs", songs));
-  auto domain = Songbook::create(root, "human");
-  ASSERT_TRUE(domain) << domain.error().what();
-  auto callbacks = LuaBindings::makeSongbookCallbacks(**domain);
-  ASSERT_TRUE(callbacks) << callbacks.error().what();
-  ASSERT_TRUE(pane->addCallbacks("songbook", *callbacks));
-  PaneManager panes(**context);
-  auto displayed = panes.displayPane(PaneLayer::Window, pane, {});
-  ASSERT_TRUE(displayed) << displayed.error().what();
-  ASSERT_TRUE(pane->call("btnPlay", {}));
-  EXPECT_FALSE(pane->isDismissed());
-  EXPECT_FALSE((*domain)->active());
-  auto search = pane->fetchChild<TextBoxWidget>("search");
-  auto group = pane->fetchChild<TextBoxWidget>("group");
-  ASSERT_TRUE(search) << search.error().what();
-  ASSERT_TRUE(group) << group.error().what();
-  ASSERT_TRUE((*search)->setText("zzsongbook"));
-  ASSERT_TRUE(pane->call("search", {}));
-  StringList visibleResources;
-  for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-    auto path = (*list)->itemAt(index)->data().toString();
-    ASSERT_TRUE(path) << path.error().what();
-    visibleResources.append(std::move(*path));
-  }
-  ASSERT_EQ(visibleResources, (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookZ.abc"}));
-  ASSERT_TRUE((*search)->setText("CAFÉ"));
-  ASSERT_TRUE(pane->call("search", {}));
-  EXPECT_EQ((*list)->listSize(), 0u); // Native case folding is not Unicode folding.
-  ASSERT_TRUE((*search)->setText("CAFé"));
-  ASSERT_TRUE(pane->call("search", {}));
-  EXPECT_EQ((*list)->listSize(), 1u);
-  ASSERT_TRUE((*search)->setText("[a]"));
-  ASSERT_TRUE(pane->call("search", {}));
-  ASSERT_EQ((*list)->listSize(), 1u);
-  auto row = (*list)->itemAt(0);
-  EXPECT_EQ(row->data(), Json(resource));
-  auto label = row->fetchChild<TextBoxWidget>("songName");
-  ASSERT_TRUE(label) << label.error().what();
-  EXPECT_EQ((*label)->getText(), String("^#bbb;zzsongbook^#7f7;[A]^#bbb;.Café^#7f7;[A]^#bbb;"));
-  ASSERT_TRUE((*list)->setSelected(0));
-  ASSERT_TRUE((*group)->setText("Band Ω"));
-  ASSERT_TRUE(pane->call("btnPlay", {}));
-  EXPECT_TRUE(pane->isDismissed());
-  EXPECT_TRUE((*domain)->active());
-  EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
-  EXPECT_EQ((*domain)->timeSource(), std::optional<String>("Band Ω"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
-  EXPECT_EQ((*search)->getText(), String("[a]"));
-  EXPECT_EQ((*group)->getText(), String("Band Ω"));
-  EXPECT_EQ((*list)->selectedWidget(), row);
-  auto closed = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
-  ASSERT_TRUE(closed) << closed.error().what();
-  EXPECT_TRUE(*closed);
-  EXPECT_TRUE(pane->isDismissed());
-  EXPECT_TRUE((*domain)->active());
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
-  ASSERT_TRUE((*search)->setText("zzsongbook"));
-  ASSERT_TRUE(pane->call("search", {}));
-  ASSERT_TRUE((*list)->setSelected(0));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->call("update", {}));
-  EXPECT_FALSE((*list)->selectedWidget());
-  EXPECT_EQ((*group)->getText(), String("Band Ω"));
-  ASSERT_TRUE(File::writeFile(String("X:5\nK:C\nF|\n"), File::relativeTo(overlay, "songs/zzsongbookNew.abc")));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->call("update", {}));
-  visibleResources.clear();
-  for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-    auto path = (*list)->itemAt(index)->data().toString();
-    ASSERT_TRUE(path) << path.error().what();
-    visibleResources.append(std::move(*path));
-  }
-  EXPECT_EQ(visibleResources, (StringList{"/songs/Nested/zzsongbookB.abc", resource,
-      "/songs/zzsongbookNew.abc", "/songs/zzsongbookZ.abc"}));
-  EXPECT_FALSE((*list)->selectedWidget());
-  EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
-  EXPECT_EQ((*domain)->timeSource(), std::optional<String>("Band Ω"));
-  ASSERT_TRUE((*list)->setSelected(0));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(File::writeFile(String("X:6\nK:C\nG|\n"), File::relativeTo(overlay, "songs/zzsongbookClosed.abc")));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
-  visibleResources.clear();
-  for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-    auto path = (*list)->itemAt(index)->data().toString();
-    ASSERT_TRUE(path);
-    visibleResources.append(std::move(*path));
-  }
-  EXPECT_EQ(visibleResources,
-            (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookClosed.abc",
-                        "/songs/zzsongbookNew.abc", "/songs/zzsongbookZ.abc"}));
-  EXPECT_FALSE((*list)->selectedWidget());
-  EXPECT_EQ((*search)->getText(), String("zzsongbook"));
-  EXPECT_EQ((*group)->getText(), String("Band Ω"));
-  EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
-  ASSERT_TRUE(panes.dismissAllPanes());
-});
+    ASSERT_TRUE(schema) << schema.error().what();
+    auto list = ListWidget::create(**context, *schema);
+    ASSERT_TRUE(list) << list.error().what();
+    (*list)->registerMemberCallback("songName", [](Widget&) -> std::expected<void, StarException> { return {}; });
+    ASSERT_TRUE(songs->addChild("list", *list));
+    ASSERT_TRUE(pane->addChild("songs", songs));
+    auto domain = Songbook::create(root, "human");
+    ASSERT_TRUE(domain) << domain.error().what();
+    auto callbacks = LuaBindings::makeSongbookCallbacks(**domain);
+    ASSERT_TRUE(callbacks) << callbacks.error().what();
+    ASSERT_TRUE(pane->addCallbacks("songbook", *callbacks));
+    PaneManager panes(**context);
+    auto displayed = panes.displayPane(PaneLayer::Window, pane, {});
+    ASSERT_TRUE(displayed) << displayed.error().what();
+    ASSERT_TRUE(pane->call("btnPlay", {}));
+    EXPECT_FALSE(pane->isDismissed());
+    EXPECT_FALSE((*domain)->active());
+    auto search = pane->fetchChild<TextBoxWidget>("search");
+    auto group = pane->fetchChild<TextBoxWidget>("group");
+    ASSERT_TRUE(search) << search.error().what();
+    ASSERT_TRUE(group) << group.error().what();
+    ASSERT_TRUE((*search)->setText("zzsongbook"));
+    ASSERT_TRUE(pane->call("search", {}));
+    StringList visibleResources;
+    for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
+      auto path = (*list)->itemAt(index)->data().toString();
+      ASSERT_TRUE(path) << path.error().what();
+      visibleResources.append(std::move(*path));
+    }
+    ASSERT_EQ(visibleResources, (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookZ.abc"}));
+    ASSERT_TRUE((*search)->setText("CAFÉ"));
+    ASSERT_TRUE(pane->call("search", {}));
+    EXPECT_EQ((*list)->listSize(), 0u);// Native case folding is not Unicode folding.
+    ASSERT_TRUE((*search)->setText("CAFé"));
+    ASSERT_TRUE(pane->call("search", {}));
+    EXPECT_EQ((*list)->listSize(), 1u);
+    ASSERT_TRUE((*search)->setText("[a]"));
+    ASSERT_TRUE(pane->call("search", {}));
+    ASSERT_EQ((*list)->listSize(), 1u);
+    auto row = (*list)->itemAt(0);
+    EXPECT_EQ(row->data(), Json(resource));
+    auto label = row->fetchChild<TextBoxWidget>("songName");
+    ASSERT_TRUE(label) << label.error().what();
+    EXPECT_EQ((*label)->getText(), String("^#bbb;zzsongbook^#7f7;[A]^#bbb;.Café^#7f7;[A]^#bbb;"));
+    ASSERT_TRUE((*list)->setSelected(0));
+    ASSERT_TRUE((*group)->setText("Band Ω"));
+    ASSERT_TRUE(pane->call("btnPlay", {}));
+    EXPECT_TRUE(pane->isDismissed());
+    EXPECT_TRUE((*domain)->active());
+    EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
+    EXPECT_EQ((*domain)->timeSource(), std::optional<String>("Band Ω"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+    EXPECT_EQ((*search)->getText(), String("[a]"));
+    EXPECT_EQ((*group)->getText(), String("Band Ω"));
+    EXPECT_EQ((*list)->selectedWidget(), row);
+    auto closed = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
+    ASSERT_TRUE(closed) << closed.error().what();
+    EXPECT_TRUE(*closed);
+    EXPECT_TRUE(pane->isDismissed());
+    EXPECT_TRUE((*domain)->active());
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+    ASSERT_TRUE((*search)->setText("zzsongbook"));
+    ASSERT_TRUE(pane->call("search", {}));
+    ASSERT_TRUE((*list)->setSelected(0));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->call("update", {}));
+    EXPECT_FALSE((*list)->selectedWidget());
+    EXPECT_EQ((*group)->getText(), String("Band Ω"));
+    ASSERT_TRUE(File::write_file(String("X:5\nK:C\nF|\n"), File::relative_to(overlay, "songs/zzsongbookNew.abc")));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->call("update", {}));
+    visibleResources.clear();
+    for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
+      auto path = (*list)->itemAt(index)->data().toString();
+      ASSERT_TRUE(path) << path.error().what();
+      visibleResources.append(std::move(*path));
+    }
+    EXPECT_EQ(
+      visibleResources,
+      (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookNew.abc", "/songs/zzsongbookZ.abc"}));
+    EXPECT_FALSE((*list)->selectedWidget());
+    EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
+    EXPECT_EQ((*domain)->timeSource(), std::optional<String>("Band Ω"));
+    ASSERT_TRUE((*list)->setSelected(0));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(File::write_file(String("X:6\nK:C\nG|\n"), File::relative_to(overlay, "songs/zzsongbookClosed.abc")));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+    visibleResources.clear();
+    for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
+      auto path = (*list)->itemAt(index)->data().toString();
+      ASSERT_TRUE(path);
+      visibleResources.append(std::move(*path));
+    }
+    EXPECT_EQ(visibleResources,
+              (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookClosed.abc",
+                          "/songs/zzsongbookNew.abc", "/songs/zzsongbookZ.abc"}));
+    EXPECT_FALSE((*list)->selectedWidget());
+    EXPECT_EQ((*search)->getText(), String("zzsongbook"));
+    EXPECT_EQ((*group)->getText(), String("Band Ω"));
+    EXPECT_EQ((*domain)->song(), (Json(JsonObject{{"resource", resource}, {"abc", abc}})));
+    ASSERT_TRUE(panes.dismissAllPanes());
+  });
 
 const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalReopensNativeStateButPlayerExpiryAndShutdownDestroy", [](GameTest& fixture) {
   auto context = textEditorContext(fixture);
@@ -2753,138 +2757,150 @@ const GameTestRegistration uiPausePolicy("LuaUiManager", "OnlyDisplayedPauseMenu
   ASSERT_TRUE(panes.dismissPane(*otherModal));
 });
 
-const GameTestRegistration codexPresentation("LuaCodex", "DomainIdentityReadReorderPageBoundsModalDeferralAndReload", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "interface")));
-  String firstPath = File::relativeTo(overlay, "interface/zzcodex-one.codex");
-  ASSERT_TRUE(File::writeFile(String(R"JSON({
+const GameTestRegistration
+  codexPresentation("LuaCodex", "DomainIdentityReadReorderPageBoundsModalDeferralAndReload", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
+    String firstPath = File::relative_to(overlay, "interface/zzcodex-one.codex");
+    ASSERT_TRUE(File::write_file(String(R"JSON({
     "id":"zzcodex-one","title":"Duplicate","species":"apex","icon":"codex/iconBook.png",
     "contentPages":["First α","Second β"]
-  })JSON"), firstPath));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({
+  })JSON"),
+                                 firstPath));
+    ASSERT_TRUE(File::write_file(String(R"JSON({
     "id":"zzcodex-two","title":"Duplicate","species":"apex","contentPages":["Other book"]
-  })JSON"), File::relativeTo(overlay, "interface/zzcodex-two.codex")));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({
+  })JSON"),
+                                 File::relative_to(overlay, "interface/zzcodex-two.codex")));
+    ASSERT_TRUE(File::write_file(String(R"JSON({
     "id":"zzcodex-empty","title":"Empty","contentPages":[]
-  })JSON"), File::relativeTo(overlay, "interface/zzcodex-empty.codex")));
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "codex.config");
-  ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-  auto& root = **createdRoot;
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration) << configuration.error().what();
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{
-      {"GuiClose", JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto factory = root.playerFactory();
-  ASSERT_TRUE(factory) << factory.error().what();
-  auto player = (*factory)->create();
-  ASSERT_TRUE(player) << player.error().what();
-  auto domain = (*player)->codexes();
-  auto first = domain->learnCodex("zzcodex-one", false);
-  auto second = domain->learnCodex("zzcodex-two", false);
-  auto empty = domain->learnCodex("zzcodex-empty", true);
-  ASSERT_TRUE(first) << first.error().what();
-  ASSERT_TRUE(second) << second.error().what();
-  ASSERT_TRUE(empty) << empty.error().what();
-  ASSERT_TRUE(*first);
-  ASSERT_TRUE(*second);
-  ASSERT_TRUE(*empty);
-  EXPECT_EQ((*first)->icon(), String("/interface/codex/iconBook.png"));
-  auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-  ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
-  auto assets = root.assets();
-  ASSERT_TRUE(assets) << assets.error().what();
-  auto config = (*assets)->json("/interface/opensb/codex/codex.config");
-  ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
-  ASSERT_TRUE(paneConfig) << paneConfig.error().what();
-  paneConfig->set("gui", JsonObject{});
-  auto createdPane = BaseScriptPane::create(**context, *paneConfig);
-  ASSERT_TRUE(createdPane) << createdPane.error().what();
-  auto pane = std::move(*createdPane);
-  pane->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  // Actual native controls and domain callbacks; only renderer-dependent label
-  // drawing is replaced by the same widget.setText-capable native TextBox.
-  for (auto const& name : {String("pageText"), String("titleLabel"), String("pageLabel"), String("pageNum"), String("selectLabel")}) {
-    auto text = textEditor(**context, "");
-    ASSERT_TRUE(text) << text.error().what();
-    (*text)->setMaxWidth(-1);
-    ASSERT_TRUE(pane->addChild(name, *text));
-  }
-  for (auto const& name : {String("prevButton"), String("nextButton")}) {
-    auto button = ButtonWidget::create(**context);
-    ASSERT_TRUE(button) << button.error().what();
-    ASSERT_TRUE(pane->addChild(name, *button));
-  }
-  auto group = std::make_shared<ButtonGroupWidget>(**context);
-  for (auto const& entry : {std::pair{-1, String("apex")}, std::pair{5, String("other")}}) {
-    auto button = ButtonWidget::create(**context);
-    ASSERT_TRUE(button) << button.error().what();
-    (*button)->setData(JsonObject{{"species", entry.second}});
-    (*button)->setButtonGroup(group, entry.first);
-    ASSERT_TRUE(group->addChild(entry.second, *button));
-  }
-  ASSERT_TRUE(group->select(-1));
-  ASSERT_TRUE(pane->addChild("speciesTabs", group));
-  group->setCallback([&](Widget&) -> std::expected<void, StarException> {
-    auto result = pane->call("updateSpecies", {});
-    if (!result) return std::unexpected(std::move(result.error()));
-    return {};
-  });
-  auto scroll = std::make_shared<Widget>(**context);
-  auto schema = Json::parseJson(R"JSON({
+  })JSON"),
+                                 File::relative_to(overlay, "interface/zzcodex-empty.codex")));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "codex.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration) << configuration.error().what();
+    ASSERT_TRUE((*configuration)
+                  ->set("bindings",
+                        JsonObject{{"GuiClose",
+                                    JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory) << factory.error().what();
+    auto player = (*factory)->create();
+    ASSERT_TRUE(player) << player.error().what();
+    auto domain = (*player)->codexes();
+    auto first = domain->learnCodex("zzcodex-one", false);
+    auto second = domain->learnCodex("zzcodex-two", false);
+    auto empty = domain->learnCodex("zzcodex-empty", true);
+    ASSERT_TRUE(first) << first.error().what();
+    ASSERT_TRUE(second) << second.error().what();
+    ASSERT_TRUE(empty) << empty.error().what();
+    ASSERT_TRUE(*first);
+    ASSERT_TRUE(*second);
+    ASSERT_TRUE(*empty);
+    EXPECT_EQ((*first)->icon(), String("/interface/codex/iconBook.png"));
+    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
+    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto assets = root.assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto config = (*assets)->json("/interface/opensb/codex/codex.config");
+    ASSERT_TRUE(config) << config.error().what();
+    auto paneConfig = config->toObject();
+    ASSERT_TRUE(paneConfig) << paneConfig.error().what();
+    paneConfig->set("gui", JsonObject{});
+    auto createdPane = BaseScriptPane::create(**context, *paneConfig);
+    ASSERT_TRUE(createdPane) << createdPane.error().what();
+    auto pane = std::move(*createdPane);
+    pane->setAnchor(PaneAnchor::BottomLeft);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    // Actual native controls and domain callbacks; only renderer-dependent label
+    // drawing is replaced by the same widget.setText-capable native TextBox.
+    for (auto const& name :
+         {String("pageText"), String("titleLabel"), String("pageLabel"), String("pageNum"), String("selectLabel")}) {
+      auto text = textEditor(**context, "");
+      ASSERT_TRUE(text) << text.error().what();
+      (*text)->setMaxWidth(-1);
+      ASSERT_TRUE(pane->addChild(name, *text));
+    }
+    for (auto const& name : {String("prevButton"), String("nextButton")}) {
+      auto button = ButtonWidget::create(**context);
+      ASSERT_TRUE(button) << button.error().what();
+      ASSERT_TRUE(pane->addChild(name, *button));
+    }
+    auto group = std::make_shared<ButtonGroupWidget>(**context);
+    for (auto const& entry : {std::pair{-1, String("apex")}, std::pair{5, String("other")}}) {
+      auto button = ButtonWidget::create(**context);
+      ASSERT_TRUE(button) << button.error().what();
+      (*button)->setData(JsonObject{{"species", entry.second}});
+      (*button)->setButtonGroup(group, entry.first);
+      ASSERT_TRUE(group->addChild(entry.second, *button));
+    }
+    ASSERT_TRUE(group->select(-1));
+    ASSERT_TRUE(pane->addChild("speciesTabs", group));
+    group->setCallback([&](Widget&) -> std::expected<void, StarException> {
+      auto result = pane->call("updateSpecies", {});
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return {};
+    });
+    auto scroll = std::make_shared<Widget>(**context);
+    auto schema = Json::parseJson(R"JSON({
     "spacing":[0,0],"memberSize":[160,12],
     "listTemplate":{
       "bookName":{"type":"textbox","position":[0,0],"maxWidth":-1},
       "bookIcon":{"type":"image","position":[0,0],"file":""}
     }
   })JSON");
-  ASSERT_TRUE(schema) << schema.error().what();
-  auto list = ListWidget::create(**context, *schema);
-  ASSERT_TRUE(list) << list.error().what();
-  (*list)->registerMemberCallback("bookName", [](Widget&) -> std::expected<void, StarException> { return {}; });
-  (*list)->setCallback([&](Widget&) -> std::expected<void, StarException> {
-    auto result = pane->call("selectCodex", {});
-    if (!result) return std::unexpected(std::move(result.error()));
-    return {};
-  });
-  ASSERT_TRUE(scroll->addChild("bookList", *list));
-  ASSERT_TRUE(pane->addChild("scrollArea", scroll));
-  PaneManager panes(**context);
-  auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
-  ASSERT_TRUE(controller) << controller.error().what();
-  auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
-  ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
-  ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
-  ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
-  LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(interface.registerCallback("paneLayerOccupied", [&](String const&) {
-    return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow}));
-  }));
-  ASSERT_TRUE(interface.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-    auto result = pane->makePaneCallbacks();
-    if (!result) return std::unexpected(std::move(result.error()));
-    return std::optional<LuaCallbacks>(std::move(*result));
-  }));
-  ASSERT_TRUE(interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
-    if (panes.isDisplayed(pane)) return pane->show();
-    return panes.displayPane(PaneLayer::Window, pane, {});
-  }));
-  ASSERT_TRUE(interface.registerCallback("callPane", [&](String const&, String const& method, JsonArray const& args) {
-    return pane->call(method, args);
-  }));
-  ASSERT_TRUE(controller->setCallbacks("interface", interface));
-  auto initialized = controller->eval<LuaValue>(R"LUA(
+    ASSERT_TRUE(schema) << schema.error().what();
+    auto list = ListWidget::create(**context, *schema);
+    ASSERT_TRUE(list) << list.error().what();
+    (*list)->registerMemberCallback("bookName", [](Widget&) -> std::expected<void, StarException> { return {}; });
+    (*list)->setCallback([&](Widget&) -> std::expected<void, StarException> {
+      auto result = pane->call("selectCodex", {});
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return {};
+    });
+    ASSERT_TRUE(scroll->addChild("bookList", *list));
+    ASSERT_TRUE(pane->addChild("scrollArea", scroll));
+    PaneManager panes(**context);
+    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    ASSERT_TRUE(controller) << controller.error().what();
+    auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
+    ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
+    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
+    LuaCallbacks interface;
+    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.registerCallback(
+      "paneLayerOccupied", [&](String const&) { return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow})); }));
+    ASSERT_TRUE(interface.registerCallback(
+      "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+        auto result = pane->makePaneCallbacks();
+        if (!result)
+          return std::unexpected(std::move(result.error()));
+        return std::optional<LuaCallbacks>(std::move(*result));
+      }));
+    ASSERT_TRUE(
+      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+        if (panes.isDisplayed(pane))
+          return pane->show();
+        return panes.displayPane(PaneLayer::Window, pane, {});
+      }));
+    ASSERT_TRUE(interface.registerCallback("callPane", [&](String const&, String const& method, JsonArray const& args) {
+      return pane->call(method, args);
+    }));
+    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    auto initialized = controller->eval<LuaValue>(R"LUA(
     require "/interface/opensb/codex/unread.lua"
     definitions = {codex = root.assetJson("/interface.config:panes.codex")}
     session = {hasPlayer=true, playerGeneration=1, worldGeneration=1}
@@ -2892,357 +2908,376 @@ const GameTestRegistration codexPresentation("LuaCodex", "DomainIdentityReadReor
     manager = UiManager.new(checkpoint, definitions, session)
     manager:restore()
   )LUA");
-  ASSERT_TRUE(initialized) << initialized.error().what();
-  auto modal = InputOrderPane::create(**context, false);
-  ASSERT_TRUE(modal) << modal.error().what();
-  ASSERT_TRUE(panes.displayPane(PaneLayer::ModalWindow, *modal, {}));
-  auto pendingId = domain->firstNewCodex()->id();
-  ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
-  EXPECT_FALSE(panes.isDisplayed(pane));
-  EXPECT_FALSE(domain->codexRead(pendingId));
-  ASSERT_TRUE(panes.dismissPane(*modal));
-  ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
-  EXPECT_TRUE(panes.isDisplayed(pane));
-  EXPECT_TRUE(domain->codexRead(pendingId));
-  ASSERT_TRUE((*list)->selectedWidget());
-  EXPECT_EQ((*list)->selectedWidget()->data(), Json(pendingId));
-  // Selecting either identical title must retain ID, even when marking it read
-  // changes unread-first domain order and synchronously rebuilds the real list.
-  auto remainingId = domain->firstNewCodex()->id();
-  ASSERT_EQ((*list)->listSize(), 2u);
-  EXPECT_EQ((*list)->itemAt(0)->data(), Json(remainingId));
-  ASSERT_TRUE((*list)->setSelected(0));
-  EXPECT_TRUE(domain->codexRead(remainingId));
-  ASSERT_TRUE((*list)->selectedWidget());
-  EXPECT_EQ((*list)->selectedWidget()->data(), Json(remainingId));
-  ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
-  EXPECT_TRUE(domain->codexRead("zzcodex-one"));
-  ASSERT_TRUE((*list)->selectedWidget());
-  EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
-  ASSERT_TRUE(pane->call("showCodex", {"zzcodex-two"}));
-  EXPECT_TRUE(domain->codexRead("zzcodex-two"));
-  EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-two"));
-  ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
-  ASSERT_TRUE(pane->call("nextButton", {}));
-  ASSERT_TRUE(pane->call("nextButton", {}));
-  auto text = pane->fetchChild<TextBoxWidget>("pageText");
-  ASSERT_TRUE(text);
-  EXPECT_EQ((*text)->getText(), String("Second β"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
-  EXPECT_EQ((*text)->getText(), String("Second β"));
-  EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
-  // Scope survival on warp/controller reload cannot re-consume any read entry.
-  ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto modal = InputOrderPane::create(**context, false);
+    ASSERT_TRUE(modal) << modal.error().what();
+    ASSERT_TRUE(panes.displayPane(PaneLayer::ModalWindow, *modal, {}));
+    auto pendingId = domain->firstNewCodex()->id();
+    ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
+    EXPECT_FALSE(panes.isDisplayed(pane));
+    EXPECT_FALSE(domain->codexRead(pendingId));
+    ASSERT_TRUE(panes.dismissPane(*modal));
+    ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
+    EXPECT_TRUE(panes.isDisplayed(pane));
+    EXPECT_TRUE(domain->codexRead(pendingId));
+    ASSERT_TRUE((*list)->selectedWidget());
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json(pendingId));
+    // Selecting either identical title must retain ID, even when marking it read
+    // changes unread-first domain order and synchronously rebuilds the real list.
+    auto remainingId = domain->firstNewCodex()->id();
+    ASSERT_EQ((*list)->listSize(), 2u);
+    EXPECT_EQ((*list)->itemAt(0)->data(), Json(remainingId));
+    ASSERT_TRUE((*list)->setSelected(0));
+    EXPECT_TRUE(domain->codexRead(remainingId));
+    ASSERT_TRUE((*list)->selectedWidget());
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json(remainingId));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
+    EXPECT_TRUE(domain->codexRead("zzcodex-one"));
+    ASSERT_TRUE((*list)->selectedWidget());
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-two"}));
+    EXPECT_TRUE(domain->codexRead("zzcodex-two"));
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-two"));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
+    ASSERT_TRUE(pane->call("nextButton", {}));
+    ASSERT_TRUE(pane->call("nextButton", {}));
+    auto text = pane->fetchChild<TextBoxWidget>("pageText");
+    ASSERT_TRUE(text);
+    EXPECT_EQ((*text)->getText(), String("Second β"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+    EXPECT_EQ((*text)->getText(), String("Second β"));
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
+    // Scope survival on warp/controller reload cannot re-consume any read entry.
+    ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     manager = UiManager.new(checkpoint, definitions, {hasPlayer=true, playerGeneration=1, worldGeneration=2})
     manager:restore()
     CodexUnread.update(manager)
   )LUA"));
-  EXPECT_EQ((*text)->getText(), String("Second β"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:update(); CodexUnread.update(manager)"));
-  EXPECT_FALSE(panes.isDisplayed(pane));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:open('codex')"));
-  ASSERT_TRUE(pane->call("showCodex", {"zzcodex-empty"}));
-  ASSERT_TRUE(pane->call("nextButton", {}));
-  ASSERT_TRUE(pane->call("prevButton", {}));
-  EXPECT_EQ((*text)->getText(), String(""));
-  auto pageNumber = pane->fetchChild<TextBoxWidget>("pageNum");
-  ASSERT_TRUE(pageNumber) << pageNumber.error().what();
-  EXPECT_EQ((*pageNumber)->getText(), String("0 of 0"));
-  ASSERT_TRUE(group->select(-1));
-  EXPECT_FALSE((*list)->selectedWidget());
-  EXPECT_EQ((*text)->getText(), String(""));
-  ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
-  ASSERT_TRUE(pane->call("nextButton", {}));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({
+    EXPECT_EQ((*text)->getText(), String("Second β"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:update(); CodexUnread.update(manager)"));
+    EXPECT_FALSE(panes.isDisplayed(pane));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:open('codex')"));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-empty"}));
+    ASSERT_TRUE(pane->call("nextButton", {}));
+    ASSERT_TRUE(pane->call("prevButton", {}));
+    EXPECT_EQ((*text)->getText(), String(""));
+    auto pageNumber = pane->fetchChild<TextBoxWidget>("pageNum");
+    ASSERT_TRUE(pageNumber) << pageNumber.error().what();
+    EXPECT_EQ((*pageNumber)->getText(), String("0 of 0"));
+    ASSERT_TRUE(group->select(-1));
+    EXPECT_FALSE((*list)->selectedWidget());
+    EXPECT_EQ((*text)->getText(), String(""));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
+    ASSERT_TRUE(pane->call("nextButton", {}));
+    ASSERT_TRUE(File::write_file(String(R"JSON({
     "id":"zzcodex-one","title":"Duplicate","species":"apex","icon":"codex/iconBook.png",
     "contentPages":["Reloaded only page"]
-  })JSON"), firstPath));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->call("update", {}));
-  // Known content is held by the native player domain, just like the old
-  // reader, rather than replaced by a newer database generation on reload.
-  EXPECT_EQ((*text)->getText(), String("Second β"));
-  EXPECT_TRUE(domain->codexRead("zzcodex-one"));
-  // Compatibility API still returns title; the additive API returns identity.
-  EXPECT_TRUE(domain->markCodexUnread("zzcodex-two"));
-  auto stable = controller->eval<Json>("return {player.getNewCodex(), player.getNewCodexId(), player.getCodex('missing') == nil}");
-  ASSERT_TRUE(stable) << stable.error().what();
-  EXPECT_EQ(*stable, (Json(JsonArray{"Duplicate", "zzcodex-two", true})));
-  ASSERT_TRUE(File::remove(File::relativeTo(overlay, "interface/zzcodex-two.codex")));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
-  EXPECT_TRUE(domain->codexRead("zzcodex-two"));
-  EXPECT_EQ((*text)->getText(), String("Other book"));
-  ASSERT_TRUE(panes.dismissAllPanes());
-});
+  })JSON"),
+                                 firstPath));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->call("update", {}));
+    // Known content is held by the native player domain, just like the old
+    // reader, rather than replaced by a newer database generation on reload.
+    EXPECT_EQ((*text)->getText(), String("Second β"));
+    EXPECT_TRUE(domain->codexRead("zzcodex-one"));
+    // Compatibility API still returns title; the additive API returns identity.
+    EXPECT_TRUE(domain->markCodexUnread("zzcodex-two"));
+    auto stable = controller->eval<Json>(
+      "return {player.getNewCodex(), player.getNewCodexId(), player.getCodex('missing') == nil}");
+    ASSERT_TRUE(stable) << stable.error().what();
+    EXPECT_EQ(*stable, (Json(JsonArray{"Duplicate", "zzcodex-two", true})));
+    ASSERT_TRUE(File::remove(File::relative_to(overlay, "interface/zzcodex-two.codex")));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
+    EXPECT_TRUE(domain->codexRead("zzcodex-two"));
+    EXPECT_EQ((*text)->getText(), String("Other book"));
+    ASSERT_TRUE(panes.dismissAllPanes());
+  });
 
-const GameTestRegistration questTrackerPresentation("LuaQuestTracker", "EffectiveDomainOptionalValuesNativeBoundsSpringAndReload", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "interface")));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "interface/questtracker")));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({
+const GameTestRegistration questTrackerPresentation(
+  "LuaQuestTracker", "EffectiveDomainOptionalValuesNativeBoundsSpringAndReload", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface/questtracker")));
+    ASSERT_TRUE(File::write_file(String(R"JSON({
     "incompleteObjectiveTemplate":"P[<objective>] <objective>\n",
     "completeObjectiveTemplate":"C(<objective>)\n"
-  })JSON"), File::relativeTo(overlay, "interface/questtracker/questtracker.config.patch")));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({"id":"zztracker","showInLog":true})JSON"),
-      File::relativeTo(overlay, "visible.questtemplate")));
-  ASSERT_TRUE(File::writeFile(String(R"JSON({"id":"zztracker-hidden","showInLog":false})JSON"),
-      File::relativeTo(overlay, "hidden.questtemplate")));
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "tracker.config");
-  ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-  auto& root = **createdRoot;
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration) << configuration.error().what();
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{
-      {"GuiClose", JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto factory = root.playerFactory();
-  ASSERT_TRUE(factory) << factory.error().what();
-  auto player = (*factory)->create();
-  ASSERT_TRUE(player) << player.error().what();
-  auto versions = root.versioningDatabase();
-  ASSERT_TRUE(versions) << versions.error().what();
-  JsonObject quests;
-  for (auto const& templateId : {String("zztracker"), String("zztracker-hidden")}) {
-    auto arc = QuestArcDescriptor::fromJson(root, JsonObject{{"quests", JsonArray{
-        JsonObject{{"questId", templateId}, {"templateId", templateId}, {"parameters", JsonObject{}}}}}});
-    ASSERT_TRUE(arc) << arc.error().what();
-    auto storedArc = arc->diskStore(root);
-    ASSERT_TRUE(storedArc) << storedArc.error().what();
-    auto storedQuest = (*versions)->makeCurrentVersionedJson("Quest", JsonObject{
-        {"state", "Active"}, {"arc", *storedArc}, {"arcPos", 0}, {"parameters", JsonObject{}},
-        {"money", 0}, {"rewards", JsonArray{}}, {"lastUpdatedOn", 0}});
-    ASSERT_TRUE(storedQuest) << storedQuest.error().what();
-    quests.set(templateId, storedQuest->toJson());
-  }
-  auto manager = (*player)->questManager();
-  ASSERT_TRUE(manager->diskLoad(JsonObject{{"quests", quests}, {"currentQuest", "zztracker"}}));
-  auto quest = manager->getQuest("zztracker");
-  ASSERT_TRUE(quest) << quest.error().what();
-  JsonArray objectives{JsonArray{"Done <literal>", true}, JsonArray{"First pending", false}, JsonArray{"Later pending", false}};
-  (*quest)->setObjectiveList(objectives);
-  (*quest)->setProgress(0.0f);
-  (*quest)->setCompassDirection(0.0f);
-  auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-  ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
-  auto probe = (*luaRoot)->createContext(StringList{});
-  ASSERT_TRUE(probe) << probe.error().what();
-  ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
-  auto compact = probe->eval<Json>("return player.currentQuestView()");
-  ASSERT_TRUE(compact) << compact.error().what();
-  EXPECT_EQ(*compact, (Json(JsonObject{{"id", "zztracker"}, {"objectives", objectives},
-      {"progress", 0.0}, {"compassDirection", 0.0}})));
-  // A tracked active quest may deliberately be excluded from the effective UI
-  // selection. Do not substitute currentQuestId for QuestManager.currentQuest.
-  manager->setAsTracked("zztracker-hidden");
-  auto hidden = probe->eval<Json>("return {player.currentQuestId(), player.currentQuestView() == nil}");
-  ASSERT_TRUE(hidden) << hidden.error().what();
-  EXPECT_EQ(*hidden, (Json(JsonArray{"zztracker-hidden", true})));
-  manager->setAsTracked("zztracker");
-
-  auto assets = root.assets();
-  ASSERT_TRUE(assets) << assets.error().what();
-  auto style = (*assets)->json("/interface/questtracker/questtracker.config");
-  ASSERT_TRUE(style) << style.error().what();
-  auto layoutJson = style->getObject("paneLayout");
-  ASSERT_TRUE(layoutJson) << layoutJson.error().what();
-  auto progressLayout = style->query("paneLayout.questProgress");
-  ASSERT_TRUE(progressLayout) << progressLayout.error().what();
-  auto headlessProgress = progressLayout->set("background", "");
-  ASSERT_TRUE(headlessProgress) << headlessProgress.error().what();
-  layoutJson->set("questProgress", *headlessProgress);
-  layoutJson->erase("panefeature");
-  layoutJson->erase("lblQuestObjectiveList");
-  auto config = (*assets)->json("/interface/opensb/questtracker/questtracker.config");
-  ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
-  ASSERT_TRUE(paneConfig) << paneConfig.error().what();
-  paneConfig->set("gui", *layoutJson);
-  auto createdPane = ScriptTestPane::create(**context, Json(*paneConfig));
-  ASSERT_TRUE(createdPane) << createdPane.error().what();
-  auto pane = std::move(*createdPane);
-  pane->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  LuaCallbacks interface;
-  bool hasPlayer = true;
-  ASSERT_TRUE(interface.registerCallback("session", [&] { return JsonObject{{"hasPlayer", hasPlayer}}; }));
-  ASSERT_TRUE(pane->addCallbacks("interface", interface));
-  // Headless GuiContext has no font painter. Keep actual image/stretch/progress
-  // widgets and a native text-capable TextBox; supply its measured bounds here.
-  // Real label wrapping and pixels are covered by the renderer-backed GUI run.
-  auto label = textEditor(**context, "");
-  ASSERT_TRUE(label) << label.error().what();
-  (*label)->setMaxWidth(-1);
-  (*label)->setPosition({-125, -3});
-  (*label)->setSize({110, 45});
-  ASSERT_TRUE(pane->addChild("lblQuestObjectiveList", *label));
-  PaneManager panes(**context);
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, pane, {}));
-  auto publicCallbacks = pane->makePaneCallbacks();
-  ASSERT_TRUE(publicCallbacks) << publicCallbacks.error().what();
-  ASSERT_TRUE(probe->setCallbacks("tracker", *publicCallbacks));
-  ASSERT_TRUE(probe->eval<LuaValue>("cachedWidgets = tracker.toWidget()"));
-  auto frame = pane->fetchChild<ImageWidget>("imgFrame");
-  auto expanded = pane->fetchChild<ImageStretchWidget>("imgFrameExpanded");
-  auto progress = pane->fetchChild<ProgressWidget>("questProgress");
-  auto progressFrame = pane->fetchChild<ImageWidget>("imgProgressFrame");
-  auto compassFrame = pane->fetchChild<ImageWidget>("imgCompassFrame");
-  ASSERT_TRUE(frame && *frame);
-  ASSERT_TRUE(expanded && *expanded);
-  ASSERT_TRUE(progress && *progress);
-  ASSERT_TRUE(progressFrame && *progressFrame);
-  ASSERT_TRUE(compassFrame && *compassFrame);
-  EXPECT_EQ((*label)->getText(), String("P[First pending] First pending\n"));
-  EXPECT_TRUE((*progress)->visibility());
-  EXPECT_TRUE((*compassFrame)->visibility());
-  EXPECT_EQ((*progress)->drawingOffset(), (Vec2I{0, -(*frame)->size()[1]}));
-  auto frameImage = (*compassFrame)->image();
-  ASSERT_TRUE(frameImage) << frameImage.error().what();
-  EXPECT_EQ(*frameImage, *style->getString("expandedCompassFrameImage"));
-
-  // Widget hit testing uses the drawing area established by rendering. Exercise
-  // real pointer boundaries in the GL smoke, not an undrawn headless widget.
-  ASSERT_TRUE(pane->evaluate("storage.expanded = true"));
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_EQ((*label)->getText(), String("C(Done <literal>)\nP[First pending] First pending\nP[Later pending] Later pending\n"));
-  EXPECT_FALSE((*frame)->visibility());
-  EXPECT_TRUE((*expanded)->visibility());
-  EXPECT_EQ((*expanded)->size()[1], 55);
-  EXPECT_EQ((*expanded)->relativePosition(), (Vec2I{-131, -55}));
-  EXPECT_EQ((*progress)->drawingOffset(), (Vec2I{0, -55}));
-  (*label)->setSize({110, 75});
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_EQ((*expanded)->size()[1], 85);
-  EXPECT_EQ((*expanded)->relativePosition()[1], -85);
-  EXPECT_EQ((*progressFrame)->drawingOffset(), (Vec2I{0, -85}));
-  (*quest)->setObjectiveList(JsonArray{});
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_FALSE((*label)->visibility());
-  EXPECT_EQ((*expanded)->size()[1], 85); // Empty is not absent.
-  (*quest)->setObjectiveList({});
-  (*quest)->setProgress({});
-  (*quest)->setCompassDirection({});
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_EQ((*label)->getText(), String(""));
-  EXPECT_FALSE((*progress)->visibility());
-  EXPECT_FALSE((*compassFrame)->visibility());
-  auto absent = probe->eval<Json>("return player.currentQuestView()");
-  ASSERT_TRUE(absent) << absent.error().what();
-  EXPECT_EQ(*absent, (Json(JsonObject{{"id", "zztracker"}})));
-  (*quest)->setObjectiveList(JsonArray{JsonArray{"First complete", true}, JsonArray{"Second complete", true}});
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  ASSERT_TRUE(pane->evaluate("storage.expanded = false"));
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_EQ((*label)->getText(), String("C(First complete)\n"));
-  auto close = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
-  ASSERT_TRUE(close) << close.error().what();
-  EXPECT_FALSE(*close);
-  EXPECT_FALSE(pane->isDismissed());
-  (*quest)->setCompassDirection(0.0f);
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  auto compactCompass = (*compassFrame)->image();
-  ASSERT_TRUE(compactCompass) << compactCompass.error().what();
-  EXPECT_EQ(*compactCompass, *style->getString("compassFrameImage"));
-
-  auto acceleration = style->getFloat("compassAcceleration");
-  auto friction = style->getFloat("compassFriction");
-  ASSERT_TRUE(acceleration && friction);
-  float direction = 0, speed = 0;
-  for (float target : {6.2f, 0.01f, 3.2f, -3.2f, 0.0f}) {
-    (*quest)->setCompassDirection(target);
-    for (int step = 0; step < 13; ++step) {
-      float diff = pfmod(target - direction, static_cast<float>(std::numbers::pi) * 2);
-      if (std::abs(diff) < *acceleration && std::abs(speed) < *acceleration) {
-        speed = 0;
-        direction = target;
-      } else {
-        if (std::abs(diff) > std::numbers::pi)
-          diff -= std::copysign(2 * std::numbers::pi, diff);
-        float ratio = std::abs(diff) / std::numbers::pi;
-        float change = *acceleration * ratio;
-        speed += std::copysign(change, diff);
-        speed -= speed * *friction;
-        direction += speed;
-      }
-      // One in-motion reload covers continuity; the other directions exercise
-      // the same spring without repeating asset/engine reconstruction.
-      if (target == 3.2f && step == 6) {
-        auto beforeReload =
-          pane->evaluate("assert(storage.compassSpeed ~= 0); return {storage.compassDirection, storage.compassSpeed}");
-        ASSERT_TRUE(beforeReload && *beforeReload);
-        ASSERT_TRUE(root.reload());
-        auto afterReload = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
-        ASSERT_TRUE(afterReload && *afterReload);
-        EXPECT_EQ(**afterReload, **beforeReload);
-      }
-      ASSERT_TRUE(pane->tick(step % 2 ? 0.001f : 0.1f));
-      auto state = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
-      ASSERT_TRUE(state && *state);
-      EXPECT_EQ(**state, (Json(JsonArray{direction, speed})));
+  })JSON"),
+                                 File::relative_to(overlay, "interface/questtracker/questtracker.config.patch")));
+    ASSERT_TRUE(File::write_file(String(R"JSON({"id":"zztracker","showInLog":true})JSON"),
+                                 File::relative_to(overlay, "visible.questtemplate")));
+    ASSERT_TRUE(File::write_file(String(R"JSON({"id":"zztracker-hidden","showInLog":false})JSON"),
+                                 File::relative_to(overlay, "hidden.questtemplate")));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "tracker.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration) << configuration.error().what();
+    ASSERT_TRUE((*configuration)
+                  ->set("bindings",
+                        JsonObject{{"GuiClose",
+                                    JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory) << factory.error().what();
+    auto player = (*factory)->create();
+    ASSERT_TRUE(player) << player.error().what();
+    auto versions = root.versioningDatabase();
+    ASSERT_TRUE(versions) << versions.error().what();
+    JsonObject quests;
+    for (auto const& templateId : {String("zztracker"), String("zztracker-hidden")}) {
+      auto arc = QuestArcDescriptor::fromJson(
+        root,
+        JsonObject{
+          {"quests",
+           JsonArray{JsonObject{{"questId", templateId}, {"templateId", templateId}, {"parameters", JsonObject{}}}}}});
+      ASSERT_TRUE(arc) << arc.error().what();
+      auto storedArc = arc->diskStore(root);
+      ASSERT_TRUE(storedArc) << storedArc.error().what();
+      auto storedQuest = (*versions)->makeCurrentVersionedJson("Quest",
+                                                               JsonObject{{"state", "Active"},
+                                                                          {"arc", *storedArc},
+                                                                          {"arcPos", 0},
+                                                                          {"parameters", JsonObject{}},
+                                                                          {"money", 0},
+                                                                          {"rewards", JsonArray{}},
+                                                                          {"lastUpdatedOn", 0}});
+      ASSERT_TRUE(storedQuest) << storedQuest.error().what();
+      quests.set(templateId, storedQuest->toJson());
     }
-  }
-  (*quest)->setCompassDirection({});
-  ASSERT_TRUE(pane->evaluate("storage.expanded = true"));
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  auto spring = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
-  ASSERT_TRUE(spring && *spring);
-  hasPlayer = false;
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_FALSE(pane->visibility());
-  EXPECT_FALSE((*frame)->active());
-  EXPECT_FALSE((*expanded)->active());
-  EXPECT_FALSE((*progressFrame)->active());
-  EXPECT_FALSE((*compassFrame)->active());
-  // The same native object/children and escaped callbacks survive a domain
-  // rebind, no-quest interval and script reload, as session overlays require.
-  auto replacement = (*factory)->create();
-  ASSERT_TRUE(replacement) << replacement.error().what();
-  auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
-  ASSERT_TRUE(replacementCallbacks) << replacementCallbacks.error().what();
-  ASSERT_TRUE(pane->dismissed());
-  ASSERT_TRUE(pane->removeCallbacks("player"));
-  ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
-  hasPlayer = true;
-  ASSERT_TRUE(pane->displayed());
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_FALSE(pane->visibility());
-  auto restoredSpring = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
-  ASSERT_TRUE(restoredSpring && *restoredSpring);
-  EXPECT_EQ(**restoredSpring, **spring);
-  auto retainedPublicHandle = probe->eval<Json>(
+    auto manager = (*player)->questManager();
+    ASSERT_TRUE(manager->diskLoad(JsonObject{{"quests", quests}, {"currentQuest", "zztracker"}}));
+    auto quest = manager->getQuest("zztracker");
+    ASSERT_TRUE(quest) << quest.error().what();
+    JsonArray objectives{JsonArray{"Done <literal>", true}, JsonArray{"First pending", false},
+                         JsonArray{"Later pending", false}};
+    (*quest)->setObjectiveList(objectives);
+    (*quest)->setProgress(0.0f);
+    (*quest)->setCompassDirection(0.0f);
+    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
+    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto probe = (*luaRoot)->createContext(StringList{});
+    ASSERT_TRUE(probe) << probe.error().what();
+    ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
+    auto compact = probe->eval<Json>("return player.currentQuestView()");
+    ASSERT_TRUE(compact) << compact.error().what();
+    EXPECT_EQ(
+      *compact,
+      (Json(
+        JsonObject{{"id", "zztracker"}, {"objectives", objectives}, {"progress", 0.0}, {"compassDirection", 0.0}})));
+    // A tracked active quest may deliberately be excluded from the effective UI
+    // selection. Do not substitute currentQuestId for QuestManager.currentQuest.
+    manager->setAsTracked("zztracker-hidden");
+    auto hidden = probe->eval<Json>("return {player.currentQuestId(), player.currentQuestView() == nil}");
+    ASSERT_TRUE(hidden) << hidden.error().what();
+    EXPECT_EQ(*hidden, (Json(JsonArray{"zztracker-hidden", true})));
+    manager->setAsTracked("zztracker");
+
+    auto assets = root.assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto style = (*assets)->json("/interface/questtracker/questtracker.config");
+    ASSERT_TRUE(style) << style.error().what();
+    auto layoutJson = style->getObject("paneLayout");
+    ASSERT_TRUE(layoutJson) << layoutJson.error().what();
+    auto progressLayout = style->query("paneLayout.questProgress");
+    ASSERT_TRUE(progressLayout) << progressLayout.error().what();
+    auto headlessProgress = progressLayout->set("background", "");
+    ASSERT_TRUE(headlessProgress) << headlessProgress.error().what();
+    layoutJson->set("questProgress", *headlessProgress);
+    layoutJson->erase("panefeature");
+    layoutJson->erase("lblQuestObjectiveList");
+    auto config = (*assets)->json("/interface/opensb/questtracker/questtracker.config");
+    ASSERT_TRUE(config) << config.error().what();
+    auto paneConfig = config->toObject();
+    ASSERT_TRUE(paneConfig) << paneConfig.error().what();
+    paneConfig->set("gui", *layoutJson);
+    auto createdPane = ScriptTestPane::create(**context, Json(*paneConfig));
+    ASSERT_TRUE(createdPane) << createdPane.error().what();
+    auto pane = std::move(*createdPane);
+    pane->setAnchor(PaneAnchor::BottomLeft);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    LuaCallbacks interface;
+    bool hasPlayer = true;
+    ASSERT_TRUE(interface.registerCallback("session", [&] { return JsonObject{{"hasPlayer", hasPlayer}}; }));
+    ASSERT_TRUE(pane->addCallbacks("interface", interface));
+    // Headless GuiContext has no font painter. Keep actual image/stretch/progress
+    // widgets and a native text-capable TextBox; supply its measured bounds here.
+    // Real label wrapping and pixels are covered by the renderer-backed GUI run.
+    auto label = textEditor(**context, "");
+    ASSERT_TRUE(label) << label.error().what();
+    (*label)->setMaxWidth(-1);
+    (*label)->setPosition({-125, -3});
+    (*label)->setSize({110, 45});
+    ASSERT_TRUE(pane->addChild("lblQuestObjectiveList", *label));
+    PaneManager panes(**context);
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, pane, {}));
+    auto publicCallbacks = pane->makePaneCallbacks();
+    ASSERT_TRUE(publicCallbacks) << publicCallbacks.error().what();
+    ASSERT_TRUE(probe->setCallbacks("tracker", *publicCallbacks));
+    ASSERT_TRUE(probe->eval<LuaValue>("cachedWidgets = tracker.toWidget()"));
+    auto frame = pane->fetchChild<ImageWidget>("imgFrame");
+    auto expanded = pane->fetchChild<ImageStretchWidget>("imgFrameExpanded");
+    auto progress = pane->fetchChild<ProgressWidget>("questProgress");
+    auto progressFrame = pane->fetchChild<ImageWidget>("imgProgressFrame");
+    auto compassFrame = pane->fetchChild<ImageWidget>("imgCompassFrame");
+    ASSERT_TRUE(frame && *frame);
+    ASSERT_TRUE(expanded && *expanded);
+    ASSERT_TRUE(progress && *progress);
+    ASSERT_TRUE(progressFrame && *progressFrame);
+    ASSERT_TRUE(compassFrame && *compassFrame);
+    EXPECT_EQ((*label)->getText(), String("P[First pending] First pending\n"));
+    EXPECT_TRUE((*progress)->visibility());
+    EXPECT_TRUE((*compassFrame)->visibility());
+    EXPECT_EQ((*progress)->drawingOffset(), (Vec2I{0, -(*frame)->size()[1]}));
+    auto frameImage = (*compassFrame)->image();
+    ASSERT_TRUE(frameImage) << frameImage.error().what();
+    EXPECT_EQ(*frameImage, *style->getString("expandedCompassFrameImage"));
+
+    // Widget hit testing uses the drawing area established by rendering. Exercise
+    // real pointer boundaries in the GL smoke, not an undrawn headless widget.
+    ASSERT_TRUE(pane->evaluate("storage.expanded = true"));
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_EQ((*label)->getText(),
+              String("C(Done <literal>)\nP[First pending] First pending\nP[Later pending] Later pending\n"));
+    EXPECT_FALSE((*frame)->visibility());
+    EXPECT_TRUE((*expanded)->visibility());
+    EXPECT_EQ((*expanded)->size()[1], 55);
+    EXPECT_EQ((*expanded)->relativePosition(), (Vec2I{-131, -55}));
+    EXPECT_EQ((*progress)->drawingOffset(), (Vec2I{0, -55}));
+    (*label)->setSize({110, 75});
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_EQ((*expanded)->size()[1], 85);
+    EXPECT_EQ((*expanded)->relativePosition()[1], -85);
+    EXPECT_EQ((*progressFrame)->drawingOffset(), (Vec2I{0, -85}));
+    (*quest)->setObjectiveList(JsonArray{});
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_FALSE((*label)->visibility());
+    EXPECT_EQ((*expanded)->size()[1], 85);// Empty is not absent.
+    (*quest)->setObjectiveList({});
+    (*quest)->setProgress({});
+    (*quest)->setCompassDirection({});
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_EQ((*label)->getText(), String(""));
+    EXPECT_FALSE((*progress)->visibility());
+    EXPECT_FALSE((*compassFrame)->visibility());
+    auto absent = probe->eval<Json>("return player.currentQuestView()");
+    ASSERT_TRUE(absent) << absent.error().what();
+    EXPECT_EQ(*absent, (Json(JsonObject{{"id", "zztracker"}})));
+    (*quest)->setObjectiveList(JsonArray{JsonArray{"First complete", true}, JsonArray{"Second complete", true}});
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    ASSERT_TRUE(pane->evaluate("storage.expanded = false"));
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_EQ((*label)->getText(), String("C(First complete)\n"));
+    auto close = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
+    ASSERT_TRUE(close) << close.error().what();
+    EXPECT_FALSE(*close);
+    EXPECT_FALSE(pane->isDismissed());
+    (*quest)->setCompassDirection(0.0f);
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    auto compactCompass = (*compassFrame)->image();
+    ASSERT_TRUE(compactCompass) << compactCompass.error().what();
+    EXPECT_EQ(*compactCompass, *style->getString("compassFrameImage"));
+
+    auto acceleration = style->getFloat("compassAcceleration");
+    auto friction = style->getFloat("compassFriction");
+    ASSERT_TRUE(acceleration && friction);
+    float direction = 0, speed = 0;
+    for (float target : {6.2f, 0.01f, 3.2f, -3.2f, 0.0f}) {
+      (*quest)->setCompassDirection(target);
+      for (int step = 0; step < 13; ++step) {
+        float diff = pfmod(target - direction, static_cast<float>(std::numbers::pi) * 2);
+        if (std::abs(diff) < *acceleration && std::abs(speed) < *acceleration) {
+          speed = 0;
+          direction = target;
+        } else {
+          if (std::abs(diff) > std::numbers::pi)
+            diff -= std::copysign(2 * std::numbers::pi, diff);
+          float ratio = std::abs(diff) / std::numbers::pi;
+          float change = *acceleration * ratio;
+          speed += std::copysign(change, diff);
+          speed -= speed * *friction;
+          direction += speed;
+        }
+        // One in-motion reload covers continuity; the other directions exercise
+        // the same spring without repeating asset/engine reconstruction.
+        if (target == 3.2f && step == 6) {
+          auto beforeReload = pane->evaluate(
+            "assert(storage.compassSpeed ~= 0); return {storage.compassDirection, storage.compassSpeed}");
+          ASSERT_TRUE(beforeReload && *beforeReload);
+          ASSERT_TRUE(root.reload());
+          auto afterReload = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
+          ASSERT_TRUE(afterReload && *afterReload);
+          EXPECT_EQ(**afterReload, **beforeReload);
+        }
+        ASSERT_TRUE(pane->tick(step % 2 ? 0.001f : 0.1f));
+        auto state = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
+        ASSERT_TRUE(state && *state);
+        EXPECT_EQ(**state, (Json(JsonArray{direction, speed})));
+      }
+    }
+    (*quest)->setCompassDirection({});
+    ASSERT_TRUE(pane->evaluate("storage.expanded = true"));
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    auto spring = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
+    ASSERT_TRUE(spring && *spring);
+    hasPlayer = false;
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_FALSE(pane->visibility());
+    EXPECT_FALSE((*frame)->active());
+    EXPECT_FALSE((*expanded)->active());
+    EXPECT_FALSE((*progressFrame)->active());
+    EXPECT_FALSE((*compassFrame)->active());
+    // The same native object/children and escaped callbacks survive a domain
+    // rebind, no-quest interval and script reload, as session overlays require.
+    auto replacement = (*factory)->create();
+    ASSERT_TRUE(replacement) << replacement.error().what();
+    auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
+    ASSERT_TRUE(replacementCallbacks) << replacementCallbacks.error().what();
+    ASSERT_TRUE(pane->dismissed());
+    ASSERT_TRUE(pane->removeCallbacks("player"));
+    ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
+    hasPlayer = true;
+    ASSERT_TRUE(pane->displayed());
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_FALSE(pane->visibility());
+    auto restoredSpring = pane->evaluate("return {storage.compassDirection, storage.compassSpeed}");
+    ASSERT_TRUE(restoredSpring && *restoredSpring);
+    EXPECT_EQ(**restoredSpring, **spring);
+    auto retainedPublicHandle = probe->eval<Json>(
       "return {tracker.isDisplayed(), cachedWidgets.active('imgFrame'), cachedWidgets.active('imgFrameExpanded')}");
-  ASSERT_TRUE(retainedPublicHandle) << retainedPublicHandle.error().what();
-  EXPECT_EQ(*retainedPublicHandle, (Json(JsonArray{true, false, false})));
-  ASSERT_TRUE(pane->dismissed());
-  ASSERT_TRUE(pane->removeCallbacks("player"));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  ASSERT_TRUE(pane->displayed());
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_TRUE(pane->visibility());
-  EXPECT_EQ(pane->fetchChild<ImageWidget>("imgFrame")->get(), frame->get());
-  EXPECT_EQ((*label)->getText(), String("C(First complete)\nC(Second complete)\n"));
-  auto retainedExpanded = probe->eval<bool>("return cachedWidgets.active('imgFrameExpanded') and not cachedWidgets.active('imgFrame')");
-  ASSERT_TRUE(retainedExpanded) << retainedExpanded.error().what();
-  EXPECT_TRUE(*retainedExpanded);
-  ASSERT_TRUE((*quest)->fail());
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_FALSE(pane->visibility());
-  auto finished = probe->eval<Json>("return {player.currentQuestId(), player.currentQuestView() == nil}");
-  ASSERT_TRUE(finished) << finished.error().what();
-  EXPECT_EQ(*finished, (Json(JsonArray{"zztracker", true})));
-  ASSERT_TRUE(panes.dismissAllPanes());
-});
+    ASSERT_TRUE(retainedPublicHandle) << retainedPublicHandle.error().what();
+    EXPECT_EQ(*retainedPublicHandle, (Json(JsonArray{true, false, false})));
+    ASSERT_TRUE(pane->dismissed());
+    ASSERT_TRUE(pane->removeCallbacks("player"));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->displayed());
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_TRUE(pane->visibility());
+    EXPECT_EQ(pane->fetchChild<ImageWidget>("imgFrame")->get(), frame->get());
+    EXPECT_EQ((*label)->getText(), String("C(First complete)\nC(Second complete)\n"));
+    auto retainedExpanded =
+      probe->eval<bool>("return cachedWidgets.active('imgFrameExpanded') and not cachedWidgets.active('imgFrame')");
+    ASSERT_TRUE(retainedExpanded) << retainedExpanded.error().what();
+    EXPECT_TRUE(*retainedExpanded);
+    ASSERT_TRUE((*quest)->fail());
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_FALSE(pane->visibility());
+    auto finished = probe->eval<Json>("return {player.currentQuestId(), player.currentQuestView() == nil}");
+    ASSERT_TRUE(finished) << finished.error().what();
+    EXPECT_EQ(*finished, (Json(JsonArray{"zztracker", true})));
+    ASSERT_TRUE(panes.dismissAllPanes());
+  });
 
 const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPreserveGeometryWithoutDoubleCentering", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
@@ -3287,13 +3322,14 @@ const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPres
   expectGeometry(*authored);
 });
 
-const GameTestRegistration questLogPresentation("LuaQuestLog", "StableSelectionReadOrderPresentationDeltasReplacementReloadAndPlayerScope", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  ASSERT_TRUE(File::writeFile(String(R"LUA(
+const GameTestRegistration questLogPresentation(
+  "LuaQuestLog", "StableSelectionReadOrderPresentationDeltasReplacementReloadAndPlayerScope", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::write_file(String(R"LUA(
     function mutate()
       quest.setTitle("Changed title")
       quest.setText("Changed body")
@@ -3315,125 +3351,143 @@ const GameTestRegistration questLogPresentation("LuaQuestLog", "StableSelectionR
     function questFail(abandoned)
       if abandoned and storage.failAbandon then error("questlog abandon regression") end
     end
-  )LUA"), File::relativeTo(overlay, "zzlog.lua")));
-  for (auto const& id : {String("zzlog-a"), String("zzlog-b"), String("zzlog-side"), String("zzlog-complete"), String("zzlog-hidden")}) {
-    Json config = JsonObject{{"id", id}, {"title", "Duplicate"}, {"text", id},
-        {"mainQuest", id == "zzlog-a" || id == "zzlog-b"},
-        {"script", "/zzlog.lua"}, {"canBeAbandoned", id != "zzlog-a"}, {"showInLog", id != "zzlog-hidden"}};
-    auto printed = config.printJson();
-    ASSERT_TRUE(printed) << printed.error().what();
-    ASSERT_TRUE(File::writeFile(*printed, File::relativeTo(overlay, id + ".questtemplate")));
-  }
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questlog.config");
-  ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-  auto& root = **createdRoot;
-  class Errors : public LogSink {
-  public:
-    Errors() { setLevel(LogLevel::Error); }
-    std::expected<void, StarException> log(std::string_view message, LogLevel) override {
-      messages.emplace_back(message);
-      return {};
+  )LUA"),
+                                 File::relative_to(overlay, "zzlog.lua")));
+    for (auto const& id : {String("zzlog-a"), String("zzlog-b"), String("zzlog-side"), String("zzlog-complete"),
+                           String("zzlog-hidden")}) {
+      Json config = JsonObject{{"id", id},
+                               {"title", "Duplicate"},
+                               {"text", id},
+                               {"mainQuest", id == "zzlog-a" || id == "zzlog-b"},
+                               {"script", "/zzlog.lua"},
+                               {"canBeAbandoned", id != "zzlog-a"},
+                               {"showInLog", id != "zzlog-hidden"}};
+      auto printed = config.printJson();
+      ASSERT_TRUE(printed) << printed.error().what();
+      ASSERT_TRUE(File::write_file(*printed, File::relative_to(overlay, id + ".questtemplate")));
     }
-    std::vector<std::string> messages;
-  };
-  auto errors = std::make_shared<Errors>();
-  root.logger().addSink(errors);
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration);
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context) << context.error().what();
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto factory = root.playerFactory();
-  ASSERT_TRUE(factory) << factory.error().what();
-  auto player = (*factory)->create();
-  ASSERT_TRUE(player) << player.error().what();
-  auto versions = root.versioningDatabase();
-  ASSERT_TRUE(versions) << versions.error().what();
-  auto items = root.itemDatabase();
-  ASSERT_TRUE(items) << items.error().what();
-  auto reward = (*items)->fromJson(JsonObject{{"name", "dirtmaterial"}, {"count", 2003}, {"parameters", JsonObject{}}});
-  ASSERT_TRUE(reward && *reward);
-  auto rewardStore = (*items)->diskStore(*reward);
-  ASSERT_TRUE(rewardStore) << rewardStore.error().what();
-  Json portrait = JsonObject{{"line", JsonArray{JsonArray{2, 3}, JsonArray{7, 11}}}, {"width", 1}};
-  JsonObject storedQuests;
-  int updated = 0;
-  for (auto const& id : {String("zzlog-a"), String("zzlog-side"), String("zzlog-b"), String("zzlog-complete"), String("zzlog-hidden")}) {
-    auto arc = QuestArcDescriptor::fromJson(root, JsonObject{{"quests", JsonArray{
-        JsonObject{{"questId", id}, {"templateId", id}, {"parameters", JsonObject{}}}}}});
-    ASSERT_TRUE(arc) << arc.error().what();
-    auto storedArc = arc->diskStore(root);
-    ASSERT_TRUE(storedArc) << storedArc.error().what();
-    auto stored = (*versions)->makeCurrentVersionedJson("Quest", JsonObject{
-        {"state", id == "zzlog-complete" ? Json("Complete") : Json("Active")}, {"arc", *storedArc},
-        {"arcPos", 0}, {"parameters", JsonObject{}}, {"money", 0}, {"lastUpdatedOn", ++updated},
-        {"rewards", JsonArray{*rewardStore, *rewardStore}},
-        {"portraits", JsonObject{{"Objective", JsonArray{portrait}}, {"QuestStarted", JsonArray{portrait}}}},
-        {"portraitTitles", JsonObject{{"Objective", id}}}});
-    ASSERT_TRUE(stored) << stored.error().what();
-    storedQuests.set(id, stored->toJson());
-  }
-  auto domain = (*player)->questManager();
-  ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
-  auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-  ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
-  auto probe = (*luaRoot)->createContext(StringList{});
-  ASSERT_TRUE(probe) << probe.error().what();
-  ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
-  auto entries = probe->eval<Json>("local s = player.questLogEntries(false); return {s.entries[1].id,s.entries[2].id,s.entries[3].id,#s.entries,s.current}");
-  ASSERT_TRUE(entries) << entries.error().what();
-  EXPECT_EQ(*entries, (Json(JsonArray{"zzlog-a", "zzlog-side", "zzlog-b", 3, "zzlog-b"})));
-  auto blocked = probe->eval<Json>("return {player.abandonQuest('zzlog-a'),player.abandonQuest('missing'),player.abandonQuest('zzlog-complete')}");
-  ASSERT_TRUE(blocked) << blocked.error().what();
-  EXPECT_EQ(*blocked, (Json(JsonArray{false, false, false})));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questlog.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    class Errors : public LogSink {
+    public:
+      Errors() { setLevel(LogLevel::Error); }
+      std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+        messages.emplace_back(message);
+        return {};
+      }
+      std::vector<std::string> messages;
+    };
+    auto errors = std::make_shared<Errors>();
+    root.logger().addSink(errors);
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration);
+    ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory) << factory.error().what();
+    auto player = (*factory)->create();
+    ASSERT_TRUE(player) << player.error().what();
+    auto versions = root.versioningDatabase();
+    ASSERT_TRUE(versions) << versions.error().what();
+    auto items = root.itemDatabase();
+    ASSERT_TRUE(items) << items.error().what();
+    auto reward =
+      (*items)->fromJson(JsonObject{{"name", "dirtmaterial"}, {"count", 2003}, {"parameters", JsonObject{}}});
+    ASSERT_TRUE(reward && *reward);
+    auto rewardStore = (*items)->diskStore(*reward);
+    ASSERT_TRUE(rewardStore) << rewardStore.error().what();
+    Json portrait = JsonObject{{"line", JsonArray{JsonArray{2, 3}, JsonArray{7, 11}}}, {"width", 1}};
+    JsonObject storedQuests;
+    int updated = 0;
+    for (auto const& id : {String("zzlog-a"), String("zzlog-side"), String("zzlog-b"), String("zzlog-complete"),
+                           String("zzlog-hidden")}) {
+      auto arc = QuestArcDescriptor::fromJson(
+        root,
+        JsonObject{
+          {"quests", JsonArray{JsonObject{{"questId", id}, {"templateId", id}, {"parameters", JsonObject{}}}}}});
+      ASSERT_TRUE(arc) << arc.error().what();
+      auto storedArc = arc->diskStore(root);
+      ASSERT_TRUE(storedArc) << storedArc.error().what();
+      auto stored = (*versions)->makeCurrentVersionedJson(
+        "Quest",
+        JsonObject{{"state", id == "zzlog-complete" ? Json("Complete") : Json("Active")},
+                   {"arc", *storedArc},
+                   {"arcPos", 0},
+                   {"parameters", JsonObject{}},
+                   {"money", 0},
+                   {"lastUpdatedOn", ++updated},
+                   {"rewards", JsonArray{*rewardStore, *rewardStore}},
+                   {"portraits", JsonObject{{"Objective", JsonArray{portrait}}, {"QuestStarted", JsonArray{portrait}}}},
+                   {"portraitTitles", JsonObject{{"Objective", id}}}});
+      ASSERT_TRUE(stored) << stored.error().what();
+      storedQuests.set(id, stored->toJson());
+    }
+    auto domain = (*player)->questManager();
+    ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
+    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
+    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto probe = (*luaRoot)->createContext(StringList{});
+    ASSERT_TRUE(probe) << probe.error().what();
+    ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
+    auto entries = probe->eval<Json>("local s = player.questLogEntries(false); return "
+                                     "{s.entries[1].id,s.entries[2].id,s.entries[3].id,#s.entries,s.current}");
+    ASSERT_TRUE(entries) << entries.error().what();
+    EXPECT_EQ(*entries, (Json(JsonArray{"zzlog-a", "zzlog-side", "zzlog-b", 3, "zzlog-b"})));
+    auto blocked = probe->eval<Json>(
+      "return {player.abandonQuest('zzlog-a'),player.abandonQuest('missing'),player.abandonQuest('zzlog-complete')}");
+    ASSERT_TRUE(blocked) << blocked.error().what();
+    EXPECT_EQ(*blocked, (Json(JsonArray{false, false, false})));
 
-  auto assets = root.assets();
-  ASSERT_TRUE(assets);
-  auto config = (*assets)->json("/interface/opensb/questlog/questlog.config");
-  ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
-  ASSERT_TRUE(paneConfig);
-  paneConfig->set("gui", JsonObject{});
-  auto createdPane = ScriptTestPane::create(**context, *paneConfig);
-  ASSERT_TRUE(createdPane) << createdPane.error().what();
-  auto pane = std::move(*createdPane);
-  pane->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  for (auto const& name : {String("lblQuestTitle"), String("lblQuestBody"), String("lblPortraitTitle")}) {
-    auto text = textEditor(**context, "");
-    ASSERT_TRUE(text);
-    (*text)->setMaxWidth(-1);
-    ASSERT_TRUE(pane->addChild(name, *text));
-  }
-  for (auto const& name : {String("btnToggleTracking"), String("btnAbandon")}) {
-    auto button = ButtonWidget::create(**context);
-    ASSERT_TRUE(button);
-    ASSERT_TRUE(pane->addChild(name, *button));
-  }
-  for (auto const& name : {String("imgPortrait"), String("imgPolaroid"), String("imgPolaroidBack"), String("lblRewards")}) {
-    auto image = ImageWidget::create(**context, "");
-    ASSERT_TRUE(image);
-    ASSERT_TRUE(pane->addChild(name, *image));
-  }
-  // Native ItemGrid construction requires renderInit even with empty slot art.
-  // Real grid stacking, capacity and tooltips are exercised by the GL smoke.
-  auto group = std::make_shared<ButtonGroupWidget>(**context);
-  for (auto const& entry : {std::pair{0, String("inProgress")}, std::pair{1, String("completed")}}) {
-    auto button = ButtonWidget::create(**context);
-    ASSERT_TRUE(button);
-    (*button)->setData(entry.second);
-    (*button)->setButtonGroup(group, entry.first);
-    ASSERT_TRUE(group->addChild(entry.second, *button));
-  }
-  ASSERT_TRUE(group->select(0));
-  ASSERT_TRUE(pane->addChild("filter", group));
-  auto scroll = std::make_shared<Widget>(**context);
-  auto layout = std::make_shared<VerticalLayout>(**context);
-  layout->setFillDown(true);
-  auto schema = Json::parseJson(R"JSON({
+    auto assets = root.assets();
+    ASSERT_TRUE(assets);
+    auto config = (*assets)->json("/interface/opensb/questlog/questlog.config");
+    ASSERT_TRUE(config) << config.error().what();
+    auto paneConfig = config->toObject();
+    ASSERT_TRUE(paneConfig);
+    paneConfig->set("gui", JsonObject{});
+    auto createdPane = ScriptTestPane::create(**context, *paneConfig);
+    ASSERT_TRUE(createdPane) << createdPane.error().what();
+    auto pane = std::move(*createdPane);
+    pane->setAnchor(PaneAnchor::BottomLeft);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    for (auto const& name : {String("lblQuestTitle"), String("lblQuestBody"), String("lblPortraitTitle")}) {
+      auto text = textEditor(**context, "");
+      ASSERT_TRUE(text);
+      (*text)->setMaxWidth(-1);
+      ASSERT_TRUE(pane->addChild(name, *text));
+    }
+    for (auto const& name : {String("btnToggleTracking"), String("btnAbandon")}) {
+      auto button = ButtonWidget::create(**context);
+      ASSERT_TRUE(button);
+      ASSERT_TRUE(pane->addChild(name, *button));
+    }
+    for (auto const& name :
+         {String("imgPortrait"), String("imgPolaroid"), String("imgPolaroidBack"), String("lblRewards")}) {
+      auto image = ImageWidget::create(**context, "");
+      ASSERT_TRUE(image);
+      ASSERT_TRUE(pane->addChild(name, *image));
+    }
+    // Native ItemGrid construction requires renderInit even with empty slot art.
+    // Real grid stacking, capacity and tooltips are exercised by the GL smoke.
+    auto group = std::make_shared<ButtonGroupWidget>(**context);
+    for (auto const& entry : {std::pair{0, String("inProgress")}, std::pair{1, String("completed")}}) {
+      auto button = ButtonWidget::create(**context);
+      ASSERT_TRUE(button);
+      (*button)->setData(entry.second);
+      (*button)->setButtonGroup(group, entry.first);
+      ASSERT_TRUE(group->addChild(entry.second, *button));
+    }
+    ASSERT_TRUE(group->select(0));
+    ASSERT_TRUE(pane->addChild("filter", group));
+    auto scroll = std::make_shared<Widget>(**context);
+    auto layout = std::make_shared<VerticalLayout>(**context);
+    layout->setFillDown(true);
+    auto schema = Json::parseJson(R"JSON({
     "spacing":[0,1],"memberSize":[150,19],
     "listTemplate":{
       "lblQuestEntry":{"type":"textbox","maxWidth":-1},
@@ -3443,927 +3497,1021 @@ const GameTestRegistration questLogPresentation("LuaQuestLog", "StableSelectionR
       "imgCurrent":{"type":"image","file":""}
     }
   })JSON");
-  ASSERT_TRUE(schema);
-  for (auto const& name : {String("mainQuestList"), String("sideQuestList")}) {
-    auto list = ListWidget::create(**context, *schema);
-    ASSERT_TRUE(list);
-    (*list)->setPosition({0, name == "mainQuestList" ? 3 : 1});
-    (*list)->registerMemberCallback("lblQuestEntry", [](Widget&) -> std::expected<void, StarException> { return {}; });
-    (*list)->setCallback([&, name](Widget&) -> std::expected<void, StarException> {
-      auto called = pane->call(name, {});
-      if (!called) return std::unexpected(std::move(called.error()));
-      return {};
-    });
-    ASSERT_TRUE(layout->addChild(name, *list));
-  }
-  auto mainHeader = std::make_shared<Widget>(**context);
-  auto sideHeader = std::make_shared<Widget>(**context);
-  mainHeader->setPosition({0, 4});
-  sideHeader->setPosition({0, 2});
-  mainHeader->setSize({100, 15});
-  sideHeader->setSize({100, 15});
-  ASSERT_TRUE(layout->addChild("mainQuestHeader", mainHeader));
-  ASSERT_TRUE(layout->addChild("sideQuestHeader", sideHeader));
-  ASSERT_TRUE(scroll->addChild("verticalLayout", layout));
-  ASSERT_TRUE(pane->addChild("scrollArea", scroll));
-  PaneManager panes(**context);
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
-  auto main = pane->fetchChild<ListWidget>("scrollArea.verticalLayout.mainQuestList");
-  auto side = pane->fetchChild<ListWidget>("scrollArea.verticalLayout.sideQuestList");
-  auto body = pane->fetchChild<TextBoxWidget>("lblQuestBody");
-  auto portraitTitle = pane->fetchChild<TextBoxWidget>("lblPortraitTitle");
-  ASSERT_TRUE(main && *main && side && *side && body && *body && portraitTitle && *portraitTitle);
-  ASSERT_EQ((*main)->listSize(), 2u);
-  ASSERT_EQ((*side)->listSize(), 1u);
-  EXPECT_EQ((*main)->itemAt(0)->data(), Json("zzlog-a"));
-  EXPECT_EQ((*main)->itemAt(1)->data(), Json("zzlog-b"));
-  ASSERT_TRUE((*main)->selectedWidget());
-  EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
-  EXPECT_EQ((*body)->getText(), String("zzlog-b"));
-  auto selectedQuest = domain->getQuest("zzlog-b");
-  auto lockedQuest = domain->getQuest("zzlog-a");
-  ASSERT_TRUE(selectedQuest && lockedQuest);
-  EXPECT_FALSE((*selectedQuest)->unread());
-  EXPECT_TRUE((*lockedQuest)->unread());
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  auto compact = probe->eval<Json>("local q = player.questLogDetails('zzlog-b'); local s = player.questLogDetails('zzlog-b',q.revision,q.portraitRevision,q.rewardsRevision); return {s.title == nil,s.rewards == nil,s.portrait == nil,s.active,s.tracked}");
-  ASSERT_TRUE(compact) << compact.error().what();
-  EXPECT_EQ(*compact, (Json(JsonArray{true, true, true, true, true})));
-  ASSERT_TRUE((*main)->clearSelected());
-  EXPECT_EQ((*body)->getText(), String(""));
-  ASSERT_TRUE((*side)->setSelected(0));
-  EXPECT_FALSE((*main)->selectedWidget());
-  EXPECT_EQ((*body)->getText(), String("zzlog-side"));
-  ASSERT_TRUE(pane->call("btnToggleTracking", {}));
-  EXPECT_EQ(domain->currentQuestId(), std::optional<String>("zzlog-side"));
-  ASSERT_TRUE(pane->call("btnToggleTracking", {}));
-  EXPECT_FALSE(domain->currentQuestId());
-  ASSERT_TRUE((*main)->setSelected(0));
-  EXPECT_FALSE((*side)->selectedWidget());
-  EXPECT_FALSE((*lockedQuest)->unread());
-  ASSERT_TRUE(pane->call("btnAbandon", {}));
-  EXPECT_TRUE(domain->isActive("zzlog-a"));
-  {
-    auto storage = File::ephemeralFile(root.random());
-    ASSERT_TRUE(storage) << storage.error().what();
-    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
-    ASSERT_TRUE(world) << world.error().what();
-    auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
-    ASSERT_TRUE((*lockedQuest)->init(**player, **world, {}));
-    auto uninitQuest = finally([&] { EXPECT_TRUE((*lockedQuest)->uninit()); });
-    auto failingQuest = domain->getQuest("zzlog-side");
-    ASSERT_TRUE(failingQuest);
-    ASSERT_TRUE((*failingQuest)->init(**player, **world, {}));
-    auto uninitFailingQuest = finally([&] { EXPECT_TRUE((*failingQuest)->uninit()); });
-    ASSERT_TRUE((*failingQuest)->callScript("enableAbandonError", {}));
-    auto rejected = probe->eval<Json>("local ok,err=pcall(player.abandonQuest,'zzlog-side'); return {ok,tostring(err):find('questlog abandon regression',1,true)~=nil}");
-    ASSERT_TRUE(rejected) << rejected.error().what();
-    EXPECT_EQ(*rejected, (Json(JsonArray{false, true})));
-    EXPECT_EQ((*failingQuest)->state(), QuestState::Failed);
-    ASSERT_EQ(errors->messages.size(), 1u);
-    EXPECT_NE(errors->messages.front().find("questlog abandon regression"), std::string::npos);
-    auto before = (*lockedQuest)->presentationRevision();
-    ASSERT_TRUE((*lockedQuest)->callScript("mutate", {}));
-    EXPECT_NE((*lockedQuest)->presentationRevision(), before);
+    ASSERT_TRUE(schema);
+    for (auto const& name : {String("mainQuestList"), String("sideQuestList")}) {
+      auto list = ListWidget::create(**context, *schema);
+      ASSERT_TRUE(list);
+      (*list)->setPosition({0, name == "mainQuestList" ? 3 : 1});
+      (*list)->registerMemberCallback("lblQuestEntry",
+                                      [](Widget&) -> std::expected<void, StarException> { return {}; });
+      (*list)->setCallback([&, name](Widget&) -> std::expected<void, StarException> {
+        auto called = pane->call(name, {});
+        if (!called)
+          return std::unexpected(std::move(called.error()));
+        return {};
+      });
+      ASSERT_TRUE(layout->addChild(name, *list));
+    }
+    auto mainHeader = std::make_shared<Widget>(**context);
+    auto sideHeader = std::make_shared<Widget>(**context);
+    mainHeader->setPosition({0, 4});
+    sideHeader->setPosition({0, 2});
+    mainHeader->setSize({100, 15});
+    sideHeader->setSize({100, 15});
+    ASSERT_TRUE(layout->addChild("mainQuestHeader", mainHeader));
+    ASSERT_TRUE(layout->addChild("sideQuestHeader", sideHeader));
+    ASSERT_TRUE(scroll->addChild("verticalLayout", layout));
+    ASSERT_TRUE(pane->addChild("scrollArea", scroll));
+    PaneManager panes(**context);
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
+    auto main = pane->fetchChild<ListWidget>("scrollArea.verticalLayout.mainQuestList");
+    auto side = pane->fetchChild<ListWidget>("scrollArea.verticalLayout.sideQuestList");
+    auto body = pane->fetchChild<TextBoxWidget>("lblQuestBody");
+    auto portraitTitle = pane->fetchChild<TextBoxWidget>("lblPortraitTitle");
+    ASSERT_TRUE(main && *main && side && *side && body && *body && portraitTitle && *portraitTitle);
+    ASSERT_EQ((*main)->listSize(), 2u);
+    ASSERT_EQ((*side)->listSize(), 1u);
+    EXPECT_EQ((*main)->itemAt(0)->data(), Json("zzlog-a"));
+    EXPECT_EQ((*main)->itemAt(1)->data(), Json("zzlog-b"));
+    ASSERT_TRUE((*main)->selectedWidget());
+    EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
+    EXPECT_EQ((*body)->getText(), String("zzlog-b"));
+    auto selectedQuest = domain->getQuest("zzlog-b");
+    auto lockedQuest = domain->getQuest("zzlog-a");
+    ASSERT_TRUE(selectedQuest && lockedQuest);
+    EXPECT_FALSE((*selectedQuest)->unread());
+    EXPECT_TRUE((*lockedQuest)->unread());
     ASSERT_TRUE(pane->tick(1.0f / 60));
-    EXPECT_EQ((*body)->getText(), String("Changed body"));
-    EXPECT_EQ((*portraitTitle)->getText(), String("Changed portrait"));
-    auto after = (*lockedQuest)->presentationRevision();
-    ASSERT_TRUE((*lockedQuest)->callScript("unchanged", {}));
-    EXPECT_EQ((*lockedQuest)->presentationRevision(), after);
-    ASSERT_TRUE(pane->tick(1.0f / 60));
-    ASSERT_TRUE(probe->eval<LuaValue>("prior = player.questLogDetails('zzlog-a')"));
-    ASSERT_TRUE((*lockedQuest)->callScript("textOnly", {}));
-    ASSERT_TRUE(pane->tick(1.0f / 60));
-    EXPECT_EQ((*body)->getText(), String("Text-only change"));
-    auto delta = probe->eval<Json>("local q=player.questLogDetails('zzlog-a',prior.revision,prior.portraitRevision,prior.rewardsRevision); return {q.text,q.rewards==nil,q.portrait==nil}");
-    ASSERT_TRUE(delta) << delta.error().what();
-    EXPECT_EQ(*delta, (Json(JsonArray{"Text-only change", true, true})));
-    ASSERT_TRUE(pane->call("filter", {}));
-    auto row = (*main)->selectedWidget()->fetchChild<TextBoxWidget>("lblQuestEntry");
-    ASSERT_TRUE(row && *row);
-    EXPECT_EQ((*row)->getText(), String("Changed title"));
-    auto parsed = probe->eval<Json>("local q=player.questLogDetails('zzlog-a'); return {q.portrait[1].line,q.portraitTitle}");
-    ASSERT_TRUE(parsed) << parsed.error().what();
-    EXPECT_EQ(*parsed, (Json(JsonArray{JsonArray{JsonArray{1, 2}, JsonArray{5, 9}}, "Changed portrait"})));
-    ASSERT_TRUE(probe->eval<LuaValue>("prior = player.questLogDetails('zzlog-a')"));
-    ASSERT_TRUE((*lockedQuest)->callScript("clearPortrait", {}));
-    ASSERT_TRUE(pane->tick(1.0f / 60));
-    auto polaroid = pane->fetchChild("imgPolaroid");
-    ASSERT_TRUE(polaroid && *polaroid);
-    EXPECT_FALSE((*polaroid)->visibility());
-    EXPECT_EQ((*portraitTitle)->getText(), String(""));
-    auto portraitDelta = probe->eval<Json>(
+    auto compact = probe->eval<Json>("local q = player.questLogDetails('zzlog-b'); local s = "
+                                     "player.questLogDetails('zzlog-b',q.revision,q.portraitRevision,q.rewardsRevision)"
+                                     "; return {s.title == nil,s.rewards == nil,s.portrait == nil,s.active,s.tracked}");
+    ASSERT_TRUE(compact) << compact.error().what();
+    EXPECT_EQ(*compact, (Json(JsonArray{true, true, true, true, true})));
+    ASSERT_TRUE((*main)->clearSelected());
+    EXPECT_EQ((*body)->getText(), String(""));
+    ASSERT_TRUE((*side)->setSelected(0));
+    EXPECT_FALSE((*main)->selectedWidget());
+    EXPECT_EQ((*body)->getText(), String("zzlog-side"));
+    ASSERT_TRUE(pane->call("btnToggleTracking", {}));
+    EXPECT_EQ(domain->currentQuestId(), std::optional<String>("zzlog-side"));
+    ASSERT_TRUE(pane->call("btnToggleTracking", {}));
+    EXPECT_FALSE(domain->currentQuestId());
+    ASSERT_TRUE((*main)->setSelected(0));
+    EXPECT_FALSE((*side)->selectedWidget());
+    EXPECT_FALSE((*lockedQuest)->unread());
+    ASSERT_TRUE(pane->call("btnAbandon", {}));
+    EXPECT_TRUE(domain->isActive("zzlog-a"));
+    {
+      auto storage = File::ephemeral_file(root.random());
+      ASSERT_TRUE(storage) << storage.error().what();
+      auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+      ASSERT_TRUE(world) << world.error().what();
+      auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+      ASSERT_TRUE((*lockedQuest)->init(**player, **world, {}));
+      auto uninitQuest = finally([&] { EXPECT_TRUE((*lockedQuest)->uninit()); });
+      auto failingQuest = domain->getQuest("zzlog-side");
+      ASSERT_TRUE(failingQuest);
+      ASSERT_TRUE((*failingQuest)->init(**player, **world, {}));
+      auto uninitFailingQuest = finally([&] { EXPECT_TRUE((*failingQuest)->uninit()); });
+      ASSERT_TRUE((*failingQuest)->callScript("enableAbandonError", {}));
+      auto rejected = probe->eval<Json>("local ok,err=pcall(player.abandonQuest,'zzlog-side'); return "
+                                        "{ok,tostring(err):find('questlog abandon regression',1,true)~=nil}");
+      ASSERT_TRUE(rejected) << rejected.error().what();
+      EXPECT_EQ(*rejected, (Json(JsonArray{false, true})));
+      EXPECT_EQ((*failingQuest)->state(), QuestState::Failed);
+      ASSERT_EQ(errors->messages.size(), 1u);
+      EXPECT_NE(errors->messages.front().find("questlog abandon regression"), std::string::npos);
+      auto before = (*lockedQuest)->presentationRevision();
+      ASSERT_TRUE((*lockedQuest)->callScript("mutate", {}));
+      EXPECT_NE((*lockedQuest)->presentationRevision(), before);
+      ASSERT_TRUE(pane->tick(1.0f / 60));
+      EXPECT_EQ((*body)->getText(), String("Changed body"));
+      EXPECT_EQ((*portraitTitle)->getText(), String("Changed portrait"));
+      auto after = (*lockedQuest)->presentationRevision();
+      ASSERT_TRUE((*lockedQuest)->callScript("unchanged", {}));
+      EXPECT_EQ((*lockedQuest)->presentationRevision(), after);
+      ASSERT_TRUE(pane->tick(1.0f / 60));
+      ASSERT_TRUE(probe->eval<LuaValue>("prior = player.questLogDetails('zzlog-a')"));
+      ASSERT_TRUE((*lockedQuest)->callScript("textOnly", {}));
+      ASSERT_TRUE(pane->tick(1.0f / 60));
+      EXPECT_EQ((*body)->getText(), String("Text-only change"));
+      auto delta = probe->eval<Json>(
+        "local q=player.questLogDetails('zzlog-a',prior.revision,prior.portraitRevision,prior.rewardsRevision); return "
+        "{q.text,q.rewards==nil,q.portrait==nil}");
+      ASSERT_TRUE(delta) << delta.error().what();
+      EXPECT_EQ(*delta, (Json(JsonArray{"Text-only change", true, true})));
+      ASSERT_TRUE(pane->call("filter", {}));
+      auto row = (*main)->selectedWidget()->fetchChild<TextBoxWidget>("lblQuestEntry");
+      ASSERT_TRUE(row && *row);
+      EXPECT_EQ((*row)->getText(), String("Changed title"));
+      auto parsed =
+        probe->eval<Json>("local q=player.questLogDetails('zzlog-a'); return {q.portrait[1].line,q.portraitTitle}");
+      ASSERT_TRUE(parsed) << parsed.error().what();
+      EXPECT_EQ(*parsed, (Json(JsonArray{JsonArray{JsonArray{1, 2}, JsonArray{5, 9}}, "Changed portrait"})));
+      ASSERT_TRUE(probe->eval<LuaValue>("prior = player.questLogDetails('zzlog-a')"));
+      ASSERT_TRUE((*lockedQuest)->callScript("clearPortrait", {}));
+      ASSERT_TRUE(pane->tick(1.0f / 60));
+      auto polaroid = pane->fetchChild("imgPolaroid");
+      ASSERT_TRUE(polaroid && *polaroid);
+      EXPECT_FALSE((*polaroid)->visibility());
+      EXPECT_EQ((*portraitTitle)->getText(), String(""));
+      auto portraitDelta = probe->eval<Json>(
         "local q=player.questLogDetails('zzlog-a',prior.revision,prior.portraitRevision,prior.rewardsRevision); "
         "return {q.title==nil,q.text==nil,q.portraitTitle,q.portrait==nil,q.rewards==nil}");
-    ASSERT_TRUE(portraitDelta) << portraitDelta.error().what();
-    EXPECT_EQ(*portraitDelta, (Json(JsonArray{true, true, "", true, true})));
-  }
-
-  // Stable identity, not title, survives reordered native rows. Replacing a
-  // Quest allocation with the same ID must also invalidate revision caches.
-  auto storedA = VersionedJson::fromJson(storedQuests["zzlog-a"]);
-  ASSERT_TRUE(storedA) << storedA.error().what();
-  auto aData = storedA->content.toObject();
-  ASSERT_TRUE(aData);
-  aData->set("text", "Replacement body");
-  aData->set("portraitTitles", JsonObject{{"Objective", "Replacement portrait"}});
-  aData->set("lastUpdatedOn", 100);
-  aData->set("rewards", JsonArray{});
-  auto replacementA = (*versions)->makeCurrentVersionedJson("Quest", *aData);
-  ASSERT_TRUE(replacementA);
-  storedQuests.set("zzlog-a", replacementA->toJson());
-  domain->setAsTracked("zzlog-b");
-  auto oldRevision = (*lockedQuest)->presentationRevision();
-  ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
-  auto newA = domain->getQuest("zzlog-a");
-  ASSERT_TRUE(newA);
-  EXPECT_NE((*newA)->presentationRevision(), oldRevision);
-  ASSERT_TRUE(pane->call("filter", {}));
-  ASSERT_TRUE((*main)->selectedWidget());
-  EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-a"));
-  EXPECT_EQ((*main)->itemAt(0)->data(), Json("zzlog-b"));
-  EXPECT_EQ((*body)->getText(), String("Replacement body"));
-  EXPECT_EQ((*portraitTitle)->getText(), String("Replacement portrait"));
-  auto clearedRewards = probe->eval<bool>("local q=player.questLogDetails('zzlog-a'); return q.rewards~=nil and #q.rewards==0");
-  ASSERT_TRUE(clearedRewards) << clearedRewards.error().what();
-  EXPECT_TRUE(*clearedRewards);
-  ASSERT_TRUE(pane->dismissed());
-  ASSERT_TRUE(pane->displayed());
-  EXPECT_EQ((*body)->getText(), String("Replacement body"));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->tick(1.0f / 60));
-  EXPECT_EQ((*body)->getText(), String("Replacement body"));
-  ASSERT_TRUE(group->select(1));
-  ASSERT_TRUE(pane->call("filter", {}));
-  EXPECT_EQ((*body)->getText(), String(""));
-  ASSERT_EQ((*side)->listSize(), 1u);
-  EXPECT_EQ((*side)->itemAt(0)->data(), Json("zzlog-complete"));
-  ASSERT_TRUE((*side)->setSelected(0));
-  EXPECT_EQ((*body)->getText(), String("zzlog-complete"));
-  auto inactive = probe->eval<Json>("local q = player.questLogDetails('zzlog-complete'); return {q.active,q.canAbandon,player.questLogDetails('missing') == nil}");
-  ASSERT_TRUE(inactive);
-  EXPECT_EQ(*inactive, (Json(JsonArray{false, false, true})));
-  ASSERT_TRUE(group->select(0));
-  ASSERT_TRUE(pane->call("filter", {}));
-  EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
-  ASSERT_TRUE((*side)->setSelected(0));
-  ASSERT_TRUE(pane->call("btnAbandon", {}));
-  EXPECT_FALSE(domain->isActive("zzlog-side"));
-  EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
-
-  // Production registration and manager retention/scope policy, using the
-  // actual consumer pane and native pane stack rather than an echoed service.
-  auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
-  ASSERT_TRUE(controller);
-  LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(interface.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-    if (!pane) return std::optional<LuaCallbacks>{};
-    auto bound = pane->makePaneCallbacks();
-    if (!bound) return std::unexpected(std::move(bound.error()));
-    return std::optional<LuaCallbacks>(std::move(*bound));
-  }));
-  ASSERT_TRUE(interface.registerCallback("createPane", [](String const&, Json const&, String const&) -> std::expected<void, StarException> {
-    return std::unexpected(StarException("Unexpected recreation of retained QuestLog"));
-  }));
-  ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
-    if (pane && panes.isDisplayed(pane)) {
-      auto dismissed = panes.dismissPane(pane);
-      if (!dismissed) return std::unexpected(std::move(dismissed.error()));
+      ASSERT_TRUE(portraitDelta) << portraitDelta.error().what();
+      EXPECT_EQ(*portraitDelta, (Json(JsonArray{true, true, "", true, true})));
     }
-    pane.reset();
-    return {};
-  }));
-  ASSERT_TRUE(interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
-    if (panes.isDisplayed(pane)) return pane->show();
-    return panes.displayPane(PaneLayer::Window, pane, {});
-  }));
-  ASSERT_TRUE(controller->setCallbacks("interface", interface));
-  auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
-  ASSERT_TRUE(rootCallbacks);
-  ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
-  ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
+
+    // Stable identity, not title, survives reordered native rows. Replacing a
+    // Quest allocation with the same ID must also invalidate revision caches.
+    auto storedA = VersionedJson::fromJson(storedQuests["zzlog-a"]);
+    ASSERT_TRUE(storedA) << storedA.error().what();
+    auto aData = storedA->content.toObject();
+    ASSERT_TRUE(aData);
+    aData->set("text", "Replacement body");
+    aData->set("portraitTitles", JsonObject{{"Objective", "Replacement portrait"}});
+    aData->set("lastUpdatedOn", 100);
+    aData->set("rewards", JsonArray{});
+    auto replacementA = (*versions)->makeCurrentVersionedJson("Quest", *aData);
+    ASSERT_TRUE(replacementA);
+    storedQuests.set("zzlog-a", replacementA->toJson());
+    domain->setAsTracked("zzlog-b");
+    auto oldRevision = (*lockedQuest)->presentationRevision();
+    ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
+    auto newA = domain->getQuest("zzlog-a");
+    ASSERT_TRUE(newA);
+    EXPECT_NE((*newA)->presentationRevision(), oldRevision);
+    ASSERT_TRUE(pane->call("filter", {}));
+    ASSERT_TRUE((*main)->selectedWidget());
+    EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-a"));
+    EXPECT_EQ((*main)->itemAt(0)->data(), Json("zzlog-b"));
+    EXPECT_EQ((*body)->getText(), String("Replacement body"));
+    EXPECT_EQ((*portraitTitle)->getText(), String("Replacement portrait"));
+    auto clearedRewards =
+      probe->eval<bool>("local q=player.questLogDetails('zzlog-a'); return q.rewards~=nil and #q.rewards==0");
+    ASSERT_TRUE(clearedRewards) << clearedRewards.error().what();
+    EXPECT_TRUE(*clearedRewards);
+    ASSERT_TRUE(pane->dismissed());
+    ASSERT_TRUE(pane->displayed());
+    EXPECT_EQ((*body)->getText(), String("Replacement body"));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->tick(1.0f / 60));
+    EXPECT_EQ((*body)->getText(), String("Replacement body"));
+    ASSERT_TRUE(group->select(1));
+    ASSERT_TRUE(pane->call("filter", {}));
+    EXPECT_EQ((*body)->getText(), String(""));
+    ASSERT_EQ((*side)->listSize(), 1u);
+    EXPECT_EQ((*side)->itemAt(0)->data(), Json("zzlog-complete"));
+    ASSERT_TRUE((*side)->setSelected(0));
+    EXPECT_EQ((*body)->getText(), String("zzlog-complete"));
+    auto inactive = probe->eval<Json>("local q = player.questLogDetails('zzlog-complete'); return "
+                                      "{q.active,q.canAbandon,player.questLogDetails('missing') == nil}");
+    ASSERT_TRUE(inactive);
+    EXPECT_EQ(*inactive, (Json(JsonArray{false, false, true})));
+    ASSERT_TRUE(group->select(0));
+    ASSERT_TRUE(pane->call("filter", {}));
+    EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
+    ASSERT_TRUE((*side)->setSelected(0));
+    ASSERT_TRUE(pane->call("btnAbandon", {}));
+    EXPECT_FALSE(domain->isActive("zzlog-side"));
+    EXPECT_EQ((*main)->selectedWidget()->data(), Json("zzlog-b"));
+
+    // Production registration and manager retention/scope policy, using the
+    // actual consumer pane and native pane stack rather than an echoed service.
+    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    ASSERT_TRUE(controller);
+    LuaCallbacks interface;
+    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.registerCallback(
+      "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+        if (!pane)
+          return std::optional<LuaCallbacks>{};
+        auto bound = pane->makePaneCallbacks();
+        if (!bound)
+          return std::unexpected(std::move(bound.error()));
+        return std::optional<LuaCallbacks>(std::move(*bound));
+      }));
+    ASSERT_TRUE(interface.registerCallback(
+      "createPane", [](String const&, Json const&, String const&) -> std::expected<void, StarException> {
+        return std::unexpected(StarException("Unexpected recreation of retained QuestLog"));
+      }));
+    ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+      if (pane && panes.isDisplayed(pane)) {
+        auto dismissed = panes.dismissPane(pane);
+        if (!dismissed)
+          return std::unexpected(std::move(dismissed.error()));
+      }
+      pane.reset();
+      return {};
+    }));
+    ASSERT_TRUE(
+      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+        if (panes.isDisplayed(pane))
+          return pane->show();
+        return panes.displayPane(PaneLayer::Window, pane, {});
+      }));
+    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
+    ASSERT_TRUE(rootCallbacks);
+    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     definitions = {QuestLog = root.assetJson('/interface.config:panes.QuestLog')}
     session = {hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=1}
     checkpoint = {session=session}
     manager = UiManager.new(checkpoint, definitions, session)
     manager:open('QuestLog')
   )LUA"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:update()"));
-  ASSERT_TRUE(pane);
-  EXPECT_FALSE(panes.isDisplayed(pane));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestLog')"));
-  EXPECT_TRUE(panes.isDisplayed(pane));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=2})"));
-  ASSERT_TRUE(pane);
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=2,worldGeneration=2})"));
-  EXPECT_FALSE(pane);
-  EXPECT_EQ(errors->messages.size(), 1u);
-});
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:update()"));
+    ASSERT_TRUE(pane);
+    EXPECT_FALSE(panes.isDisplayed(pane));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestLog')"));
+    EXPECT_TRUE(panes.isDisplayed(pane));
+    ASSERT_TRUE(controller->eval<LuaValue>(
+      "manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=2})"));
+    ASSERT_TRUE(pane);
+    ASSERT_TRUE(controller->eval<LuaValue>(
+      "manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=2,worldGeneration=2})"));
+    EXPECT_FALSE(pane);
+    EXPECT_EQ(errors->messages.size(), 1u);
+  });
 
-const GameTestRegistration questDialogs("QuestDialogs", "LuaModalDecisionsReloadIdentityTemplatesAndCinema", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  ASSERT_TRUE(File::makeDirectory(File::relativeTo(overlay, "quests")));
-  auto writeJson = [&](String const& path, Json const& json) -> std::expected<void, StarException> {
-    auto text = json.printJson();
-    if (!text) return std::unexpected(std::move(text.error()));
-    return File::writeFile(*text, File::relativeTo(overlay, path));
-  };
-  // Real widgets and production Lua, with only renderer-dependent ItemGrid
-  // omitted. Its native bag/capacity/tooltips are exercised in the GL client.
-  JsonObject layout{{"panefeature", JsonObject{{"type", "panefeature"}, {"anchor", "bottomLeft"}}}};
-  for (auto const& name : {String("marker"), String("lblQuestTitle"), String("lblQuestBody"),
-      String("portraitTitle"), String("objectivePortraitTitle"), String("lblMoneyAmount")})
-    layout.set(name, JsonObject{{"type", "textbox"}, {"callback", "null"}, {"maxWidth", -1}});
-  for (auto const& name : {String("portraitImage"), String("objectivePortraitImage"),
-      String("imgPolaroid"), String("imgPolaroidBack")})
-    layout.set(name, JsonObject{{"type", "image"}, {"file", ""}});
-  for (auto const& name : {String("short"), String("portrait"), String("complete"), String("failed"), String("custom")}) {
-    auto gui = layout;
-    gui.set("marker", JsonObject{{"type", "textbox"}, {"callback", "null"}, {"maxWidth", -1}, {"value", name}});
-    if (name == "short") {
-      gui.set("background", JsonObject{{"type", "background"}});
-      gui.set("unusedMoney", JsonObject{{"type", "image"}, {"file", ""}, {"position", JsonArray{60, 700}}});
+const GameTestRegistration
+  questDialogs("QuestDialogs", "LuaModalDecisionsReloadIdentityTemplatesAndCinema", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "quests")));
+    auto writeJson = [&](String const& path, Json const& json) -> std::expected<void, StarException> {
+      auto text = json.printJson();
+      if (!text)
+        return std::unexpected(std::move(text.error()));
+      return File::write_file(*text, File::relative_to(overlay, path));
+    };
+    // Real widgets and production Lua, with only renderer-dependent ItemGrid
+    // omitted. Its native bag/capacity/tooltips are exercised in the GL client.
+    JsonObject layout{{"panefeature", JsonObject{{"type", "panefeature"}, {"anchor", "bottomLeft"}}}};
+    for (auto const& name : {String("marker"), String("lblQuestTitle"), String("lblQuestBody"), String("portraitTitle"),
+                             String("objectivePortraitTitle"), String("lblMoneyAmount")})
+      layout.set(name, JsonObject{{"type", "textbox"}, {"callback", "null"}, {"maxWidth", -1}});
+    for (auto const& name :
+         {String("portraitImage"), String("objectivePortraitImage"), String("imgPolaroid"), String("imgPolaroidBack")})
+      layout.set(name, JsonObject{{"type", "image"}, {"file", ""}});
+    for (auto const& name :
+         {String("short"), String("portrait"), String("complete"), String("failed"), String("custom")}) {
+      auto gui = layout;
+      gui.set("marker", JsonObject{{"type", "textbox"}, {"callback", "null"}, {"maxWidth", -1}, {"value", name}});
+      if (name == "short") {
+        gui.set("background", JsonObject{{"type", "background"}});
+        gui.set("unusedMoney", JsonObject{{"type", "image"}, {"file", ""}, {"position", JsonArray{60, 700}}});
+      }
+      ASSERT_TRUE(
+        writeJson("zzdialog-" + name + ".config", JsonObject{{"onShowSound", JsonArray{}}, {"paneLayout", gui}}));
     }
-    ASSERT_TRUE(writeJson("zzdialog-" + name + ".config", JsonObject{{"onShowSound", JsonArray{}}, {"paneLayout", gui}}));
-  }
-  ASSERT_TRUE(writeJson("quests/quests.config.patch", JsonArray{
-      JsonObject{{"op", "replace"}, {"path", "/defaultGuiConfigs/newQuest"}, {"value", "/zzdialog-short.config"}},
-      JsonObject{{"op", "replace"}, {"path", "/defaultGuiConfigs/newQuestPortrait"}, {"value", "/zzdialog-portrait.config"}},
-      JsonObject{{"op", "replace"}, {"path", "/defaultGuiConfigs/questComplete"}, {"value", "/zzdialog-complete.config"}},
-      JsonObject{{"op", "replace"}, {"path", "/defaultGuiConfigs/questFailed"}, {"value", "/zzdialog-failed.config"}}}));
-  ASSERT_TRUE(File::writeFile(String(R"LUA(
+    ASSERT_TRUE(writeJson(
+      "quests/quests.config.patch",
+      JsonArray{
+        JsonObject{{"op", "replace"}, {"path", "/defaultGuiConfigs/newQuest"}, {"value", "/zzdialog-short.config"}},
+        JsonObject{{"op", "replace"},
+                   {"path", "/defaultGuiConfigs/newQuestPortrait"},
+                   {"value", "/zzdialog-portrait.config"}},
+        JsonObject{{"op", "replace"},
+                   {"path", "/defaultGuiConfigs/questComplete"},
+                   {"value", "/zzdialog-complete.config"}},
+        JsonObject{{"op", "replace"},
+                   {"path", "/defaultGuiConfigs/questFailed"},
+                   {"value", "/zzdialog-failed.config"}}}));
+    ASSERT_TRUE(File::write_file(String(R"LUA(
     function questStart() player.setProperty("zzdialogDecision", "accept") end
     function questDecline() player.setProperty("zzdialogDecision", "decline") end
     function questCancel()
       player.setProperty("zzdialogDecision", "cancel")
       if player.getProperty("zzdialogThrow", false) then error("quest decision regression") end
     end
-  )LUA"), File::relativeTo(overlay, "zzdialog.lua")));
-  for (auto const& id : {String("zzdialog-failed"), String("zzdialog-complete"), String("zzdialog-offer"),
-      String("zzdialog-locked"), String("zzdialog-custom"), String("zzdialog-missing"), String("zzdialog-malformed")}) {
-    JsonObject config{{"id", id}, {"title", id}, {"text", "Offer body"}, {"completionText", "Completion body"},
-        {"failureText", "Failure body"}, {"script", "/zzdialog.lua"}, {"canBeAbandoned", id != "zzdialog-locked"}};
-    if (id == "zzdialog-complete") {
-      config.set("completionCinema", "/zzdialog-<species>-<gender>.cinematic");
-      config.set("ephemeral", true);
+  )LUA"),
+                                 File::relative_to(overlay, "zzdialog.lua")));
+    for (auto const& id :
+         {String("zzdialog-failed"), String("zzdialog-complete"), String("zzdialog-offer"), String("zzdialog-locked"),
+          String("zzdialog-custom"), String("zzdialog-missing"), String("zzdialog-malformed")}) {
+      JsonObject config{{"id", id},
+                        {"title", id},
+                        {"text", "Offer body"},
+                        {"completionText", "Completion body"},
+                        {"failureText", "Failure body"},
+                        {"script", "/zzdialog.lua"},
+                        {"canBeAbandoned", id != "zzdialog-locked"}};
+      if (id == "zzdialog-complete") {
+        config.set("completionCinema", "/zzdialog-<species>-<gender>.cinematic");
+        config.set("ephemeral", true);
+      }
+      if (id == "zzdialog-custom")
+        config.set("guiConfigs",
+                   JsonObject{{"newQuest", "/zzdialog-custom.config"},
+                              {"questComplete", "/zzdialog-custom.config"},
+                              {"questFailed", "/zzdialog-custom.config"}});
+      if (id == "zzdialog-missing")
+        config.set("completionCinema", "/zzdialog-nonexistent.cinematic");
+      if (id == "zzdialog-malformed")
+        config.set("completionCinema", "/zzdialog-malformed.cinematic");
+      ASSERT_TRUE(writeJson(id + ".questtemplate", config));
     }
-    if (id == "zzdialog-custom")
-      config.set("guiConfigs", JsonObject{{"newQuest", "/zzdialog-custom.config"},
-          {"questComplete", "/zzdialog-custom.config"}, {"questFailed", "/zzdialog-custom.config"}});
-    if (id == "zzdialog-missing") config.set("completionCinema", "/zzdialog-nonexistent.cinematic");
-    if (id == "zzdialog-malformed") config.set("completionCinema", "/zzdialog-malformed.cinematic");
-    ASSERT_TRUE(writeJson(id + ".questtemplate", config));
-  }
-  ASSERT_TRUE(writeJson("zzdialog-malformed.cinematic", JsonObject{{"panels", 7}}));
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questdialogs.config");
-  ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-  auto& root = **createdRoot;
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration);
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{{"GuiClose", JsonArray{
-      JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context);
-  auto factory = root.playerFactory();
-  ASSERT_TRUE(factory);
-  auto player = (*factory)->create();
-  ASSERT_TRUE(player);
-  auto versions = root.versioningDatabase();
-  ASSERT_TRUE(versions);
-  auto storedQuest = [&](String const& id, String const& templateId, String const& state, bool portrait) -> std::expected<Json, StarException> {
-    auto arc = QuestArcDescriptor::fromJson(root, JsonObject{{"quests", JsonArray{
-        JsonObject{{"questId", id}, {"templateId", templateId}, {"parameters", JsonObject{}}}}}});
-    if (!arc) return std::unexpected(std::move(arc.error()));
-    auto storedArc = arc->diskStore(root);
-    if (!storedArc) return std::unexpected(std::move(storedArc.error()));
-    JsonObject value{{"state", state}, {"arc", *storedArc}, {"arcPos", 0},
-        {"parameters", JsonObject{}}, {"money", 12345}, {"rewards", JsonArray{}},
-        {"lastUpdatedOn", 0}, {"showDialog", true}};
-    if (portrait) value.set("portraits", JsonObject{{"Objective", JsonArray{
-        JsonObject{{"line", JsonArray{JsonArray{2, 3}, JsonArray{7, 11}}}, {"width", 1}}}}});
-    auto stored = (*versions)->makeCurrentVersionedJson("Quest", value);
-    if (!stored) return std::unexpected(std::move(stored.error()));
-    return stored->toJson();
-  };
-  JsonObject initial;
-  for (auto const& entry : {std::pair{String("zzdialog-failed"), String("Failed")},
-      std::pair{String("zzdialog-complete"), String("Complete")}, std::pair{String("zzdialog-offer"), String("Offer")}}) {
-    auto stored = storedQuest(entry.first, entry.first, entry.second, entry.second == "Offer");
-    ASSERT_TRUE(stored);
-    initial.set(entry.first, *stored);
-  }
-  auto domain = (*player)->questManager();
-  ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", initial}}));
-  auto storage = File::ephemeralFile(root.random());
-  ASSERT_TRUE(storage);
-  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
-  ASSERT_TRUE(world) << world.error().what();
-  auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
-  ASSERT_TRUE(domain->init(**player, **world));
-  auto uninitDomain = finally([&] { EXPECT_TRUE(domain->uninit()); });
-  auto failed = domain->getQuest("zzdialog-failed");
-  auto complete = domain->getQuest("zzdialog-complete");
-  auto offered = domain->getQuest("zzdialog-offer");
-  ASSERT_TRUE(failed && complete && offered);
-  auto cinemaFile = "zzdialog-" + (*player)->species() + "-" + ((*player)->gender() == Gender::Male ? String("male") : String("female")) + ".cinematic";
-  ASSERT_TRUE(writeJson(cinemaFile, JsonObject{
-      {"panels", JsonArray{JsonObject{{"keyframes", JsonArray{
-          JsonObject{{"timecode", 0}}, JsonObject{{"timecode", 1}}}}}}},
-      {"audio", JsonArray{}}, {"suppressInput", true}}));
-  // Discover the player's resolved species/gender asset before exercising
-  // native fetchJson and real Cinematic::load.
-  ASSERT_TRUE(root.reload());
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot);
-  auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-  ASSERT_TRUE(playerCallbacks);
-  auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
-  ASSERT_TRUE(rootCallbacks);
-  auto cinematic = Cinematic::create(**context);
-  ASSERT_TRUE(cinematic);
-  int cinemaLoads = 0;
-  PaneManager panes(**context);
-  std::shared_ptr<ScriptTestPane> pane;
-  LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(interface.registerCallback("paneLayerOccupied", [&](String const&) {
-    return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow}));
-  }));
-  ASSERT_TRUE(interface.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-    if (!pane) return std::optional<LuaCallbacks>{};
-    auto bound = pane->makePaneCallbacks();
-    if (!bound) return std::unexpected(std::move(bound.error()));
-    return std::optional<LuaCallbacks>(std::move(*bound));
-  }));
-  ASSERT_TRUE(interface.registerCallback("playCinematic", [&](Json const& json) -> std::expected<void, StarException> {
-    auto loaded = (*cinematic)->load(json);
-    if (!loaded) return std::unexpected(std::move(loaded.error()));
-    ++cinemaLoads;
-    return {};
-  }));
-  ASSERT_TRUE(interface.registerCallback("createPane", [&](String const&, Json config, String const&) -> std::expected<void, StarException> {
-    auto created = ScriptTestPane::create(**context, std::move(config));
-    if (!created) return std::unexpected(std::move(created.error()));
-    pane = std::move(*created);
-    auto button = ButtonWidget::create(**context);
-    if (!button) return std::unexpected(std::move(button.error()));
-    if (auto added = pane->addChild("btnDecline", *button); !added) return std::unexpected(std::move(added.error()));
-    if (auto bound = pane->setLuaRoot(*luaRoot); !bound) return std::unexpected(std::move(bound.error()));
-    if (auto bound = pane->addCallbacks("player", *playerCallbacks); !bound) return std::unexpected(std::move(bound.error()));
-    return pane->addCallbacks("interface", interface);
-  }));
-  ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
-    if (pane && panes.isDisplayed(pane)) {
-      auto dismissed = panes.dismissPane(pane);
-      if (!dismissed) return std::unexpected(std::move(dismissed.error()));
+    ASSERT_TRUE(writeJson("zzdialog-malformed.cinematic", JsonObject{{"panels", 7}}));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "questdialogs.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    auto& root = **createdRoot;
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration);
+    ASSERT_TRUE((*configuration)
+                  ->set("bindings",
+                        JsonObject{{"GuiClose",
+                                    JsonArray{JsonObject{{"type", "key"}, {"value", "Esc"}, {"mods", JsonArray{}}}}}}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context);
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto player = (*factory)->create();
+    ASSERT_TRUE(player);
+    auto versions = root.versioningDatabase();
+    ASSERT_TRUE(versions);
+    auto storedQuest = [&](String const& id, String const& templateId, String const& state,
+                           bool portrait) -> std::expected<Json, StarException> {
+      auto arc = QuestArcDescriptor::fromJson(
+        root,
+        JsonObject{{"quests",
+                    JsonArray{JsonObject{{"questId", id}, {"templateId", templateId}, {"parameters", JsonObject{}}}}}});
+      if (!arc)
+        return std::unexpected(std::move(arc.error()));
+      auto storedArc = arc->diskStore(root);
+      if (!storedArc)
+        return std::unexpected(std::move(storedArc.error()));
+      JsonObject value{{"state", state}, {"arc", *storedArc},      {"arcPos", 0},        {"parameters", JsonObject{}},
+                       {"money", 12345}, {"rewards", JsonArray{}}, {"lastUpdatedOn", 0}, {"showDialog", true}};
+      if (portrait)
+        value.set(
+          "portraits",
+          JsonObject{{"Objective",
+                      JsonArray{JsonObject{{"line", JsonArray{JsonArray{2, 3}, JsonArray{7, 11}}}, {"width", 1}}}}});
+      auto stored = (*versions)->makeCurrentVersionedJson("Quest", value);
+      if (!stored)
+        return std::unexpected(std::move(stored.error()));
+      return stored->toJson();
+    };
+    JsonObject initial;
+    for (auto const& entry : {std::pair{String("zzdialog-failed"), String("Failed")},
+                              std::pair{String("zzdialog-complete"), String("Complete")},
+                              std::pair{String("zzdialog-offer"), String("Offer")}}) {
+      auto stored = storedQuest(entry.first, entry.first, entry.second, entry.second == "Offer");
+      ASSERT_TRUE(stored);
+      initial.set(entry.first, *stored);
     }
-    pane.reset();
-    return {};
-  }));
-  ASSERT_TRUE(interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
-    if (panes.isDisplayed(pane)) {
-      if (auto shown = pane->show(); !shown)
-        return std::unexpected(std::move(shown.error()));
-      return pane->resumeScripts();
-    }
-    return panes.displayPane(PaneLayer::ModalWindow, pane, {});
-  }));
-  auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
-  ASSERT_TRUE(controller);
-  ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
-  ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
-  ASSERT_TRUE(controller->setCallbacks("interface", interface));
-  ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
+    auto domain = (*player)->questManager();
+    ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", initial}}));
+    auto storage = File::ephemeral_file(root.random());
+    ASSERT_TRUE(storage);
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world) << world.error().what();
+    auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+    ASSERT_TRUE(domain->init(**player, **world));
+    auto uninitDomain = finally([&] { EXPECT_TRUE(domain->uninit()); });
+    auto failed = domain->getQuest("zzdialog-failed");
+    auto complete = domain->getQuest("zzdialog-complete");
+    auto offered = domain->getQuest("zzdialog-offer");
+    ASSERT_TRUE(failed && complete && offered);
+    auto cinemaFile = "zzdialog-" + (*player)->species() + "-"
+      + ((*player)->gender() == Gender::Male ? String("male") : String("female")) + ".cinematic";
+    ASSERT_TRUE(writeJson(
+      cinemaFile,
+      JsonObject{
+        {"panels",
+         JsonArray{JsonObject{{"keyframes", JsonArray{JsonObject{{"timecode", 0}}, JsonObject{{"timecode", 1}}}}}}},
+        {"audio", JsonArray{}},
+        {"suppressInput", true}}));
+    // Discover the player's resolved species/gender asset before exercising
+    // native fetchJson and real Cinematic::load.
+    ASSERT_TRUE(root.reload());
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot);
+    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
+    ASSERT_TRUE(playerCallbacks);
+    auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
+    ASSERT_TRUE(rootCallbacks);
+    auto cinematic = Cinematic::create(**context);
+    ASSERT_TRUE(cinematic);
+    int cinemaLoads = 0;
+    PaneManager panes(**context);
+    std::shared_ptr<ScriptTestPane> pane;
+    LuaCallbacks interface;
+    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.registerCallback(
+      "paneLayerOccupied", [&](String const&) { return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow})); }));
+    ASSERT_TRUE(interface.registerCallback(
+      "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+        if (!pane)
+          return std::optional<LuaCallbacks>{};
+        auto bound = pane->makePaneCallbacks();
+        if (!bound)
+          return std::unexpected(std::move(bound.error()));
+        return std::optional<LuaCallbacks>(std::move(*bound));
+      }));
+    ASSERT_TRUE(
+      interface.registerCallback("playCinematic", [&](Json const& json) -> std::expected<void, StarException> {
+        auto loaded = (*cinematic)->load(json);
+        if (!loaded)
+          return std::unexpected(std::move(loaded.error()));
+        ++cinemaLoads;
+        return {};
+      }));
+    ASSERT_TRUE(interface.registerCallback(
+      "createPane", [&](String const&, Json config, String const&) -> std::expected<void, StarException> {
+        auto created = ScriptTestPane::create(**context, std::move(config));
+        if (!created)
+          return std::unexpected(std::move(created.error()));
+        pane = std::move(*created);
+        auto button = ButtonWidget::create(**context);
+        if (!button)
+          return std::unexpected(std::move(button.error()));
+        if (auto added = pane->addChild("btnDecline", *button); !added)
+          return std::unexpected(std::move(added.error()));
+        if (auto bound = pane->setLuaRoot(*luaRoot); !bound)
+          return std::unexpected(std::move(bound.error()));
+        if (auto bound = pane->addCallbacks("player", *playerCallbacks); !bound)
+          return std::unexpected(std::move(bound.error()));
+        return pane->addCallbacks("interface", interface);
+      }));
+    ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+      if (pane && panes.isDisplayed(pane)) {
+        auto dismissed = panes.dismissPane(pane);
+        if (!dismissed)
+          return std::unexpected(std::move(dismissed.error()));
+      }
+      pane.reset();
+      return {};
+    }));
+    ASSERT_TRUE(
+      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+        if (panes.isDisplayed(pane)) {
+          if (auto shown = pane->show(); !shown)
+            return std::unexpected(std::move(shown.error()));
+          return pane->resumeScripts();
+        }
+        return panes.displayPane(PaneLayer::ModalWindow, pane, {});
+      }));
+    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    ASSERT_TRUE(controller);
+    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     require "/interface/opensb/questdialogs/pending.lua"
     session = {hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=1}
     checkpoint = {session=session}
     manager = UiManager.new(checkpoint, {}, session)
   )LUA"));
-  auto update = [&] { return controller->eval<LuaValue>("manager:update(); QuestDialogs.update(manager)"); };
-  auto text = [&](String const& name) {
-    auto child = pane->fetchChild<TextBoxWidget>(name);
-    EXPECT_TRUE(child && *child);
-    return child && *child ? (*child)->getText() : String{};
-  };
-  auto token = [&]() { return pane->config().query("questDialog.token").and_then([](Json const& value) { return value.toUInt(); }); };
-  auto blocker = Pane::create(**context);
-  ASSERT_TRUE(blocker);
-  (*blocker)->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(panes.displayPane(PaneLayer::ModalWindow, *blocker, {}));
-  ASSERT_TRUE(update());
-  EXPECT_FALSE(pane);
-  EXPECT_TRUE((*failed)->showDialog());
-  EXPECT_TRUE((*complete)->showDialog());
-  ASSERT_TRUE(panes.dismissPane(*blocker));
-  ASSERT_TRUE(update());
-  ASSERT_TRUE(pane);
-  EXPECT_EQ(text("marker"), String("failed"));
-  EXPECT_EQ(text("lblQuestBody"), String("Failure body"));
-  EXPECT_FALSE((*failed)->showDialog());
-  EXPECT_TRUE((*complete)->showDialog());
-  auto failurePane = pane;
-  ASSERT_TRUE(update());
-  EXPECT_EQ(pane, failurePane);
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(update());
-  EXPECT_EQ(text("marker"), String("complete"));
-  EXPECT_EQ(text("lblMoneyAmount"), String("12345"));
-  EXPECT_FALSE((*complete)->showDialog());
-  // Acknowledgment can remove an ephemeral quest without invalidating its
-  // captured completion transaction.
-  auto completionToken = token();
-  ASSERT_TRUE(completionToken);
-  ASSERT_TRUE(domain->update(0));
-  EXPECT_FALSE(domain->hasQuest("zzdialog-complete"));
-  EXPECT_TRUE(domain->dialogValid(*completionToken));
-  auto resolved = domain->dialogCinema(*completionToken);
-  ASSERT_TRUE(resolved) << resolved.error().what();
-  EXPECT_EQ(resolved->getBool("suppressInput"), true);
-  ASSERT_TRUE(pane->call("close"));
-  EXPECT_TRUE((*cinematic)->suppressInput());
-  EXPECT_EQ(cinemaLoads, 1);
-  ASSERT_TRUE(pane->call("btnAccept"));
-  EXPECT_EQ(cinemaLoads, 1);
-  (*cinematic)->setTime(2);
-  EXPECT_FALSE((*cinematic)->suppressInput());
-  ASSERT_TRUE(panes.dismissPane(pane));
-  ASSERT_TRUE(update());
-  EXPECT_EQ(text("marker"), String("portrait"));
-  auto offerToken = token();
-  ASSERT_TRUE(offerToken);
-  auto repeatView = domain->pendingDialog("offer");
-  ASSERT_TRUE(repeatView);
-  EXPECT_EQ(repeatView->getUInt("token"), *offerToken);
-  auto objective = pane->fetchChild<ImageWidget>("objectivePortraitImage");
-  ASSERT_TRUE(objective && *objective);
-  EXPECT_NE((*objective)->size(), Vec2I{});
-  // This is the generic centralized capability-retirement primitive, not a
-  // dialog-specific reload path. Native display membership survives it.
-  ASSERT_TRUE(pane->stopScripts());
-  EXPECT_TRUE(panes.isDisplayed(pane));
-  EXPECT_EQ((*offered)->state(), QuestState::Offer);
-  ASSERT_TRUE(pane->removeCallbacks("player"));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestDialog')"));
-  ASSERT_TRUE(pane->tick(0));
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(pane->tick(0));
-  EXPECT_TRUE(domain->dialogValid(*offerToken));
-  EXPECT_EQ((*offered)->state(), QuestState::Offer);
-  auto shown = pane->evaluate("return storage.shown and not storage.finished");
-  ASSERT_TRUE(shown && *shown);
-  EXPECT_EQ(**shown, Json(true));
-  ASSERT_TRUE(pane->call("btnAccept"));
-  EXPECT_EQ((*offered)->state(), QuestState::Offer);
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ((*offered)->state(), QuestState::Active);
-  auto duplicate = domain->finishDialog(*offerToken, "cancel");
-  ASSERT_TRUE(duplicate);
-  EXPECT_FALSE(*duplicate);
-  auto decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
-  ASSERT_TRUE(decision);
-  EXPECT_EQ(*decision, Json("accept"));
-
-  auto replace = [&](String const& templateId, String const& state, bool portrait = false) -> std::expected<void, StarException> {
-    auto stored = storedQuest("zzdialog-reused", templateId, state, portrait);
-    if (!stored) return std::unexpected(std::move(stored.error()));
-    auto loaded = domain->diskLoad(JsonObject{{"quests", JsonObject{{"zzdialog-reused", *stored}}}});
-    if (!loaded) return std::unexpected(std::move(loaded.error()));
-    return domain->init(**player, **world);
-  };
-  ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
-  ASSERT_TRUE(update());
-  EXPECT_EQ(text("marker"), String("short"));
-  // Native QuestPane centers the background bounds, ignoring parked controls.
-  // Empty background art keeps this regression genuinely renderer-independent.
-  EXPECT_EQ(pane->size(), Vec2I{});
-  auto unusedMoney = pane->fetchChild<ImageWidget>("unusedMoney");
-  ASSERT_TRUE(unusedMoney && *unusedMoney);
-  EXPECT_EQ((*unusedMoney)->relativePosition(), (Vec2I{60, 700}));
-  auto stale = token();
-  ASSERT_TRUE(stale);
-  auto oldQuest = domain->getQuest("zzdialog-reused");
-  ASSERT_TRUE(oldQuest);
-  auto lockedStore = storedQuest("zzdialog-reused", "zzdialog-locked", "Offer", false);
-  ASSERT_TRUE(lockedStore);
-  auto locked = Quest::create(root, *lockedStore);
-  ASSERT_TRUE(locked);
-  ASSERT_TRUE(domain->offer(*locked));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  auto replacement = domain->getQuest("zzdialog-reused");
-  ASSERT_TRUE(replacement);
-  EXPECT_EQ((*replacement)->state(), QuestState::Offer);
-  EXPECT_EQ((*oldQuest)->state(), QuestState::Offer);
-  EXPECT_FALSE(domain->dialogValid(*stale));
-  ASSERT_TRUE(update());
-  auto declineButton = pane->fetchChild<ButtonWidget>("btnDecline");
-  ASSERT_TRUE(declineButton && *declineButton);
-  EXPECT_EQ(pane->config().query("questDialog.canDecline"), Json(false));
-  ASSERT_TRUE(pane->call("btnDecline"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ((*replacement)->state(), QuestState::New);
-  decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
-  ASSERT_TRUE(decision);
-  EXPECT_EQ(*decision, Json("cancel"));
-  ASSERT_TRUE(replace("zzdialog-custom", "Offer"));
-  ASSERT_TRUE(update());
-  EXPECT_EQ(text("marker"), String("custom"));
-  ASSERT_TRUE(pane->call("btnDecline"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
-  ASSERT_TRUE(decision);
-  EXPECT_EQ(*decision, Json("decline"));
-  // The same allocation returning to Offer is a new decision, not a revival
-  // of an old response merely because its ID and current state match.
-  ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
-  ASSERT_TRUE(update());
-  auto priorOffer = token();
-  ASSERT_TRUE(priorOffer);
-  auto reoffered = domain->getQuest("zzdialog-reused");
-  ASSERT_TRUE(reoffered);
-  ASSERT_TRUE((*reoffered)->cancelOffer());
-  ASSERT_TRUE((*reoffered)->offer());
-  EXPECT_EQ((*reoffered)->state(), QuestState::Offer);
-  EXPECT_FALSE(domain->dialogValid(*priorOffer));
-  ASSERT_TRUE(pane->call("btnAccept"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ((*reoffered)->state(), QuestState::Offer);
-  ASSERT_TRUE(update());
-  auto renewedOffer = token();
-  ASSERT_TRUE(renewedOffer);
-  EXPECT_NE(*renewedOffer, *priorOffer);
-  ASSERT_TRUE(pane->call("btnAccept"));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ((*reoffered)->state(), QuestState::Active);
-  for (auto const& state : {String("Complete"), String("Failed")}) {
-    ASSERT_TRUE(replace("zzdialog-custom", state));
+    auto update = [&] { return controller->eval<LuaValue>("manager:update(); QuestDialogs.update(manager)"); };
+    auto text = [&](String const& name) {
+      auto child = pane->fetchChild<TextBoxWidget>(name);
+      EXPECT_TRUE(child && *child);
+      return child && *child ? (*child)->getText() : String{};
+    };
+    auto token = [&]() {
+      return pane->config().query("questDialog.token").and_then([](Json const& value) { return value.toUInt(); });
+    };
+    auto blocker = Pane::create(**context);
+    ASSERT_TRUE(blocker);
+    (*blocker)->setAnchor(PaneAnchor::BottomLeft);
+    ASSERT_TRUE(panes.displayPane(PaneLayer::ModalWindow, *blocker, {}));
     ASSERT_TRUE(update());
-    EXPECT_EQ(text("marker"), String("custom"));
-    EXPECT_EQ(text("lblQuestBody"), state == "Complete" ? String("Completion body") : String("Failure body"));
+    EXPECT_FALSE(pane);
+    EXPECT_TRUE((*failed)->showDialog());
+    EXPECT_TRUE((*complete)->showDialog());
+    ASSERT_TRUE(panes.dismissPane(*blocker));
+    ASSERT_TRUE(update());
+    ASSERT_TRUE(pane);
+    EXPECT_EQ(text("marker"), String("failed"));
+    EXPECT_EQ(text("lblQuestBody"), String("Failure body"));
+    EXPECT_FALSE((*failed)->showDialog());
+    EXPECT_TRUE((*complete)->showDialog());
+    auto failurePane = pane;
+    ASSERT_TRUE(update());
+    EXPECT_EQ(pane, failurePane);
     ASSERT_TRUE(panes.dismissPane(pane));
-  }
-  ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
-  ASSERT_TRUE(update());
-  auto expired = domain->getQuest("zzdialog-reused");
-  ASSERT_TRUE(expired);
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=2})"));
-  EXPECT_FALSE(pane);
-  EXPECT_EQ((*expired)->state(), QuestState::New);
-  ASSERT_TRUE(replace("zzdialog-complete", "Complete"));
-  ASSERT_TRUE(update());
-  auto escapedToken = token();
-  ASSERT_TRUE(escapedToken);
-  auto escaped = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
-  ASSERT_TRUE(escaped && *escaped);
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_FALSE(domain->dialogValid(*escapedToken));
-  EXPECT_EQ(cinemaLoads, 1);
-  // Admin previews use the same real Lua layouts but cannot mutate a quest,
-  // acknowledge a player's quest, or run its completion cinema.
-  for (auto const& kind : {String("offer"), String("complete"), String("failed")}) {
-    auto previewStore = storedQuest("zzdialog-preview", "zzdialog-custom", "Offer", false);
-    ASSERT_TRUE(previewStore);
-    auto preview = Quest::create(root, *previewStore);
-    ASSERT_TRUE(preview);
-    ASSERT_TRUE(domain->previewDialog(*preview, kind));
+    ASSERT_TRUE(update());
+    EXPECT_EQ(text("marker"), String("complete"));
+    EXPECT_EQ(text("lblMoneyAmount"), String("12345"));
+    EXPECT_FALSE((*complete)->showDialog());
+    // Acknowledgment can remove an ephemeral quest without invalidating its
+    // captured completion transaction.
+    auto completionToken = token();
+    ASSERT_TRUE(completionToken);
+    ASSERT_TRUE(domain->update(0));
+    EXPECT_FALSE(domain->hasQuest("zzdialog-complete"));
+    EXPECT_TRUE(domain->dialogValid(*completionToken));
+    auto resolved = domain->dialogCinema(*completionToken);
+    ASSERT_TRUE(resolved) << resolved.error().what();
+    EXPECT_EQ(resolved->getBool("suppressInput"), true);
+    ASSERT_TRUE(pane->call("close"));
+    EXPECT_TRUE((*cinematic)->suppressInput());
+    EXPECT_EQ(cinemaLoads, 1);
+    ASSERT_TRUE(pane->call("btnAccept"));
+    EXPECT_EQ(cinemaLoads, 1);
+    (*cinematic)->setTime(2);
+    EXPECT_FALSE((*cinematic)->suppressInput());
+    ASSERT_TRUE(panes.dismissPane(pane));
+    ASSERT_TRUE(update());
+    EXPECT_EQ(text("marker"), String("portrait"));
+    auto offerToken = token();
+    ASSERT_TRUE(offerToken);
+    auto repeatView = domain->pendingDialog("offer");
+    ASSERT_TRUE(repeatView);
+    EXPECT_EQ(repeatView->getUInt("token"), *offerToken);
+    auto objective = pane->fetchChild<ImageWidget>("objectivePortraitImage");
+    ASSERT_TRUE(objective && *objective);
+    EXPECT_NE((*objective)->size(), Vec2I{});
+    // This is the generic centralized capability-retirement primitive, not a
+    // dialog-specific reload path. Native display membership survives it.
+    ASSERT_TRUE(pane->stopScripts());
+    EXPECT_TRUE(panes.isDisplayed(pane));
+    EXPECT_EQ((*offered)->state(), QuestState::Offer);
+    ASSERT_TRUE(pane->removeCallbacks("player"));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestDialog')"));
+    ASSERT_TRUE(pane->tick(0));
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(pane->tick(0));
+    EXPECT_TRUE(domain->dialogValid(*offerToken));
+    EXPECT_EQ((*offered)->state(), QuestState::Offer);
+    auto shown = pane->evaluate("return storage.shown and not storage.finished");
+    ASSERT_TRUE(shown && *shown);
+    EXPECT_EQ(**shown, Json(true));
+    ASSERT_TRUE(pane->call("btnAccept"));
+    EXPECT_EQ((*offered)->state(), QuestState::Offer);
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_EQ((*offered)->state(), QuestState::Active);
+    auto duplicate = domain->finishDialog(*offerToken, "cancel");
+    ASSERT_TRUE(duplicate);
+    EXPECT_FALSE(*duplicate);
+    auto decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
+    ASSERT_TRUE(decision);
+    EXPECT_EQ(*decision, Json("accept"));
+
+    auto replace = [&](String const& templateId, String const& state,
+                       bool portrait = false) -> std::expected<void, StarException> {
+      auto stored = storedQuest("zzdialog-reused", templateId, state, portrait);
+      if (!stored)
+        return std::unexpected(std::move(stored.error()));
+      auto loaded = domain->diskLoad(JsonObject{{"quests", JsonObject{{"zzdialog-reused", *stored}}}});
+      if (!loaded)
+        return std::unexpected(std::move(loaded.error()));
+      return domain->init(**player, **world);
+    };
+    ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
+    ASSERT_TRUE(update());
+    EXPECT_EQ(text("marker"), String("short"));
+    // Native QuestPane centers the background bounds, ignoring parked controls.
+    // Empty background art keeps this regression genuinely renderer-independent.
+    EXPECT_EQ(pane->size(), Vec2I{});
+    auto unusedMoney = pane->fetchChild<ImageWidget>("unusedMoney");
+    ASSERT_TRUE(unusedMoney && *unusedMoney);
+    EXPECT_EQ((*unusedMoney)->relativePosition(), (Vec2I{60, 700}));
+    auto stale = token();
+    ASSERT_TRUE(stale);
+    auto oldQuest = domain->getQuest("zzdialog-reused");
+    ASSERT_TRUE(oldQuest);
+    auto lockedStore = storedQuest("zzdialog-reused", "zzdialog-locked", "Offer", false);
+    ASSERT_TRUE(lockedStore);
+    auto locked = Quest::create(root, *lockedStore);
+    ASSERT_TRUE(locked);
+    ASSERT_TRUE(domain->offer(*locked));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    auto replacement = domain->getQuest("zzdialog-reused");
+    ASSERT_TRUE(replacement);
+    EXPECT_EQ((*replacement)->state(), QuestState::Offer);
+    EXPECT_EQ((*oldQuest)->state(), QuestState::Offer);
+    EXPECT_FALSE(domain->dialogValid(*stale));
+    ASSERT_TRUE(update());
+    auto declineButton = pane->fetchChild<ButtonWidget>("btnDecline");
+    ASSERT_TRUE(declineButton && *declineButton);
+    EXPECT_EQ(pane->config().query("questDialog.canDecline"), Json(false));
+    ASSERT_TRUE(pane->call("btnDecline"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_EQ((*replacement)->state(), QuestState::New);
+    decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
+    ASSERT_TRUE(decision);
+    EXPECT_EQ(*decision, Json("cancel"));
+    ASSERT_TRUE(replace("zzdialog-custom", "Offer"));
     ASSERT_TRUE(update());
     EXPECT_EQ(text("marker"), String("custom"));
+    ASSERT_TRUE(pane->call("btnDecline"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    decision = controller->eval<Json>("return player.getProperty('zzdialogDecision')");
+    ASSERT_TRUE(decision);
+    EXPECT_EQ(*decision, Json("decline"));
+    // The same allocation returning to Offer is a new decision, not a revival
+    // of an old response merely because its ID and current state match.
+    ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
+    ASSERT_TRUE(update());
+    auto priorOffer = token();
+    ASSERT_TRUE(priorOffer);
+    auto reoffered = domain->getQuest("zzdialog-reused");
+    ASSERT_TRUE(reoffered);
+    ASSERT_TRUE((*reoffered)->cancelOffer());
+    ASSERT_TRUE((*reoffered)->offer());
+    EXPECT_EQ((*reoffered)->state(), QuestState::Offer);
+    EXPECT_FALSE(domain->dialogValid(*priorOffer));
     ASSERT_TRUE(pane->call("btnAccept"));
     ASSERT_TRUE(panes.dismissPane(pane));
-    EXPECT_EQ((*preview)->state(), QuestState::Offer);
+    EXPECT_EQ((*reoffered)->state(), QuestState::Offer);
+    ASSERT_TRUE(update());
+    auto renewedOffer = token();
+    ASSERT_TRUE(renewedOffer);
+    EXPECT_NE(*renewedOffer, *priorOffer);
+    ASSERT_TRUE(pane->call("btnAccept"));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_EQ((*reoffered)->state(), QuestState::Active);
+    for (auto const& state : {String("Complete"), String("Failed")}) {
+      ASSERT_TRUE(replace("zzdialog-custom", state));
+      ASSERT_TRUE(update());
+      EXPECT_EQ(text("marker"), String("custom"));
+      EXPECT_EQ(text("lblQuestBody"), state == "Complete" ? String("Completion body") : String("Failure body"));
+      ASSERT_TRUE(panes.dismissPane(pane));
+    }
+    ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
+    ASSERT_TRUE(update());
+    auto expired = domain->getQuest("zzdialog-reused");
+    ASSERT_TRUE(expired);
+    ASSERT_TRUE(controller->eval<LuaValue>(
+      "manager:suspend({hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=2})"));
+    EXPECT_FALSE(pane);
+    EXPECT_EQ((*expired)->state(), QuestState::New);
+    ASSERT_TRUE(replace("zzdialog-complete", "Complete"));
+    ASSERT_TRUE(update());
+    auto escapedToken = token();
+    ASSERT_TRUE(escapedToken);
+    auto escaped = pane->sendEvent(KeyDownEvent{Key::Escape, KeyMod::NoMod});
+    ASSERT_TRUE(escaped && *escaped);
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_FALSE(domain->dialogValid(*escapedToken));
     EXPECT_EQ(cinemaLoads, 1);
-  }
-  EXPECT_FALSE(domain->pendingDialog("invalid"));
-  EXPECT_FALSE(domain->finishDialog(0, "invalid"));
+    // Admin previews use the same real Lua layouts but cannot mutate a quest,
+    // acknowledge a player's quest, or run its completion cinema.
+    for (auto const& kind : {String("offer"), String("complete"), String("failed")}) {
+      auto previewStore = storedQuest("zzdialog-preview", "zzdialog-custom", "Offer", false);
+      ASSERT_TRUE(previewStore);
+      auto preview = Quest::create(root, *previewStore);
+      ASSERT_TRUE(preview);
+      ASSERT_TRUE(domain->previewDialog(*preview, kind));
+      ASSERT_TRUE(update());
+      EXPECT_EQ(text("marker"), String("custom"));
+      ASSERT_TRUE(pane->call("btnAccept"));
+      ASSERT_TRUE(panes.dismissPane(pane));
+      EXPECT_EQ((*preview)->state(), QuestState::Offer);
+      EXPECT_EQ(cinemaLoads, 1);
+    }
+    EXPECT_FALSE(domain->pendingDialog("invalid"));
+    EXPECT_FALSE(domain->finishDialog(0, "invalid"));
 
-  // Generic dismissal never executes cinema; explicit close propagates both
-  // asset-fetch and native Cinematic::load failures without dismissing.
-  ASSERT_TRUE(replace("zzdialog-missing", "Complete"));
-  ASSERT_TRUE(update());
-  auto missingToken = token();
-  ASSERT_TRUE(missingToken);
-  EXPECT_FALSE(domain->dialogCinema(*missingToken));
-  auto closeError = pane->evaluate("local ok = pcall(close); return ok");
-  ASSERT_TRUE(closeError && *closeError);
-  EXPECT_EQ(**closeError, Json(false));
-  EXPECT_TRUE(pane->isDisplayed());
-  EXPECT_TRUE(domain->dialogValid(*missingToken));
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ(cinemaLoads, 1);
-  ASSERT_TRUE(replace("zzdialog-malformed", "Complete"));
-  ASSERT_TRUE(update());
-  closeError = pane->evaluate("local ok = pcall(btnAccept); return ok");
-  ASSERT_TRUE(closeError && *closeError);
-  EXPECT_EQ(**closeError, Json(false));
-  EXPECT_TRUE(pane->isDisplayed());
-  ASSERT_TRUE(panes.dismissPane(pane));
-  EXPECT_EQ(cinemaLoads, 1);
-  ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
-  auto errorView = domain->pendingDialog("offer");
-  ASSERT_TRUE(errorView);
-  auto errorToken = errorView->getUInt("token");
-  ASSERT_TRUE(errorToken);
-  ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', true)"));
-  // Invoke through Lua pcall so the intentional domain exception is observed,
-  // not converted to a component error/log or silently suppressed.
-  auto thrown = controller->eval<Json>(strf("local ok,err=pcall(player.finishQuestDialog,{},'cancel'); return {{ok,tostring(err):find('quest decision regression',1,true)~=nil}}", *errorToken));
-  ASSERT_TRUE(thrown);
-  EXPECT_EQ(*thrown, (Json(JsonArray{false, true})));
-  EXPECT_FALSE(domain->dialogValid(*errorToken));
-  ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', false)"));
-  ASSERT_TRUE(controller->eval<LuaValue>("manager:shutdown()"));
-});
-
-const GameTestRegistration planetTextPresentation("LuaPlanetText", "NativeTimerDomainAndPersistentSessionPresentation", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  auto overlay = File::relativeTo(*directory, "assets");
-  ASSERT_TRUE(File::makeDirectory(overlay));
-  auto patchPath = File::relativeTo(overlay, "interface.config.patch");
-  auto writeStyle = [&](float duration, float fade) -> std::expected<void, StarException> {
-    auto json = Json(JsonObject{
-        {"planetNameTime", duration}, {"planetNameFadeTime", fade},
-        {"planetNameFormatString", "[<worldName>] <worldName>"},
-        {"planetTextOffset", JsonArray{-7, 121}},
-        {"planetTextStyle", JsonObject{{"fontSize", 24}, {"shadow", "red"},
-            {"backDirectives", "border=1;000;000"}, {"color", "blue"}}}}).repr();
-    if (!json) return std::unexpected(std::move(json.error()));
-    return File::writeFile(*json, patchPath);
-  };
-  ASSERT_TRUE(writeStyle(0.7f, 0.3f));
-  auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "planettext.config");
-  ASSERT_TRUE(createdRoot);
-  auto& root = **createdRoot;
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration);
-  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
-  auto context = GuiContext::create(root, {}, {});
-  ASSERT_TRUE(context);
-  auto assets = root.assets();
-  ASSERT_TRUE(assets);
-  auto available = MainInterface::paneIdAvailable("PlanetText");
-  ASSERT_TRUE(available);
-  EXPECT_TRUE(*available);
-  auto config = (*assets)->json("/interface/opensb/planettext/planettext.config");
-  ASSERT_TRUE(config);
-  auto paneConfig = config->toObject();
-  ASSERT_TRUE(paneConfig);
-  // Real LabelWidget construction requires renderInit, even for an empty
-  // string. Use a real native TextBox for text/visibility policy, not a mock
-  // renderer or callback echo. Label metrics/style pixels are a GUI gate.
-  paneConfig->set("gui", JsonObject{});
-  auto createdPane = ScriptTestPane::create(**context, Json(*paneConfig));
-  ASSERT_TRUE(createdPane);
-  auto pane = *createdPane;
-  pane->setAnchor(PaneAnchor::Center);
-  auto text = textEditor(**context, "");
-  ASSERT_TRUE(text);
-  (*text)->setMaxWidth(-1);
-  ASSERT_TRUE(pane->addChild("planetText", *text));
-  auto luaRoot = LuaRoot::create(root);
-  ASSERT_TRUE(luaRoot);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-  auto factory = root.playerFactory();
-  ASSERT_TRUE(factory);
-  auto player = (*factory)->create();
-  ASSERT_TRUE(player);
-  auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-  ASSERT_TRUE(playerCallbacks);
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
-  ASSERT_TRUE(rootCallbacks);
-  ASSERT_TRUE(pane->addCallbacks("root", *rootCallbacks));
-  auto cinematic = Cinematic::create(**context);
-  ASSERT_TRUE(cinematic);
-  // Cinematic uses a real clock. Keep it active through expensive Root reloads;
-  // each transition below stops it explicitly instead of racing a one-second end.
-  auto startCinema = [&] {
-    return (*cinematic)->load(JsonObject{{"panels", JsonArray{JsonObject{
-        {"keyframes", JsonArray{JsonObject{{"timecode", 0}},
-            JsonObject{{"timecode", std::numeric_limits<float>::max()}}}}}}},
-        {"audio", JsonArray{}}});
-  };
-  bool hasPlayer = true, worldAvailable = true;
-  float scale = 1.25f;
-  LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("session", [&] {
-    return JsonObject{{"hasPlayer", hasPlayer}, {"inWorld", worldAvailable}};
-  }));
-  ASSERT_TRUE(interface.registerCallback("cinematicActive", [&] { return !(*cinematic)->completed(); }));
-  ASSERT_TRUE(interface.registerCallback("scale", [&] { return scale; }));
-  ASSERT_TRUE(pane->addCallbacks("interface", interface));
-
-  // Stored native templates let the name query read the exact domain name,
-  // including tag-like characters, without generating/serializing a planet.
-  auto blankTemplate = WorldTemplate::create(root, Vec2U{2048, 2048});
-  ASSERT_TRUE(blankTemplate);
-  auto storedTemplate = (*blankTemplate)->store();
-  ASSERT_TRUE(storedTemplate);
-  auto namedTemplate = [&](String const& name) -> std::expected<std::shared_ptr<WorldTemplate>, StarException> {
-    auto celestial = CelestialParameters::create(root, CelestialCoordinate{}, 1, name, JsonObject{});
-    if (!celestial) return std::unexpected(std::move(celestial.error()));
-    auto storedCelestial = celestial->diskStore();
-    if (!storedCelestial) return std::unexpected(std::move(storedCelestial.error()));
-    auto stored = storedTemplate->set("celestialParameters", *storedCelestial);
-    if (!stored) return std::unexpected(std::move(stored.error()));
-    return WorldTemplate::create(root, *stored);
-  };
-  auto templateA = namedTemplate("A <worldName> 中");
-  auto templateB = namedTemplate("B");
-  ASSERT_TRUE(templateA && templateB);
-  auto makeWorld = [&](std::shared_ptr<WorldTemplate> worldTemplate) -> std::expected<std::shared_ptr<WorldServer>, StarException> {
-    auto storage = File::ephemeralFile(root.random());
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return WorldServer::create(root, std::move(worldTemplate), *storage);
-  };
-  auto worldA = makeWorld(*templateA);
-  auto worldB = makeWorld(*templateB);
-  auto emptyWorld = makeWorld(*blankTemplate);
-  ASSERT_TRUE(worldA && worldB && emptyWorld);
-  auto closeWorlds = finally([&] {
-    if ((*player)->inWorld()) EXPECT_TRUE((*player)->uninit());
-    EXPECT_TRUE((*worldA)->close());
-    EXPECT_TRUE((*worldB)->close());
-    EXPECT_TRUE((*emptyWorld)->close());
+    // Generic dismissal never executes cinema; explicit close propagates both
+    // asset-fetch and native Cinematic::load failures without dismissing.
+    ASSERT_TRUE(replace("zzdialog-missing", "Complete"));
+    ASSERT_TRUE(update());
+    auto missingToken = token();
+    ASSERT_TRUE(missingToken);
+    EXPECT_FALSE(domain->dialogCinema(*missingToken));
+    auto closeError = pane->evaluate("local ok = pcall(close); return ok");
+    ASSERT_TRUE(closeError && *closeError);
+    EXPECT_EQ(**closeError, Json(false));
+    EXPECT_TRUE(pane->isDisplayed());
+    EXPECT_TRUE(domain->dialogValid(*missingToken));
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_EQ(cinemaLoads, 1);
+    ASSERT_TRUE(replace("zzdialog-malformed", "Complete"));
+    ASSERT_TRUE(update());
+    closeError = pane->evaluate("local ok = pcall(btnAccept); return ok");
+    ASSERT_TRUE(closeError && *closeError);
+    EXPECT_EQ(**closeError, Json(false));
+    EXPECT_TRUE(pane->isDisplayed());
+    ASSERT_TRUE(panes.dismissPane(pane));
+    EXPECT_EQ(cinemaLoads, 1);
+    ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
+    auto errorView = domain->pendingDialog("offer");
+    ASSERT_TRUE(errorView);
+    auto errorToken = errorView->getUInt("token");
+    ASSERT_TRUE(errorToken);
+    ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', true)"));
+    // Invoke through Lua pcall so the intentional domain exception is observed,
+    // not converted to a component error/log or silently suppressed.
+    auto thrown = controller->eval<Json>(strf("local ok,err=pcall(player.finishQuestDialog,{},'cancel'); return "
+                                              "{{ok,tostring(err):find('quest decision regression',1,true)~=nil}}",
+                                              *errorToken));
+    ASSERT_TRUE(thrown);
+    EXPECT_EQ(*thrown, (Json(JsonArray{false, true})));
+    EXPECT_FALSE(domain->dialogValid(*errorToken));
+    ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', false)"));
+    ASSERT_TRUE(controller->eval<LuaValue>("manager:shutdown()"));
   });
-  auto bindWorld = [&](WorldServer& world) -> std::expected<void, StarException> {
-    auto callbacks = LuaBindings::makeWorldCallbacks(root, world);
-    if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-    auto removed = pane->removeCallbacks("world");
-    if (!removed) return std::unexpected(std::move(removed.error()));
-    return pane->addCallbacks("world", *callbacks);
-  };
-  ASSERT_TRUE(bindWorld(**worldA));
-  PaneManager panes(**context);
-  ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, pane, {}));
-  EXPECT_EQ(pane->size(), (Vec2I{0, 0}));
-  EXPECT_FALSE(pane->interactive());
-  EXPECT_FALSE(pane->visibility());
-  auto publicCallbacks = pane->makePaneCallbacks();
-  ASSERT_TRUE(publicCallbacks);
-  auto probe = (*luaRoot)->createContext(StringList{});
-  ASSERT_TRUE(probe);
-  ASSERT_TRUE(probe->setCallbacks("planet", *publicCallbacks));
-  ASSERT_TRUE(probe->eval<LuaValue>("cached = planet.toWidget()"));
 
-  GameTimer expected(0.7f);
-  float fade = 0.3f;
-  auto activePlayer = *player;
-  auto checkStep = [&](ScriptTestPane& subject, GameTimer& expected, float fade, float dt) -> testing::AssertionResult {
-    bool ready = false;
-    if ((*cinematic)->completed())
-      ready = expected.tick(dt);
-    else if (!hasPlayer || !activePlayer->inWorld())
-      expected.reset();
-    auto ticked = subject.tick(dt);
-    if (!ticked)
-      return testing::AssertionFailure() << ticked.error().what();
-    auto timer = subject.evaluate("return storage.timer");
-    if (!timer)
-      return testing::AssertionFailure() << timer.error().what();
-    if (!*timer)
-      return testing::AssertionFailure() << "Missing planet countdown";
-    auto timerValue = (**timer).toFloat();
-    if (!timerValue)
-      return testing::AssertionFailure() << timerValue.error().what();
-    if (*timerValue != expected.timer)
-      return testing::AssertionFailure() << "Countdown: " << *timerValue << " != " << expected.timer;
-    if ((*cinematic)->completed() && !ready) {
-      float alpha = expected.timer < fade ? expected.timer / fade : 1.0f;
-      auto actual = subject.evaluate("return storage.alpha");
-      if (!actual)
-        return testing::AssertionFailure() << actual.error().what();
-      if (!*actual)
-        return testing::AssertionFailure() << "Missing planet alpha";
-      auto actualAlpha = (**actual).toFloat();
-      if (!actualAlpha)
-        return testing::AssertionFailure() << actualAlpha.error().what();
-      if (*actualAlpha != alpha)
-        return testing::AssertionFailure() << "Alpha: " << *actualAlpha << " != " << alpha;
-    }
-    return testing::AssertionSuccess();
-  };
-  auto step = [&](float dt) { return checkStep(*pane, expected, fade, dt); };
-  ASSERT_TRUE(startCinema());
-  ASSERT_TRUE(step(0.4f));// Off-world cinematic resets, without advancing.
-  EXPECT_FALSE(pane->visibility());
-  ASSERT_TRUE((*player)->init(**worldA, 1, EntityMode::Slave));
-  ASSERT_TRUE(step(0.2f));// In-world cinematic pauses; no show or color change.
-  EXPECT_FALSE(pane->visibility());
-  (*cinematic)->stop();
-  ASSERT_TRUE(step(0.1f));
-  EXPECT_TRUE(pane->visibility());
-  EXPECT_EQ((*text)->getText(), String("[A <worldName> 中] A <worldName> 中"));
-  EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
-  ASSERT_TRUE(startCinema());
-  ASSERT_TRUE(step(2.0f));// An in-world cinematic does not expire an already visible name.
-  EXPECT_TRUE(pane->visibility());
-  (*cinematic)->stop();
-  ASSERT_TRUE(bindWorld(**worldB)); // Animation-free world change does not reset.
-  scale = 3.0f;
-  ASSERT_TRUE(step(0.1f));
-  EXPECT_EQ((*text)->getText(), String("[B] B"));
-  EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
-  ASSERT_TRUE(bindWorld(**emptyWorld));
-  ASSERT_TRUE(step(0.1f));// Empty name retains old displayed text.
-  EXPECT_TRUE(pane->visibility());
-  EXPECT_EQ((*text)->getText(), String("[B] B"));
-  worldAvailable = false; // No world capability/template, actor still present.
-  ASSERT_TRUE(pane->removeCallbacks("world"));
-  ASSERT_TRUE(pane->addCallbacks("world", LuaCallbacks{}));
-  ASSERT_TRUE(step(0.1f));
-  EXPECT_TRUE(pane->visibility());
-  ASSERT_TRUE(root.reload());
-  ASSERT_TRUE(step(0.01f));// Reload preserves timer/text/handle, no init-time tick.
-  EXPECT_EQ((*text)->getText(), String("[B] B"));
-  ASSERT_TRUE(pane->stopScripts());
-  auto replacement = (*factory)->create();
-  ASSERT_TRUE(replacement);
-  auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
-  ASSERT_TRUE(replacementCallbacks);
-  ASSERT_TRUE(pane->removeCallbacks("player"));
-  ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
-  activePlayer = *replacement;
-  ASSERT_TRUE(pane->resumeScripts());
-  ASSERT_TRUE(step(0.01f));// Off-world without a cinematic continues, never resets.
-  EXPECT_TRUE(pane->visibility());
-  ASSERT_TRUE(step(1.0f));
-  EXPECT_FALSE(pane->visibility());
-  ASSERT_TRUE(startCinema());
-  ASSERT_TRUE(step(0.1f));// Replacement actor is off-world: reset and hide.
-  ASSERT_TRUE(pane->stopScripts());
-  ASSERT_TRUE(pane->removeCallbacks("player"));
-  ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
-  activePlayer = *player;
-  ASSERT_TRUE(pane->resumeScripts());
-  worldAvailable = true;
-  ASSERT_TRUE(bindWorld(**worldA));
-  (*cinematic)->stop();
-  ASSERT_TRUE(step(0.1f));
-  EXPECT_TRUE(pane->visibility());
-  auto retained = probe->eval<Json>("return {planet.isDisplayed(), cached.getText('planetText')}");
-  ASSERT_TRUE(retained);
-  EXPECT_EQ(*retained, (Json(JsonArray{true, "[A <worldName> 中] A <worldName> 中"})));
-  EXPECT_EQ(pane->fetchChild<TextBoxWidget>("planetText")->get(), text->get());
+const GameTestRegistration
+  planetTextPresentation("LuaPlanetText", "NativeTimerDomainAndPersistentSessionPresentation", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    auto patchPath = File::relative_to(overlay, "interface.config.patch");
+    auto writeStyle = [&](float duration, float fade) -> std::expected<void, StarException> {
+      auto json = Json(JsonObject{{"planetNameTime", duration},
+                                  {"planetNameFadeTime", fade},
+                                  {"planetNameFormatString", "[<worldName>] <worldName>"},
+                                  {"planetTextOffset", JsonArray{-7, 121}},
+                                  {"planetTextStyle",
+                                   JsonObject{{"fontSize", 24},
+                                              {"shadow", "red"},
+                                              {"backDirectives", "border=1;000;000"},
+                                              {"color", "blue"}}}})
+                    .repr();
+      if (!json)
+        return std::unexpected(std::move(json.error()));
+      return File::write_file(*json, patchPath);
+    };
+    ASSERT_TRUE(writeStyle(0.7f, 0.3f));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "planettext.config");
+    ASSERT_TRUE(createdRoot);
+    auto& root = **createdRoot;
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration);
+    ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+    auto context = GuiContext::create(root, {}, {});
+    ASSERT_TRUE(context);
+    auto assets = root.assets();
+    ASSERT_TRUE(assets);
+    auto available = MainInterface::paneIdAvailable("PlanetText");
+    ASSERT_TRUE(available);
+    EXPECT_TRUE(*available);
+    auto config = (*assets)->json("/interface/opensb/planettext/planettext.config");
+    ASSERT_TRUE(config);
+    auto paneConfig = config->toObject();
+    ASSERT_TRUE(paneConfig);
+    // Real LabelWidget construction requires renderInit, even for an empty
+    // string. Use a real native TextBox for text/visibility policy, not a mock
+    // renderer or callback echo. Label metrics/style pixels are a GUI gate.
+    paneConfig->set("gui", JsonObject{});
+    auto createdPane = ScriptTestPane::create(**context, Json(*paneConfig));
+    ASSERT_TRUE(createdPane);
+    auto pane = *createdPane;
+    pane->setAnchor(PaneAnchor::Center);
+    auto text = textEditor(**context, "");
+    ASSERT_TRUE(text);
+    (*text)->setMaxWidth(-1);
+    ASSERT_TRUE(pane->addChild("planetText", *text));
+    auto luaRoot = LuaRoot::create(root);
+    ASSERT_TRUE(luaRoot);
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto player = (*factory)->create();
+    ASSERT_TRUE(player);
+    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
+    ASSERT_TRUE(playerCallbacks);
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
+    ASSERT_TRUE(rootCallbacks);
+    ASSERT_TRUE(pane->addCallbacks("root", *rootCallbacks));
+    auto cinematic = Cinematic::create(**context);
+    ASSERT_TRUE(cinematic);
+    // Cinematic uses a real clock. Keep it active through expensive Root reloads;
+    // each transition below stops it explicitly instead of racing a one-second end.
+    auto startCinema = [&] {
+      return (*cinematic)
+        ->load(JsonObject{
+          {"panels",
+           JsonArray{JsonObject{
+             {"keyframes",
+              JsonArray{JsonObject{{"timecode", 0}}, JsonObject{{"timecode", std::numeric_limits<float>::max()}}}}}}},
+          {"audio", JsonArray{}}});
+    };
+    bool hasPlayer = true, worldAvailable = true;
+    float scale = 1.25f;
+    LuaCallbacks interface;
+    ASSERT_TRUE(interface.registerCallback(
+      "session", [&] { return JsonObject{{"hasPlayer", hasPlayer}, {"inWorld", worldAvailable}}; }));
+    ASSERT_TRUE(interface.registerCallback("cinematicActive", [&] { return !(*cinematic)->completed(); }));
+    ASSERT_TRUE(interface.registerCallback("scale", [&] { return scale; }));
+    ASSERT_TRUE(pane->addCallbacks("interface", interface));
 
-  // Cover all signed duration/dt and fade boundaries in fresh consumers of the
-  // real asset script. Only duration/fade configuration inputs are injected;
-  // countdown/alpha are computed by Lua and applied to native pane/widgets.
-  ASSERT_TRUE((*player)->uninit());
-  for (auto [duration, fadeTime] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f},
-      std::pair{0.7f, 0.0f}, std::pair{0.7f, -0.2f}, std::pair{0.7f, 1.3f}}) {
-    SCOPED_TRACE(strf("duration={}, fade={}", duration, fadeTime));
-    auto boundaryPane = ScriptTestPane::create(**context, Json(*paneConfig));
-    ASSERT_TRUE(boundaryPane) << boundaryPane.error().what();
-    auto boundaryText = textEditor(**context, "");
-    ASSERT_TRUE(boundaryText) << boundaryText.error().what();
-    ASSERT_TRUE((*boundaryPane)->addChild("planetText", *boundaryText));
-    ASSERT_TRUE((*boundaryPane)->setLuaRoot(*luaRoot));
-    LuaCallbacks styleInputs;
-    ASSERT_TRUE(
-      styleInputs.registerCallback("assetJson", [&](String const& path) -> std::expected<Json, StarException> {
-        if (path == "/interface.config:planetNameTime")
-          return Json(duration);
-        if (path == "/interface.config:planetNameFadeTime")
-          return Json(fadeTime);
-        return (*assets)->json(path);
-      }));
-    ASSERT_TRUE((*boundaryPane)->addCallbacks("root", std::move(styleInputs)));
-    ASSERT_TRUE((*boundaryPane)->addCallbacks("player", *playerCallbacks));
-    ASSERT_TRUE((*boundaryPane)->addCallbacks("interface", interface));
-    ASSERT_TRUE((*boundaryPane)->displayed());
-    GameTimer boundaryTimer(duration);
+    // Stored native templates let the name query read the exact domain name,
+    // including tag-like characters, without generating/serializing a planet.
+    auto blankTemplate = WorldTemplate::create(root, Vec2U{2048, 2048});
+    ASSERT_TRUE(blankTemplate);
+    auto storedTemplate = (*blankTemplate)->store();
+    ASSERT_TRUE(storedTemplate);
+    auto namedTemplate = [&](String const& name) -> std::expected<std::shared_ptr<WorldTemplate>, StarException> {
+      auto celestial = CelestialParameters::create(root, CelestialCoordinate{}, 1, name, JsonObject{});
+      if (!celestial)
+        return std::unexpected(std::move(celestial.error()));
+      auto storedCelestial = celestial->diskStore();
+      if (!storedCelestial)
+        return std::unexpected(std::move(storedCelestial.error()));
+      auto stored = storedTemplate->set("celestialParameters", *storedCelestial);
+      if (!stored)
+        return std::unexpected(std::move(stored.error()));
+      return WorldTemplate::create(root, *stored);
+    };
+    auto templateA = namedTemplate("A <worldName> 中");
+    auto templateB = namedTemplate("B");
+    ASSERT_TRUE(templateA && templateB);
+    auto makeWorld =
+      [&](std::shared_ptr<WorldTemplate> worldTemplate) -> std::expected<std::shared_ptr<WorldServer>, StarException> {
+      auto storage = File::ephemeral_file(root.random());
+      if (!storage)
+        return std::unexpected(std::move(storage.error()));
+      return WorldServer::create(root, std::move(worldTemplate), *storage);
+    };
+    auto worldA = makeWorld(*templateA);
+    auto worldB = makeWorld(*templateB);
+    auto emptyWorld = makeWorld(*blankTemplate);
+    ASSERT_TRUE(worldA && worldB && emptyWorld);
+    auto closeWorlds = finally([&] {
+      if ((*player)->inWorld())
+        EXPECT_TRUE((*player)->uninit());
+      EXPECT_TRUE((*worldA)->close());
+      EXPECT_TRUE((*worldB)->close());
+      EXPECT_TRUE((*emptyWorld)->close());
+    });
+    auto bindWorld = [&](WorldServer& world) -> std::expected<void, StarException> {
+      auto callbacks = LuaBindings::makeWorldCallbacks(root, world);
+      if (!callbacks)
+        return std::unexpected(std::move(callbacks.error()));
+      auto removed = pane->removeCallbacks("world");
+      if (!removed)
+        return std::unexpected(std::move(removed.error()));
+      return pane->addCallbacks("world", *callbacks);
+    };
+    ASSERT_TRUE(bindWorld(**worldA));
+    PaneManager panes(**context);
+    ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, pane, {}));
+    EXPECT_EQ(pane->size(), (Vec2I{0, 0}));
+    EXPECT_FALSE(pane->interactive());
+    EXPECT_FALSE(pane->visibility());
+    auto publicCallbacks = pane->makePaneCallbacks();
+    ASSERT_TRUE(publicCallbacks);
+    auto probe = (*luaRoot)->createContext(StringList{});
+    ASSERT_TRUE(probe);
+    ASSERT_TRUE(probe->setCallbacks("planet", *publicCallbacks));
+    ASSERT_TRUE(probe->eval<LuaValue>("cached = planet.toWidget()"));
+
+    GameTimer expected(0.7f);
+    float fade = 0.3f;
+    auto activePlayer = *player;
+    auto checkStep = [&](ScriptTestPane& subject, GameTimer& expected, float fade,
+                         float dt) -> testing::AssertionResult {
+      bool ready = false;
+      if ((*cinematic)->completed())
+        ready = expected.tick(dt);
+      else if (!hasPlayer || !activePlayer->inWorld())
+        expected.reset();
+      auto ticked = subject.tick(dt);
+      if (!ticked)
+        return testing::AssertionFailure() << ticked.error().what();
+      auto timer = subject.evaluate("return storage.timer");
+      if (!timer)
+        return testing::AssertionFailure() << timer.error().what();
+      if (!*timer)
+        return testing::AssertionFailure() << "Missing planet countdown";
+      auto timerValue = (**timer).toFloat();
+      if (!timerValue)
+        return testing::AssertionFailure() << timerValue.error().what();
+      if (*timerValue != expected.timer)
+        return testing::AssertionFailure() << "Countdown: " << *timerValue << " != " << expected.timer;
+      if ((*cinematic)->completed() && !ready) {
+        float alpha = expected.timer < fade ? expected.timer / fade : 1.0f;
+        auto actual = subject.evaluate("return storage.alpha");
+        if (!actual)
+          return testing::AssertionFailure() << actual.error().what();
+        if (!*actual)
+          return testing::AssertionFailure() << "Missing planet alpha";
+        auto actualAlpha = (**actual).toFloat();
+        if (!actualAlpha)
+          return testing::AssertionFailure() << actualAlpha.error().what();
+        if (*actualAlpha != alpha)
+          return testing::AssertionFailure() << "Alpha: " << *actualAlpha << " != " << alpha;
+      }
+      return testing::AssertionSuccess();
+    };
+    auto step = [&](float dt) { return checkStep(*pane, expected, fade, dt); };
     ASSERT_TRUE(startCinema());
-    ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, 0.0f));
+    ASSERT_TRUE(step(0.4f));// Off-world cinematic resets, without advancing.
+    EXPECT_FALSE(pane->visibility());
+    ASSERT_TRUE((*player)->init(**worldA, 1, EntityMode::Slave));
+    ASSERT_TRUE(step(0.2f));// In-world cinematic pauses; no show or color change.
+    EXPECT_FALSE(pane->visibility());
     (*cinematic)->stop();
-    for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f}) {
-      SCOPED_TRACE(dt);
-      ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, dt));
-    }
-    ASSERT_TRUE((*boundaryPane)->dismissed());
-  }
+    ASSERT_TRUE(step(0.1f));
+    EXPECT_TRUE(pane->visibility());
+    EXPECT_EQ((*text)->getText(), String("[A <worldName> 中] A <worldName> 中"));
+    EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
+    ASSERT_TRUE(startCinema());
+    ASSERT_TRUE(step(2.0f));// An in-world cinematic does not expire an already visible name.
+    EXPECT_TRUE(pane->visibility());
+    (*cinematic)->stop();
+    ASSERT_TRUE(bindWorld(**worldB));// Animation-free world change does not reset.
+    scale = 3.0f;
+    ASSERT_TRUE(step(0.1f));
+    EXPECT_EQ((*text)->getText(), String("[B] B"));
+    EXPECT_EQ(pane->relativePosition(), (Vec2I{-7, 121} * (2.f / scale)));
+    ASSERT_TRUE(bindWorld(**emptyWorld));
+    ASSERT_TRUE(step(0.1f));// Empty name retains old displayed text.
+    EXPECT_TRUE(pane->visibility());
+    EXPECT_EQ((*text)->getText(), String("[B] B"));
+    worldAvailable = false;// No world capability/template, actor still present.
+    ASSERT_TRUE(pane->removeCallbacks("world"));
+    ASSERT_TRUE(pane->addCallbacks("world", LuaCallbacks{}));
+    ASSERT_TRUE(step(0.1f));
+    EXPECT_TRUE(pane->visibility());
+    ASSERT_TRUE(root.reload());
+    ASSERT_TRUE(step(0.01f));// Reload preserves timer/text/handle, no init-time tick.
+    EXPECT_EQ((*text)->getText(), String("[B] B"));
+    ASSERT_TRUE(pane->stopScripts());
+    auto replacement = (*factory)->create();
+    ASSERT_TRUE(replacement);
+    auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
+    ASSERT_TRUE(replacementCallbacks);
+    ASSERT_TRUE(pane->removeCallbacks("player"));
+    ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
+    activePlayer = *replacement;
+    ASSERT_TRUE(pane->resumeScripts());
+    ASSERT_TRUE(step(0.01f));// Off-world without a cinematic continues, never resets.
+    EXPECT_TRUE(pane->visibility());
+    ASSERT_TRUE(step(1.0f));
+    EXPECT_FALSE(pane->visibility());
+    ASSERT_TRUE(startCinema());
+    ASSERT_TRUE(step(0.1f));// Replacement actor is off-world: reset and hide.
+    ASSERT_TRUE(pane->stopScripts());
+    ASSERT_TRUE(pane->removeCallbacks("player"));
+    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    activePlayer = *player;
+    ASSERT_TRUE(pane->resumeScripts());
+    worldAvailable = true;
+    ASSERT_TRUE(bindWorld(**worldA));
+    (*cinematic)->stop();
+    ASSERT_TRUE(step(0.1f));
+    EXPECT_TRUE(pane->visibility());
+    auto retained = probe->eval<Json>("return {planet.isDisplayed(), cached.getText('planetText')}");
+    ASSERT_TRUE(retained);
+    EXPECT_EQ(*retained, (Json(JsonArray{true, "[A <worldName> 中] A <worldName> 中"})));
+    EXPECT_EQ(pane->fetchChild<TextBoxWidget>("planetText")->get(), text->get());
 
-  // One representative still exercises changed assets through Root reload and
-  // the original retained pane; the earlier in-motion reload remains separate.
-  ASSERT_TRUE(writeStyle(0.7f, 0.0f));
-  ASSERT_TRUE(root.reload());
-  expected = GameTimer(0.7f);
-  fade = 0.0f;
-  ASSERT_TRUE(startCinema());
-  ASSERT_TRUE(step(0.0f));
-  (*cinematic)->stop();
-  for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f})
-    ASSERT_TRUE(step(dt));
-  ASSERT_TRUE(panes.dismissAllPanes());
-});
+    // Cover all signed duration/dt and fade boundaries in fresh consumers of the
+    // real asset script. Only duration/fade configuration inputs are injected;
+    // countdown/alpha are computed by Lua and applied to native pane/widgets.
+    ASSERT_TRUE((*player)->uninit());
+    for (auto [duration, fadeTime] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f}, std::pair{0.7f, 0.0f},
+                                      std::pair{0.7f, -0.2f}, std::pair{0.7f, 1.3f}}) {
+      SCOPED_TRACE(strf("duration={}, fade={}", duration, fadeTime));
+      auto boundaryPane = ScriptTestPane::create(**context, Json(*paneConfig));
+      ASSERT_TRUE(boundaryPane) << boundaryPane.error().what();
+      auto boundaryText = textEditor(**context, "");
+      ASSERT_TRUE(boundaryText) << boundaryText.error().what();
+      ASSERT_TRUE((*boundaryPane)->addChild("planetText", *boundaryText));
+      ASSERT_TRUE((*boundaryPane)->setLuaRoot(*luaRoot));
+      LuaCallbacks styleInputs;
+      ASSERT_TRUE(
+        styleInputs.registerCallback("assetJson", [&](String const& path) -> std::expected<Json, StarException> {
+          if (path == "/interface.config:planetNameTime")
+            return Json(duration);
+          if (path == "/interface.config:planetNameFadeTime")
+            return Json(fadeTime);
+          return (*assets)->json(path);
+        }));
+      ASSERT_TRUE((*boundaryPane)->addCallbacks("root", std::move(styleInputs)));
+      ASSERT_TRUE((*boundaryPane)->addCallbacks("player", *playerCallbacks));
+      ASSERT_TRUE((*boundaryPane)->addCallbacks("interface", interface));
+      ASSERT_TRUE((*boundaryPane)->displayed());
+      GameTimer boundaryTimer(duration);
+      ASSERT_TRUE(startCinema());
+      ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, 0.0f));
+      (*cinematic)->stop();
+      for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f}) {
+        SCOPED_TRACE(dt);
+        ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, dt));
+      }
+      ASSERT_TRUE((*boundaryPane)->dismissed());
+    }
+
+    // One representative still exercises changed assets through Root reload and
+    // the original retained pane; the earlier in-motion reload remains separate.
+    ASSERT_TRUE(writeStyle(0.7f, 0.0f));
+    ASSERT_TRUE(root.reload());
+    expected = GameTimer(0.7f);
+    fade = 0.0f;
+    ASSERT_TRUE(startCinema());
+    ASSERT_TRUE(step(0.0f));
+    (*cinematic)->stop();
+    for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f})
+      ASSERT_TRUE(step(dt));
+    ASSERT_TRUE(panes.dismissAllPanes());
+  });
 
 const GameTestRegistration notificationPresentation("LuaNotifications", "OverflowEvictsOldestAndPickupIdentitySurvivesReload", [](GameTest& fixture) {
   auto context = textEditorContext(fixture);

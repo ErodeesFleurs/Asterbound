@@ -152,7 +152,8 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   auto position = item->instanceValue("handPosition", JsonArray{0, 0}).and_then(jsonToVec2F);
   if (!position)
     return std::unexpected(std::move(position.error()));
-  auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory, *image), 1.0f / TilePixels, true, *position);
+  auto drawable =
+    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, *position);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables.append(std::move(*drawable));
@@ -162,7 +163,8 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   auto activePosition = item->instanceValue("activeHandPosition", JsonArray{0, 0}).and_then(jsonToVec2F);
   if (!activePosition)
     return std::unexpected(std::move(activePosition.error()));
-  auto activeDrawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory, *activeImage), 1.0f / TilePixels, true, *activePosition);
+  auto activeDrawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *activeImage),
+                                            1.0f / TilePixels, true, *activePosition);
   if (!activeDrawable)
     return std::unexpected(std::move(activeDrawable.error()));
   item->m_activeDrawables.append(std::move(*activeDrawable));

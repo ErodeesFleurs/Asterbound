@@ -173,13 +173,13 @@ std::expected<void, StarException> LuaRoot::shutdown() {
   auto summary = Json(profile.transformed(jsonFromProfileEntry)).repr(1);
   if (!summary)
     return std::unexpected(std::move(summary.error()));
-  auto directory = File::isDirectory(m_storageDirectory);
+  auto directory = File::is_directory(m_storageDirectory);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory) {
     if (auto logged = m_root.logger().info("Creating lua storage directory"); !logged)
       return std::unexpected(std::move(logged.error()));
-    if (auto result = File::makeDirectory(m_storageDirectory); !result)
+    if (auto result = File::create_directory(m_storageDirectory); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto timestamp = Time::localTime(std::chrono::system_clock::now());
@@ -188,10 +188,10 @@ std::expected<void, StarException> LuaRoot::shutdown() {
   auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(*timestamp);
   auto millis = *timestamp - wholeSeconds;
   String filename = strf("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
-  String path = File::relativeTo(m_storageDirectory, filename);
+  String path = File::relative_to(m_storageDirectory, filename);
   if (auto logged = m_root.logger().info("Writing lua profile {}", filename); !logged)
     return std::unexpected(std::move(logged.error()));
-  return File::writeFile(*summary, path);
+  return File::write_file(*summary, path);
 }
 
 std::expected<LuaContext, StarException> LuaRoot::createContext(String const& script, std::stop_token loadLifetime) {

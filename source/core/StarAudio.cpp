@@ -63,7 +63,7 @@ namespace {
   template <typename T>
   [[nodiscard]] std::expected<T, StarException> readLEType(IODevice& device) {
     T value;
-    auto read = device.readFull({reinterpret_cast<char*>(&value), sizeof(value)});
+    auto read = device.read_full({reinterpret_cast<char*>(&value), sizeof(value)});
     if (!read)
       return std::unexpected(std::move(read.error()));
     fromByteOrder(ByteOrder::LittleEndian, reinterpret_cast<char*>(&value), sizeof(value));
@@ -78,7 +78,7 @@ namespace {
     auto seek = device.seek(0);
     if (!seek)
       return std::unexpected(std::move(seek.error()));
-    auto read = device.readFull(signature);
+    auto read = device.read_full(signature);
     auto restore = device.seek(*previous);
     if (!read)
       return std::unexpected(std::move(read.error()));
@@ -93,7 +93,7 @@ namespace {
     if (!seek)
       return std::unexpected(std::move(seek.error()));
     std::array<char, 4> signature{};
-    auto read = device->readFull(signature);
+    auto read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "RIFF", 4) != 0)
@@ -106,12 +106,12 @@ namespace {
       return std::unexpected(std::move(actualSize.error()));
     if (*actualSize < 0 || std::uint64_t(*fileSize) + 8 != std::uint64_t(*actualSize))
       return std::unexpected(AudioException::format("Wav file is wrong size, reports {} is actually {}", std::uint64_t(*fileSize) + 8, *actualSize));
-    read = device->readFull(signature);
+    read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "WAVE", 4) != 0)
       return std::unexpected(AudioException("Wav file has invalid WAVE magic bytes"));
-    read = device->readFull(signature);
+    read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "fmt ", 4) != 0)
@@ -152,7 +152,7 @@ namespace {
     seek = device->seek(*fmtSize - 16, IOSeek::Relative);
     if (!seek)
       return std::unexpected(std::move(seek.error()));
-    read = device->readFull(signature);
+    read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "data", 4) != 0)
@@ -170,7 +170,7 @@ namespace {
 #ifdef STAR_STREAM_AUDIO
     return WaveData{std::move(device), {}, *channels, *rate, *dataSize, *dataStart};
 #else
-    auto bytes = device->readBytes(*dataSize);
+    auto bytes = device->read_bytes(*dataSize);
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
     for (std::size_t i = 0; i < bytes->size() / 2; ++i)
@@ -203,7 +203,7 @@ public:
       return std::unexpected(std::move(size.error()));
     if (*size < 0 || std::uint64_t(*size) > std::numeric_limits<std::size_t>::max())
       return std::unexpected(AudioException("Audio device size is out of range"));
-    auto bytes = device.readBytes(static_cast<std::size_t>(*size));
+    auto bytes = device.read_bytes(static_cast<std::size_t>(*size));
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
     impl->m_bytes = std::make_shared<ByteArray>(std::move(*bytes));
@@ -463,7 +463,7 @@ public:
     if (*read == 0)
       return std::unexpected(AudioException("PCM audio data is truncated"));
     if (*read % 2 != 0) {
-      auto tail = m_data.device().readFull({reinterpret_cast<char*>(buffer.data()) + *read, 1});
+      auto tail = m_data.device().read_full({reinterpret_cast<char*>(buffer.data()) + *read, 1});
       if (!tail)
         return std::unexpected(std::move(tail.error()));
       ++*read;
@@ -482,7 +482,7 @@ private:
 std::expected<Audio, StarException> Audio::create(std::shared_ptr<IODevice> device, String name) {
   if (!device)
     return std::unexpected(AudioException("Cannot load audio from a null device"));
-  if (!device->isOpen()) {
+  if (!device->is_open()) {
     auto open = device->open(IOMode::Read);
     if (!open)
       return std::unexpected(std::move(open.error()));

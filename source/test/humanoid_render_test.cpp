@@ -115,15 +115,16 @@ const GameTestRegistration
 
 const GameTestRegistration transientMovementAnimation(
   "HumanoidRenderTest", "PlayerMovementRequestIsTransientRotatedAndNetworked", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectoryRecursive(overlay));
-    ASSERT_TRUE(File::writeFile(String(R"([
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
+    ASSERT_TRUE(File::write_file(String(R"([
       {"op":"replace","path":"/genericScriptContexts","value":{"movementPoseFixture":"/pose.lua"}}
-    ])"), File::relativeTo(overlay, "player.config.patch")));
-    ASSERT_TRUE(File::writeFile(String(R"LUA(
+    ])"),
+                                 File::relative_to(overlay, "player.config.patch")));
+    ASSERT_TRUE(File::write_file(String(R"LUA(
       function update()
         local state = player.getProperty("poseFixture")
         if state then player.controlMovementState(state) end
@@ -132,17 +133,18 @@ const GameTestRegistration transientMovementAnimation(
       function postUpdate()
         if player.getProperty("poseLate") then player.controlMovementState("duck") end
       end
-    )LUA"), File::relativeTo(overlay, "pose.lua")));
+    )LUA"),
+                                 File::relative_to(overlay, "pose.lua")));
     auto settings = fixture.rootSettings();
     settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
     settings.includeUGC = false;
     auto root = Root::create(std::move(settings));
     ASSERT_TRUE(root) << root.error().what();
-    auto storage = File::ephemeralFile((*root)->random());
+    auto storage = File::ephemeral_file((*root)->random());
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
@@ -765,7 +767,7 @@ const GameTestRegistration humanoidSemanticSampling(
 const GameTestRegistration playerPresentationEvents(
   "HumanoidRenderTest", "PlayerEventsAreTickOwnedAndInvisibleEventsAreDiscarded", [](GameTest& fixture) {
     auto& root = fixture.root();
-    auto storage = File::ephemeralFile(root.random());
+    auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
@@ -962,17 +964,18 @@ const GameTestRegistration humanoidTickOwnedPose(
   "HumanoidRenderTest", "TickPoseAndFreshLightSamplesDoNotDependOnPreviousRender", [](GameTest& fixture) {
     // Vanilla species are legacy by default. Exercise the actual authored
     // builder rather than using its incomplete base animation by itself.
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectoryRecursive(File::relativeTo(overlay, "species")));
-    ASSERT_TRUE(File::writeFile(String(R"([
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "species")));
+    ASSERT_TRUE(File::write_file(String(R"([
       {"op":"add","path":"/buildScripts","value":["/humanoid/opensb/build.lua"]}
-    ])"), File::relativeTo(overlay, "species/human.species.patch")));
+    ])"),
+                                 File::relative_to(overlay, "species/human.species.patch")));
     auto settings = fixture.rootSettings();
     settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};

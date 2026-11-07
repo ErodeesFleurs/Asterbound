@@ -98,13 +98,13 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
       auto scriptName = script.toString();
       if (!scriptName)
         return std::unexpected(std::move(scriptName.error()));
-      tech.scripts.append(AssetPath::relativeTo(path, *scriptName));
+      tech.scripts.append(AssetPath::relative_to(path, *scriptName));
     }
     auto animator = config.optString("animator");
     if (!animator)
       return std::unexpected(std::move(animator.error()));
     if (*animator)
-      tech.animationConfig = AssetPath::relativeTo(path, **animator);
+      tech.animationConfig = AssetPath::relative_to(path, **animator);
     auto description = config.getString("description");
     if (!description)
       return std::unexpected(std::move(description.error()));
@@ -125,7 +125,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto icon = config.getString("icon");
     if (!icon)
       return std::unexpected(std::move(icon.error()));
-    tech.icon = AssetPath::relativeTo(path, *icon);
+    tech.icon = AssetPath::relative_to(path, *icon);
     return tech;
   }();
   if (!parsed)

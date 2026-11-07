@@ -62,11 +62,11 @@ std::string_view const VersionedJson::Magic = "SBVJ01";
 std::size_t const VersionedJson::MagicStringSize = 6;
 VersionNumber const VersionedJson::SubVersioning = 1;
 
-std::expected<VersionedJson, StarException> VersionedJson::readFile(String const& filename) {
+std::expected<VersionedJson, StarException> VersionedJson::read_file(String const& filename) {
   auto file = File::open(filename, IOMode::Read);
   if (!file) return std::unexpected(std::move(file.error()));
   DataStreamIODevice ds(**file);
-  auto magic = ds.readBytes(MagicStringSize);
+  auto magic = ds.read_bytes(MagicStringSize);
   if (!magic) return std::unexpected(std::move(magic.error()));
   if (*magic != ByteArray(std::span<char const>(Magic)))
     return std::unexpected(IOException::format("Wrong magic bytes at start of versioned json file, expected '{}'", Magic));
@@ -76,7 +76,8 @@ std::expected<VersionedJson, StarException> VersionedJson::readFile(String const
   if (!subVersions) return std::unexpected(std::move(subVersions.error()));
   return std::move(*result);
 }
-std::expected<void, StarException> VersionedJson::writeFile(VersionedJson const& versionedJson, String const& filename) {
+std::expected<void, StarException> VersionedJson::write_file(VersionedJson const& versionedJson,
+                                                             String const& filename) {
   DataStreamBuffer ds;
   auto magic = ds.writeData(std::span<char const>(Magic));
   if (!magic) return std::unexpected(std::move(magic.error()));
@@ -84,7 +85,7 @@ std::expected<void, StarException> VersionedJson::writeFile(VersionedJson const&
   if (!written) return std::unexpected(std::move(written.error()));
   auto subVersions = writeSubVersioning(ds, versionedJson);
   if (!subVersions) return std::unexpected(std::move(subVersions.error()));
-  return File::overwriteFileWithRename(ds.takeData(), filename);
+  return File::overwrite_file_with_rename(ds.takeData(), filename);
 }
 std::expected<void, StarException> VersionedJson::writeSubVersioning(DataStream& ds, VersionedJson const& versionedJson) {
   auto version = ds.write(SubVersioning);
@@ -94,7 +95,7 @@ std::expected<void, StarException> VersionedJson::writeSubVersioning(DataStream&
   return ds.write(JsonObject{{"subVersions", subVersions}});
 }
 std::expected<void, StarException> VersionedJson::readSubVersioning(DataStream& ds, VersionedJson& versionedJson) {
-  auto end = ds.atEnd();
+  auto end = ds.at_end();
   if (!end) return std::unexpected(std::move(end.error()));
   if (*end) return {};
   VersionNumber extraVersioning = 0;
@@ -241,25 +242,32 @@ std::expected<void, StarException> VersioningDatabase::init() {
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   for (auto const& script : *scripts) {
     auto parse = [&]() -> std::expected<void, StarException> {
-      auto parts = File::baseName(script).splitAny("_.");
-      if (!parts) return std::unexpected(std::move(parts.error()));
+      auto parts = File::base_name(script).splitAny("_.");
+      if (!parts)
+        return std::unexpected(std::move(parts.error()));
       if (parts->size() != 4 && parts->size() != 6)
         return std::unexpected(VersioningDatabaseException::format("Script file '{}' filename not of the form <identifier>_<fromversion>_<toversion>.lua or <identifier>_<atVersion>_<subIdentifier>_<fromSubVersion>_<toSubVersion>.lua", script));
       auto identifier = (*parts)[0].toLower();
-      if (!identifier) return std::unexpected(std::move(identifier.error()));
+      if (!identifier)
+        return std::unexpected(std::move(identifier.error()));
       auto firstVersion = lexicalCast<VersionNumber>((*parts)[1]);
-      if (!firstVersion) return std::unexpected(std::move(firstVersion.error()));
+      if (!firstVersion)
+        return std::unexpected(std::move(firstVersion.error()));
       if (parts->size() == 4) {
         auto toVersion = lexicalCast<VersionNumber>((*parts)[2]);
-        if (!toVersion) return std::unexpected(std::move(toVersion.error()));
+        if (!toVersion)
+          return std::unexpected(std::move(toVersion.error()));
         m_versionUpdateScripts[*identifier].append({script, *firstVersion, *toVersion});
       } else {
         auto subIdentifier = (*parts)[2].toLower();
-        if (!subIdentifier) return std::unexpected(std::move(subIdentifier.error()));
+        if (!subIdentifier)
+          return std::unexpected(std::move(subIdentifier.error()));
         auto fromVersion = lexicalCast<VersionNumber>((*parts)[3]);
-        if (!fromVersion) return std::unexpected(std::move(fromVersion.error()));
+        if (!fromVersion)
+          return std::unexpected(std::move(fromVersion.error()));
         auto toVersion = lexicalCast<VersionNumber>((*parts)[4]);
-        if (!toVersion) return std::unexpected(std::move(toVersion.error()));
+        if (!toVersion)
+          return std::unexpected(std::move(toVersion.error()));
         m_subVersionUpdateScripts[*identifier][*firstVersion][*subIdentifier].append({script, *fromVersion, *toVersion});
       }
       return {};
@@ -415,29 +423,40 @@ std::expected<Json, StarException> VersioningDatabase::loadVersionedJson(Version
 }
 std::expected<LuaCallbacks, StarException> VersioningDatabase::makeVersioningCallbacks(std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
   LuaCallbacks callbacks;
-  auto registered = callbacks.registerCallback("loadVersionedJson", [&database = *this, itemCatalog](String const& storagePath) -> std::expected<Json, StarException> {
-    auto loaded = [&]() -> std::expected<Json, StarException> {
-      auto filePath = File::fullPath(database.m_root.toStoragePath(storagePath));
-      if (!filePath) return std::unexpected(std::move(filePath.error()));
-      auto basePath = File::fullPath(database.m_root.toStoragePath("."));
-      if (!basePath) return std::unexpected(std::move(basePath.error()));
-      auto withinStorage = filePath->beginsWith(*basePath);
-      if (!withinStorage) return std::unexpected(std::move(withinStorage.error()));
-      if (!*withinStorage)
-        return std::unexpected(VersioningDatabaseException("Cannot load external VersionedJson outside of the Root storage path"));
-      auto file = VersionedJson::readFile(*filePath);
-      if (!file) return std::unexpected(std::move(file.error()));
-      auto updated = database.updateVersionedJson(*file, itemCatalog);
-      if (!updated) return std::unexpected(std::move(updated.error()));
-      return std::move(updated->content);
-    }();
-    if (!loaded && loaded.error().is<IOException>()) {
-      auto logged = database.m_root.logger().debug("Unable to load versioned JSON file {} in versioning script: {}", storagePath, outputException(ExceptionDiagnostic(loaded.error()), false));
-      if (!logged) return std::unexpected(std::move(logged.error()));
-      return Json();
-    }
-    return loaded;
-  });
+  auto registered = callbacks.registerCallback(
+    "loadVersionedJson",
+    [&database = *this, itemCatalog](String const& storagePath) -> std::expected<Json, StarException> {
+      auto loaded = [&]() -> std::expected<Json, StarException> {
+        auto filePath = File::full_path(database.m_root.toStoragePath(storagePath));
+        if (!filePath)
+          return std::unexpected(std::move(filePath.error()));
+        auto basePath = File::full_path(database.m_root.toStoragePath("."));
+        if (!basePath)
+          return std::unexpected(std::move(basePath.error()));
+        auto withinStorage = filePath->beginsWith(*basePath);
+        if (!withinStorage)
+          return std::unexpected(std::move(withinStorage.error()));
+        if (!*withinStorage)
+          return std::unexpected(
+            VersioningDatabaseException("Cannot load external VersionedJson outside of the Root storage path"));
+        auto file = VersionedJson::read_file(*filePath);
+        if (!file)
+          return std::unexpected(std::move(file.error()));
+        auto updated = database.updateVersionedJson(*file, itemCatalog);
+        if (!updated)
+          return std::unexpected(std::move(updated.error()));
+        return std::move(updated->content);
+      }();
+      if (!loaded && loaded.error().is<IOException>()) {
+        auto logged =
+          database.m_root.logger().debug("Unable to load versioned JSON file {} in versioning script: {}", storagePath,
+                                         outputException(ExceptionDiagnostic(loaded.error()), false));
+        if (!logged)
+          return std::unexpected(std::move(logged.error()));
+        return Json();
+      }
+      return loaded;
+    });
   if (!registered) return std::unexpected(std::move(registered.error()));
   return callbacks;
 }

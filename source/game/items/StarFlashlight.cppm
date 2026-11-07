@@ -118,7 +118,7 @@ std::expected<std::shared_ptr<Flashlight>, StarException> Flashlight::create(Roo
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  item->m_image = AssetPath::relativeTo(directory, *image);
+  item->m_image = AssetPath::relative_to(directory, *image);
   auto handPosition = item->instanceValue("handPosition").and_then(jsonToVec2F);
   if (!handPosition)
     return std::unexpected(std::move(handPosition.error()));

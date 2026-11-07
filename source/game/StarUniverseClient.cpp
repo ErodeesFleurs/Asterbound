@@ -1459,7 +1459,7 @@ std::shared_ptr<UniverseClient::ScriptComponent> UniverseClient::scriptContext(S
 std::expected<void, StarException> UniverseClient::createCustomWorld(String const& name, Json templateData) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  auto directoryResult = File::isDirectory(m_customWorldStorageDirectory);
+  auto directoryResult = File::is_directory(m_customWorldStorageDirectory);
   if (!directoryResult)
     return std::unexpected(std::move(directoryResult.error()));
   auto directory = std::move(*directoryResult);
@@ -1467,11 +1467,11 @@ std::expected<void, StarException> UniverseClient::createCustomWorld(String cons
     auto operation30 = m_root.logger().info("UniverseClient: Creating universe client storage directory");
     if (!operation30)
       return std::unexpected(std::move(operation30.error()));
-    auto operation31 = File::makeDirectory(m_customWorldStorageDirectory);
+    auto operation31 = File::create_directory(m_customWorldStorageDirectory);
     if (!operation31)
       return std::unexpected(std::move(operation31.error()));
   }
-  String filename = File::relativeTo(m_customWorldStorageDirectory, strf("{}.world", name));
+  String filename = File::relative_to(m_customWorldStorageDirectory, strf("{}.world", name));
   auto existsResult = File::exists(filename);
   if (!existsResult)
     return std::unexpected(std::move(existsResult.error()));
@@ -1710,7 +1710,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
               if (!operation74)
                 return std::unexpected(std::move(operation74.error()));
             } else {
-              String path = File::relativeTo(m_customWorldStorageDirectory, strf("{}.world", p.first));
+              String path = File::relative_to(m_customWorldStorageDirectory, strf("{}.world", p.first));
               auto operation75 = WorldStorage::applyWorldChunksUpdateToFile(m_root.logger(), path, p.second);
               if (!operation75)
                 return std::unexpected(std::move(operation75.error()));
@@ -1811,7 +1811,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         } else {
           std::unique_lock locker(m_mutex, std::defer_lock);
           lockWithDiagnostics(locker);
-          String filename = File::relativeTo(m_customWorldStorageDirectory, strf("{}.world", request->name));
+          String filename = File::relative_to(m_customWorldStorageDirectory, strf("{}.world", request->name));
           auto existsResult = File::exists(filename);
           if (!existsResult)
             return std::unexpected(std::move(existsResult.error()));

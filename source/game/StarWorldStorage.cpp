@@ -216,10 +216,12 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   result->m_generatorFacade = generatorFacade;
   result->m_floatingDungeonWorld = false;
   {
-    auto operationResult1 = File::ephemeralFile(root.random());
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    auto operationResult2 = openDatabase(db, (*operationResult1));
-    if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
+    auto storage_file = File::ephemeral_file(root.random());
+    if (!storage_file)
+      return std::unexpected(std::move(storage_file.error()));
+    auto database_opened = openDatabase(db, (*storage_file));
+    if (!database_opened)
+      return std::unexpected(std::move(database_opened.error()));
   }
   for (auto const& pair : chunks) {
     if (pair.second) {

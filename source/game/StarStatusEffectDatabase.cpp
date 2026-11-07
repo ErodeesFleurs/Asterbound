@@ -85,14 +85,14 @@ std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::par
     auto scripts = jsonToStringList(*scriptsConfig);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     for (auto const& script : *scripts)
-      effect.scripts.append(AssetPath::relativeTo(path, script));
+      effect.scripts.append(AssetPath::relative_to(path, script));
     auto scriptDelta = config.getUInt("scriptDelta", 1);
     if (!scriptDelta) return std::unexpected(std::move(scriptDelta.error()));
     effect.scriptDelta = *scriptDelta;
     auto animationConfig = config.optString("animationConfig");
     if (!animationConfig) return std::unexpected(std::move(animationConfig.error()));
     if (*animationConfig)
-      effect.animationConfig = AssetPath::relativeTo(path, **animationConfig);
+      effect.animationConfig = AssetPath::relative_to(path, **animationConfig);
     auto label = config.getString("label", "");
     if (!label) return std::unexpected(std::move(label.error()));
     effect.label = std::move(*label);
@@ -102,7 +102,7 @@ std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::par
     auto icon = config.optString("icon");
     if (!icon) return std::unexpected(std::move(icon.error()));
     if (*icon)
-      effect.icon = AssetPath::relativeTo(path, **icon);
+      effect.icon = AssetPath::relative_to(path, **icon);
     return effect;
   }();
   if (!parsed)

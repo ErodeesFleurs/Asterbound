@@ -205,7 +205,7 @@ TEST(TupleSerialization, OrderedWireAndEnumWidths) {
   decltype(values) restored{};
   ASSERT_TRUE(stream >> restored);
   EXPECT_EQ(restored, values);
-  auto atEnd = stream.atEnd();
+  auto atEnd = stream.at_end();
   ASSERT_TRUE(atEnd);
   EXPECT_TRUE(*atEnd);
 

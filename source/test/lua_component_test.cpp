@@ -194,26 +194,28 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   EXPECT_EQ(*unchanged, saved);
 }
 
-const GameTestRegistration persistentStorage("LuaComponentLifecycle", "PersistentHostsPreserveStorageAcrossContexts", [](GameTest& fixture) {
-  auto storage = File::ephemeralFile(fixture.root().random());
-  ASSERT_TRUE(storage) << storage.error().what();
-  auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
-  ASSERT_TRUE(created) << created.error().what();
-  auto world = *created;
-  auto close = finally([&] { EXPECT_TRUE(world->close()); });
-  {
-    SCOPED_TRACE("LuaStoredEntityScript");
-    expectStorageLifecycle<LuaStoredEntityScript>(fixture.root(), *world);
-  }
-  {
-    SCOPED_TRACE("LuaActorScript");
-    expectStorageLifecycle<LuaActorScript>(fixture.root(), *world);
-  }
-  {
-    SCOPED_TRACE("LuaActionScript");
-    expectStorageLifecycle<LuaActionScript>(fixture.root(), *world);
-  }
-});
+const GameTestRegistration persistentStorage("LuaComponentLifecycle", "PersistentHostsPreserveStorageAcrossContexts",
+                                             [](GameTest& fixture) {
+                                               auto storage = File::ephemeral_file(fixture.root().random());
+                                               ASSERT_TRUE(storage) << storage.error().what();
+                                               auto created =
+                                                 WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+                                               ASSERT_TRUE(created) << created.error().what();
+                                               auto world = *created;
+                                               auto close = finally([&] { EXPECT_TRUE(world->close()); });
+                                               {
+                                                 SCOPED_TRACE("LuaStoredEntityScript");
+                                                 expectStorageLifecycle<LuaStoredEntityScript>(fixture.root(), *world);
+                                               }
+                                               {
+                                                 SCOPED_TRACE("LuaActorScript");
+                                                 expectStorageLifecycle<LuaActorScript>(fixture.root(), *world);
+                                               }
+                                               {
+                                                 SCOPED_TRACE("LuaActionScript");
+                                                 expectStorageLifecycle<LuaActionScript>(fixture.root(), *world);
+                                               }
+                                             });
 
 const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArgumentsAndHandlersFollowContextLifetime", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
@@ -564,7 +566,7 @@ const GameTestRegistration workerStartupFailure(
 const GameTestRegistration
   deferredWorldShutdown("LuaComponentLifecycle", "DeferredWorldShutdownKeepsCapabilitiesThroughLuaHooks",
                         [](GameTest& fixture) {
-                          auto storage = File::ephemeralFile(fixture.root().random());
+                          auto storage = File::ephemeral_file(fixture.root().random());
                           ASSERT_TRUE(storage);
                           auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
                           ASSERT_TRUE(world);
@@ -717,7 +719,7 @@ const GameTestRegistration
                         parameters.pathExploreRate = 23.5f;
                         auto controller = ActorMovementController::create(fixture.root(), parameters);
                         ASSERT_TRUE(controller) << controller.error().what();
-                        auto storage = File::ephemeralFile(fixture.root().random());
+                        auto storage = File::ephemeral_file(fixture.root().random());
                         ASSERT_TRUE(storage);
                         auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
                         ASSERT_TRUE(world);
@@ -865,7 +867,7 @@ const GameTestRegistration inputModifierPresence("InputNameSerialization",
                                                  });
 const GameTestRegistration luaEntityIdentifiers(
   "LuaEntityBindings", "EmbeddedNullIdentifiersSurviveFreshAndRestartedEngines", [](GameTest& fixture) {
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world);
@@ -1170,20 +1172,20 @@ const GameTestRegistration closedWorkerMessages(
 
 const GameTestRegistration workerChainedReplyClosure(
   "LuaComponentLifecycle", "ActualWorkerClosureCancelsDelegatedReplyWithoutCancellingProducer", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto removeDirectory = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectory(overlay));
-    ASSERT_TRUE(File::writeFile(String(R"LUA(
+    auto removeDirectory = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::write_file(String(R"LUA(
       function init()
         message.setHandler("pending", function() return host.promise() end)
       end
     )LUA"),
-                                File::relativeTo(overlay, "p6-worker.lua")));
+                                 File::relative_to(overlay, "p6-worker.lua")));
     auto settings = fixture.rootSettings();
     settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = String("p6-worker.config");
     settings.logDirectory = {};
     settings.logFile = {};
@@ -1333,7 +1335,7 @@ const GameTestRegistration
 const GameTestRegistration scopedPathFinder("LuaComponentBindings",
                                             "PathFinderCannotExploreRetiredWorldButKeepsResultSnapshot",
                                             [](GameTest& fixture) {
-                                              auto storage = File::ephemeralFile(fixture.root().random());
+                                              auto storage = File::ephemeral_file(fixture.root().random());
                                               ASSERT_TRUE(storage);
                                               auto world =
                                                 WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);

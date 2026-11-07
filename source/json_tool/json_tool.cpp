@@ -156,13 +156,13 @@ std::expected<FormattedJson, StarException> Star::addOrSet(bool add,
 [[nodiscard]]
 std::expected<void, StarException> forEachFileRecursive(Logger& logger, String const& directory,
     std::function<std::expected<void, StarException>(String const&)> const& func) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    String filename = File::relativeTo(directory, entry.first);
+    String filename = File::relative_to(directory, entry.first);
     if (entry.second) {
-      auto symlink = File::isSymlink(filename);
+      auto symlink = File::is_symlink(filename);
       if (!symlink)
         return std::unexpected(std::move(symlink.error()));
       if (*symlink) {
@@ -305,10 +305,10 @@ std::expected<void, StarException> process(Logger& logger,
         auto repr = reprWithLineEnding(json);
         if (!repr)
           return std::unexpected(std::move(repr.error()));
-        return File::overwriteFileWithRename(*repr, file);
+        return File::overwrite_file_with_rename(*repr, file);
       };
     }
-    auto contents = File::readFileString(file);
+    auto contents = File::read_file_string(file);
     if (!contents)
       return std::unexpected(std::move(contents.error()));
     auto processed = process(output, command, options, *contents);

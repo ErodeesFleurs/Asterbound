@@ -157,7 +157,7 @@ m_clientEntityMode = result1012->get();
 if (!result1013) return std::unexpected(std::move(result1013.error()));
 auto result1014 = std::move(*result1013).toString();
 if (!result1014) return std::unexpected(std::move(result1014.error()));
-auto result1015 = m_scriptComponent.setScript(AssetPath::relativeTo(m_path, std::move(*result1014)));
+auto result1015 = m_scriptComponent.setScript(AssetPath::relative_to(m_path, std::move(*result1014)));
 if (!result1015) return std::unexpected(std::move(result1015.error()));
   auto result1016 = configValue("scriptDelta", 1);
 if (!result1016) return std::unexpected(std::move(result1016.error()));

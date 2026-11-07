@@ -160,21 +160,22 @@ TestUniverse::TestUniverse(Vec2U clientWindowSize)
 
 std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create(Root& root, Vec2U clientWindowSize) {
   auto fixture = std::unique_ptr<TestUniverse>(new TestUniverse(clientWindowSize));
-  auto storagePath = File::temporaryDirectory(root.random());
+  auto storagePath = File::temporary_directory(root.random());
   if (!storagePath)
     return std::unexpected(std::move(storagePath.error()));
   fixture->m_storagePath = std::move(*storagePath);
-  auto playerStorage = PlayerStorage::create(root, File::relativeTo(fixture->m_storagePath, "player"));
+  auto playerStorage = PlayerStorage::create(root, File::relative_to(fixture->m_storagePath, "player"));
   if (!playerStorage)
     return std::unexpected(std::move(playerStorage.error()));
-  auto statistics = Statistics::create(root, File::relativeTo(fixture->m_storagePath, "statistics"));
+  auto statistics = Statistics::create(root, File::relative_to(fixture->m_storagePath, "statistics"));
   if (!statistics)
     return std::unexpected(std::move(statistics.error()));
-  auto server = UniverseServer::create(root, File::relativeTo(fixture->m_storagePath, "universe"));
+  auto server = UniverseServer::create(root, File::relative_to(fixture->m_storagePath, "universe"));
   if (!server)
     return std::unexpected(std::move(server.error()));
   fixture->m_server = std::move(*server);
-  auto client = UniverseClient::create(root, *playerStorage, *statistics, File::relativeTo(fixture->m_storagePath, "universeclient"));
+  auto client = UniverseClient::create(root, *playerStorage, *statistics,
+                                       File::relative_to(fixture->m_storagePath, "universeclient"));
   if (!client)
     return std::unexpected(std::move(client.error()));
   fixture->m_client = std::move(*client);
@@ -311,7 +312,7 @@ std::expected<void, StarException> TestUniverse::close() {
   }
   m_mainPlayer.reset();
   if (!m_storagePath.empty()) {
-    auto removed = File::removeDirectoryRecursive(m_storagePath);
+    auto removed = File::remove_all(m_storagePath);
     if (removed)
       m_storagePath.clear();
     else if (!error)

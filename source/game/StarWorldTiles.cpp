@@ -108,7 +108,7 @@ std::expected<void, StarException> ServerTile::read(DataStream& ds, VersionNumbe
       return std::unexpected(std::move(transition.error()));
   }
   if (serializationVersion < 418) {
-    auto legacyRoot = ds.readBytes(1);
+    auto legacyRoot = ds.read_bytes(1);
     if (!legacyRoot)
       return std::unexpected(std::move(legacyRoot.error()));
     rootSource = {};

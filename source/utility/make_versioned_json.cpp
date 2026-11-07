@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
       return -1;
     }
 
-    auto text = File::readFileString(String(std::string_view(argv[1])));
+    auto text = File::read_file_string(String(std::string_view(argv[1])));
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto json = Json::parse(*text);
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     auto versionedJson = VersionedJson::fromJson(*json);
     if (!versionedJson)
       return std::unexpected(std::move(versionedJson.error()));
-    auto written = VersionedJson::writeFile(*versionedJson, String(std::string_view(argv[2])));
+    auto written = VersionedJson::write_file(*versionedJson, String(std::string_view(argv[2])));
     if (!written)
       return std::unexpected(std::move(written.error()));
     return 0;

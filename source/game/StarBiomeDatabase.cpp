@@ -83,17 +83,21 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
     if (!queued) return std::unexpected(std::move(queued.error()));
     for (auto const& file : files->get()) {
       auto const& path = file.string();
-      auto readFile = [&]() -> std::expected<void, StarException> {
+      auto read_file = [&]() -> std::expected<void, StarException> {
         auto parameters = (*assets)->json(path);
-        if (!parameters) return std::unexpected(std::move(parameters.error()));
-        if (parameters->isNull()) return {};
+        if (!parameters)
+          return std::unexpected(std::move(parameters.error()));
+        if (parameters->isNull())
+          return {};
         auto name = parameters->getString("name");
-        if (!name) return std::unexpected(std::move(name.error()));
-        if (map.contains(*name)) return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        if (map.contains(*name))
+          return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
         map[*name] = {path, *name, std::move(*parameters)};
         return {};
       };
-      auto loaded = readFile();
+      auto loaded = read_file();
       if (!loaded) return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), path, "Loading biome or weather"));
     }
     return {};
@@ -399,7 +403,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     auto parallax = parameters.optString("parallax");
     if (!parallax) return std::unexpected(std::move(parallax.error()));
     if (*parallax) {
-      auto path = AssetPath::relativeTo(config->get().path, **parallax);
+      auto path = AssetPath::relative_to(config->get().path, **parallax);
       {
         auto value = Parallax::create(m_root, path, seed, verticalMidPoint, *hue, biome->surfacePlaceables.firstTreeType());
         if (!value) return std::unexpected(std::move(value.error()));

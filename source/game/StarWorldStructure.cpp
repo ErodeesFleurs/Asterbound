@@ -68,9 +68,10 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autopositionResult2 = jsonToVec2F((*autopositionResult1));
     if (!autopositionResult2) return std::unexpected(std::move(autopositionResult2.error()));
     auto position = std::move((*autopositionResult2));
-    auto autoimageResult1 = overlaySettings.getString("image");
-    if (!autoimageResult1) return std::unexpected(std::move(autoimageResult1.error()));
-    auto image = AssetPath::relativeTo(configPath, (*autoimageResult1));
+    auto overlay_image_name = overlaySettings.getString("image");
+    if (!overlay_image_name)
+      return std::unexpected(std::move(overlay_image_name.error()));
+    auto image = AssetPath::relative_to(configPath, (*overlay_image_name));
     auto autofullbrightResult1 = overlaySettings.getBool("fullbright", false);
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
@@ -90,9 +91,10 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autopositionResult2 = jsonToVec2F((*autopositionResult1));
     if (!autopositionResult2) return std::unexpected(std::move(autopositionResult2.error()));
     auto position = std::move((*autopositionResult2));
-    auto autoimageResult1 = overlaySettings.getString("image");
-    if (!autoimageResult1) return std::unexpected(std::move(autoimageResult1.error()));
-    auto image = AssetPath::relativeTo(configPath, (*autoimageResult1));
+    auto overlay_image_name = overlaySettings.getString("image");
+    if (!overlay_image_name)
+      return std::unexpected(std::move(overlay_image_name.error()));
+    auto image = AssetPath::relative_to(configPath, (*overlay_image_name));
     auto autofullbrightResult1 = overlaySettings.getBool("fullbright", false);
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
@@ -250,11 +252,13 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
   if (!autohasBlockImageResult1) return std::unexpected(std::move(autohasBlockImageResult1.error()));
   auto hasBlockImage = std::move((*autohasBlockImageResult1));
   if (hasBlockImage) {
-    auto autoblocksImageResult1 = settings.getString("blockImage");
-    if (!autoblocksImageResult1) return std::unexpected(std::move(autoblocksImageResult1.error()));
-    auto autoblocksImageResult2 = assets->image(AssetPath::relativeTo(configPath, (*autoblocksImageResult1)));
-    if (!autoblocksImageResult2) return std::unexpected(std::move(autoblocksImageResult2.error()));
-    auto blocksImage = std::move((*autoblocksImageResult2));
+    auto block_image_name = settings.getString("blockImage");
+    if (!block_image_name)
+      return std::unexpected(std::move(block_image_name.error()));
+    auto block_image = assets->image(AssetPath::relative_to(configPath, (*block_image_name)));
+    if (!block_image)
+      return std::unexpected(std::move(block_image.error()));
+    auto blocksImage = std::move((*block_image));
     const BlockKey defaultBlockKey = {.anchor = false,
                                       .foregroundBlock = false,
                                       .foregroundMat = StructureMaterialId,

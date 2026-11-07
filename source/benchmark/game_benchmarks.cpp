@@ -48,7 +48,7 @@ struct BenchmarkLifetime {
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
   // A benchmark bootconfig must point at private storage, never a save tree.
   for (std::string_view name : {"player", "universe"}) {
-    auto exists = File::exists(File::relativeTo(storage, name));
+    auto exists = File::exists(File::relative_to(storage, name));
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists)
@@ -406,7 +406,7 @@ std::expected<void, StarException> inspectProfile(Json const& entries, std::size
 }
 
 std::expected<void, StarException> requireEmptyProfileDirectory(String const& directory) {
-  auto link = File::isSymlink(directory);
+  auto link = File::is_symlink(directory);
   if (!link)
     return std::unexpected(std::move(link.error()));
   if (*link)
@@ -415,10 +415,10 @@ std::expected<void, StarException> requireEmptyProfileDirectory(String const& di
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (!*exists) {
-    if (auto made = File::makeDirectory(directory); !made)
+    if (auto made = File::create_directory(directory); !made)
       return std::unexpected(std::move(made.error()));
   }
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   if (!entries->empty())
@@ -427,7 +427,7 @@ std::expected<void, StarException> requireEmptyProfileDirectory(String const& di
 }
 
 std::expected<void, StarException> consumeProfiles(String const& directory, bool validate) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   std::optional<StarException> error;
@@ -441,10 +441,10 @@ std::expected<void, StarException> consumeProfiles(String const& directory, bool
       continue;
     }
     ++profiles;
-    auto path = File::relativeTo(directory, name);
+    auto path = File::relative_to(directory, name);
     if (validate) {
       auto checked = [&]() -> std::expected<void, StarException> {
-        auto text = File::readFileString(path);
+        auto text = File::read_file_string(path);
         if (!text)
           return std::unexpected(std::move(text.error()));
         auto json = Json::parseJson(*text);

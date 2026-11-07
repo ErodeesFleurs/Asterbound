@@ -302,7 +302,7 @@ std::expected<void, StarException> moveSnapshotWindow(SnapshotFixture& fixture, 
 
 std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root, unsigned clientCount) {
   SnapshotFixture fixture;
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   auto worldTemplate = WorldTemplate::create(root, Vec2U(2048, 2048));

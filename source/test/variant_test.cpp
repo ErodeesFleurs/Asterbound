@@ -26,7 +26,7 @@ void expectVariantWire(T const& value, std::array<unsigned char, N> const& expec
   auto read = stream >> restored;
   ASSERT_TRUE(read);
   EXPECT_EQ(restored, value);
-  auto atEnd = stream.atEnd();
+  auto atEnd = stream.at_end();
   ASSERT_TRUE(atEnd);
   EXPECT_TRUE(*atEnd);
 }

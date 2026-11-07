@@ -1,4 +1,5 @@
 import star.json;
+import star.json_extra;
 import star.ordered_map;
 import star.bi_map;
 import star.thread;
@@ -19,6 +20,11 @@ import std;
 import star.assets;
 import star.asset_source;
 import star.directory_asset_source;
+import star.memory_asset_source;
+import star.packed_asset_source;
+import star.data_stream_devices;
+import star.data_stream_extra;
+import star.sha256;
 import star.animated_part_set;
 import star.audio;
 import star.buffer;
@@ -57,6 +63,63 @@ struct AssetWorkerTestAccess {
       return std::unexpected(StarException("Asset queue stopped before draining"));
     return {};
   }
+
+  // Retain the former reader-based algorithm as an independent byte oracle.
+  static std::expected<ByteArray, StarException> reader_digest(Assets& assets) {
+    Sha256Hasher digest;
+    StringList paths;
+    for (auto const& entry : assets.m_files) {
+      auto lower = entry.first.string().toLower();
+      if (!lower)
+        return std::unexpected(std::move(lower.error()));
+      paths.append(std::move(*lower));
+    }
+    paths.sort();
+    for (auto const& path : paths) {
+      bool ignored = false;
+      for (auto const& pattern : assets.m_settings.digestIgnore) {
+        auto matches = path.regexMatch(pattern, false, false);
+        if (!matches)
+          return std::unexpected(std::move(matches.error()));
+        if (*matches) {
+          ignored = true;
+          break;
+        }
+      }
+      if (ignored)
+        continue;
+      auto key = CaseInsensitiveStringView::create(path);
+      if (!key)
+        return std::unexpected(std::move(key.error()));
+      auto descriptor = assets.m_files.get(*key);
+      if (!descriptor)
+        return std::unexpected(std::move(descriptor.error()));
+      digest.push(path);
+      auto device = descriptor->get().source->open(descriptor->get().sourceName);
+      if (!device)
+        return std::unexpected(std::move(device.error()));
+      auto size = (*device)->size();
+      if (!size)
+        return std::unexpected(std::move(size.error()));
+      auto bytes = DataStreamBuffer::serialize(*size);
+      if (!bytes)
+        return std::unexpected(std::move(bytes.error()));
+      digest.push(*bytes);
+      for (auto const& patch : descriptor->get().patchSources) {
+        auto patch_device = patch.second->open(AssetPath::removeSubPath(patch.first));
+        if (!patch_device)
+          return std::unexpected(std::move(patch_device.error()));
+        auto patch_size = (*patch_device)->size();
+        if (!patch_size)
+          return std::unexpected(std::move(patch_size.error()));
+        auto patch_bytes = DataStreamBuffer::serialize(*patch_size);
+        if (!patch_bytes)
+          return std::unexpected(std::move(patch_bytes.error()));
+        digest.push(*patch_bytes);
+      }
+    }
+    return digest.compute();
+  }
 };
 }
 
@@ -75,7 +138,7 @@ namespace {
   class FailingPngNameBuffer : public Buffer {
   public:
     explicit FailingPngNameBuffer(ByteArray bytes) : Buffer(std::move(bytes)) {}
-    [[nodiscard]] std::expected<String, StarException> deviceName() const override {
+    [[nodiscard]] std::expected<String, StarException> device_name() const override {
       return std::unexpected(PngIoFailure("Injected PNG device-name failure"));
     }
   };
@@ -84,18 +147,18 @@ namespace {
   public:
     FailingPngBuffer(ByteArray bytes, StreamOffset failAt) : Buffer(std::move(bytes)), m_failAt(failAt) {}
 
-    [[nodiscard]] std::expected<void, StarException> readFull(std::span<char> data) override {
+    [[nodiscard]] std::expected<void, StarException> read_full(std::span<char> data) override {
       auto ready = failIfRequested();
       if (!ready)
         return std::unexpected(std::move(ready.error()));
-      return Buffer::readFull(data);
+      return Buffer::read_full(data);
     }
 
-    [[nodiscard]] std::expected<void, StarException> writeFull(std::span<char const> data) override {
+    [[nodiscard]] std::expected<void, StarException> write_full(std::span<char const> data) override {
       auto ready = failIfRequested();
       if (!ready)
         return std::unexpected(std::move(ready.error()));
-      return Buffer::writeFull(data);
+      return Buffer::write_full(data);
     }
 
     unsigned unwound = 0;
@@ -156,17 +219,17 @@ const GameTestRegistration assetsAll("AssetsTest", "All", [](GameTest&) {
   EXPECT_EQ(AssetPath::filename("/foo/"), "");
   EXPECT_EQ(AssetPath::filename("/foo/bar"), "bar");
 
-  EXPECT_EQ(
-      AssetPath::relativeTo("/foo/bar/baz:baf?whoa?there", "thing:sub?directive"), "/foo/bar/thing:sub?directive");
+  EXPECT_EQ(AssetPath::relative_to("/foo/bar/baz:baf?whoa?there", "thing:sub?directive"),
+            "/foo/bar/thing:sub?directive");
 });
 
 const GameTestRegistration objectCursorPreviewRandomIsolation(
   "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
@@ -194,7 +257,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
     ASSERT_FALSE(objectName.empty()) << "The installed assets must supply a flickering object for this regression";
     SCOPED_TRACE(objectName.utf8());
 
-    auto storage = File::ephemeralFile(root.random());
+    auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
@@ -229,20 +292,20 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
 
 const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "SymlinkLoopIsNotFollowed", [](GameTest& fixture) {
   // A link back to an ancestor must not make asset scanning fail with ELOOP.
-  auto directory = File::temporaryDirectory(fixture.root().random());
+  auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory);
   auto tempDir = std::move(*directory);
-  auto finallyGuard = finally([&tempDir]() { EXPECT_TRUE(File::removeDirectoryRecursive(tempDir)); });
+  auto finallyGuard = finally([&tempDir]() { EXPECT_TRUE(File::remove_all(tempDir)); });
 
   std::error_code ec;
-  std::filesystem::create_directories(fsPath(File::relativeTo(tempDir, "real")), ec);
+  std::filesystem::create_directories(fsPath(File::relative_to(tempDir, "real")), ec);
   ASSERT_FALSE(ec) << ec.message();
-  ASSERT_TRUE(File::writeFile(String("data"), File::relativeTo(File::relativeTo(tempDir, "real"), "asset.txt")));
-  std::filesystem::create_directory_symlink(
-      fsPath(File::relativeTo(tempDir, "real")), fsPath(File::relativeTo(tempDir, "link")), ec);
+  ASSERT_TRUE(File::write_file(String("data"), File::relative_to(File::relative_to(tempDir, "real"), "asset.txt")));
+  std::filesystem::create_directory_symlink(fsPath(File::relative_to(tempDir, "real")),
+                                            fsPath(File::relative_to(tempDir, "link")), ec);
   if (ec)
     GTEST_SKIP() << "cannot create directory symlinks here: " << ec.message();
-  std::filesystem::create_directory_symlink(fsPath(tempDir), fsPath(File::relativeTo(tempDir, "loop")), ec);
+  std::filesystem::create_directory_symlink(fsPath(tempDir), fsPath(File::relative_to(tempDir, "loop")), ec);
   if (ec)
     GTEST_SKIP() << "cannot create directory symlinks here: " << ec.message();
 
@@ -262,6 +325,206 @@ const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "Symlink
   ASSERT_TRUE(loopSibling);
   EXPECT_FALSE(*loopSibling);
 });
+
+const GameTestRegistration
+  assetMetadataLengths("AssetsTest", "MetadataLengthsStayFreshAndRejectMissingOrReplacedFiles", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto path = File::relative_to(*directory, "mutable.json");
+    ASSERT_TRUE(File::write_file(String("{}"), path));
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    auto source = DirectoryAssetSource::create(fixture.root().logger(), *directory);
+    ASSERT_TRUE(source);
+    auto size = (*source)->file_size("/mutable.json");
+    ASSERT_TRUE(size);
+    EXPECT_EQ(*size, 2);
+    EXPECT_FALSE((*source)->file_size("/MUTABLE.json"));
+    EXPECT_FALSE((*source)->file_size("/../mutable.json"));
+    EXPECT_FALSE((*source)->file_size("/"));
+    auto added = File::relative_to(*directory, "unindexed.txt");
+    ASSERT_TRUE(File::write_file(String("not enumerated"), added));
+    EXPECT_FALSE((*source)->file_size("/unindexed.txt"));
+
+    Assets::Settings settings{};
+    settings.workerPoolSize = 1;
+    auto assets =
+      Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets) << assets.error().what();
+    ASSERT_TRUE((*assets)->json("/mutable.json"));
+    String replacement(R"({"recovered":42})");
+    ASSERT_TRUE(File::write_file(replacement, path));
+    (*assets)->hotReload();
+    size = (*source)->file_size("/mutable.json");
+    ASSERT_TRUE(size);
+    EXPECT_EQ(*size, static_cast<StreamOffset>(replacement.utf8Size()));
+    auto recovered = (*assets)->json("/mutable.json");
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ(recovered->getInt("recovered"), 42);
+
+    ASSERT_TRUE(File::remove(path));
+    auto missing = (*source)->file_size("/mutable.json");
+    ASSERT_FALSE(missing);
+    EXPECT_TRUE(missing.error().is<IOException>());
+    std::error_code ec;
+    ASSERT_TRUE(std::filesystem::create_directory(fsPath(path), ec));
+    ASSERT_FALSE(ec) << ec.message();
+    auto replaced = (*source)->file_size("/mutable.json");
+    ASSERT_FALSE(replaced);
+    EXPECT_TRUE(replaced.error().is<IOException>());
+    EXPECT_FALSE((*source)->open("/mutable.json"));
+    ASSERT_TRUE(std::filesystem::remove(fsPath(path), ec));
+    ASSERT_FALSE(ec) << ec.message();
+    ASSERT_TRUE(File::write_file(String("{}"), path));
+    size = (*source)->file_size("/mutable.json");
+    ASSERT_TRUE(size);
+    EXPECT_EQ(*size, 2);
+    (*assets)->hotReload();
+    EXPECT_TRUE((*assets)->json("/mutable.json"));
+
+    MemoryAssetSource memory("metadata-test");
+    memory.set("/bytes", ByteArray(std::span("one\0two", 7)));
+    memory.set("/image", Image(3, 2, PixelFormat::RGBA32));
+    auto bytes_size = memory.file_size("/bytes");
+    ASSERT_TRUE(bytes_size);
+    EXPECT_EQ(*bytes_size, 7);
+    auto image_size = memory.file_size("/image");
+    ASSERT_TRUE(image_size);
+    EXPECT_EQ(*image_size, 24);
+    for (auto const& asset_path : memory.assetPaths()) {
+      auto reader = memory.open(asset_path);
+      ASSERT_TRUE(reader);
+      auto reader_size = (*reader)->size();
+      ASSERT_TRUE(reader_size);
+      auto metadata_size = memory.file_size(asset_path);
+      ASSERT_TRUE(metadata_size);
+      EXPECT_EQ(*metadata_size, *reader_size);
+    }
+    memory.set("/bytes", ByteArray{});
+    bytes_size = memory.file_size("/bytes");
+    ASSERT_TRUE(bytes_size);
+    EXPECT_EQ(*bytes_size, 0);
+    ASSERT_TRUE(memory.erase("/bytes"));
+    EXPECT_FALSE(memory.file_size("/bytes"));
+  });
+
+const GameTestRegistration packedMetadataLengths(
+  "AssetsTest", "PackedMetadataLengthsValidateFreshExtentAndMalformedEntries", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    std::error_code ec;
+    ASSERT_TRUE(std::filesystem::create_directory(fsPath(original), ec));
+    ASSERT_FALSE(ec) << ec.message();
+    ASSERT_TRUE(File::write_file(String(std::string_view("one\0two", 7)), File::relative_to(original, "binary")));
+    auto source = DirectoryAssetSource::create(fixture.root().logger(), original);
+    ASSERT_TRUE(source);
+    auto packed_path = File::relative_to(*directory, "assets.pak");
+    ASSERT_TRUE(PackedAssetSource::build(**source, packed_path));
+    auto original_bytes = File::read_file(packed_path);
+    ASSERT_TRUE(original_bytes);
+    auto packed = PackedAssetSource::create(packed_path);
+    ASSERT_TRUE(packed);
+    auto size = (*packed)->file_size("/binary");
+    ASSERT_TRUE(size);
+    EXPECT_EQ(*size, 7);
+    EXPECT_FALSE((*packed)->file_size("/missing"));
+    auto payload = (*packed)->read("/binary");
+    ASSERT_TRUE(payload);
+    EXPECT_EQ(*payload, ByteArray(std::span("one\0two", 7)));
+    auto writable = File::open(packed_path, IOMode::ReadWrite);
+    ASSERT_TRUE(writable);
+    ASSERT_TRUE((*writable)->resize(22));// Asset starts at 16 and needs seven bytes.
+    auto truncated = (*packed)->file_size("/binary");
+    ASSERT_FALSE(truncated);
+    EXPECT_TRUE(truncated.error().is<AssetSourceException>());
+    EXPECT_FALSE((*packed)->open("/binary"));
+    EXPECT_FALSE((*packed)->read("/binary"));
+    EXPECT_FALSE(PackedAssetSource::create(packed_path));
+    ASSERT_TRUE((*writable)->close());
+    ASSERT_TRUE(File::write_file(*original_bytes, packed_path));
+    size = (*packed)->file_size("/binary");
+    ASSERT_TRUE(size);
+    EXPECT_EQ(*size, 7);
+    EXPECT_TRUE((*packed)->read("/binary"));
+
+    for (auto const& entry :
+         std::array{std::pair<std::uint64_t, std::uint64_t>{std::numeric_limits<std::uint64_t>::max(), 1},
+                    std::pair<std::uint64_t, std::uint64_t>{16, std::numeric_limits<std::uint64_t>::max()}}) {
+      auto malformed_path = File::relative_to(*directory, "malformed.pak");
+      DataStreamBuffer malformed;
+      ASSERT_TRUE(malformed.writeData(std::span("SBAsset6", 8)));
+      ASSERT_TRUE(malformed.write(std::uint64_t(16)));
+      ASSERT_TRUE(malformed.writeData(std::span("INDEX", 5)));
+      ASSERT_TRUE(malformed.write(JsonObject{}));
+      ASSERT_TRUE(malformed.write(StringMap<std::pair<std::uint64_t, std::uint64_t>>{{"/bad", entry}}));
+      ASSERT_TRUE(File::write_file(malformed.data(), malformed_path));
+      auto invalid = PackedAssetSource::create(malformed_path);
+      ASSERT_TRUE(invalid);
+      auto invalid_size = (*invalid)->file_size("/bad");
+      ASSERT_FALSE(invalid_size);
+      EXPECT_TRUE(invalid_size.error().is<AssetSourceException>());
+      EXPECT_FALSE((*invalid)->open("/bad"));
+      EXPECT_FALSE((*invalid)->read("/bad"));
+    }
+  });
+
+const GameTestRegistration assetMetadataDigest(
+  "AssetsTest", "MetadataDigestMatchesFormerReaderBytesForDirectoryAndPackedSources", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    std::error_code ec;
+    ASSERT_TRUE(std::filesystem::create_directory(fsPath(original), ec));
+    ASSERT_FALSE(ec) << ec.message();
+    auto patch_directory = File::relative_to(*directory, "patches");
+    ASSERT_TRUE(std::filesystem::create_directory(fsPath(patch_directory), ec));
+    ASSERT_FALSE(ec) << ec.message();
+    for (auto const& [name, bytes] :
+         std::array{std::pair{"preload.config", "[]"}, std::pair{"Mixed.json", R"({"original":true})"},
+                    std::pair{"ignored.txt", "excluded"},
+                    std::pair{"generated.lua", "assets.add('/memory.json', {generated = true})"},
+                    std::pair{"_metadata", R"({"scripts":{"postLoad":["/generated.lua"]}})"}}) {
+      ASSERT_TRUE(
+        File::write_file(String(std::string_view(bytes)), File::relative_to(original, String(std::string_view(name)))));
+    }
+    ASSERT_TRUE(File::write_file(String(R"([{"op":"add","path":"/patched","value":true}])"),
+                                 File::relative_to(patch_directory, "Mixed.json.patch")));
+    auto source = DirectoryAssetSource::create(fixture.root().logger(), original);
+    ASSERT_TRUE(source);
+    auto packed_path = File::relative_to(*directory, "assets.pak");
+    ASSERT_TRUE(PackedAssetSource::build(**source, packed_path));
+    auto patch_source = DirectoryAssetSource::create(fixture.root().logger(), patch_directory);
+    ASSERT_TRUE(patch_source);
+    auto packed_patch_path = File::relative_to(*directory, "patches.pak");
+    ASSERT_TRUE(PackedAssetSource::build(**patch_source, packed_patch_path));
+    std::optional<ByteArray> directory_digest;
+    // Explicit provider order, independent of directory versus packed index traversal.
+    for (auto const& [source_path, patch_path] :
+         std::array{std::pair{original, patch_directory}, std::pair{packed_path, packed_patch_path}}) {
+      Assets::Settings settings{};
+      settings.workerPoolSize = 1;
+      settings.digestIgnore = {"^/ignored\\.txt$"};
+      auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
+                                   {source_path, patch_path});
+      ASSERT_TRUE(assets) << assets.error().what();
+      auto historical = AssetWorkerTestAccess::reader_digest(**assets);
+      ASSERT_TRUE(historical) << historical.error().what();
+      EXPECT_EQ((*assets)->digest(), *historical);
+      if (directory_digest)
+        EXPECT_EQ((*assets)->digest(), *directory_digest);
+      else
+        directory_digest = (*assets)->digest();
+      auto generated = (*assets)->json("/memory.json");
+      ASSERT_TRUE(generated);
+      EXPECT_EQ(*generated, Json(JsonObject{{"generated", true}}));
+      auto patched = (*assets)->json("/mixed.json");
+      ASSERT_TRUE(patched);
+      EXPECT_EQ(*patched, Json(JsonObject{{"original", true}, {"patched", true}}));
+    }
+  });
 
 const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("AssetsTest", "ConstAnimationCachesRefreshFramesAndParts", [](GameTest&) {
   auto config = Json::parse(R"({
@@ -692,7 +955,7 @@ const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSi
   };
   auto device = [&]() -> std::expected<std::shared_ptr<Buffer>, StarException> {
     auto buffer = std::make_shared<Buffer>();
-    auto written = buffer->writeFull({reinterpret_cast<char const*>(bytes.data()), bytes.size()});
+    auto written = buffer->write_full({reinterpret_cast<char const*>(bytes.data()), bytes.size()});
     if (!written)
       return std::unexpected(std::move(written.error()));
     auto sought = buffer->seek(0);
@@ -844,81 +1107,84 @@ const GameTestRegistration assetsOggCloneLifetimes("AssetsTest", "OggCloneIndepe
   EXPECT_EQ(replay, original);
 });
 
-const GameTestRegistration assetsFailedStartupJoinsWorkers("AssetsTest", "FailedStartupJoinsWorkers", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory);
-  auto tempDir = std::move(*directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(tempDir)); });
-  Assets::Settings settings{};
-  settings.workerPoolSize = 4;
-  settings.assetTimeToLive = 10;
-  // Fail after worker launch, including completed preload work followed by failure.
-  Logger logger;
-  for (unsigned attempt = 0; attempt < 4; ++attempt) {
-    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-    ASSERT_FALSE(assets);
-    EXPECT_TRUE(assets.error().is<AssetException>());
-  }
+const GameTestRegistration
+  assetsFailedStartupJoinsWorkers("AssetsTest", "FailedStartupJoinsWorkers", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto tempDir = std::move(*directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
+    Assets::Settings settings{};
+    settings.workerPoolSize = 4;
+    settings.assetTimeToLive = 10;
+    // Fail after worker launch, including completed preload work followed by failure.
+    Logger logger;
+    for (unsigned attempt = 0; attempt < 4; ++attempt) {
+      auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+      ASSERT_FALSE(assets);
+      EXPECT_TRUE(assets.error().is<AssetException>());
+    }
 
-  ASSERT_TRUE(File::writeFile(String("not json"), File::relativeTo(tempDir, "preload.config")));
-  auto malformed = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-  ASSERT_FALSE(malformed);
-  EXPECT_TRUE(malformed.error().is<AssetException>());
+    ASSERT_TRUE(File::write_file(String("not json"), File::relative_to(tempDir, "preload.config")));
+    auto malformed = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+    ASSERT_FALSE(malformed);
+    EXPECT_TRUE(malformed.error().is<AssetException>());
 
-  ASSERT_TRUE(File::writeFile(String("{}"), File::relativeTo(tempDir, "present.json")));
-  ASSERT_TRUE(File::writeFile(
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(tempDir, "present.json")));
+    ASSERT_TRUE(File::write_file(
       String("[{\"type\":\"json\",\"path\":\"/present.json\"},{\"type\":\"json\",\"path\":\"/absent.json\"}]"),
-      File::relativeTo(tempDir, "preload.config")));
-  auto missing = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-  ASSERT_FALSE(missing);
-  EXPECT_TRUE(missing.error().is<AssetException>());
+      File::relative_to(tempDir, "preload.config")));
+    auto missing = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+    ASSERT_FALSE(missing);
+    EXPECT_TRUE(missing.error().is<AssetException>());
 
-  ASSERT_TRUE(File::writeFile(String("[{\"type\":\"image\",\"path\":\"relative.png\"}]"),
-      File::relativeTo(tempDir, "preload.config")));
-  auto invalid = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-  ASSERT_FALSE(invalid);
-  EXPECT_TRUE(invalid.error().is<AssetException>());
-  ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(tempDir, "preload.config")));
-  auto valid = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-  ASSERT_TRUE(valid);
-  auto recovered = (*valid)->json("/present.json");
-  ASSERT_TRUE(recovered);
-  EXPECT_EQ(*recovered, Json(JsonObject{}));
-});
+    ASSERT_TRUE(File::write_file(String("[{\"type\":\"image\",\"path\":\"relative.png\"}]"),
+                                 File::relative_to(tempDir, "preload.config")));
+    auto invalid = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+    ASSERT_FALSE(invalid);
+    EXPECT_TRUE(invalid.error().is<AssetException>());
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(tempDir, "preload.config")));
+    auto valid = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+    ASSERT_TRUE(valid);
+    auto recovered = (*valid)->json("/present.json");
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ(*recovered, Json(JsonObject{}));
+  });
 
-const GameTestRegistration assetsShutdownWithQueuedImageDependencies("AssetsTest", "ShutdownWithQueuedImageDependencies", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory);
-  auto tempDir = std::move(*directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(tempDir)); });
-  ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(tempDir, "preload.config")));
-  auto bytes = pngTestBytes(fixture.root().logger());
-  ASSERT_TRUE(bytes);
-  ASSERT_TRUE(File::writeFile(*bytes, File::relativeTo(tempDir, "sample.png")));
-  Assets::Settings settings{};
-  settings.workerPoolSize = 4;
-  settings.assetTimeToLive = 10;
-  for (unsigned attempt = 0; attempt < 16; ++attempt) {
-    auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
-    ASSERT_TRUE(assets);
-    ASSERT_TRUE((*assets)->queueImages(StringList{"/sample.png?flipx", "/sample.png?flipy", "/sample.png"}));
-  }
-});
+const GameTestRegistration
+  assetsShutdownWithQueuedImageDependencies("AssetsTest", "ShutdownWithQueuedImageDependencies", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto tempDir = std::move(*directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(tempDir, "preload.config")));
+    auto bytes = pngTestBytes(fixture.root().logger());
+    ASSERT_TRUE(bytes);
+    ASSERT_TRUE(File::write_file(*bytes, File::relative_to(tempDir, "sample.png")));
+    Assets::Settings settings{};
+    settings.workerPoolSize = 4;
+    settings.assetTimeToLive = 10;
+    for (unsigned attempt = 0; attempt < 16; ++attempt) {
+      auto assets =
+        Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
+      ASSERT_TRUE(assets);
+      ASSERT_TRUE((*assets)->queueImages(StringList{"/sample.png?flipx", "/sample.png?flipy", "/sample.png"}));
+    }
+  });
 
 const GameTestRegistration
   assetsQueuedLuaPatches("AssetsTest", "QueuedLuaPatchErrorsDoNotDiscardOtherResults", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
-    ASSERT_TRUE(File::writeFile(String("{}"), File::relativeTo(*directory, "broken.json")));
-    ASSERT_TRUE(File::writeFile(String("function patch() error('deliberate patch failure') end"),
-                                File::relativeTo(*directory, "broken.json.patch.lua")));
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "broken.json")));
+    ASSERT_TRUE(File::write_file(String("function patch() error('deliberate patch failure') end"),
+                                 File::relative_to(*directory, "broken.json.patch.lua")));
     StringList paths{"/broken.json"};
     for (unsigned i = 0; i != 32; ++i) {
       auto name = strf("queued{}.json", i);
-      ASSERT_TRUE(File::writeFile(String(strf("{{\"index\":{}}}", i)), File::relativeTo(*directory, name)));
-      ASSERT_TRUE(File::writeFile(String(R"lua(function patch(asset)
+      ASSERT_TRUE(File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
+      ASSERT_TRUE(File::write_file(String(R"lua(function patch(asset)
       local garbage = {}
       for i = 1, 128 do
         local node = {value = i}
@@ -928,7 +1194,7 @@ const GameTestRegistration
       asset.result = asset.index + garbage[128].value
       return asset
     end)lua"),
-                                  File::relativeTo(*directory, name + ".patch.lua")));
+                                   File::relative_to(*directory, name + ".patch.lua")));
       paths.append("/" + name);
     }
     Assets::Settings settings{};
@@ -948,25 +1214,25 @@ const GameTestRegistration
   });
 
 const GameTestRegistration assetsSharedPatchStateAcrossDrains(
-    "AssetsTest", "SharedPatchStateSurvivesQueueDrainsAndErrors", [](GameTest& fixture) {
-  auto directory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-  ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
-  StringList paths;
-  JsonArray targets;
-  for (unsigned i = 0; i <= 32; ++i) {
-    auto name = strf("shared{}.json", i);
-    ASSERT_TRUE(File::writeFile(String(strf("{{\"index\":{}}}", i)), File::relativeTo(*directory, name)));
-    paths.append("/" + name);
-    targets.emplace_back(paths.back());
-  }
-  Json patchList = JsonArray{JsonObject{{"paths", std::move(targets)}, {"patches", JsonArray{"/shared.lua"}}}};
-  auto encoded = patchList.repr();
-  ASSERT_TRUE(encoded);
-  // Patch lists attach to already registered targets in source scan order.
-  ASSERT_TRUE(File::writeFile(*encoded, File::relativeTo(*directory, "zz-shared.patchlist")));
-  ASSERT_TRUE(File::writeFile(String(R"lua(counter = 0
+  "AssetsTest", "SharedPatchStateSurvivesQueueDrainsAndErrors", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    StringList paths;
+    JsonArray targets;
+    for (unsigned i = 0; i <= 32; ++i) {
+      auto name = strf("shared{}.json", i);
+      ASSERT_TRUE(File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
+      paths.append("/" + name);
+      targets.emplace_back(paths.back());
+    }
+    Json patchList = JsonArray{JsonObject{{"paths", std::move(targets)}, {"patches", JsonArray{"/shared.lua"}}}};
+    auto encoded = patchList.repr();
+    ASSERT_TRUE(encoded);
+    // Patch lists attach to already registered targets in source scan order.
+    ASSERT_TRUE(File::write_file(*encoded, File::relative_to(*directory, "zz-shared.patchlist")));
+    ASSERT_TRUE(File::write_file(String(R"lua(counter = 0
 function patch(asset)
   counter = counter + 1
   local garbage = {}
@@ -979,46 +1245,47 @@ function patch(asset)
   asset.serial = counter
   return asset
 end
-)lua"), File::relativeTo(*directory, "shared.lua")));
-  for (unsigned workerCount : {1u, 4u}) {
-    Assets::Settings settings{};
-    settings.workerPoolSize = workerCount;
-    settings.assetTimeToLive = 600;
-    Logger logger;
-    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
-    ASSERT_TRUE(assets);
-    std::set<std::int64_t> serials;
-    for (unsigned begin = 0; begin < 32; begin += 8) {
-      StringList batch;
-      for (unsigned i = begin; i < begin + 8; ++i)
-        batch.append(paths[i]);
-      ASSERT_TRUE((*assets)->queueJsons(batch));
-      auto drained = AssetWorkerTestAccess::drain(**assets);
-      ASSERT_TRUE(drained) << drained.error().what();
-      for (unsigned i = begin; i < begin + 8; ++i) {
-        auto loaded = (*assets)->json(paths[i]);
-        if (i == 17) {
-          EXPECT_FALSE(loaded);
-          continue;
+)lua"),
+                                 File::relative_to(*directory, "shared.lua")));
+    for (unsigned workerCount : {1u, 4u}) {
+      Assets::Settings settings{};
+      settings.workerPoolSize = workerCount;
+      settings.assetTimeToLive = 600;
+      Logger logger;
+      auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+      ASSERT_TRUE(assets);
+      std::set<std::int64_t> serials;
+      for (unsigned begin = 0; begin < 32; begin += 8) {
+        StringList batch;
+        for (unsigned i = begin; i < begin + 8; ++i)
+          batch.append(paths[i]);
+        ASSERT_TRUE((*assets)->queueJsons(batch));
+        auto drained = AssetWorkerTestAccess::drain(**assets);
+        ASSERT_TRUE(drained) << drained.error().what();
+        for (unsigned i = begin; i < begin + 8; ++i) {
+          auto loaded = (*assets)->json(paths[i]);
+          if (i == 17) {
+            EXPECT_FALSE(loaded);
+            continue;
+          }
+          ASSERT_TRUE(loaded) << loaded.error().what();
+          auto serial = loaded->getInt("serial");
+          ASSERT_TRUE(serial);
+          EXPECT_GE(*serial, 1);
+          EXPECT_LE(*serial, 32);
+          EXPECT_TRUE(serials.insert(*serial).second);
         }
-        ASSERT_TRUE(loaded) << loaded.error().what();
-        auto serial = loaded->getInt("serial");
-        ASSERT_TRUE(serial);
-        EXPECT_GE(*serial, 1);
-        EXPECT_LE(*serial, 32);
-        EXPECT_TRUE(serials.insert(*serial).second);
       }
+      EXPECT_EQ(serials.size(), 31u);
+      auto final = (*assets)->json(paths[32]);
+      ASSERT_TRUE(final) << final.error().what();
+      auto count = final->getInt("serial");
+      ASSERT_TRUE(count);
+      EXPECT_EQ(*count, 33);
+      EXPECT_FALSE((*assets)->json(paths[17]));
+      assets->reset();
     }
-    EXPECT_EQ(serials.size(), 31u);
-    auto final = (*assets)->json(paths[32]);
-    ASSERT_TRUE(final) << final.error().what();
-    auto count = final->getInt("serial");
-    ASSERT_TRUE(count);
-    EXPECT_EQ(*count, 33);
-    EXPECT_FALSE((*assets)->json(paths[17]));
-    assets->reset();
-  }
-});
+  });
 
 const GameTestRegistration pngRoundTripPreservesPixelsAndMetadata("ImageTest", "PngRoundTripPreservesPixelsAndMetadata", [](GameTest& fixture) {
   for (auto format : {PixelFormat::RGB24, PixelFormat::RGBA32}) {
@@ -1120,12 +1387,12 @@ const GameTestRegistration invalidPngWriteThrows("ImageTest", "InvalidPngWriteTh
 
 const GameTestRegistration assetsFailureCacheReload(
   "AssetsTest", "QueuedFailureSurvivesCacheClearAndRecoversAfterReload", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
-    auto path = File::relativeTo(*directory, "failure.json");
-    ASSERT_TRUE(File::writeFile(String("{ invalid json"), path));
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    auto path = File::relative_to(*directory, "failure.json");
+    ASSERT_TRUE(File::write_file(String("{ invalid json"), path));
     Assets::Settings settings{};
     settings.workerPoolSize = 2;
     settings.assetTimeToLive = 600;
@@ -1139,7 +1406,7 @@ const GameTestRegistration assetsFailureCacheReload(
     EXPECT_TRUE(first.error().is<AssetException>());
     EXPECT_EQ(first.error().diagnosticSummary()->asset, "/failure.json");
     auto reason = first.error().diagnosticSummary()->reason;
-    ASSERT_TRUE(File::writeFile(String(R"({"recovered":42})"), path));
+    ASSERT_TRUE(File::write_file(String(R"({"recovered":42})"), path));
     (*assets)->clearCache();
     auto cached = (*assets)->json("/failure.json");
     ASSERT_FALSE(cached);
@@ -1154,17 +1421,16 @@ const GameTestRegistration assetsFailureCacheReload(
 
 const GameTestRegistration recoverableDatabaseProvider(
   "AssetsTest", "RecoverableDatabaseFailureReportsProviderAndKeepsFallback", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    ASSERT_TRUE(File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config")));
-    ASSERT_TRUE(File::writeFile(
-        String(R"({"name":"dance_recovery","friendlyName":"Dance Recovery Provider"})"),
-        File::relativeTo(*directory, "_metadata")));
-    ASSERT_TRUE(File::writeFile(String("{}"), File::relativeTo(*directory, "broken.dance")));
-    ASSERT_TRUE(File::writeFile(
-        String(R"({"name":"assetmissing","states":[],"cycle":1,"cyclic":true,"duration":1,"steps":[]})"),
-        File::relativeTo(*directory, "fallback.dance")));
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(R"({"name":"dance_recovery","friendlyName":"Dance Recovery Provider"})"),
+                                 File::relative_to(*directory, "_metadata")));
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "broken.dance")));
+    ASSERT_TRUE(
+      File::write_file(String(R"({"name":"assetmissing","states":[],"cycle":1,"cyclic":true,"duration":1,"steps":[]})"),
+                       File::relative_to(*directory, "fallback.dance")));
     class Errors : public LogSink {
     public:
       Errors() { setLevel(LogLevel::Error); }

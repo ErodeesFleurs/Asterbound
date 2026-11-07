@@ -1,3 +1,9 @@
+#ifndef STAR_SYSTEM_FAMILY_WINDOWS
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 import std;
 import star.set;
 import star.list;
@@ -12,6 +18,9 @@ import star.bi_map;
 import star.data_stream;
 import star.data_stream_devices;
 import star.byte_array;
+import star.file;
+import star.io_device;
+import star.random;
 
 #include "gtest/gtest.h"
 
@@ -658,3 +667,231 @@ TEST(IdMapTest, HashDecodeAcceptsAnOccupiedCursorAndKeepsFraming) {
   ASSERT_TRUE(sentinel);
   EXPECT_EQ(*sentinel, 0xa5);
 }
+
+namespace {
+std::filesystem::path native_test_path(String const& path) {
+  return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8Ptr()), path.utf8Size()));
+}
+
+struct NativePathCleanup {
+  String path;
+  ~NativePathCleanup() {
+    std::error_code ignored;
+    std::filesystem::remove_all(native_test_path(path), ignored);
+  }
+};
+
+class FileNativeTest : public testing::Test {
+protected:
+  void SetUp() override {
+    auto random = RandomService::create();
+    ASSERT_TRUE(random);
+    auto directory = File::temporary_directory(**random);
+    ASSERT_TRUE(directory);
+    directory_path = std::move(*directory);
+  }
+
+  void TearDown() override {
+    if (directory_path.empty())
+      return;
+    std::error_code ignored;
+    std::filesystem::remove_all(native_test_path(directory_path), ignored);
+  }
+
+  String child(String const& name) const { return File::relative_to(directory_path, name); }
+
+  String directory_path;
+};
+}// namespace
+
+TEST_F(FileNativeTest, StatusDistinguishesMissingWrongTypeAndMetadata) {
+  auto regular = child("regular");
+  ASSERT_TRUE(File::write_file(String("payload"), regular));
+  for (auto const& missing : {child("missing"), File::relative_to(regular, "child")}) {
+    EXPECT_EQ(File::exists(missing), false);
+    EXPECT_EQ(File::is_regular_file(missing), false);
+    EXPECT_EQ(File::is_directory(missing), false);
+    EXPECT_EQ(File::is_symlink(missing), false);
+    EXPECT_FALSE(File::file_size(missing));
+  }
+  EXPECT_EQ(File::exists(regular), true);
+  EXPECT_EQ(File::is_regular_file(regular), true);
+  EXPECT_EQ(File::is_directory(regular), false);
+  EXPECT_EQ(File::is_regular_file(directory_path), false);
+  EXPECT_EQ(File::is_directory(directory_path), true);
+  EXPECT_EQ(File::file_size(regular), 7);
+  EXPECT_FALSE(File::file_size(directory_path));
+}
+
+TEST_F(FileNativeTest, NamedTemporaryAcquisitionRetriesOnlyCollisions) {
+  auto entropy = RandomService::create();
+  ASSERT_TRUE(entropy);
+  auto seed = (*entropy)->randu64();
+  RandomService first(seed);
+  RandomService repeated(seed);
+  auto candidate_file = File::temporary_file(first);
+  ASSERT_TRUE(candidate_file);
+  auto candidate = (*candidate_file)->file_name();
+  NativePathCleanup candidate_cleanup{candidate};
+  ASSERT_TRUE((*candidate_file)->write_full(String("do not truncate").utf8()));
+  ASSERT_TRUE((*candidate_file)->close());
+  auto temporary = File::temporary_file(repeated);
+  ASSERT_TRUE(temporary);
+  NativePathCleanup temporary_cleanup{(*temporary)->file_name()};
+  EXPECT_NE((*temporary)->file_name(), candidate);
+  EXPECT_EQ(File::read_file_string(candidate), String("do not truncate"));
+  EXPECT_EQ((*temporary)->size(), 0);
+  ASSERT_TRUE((*temporary)->close());
+}
+
+TEST_F(FileNativeTest, TemporaryDirectoriesDoNotAdoptExistingDirectory) {
+  auto entropy = RandomService::create();
+  ASSERT_TRUE(entropy);
+  auto seed = (*entropy)->randu64();
+  RandomService first(seed);
+  RandomService repeated(seed);
+  auto original = File::temporary_directory(first);
+  ASSERT_TRUE(original);
+  NativePathCleanup original_cleanup{*original};
+  auto marker = File::relative_to(*original, "marker");
+  ASSERT_TRUE(File::write_file(String("retained"), marker));
+  auto next = File::temporary_directory(repeated);
+  ASSERT_TRUE(next);
+  NativePathCleanup next_cleanup{*next};
+  EXPECT_NE(*original, *next);
+  EXPECT_EQ(File::read_file_string(marker), String("retained"));
+}
+
+TEST_F(FileNativeTest, ReplacementDoesNotClobberExistingStagingFile) {
+  auto target = child("target");
+  auto stage = target + ".new";
+  ASSERT_TRUE(File::write_file(String("original"), target));
+  ASSERT_TRUE(File::write_file(String("unrelated staging data"), stage));
+  EXPECT_FALSE(File::overwrite_file_with_rename(String("replacement"), target));
+  EXPECT_EQ(File::read_file_string(target), String("original"));
+  EXPECT_EQ(File::read_file_string(stage), String("unrelated staging data"));
+}
+
+TEST_F(FileNativeTest, ReplacementCompletesAndFailedRenamePreservesTarget) {
+  auto target = child("target");
+  ASSERT_TRUE(File::write_file(String("original"), target));
+  String bytes(std::string(16385, '\0'));
+  ASSERT_TRUE(File::overwrite_file_with_rename(bytes, target));
+  EXPECT_EQ(File::read_file_string(target), bytes);
+  EXPECT_EQ(File::exists(target + ".new"), false);
+  EXPECT_FALSE(File::rename(child("missing-source"), target));
+  EXPECT_EQ(File::read_file_string(target), bytes);
+  // A same-path request may succeed or be rejected by the native API, but must
+  // never move the only copy away or delete its contents.
+  auto same_path = File::rename(target, target);
+  (void)same_path;
+  EXPECT_EQ(File::read_file_string(target), bytes);
+}
+
+TEST_F(FileNativeTest, FailedReplacementDoesNotFallBackToDirectWrite) {
+  auto target = child("target-directory");
+  ASSERT_TRUE(File::create_directory(target));
+  auto marker = File::relative_to(target, "marker");
+  ASSERT_TRUE(File::write_file(String("keep"), marker));
+  EXPECT_FALSE(File::overwrite_file_with_rename(String("replacement"), target));
+  EXPECT_EQ(File::is_directory(target), true);
+  EXPECT_EQ(File::read_file_string(marker), String("keep"));
+  EXPECT_EQ(File::exists(target + ".new"), false);
+  ASSERT_TRUE(File::remove_all(target));
+  ASSERT_TRUE(File::overwrite_file_with_rename(String("recovered"), target));
+  EXPECT_EQ(File::read_file_string(target), String("recovered"));
+}
+
+#ifndef STAR_SYSTEM_FAMILY_WINDOWS
+TEST_F(FileNativeTest, StatusReportsSymlinkLoopsButRecognizesBrokenSymlinks) {
+  auto loop = child("loop");
+  ASSERT_EQ(::symlink("loop", loop.utf8Ptr()), 0);
+  EXPECT_FALSE(File::exists(loop));
+  EXPECT_FALSE(File::is_regular_file(loop));
+  EXPECT_FALSE(File::is_directory(loop));
+  EXPECT_FALSE(File::file_size(loop));
+  EXPECT_EQ(File::is_symlink(loop), true);
+  auto broken = child("broken");
+  ASSERT_EQ(::symlink("absent", broken.utf8Ptr()), 0);
+  EXPECT_EQ(File::exists(broken), false);
+  EXPECT_EQ(File::is_regular_file(broken), false);
+  EXPECT_EQ(File::is_directory(broken), false);
+  EXPECT_EQ(File::is_symlink(broken), true);
+}
+
+TEST_F(FileNativeTest, ExclusiveStagingNeverFollowsSymlinks) {
+  auto target = child("target");
+  auto unrelated = child("unrelated");
+  ASSERT_TRUE(File::write_file(String("original"), target));
+  ASSERT_TRUE(File::write_file(String("untouched"), unrelated));
+  ASSERT_EQ(::symlink(unrelated.utf8Ptr(), (target + ".new").utf8Ptr()), 0);
+  EXPECT_FALSE(File::overwrite_file_with_rename(String("replacement"), target));
+  EXPECT_EQ(File::read_file_string(target), String("original"));
+  EXPECT_EQ(File::read_file_string(unrelated), String("untouched"));
+}
+
+TEST_F(FileNativeTest, NativeSizeDoesNotMoveCursorAndRejectsNonregularDevices) {
+  auto regular = child("regular");
+  ASSERT_TRUE(File::write_file(String("payload"), regular));
+  auto file = File::open(regular, IOMode::Read);
+  ASSERT_TRUE(file);
+  ASSERT_TRUE((*file)->seek(3));
+  EXPECT_EQ((*file)->size(), 7);
+  EXPECT_EQ((*file)->pos(), 3);
+  auto device = File::open("/dev/null", IOMode::Read);
+  ASSERT_TRUE(device);
+  EXPECT_FALSE((*device)->size());
+  EXPECT_FALSE(File::file_size("/dev/null"));
+  char byte;
+  EXPECT_EQ((*device)->read(std::span<char>(&byte, 1)), 0u);
+  auto fifo = child("fifo");
+  ASSERT_EQ(::mkfifo(fifo.utf8Ptr(), 0600), 0);
+  EXPECT_FALSE(File::open(fifo, IOMode::ReadWrite | IOMode::Append));
+  EXPECT_FALSE(File::file_size(fifo));
+}
+#endif
+
+#ifdef STAR_SYSTEM_LINUX
+TEST_F(FileNativeTest, NonblockingReadFailureIsNotReportedAsEndOfFile) {
+  auto fifo = child("fifo");
+  ASSERT_EQ(::mkfifo(fifo.utf8Ptr(), 0600), 0);
+  auto file = File::open(fifo, IOMode::ReadWrite);
+  ASSERT_TRUE(file);
+  // Locate the actual owned descriptor without adding a public native-handle
+  // escape hatch solely for the test.
+  int descriptor = -1;
+  std::error_code error;
+  for (std::filesystem::directory_iterator entry("/proc/self/fd", error), end; !error && entry != end;
+       entry.increment(error)) {
+    auto target = std::filesystem::read_symlink(entry->path(), error);
+    if (error)
+      break;
+    if (target == native_test_path(fifo)) {
+      auto name = entry->path().filename().native();
+      auto parsed = std::from_chars(name.data(), name.data() + name.size(), descriptor);
+      ASSERT_EQ(parsed.ec, std::errc{});
+      break;
+    }
+  }
+  ASSERT_FALSE(error);
+  ASSERT_GE(descriptor, 0);
+  auto flags = ::fcntl(descriptor, F_GETFL);
+  ASSERT_GE(flags, 0);
+  ASSERT_EQ(::fcntl(descriptor, F_SETFL, flags | O_NONBLOCK), 0);
+  char byte;
+  auto read = (*file)->read(std::span<char>(&byte, 1));
+  ASSERT_FALSE(read);
+  EXPECT_TRUE(read.error().is<IOException>());
+  EXPECT_FALSE((*file)->at_end());
+}
+#endif
+
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+TEST_F(FileNativeTest, StatusRetainsNativeWildcardMatching) {
+  ASSERT_TRUE(File::write_file(String("payload"), child("match.txt")));
+  EXPECT_EQ(File::exists(child("match.*")), true);
+  EXPECT_EQ(File::is_regular_file(child("match.*")), true);
+  EXPECT_EQ(File::exists(child("missing.*")), false);
+  EXPECT_EQ(File::is_regular_file(child("missing.*")), false);
+}
+#endif

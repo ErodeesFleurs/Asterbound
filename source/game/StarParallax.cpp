@@ -359,14 +359,14 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(baseCount.error()));
   int baseCountValue = *baseCount;
   int base = rnd.randInt(baseCountValue - 1) + 1;
-  layer.textures.append(AssetPath::relativeTo(texPath, "base/" + toString<int>(base) + ".png"));
+  layer.textures.append(AssetPath::relative_to(texPath, "base/" + toString<int>(base) + ".png"));
   auto modCount = layerSettings.getInt("modCount", 0);
   if (!modCount)
     return std::unexpected(std::move(modCount.error()));
   int modCountValue = *modCount;
   int mod = rnd.randInt(modCountValue);
   if (mod != 0)
-    layer.textures.append(AssetPath::relativeTo(texPath, "mod/" + toString<int>(mod) + ".png"));
+    layer.textures.append(AssetPath::relative_to(texPath, "mod/" + toString<int>(mod) + ".png"));
 
   auto parallaxConfig = layerSettings.get("parallax");
   if (!parallaxConfig)

@@ -327,7 +327,7 @@ std::expected<void, StarException> SystemWorldServerThread::store() {
   auto versioned = (*versioning)->makeCurrentVersionedJson("System", *data);
   if (!versioned)
     return std::unexpected(std::move(versioned.error()));
-  return VersionedJson::writeFile(*versioned, m_storageFile);
+  return VersionedJson::write_file(*versioned, m_storageFile);
 }
 
 }

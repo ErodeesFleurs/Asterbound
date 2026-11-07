@@ -784,7 +784,7 @@ namespace Dungeon {
     if (assetDefinitions->type() == Json::Type::String) {
       auto asset = assetDefinitions->toString();
       if (!asset) return std::unexpected(std::move(asset.error()));
-      auto loaded = reader->readAsset(AssetPath::relativeTo(dungeon.directory(), *asset));
+      auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
       if (!loaded) return std::unexpected(std::move(loaded.error()));
     } else {
       auto assets = assetDefinitions->iterateArray();
@@ -792,7 +792,7 @@ namespace Dungeon {
       for (auto const& definition : *assets) {
         auto asset = definition.toString();
         if (!asset) return std::unexpected(std::move(asset.error()));
-        auto loaded = reader->readAsset(AssetPath::relativeTo(dungeon.directory(), *asset));
+        auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
         if (!loaded) return std::unexpected(std::move(loaded.error()));
       }
     }

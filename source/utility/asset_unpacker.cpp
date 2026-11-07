@@ -53,15 +53,15 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
   if (!assetsPack)
     return std::unexpected(std::move(assetsPack.error()));
 
-  auto outputIsDirectory = File::isDirectory(outputFolderPath);
+  auto outputIsDirectory = File::is_directory(outputFolderPath);
   if (!outputIsDirectory)
     return std::unexpected(std::move(outputIsDirectory.error()));
   if (!*outputIsDirectory) {
-    auto madeDirectory = File::makeDirectory(outputFolderPath);
+    auto madeDirectory = File::create_directory(outputFolderPath);
     if (!madeDirectory)
       return std::unexpected(std::move(madeDirectory.error()));
   }
-  auto changedDirectory = File::changeDirectory(outputFolderPath);
+  auto changedDirectory = File::change_directory(outputFolderPath);
   if (!changedDirectory)
     return std::unexpected(std::move(changedDirectory.error()));
 
@@ -90,11 +90,11 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
       if (!fileData)
         return std::unexpected(std::move(fileData.error()));
       auto relativePath = "." + file;
-      auto relativeDir = File::dirName(relativePath);
-      auto madeDirectory = File::makeDirectoryRecursive(relativeDir);
+      auto relativeDir = File::dir_name(relativePath);
+      auto madeDirectory = File::create_directories(relativeDir);
       if (!madeDirectory)
         return std::unexpected(std::move(madeDirectory.error()));
-      auto written = File::writeFile(*fileData, relativePath);
+      auto written = File::write_file(*fileData, relativePath);
       if (!written)
         return std::unexpected(std::move(written.error()));
       if (verbose)
@@ -115,7 +115,7 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
     auto printed = Json(std::move(metadata)).printJson(2);
     if (!printed)
       return std::unexpected(std::move(printed.error()));
-    auto written = File::writeFile(*printed, "_metadata");
+    auto written = File::write_file(*printed, "_metadata");
     if (!written)
       return std::unexpected(std::move(written.error()));
   }

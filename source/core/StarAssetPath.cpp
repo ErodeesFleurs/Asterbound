@@ -155,7 +155,7 @@ String AssetPath::extension(String const& path) {
   return String(file.utf8().substr(lastDot + 1));
 }
 
-String AssetPath::relativeTo(String const& sourcePath, String const& givenPath) {
+String AssetPath::relative_to(String const& sourcePath, String const& givenPath) {
   if (!givenPath.empty() && givenPath.utf8()[0] == '/')
     return givenPath;
 

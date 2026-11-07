@@ -49,7 +49,7 @@ struct FontImpl {
 };
 
 std::expected<std::shared_ptr<Font>, StarException> Font::loadFont(FontLibrary const& library, String const& fileName, unsigned pixelSize) {
-  auto bytes = File::readFile(fileName);
+  auto bytes = File::read_file(fileName);
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   return loadFont(library, std::make_shared<ByteArray>(std::move(*bytes)), pixelSize);

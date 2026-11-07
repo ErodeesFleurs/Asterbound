@@ -1002,7 +1002,7 @@ template <typename ResponsePacket> void messageResponseWireCompatibility() {
     ASSERT_TRUE(decoded.read(wire));
     EXPECT_EQ(decoded.response, response);
     EXPECT_EQ(decoded.uuid, *uuid);
-    auto atEnd = wire.atEnd();
+    auto atEnd = wire.at_end();
     ASSERT_TRUE(atEnd);
     EXPECT_TRUE(*atEnd);
   }
@@ -1023,7 +1023,7 @@ template <typename ResponsePacket> void messageResponseUnknownTags() {
       ASSERT_TRUE(decoded.read(wire));
       EXPECT_EQ(decoded.response, previous);
       EXPECT_EQ(decoded.uuid, *uuid);
-      auto atEnd = wire.atEnd();
+      auto atEnd = wire.at_end();
       ASSERT_TRUE(atEnd);
       EXPECT_TRUE(*atEnd);
 

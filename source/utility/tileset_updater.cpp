@@ -74,7 +74,7 @@ void Tileset::defineTile(std::shared_ptr<::Star::Tile> const& tile) {
 
 [[nodiscard]]
 std::expected<std::optional<std::pair<String, String>>, StarException> parseAssetSource(String const& source) {
-  auto directory = File::isDirectory(source);
+  auto directory = File::is_directory(source);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory)
@@ -103,7 +103,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   auto const& [sourceName, sourcePath] = **parsedSource;
   String exportDir = tilesetExportDir(sourcePath, sourceName);
   String tilesetPath = unixFileJoin(exportDir, m_name + ".json");
-  auto directory = File::makeDirectoryRecursive(File::dirName(tilesetPath));
+  auto directory = File::create_directories(File::dir_name(tilesetPath));
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   auto logged = m_logger.info("Updating tileset at {}", tilesetPath);
@@ -150,7 +150,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   auto images = exportTilesetImages(exportDir);
   if (!images)
     return std::unexpected(std::move(images.error()));
-  return File::overwriteFileWithRename(*text, tilesetPath);
+  return File::overwrite_file_with_rename(*text, tilesetPath);
 }
 
 String Tileset::name() const {
@@ -211,7 +211,7 @@ Json Tileset::tileImageReference(String const& tileName, String const& database)
 std::expected<void, StarException> Tileset::exportTilesetImages(String const& exportDir) const {
   for (auto const& tile : m_tiles) {
     String imageDir = unixFileJoin(imageDirName(exportDir), tile->database);
-    auto directory = File::makeDirectoryRecursive(imageDir);
+    auto directory = File::create_directories(imageDir);
     if (!directory)
       return std::unexpected(std::move(directory.error()));
     String imageName = unixFileJoin(imageDir, tile->name + ".png");
@@ -236,7 +236,7 @@ std::expected<Json, StarException> Tileset::getTilesetJson(String const& tileset
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (*exists) {
-    auto text = File::readFileString(tilesetPath);
+    auto text = File::read_file_string(tilesetPath);
     if (!text)
       return std::unexpected(std::move(text.error()));
     return Json::parseJson(*text);
@@ -353,19 +353,19 @@ std::expected<void, StarException> TilesetUpdater::defineAssetSource(String cons
   auto logged = m_logger.info("Scanning {} for images...", imageDir);
   if (!logged)
     return std::unexpected(std::move(logged.error()));
-  auto directory = File::isDirectory(imageDir);
+  auto directory = File::is_directory(imageDir);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory)
     return {};
 
-  auto entries = File::dirList(imageDir);
+  auto entries = File::directory_entries(imageDir);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (std::pair<String, bool> const& entry : *entries) {
     // Never follow a symlinked directory: it can point outside of the asset
     // source, or at one of its own parents.
-    auto symlink = File::isSymlink(unixFileJoin(imageDir, entry.first));
+    auto symlink = File::is_symlink(unixFileJoin(imageDir, entry.first));
     if (!symlink)
       return std::unexpected(std::move(symlink.error()));
     if (*symlink) {
@@ -381,7 +381,7 @@ std::expected<void, StarException> TilesetUpdater::defineAssetSource(String cons
       auto loggedDatabase = m_logger.info("Scanning database {}...", databaseName);
       if (!loggedDatabase)
         return std::unexpected(std::move(loggedDatabase.error()));
-      auto images = File::dirList(databasePath);
+      auto images = File::directory_entries(databasePath);
       if (!images)
         return std::unexpected(std::move(images.error()));
       for (std::pair<String, bool> const& image : *images) {
@@ -429,7 +429,7 @@ std::expected<void, StarException> TilesetUpdater::exportTilesets() {
       StringSet unusedImages = m_preexistingImages[sourceName][database->name()].difference(database->tileNames());
       for (String tileName : unusedImages) {
         String tileImagePath = unixFileJoin(databaseImagePath, tileName + ".png");
-        auto file = File::isFile(tileImagePath);
+        auto file = File::is_regular_file(tileImagePath);
         if (!file)
           return std::unexpected(std::move(file.error()));
         if (!*file)

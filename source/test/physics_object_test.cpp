@@ -30,7 +30,7 @@ const GameTestRegistration
     // The empty world is sparse: no sectors or terrain need to be generated to
     // initialize an anchor-free object and index its physics bounds.
     Vec2U worldSize(32768, 32768);
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto created = WorldServer::create(fixture.root(), worldSize, *storage);
     ASSERT_TRUE(created) << created.error().what();

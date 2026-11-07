@@ -142,7 +142,7 @@ namespace Star {
     auto oldBlockSize = m_blockSize;
     auto oldKeySize = m_keySize;
     auto oldIdentifier = m_contentIdentifier;
-    bool openedDevice = m_device && !m_device->isOpen();
+    bool openedDevice = m_device && !m_device->is_open();
     std::optional<StreamOffset> initialDeviceSize;
     auto initialize = [&]() -> std::expected<bool, StarException> {
 
@@ -150,10 +150,9 @@ namespace Star {
         return std::unexpected(DBException("BlockStorage::open called with no IODevice set"));
       }
 
-      if (!m_device->isOpen()) {
+      if (!m_device->is_open()) {
         auto result103 = m_device->open(IOMode::ReadWrite);
         if (!result103) return std::unexpected(std::move(result103.error()));
-
       }
 
       auto result104 = m_device->size();
@@ -165,7 +164,7 @@ namespace Star {
         auto result105 = ds.seek(0);
         if (!result105) return std::unexpected(std::move(result105.error()));
 
-        auto result106 = ds.readBytes(VersionMagicSize);
+        auto result106 = ds.read_bytes(VersionMagicSize);
         if (!result106) return std::unexpected(std::move(result106.error()));
         auto magic = std::move(*result106);
         if (magic != ByteArray(std::span(VersionMagic))) {
@@ -179,7 +178,7 @@ namespace Star {
           return std::unexpected(DBException("Invalid database block size"));
         }
 
-        auto result108 = ds.readBytes(ContentIdentifierStringSize);
+        auto result108 = ds.read_bytes(ContentIdentifierStringSize);
         if (!result108) return std::unexpected(std::move(result108.error()));
         auto contentIdentifier = std::move(*result108);
         auto identifierBytes = contentIdentifier.span();
@@ -194,10 +193,9 @@ namespace Star {
         auto result110 = readRoot();
         if (!result110) return std::unexpected(std::move(result110.error()));
 
-        if (m_device->isWritable()) {
+        if (m_device->is_writable()) {
           auto result111 = m_device->resize(m_deviceSize);
           if (!result111) return std::unexpected(std::move(result111.error()));
-
         }
 
         return false;
@@ -248,7 +246,7 @@ namespace Star {
     if (!initialized) {
 
       auto failure = std::move(initialized.error());
-      if (initialDeviceSize == 0 && m_device && m_device->isOpen() && m_device->isWritable()) {
+      if (initialDeviceSize == 0 && m_device && m_device->is_open() && m_device->is_writable()) {
         auto truncated = m_device->resize(0);
         if (!truncated)
           failure = DBException(strf("Opening database failed; removing the partial new database also failed: {}", truncated.error().what()), ExceptionDiagnostic(failure));
@@ -266,7 +264,7 @@ namespace Star {
       m_uncommitted.clear();
       m_uncommittedWrites.clear();
       m_indexCache.clear();
-      if (openedDevice && m_device->isOpen()) {
+      if (openedDevice && m_device->is_open()) {
         auto closed = m_device->close();
         if (!closed)
           failure = DBException(strf("Opening database failed; closing its device also failed: {}", closed.error().what()), ExceptionDiagnostic(failure));
@@ -492,7 +490,7 @@ namespace Star {
     if (auto rootRead = readRoot(); !rootRead)
       return std::unexpected(std::move(rootRead.error()));
 
-    if (m_device->isWritable())
+    if (m_device->is_writable())
       return m_device->resize(m_deviceSize);
     return {};
   }
@@ -511,7 +509,7 @@ namespace Star {
       m_indexCache.clear();
 
       m_open = false;
-      if (closeDevice && m_device && m_device->isOpen())
+      if (closeDevice && m_device && m_device->is_open())
         return m_device->close();
     }
     return {};
@@ -727,7 +725,7 @@ namespace Star {
     if (!result247) return std::unexpected(std::move(result247.error()));
     DataStreamBuffer buffer(std::move(*result247));
 
-    auto result248 = buffer.readBytes(2);
+    auto result248 = buffer.read_bytes(2);
     if (!result248) return std::unexpected(std::move(result248.error()));
     if ((*result248) != ByteArray(std::span(IndexMagic))) {
       return std::unexpected(DBException("Error, incorrect index block signature."));
@@ -749,7 +747,7 @@ namespace Star {
     for (std::uint32_t i = 0; i < s; ++i) {
 
       auto& e = index->pointers[i];
-      auto result252 = buffer.readBytes(parent.m_keySize);
+      auto result252 = buffer.read_bytes(parent.m_keySize);
       if (!result252) return std::unexpected(std::move(result252.error()));
       e.key = std::move(*result252);
       auto result253 = buffer.read<BlockIndex>();
@@ -825,7 +823,7 @@ namespace Star {
 
     for (auto i = index->pointers.begin(); i != index->pointers.end(); ++i) {
 
-      auto result244 = buffer.writeBytes(i->key);
+      auto result244 = buffer.write_bytes(i->key);
       if (!result244) return std::unexpected(std::move(result244.error()));
       if constexpr (Star::DebugEnabled) {
         Star::starAssertFailed((i->key.size() == parent.m_keySize));
@@ -864,7 +862,7 @@ namespace Star {
     auto result232 = parent.readBlock(currentLeafBlock, 0, leafBuffer.span());
     if (!result232) return std::unexpected(std::move(result232.error()));
 
-    auto result233 = leafBuffer.readBytes(2);
+    auto result233 = leafBuffer.read_bytes(2);
     if (!result233) return std::unexpected(std::move(result233.error()));
     if ((*result233) != ByteArray(std::span(LeafMagic))) {
       return std::unexpected(DBException("Error, incorrect leaf block signature."));
@@ -910,7 +908,7 @@ namespace Star {
             auto result125 = parent.readBlock(currentLeafBlock, 0, leafBuffer.span());
             if (!result125) return std::unexpected(std::move(result125.error()));
 
-            auto result126 = leafBuffer.readBytes(2);
+            auto result126 = leafBuffer.read_bytes(2);
             if (!result126) return std::unexpected(std::move(result126.error()));
             if ((*result126) != ByteArray(std::span(LeafMagic))) {
               return std::unexpected(DBException("Error, incorrect leaf block signature."));
@@ -934,7 +932,7 @@ namespace Star {
     for (std::uint32_t i = 0; i < count; ++i) {
 
       auto& element = leaf->elements[i];
-      auto result235 = leafInput.readBytes(parent.m_keySize);
+      auto result235 = leafInput.read_bytes(parent.m_keySize);
       if (!result235) return std::unexpected(std::move(result235.error()));
       element.key = std::move(*result235);
       auto result236 = leafInput.read<ByteArray>();
@@ -1078,7 +1076,7 @@ namespace Star {
 
     for (LeafNode::ElementList::iterator i = leaf->elements.begin(); i != leaf->elements.end(); ++i) {
 
-      auto result227 = leafOutput.writeBytes(i->key);
+      auto result227 = leafOutput.write_bytes(i->key);
       if (!result227) return std::unexpected(std::move(result227.error()));
       if constexpr (Star::DebugEnabled) {
         Star::starAssertFailed((i->key.size() == parent.m_keySize));
@@ -1209,8 +1207,8 @@ namespace Star {
     if (auto buffer = m_uncommittedWrites.find_ref(blockIndex)) {
       buffer->get().copyTo(block, blockOffset);
     } else {
-      return m_device->readFullAbsolute(HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize) + blockOffset,
-                                        block);
+      return m_device->read_full_absolute(
+        HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize) + blockOffset, block);
     }
     return {};
   }
@@ -1225,10 +1223,21 @@ namespace Star {
       return {};
     }
 
+    if (blockOffset == 0 && size == m_blockSize) {
+      if (auto staged = m_uncommittedWrites.find_ref(blockIndex)) {
+        auto destination = staged->get().span();
+        if (destination.data() != block.data())
+          std::memmove(destination.data(), block.data(), size);
+      } else {
+        m_uncommittedWrites.emplace(blockIndex, ByteArray(block));
+      }
+      return {};
+    }
+
     StreamOffset blockStart = HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize);
     auto buffer = m_uncommittedWrites.find(blockIndex);
     if (buffer == m_uncommittedWrites.end()) {
-      auto result214 = m_device->readBytesAbsolute(blockStart, m_blockSize);
+      auto result214 = m_device->read_bytes_absolute(blockStart, m_blockSize);
       if (!result214) return std::unexpected(std::move(result214.error()));
       buffer = m_uncommittedWrites.emplace(blockIndex, std::move(*result214)).first;
     }
@@ -1577,8 +1586,8 @@ namespace Star {
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::commitWrites() {
     for (auto& write : m_uncommittedWrites) {
-      auto result157 = m_device->writeFullAbsolute(HeaderSize + write.first * static_cast<StreamOffset>(m_blockSize),
-                                                   write.second.span().first(m_blockSize));
+      auto result157 = m_device->write_full_absolute(HeaderSize + write.first * static_cast<StreamOffset>(m_blockSize),
+                                                     write.second.span().first(m_blockSize));
       if (!result157) return std::unexpected(std::move(result157.error()));
 
     }
@@ -1591,7 +1600,7 @@ namespace Star {
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::tryFlatten() {
-    if (m_headFreeIndexBlock == InvalidBlockIndex || m_rootIsLeaf || !m_device->isWritable()) {
+    if (m_headFreeIndexBlock == InvalidBlockIndex || m_rootIsLeaf || !m_device->is_writable()) {
       return false;
     }
 
@@ -1612,7 +1621,7 @@ namespace Star {
       return false;
     }
 
-    auto result148 = m_device->deviceName();
+    auto result148 = m_device->device_name();
     if (!result148) return std::unexpected(std::move(result148.error()));
     auto flattenLogged = m_logger.info("[BTreeDatabase] File '{}' is {:.2f}% free space, flattening", *result148, free * 100.f);
     if (!flattenLogged) return std::unexpected(std::move(flattenLogged.error()));
@@ -1671,7 +1680,7 @@ namespace Star {
     auto result155 = m_device->resize(flattenedSize);
     if (!result155) return std::unexpected(std::move(result155.error()));
 
-    auto result156 = m_device->deviceName();
+    auto result156 = m_device->device_name();
     if (!result156) return std::unexpected(std::move(result156.error()));
     auto finishedLogged = m_logger.info("[BTreeDatabase] Finished flattening '{}' in {:.2f} milliseconds", *result156, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     if (!finishedLogged) return std::unexpected(std::move(finishedLogged.error()));

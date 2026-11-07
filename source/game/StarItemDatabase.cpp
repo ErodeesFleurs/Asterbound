@@ -908,7 +908,7 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       data.directory = AssetPath::directory(file);
       data.filename = AssetPath::filename(file);
       for (auto const& script : *scripts)
-        data.agingScripts.append(AssetPath::relativeTo(data.directory, script));
+        data.agingScripts.append(AssetPath::relative_to(data.directory, script));
       return data;
     }();
     if (!loaded)

@@ -66,7 +66,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
     if (!configArgument)
       return std::unexpected(std::move(configArgument.error()));
     String configFile = configArgument->get();
-    auto configFileContents = File::readFileString(configFile);
+    auto configFileContents = File::read_file_string(configFile);
     if (!configFileContents) {
       if (!configFileContents.error().is<IOException>())
         return std::unexpected(std::move(configFileContents.error()));
@@ -126,10 +126,10 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
       coutf("Adding file '{}' to the target pak as '{}'\n", filePath, assetPath);
   };
 
-  auto outputDirectory = File::fullPath(File::dirName(outputFilename));
+  auto outputDirectory = File::full_path(File::dir_name(outputFilename));
   if (!outputDirectory)
     return std::unexpected(std::move(outputDirectory.error()));
-  outputFilename = File::relativeTo(*outputDirectory, File::baseName(outputFilename));
+  outputFilename = File::relative_to(*outputDirectory, File::base_name(outputFilename));
   auto directorySource = DirectoryAssetSource::create(logger, assetsFolderPath, ignoreFiles);
   if (!directorySource)
     return std::unexpected(std::move(directorySource.error()));

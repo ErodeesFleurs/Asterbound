@@ -46,32 +46,32 @@ struct AssetWorkerBenchmarkAccess {
 namespace {
 
 void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session, bool mixed = false) {
-  auto directory = File::temporaryDirectory(session.root.random());
+  auto directory = File::temporary_directory(session.root.random());
   if (!directory) {
     session.fail(state, directory.error());
     return;
   }
   auto cleanup = finally([&] {
-    auto removed = File::removeDirectoryRecursive(*directory);
+    auto removed = File::remove_all(*directory);
     if (!removed)
       session.fail(state, removed.error());
   });
   auto count = static_cast<unsigned>(state.range(0));
   StringList paths;
-  auto prepared = File::writeFile(String("[]"), File::relativeTo(*directory, "preload.config"));
+  auto prepared = File::write_file(String("[]"), File::relative_to(*directory, "preload.config"));
   if (!prepared) {
     session.fail(state, prepared.error());
     return;
   }
   for (unsigned i = 0; i != count; ++i) {
     auto name = strf("asset{}.json", i);
-    auto written = File::writeFile(String(strf("{{\"index\":{}}}", i)), File::relativeTo(*directory, name));
+    auto written = File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name));
     if (!written) {
       session.fail(state, written.error());
       return;
     }
     if (!mixed || i % 2 == 0) {
-      auto patch = File::writeFile(String(R"lua(function patch(asset)
+      auto patch = File::write_file(String(R"lua(function patch(asset)
   local garbage = {}
   for i = 1, 256 do
     local node = {value = i, text = "asset-temporary-" .. i}
@@ -82,7 +82,7 @@ void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session,
   return asset
 end
 )lua"),
-                                   File::relativeTo(*directory, name + ".patch.lua"));
+                                    File::relative_to(*directory, name + ".patch.lua"));
       if (!patch) {
         session.fail(state, patch.error());
         return;

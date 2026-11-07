@@ -529,7 +529,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
         if (!scriptsResult)
           return std::unexpected(std::move(scriptsResult.error()));
         auto scripts = std::move(*scriptsResult);
-        std::ranges::for_each(scripts, [&](String& script) { script = AssetPath::relativeTo(m_config->path, script); });
+        std::ranges::for_each(scripts,
+                              [&](String& script) { script = AssetPath::relative_to(m_config->path, script); });
         auto operation3 = m_scriptComponent.setScripts(std::move(scripts));
         if (!operation3)
           return std::unexpected(std::move(operation3.error()));
@@ -1317,7 +1318,8 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::makeImage(*metadata, AssetPath::relativeTo(m_config->path, placementImage), 1.0 / TilePixels, false, imagePosition / TilePixels);
+    auto drawableResult = Drawable::makeImage(*metadata, AssetPath::relative_to(m_config->path, placementImage),
+                                              1.0 / TilePixels, false, imagePosition / TilePixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
     auto drawable = std::move(*drawableResult);

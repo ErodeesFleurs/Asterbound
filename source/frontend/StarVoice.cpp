@@ -569,7 +569,7 @@ std::expected<int, StarException> Voice::send(DataStreamBuffer& out, std::size_t
   for (auto& chunk : encodedChunks) {
     if (auto result = out.write<std::uint32_t>(chunk.size()); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = out.writeBytes(chunk); !result)
+    if (auto result = out.write_bytes(chunk); !result)
       return std::unexpected(std::move(result.error()));
     if (budget && (budget -= std::min<std::size_t>(budget, chunk.size())) == 0)
       break;
@@ -604,7 +604,7 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
     if (*version > VOICE_VERSION)
       return false;
     while (true) {
-      auto atEnd = reader.atEnd();
+      auto atEnd = reader.at_end();
       if (!atEnd) return std::unexpected(std::move(atEnd.error()));
       if (*atEnd) break;
       auto opusLength = reader.read<std::uint32_t>();
