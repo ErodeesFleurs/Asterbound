@@ -216,6 +216,7 @@ BENCHMARK(file_read_bytes_evict_advised)
   ->Name("File/ReadBytesEvictAdvised")
   ->Arg(1048576)
   ->Arg(16777216)
+  ->Arg(67108864)
   ->UseRealTime();
 #endif
 
@@ -325,9 +326,18 @@ void file_overwrite_rename(benchmark::State& state) {
   state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(length));
 }
 
+void whole_read_arguments(benchmark::internal::Benchmark* benchmark) {
+  // Preserve the original inputs, add just-over/under growth boundaries and
+  // files well beyond the original 16MiB workload. Both readers use the exact
+  // same deterministic fixture and open/read/close/destruction operation.
+  for (std::int64_t size : {0ll, 4096ll, 1048575ll, 1048576ll, 1048577ll, 16777215ll, 16777216ll, 16777217ll,
+                            67108863ll, 67108864ll, 67108865ll, 268435456ll})
+    benchmark->Arg(size);
+}
+
 BENCHMARK(file_size)->Name("File/Size")->UseRealTime();
-BENCHMARK(file_read_bytes)->Name("File/ReadBytes")->Arg(0)->Arg(4096)->Arg(1048576)->Arg(16777216)->UseRealTime();
-BENCHMARK(file_read_string)->Name("File/ReadString")->Arg(0)->Arg(4096)->Arg(1048576)->Arg(16777216)->UseRealTime();
+BENCHMARK(file_read_bytes)->Name("File/ReadBytes")->Apply(whole_read_arguments)->UseRealTime();
+BENCHMARK(file_read_string)->Name("File/ReadString")->Apply(whole_read_arguments)->UseRealTime();
 BENCHMARK(file_positioned_read)->Name("File/PositionedRead")->UseRealTime();
 BENCHMARK(file_overwrite_rename)->Name("File/OverwriteRename")->Arg(4096)->Arg(1048576)->UseRealTime();
 

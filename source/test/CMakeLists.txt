@@ -181,6 +181,7 @@ set (star_game_tests_SOURCES
       movement_controller_test.cpp
       particle_presentation_test.cpp
       physics_object_test.cpp
+      player_storage_test.cpp
       root_test.cpp
       server_test.cpp
       spawn_test.cpp

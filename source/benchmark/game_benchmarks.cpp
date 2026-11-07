@@ -22,6 +22,8 @@ import star.world_parameters;
 
 using namespace Star;
 
+void register_player_storage_benchmarks(Star::Root& root, bool& failed);
+
 namespace {
 
 struct BenchmarkSession {
@@ -568,6 +570,7 @@ int main(int argc, char** argv) {
   benchmark::RegisterBenchmark("LuaRoot/NestedProfileShutdownAndExport", [&](benchmark::State& state) {
     luaNestedProfileExport(state, session);
   })->Iterations(8)->UseRealTime()->Unit(benchmark::kMicrosecond);
+  register_player_storage_benchmarks(**root, session.failed);
   auto matched = benchmark::RunSpecifiedBenchmarks();
   // Remove callbacks borrowing session/Root before those owners leave scope.
   benchmark::ClearRegisteredBenchmarks();

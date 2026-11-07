@@ -125,6 +125,8 @@ private:
   OrderedHashMap<Uuid, Json> m_savedPlayersCache;
   BiMap<Uuid, String> m_playerFileNames;
   JsonObject m_metadata;
+  // Only acknowledge metadata after a successful load or durable replacement.
+  std::optional<Json> m_writtenMetadata;
 };
 
 }

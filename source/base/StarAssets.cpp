@@ -955,43 +955,80 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     digestPaths.append(std::move(*lower));
   }
   digestPaths.sort();
-  for (auto const& assetPath : digestPaths) {
-    bool digestFile = true;
-    for (auto const& pattern : m_settings.digestIgnore) {
-      auto matches = assetPath.regexMatch(pattern, false, false);
-      if (!matches)
-        return std::unexpected(std::move(matches.error()));
-      if (*matches) {
-        digestFile = false;
-        break;
+  struct SizeGroup {
+    std::shared_ptr<AssetSource> source;
+    std::vector<std::reference_wrapper<String const>> paths;
+    std::vector<std::expected<StreamOffset, StarException>> sizes;
+  };
+  struct DigestEntry {
+    std::optional<std::reference_wrapper<String const>> path;
+    std::size_t group;
+    std::size_t index;
+  };
+  std::vector<SizeGroup> sizeGroups;
+  std::unordered_map<AssetSource*, std::size_t> sourceGroups;
+  std::vector<DigestEntry> digestEntries;
+  digestEntries.reserve(digestPaths.size());
+  // Patch subpaths need owned stripped names; deque keeps borrows stable.
+  std::deque<String> patchNames;
+  auto add_size = [&](std::shared_ptr<AssetSource> const& source, String const& path,
+                      std::optional<std::reference_wrapper<String const>> digestPath = {}) {
+    auto [group, inserted] = sourceGroups.try_emplace(source.get(), sizeGroups.size());
+    if (inserted)
+      sizeGroups.push_back({source, {}, {}});
+    auto& requests = sizeGroups[group->second].paths;
+    digestEntries.push_back({digestPath, group->second, requests.size()});
+    requests.emplace_back(path);
+  };
+  // Retain a preparation error until all preceding metadata results have been
+  // consumed. Group traversal must never determine the first reported error.
+  auto prepared = [&]() -> std::expected<void, StarException> {
+    for (auto const& assetPath : digestPaths) {
+      bool digestFile = true;
+      for (auto const& pattern : m_settings.digestIgnore) {
+        auto matches = assetPath.regexMatch(pattern, false, false);
+        if (!matches)
+          return std::unexpected(std::move(matches.error()));
+        if (*matches) {
+          digestFile = false;
+          break;
+        }
+      }
+      auto assetKey = CaseInsensitiveStringView::create(assetPath);
+      if (!assetKey)
+        return std::unexpected(std::move(assetKey.error()));
+      auto descriptor = m_files.get(*assetKey);
+      if (!descriptor)
+        return std::unexpected(std::move(descriptor.error()));
+      if (digestFile) {
+        add_size(descriptor->get().source, descriptor->get().sourceName, std::cref(assetPath));
+        for (auto const& pair : descriptor->get().patchSources) {
+          if (pair.first.utf8().find_first_of(":?") == std::string::npos) {
+            add_size(pair.second, pair.first);
+          } else {
+            patchNames.push_back(AssetPath::removeSubPath(pair.first));
+            add_size(pair.second, patchNames.back());
+          }
+        }
       }
     }
-    auto assetKey = CaseInsensitiveStringView::create(assetPath);
-    if (!assetKey)
-      return std::unexpected(std::move(assetKey.error()));
-    auto descriptor = m_files.get(*assetKey);
-    if (!descriptor)
-      return std::unexpected(std::move(descriptor.error()));
-    if (digestFile) {
-      digest.push(assetPath);
-      auto size = descriptor->get().source->file_size(descriptor->get().sourceName);
-      if (!size)
-        return std::unexpected(std::move(size.error()));
-      auto serialized = DataStreamBuffer::serialize(*size);
-      if (!serialized)
-        return std::unexpected(std::move(serialized.error()));
-      digest.push(*serialized);
-      for (auto const& pair : descriptor->get().patchSources) {
-        auto patchSize = pair.second->file_size(AssetPath::removeSubPath(pair.first));
-        if (!patchSize)
-          return std::unexpected(std::move(patchSize.error()));
-        auto serializedPatchSize = DataStreamBuffer::serialize(*patchSize);
-        if (!serializedPatchSize)
-          return std::unexpected(std::move(serializedPatchSize.error()));
-        digest.push(*serializedPatchSize);
-      }
-    }
+    return {};
+  }();
+  for (auto& group : sizeGroups)
+    group.sizes = group.source->file_sizes(group.paths);
+  for (auto const& entry : digestEntries) {
+    if (entry.path)
+      digest.push(entry.path->get());
+    auto& size = sizeGroups[entry.group].sizes[entry.index];
+    if (!size)
+      return std::unexpected(std::move(size.error()));
+    auto serialized = DataStreamBuffer::serialize(*size);
+    if (!serialized)
+      return std::unexpected(std::move(serialized.error()));
+    digest.push(*serialized);
   }
+  if (!prepared)
+    return std::unexpected(std::move(prepared.error()));
   m_digest = digest.compute();
 
   // The owning factory destroys this object on failure, stopping and joining

@@ -69,6 +69,56 @@ namespace {
     }
   };
 
+  // Delegate successful operations to a real File. Faults stop one actual
+  // commit phase, including a short inactive-root write reported by write_full.
+  struct CommitFaultFile : File {
+    using File::File;
+
+    unsigned phase = 0;
+    unsigned fault_phase = 0;
+    bool write_fault = false;
+    bool short_root_write = false;
+    bool armed = false;
+
+    void arm(unsigned target_phase, bool fail_write, bool partial_root) {
+      phase = 0;
+      fault_phase = target_phase;
+      write_fault = fail_write;
+      short_root_write = partial_root;
+      armed = true;
+    }
+
+    [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const> data) override {
+      if (armed && write_fault && phase == fault_phase) {
+        armed = false;
+        if (short_root_write)
+          return File::write(data.first(std::min<std::size_t>(8, data.size() / 2)));
+        return std::unexpected(IOException("Injected commit write failure"));
+      }
+      return File::write(data);
+    }
+
+    [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset position,
+                                                                           std::span<char const> data) override {
+      if (armed && write_fault && phase == fault_phase) {
+        armed = false;
+        return std::unexpected(IOException("Injected commit block write failure"));
+      }
+      return File::write_absolute(position, data);
+    }
+
+    [[nodiscard]] std::expected<void, StarException> sync() override {
+      if (armed && !write_fault && phase == fault_phase) {
+        armed = false;
+        return std::unexpected(IOException("Injected commit barrier failure"));
+      }
+      auto result = File::sync();
+      if (result)
+        ++phase;
+      return result;
+    }
+  };
+
   std::size_t const RandFactor = 0xd5a2f037;
   std::size_t const MaxSize = 400;
   std::uint32_t const MaxKey = 100000;
@@ -506,6 +556,116 @@ TEST(BTreeDatabaseTest, PartialFreeIndexWritesPreservePayloadAndRollback) {
   EXPECT_EQ(**second, other_value);
   checkBlockCounts(db);
   EXPECT_TRUE(db.close());
+}
+
+TEST(BTreeDatabaseTest, CommitPhaseFailuresPreservePendingDataAndRecover) {
+  struct Fault {
+    unsigned phase;
+    bool write;
+    bool partial_root;
+  };
+  std::array const faults{Fault{0, true, false},  Fault{0, false, false}, Fault{1, true, true},
+                          Fault{1, false, false}, Fault{2, true, false},  Fault{2, false, false}};
+
+  for (auto fault : faults) {
+    for (bool retry : {false, true}) {
+      SCOPED_TRACE(::testing::Message() << "phase=" << fault.phase << " write=" << fault.write
+                                        << " partial=" << fault.partial_root << " retry=" << retry);
+      auto random_result = RandomService::create();
+      ASSERT_TRUE(random_result);
+      auto temporary_result = File::temporary_file(**random_result);
+      ASSERT_TRUE(temporary_result);
+      auto temporary = std::move(*temporary_result);
+      auto cleanup = finally([&]() { EXPECT_TRUE(temporary->remove()); });
+      auto device = std::make_shared<CommitFaultFile>(temporary->file_name());
+      Logger logger;
+      BTreeDatabase db(logger, "TestDB", 4);
+      ASSERT_TRUE(db.setAutoCommit(false));
+      ASSERT_TRUE(db.setIODevice(device));
+      ASSERT_TRUE(db.open());
+      ByteArray original(20, 'o');
+      ByteArray changed(24, 'c');
+      ByteArray retained(20, 'r');
+      ByteArray added(20, 'a');
+      ASSERT_TRUE(db.insert(toByteArray(0), original));
+      ASSERT_TRUE(db.insert(toByteArray(1), retained));
+      ASSERT_TRUE(db.commit());
+
+      // Bytes 67..511 are reserved, not part of either 17-byte root. A root
+      // write/retry must preserve nonzero legacy padding as well as the prefix.
+      std::array<char, 512 - 67> padding;
+      padding.fill('\x5a');
+      ASSERT_TRUE(temporary->write_full_absolute(67, padding));
+      ASSERT_TRUE(temporary->sync());
+      auto before = temporary->read_bytes_absolute(0, 512);
+      ASSERT_TRUE(before) << before.error().what();
+      ASSERT_TRUE(db.insert(toByteArray(0), changed));
+      ASSERT_TRUE(db.insert(toByteArray(2), added));
+      device->arm(fault.phase, fault.write, fault.partial_root);
+      auto committed = db.commit();
+      ASSERT_FALSE(committed);
+      EXPECT_TRUE(committed.error().is<IOException>());
+      EXPECT_FALSE(device->armed);
+      EXPECT_TRUE(db.isOpen());
+      auto pending = db.find(toByteArray(0));
+      ASSERT_TRUE(pending) << pending.error().what();
+      ASSERT_TRUE(*pending);
+      EXPECT_EQ(**pending, changed);
+      auto pending_added = db.find(toByteArray(2));
+      ASSERT_TRUE(pending_added) << pending_added.error().what();
+      ASSERT_TRUE(*pending_added);
+      EXPECT_EQ(**pending_added, added);
+
+      auto failed_header = temporary->read_bytes_absolute(0, 512);
+      ASSERT_TRUE(failed_header) << failed_header.error().what();
+      bool selector_was_written = fault.phase == 2 && !fault.write;
+      EXPECT_EQ((*failed_header)[32] != (*before)[32], selector_was_written);
+      EXPECT_EQ(ByteArray(failed_header->span().first(32)), ByteArray(before->span().first(32)));
+      EXPECT_EQ(ByteArray(failed_header->span().subspan(67)), ByteArray(padding));
+      auto old_root_offset = (*before)[32] ? 50u : 33u;
+      EXPECT_EQ(ByteArray(failed_header->span().subspan(old_root_offset, 17)),
+                ByteArray(before->span().subspan(old_root_offset, 17)));
+
+      if (retry) {
+        ASSERT_TRUE(db.commit());
+      } else {
+        // Failed synchronization is uncertain durability, not a promise of
+        // old-value visibility: reused leaf blocks may already be overwritten.
+        ASSERT_TRUE(db.rollback());
+      }
+      ASSERT_TRUE(db.close());
+      ASSERT_TRUE(db.open());
+      auto recovered = db.find(toByteArray(0));
+      ASSERT_TRUE(recovered) << recovered.error().what();
+      ASSERT_TRUE(*recovered);
+      if (retry)
+        EXPECT_EQ(**recovered, changed);
+      else
+        EXPECT_TRUE(**recovered == original || **recovered == changed);
+      auto recovered_added = db.find(toByteArray(2));
+      ASSERT_TRUE(recovered_added) << recovered_added.error().what();
+      if (retry)
+        ASSERT_TRUE(*recovered_added);
+      if (*recovered_added)
+        EXPECT_EQ(**recovered_added, added);
+      auto recovered_retained = db.find(toByteArray(1));
+      ASSERT_TRUE(recovered_retained) << recovered_retained.error().what();
+      ASSERT_TRUE(*recovered_retained);
+      EXPECT_EQ(**recovered_retained, retained);
+      checkBlockCounts(db);
+      ASSERT_TRUE(db.insert(toByteArray(3), genBlock(3)));
+      ASSERT_TRUE(db.close());
+      ASSERT_TRUE(db.open());
+      auto subsequent = db.find(toByteArray(3));
+      ASSERT_TRUE(subsequent) << subsequent.error().what();
+      ASSERT_TRUE(*subsequent);
+      EXPECT_EQ(**subsequent, genBlock(3));
+      auto final_padding = temporary->read_bytes_absolute(67, padding.size());
+      ASSERT_TRUE(final_padding) << final_padding.error().what();
+      EXPECT_EQ(*final_padding, ByteArray(padding));
+      EXPECT_TRUE(db.close());
+    }
+  }
 }
 
 TEST(BTreeDatabaseTest, FailedCommitIsReportedWithoutDestructorRetry) {

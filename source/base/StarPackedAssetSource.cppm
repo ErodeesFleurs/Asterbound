@@ -39,6 +39,8 @@ public:
   StringList assetPaths() const override;
   bool contains(String const& path) const override;
   [[nodiscard]] std::expected<StreamOffset, StarException> file_size(String const& path) override;
+  [[nodiscard]] std::vector<std::expected<StreamOffset, StarException>>
+  file_sizes(std::span<std::reference_wrapper<String const> const> paths) override;
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) override;
   [[nodiscard]] std::expected<ByteArray, StarException> read(String const& path) override;
 
@@ -203,6 +205,32 @@ std::expected<StreamOffset, StarException> PackedAssetSource::file_size(String c
     return std::unexpected(
       AssetSourceException::format("Requested file '{}' has an out of range size in the packed assets file", path));
   return static_cast<StreamOffset>(entry->get().second);
+}
+
+std::vector<std::expected<StreamOffset, StarException>>
+PackedAssetSource::file_sizes(std::span<std::reference_wrapper<String const> const> paths) {
+  std::vector<std::expected<StreamOffset, StarException>> sizes;
+  sizes.reserve(paths.size());
+  if (paths.empty())
+    return sizes;
+  auto extent = m_packedFile->size();
+  for (auto path : paths) {
+    auto entry = m_index.find_ref(path.get());
+    // Preserve scalar membership-before-extent error precedence for each entry.
+    if (!entry) {
+      sizes.emplace_back(std::unexpected(
+        AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path.get())));
+    } else if (!extent) {
+      sizes.emplace_back(std::unexpected(extent.error()));
+    } else if (*extent < 0 || entry->get().first > static_cast<std::uint64_t>(*extent)
+               || entry->get().second > static_cast<std::uint64_t>(*extent) - entry->get().first) {
+      sizes.emplace_back(std::unexpected(AssetSourceException::format(
+        "Requested file '{}' has an out of range size in the packed assets file", path.get())));
+    } else {
+      sizes.emplace_back(static_cast<StreamOffset>(entry->get().second));
+    }
+  }
+  return sizes;
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(String const& path) {

@@ -130,6 +130,25 @@ namespace {
     return std::filesystem::path(path.utf8());
   }
 
+  void expect_batch_matches_scalar(AssetSource& source, std::span<String const> paths) {
+    std::vector<std::reference_wrapper<String const>> requests;
+    requests.reserve(paths.size());
+    for (auto const& path : paths)
+      requests.emplace_back(path);
+    auto batch = source.file_sizes(requests);
+    ASSERT_EQ(batch.size(), paths.size());
+    for (std::size_t i = 0; i != paths.size(); ++i) {
+      SCOPED_TRACE(paths[i].utf8());
+      auto scalar = source.file_size(paths[i]);
+      ASSERT_EQ(batch[i].has_value(), scalar.has_value());
+      if (scalar)
+        EXPECT_EQ(*batch[i], *scalar);
+      else
+        EXPECT_STREQ(batch[i].error().what(), scalar.error().what());
+    }
+    EXPECT_TRUE(source.file_sizes({}).empty());
+  }
+
   struct PngIoFailureTag {
     static constexpr std::string_view name() { return "PngIoFailure"; }
   };
@@ -345,6 +364,9 @@ const GameTestRegistration
     auto added = File::relative_to(*directory, "unindexed.txt");
     ASSERT_TRUE(File::write_file(String("not enumerated"), added));
     EXPECT_FALSE((*source)->file_size("/unindexed.txt"));
+    std::array<String, 7> requests{"/mutable.json",    "/missing", "/mutable.json", "/MUTABLE.json",
+                                   "/../mutable.json", "/",        "/unindexed.txt"};
+    expect_batch_matches_scalar(**source, requests);
 
     Assets::Settings settings{};
     settings.workerPoolSize = 1;
@@ -358,6 +380,7 @@ const GameTestRegistration
     size = (*source)->file_size("/mutable.json");
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, static_cast<StreamOffset>(replacement.utf8Size()));
+    expect_batch_matches_scalar(**source, requests);
     auto recovered = (*assets)->json("/mutable.json");
     ASSERT_TRUE(recovered);
     EXPECT_EQ(recovered->getInt("recovered"), 42);
@@ -366,6 +389,7 @@ const GameTestRegistration
     auto missing = (*source)->file_size("/mutable.json");
     ASSERT_FALSE(missing);
     EXPECT_TRUE(missing.error().is<IOException>());
+    expect_batch_matches_scalar(**source, requests);
     std::error_code ec;
     ASSERT_TRUE(std::filesystem::create_directory(fsPath(path), ec));
     ASSERT_FALSE(ec) << ec.message();
@@ -373,12 +397,14 @@ const GameTestRegistration
     ASSERT_FALSE(replaced);
     EXPECT_TRUE(replaced.error().is<IOException>());
     EXPECT_FALSE((*source)->open("/mutable.json"));
+    expect_batch_matches_scalar(**source, requests);
     ASSERT_TRUE(std::filesystem::remove(fsPath(path), ec));
     ASSERT_FALSE(ec) << ec.message();
     ASSERT_TRUE(File::write_file(String("{}"), path));
     size = (*source)->file_size("/mutable.json");
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, 2);
+    expect_batch_matches_scalar(**source, requests);
     (*assets)->hotReload();
     EXPECT_TRUE((*assets)->json("/mutable.json"));
 
@@ -391,6 +417,8 @@ const GameTestRegistration
     auto image_size = memory.file_size("/image");
     ASSERT_TRUE(image_size);
     EXPECT_EQ(*image_size, 24);
+    std::array<String, 4> memory_requests{"/bytes", "/missing", "/image", "/bytes"};
+    expect_batch_matches_scalar(memory, memory_requests);
     for (auto const& asset_path : memory.assetPaths()) {
       auto reader = memory.open(asset_path);
       ASSERT_TRUE(reader);
@@ -404,8 +432,10 @@ const GameTestRegistration
     bytes_size = memory.file_size("/bytes");
     ASSERT_TRUE(bytes_size);
     EXPECT_EQ(*bytes_size, 0);
+    expect_batch_matches_scalar(memory, memory_requests);
     ASSERT_TRUE(memory.erase("/bytes"));
     EXPECT_FALSE(memory.file_size("/bytes"));
+    expect_batch_matches_scalar(memory, memory_requests);
   });
 
 const GameTestRegistration packedMetadataLengths(
@@ -430,6 +460,15 @@ const GameTestRegistration packedMetadataLengths(
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, 7);
     EXPECT_FALSE((*packed)->file_size("/missing"));
+    std::array<String, 4> requests{"/binary", "/missing", "/binary", "/BINARY"};
+    expect_batch_matches_scalar(**packed, requests);
+    std::array<String, 2> duplicate_paths{"/binary", "/binary"};
+    std::array<std::reference_wrapper<String const>, 2> duplicate_requests{std::cref(duplicate_paths[0]),
+                                                                           std::cref(duplicate_paths[1])};
+    auto before_truncation = (*packed)->file_sizes(duplicate_requests);
+    ASSERT_EQ(before_truncation.size(), 2);
+    ASSERT_TRUE(before_truncation[0]);
+    ASSERT_TRUE(before_truncation[1]);
     auto payload = (*packed)->read("/binary");
     ASSERT_TRUE(payload);
     EXPECT_EQ(*payload, ByteArray(std::span("one\0two", 7)));
@@ -439,6 +478,15 @@ const GameTestRegistration packedMetadataLengths(
     auto truncated = (*packed)->file_size("/binary");
     ASSERT_FALSE(truncated);
     EXPECT_TRUE(truncated.error().is<AssetSourceException>());
+    expect_batch_matches_scalar(**packed, requests);
+    auto during_truncation = (*packed)->file_sizes(duplicate_requests);
+    ASSERT_EQ(during_truncation.size(), 2);
+    EXPECT_FALSE(during_truncation[0]);
+    EXPECT_FALSE(during_truncation[1]);
+    // A snapshot is the captured extent of one call, not a cross-call cache
+    // and not a promise that the corresponding payload remains immutable.
+    EXPECT_EQ(*before_truncation[0], 7);
+    EXPECT_EQ(*before_truncation[1], 7);
     EXPECT_FALSE((*packed)->open("/binary"));
     EXPECT_FALSE((*packed)->read("/binary"));
     EXPECT_FALSE(PackedAssetSource::create(packed_path));
@@ -448,6 +496,13 @@ const GameTestRegistration packedMetadataLengths(
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, 7);
     EXPECT_TRUE((*packed)->read("/binary"));
+    expect_batch_matches_scalar(**packed, requests);
+    auto after_recovery = (*packed)->file_sizes(duplicate_requests);
+    ASSERT_EQ(after_recovery.size(), 2);
+    ASSERT_TRUE(after_recovery[0]);
+    ASSERT_TRUE(after_recovery[1]);
+    EXPECT_EQ(*after_recovery[0], 7);
+    EXPECT_EQ(*after_recovery[1], 7);
 
     for (auto const& entry :
          std::array{std::pair<std::uint64_t, std::uint64_t>{std::numeric_limits<std::uint64_t>::max(), 1},
@@ -465,6 +520,8 @@ const GameTestRegistration packedMetadataLengths(
       auto invalid_size = (*invalid)->file_size("/bad");
       ASSERT_FALSE(invalid_size);
       EXPECT_TRUE(invalid_size.error().is<AssetSourceException>());
+      std::array<String, 3> invalid_requests{"/missing", "/bad", "/bad"};
+      expect_batch_matches_scalar(**invalid, invalid_requests);
       EXPECT_FALSE((*invalid)->open("/bad"));
       EXPECT_FALSE((*invalid)->read("/bad"));
     }
@@ -523,6 +580,112 @@ const GameTestRegistration assetMetadataDigest(
       auto patched = (*assets)->json("/mixed.json");
       ASSERT_TRUE(patched);
       EXPECT_EQ(*patched, Json(JsonObject{{"original", true}, {"patched", true}}));
+    }
+  });
+
+const GameTestRegistration assetBatchDigestPatchProviders(
+  "AssetsTest", "BatchDigestMatchesReaderOracleWithInlineAndMemoryPatchProviders", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto original = File::relative_to(*directory, "original");
+    auto patches = File::relative_to(*directory, "patches");
+    ASSERT_TRUE(File::create_directory(original));
+    ASSERT_TRUE(File::create_directory(patches));
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(original, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(R"({"original":true})"), File::relative_to(original, "target.json")));
+    ASSERT_TRUE(File::write_file(String(R"({"scripts":{"postLoad":["/generated.lua"]}})"),
+                                 File::relative_to(original, "_metadata")));
+    ASSERT_TRUE(File::write_file(String(R"lua(
+assets.add('/memory.json', {generated = true})
+assets.add('/target.json.patch', '[{"op":"add","path":"/memory","value":9}]')
+)lua"),
+                                 File::relative_to(original, "generated.lua")));
+    ASSERT_TRUE(
+      File::write_file(String(R"([{"paths":["/target.json"],"patches":[[{"op":"add","path":"/inline","value":7}]]}])"),
+                       File::relative_to(patches, "inline.patchlist")));
+    auto original_source = DirectoryAssetSource::create(fixture.root().logger(), original);
+    auto patch_source = DirectoryAssetSource::create(fixture.root().logger(), patches);
+    ASSERT_TRUE(original_source);
+    ASSERT_TRUE(patch_source);
+    auto packed = File::relative_to(*directory, "original.pak");
+    auto packed_patches = File::relative_to(*directory, "patches.pak");
+    ASSERT_TRUE(PackedAssetSource::build(**original_source, packed));
+    ASSERT_TRUE(PackedAssetSource::build(**patch_source, packed_patches));
+    std::optional<ByteArray> directory_digest;
+    for (auto const& [source_path, patch_path] :
+         std::array{std::pair{original, patches}, std::pair{packed, packed_patches}}) {
+      Assets::Settings settings{};
+      settings.workerPoolSize = 1;
+      auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
+                                   {source_path, patch_path});
+      ASSERT_TRUE(assets) << assets.error().what();
+      auto oracle = AssetWorkerTestAccess::reader_digest(**assets);
+      ASSERT_TRUE(oracle) << oracle.error().what();
+      EXPECT_EQ((*assets)->digest(), *oracle);
+      if (directory_digest)
+        EXPECT_EQ((*assets)->digest(), *directory_digest);
+      else
+        directory_digest = (*assets)->digest();
+      auto target = (*assets)->json("/target.json");
+      ASSERT_TRUE(target) << target.error().what();
+      EXPECT_EQ(*target, Json(JsonObject{{"original", true}, {"inline", 7}, {"memory", 9}}));
+      auto memory = (*assets)->json("/memory.json");
+      ASSERT_TRUE(memory);
+      EXPECT_EQ(*memory, Json(JsonObject{{"generated", true}}));
+    }
+  });
+
+const GameTestRegistration assetBatchDigestErrorOrder(
+  "AssetsTest", "BatchDigestRetainsGlobalFirstErrorAcrossInterleavedProvidersAndPatches", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    using Index = StringMap<std::pair<std::uint64_t, std::uint64_t>>;
+    auto write_packed = [](String const& path, Index const& index) -> std::expected<void, StarException> {
+      DataStreamBuffer bytes;
+      if (auto result = bytes.writeData(std::span("SBAsset6", 8)); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = bytes.write(std::uint64_t(18)); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = bytes.writeData(std::span("[]", 2)); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = bytes.writeData(std::span("INDEX", 5)); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = bytes.write(JsonObject{}); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = bytes.write(index); !result)
+        return std::unexpected(std::move(result.error()));
+      return File::write_file(bytes.data(), path);
+    };
+    auto valid = std::pair<std::uint64_t, std::uint64_t>{16, 2};
+    auto invalid = std::pair<std::uint64_t, std::uint64_t>{16, std::numeric_limits<std::uint64_t>::max()};
+    for (unsigned scenario = 0; scenario != 3; ++scenario) {
+      SCOPED_TRACE(scenario);
+      auto first_path = File::relative_to(*directory, "first.pak");
+      auto second_path = File::relative_to(*directory, "second.pak");
+      Index first{{"/a.json", scenario == 1 ? invalid : valid}, {"/preload.config", valid}, {"/z.json", invalid}};
+      Index second{{"/b.json", invalid}};
+      if (scenario != 2)
+        second["/a.json.patch"] = invalid;
+      ASSERT_TRUE(write_packed(first_path, first));
+      ASSERT_TRUE(write_packed(second_path, second));
+      auto first_source = PackedAssetSource::create(first_path);
+      auto second_source = PackedAssetSource::create(second_path);
+      ASSERT_TRUE(first_source);
+      ASSERT_TRUE(second_source);
+      // Source A is visited first and contains a later failure (/z.json).
+      // The first global failure is instead A's base, B's patch, or B's base.
+      auto expected_error = scenario == 1
+        ? (*first_source)->file_size("/a.json")
+        : (*second_source)->file_size(scenario == 0 ? String("/a.json.patch") : String("/b.json"));
+      ASSERT_FALSE(expected_error);
+      Assets::Settings settings{};
+      settings.workerPoolSize = 1;
+      auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
+                                   {first_path, second_path});
+      ASSERT_FALSE(assets);
+      EXPECT_STREQ(assets.error().what(), expected_error.error().what());
     }
   });
 

@@ -52,8 +52,10 @@ std::expected<std::size_t, StarException> read_file_tail(File& file, std::string
 
 template <typename Buffer>
 concept whole_file_buffer = std::default_initializable<Buffer> && std::movable<Buffer>
-  && requires(Buffer& buffer, File& file, std::size_t amount) {
-       { buffer.size() } -> std::same_as<std::size_t>;
+  && requires(Buffer& buffer, Buffer const& contents, File& file, std::size_t amount) {
+       { contents.size() } -> std::same_as<std::size_t>;
+       { contents.capacity() } -> std::same_as<std::size_t>;
+       { buffer.reserve(amount) } -> std::same_as<void>;
        { read_file_tail(file, buffer, amount, char{}) } -> std::same_as<std::expected<std::size_t, StarException>>;
      };
 
@@ -75,7 +77,9 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
       amount = static_cast<std::size_t>(std::clamp<StreamOffset>(*hint, 1, maximum_chunk));
 
     auto limit = static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
-    if constexpr (requires { buffer.max_size(); })
+    if constexpr (requires {
+                    { buffer.max_size() } -> std::same_as<std::size_t>;
+                  })
       limit = std::min(limit, buffer.max_size());
     while (true) {
       // Probe EOF before growing the owning buffer, including after the size hint.
@@ -86,8 +90,21 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
       if (*prefix == 0)
         return buffer;
       auto offset = buffer.size();
+      // Do not outgrow a precise reservation merely to request a full last
+      // chunk. Reaching the hint still requires the next real EOF probe.
+      if (hint && *hint > static_cast<StreamOffset>(offset))
+        amount = static_cast<std::size_t>(std::min<StreamOffset>(amount, *hint - static_cast<StreamOffset>(offset)));
       if (amount > limit - offset)
         return std::unexpected(IOException::format("File '{}' is too large to read into memory", filename));
+      if (offset && hint && *hint > 0 && amount > buffer.capacity() - offset) {
+        // Reduce repeated large moves, but speculate only after another real
+        // byte arrives and only up to four times the payload already observed.
+        // An inaccurate size cannot trigger an unbounded up-front reservation.
+        auto observed_bound = offset > limit / 4 ? limit : offset * 4;
+        auto reservation = static_cast<std::size_t>(std::min(*hint, static_cast<StreamOffset>(observed_bound)));
+        if (reservation > offset + amount)
+          buffer.reserve(reservation);
+      }
       auto count = read_file_tail(file, buffer, amount, first);
       if (!count)
         return std::unexpected(std::move(count.error()));

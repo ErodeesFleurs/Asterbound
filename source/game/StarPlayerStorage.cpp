@@ -299,6 +299,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
           m_savedPlayersCache.move_to_back(entry);
       }
     }
+    m_writtenMetadata = *json;
     return {};
   }();
   if (!metadata)
@@ -395,18 +396,12 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
   if (!playerUuid)
     return std::unexpected(std::move(playerUuid.error()));
   auto uuid = *playerUuid;
-  auto& playerCacheData = m_savedPlayersCache[uuid];
-  if (!m_playerFileNames.contains_left(uuid)) {
-    auto added = m_playerFileNames.add(uuid, uuid.hex());
-    if (!added)
-      return std::unexpected(std::move(added.error()));
-  }
   auto newPlayerData = player->diskStore();
   if (!newPlayerData)
     return std::unexpected(std::move(newPlayerData.error()));
-  if (playerCacheData != *newPlayerData) {
-    playerCacheData = *newPlayerData;
-    auto versionedJson = (*entityFactory)->storeVersionedJson(EntityType::Player, playerCacheData);
+  auto cached = m_savedPlayersCache.find_ref(uuid);
+  if (!cached || cached->get() != *newPlayerData) {
+    auto versionedJson = (*entityFactory)->storeVersionedJson(EntityType::Player, *newPlayerData);
     if (!versionedJson)
       return std::unexpected(std::move(versionedJson.error()));
     auto basename = uuidFileName(uuid);
@@ -416,6 +411,7 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
     auto written = VersionedJson::write_file(*versionedJson, File::relative_to(m_storageDirectory, fileName));
     if (!written)
       return std::unexpected(std::move(written.error()));
+    m_savedPlayersCache[uuid] = *newPlayerData;
     auto playerName = player->name();
     if (!playerName)
       return std::unexpected(std::move(playerName.error()));
@@ -556,6 +552,8 @@ std::expected<void, StarException> PlayerStorage::applyShipUpdates(Uuid const& u
 }
 
 std::expected<void, StarException> PlayerStorage::moveToFront(Uuid const& uuid) {
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lockWithDiagnostics(locker);
   auto moved = m_savedPlayersCache.move_to_front(uuid);
   if (!moved)
     return std::unexpected(std::move(moved.error()));
@@ -599,15 +597,15 @@ std::expected<void, StarException> PlayerStorage::backupCycle(Uuid const& uuid) 
 }
 
 std::expected<void, StarException> PlayerStorage::setMetadata(String key, Json value) {
-  auto& val = m_metadata[std::move(key)];
-  if (val != value) {
-    val = std::move(value);
-    return writeMetadata();
-  }
-  return {};
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lockWithDiagnostics(locker);
+  m_metadata[std::move(key)] = std::move(value);
+  return writeMetadata();
 }
 
 std::expected<Json, StarException> PlayerStorage::getMetadata(String const& key) {
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lockWithDiagnostics(locker);
   return Json(m_metadata).get(key, {});
 }
 
@@ -621,15 +619,24 @@ std::expected<std::reference_wrapper<String const>, StarException> PlayerStorage
 }
 
 std::expected<void, StarException> PlayerStorage::writeMetadata() {
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lockWithDiagnostics(locker);
   JsonArray order;
   for (auto const& p : m_savedPlayersCache)
     order.append(p.first.hex());
   m_metadata["order"] = std::move(order);
-  String filename = File::relative_to(m_storageDirectory, "metadata");
-  auto contents = Json(m_metadata).printJson(0);
+  Json metadata(m_metadata);
+  if (m_writtenMetadata && *m_writtenMetadata == metadata)
+    return {};
+  auto contents = metadata.printJson(0);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
-  return File::overwrite_file_with_rename(*contents, filename);
+  String filename = File::relative_to(m_storageDirectory, "metadata");
+  auto written = File::overwrite_file_with_rename(*contents, filename);
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  m_writtenMetadata = std::move(metadata);
+  return {};
 }
 
 }

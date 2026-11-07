@@ -1433,23 +1433,40 @@ namespace Star {
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::writeRoot() {
     DataStreamIODevice ds(*m_device);
-    // First write the root info to whichever section we are not currently using
+    // commitWrites() has already synchronized staged blocks. Serialize only the
+    // inactive root's 4 + 8 + 4 + 1 bytes; the other root and reserved header
+    // padding must not be rewritten. Keep the existing DataStream encodings.
     if (auto rootPositioned = ds.seek(BTreeRootInfoStart + (m_usingAltRoot ? 0 : BTreeRootInfoSize)); !rootPositioned)
       return std::unexpected(std::move(rootPositioned.error()));
 
-    if (auto freeIndexWritten = ds.write<BlockIndex>(m_headFreeIndexBlock); !freeIndexWritten)
+    static_assert(2 * sizeof(BlockIndex) + sizeof(StreamOffset) + 1 == BTreeRootInfoSize);
+    std::array<char, BTreeRootInfoSize> root_info;
+    std::span<char> remaining(root_info);
+    DataStreamFunctions fields({},
+                               [&remaining](std::span<char const> data) -> std::expected<std::size_t, StarException> {
+                                 if (data.size() > remaining.size())
+                                   return std::unexpected(IOException("BTree root info exceeds reserved size"));
+                                 std::ranges::copy(data, remaining.begin());
+                                 remaining = remaining.subspan(data.size());
+                                 return data.size();
+                               });
+
+    if (auto freeIndexWritten = fields.write<BlockIndex>(m_headFreeIndexBlock); !freeIndexWritten)
       return std::unexpected(std::move(freeIndexWritten.error()));
 
-    if (auto sizeWritten = ds.write<StreamOffset>(m_deviceSize); !sizeWritten)
+    if (auto sizeWritten = fields.write<StreamOffset>(m_deviceSize); !sizeWritten)
       return std::unexpected(std::move(sizeWritten.error()));
 
-    if (auto rootWritten = ds.write<BlockIndex>(m_root); !rootWritten)
+    if (auto rootWritten = fields.write<BlockIndex>(m_root); !rootWritten)
       return std::unexpected(std::move(rootWritten.error()));
 
-    if (auto leafFlagWritten = ds.write<bool>(m_rootIsLeaf); !leafFlagWritten)
+    if (auto leafFlagWritten = fields.write<bool>(m_rootIsLeaf); !leafFlagWritten)
       return std::unexpected(std::move(leafFlagWritten.error()));
 
-    // Then flush all the pending changes.
+    if (auto rootWritten = ds.writeData(root_info); !rootWritten)
+      return std::unexpected(std::move(rootWritten.error()));
+
+    // Barrier 2: the complete inactive root must be durable before selecting it.
     if (auto changesSynced = m_device->sync(); !changesSynced)
       return std::unexpected(std::move(changesSynced.error()));
 
@@ -1463,8 +1480,8 @@ namespace Star {
 
     m_usingAltRoot = usingAltRoot;
 
-    // Then flush this single bit write to make sure it happens before anything
-    // else.
+    // Barrier 3: acknowledge the selector only after its own synchronization.
+    // Preserve the selector update even on sync failure: durability is uncertain.
     return m_device->sync();
   }
 
@@ -1592,6 +1609,8 @@ namespace Star {
 
     }
 
+    // Barrier 1: keep staged bytes until every block write and this sync succeed.
+    // Root publication must not cross this barrier, even on a retry.
     auto result158 = m_device->sync();
     if (!result158) return std::unexpected(std::move(result158.error()));
 

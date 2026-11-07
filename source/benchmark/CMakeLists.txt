@@ -20,7 +20,8 @@ star_add_core_benchmark(core_benchmarks)
 star_add_core_benchmark(json_benchmarks)
 star_add_core_benchmark(worker_benchmarks)
 star_add_core_benchmark(file_benchmarks)
-target_sources(file_benchmarks PRIVATE file_asset_benchmarks.cpp)
+target_sources(file_benchmarks PRIVATE
+  file_asset_benchmarks.cpp file_asset_batch_benchmarks.cpp file_commit_benchmarks.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)
   star_add_core_benchmark(allocator_benchmarks)
   if(CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -46,7 +47,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)
   endforeach()
 endif()
 
-add_executable(game_benchmarks game_benchmarks.cpp
+add_executable(game_benchmarks game_benchmarks.cpp player_storage_benchmarks.cpp
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core> $<TARGET_OBJECTS:star_game>)
 target_include_directories(game_benchmarks PRIVATE
   ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}

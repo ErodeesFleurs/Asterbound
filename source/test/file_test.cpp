@@ -161,7 +161,9 @@ TEST(FileTest, WholeReadsPreserveEmptyBinaryLargeAndUtf8Contents) {
   auto cleanup = finally([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "whole");
   for (std::size_t size :
-       {std::size_t(0), std::size_t(1), std::size_t(1024), std::size_t(65536), std::size_t(3 * 1024 * 1024 + 137)}) {
+       {std::size_t(0), std::size_t(1), std::size_t(1024), std::size_t(4095), std::size_t(4096), std::size_t(4097),
+        std::size_t(65536), std::size_t(1024 * 1024 - 1), std::size_t(1024 * 1024), std::size_t(1024 * 1024 + 1),
+        std::size_t(3 * 1024 * 1024 + 137)}) {
     SCOPED_TRACE(size);
     std::string bytes(size, '\0');
     for (std::size_t i = 0; i < size; ++i)
@@ -598,6 +600,38 @@ TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
 }
 
 #ifdef STAR_SYSTEM_LINUX
+TEST(FileTest, WholeReadsStopAtActualEofWhenMetadataOverstatesContents) {
+  // sysfs text attributes conventionally report a page-sized stat length even
+  // when their complete payload is only a few bytes. CPU possible is boot-time
+  // configuration, unlike counters whose value can change between reads.
+  String path("/sys/devices/system/cpu/possible");
+  auto opened = File::open(path, IOMode::Read);
+  if (!opened)
+    GTEST_SKIP() << "sysfs CPU configuration is unavailable";
+  auto& file = **opened;
+  auto hint = file.size();
+  ASSERT_TRUE(hint);
+  std::string expected;
+  std::array<char, 256> chunk;
+  while (true) {
+    auto count = file.read(chunk);
+    ASSERT_TRUE(count);
+    if (*count == 0)
+      break;
+    expected.append(chunk.data(), *count);
+  }
+  ASSERT_TRUE(file.close());
+  if (*hint <= static_cast<StreamOffset>(expected.size()))
+    GTEST_SKIP() << "This kernel does not overstate the sysfs attribute length";
+  ASSERT_FALSE(expected.empty());
+  auto bytes = File::read_file(path);
+  ASSERT_TRUE(bytes);
+  EXPECT_TRUE(std::ranges::equal(bytes->span(), expected));
+  auto text = File::read_file_string(path);
+  ASSERT_TRUE(text);
+  EXPECT_EQ(text->utf8(), expected);
+}
+
 TEST(FileTest, WholeReadsConsumeStreamsWhoseMetadataSizeIsZero) {
   auto random = RandomService::create();
   ASSERT_TRUE(random);
