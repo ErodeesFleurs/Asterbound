@@ -52,9 +52,9 @@ private:
   Set<std::pair<NodeParameterType, String>> m_ephemeral;
 };
 
-typedef std::optional<std::variant<ActionState, DecoratorState, CompositeState>> NodeState;
+using NodeState = std::optional<std::variant<ActionState, DecoratorState, CompositeState>>;
 
-typedef std::pair<LuaFunction, LuaThread> Coroutine;
+using Coroutine = std::pair<LuaFunction, LuaThread>;
 
 enum class NodeStatus {
   Invalid,
@@ -63,7 +63,7 @@ enum class NodeStatus {
   Running
 };
 
-typedef LuaTupleReturn<NodeStatus, LuaValue> ActionReturn;
+using ActionReturn = LuaTupleReturn<NodeStatus, LuaValue>;
 struct ActionState {
   LuaThread thread;
 };

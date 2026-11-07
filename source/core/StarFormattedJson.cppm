@@ -56,8 +56,8 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 // Class representing formatted JSON data. Preserves whitespace and comments.
 class FormattedJson {
 public:
-  typedef List<JsonElement> ElementList;
-  typedef std::size_t ElementLocation;
+  using ElementList = List<JsonElement>;
+  using ElementLocation = std::size_t;
 
   static std::expected<FormattedJson, StarException> parse(String const& string);
   static std::expected<FormattedJson, StarException> parseJson(String const& string);

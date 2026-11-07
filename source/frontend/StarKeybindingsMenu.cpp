@@ -145,7 +145,7 @@ std::expected<bool, StarException> KeybindingsMenu::sendEvent(InputEvent const& 
       if (auto modKey = std::ranges::find(KeyChordMods, keyUp.key, &std::pair<Key, KeyMod>::first);
           modKey != KeyChordMods.end()) {
         m_currentMods &= ~modKey->second;
-        if (auto result = setKeybinding(KeyChord{keyUp.key, m_currentMods}); !result)
+        if (auto result = setKeybinding(KeyChord{.key = keyUp.key, .mods = m_currentMods}); !result)
           return std::unexpected(std::move(result.error()));
         return true;
       }
@@ -159,7 +159,7 @@ std::expected<bool, StarException> KeybindingsMenu::sendEvent(InputEvent const& 
         return std::unexpected(std::move(modKey.error()));
       if (*modKey) {
         m_currentMods |= **modKey;
-      } else if (auto result = setKeybinding(KeyChord{keyDown.key, m_currentMods}); !result) {
+      } else if (auto result = setKeybinding(KeyChord{.key = keyDown.key, .mods = m_currentMods}); !result) {
         return std::unexpected(std::move(result.error()));
       }
       return true;

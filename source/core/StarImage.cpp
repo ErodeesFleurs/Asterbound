@@ -313,9 +313,9 @@ void Image::reset(unsigned width, unsigned height, std::optional<PixelFormat> pf
   } else {
     std::uint8_t* newData = nullptr;
     if (!m_data)
-      newData = (std::uint8_t*)Star::malloc(imageSize);
+      newData = static_cast<std::uint8_t*>(Star::malloc(imageSize));
     else
-      newData = (std::uint8_t*)Star::realloc(m_data, imageSize);
+      newData = static_cast<std::uint8_t*>(Star::realloc(m_data, imageSize));
 
     if (!newData)
       std::terminate();
@@ -452,8 +452,8 @@ std::expected<Vec4B, StarException> Image::getrgb(Vec2U const& pos) const {
 
 Vec4B Image::clamp(Vec2I const& pos) const {
   Vec4B c;
-  unsigned x = (unsigned)Star::clamp<int>(pos[0], 0, m_width - 1);
-  unsigned y = (unsigned)Star::clamp<int>(pos[1], 0, m_height - 1);
+  unsigned x = static_cast<unsigned>(Star::clamp<int>(pos[0], 0, m_width - 1));
+  unsigned y = static_cast<unsigned>(Star::clamp<int>(pos[1], 0, m_height - 1));
   if (m_width == 0 || m_height == 0) {
     return {0, 0, 0, 0};
   } else if (bytesPerPixel() == 4) {

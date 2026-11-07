@@ -37,7 +37,7 @@ struct TenantMonsterSpawnable {
   std::optional<Json> overrides;
 };
 
-typedef std::variant<std::monostate, TenantNpcSpawnable, TenantMonsterSpawnable> TenantSpawnable;
+using TenantSpawnable = std::variant<std::monostate, TenantNpcSpawnable, TenantMonsterSpawnable>;
 
 struct TenantRent {
   Vec2F periodRange;

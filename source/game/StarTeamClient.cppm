@@ -77,7 +77,8 @@ public:
   [[nodiscard]] std::expected<std::optional<Json>, StarException> memberPortrait(Uuid const& uuid, std::optional<std::uint64_t> knownRevision) const;
 
 private:
-  typedef std::pair<RpcPromise<Json>, std::function<std::expected<void, StarException>(Json const&)>> RpcResponseHandler;
+  using RpcResponseHandler =
+    std::pair<RpcPromise<Json>, std::function<std::expected<void, StarException>(Json const&)>>;
 
   [[nodiscard]] std::expected<void, StarException> invokeRemote(String const& method, Json const& args,
       std::function<std::expected<void, StarException>(Json const&)> responseFunction = {});

@@ -369,7 +369,7 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   Vec2U imageSize(TilePixels, TilePixels);
-  for (auto liquid : (*liquids)->allLiquidSettings()) {
+  for (auto const& liquid : (*liquids)->allLiquidSettings()) {
     auto image = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
     image->fill(liquid->liquidColor);
     auto assetSource = (*assets)->assetSource(liquid->path);
@@ -415,7 +415,7 @@ int main(int argc, char** argv) {
     auto assets = root->assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    for (String source : (*assets)->assetSources()) {
+    for (String const& source : (*assets)->assetSources()) {
       auto logged = root->logger().info("Assets source: \"{}\"", source);
       if (!logged)
         return std::unexpected(std::move(logged.error()));

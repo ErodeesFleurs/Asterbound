@@ -20,10 +20,7 @@ public:
   PLHasher(std::size_t initial = 0)
     : m_hash(initial) {}
 
-  template <typename T>
-  void put(T b) {
-    m_hash = m_hash * 101 + (std::size_t)b;
-  }
+  template <typename T> void put(T b) { m_hash = m_hash * 101 + static_cast<std::size_t>(b); }
 
   std::size_t hash() const {
     return m_hash;
@@ -60,7 +57,7 @@ public:
 template <typename... TTypes>
 class hash<std::tuple<TTypes...>> {
 private:
-  typedef std::tuple<TTypes...> Tuple;
+  using Tuple = std::tuple<TTypes...>;
 
   template <std::size_t N>
   std::size_t operator()(Tuple const&) const {

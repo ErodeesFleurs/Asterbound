@@ -387,13 +387,15 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
       if (!value) return std::unexpected(std::move(value.error()));
       result.m_modulusOffset = std::move(*value);
     }
-    result.m_densityFunction = PerlinF((unsigned)*octaves, 1.0f / *densityPeriod, 1.0, *densityOffset, *alpha, *beta, rand.randu64());
-    result.m_modulusDistortion = PerlinF((unsigned)*octaves, 1.0f / result.m_modulus, *modulusVariance, *modulusVariance * 2, *alpha, *beta, rand.randu64());
+    result.m_densityFunction = PerlinF(static_cast<unsigned>(*octaves), 1.0f / *densityPeriod, 1.0, *densityOffset,
+                                       *alpha, *beta, rand.randu64());
+    result.m_modulusDistortion = PerlinF(static_cast<unsigned>(*octaves), 1.0f / result.m_modulus, *modulusVariance,
+                                         *modulusVariance * 2, *alpha, *beta, rand.randu64());
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
       if (*item) {
-        PerlinF weight((unsigned)*octaves, 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
+        PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
         result.m_weightedItems.append({std::move(**item), weight});
       }
     }
@@ -535,7 +537,7 @@ std::expected<std::optional<BiomeItemPlacement>, StarException> BiomeItemDistrib
     if (*density > 0) {
       auto distortion = m_modulusDistortion.get(x, y);
       if (!distortion) return std::unexpected(std::move(distortion.error()));
-      if ((int)(x + m_modulusOffset + *distortion) % m_modulus == 0) {
+      if (static_cast<int>(x + m_modulusOffset + *distortion) % m_modulus == 0) {
         float maxWeight = std::numeric_limits<float>::lowest();
         for (auto const& weightedItem : m_weightedItems) {
           auto weightResult = weightedItem.second.get(x, y);

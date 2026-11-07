@@ -17,10 +17,10 @@ import star.byte_array;
 import star.map;
 import star.data_stream_devices;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 
@@ -113,7 +113,7 @@ public:
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<CompressedPacketSocket, PacketSocket>(this, key); }
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<CompressedPacketSocket>(); }
 
-  virtual ~CompressedPacketSocket() = default;
+  ~CompressedPacketSocket() override = default;
 
   virtual void setCompressionStreamEnabled(bool enabled);
   virtual bool compressionStreamEnabled() const;

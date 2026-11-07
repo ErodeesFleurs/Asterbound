@@ -15,7 +15,7 @@ public:
     return Star::typeName<ActivatableItem>();
   }
 
-  virtual ~ActivatableItem() {}
+  virtual ~ActivatableItem() = default;
   [[nodiscard]]
   virtual std::expected<bool, StarException> active() const = 0;
   virtual void setActive(bool active) = 0;

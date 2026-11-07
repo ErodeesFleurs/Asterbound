@@ -304,9 +304,9 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   auto setLabelResult796 = container->setLabel("countLabel", toString(std::move(*toUIntResult795) * item->count()));
   if (!setLabelResult796)
     return std::unexpected(std::move(setLabelResult796.error()));
-  auto setLabelResult797 = container->setLabel("priceLabel", toString((int)item->price()));
-  if (!setLabelResult797)
-    return std::unexpected(std::move(setLabelResult797.error()));
+  auto priceLabelUpdated = container->setLabel("priceLabel", toString(static_cast<int>(item->price())));
+  if (!priceLabelUpdated)
+    return std::unexpected(std::move(priceLabelUpdated.error()));
 
   if (auto objectItem = as<ObjectItem>(item)) {
     auto objectDescription = [&]() -> std::expected<void, StarException> {
@@ -572,13 +572,11 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
         auto effects = statusEffects->statusEffects();
         if (!effects)
           return std::unexpected(std::move(effects.error()));
-        for (auto effect : *effects)
-          {
-            auto describePersistentEffectResult850 = describePersistentEffect(context, statusList, effect);
-            if (!describePersistentEffectResult850)
-              return std::unexpected(std::move(describePersistentEffectResult850.error()));
-            
-          }
+        for (auto const& effect : *effects) {
+          auto effectDescription = describePersistentEffect(context, statusList, effect);
+          if (!effectDescription)
+            return std::unexpected(std::move(effectDescription.error()));
+        }
       }
     }
   }

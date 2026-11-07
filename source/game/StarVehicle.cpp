@@ -532,7 +532,8 @@ if (!result1241) return std::unexpected(std::move(result1241.error()));
 if (!result1242) return std::unexpected(std::move(result1242.error()));
 auto result1243 = m_scriptComponent.addCallbacks("vehicle", std::move(*result1242));
 if (!result1243) return std::unexpected(std::move(result1243.error()));
-    auto result1244 = LuaBindings::makeConfigCallbacks(std::bind(&Vehicle::configValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2));
+auto result1244 =
+  LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) { return configValue(name, def); });
 if (!result1244) return std::unexpected(std::move(result1244.error()));
 auto result1245 = m_scriptComponent.addCallbacks(
         "config", std::move(*result1244));
@@ -1196,7 +1197,10 @@ void Vehicle::setPosition(Vec2F const& position) {
 
 EntityRenderLayer Vehicle::renderLayer(VehicleLayer vehicleLayer) const {
   // Z-offset based on entity id, so vehicles don't overlap strangely.
-  return m_overrideRenderLayer ? (*m_overrideRenderLayer + (unsigned)vehicleLayer) : (m_baseRenderLayer + ((EntityRenderLayer)(entityId() * 4 + (unsigned)vehicleLayer) & RenderLayerLowerMask));
+  return m_overrideRenderLayer
+    ? (*m_overrideRenderLayer + static_cast<unsigned>(vehicleLayer))
+    : (m_baseRenderLayer
+       + (static_cast<EntityRenderLayer>(entityId() * 4 + static_cast<unsigned>(vehicleLayer)) & RenderLayerLowerMask));
 }
 
 std::expected<LuaCallbacks, StarException> Vehicle::makeVehicleCallbacks() {

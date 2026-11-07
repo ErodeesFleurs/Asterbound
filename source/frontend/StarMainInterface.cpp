@@ -1149,9 +1149,7 @@ std::expected<void, StarException> MainInterface::togglePlainCraftingWindow() {
   return {};
 }
 
-bool MainInterface::windowsOpen() const {
-  return (bool)m_paneManager.topPane({PaneLayer::Window});
-}
+bool MainInterface::windowsOpen() const { return static_cast<bool>(m_paneManager.topPane({PaneLayer::Window})); }
 
 std::shared_ptr<MerchantPane> MainInterface::activeMerchantPane() const {
   if (m_paneManager.isDisplayed(m_merchantWindow))
@@ -1186,7 +1184,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
         bool& enabled;
         bool previous;
         ~CommandInputScope() { enabled = previous; }
-      } commandScope{m_commandInput, std::exchange(m_commandInput, userSubmit)};
+      } commandScope{.enabled = m_commandInput, .previous = std::exchange(m_commandInput, userSubmit)};
       std::optional<Input::ClipboardUnlock> clipboardUnlock;
       if (userSubmit) {
         auto input = context().input();
@@ -1479,7 +1477,10 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
           auto name = config->getString("bookmarkName", "");
           if (!name)
             return std::unexpected(std::move(name.error()));
-          currentLocation = TeleportBookmark{{playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)}, planetName, *name, icon};
+          currentLocation = TeleportBookmark{.target = {playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)},
+                                             .targetName = planetName,
+                                             .bookmarkName = *name,
+                                             .icon = icon};
           auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
           if (!bookmarks)
             return std::unexpected(std::move(bookmarks.error()));
@@ -1662,7 +1663,8 @@ std::expected<void, StarException> MainInterface::update(float dt) {
               m_cinematicOverlay->stop();
             }
           } else {
-            auto logged = context().root().logger().warn("MainInterface: ignoring non-object cinematic of type {}", (int)definition.type());
+            auto logged = context().root().logger().warn("MainInterface: ignoring non-object cinematic of type {}",
+                                                         static_cast<int>(definition.type()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             m_cinematicOverlay->stop();
@@ -1906,7 +1908,7 @@ std::expected<StringList, StarException> MainInterface::executeClientCommand(Str
     bool& enabled;
     bool previous;
     ~CommandInputScope() { enabled = previous; }
-  } commandScope{m_commandInput, std::exchange(m_commandInput, false)};
+  } commandScope{.enabled = m_commandInput, .previous = std::exchange(m_commandInput, false)};
   if (commandScope.previous)
     m_lastCommand = command;
   return m_clientCommandProcessor->handleCommand(command);
@@ -2183,7 +2185,7 @@ std::expected<void, StarException> MainInterface::updateCursor() {
         }
       }
       if (!cursorOverride) {
-        for (auto item : {player->primaryHandItem(), player->altHandItem()}) {
+        for (auto const& item : {player->primaryHandItem(), player->altHandItem()}) {
           if (auto activeItem = as<ActiveItem>(item)) {
             if (auto cursor = activeItem->cursor()) {
               cursorOverride = cursor;
@@ -2230,7 +2232,7 @@ std::expected<void, StarException> MainInterface::renderCursor() {
     if (!width) return std::unexpected(std::move(width.error()));
     auto height = windowHeight();
     if (!height) return std::unexpected(std::move(height.error()));
-    return m_cursorItem->render(RectI::withSize({}, {(int)*width, (int)*height}));
+    return m_cursorItem->render(RectI::withSize({}, {static_cast<int>(*width), static_cast<int>(*height)}));
   };
   auto drawn = drawItem();
   auto reset = context().resetInterfaceScissorRect();

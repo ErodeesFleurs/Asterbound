@@ -203,9 +203,7 @@ std::expected<void, StarException> WorldClientThread::stop() {
   return {};
 }
 
-void WorldClientThread::setPause(std::shared_ptr<const std::atomic<bool>> pause) {
-  m_pause = pause;
-}
+void WorldClientThread::setPause(std::shared_ptr<const std::atomic<bool>> pause) { m_pause = std::move(pause); }
 
 bool WorldClientThread::errorOccurred() {
   return m_errorOccurred;
@@ -238,7 +236,7 @@ std::expected<void, StarException> WorldClientThread::executeAction(WorldClientA
 void WorldClientThread::setUpdateAction(WorldClientAction updateAction) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_updateAction = updateAction;
+  m_updateAction = std::move(updateAction);
 }
 
 void WorldClientThread::passMessage(Message&& message) {

@@ -152,8 +152,8 @@ extern VersionNumber const TeamClientVersion = 1;
   
 TeamClient::TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<ClientContext> clientContext)
   : m_root(root), m_teamLeader(root.random()), m_pendingInvitation(Uuid(root.random()), String()) {
-  m_mainPlayer = mainPlayer;
-  m_clientContext = clientContext;
+  m_mainPlayer = std::move(mainPlayer);
+  m_clientContext = std::move(clientContext);
 
   m_hasPendingInvitation = false;
   m_pollInvitationsTimer = {};
@@ -177,9 +177,7 @@ bool TeamClient::isTeamLeader(Uuid const& playerUuid) {
   return m_teamLeader == playerUuid;
 }
 
-bool TeamClient::isMemberOfTeam() {
-  return (bool)m_teamUuid;
-}
+bool TeamClient::isMemberOfTeam() { return static_cast<bool>(m_teamUuid); }
 
 std::expected<void, StarException> TeamClient::invitePlayer(String const& playerName) {
   if (playerName.empty()) return {};

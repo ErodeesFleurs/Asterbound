@@ -44,7 +44,7 @@ extern std::expected<EnumMap<EntityType>, StarException> const EntityTypeNames =
   {EntityType::Player, "player"}
 });
 
-Entity::~Entity() {}
+Entity::~Entity() = default;
 
 std::expected<void, StarException> Entity::init(World& world, EntityId entityId, EntityMode mode) {
   if (entityId == NullEntityId)
@@ -241,9 +241,7 @@ void Entity::setKeepAlive(bool keepAlive) {
   m_keepAlive = keepAlive;
 }
 
-void Entity::setUniqueId(std::optional<String> uniqueId) {
-  m_uniqueId = uniqueId;
-}
+void Entity::setUniqueId(std::optional<String> uniqueId) { m_uniqueId = std::move(uniqueId); }
 
 void Entity::setTeam(EntityDamageTeam newTeam) {
   m_team = newTeam;

@@ -280,9 +280,10 @@ std::expected<void, StarException> Songbook::playback() {
     audioInstance->setMixerGroup(MixerGroup::Instruments);
     audioInstance->setPitchMultiplier(note.velocity);
 
-    auto start = m_timeSourceInstance->epoch + (std::int64_t)(note.timecode * 1000.0);
+    auto start = m_timeSourceInstance->epoch + static_cast<std::int64_t>(note.timecode * 1000.0);
     audioInstance->setClockStart(start);
-    audioInstance->setClockStop(start + (std::int64_t)(note.duration * 1000.0), (std::int64_t)(note.fadeout * 1000.0));
+    audioInstance->setClockStop(start + static_cast<std::int64_t>(note.duration * 1000.0),
+                                static_cast<std::int64_t>(note.fadeout * 1000.0));
 
     audioInstance->setPosition(m_position);
 
@@ -654,7 +655,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
             return std::unexpected(std::move(parsedDuration.error()));
           auto duration = *parsedDuration;
           if (duration != 1) {
-            for (int index = groupStartIndex; index < (int)result.size(); index++) {
+            for (int index = groupStartIndex; index < static_cast<int>(result.size()); index++) {
               auto& entry = result[index];
               entry.duration *= duration;
             }
@@ -669,15 +670,15 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
             int p = 0;
             int q = 0;
             int r = 0;
-            p = (int)readChar() - (int)'0';
+            p = static_cast<int>(readChar()) - static_cast<int>('0');
             if (peek() == ':') {
               readChar();
               if (String::isAsciiNumber(peek()))
-                q = (int)readChar() - (int)'0';
+                q = static_cast<int>(readChar()) - static_cast<int>('0');
               if (peek() == ':') {
                 readChar();
                 if (String::isAsciiNumber(peek()))
-                  r = (int)readChar() - (int)'0';
+                  r = static_cast<int>(readChar()) - static_cast<int>('0');
               }
             }
 
@@ -689,7 +690,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               return std::unexpected(StarException("ABC tuplet has a zero count"));
 
             tupleCount = p;
-            tupleDurationFactor = (float)q / (float)p;
+            tupleDurationFactor = static_cast<float>(q) / static_cast<float>(p);
           }
 
           continue;
@@ -761,9 +762,8 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               note = 0;
               break;
             }
-            default:
-              return std::unexpected(StarException(strf("Unrecognized note {}", (char)head)));
-          }
+            default: return std::unexpected(StarException(strf("Unrecognized note {}", static_cast<char>(head))));
+            }
           if (note != 0) {
             bool accidentalActive = accidentalSpecified;
             if (!accidentalSpecified) {
@@ -814,9 +814,8 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
                 case 'z': {
                   break;
                 }
-                default:
-                  return std::unexpected(StarException(strf("Unrecognized note {}", (char)head)));
-              }
+                default: return std::unexpected(StarException(strf("Unrecognized note {}", static_cast<char>(head))));
+                }
             }
 
             // std::cerr << ":" << note << ":" << (int)accidentalSpecified <<
@@ -939,7 +938,7 @@ bool Songbook::instrumentPlaying() const {
     return false;
   if (m_timeSourceInstance) {
     auto now = (Time::millisecondsSinceEpoch() - m_timeSourceInstance->epoch) / 1000.0;
-    for (auto n : m_heldNotes) {
+    for (auto const& n : m_heldNotes) {
       if ((n.start <= now) && (now <= n.end))
         return true;
     }

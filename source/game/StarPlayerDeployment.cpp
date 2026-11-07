@@ -215,7 +215,7 @@ std::expected<void, StarException> PlayerDeployment::collectRenderEvents(RenderC
   auto particles = renderCallback.addParticles(m_scriptComponent.pullNewParticles());
   if (!particles)
     return std::unexpected(std::move(particles.error()));
-  for (auto audio : m_scriptComponent.pullNewAudios()) {
+  for (auto const& audio : m_scriptComponent.pullNewAudios()) {
     audio->setPosition(position);
     auto added = renderCallback.addAudio(audio);
     if (!added)

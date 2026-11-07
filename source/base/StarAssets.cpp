@@ -625,7 +625,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       auto originalSource = m_assetSourcePaths.maybeRightRef(sourcePath);
       if (!originalSource || !originalSource->get()->contains(originalScriptPath))
         return false;
-      LoadScriptReference original{originalSource->get(), originalScriptPath};
+      LoadScriptReference original{.source = originalSource->get(), .path = originalScriptPath};
       if (loadScriptState->unavailable.contains(original))
         return false;
       auto metadata = original.source->metadata();
@@ -648,7 +648,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       }
       if (!declared)
         return false;
-      LoadScriptReference replacement{newFiles, replacementScriptPath};
+      LoadScriptReference replacement{.source = newFiles, .path = replacementScriptPath};
       if (!newFiles->contains(replacementScriptPath)) {
         auto replacementKey = CaseInsensitiveStringView::create(replacementScriptPath);
         if (!replacementKey)
@@ -656,7 +656,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         auto descriptor = m_files.maybeRef(*replacementKey);
         if (!descriptor)
           return false;
-        replacement = {descriptor->get().source, descriptor->get().sourceName};
+        replacement = {.source = descriptor->get().source, .path = descriptor->get().sourceName};
       }
       for (auto& entry : loadScriptState->replacements) {
         if (entry.original == original) {
@@ -664,7 +664,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           return true;
         }
       }
-      loadScriptState->replacements.append({std::move(original), std::move(replacement)});
+      loadScriptState->replacements.append({.original = std::move(original), .replacement = std::move(replacement)});
       return true;
     });
     if (!registered)
@@ -844,7 +844,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             auto path = jPath.toString();
             if (!path)
               return std::unexpected(std::move(path.error()));
-            LoadScriptReference selected{source, *path};
+            LoadScriptReference selected{.source = source, .path = *path};
             loadScriptState->unavailable.append(selected);
             for (auto const& entry : loadScriptState->replacements) {
               if (entry.original == selected) {
@@ -869,7 +869,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           auto path = jPath.toString();
           if (!path)
             return std::unexpected(std::move(path.error()));
-          LoadScriptReference closed{source, std::move(*path)};
+          LoadScriptReference closed{.source = source, .path = std::move(*path)};
           if (!loadScriptState->unavailable.contains(closed))
             loadScriptState->unavailable.append(std::move(closed));
         }
@@ -1046,7 +1046,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto validated = validatePath(components, *type == AssetType::Json || *type == AssetType::Image, *type == AssetType::Image);
     if (!validated)
       return std::unexpected(std::move(validated.error()));
-    auto asset = getAsset(AssetId{*type, std::move(components)});
+    auto asset = getAsset(AssetId{.type = *type, .path = std::move(components)});
     if (!asset)
       return std::unexpected(std::move(asset.error()));
     (*asset)->forcePersist = true;
@@ -1202,7 +1202,7 @@ std::expected<Json, StarException> Assets::json(String const& path) const {
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, true, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset(AssetId{AssetType::Json, std::move(components)});
+  auto data = getAsset(AssetId{.type = AssetType::Json, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   return asRef<JsonData>(**data)->get().json;
@@ -1223,7 +1223,7 @@ std::expected<void, StarException> Assets::queueJsons(StringList const& paths) c
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, true, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({AssetType::Json, {std::move(components.basePath), {}, {}}});
+    ids.append({.type = AssetType::Json, .path = {std::move(components.basePath), {}, {}}});
   }
   queueAssets(ids);
   return {};
@@ -1235,14 +1235,14 @@ std::expected<void, StarException> Assets::queueJsons(CaseInsensitiveStringSet c
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, true, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    if (queueAsset({AssetType::Json, {std::move(components.basePath), {}, {}}}))
+    if (queueAsset({.type = AssetType::Json, .path = {std::move(components.basePath), {}, {}}}))
       m_assetsQueued.notify_one();
   }
   return {};
 }
 
 std::expected<std::shared_ptr<Image const>, StarException> Assets::image(AssetPath const& path) const {
-  auto data = getAsset({AssetType::Image, path});
+  auto data = getAsset({.type = AssetType::Image, .path = path});
   if (!data)
     return std::unexpected(std::move(data.error()));
   return asRef<ImageData>(**data)->get().image;
@@ -1254,7 +1254,7 @@ std::expected<void, StarException> Assets::queueImages(StringList const& paths) 
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, true, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({AssetType::Image, std::move(components)});
+    ids.append({.type = AssetType::Image, .path = std::move(components)});
   }
   queueAssets(ids);
   return {};
@@ -1266,14 +1266,14 @@ std::expected<void, StarException> Assets::queueImages(CaseInsensitiveStringSet 
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, true, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    if (queueAsset({AssetType::Image, std::move(components)}))
+    if (queueAsset({.type = AssetType::Image, .path = std::move(components)}))
       m_assetsQueued.notify_one();
   }
   return {};
 }
 
 std::expected<std::shared_ptr<Image const>, StarException> Assets::tryImage(AssetPath const& path) const {
-  auto data = tryAsset({AssetType::Image, path});
+  auto data = tryAsset({.type = AssetType::Image, .path = path});
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
@@ -1293,7 +1293,7 @@ std::expected<std::shared_ptr<Audio const>, StarException> Assets::audio(String 
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({AssetType::Audio, std::move(components)});
+  auto data = getAsset({.type = AssetType::Audio, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   return asRef<AudioData>(**data)->get().audio;
@@ -1305,7 +1305,7 @@ std::expected<void, StarException> Assets::queueAudios(StringList const& paths) 
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, false, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({AssetType::Audio, std::move(components)});
+    ids.append({.type = AssetType::Audio, .path = std::move(components)});
   }
   queueAssets(ids);
   return {};
@@ -1317,7 +1317,7 @@ std::expected<void, StarException> Assets::queueAudios(CaseInsensitiveStringSet 
     auto components = AssetPath::split(path.string());
     if (auto valid = validatePath(components, false, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    if (queueAsset({AssetType::Audio, std::move(components)}))
+    if (queueAsset({.type = AssetType::Audio, .path = std::move(components)}))
       m_assetsQueued.notify_one();
   }
   return {};
@@ -1327,7 +1327,7 @@ std::expected<std::shared_ptr<Audio const>, StarException> Assets::tryAudio(Stri
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = tryAsset({AssetType::Audio, std::move(components)});
+  auto data = tryAsset({.type = AssetType::Audio, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
@@ -1339,7 +1339,7 @@ std::expected<std::shared_ptr<Font const>, StarException> Assets::font(String co
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({AssetType::Font, std::move(components)});
+  auto data = getAsset({.type = AssetType::Font, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   return asRef<FontData>(**data)->get().font;
@@ -1349,7 +1349,7 @@ std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(Str
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({AssetType::Bytes, std::move(components)});
+  auto data = getAsset({.type = AssetType::Bytes, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   return asRef<BytesData>(**data)->get().bytes;
@@ -1841,7 +1841,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
     if (*isLua) {
-      PatchContextKey contextKey{std::ref(*patchSource), patchPath};
+      PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchPath};
       lockWithDiagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
@@ -1983,7 +1983,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
     if (*isLua) {
-      PatchContextKey contextKey{std::ref(*patchSource), patchBasePath};
+      PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchBasePath};
       std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
       lockWithDiagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
@@ -2166,7 +2166,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadJson(AssetPath const& path) const {
   if (path.subPath) {
-    auto top = loadAsset({AssetType::Json, {path.basePath, {}, {}}});
+    auto top = loadAsset({.type = AssetType::Json, .path = {path.basePath, {}, {}}});
     if (!top)
       return std::unexpected(std::move(top.error()));
     if (!*top)
@@ -2192,7 +2192,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
   if (auto valid = validatePath(path, true, true); !valid)
     return std::unexpected(std::move(valid.error()));
   if (!path.directives.empty()) {
-    auto loaded = loadAsset({AssetType::Image, {path.basePath, path.subPath, {}}});
+    auto loaded = loadAsset({.type = AssetType::Image, .path = {path.basePath, path.subPath, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
@@ -2210,7 +2210,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       auto components = AssetPath::split(ref);
       if (auto valid = validatePath(components, true, false); !valid)
         return std::unexpected(std::move(valid.error()));
-      auto reference = loadAsset({AssetType::Image, std::move(components)});
+      auto reference = loadAsset({.type = AssetType::Image, .path = std::move(components)});
       if (!reference)
         return std::unexpected(std::move(reference.error()));
       if (!*reference)
@@ -2234,7 +2234,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     });
   }
   if (path.subPath) {
-    auto loaded = loadAsset({AssetType::Image, {path.basePath, {}, {}}});
+    auto loaded = loadAsset({.type = AssetType::Image, .path = {path.basePath, {}, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
@@ -2243,7 +2243,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     if (!source.frames)
       return std::unexpected(AssetException::format("No associated frames file found for image '{}' while resolving image frame '{}'", path.basePath, path));
     if (auto alias = source.frames->aliases.maybeRef(*path.subPath)) {
-      auto target = loadAsset({AssetType::Image, {path.basePath, alias->get(), path.directives}});
+      auto target = loadAsset({.type = AssetType::Image, .path = {path.basePath, alias->get(), path.directives}});
       if (!target)
         return std::unexpected(std::move(target.error()));
       if (!*target)

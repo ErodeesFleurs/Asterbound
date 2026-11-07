@@ -12,9 +12,9 @@ namespace Star {
 template <typename T>
 class Matrix3 {
 public:
-  typedef Vector<T, 3> Vec3;
-  typedef Vector<T, 2> Vec2;
-  typedef Array<Vec3, 3> Rows;
+  using Vec3 = Vector<T, 3>;
+  using Vec2 = Vector<T, 2>;
+  using Rows = Array<Vec3, 3>;
 
   static Matrix3 identity();
 
@@ -115,8 +115,8 @@ private:
   Rows m_rows;
 };
 
-typedef Matrix3<float> Mat3F;
-typedef Matrix3<double> Mat3D;
+using Mat3F = Matrix3<float>;
+using Mat3D = Matrix3<double>;
 
 template <typename T>
 Matrix3<T> Matrix3<T>::identity() {
@@ -145,8 +145,7 @@ Matrix3<T> Matrix3<T>::scaling(Vec2 const& scale, Vec2 const& point) {
   return Matrix3(scale[0], 0, point[0] - point[0] * scale[0], 0, scale[1], point[1] - point[1] * scale[1], 0, 0, 1);
 }
 
-template <typename T>
-Matrix3<T>::Matrix3() {}
+template <typename T> Matrix3<T>::Matrix3() = default;
 
 template <typename T>
 Matrix3<T>::Matrix3(T r1c1, T r1c2, T r1c3, T r2c1, T r2c2, T r2c3, T r3c1, T r3c2, T r3c3)

@@ -262,7 +262,8 @@ m_scriptComponent.setUpdateDelta(std::move(*result961));
 if (!result962) return std::unexpected(std::move(result962.error()));
 auto result963 = m_scriptComponent.addCallbacks("projectile", std::move(*result962));
 if (!result963) return std::unexpected(std::move(result963.error()));
-      auto result964 = LuaBindings::makeConfigCallbacks(std::bind(&Projectile::configValue, std::cref(*this), std::placeholders::_1, std::placeholders::_2));
+auto result964 =
+  LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) { return configValue(name, def); });
 if (!result964) return std::unexpected(std::move(result964.error()));
 auto result965 = m_scriptComponent.addCallbacks("config", std::move(*result964));
 if (!result965) return std::unexpected(std::move(result965.error()));
@@ -460,8 +461,9 @@ if (std::move(*result924))
 
   List<DamageSource> res;
   auto addDamageSource = [&, &self = *this](DamageSource::DamageArea damageArea) {
-    res.append(DamageSource(self.m_damageType, damageArea, self.m_power * self.m_powerMultiplier, true, self.m_sourceEntity, sourceTeam,
-        self.m_damageRepeatGroup, self.m_damageRepeatTimeout, self.m_damageKind, statusEffects, knockback, self.m_rayCheckToSource));
+    res.append(DamageSource(self.m_damageType, std::move(damageArea), self.m_power * self.m_powerMultiplier, true,
+                            self.m_sourceEntity, sourceTeam, self.m_damageRepeatGroup, self.m_damageRepeatTimeout,
+                            self.m_damageKind, statusEffects, knockback, self.m_rayCheckToSource));
   };
 
   auto result925 = world();
@@ -937,7 +939,7 @@ if (!result658) return std::unexpected(std::move(result658.error()));
       {
 auto result659 = self.world();
 if (!result659) return std::unexpected(std::move(result659.error()));
-result659->get().timer((float)stepsDelay / 60.f, function);
+result659->get().timer(static_cast<float>(stepsDelay) / 60.f, function);
 }
     return {};
 };
@@ -953,19 +955,22 @@ auto materialDatabase = std::move(*result733);
     unsigned totalDrops = 0;
     auto result734 = parameters.getArray("materials");
 if (!result734) return std::unexpected(std::move(result734.error()));
-for (auto sets : std::move(*result734)) {
-      auto result735 = sets.getUInt("quantity", 1);
-if (!result735) return std::unexpected(std::move(result735.error()));
-unsigned numDrops = std::move(*result735);
-      auto result736 = sets.getString("kind");
-if (!result736) return std::unexpected(std::move(result736.error()));
-auto result737 = materialDatabase->materialId(std::move(*result736));
-if (!result737) return std::unexpected(std::move(result737.error()));
-auto mat = std::move(*result737);
-      for (unsigned i = 0; i < numDrops; i++)
-        tileDrops.push_back(mat);
-      totalDrops += numDrops;
-    }
+for (auto const& sets : std::move(*result734)) {
+  auto result735 = sets.getUInt("quantity", 1);
+  if (!result735)
+    return std::unexpected(std::move(result735.error()));
+  unsigned numDrops = std::move(*result735);
+  auto result736 = sets.getString("kind");
+  if (!result736)
+    return std::unexpected(std::move(result736.error()));
+  auto result737 = materialDatabase->materialId(std::move(*result736));
+  if (!result737)
+    return std::unexpected(std::move(result737.error()));
+  auto mat = std::move(*result737);
+  for (unsigned i = 0; i < numDrops; i++)
+    tileDrops.push_back(mat);
+  totalDrops += numDrops;
+}
 
     auto result738 = world();
 if (!result738) return std::unexpected(std::move(result738.error()));
@@ -1497,14 +1502,8 @@ auto result871 = jsonToColor(std::move(*result870));
 if (!result871) return std::unexpected(std::move(result871.error()));
 auto result872 = parameters.getBool("pointLight", true);
 if (!result872) return std::unexpected(std::move(result872.error()));
-m_pendingRenderables.append(LightSource{
-        position(),
-        std::move(*result871).toRgbF(),
-        (LightType)std::move(*result872),
-        0.0f,
-        0.0f,
-        0.0f
-      });
+m_pendingRenderables.append(LightSource{position(), std::move(*result871).toRgbF(),
+                                        static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
 
   } else if (command == "option") {
     auto result873 = parameters.getArray("options");
@@ -1636,7 +1635,7 @@ String processing = std::move(*result685);
       m_imageSuffix = "";
     }
     else {
-      m_imageDirectives = (String)processing.utf8().substr(begin);
+      m_imageDirectives = static_cast<String>(processing.utf8().substr(begin));
       m_imageSuffix = processing.utf8().substr(0, begin);
     }
   }

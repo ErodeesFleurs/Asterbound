@@ -243,8 +243,8 @@ variant.humanoidParameters = std::move(*result19);
     if (!result24) return std::unexpected(std::move(result24.error()));
     auto result25 = jsonToStringList(std::move(*result24));
     if (!result25) return std::unexpected(std::move(result25.error()));
-    auto result26 = std::move(*result23)->generateName(
-            std::move(*result25)[(int)identity.gender], randSource);
+    auto result26 =
+      std::move(*result23)->generateName(std::move(*result25)[static_cast<int>(identity.gender)], randSource);
     if (!result26) return std::unexpected(std::move(result26.error()));
     identity.name = std::move(*result26);
       }
@@ -420,7 +420,7 @@ bool matchColorIndices = std::move(*result65);
           auto result68 = result67->get().toObject();
           if (!result68)
             return std::unexpected(std::move(result68.error()));
-          for (auto itemSlotConfig : std::move(*result68)) {
+          for (auto const& itemSlotConfig : std::move(*result68)) {
             auto result69 = itemSlotConfig.second.arrayPtr();
             if (!result69)
               return std::unexpected(std::move(result69.error()));
@@ -993,25 +993,29 @@ itemDatabase = std::move(*result208);
     itemCatalog = std::cref(*itemDatabase);
   }
 
-  auto makeItem = [&npcVariant, itemCatalog](ItemDescriptor itemDescriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
-    return itemCatalog->get().item(itemDescriptor, npcVariant.level, npcVariant.seed);
+  auto makeItem = [&npcVariant,
+                   itemCatalog](ItemDescriptor itemDescriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
+    return itemCatalog->get().item(std::move(itemDescriptor), npcVariant.level, npcVariant.seed);
   };
 
   auto result209 = ArmorWearer::create(m_root);
 if (!result209) return std::unexpected(std::move(result209.error()));
 auto armor = std::move(*result209);
-  for (auto item : npcVariant.items) {
-    {
-  if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result210 = EquipmentSlotNames->maybeLeft(item.first);
-  if (!result210) return std::unexpected(std::move(result210.error()));
-  if (auto equipmentSlot = std::move(*result210)) {
-        auto result211 = makeItem(item.second);
-  if (!result211) return std::unexpected(std::move(result211.error()));
-  armor->setItem((std::uint8_t)*equipmentSlot, as<ArmorItem>(std::move(*result211)));
-      }
-}
+for (auto const& item : npcVariant.items) {
+  {
+    if (!EquipmentSlotNames)
+      return std::unexpected(EquipmentSlotNames.error());
+    auto result210 = EquipmentSlotNames->maybeLeft(item.first);
+    if (!result210)
+      return std::unexpected(std::move(result210.error()));
+    if (auto equipmentSlot = std::move(*result210)) {
+      auto result211 = makeItem(item.second);
+      if (!result211)
+        return std::unexpected(std::move(result211.error()));
+      armor->setItem(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(std::move(*result211)));
+    }
   }
+}
 
   auto result212 = armor->setupHumanoid(*humanoid, false);
 if (!result212) return std::unexpected(std::move(result212.error()));

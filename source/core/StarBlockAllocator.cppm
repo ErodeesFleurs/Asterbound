@@ -14,23 +14,23 @@ template <typename T, std::size_t BlockSize>
 class BlockAllocator {
   static_assert(BlockSize > 0);
 public:
-  typedef T value_type;
+  using value_type = T;
 
-  typedef T* pointer;
-  typedef T const* const_pointer;
+  using pointer = T*;
+  using const_pointer = T const*;
 
-  typedef T& reference;
-  typedef T const& const_reference;
+  using reference = T&;
+  using const_reference = T const&;
 
   // Allocator can be shared, but since it is NOT thread safe this should not
   // be done by default.
-  typedef std::false_type propagate_on_container_copy_assignment;
-  typedef std::true_type propagate_on_container_move_assignment;
-  typedef std::true_type propagate_on_container_swap;
+  using propagate_on_container_copy_assignment = std::false_type;
+  using propagate_on_container_move_assignment = std::true_type;
+  using propagate_on_container_swap = std::true_type;
 
   template <class U>
   struct rebind {
-    typedef BlockAllocator<U, BlockSize> other;
+    using other = BlockAllocator<U, BlockSize>;
   };
 
   BlockAllocator();
@@ -104,7 +104,7 @@ private:
     std::allocator<T> multiAllocator;
   };
 
-  typedef std::unordered_map<TypeKey, std::shared_ptr<void>> BlockAllocatorFamily;
+  using BlockAllocatorFamily = std::unordered_map<TypeKey, std::shared_ptr<void>>;
 
   static Data* getAllocatorData(BlockAllocatorFamily& family);
 
@@ -280,7 +280,7 @@ typename BlockAllocator<T, BlockSize>::Data* BlockAllocator<T, BlockSize>::getAl
   auto& dataptr = family[typeKey<Data>()];
   if (!dataptr)
     dataptr = std::make_shared<Data>();
-  return (Data*)dataptr.get();
+  return static_cast<Data*>(dataptr.get());
 }
 
 }

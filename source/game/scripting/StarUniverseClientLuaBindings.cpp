@@ -27,10 +27,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import std;
@@ -141,7 +141,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
   
   if (auto registration = callbacks.registerCallback("sendOwnUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     auto pair = RpcPromise<Json>::createPair();
-    auto passed = universe.passMessage({message, JsonArray::from(std::move(args)), pair.second});
+    auto passed =
+      universe.passMessage({.message = message, .args = JsonArray::from(std::move(args)), .keeper = pair.second});
     if (!passed)
       return std::unexpected(std::move(passed.error()));
     return std::move(pair.first);
@@ -155,12 +156,15 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     return universe.sendUniverseMessage(ServerConnectionId,message,JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
-  
-  if (auto registration = callbacks.registerCallback("createClientCustomWorld", [&universe](String name, Json templateData)  -> std::expected<void, StarException> {
-    return universe.createCustomWorld(name, templateData);
-  }); !registration)
-      return std::unexpected(std::move(registration.error()));
-  
+
+  if (auto registration =
+        callbacks.registerCallback("createClientCustomWorld",
+                                   [&universe](String name, Json templateData) -> std::expected<void, StarException> {
+                                     return universe.createCustomWorld(name, std::move(templateData));
+                                   });
+      !registration)
+    return std::unexpected(std::move(registration.error()));
+
   if (auto registration = callbacks.registerCallback("createClientCustomWorldFromConfig", [&root, &universe](String name, Json worldConfig)  -> std::expected<void, StarException> {
     std::uint64_t worldSeed;
     auto hasSeed = worldConfig.contains("seed");

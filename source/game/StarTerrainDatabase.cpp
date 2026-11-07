@@ -84,7 +84,7 @@ TerrainSelectorParameters TerrainSelectorParameters::withCommonality(float commo
 TerrainSelector::TerrainSelector(String type, Json config, TerrainSelectorParameters parameters)
   : type(std::move(type)), config(std::move(config)), parameters(std::move(parameters)) {}
 
-TerrainSelector::~TerrainSelector() {}
+TerrainSelector::~TerrainSelector() = default;
 
 TerrainDatabase::TerrainDatabase(ConstructionKey, RandomService& random) : m_random(random) {}
 

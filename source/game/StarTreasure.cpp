@@ -316,7 +316,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
       auto poolContents = createTreasure(std::get<String>(fillEntry), level, seed + ++mix, visitedPools, itemCatalog);
       if (!poolContents)
         return std::unexpected(std::move(poolContents.error()));
-      for (auto item : *poolContents) {
+      for (auto const& item : *poolContents) {
         if (itemPool.allowDuplication || previousDescriptors.add(item->descriptor().singular()))
           treasureItems.append(item);
       }
@@ -340,7 +340,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
         auto poolContents = createTreasure(std::get<String>(poolEntry), level, staticRandomU64(seed, i, "TreasureSeedRecursion"), visitedPools, itemCatalog);
         if (!poolContents)
           return std::unexpected(std::move(poolContents.error()));
-        for (auto item : *poolContents) {
+        for (auto const& item : *poolContents) {
           if (itemPool.allowDuplication || previousDescriptors.add(item->descriptor().singular()))
             treasureItems.append(item);
         }

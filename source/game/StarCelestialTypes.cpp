@@ -97,7 +97,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return ds << systemObjects.systemLocation << systemObjects.planets;
 }
 
-CelestialChunk::CelestialChunk() {}
+CelestialChunk::CelestialChunk() = default;
 
 std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& store) {
   CelestialChunk chunk;

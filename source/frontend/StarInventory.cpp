@@ -488,7 +488,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     });
   if (!sortByComputedValueResult41)
     return std::unexpected(std::move(sortByComputedValueResult41.error()));
-  for (auto name : bagOrder) {
+  for (auto const& name : bagOrder) {
     auto getResult42 = itemBagConfig.get(name);
     if (!getResult42)
       return std::unexpected(std::move(getResult42.error()));
@@ -496,9 +496,18 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!getStringResult43)
       return std::unexpected(std::move(getStringResult43.error()));
     auto itemGrid = std::move(*getStringResult43);
-    invWindowReader.registerCallback(itemGrid, std::bind(leftClickCallback, name, std::placeholders::_1));
-    invWindowReader.registerCallback(itemGrid + ".right", std::bind(bagGridCallback, name, std::placeholders::_1));
-    invWindowReader.registerCallback(itemGrid + ".middle", std::bind(middleClickCallback, name, std::placeholders::_1));
+    invWindowReader.registerCallback(
+      itemGrid, [leftClickCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return leftClickCallback(name, widget);
+      });
+    invWindowReader.registerCallback(
+      itemGrid + ".right", [bagGridCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return bagGridCallback(name, widget);
+      });
+    invWindowReader.registerCallback(
+      itemGrid + ".middle", [middleClickCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return middleClickCallback(name, widget);
+      });
   }
 
   invWindowReader.registerCallback("close", [this](Widget&)  -> std::expected<void, StarException> {
@@ -663,7 +672,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     }
   }
 
-  for (auto name : bagOrder) {
+  for (auto const& name : bagOrder) {
     auto getResult70 = itemBagConfig.get(name);
     if (!getResult70)
       return std::unexpected(std::move(getResult70.error()));
@@ -1455,7 +1464,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   }
 
   if (auto item = inventory->swapSlotItem()) {
-    float pitch = 1.f - ((float)item->count() / (float)item->maxStack()) * .2f;
+    float pitch = 1.f - (static_cast<float>(item->count()) / static_cast<float>(item->maxStack())) * .2f;
     if (!m_currentSwapSlotItem || !item->matches(*m_currentSwapSlotItem, true))
       {
         auto randFromResult210 = RandomSource(context.root().random().randu64()).randFrom(m_pickUpSounds);

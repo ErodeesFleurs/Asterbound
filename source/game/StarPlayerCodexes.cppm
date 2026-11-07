@@ -18,7 +18,7 @@ class UniverseClient;
 
 class PlayerCodexes {
 public:
-  typedef std::pair<std::shared_ptr<Codex const>, bool> CodexEntry;
+  using CodexEntry = std::pair<std::shared_ptr<Codex const>, bool>;
 
   PlayerCodexes(Root& root);
   [[nodiscard]] static std::expected<std::shared_ptr<PlayerCodexes>, StarException> create(Root& root, Json const& json);

@@ -139,7 +139,7 @@ public:
   [[nodiscard]] std::expected<List<std::shared_ptr<EntityT>>, StarException> atTile(Vec2I const& pos) const;
 
 private:
-  typedef SpatialHash2D<EntityId, float, std::shared_ptr<Entity>> SpatialMap;
+  using SpatialMap = SpatialHash2D<EntityId, float, std::shared_ptr<Entity>>;
 
   WorldGeometry m_geometry;
 

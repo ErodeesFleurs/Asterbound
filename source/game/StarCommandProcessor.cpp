@@ -57,10 +57,10 @@ import star.ordered_set;
 import star.lock_file;
 import star.io_device;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.ref_ptr;
 import star.listener;
@@ -293,7 +293,7 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
     auto object = commands[i].toObject();
     if (!object) return std::unexpected(std::move(object.error()));
     StringList list = object->keys();
-    std::sort(list.begin(), list.end(), std::less<String>());
+    std::sort(list.begin(), list.end(), std::less<>());
     auto templateJson = assets->json("/help.config:" + names[i] + "HelpText");
     if (!templateJson) return std::unexpected(std::move(templateJson.error()));
     auto text = templateJson->toString();
@@ -612,7 +612,7 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
   auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
-  if (arguments.size() < 1)
+  if (arguments.empty())
     return "Not enough arguments to /setdungeonid. Use /setdungeonid <dungeonId>";
 
   auto result = [&]() -> std::expected<String, StarException> {
@@ -1055,7 +1055,7 @@ std::expected<String, StarException> CommandProcessor::clearStagehand(Connection
         auto queryRect = RectF::withCenter((*aimPosition), Vec2F{2, 2});
         auto stagehands = world.query<Stagehand>(queryRect);
         if (!stagehands) return std::unexpected(std::move(stagehands.error()));
-        for (auto stagehand : *stagehands) {
+        for (auto const& stagehand : *stagehands) {
           auto removedEntity = world.removeEntity(stagehand->entityId(), true);
           if (!removedEntity) return std::unexpected(std::move(removedEntity.error()));
           ++removed;
@@ -1282,7 +1282,7 @@ std::expected<String, StarException> CommandProcessor::clientCoordinate(Connecti
   auto permission = adminCheck(connectionId, "find other players");
   if (!permission) return std::unexpected(std::move(permission.error()));
   if (!*permission) {
-    if (arguments.size() > 0) {
+    if (!arguments.empty()) {
       auto cidResult = playerCidFromCommand(arguments[0], m_universe);
       if (!cidResult) return std::unexpected(std::move(cidResult.error()));
       auto cid = *cidResult;
@@ -1768,7 +1768,11 @@ std::expected<std::optional<String>, StarException> CommandProcessor::localCheck
 
 std::expected<LuaCallbacks, StarException> CommandProcessor::makeCommandCallbacks() {
   LuaCallbacks callbacks;
-  auto registered = callbacks.registerCallbackWithSignature<std::expected<std::optional<String>, StarException>, ConnectionId, String>("adminCheck", std::bind(&CommandProcessor::adminCheck, std::ref(*this), std::placeholders::_1, std::placeholders::_2));
+  auto registered =
+    callbacks.registerCallbackWithSignature<std::expected<std::optional<String>, StarException>, ConnectionId, String>(
+      "adminCheck", [this](ConnectionId connectionId, String const& commandDescription) {
+        return adminCheck(connectionId, commandDescription);
+      });
   if (!registered) return std::unexpected(std::move(registered.error()));
   return callbacks;
 }

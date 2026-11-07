@@ -150,8 +150,8 @@ std::expected<bool, StarException> ServerQueryThread::processPacket(HostAddressW
     auto response = m_generalResponse << A2S_HEAD_INT << A2S_INFO_REPLY << A2S_VERSION << m_serverName << *worlds
                                       << GAME_DIR << GAME_DESC
                                       << A2S_APPID// Should be SteamAppId but this isn't a short :(
-                                      << serverPlayerCount() << m_maxPlayers << (std::uint8_t)0x00// bots
-                                      << A2S_TYPE_DEDICATED                                       // dedicated
+                                      << serverPlayerCount() << m_maxPlayers << static_cast<std::uint8_t>(0x00)// bots
+                                      << A2S_TYPE_DEDICATED// dedicated
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
                                       << A2S_ENV_WINDOWS// os
 #elif defined(STAR_SYSTEM_MACOS)
@@ -237,7 +237,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
     auto name = m_universe.get().clientNick(pair.first);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto timeConnected = float((now - pair.second).count()) / 1000.f;
+    auto timeConnected = static_cast<float>((now - pair.second).count()) / 1000.f;
     auto player = m_playersResponse << i++ << *name << kills << timeConnected;
     if (!player)
       return std::unexpected(std::move(player.error()));
@@ -335,8 +335,9 @@ bool ServerQueryThread::validChallenge(HostAddressWithPort const& address, std::
     return false;
   }
 
-  std::int32_t challenge = ((std::int32_t)b[8] & 0xff) << 24 | ((std::int32_t)b[7] & 0xff) << 16
-    | ((std::int32_t)b[6] & 0xff) << 8 | ((std::int32_t)b[5] & 0xff);
+  std::int32_t challenge = (static_cast<std::int32_t>(b[8]) & 0xff) << 24
+    | (static_cast<std::int32_t>(b[7]) & 0xff) << 16 | (static_cast<std::int32_t>(b[6]) & 0xff) << 8
+    | (static_cast<std::int32_t>(b[5]) & 0xff);
   // Note: No byte order swapping needed as protcol performs no conversion
   if (knownChallenge->get()->getChallenge() != challenge) {
     // Challenges didnt match ignore

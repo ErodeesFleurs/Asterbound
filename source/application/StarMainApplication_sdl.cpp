@@ -747,7 +747,7 @@ public:
     if (auto result = (*m_logger).info("Application: Opening audio device"); !result)
       return std::unexpected(std::move(result.error()));
     m_audioOutputData.clear();
-    SDL_AudioSpec desired = {SDL_AUDIO_S16, 2, 44100};
+    SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = 2, .freq = 44100};
     m_sdlAudioOutputStream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired,
     [](void* userdata, SDL_AudioStream* stream, int len, int) {
       if (len > 0) {
@@ -821,7 +821,7 @@ public:
       return false;
     }
     m_audioInputCallback = std::move(callback);
-    SDL_AudioSpec desired = {SDL_AUDIO_S16, channels, freq};
+    SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = channels, .freq = freq};
     m_sdlAudioInputStream.reset(SDL_OpenAudioDeviceStream(deviceId, &desired,
     [](void* userdata, SDL_AudioStream* stream, int len, int) {
       if (len > 0) {
@@ -1397,7 +1397,9 @@ private:
           int currentDisplayIndex = SDL_GetDisplayForWindow(parent.m_sdlWindow.get());
 
           SDL_DisplayMode closestDisplayMode;
-          if (SDL_GetClosestFullscreenDisplayMode(currentDisplayIndex, (int)fullScreenResolution[0], (int)fullScreenResolution[1], 0.f, true, &closestDisplayMode)) {
+          if (SDL_GetClosestFullscreenDisplayMode(currentDisplayIndex, static_cast<int>(fullScreenResolution[0]),
+                                                  static_cast<int>(fullScreenResolution[1]), 0.f, true,
+                                                  &closestDisplayMode)) {
             if (SDL_SetWindowFullscreenMode(parent.m_sdlWindow.get(), &closestDisplayMode)) {
               if (parent.m_windowMode == WindowMode::Fullscreen)
                 SDL_SetWindowFullscreen(parent.m_sdlWindow.get(), 0);
@@ -1409,16 +1411,23 @@ private:
               parent.m_windowMode = WindowMode::Fullscreen;
               SDL_SetWindowFullscreen(parent.m_sdlWindow.get(), SDL_WINDOW_FULLSCREEN);
             } else {
-              if (auto result = (*parent.m_logger).warn("Failed to set resolution {}, {}", (unsigned)closestDisplayMode.w, (unsigned)closestDisplayMode.h); !result)
+              if (auto result = (*parent.m_logger)
+                                  .warn("Failed to set resolution {}, {}", static_cast<unsigned>(closestDisplayMode.w),
+                                        static_cast<unsigned>(closestDisplayMode.h));
+                  !result)
                 return std::unexpected(std::move(result.error()));
             }
           } else {
-            if (auto result = (*parent.m_logger).warn("Unable to set requested display resolution {}, {}", (int)fullScreenResolution[0], (int)fullScreenResolution[1]); !result)
+            if (auto result =
+                  (*parent.m_logger)
+                    .warn("Unable to set requested display resolution {}, {}",
+                          static_cast<int>(fullScreenResolution[0]), static_cast<int>(fullScreenResolution[1]));
+                !result)
               return std::unexpected(std::move(result.error()));
           }
 
           if (auto displayMode = SDL_GetWindowFullscreenMode(parent.m_sdlWindow.get())) {
-            parent.m_windowSize = {(unsigned)displayMode->w, (unsigned)displayMode->h};
+            parent.m_windowSize = {static_cast<unsigned>(displayMode->w), static_cast<unsigned>(displayMode->h)};
 
             // call these manually since no SDL_WindowEvent is triggered when changing between fullscreen resolutions for some reason
             changed = std::pair{parent.m_windowMode, parent.m_windowSize};
@@ -1488,15 +1497,15 @@ private:
           parent.m_windowMode = WindowMode::Borderless;
 
           if (auto displayMode = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(parent.m_sdlWindow.get()))) {
-            parent.m_windowSize = {(unsigned)displayMode->w, (unsigned)displayMode->h};
-            #ifdef STAR_SYSTEM_WINDOWS
+            parent.m_windowSize = {static_cast<unsigned>(displayMode->w), static_cast<unsigned>(displayMode->h)};
+#ifdef STAR_SYSTEM_WINDOWS
             if (m_borderlessWorkaround) { // breaks brightness on some setups god what the fuck fuck microsoft fuck nvidia
               auto handle = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(parent.m_sdlWindow.get()), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
               SetWindowLongPtr(handle, GWL_STYLE, WS_OVERLAPPED);
               SetWindowLongPtr(handle, GWL_EXSTYLE, WS_EX_APPWINDOW);
               SetWindowPos(handle, HWND_TOP, 0, 0, displayMode->w, displayMode->h, SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
             } // fuck everything dude it's all so fucked. everything is so fucked
-            #endif
+#endif
             SDL_SetWindowPosition(parent.m_sdlWindow.get(), 0, 0);
             SDL_SetWindowSize(parent.m_sdlWindow.get(), parent.m_windowSize[0], parent.m_windowSize[1]);
             changed = std::pair{parent.m_windowMode, parent.m_windowSize};
@@ -1734,28 +1743,28 @@ private:
       } else if (event.type == SDL_EVENT_TEXT_INPUT && !m_captureText) {
         starEvent.emplace(TextInputEvent{String(std::string_view(event.text.text))});
       } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
-        starEvent.emplace(MouseMoveEvent{
-          {event.motion.xrel, -event.motion.yrel},
-          {event.motion.x, (int)m_windowSize[1] - event.motion.y}});
+        starEvent.emplace(MouseMoveEvent{{event.motion.xrel, -event.motion.yrel},
+                                         {event.motion.x, static_cast<int>(m_windowSize[1]) - event.motion.y}});
       } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !m_captureMouse) {
         starEvent.emplace(MouseButtonDownEvent{mouseButtonFromSdlMouseButton(event.button.button),
-          {event.button.x, (int)m_windowSize[1] - event.button.y}});
+                                               {event.button.x, static_cast<int>(m_windowSize[1]) - event.button.y}});
       } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && !m_captureMouse) {
         starEvent.emplace(MouseButtonUpEvent{mouseButtonFromSdlMouseButton(event.button.button),
-          {event.button.x, (int)m_windowSize[1] - event.button.y}});
+                                             {event.button.x, static_cast<int>(m_windowSize[1]) - event.button.y}});
       } else if (event.type == SDL_EVENT_MOUSE_WHEEL && !m_captureMouse) {
-        starEvent.emplace(MouseWheelEvent{event.wheel.y < 0 ? MouseWheel::Down : MouseWheel::Up,
-          {event.wheel.mouse_x, (int)m_windowSize[1] - event.wheel.mouse_y}});
+        starEvent.emplace(
+          MouseWheelEvent{event.wheel.y < 0 ? MouseWheel::Down : MouseWheel::Up,
+                          {event.wheel.mouse_x, static_cast<int>(m_windowSize[1]) - event.wheel.mouse_y}});
       } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
-        starEvent.emplace(ControllerAxisEvent{
-          (ControllerId)event.gaxis.which,
-          controllerAxisFromSdlControllerAxis(event.gaxis.axis),
-          (float)event.gaxis.value / 32768.0f
-        });
+        starEvent.emplace(ControllerAxisEvent{static_cast<ControllerId>(event.gaxis.which),
+                                              controllerAxisFromSdlControllerAxis(event.gaxis.axis),
+                                              static_cast<float>(event.gaxis.value) / 32768.0f});
       } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-        starEvent.emplace(ControllerButtonDownEvent{ (ControllerId)event.gbutton.which, controllerButtonFromSdlControllerButton(event.gbutton.button) });
+        starEvent.emplace(ControllerButtonDownEvent{static_cast<ControllerId>(event.gbutton.which),
+                                                    controllerButtonFromSdlControllerButton(event.gbutton.button)});
       } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
-        starEvent.emplace(ControllerButtonUpEvent{ (ControllerId)event.gbutton.which, controllerButtonFromSdlControllerButton(event.gbutton.button) });
+        starEvent.emplace(ControllerButtonUpEvent{static_cast<ControllerId>(event.gbutton.which),
+                                                  controllerButtonFromSdlControllerButton(event.gbutton.button)});
       } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
         auto insertion = m_SdlControllers.insert_or_assign(event.gdevice.which, std::unique_ptr<SDL_Gamepad, decltype(&SDL_CloseGamepad)>(SDL_OpenGamepad(event.gdevice.which), SDL_CloseGamepad));
         if (SDL_Gamepad* controller = insertion.first->second.get())
@@ -1909,7 +1918,10 @@ private:
       m_textInputArea = std::move(*state.textInputArea);
       if (m_textInputArea) {
         auto const& [r, cursor] = *m_textInputArea;
-        SDL_Rect rect{r.xMin(), (int)m_windowSize.y() - r.yMax(), r.width(), r.height()};
+        SDL_Rect rect{.x = r.xMin(),
+                      .y = static_cast<int>(m_windowSize.y()) - r.yMax(),
+                      .w = r.width(),
+                      .h = r.height()};
         SDL_SetTextInputArea(m_sdlWindow.get(), &rect, cursor);
       } else {
         SDL_SetTextInputArea(m_sdlWindow.get(), nullptr, 0);
@@ -1959,11 +1971,13 @@ private:
       List<ImageOperation> operations;
       if (scale != 1)
         operations = {
-          FlipImageOperation{ FlipImageOperation::Mode::FlipY }, // SDL wants an Australian cursor.
-          BorderImageOperation{ 1, Vec4B(), Vec4B(), false, false }, // Nearest scaling fucks up and clips half off the edges, work around this with border+crop for now.
-          ScaleImageOperation{ ScaleImageOperation::Mode::Nearest, Vec2F::filled(scale) },
-          CropImageOperation{ RectI::withSize(Vec2I::filled(std::ceilf((float)scale / 2)), Vec2I(imageSize)) }
-        };
+          FlipImageOperation{FlipImageOperation::Mode::FlipY},// SDL wants an Australian cursor.
+          BorderImageOperation{
+            1, Vec4B(), Vec4B(), false,
+            false},// Nearest scaling fucks up and clips half off the edges, work around this with border+crop for now.
+          ScaleImageOperation{ScaleImageOperation::Mode::Nearest, Vec2F::filled(scale)},
+          CropImageOperation{
+            RectI::withSize(Vec2I::filled(std::ceilf(static_cast<float>(scale) / 2)), Vec2I(imageSize))}};
       else
         operations = { FlipImageOperation{ FlipImageOperation::Mode::FlipY } };
 
@@ -2031,7 +2045,7 @@ private:
       *size = 0;
       return NULL;
     };
-    auto cleanup = [](void* userdata) { delete ((StringMap<ByteArray>*)userdata); };
+    auto cleanup = [](void* userdata) { delete static_cast<StringMap<ByteArray>*>(userdata); };
     if (SDL_SetClipboardData(request, cleanup, heldData.get(), types.data(), types.size())) {
       heldData.release();
       return true;
@@ -2112,7 +2126,7 @@ private:
     CursorEntry() : image(nullptr), sdlSurface(nullptr, SDL_DestroySurface), sdlCursor(nullptr, SDL_DestroyCursor) {};
   };
 
-  typedef std::tuple<unsigned, Vec2I, String> CursorDescriptor;
+  using CursorDescriptor = std::tuple<unsigned, Vec2I, String>;
 
   // Native cursor-cache expiry jitter belongs to this platform, not gameplay.
   RandomService m_cursorRandom{0};

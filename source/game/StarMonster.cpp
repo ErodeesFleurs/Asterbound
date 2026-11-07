@@ -645,7 +645,7 @@ auto damageSource = std::move(*result99);
   }
 
   auto animationDamageParts = m_monsterVariant.animationDamageParts;
-  for (auto pair : m_monsterVariant.animationDamageParts) {
+  for (auto const& pair : m_monsterVariant.animationDamageParts) {
     if (!m_animationDamageParts.get().contains(pair.first))
       continue;
 
@@ -761,13 +761,11 @@ String knockoutEffect = std::move(*result114);
   auto result116 = m_monsterVariant.parameters.getObject("knockoutAnimationStates", JsonObject());
 if (!result116) return std::unexpected(std::move(result116.error()));
 auto knockoutAnimationStates = std::move(*result116);
-  for (auto pair : knockoutAnimationStates)
-    {
+for (auto const& pair : knockoutAnimationStates) {
   auto result117 = pair.second.toString();
   if (!result117) return std::unexpected(std::move(result117.error()));
   auto result118 = m_networkedAnimator->setState(pair.first, std::move(*result117));
   if (!result118) return std::unexpected(std::move(result118.error()));
-
 }
   return {};
 }
@@ -1032,9 +1030,7 @@ if (!result160) return std::unexpected(std::move(result160.error()));
 auto result161 = renderCallback.addDrawables(std::move(*result160), m_monsterVariant.renderLayer);
 if (!result161) return std::unexpected(std::move(result161.error()));
 
-
-  for (auto drawablePair : m_scriptedAnimator.drawables())
-    {
+for (auto const& drawablePair : m_scriptedAnimator.drawables()) {
   auto result165 = renderCallback.addDrawable(drawablePair.first, drawablePair.second.value_or(m_monsterVariant.renderLayer));
   if (!result165) return std::unexpected(std::move(result165.error()));
 }
@@ -1266,9 +1262,8 @@ setTeam(std::move(*result203));
 });
 if (!result204) return std::unexpected(std::move(result204.error()));
 
-  auto result205 = callbacks.registerCallback("setUniqueId", [this](std::optional<String> uniqueId) {
-      setUniqueId(uniqueId);
-    });
+auto result205 = callbacks.registerCallback(
+  "setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(std::move(uniqueId)); });
 if (!result205) return std::unexpected(std::move(result205.error()));
 
   auto result207 = callbacks.registerCallback("setDamageBar", [this](String const& damageBarType) -> std::expected<void, StarException> {

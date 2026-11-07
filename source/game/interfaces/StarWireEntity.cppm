@@ -48,7 +48,7 @@ public:
     return Star::typeName<WireEntity>();
   }
 
-  virtual ~WireEntity() {}
+  ~WireEntity() override = default;
 
   virtual std::size_t nodeCount(WireDirection direction) const = 0;
   [[nodiscard]] virtual std::expected<Vec2I, StarException> nodePosition(WireNode wireNode) const = 0;

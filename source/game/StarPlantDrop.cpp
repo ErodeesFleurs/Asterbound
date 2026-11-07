@@ -424,49 +424,60 @@ if (!result317) return std::unexpected(std::move(result317.error()));
 auto result318 = result317->get().toArray();
 if (!result318) return std::unexpected(std::move(result318.error()));
 auto option = std::move(*result318);
-          for (auto drop : option) {
-            auto result319 = imgMetadata->imageSize(plantPiece.image);
-if (!result319) return std::unexpected(std::move(result319.error()));
-auto size = std::move(*result319);
-            auto result320 = this->root().random().randf(-0.2f, 0.2f);
-if (!result320) return std::unexpected(std::move(result320.error()));
-auto result321 = this->root().random().randf(-0.2f, 0.2f);
-if (!result321) return std::unexpected(std::move(result321.error()));
-Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / TilePixels).rotate(m_movementController->rotation())
-                + Vec2F(std::move(*result320), std::move(*result321));
-            auto result322 = drop.getString("item");
-if (!result322) return std::unexpected(std::move(result322.error()));
-if (std::move(*result322) == "sapling")
-              {
-auto result323 = world();
-if (!result323) return std::unexpected(std::move(result323.error()));
-auto result324 = drop.getInt("count", 1);
-if (!result324) return std::unexpected(std::move(result324.error()));
-auto result325 = ItemDescriptor::create("sapling", (std::size_t)std::move(*result324), m_saplingConfig);
-if (!result325) return std::unexpected(std::move(result325.error()));
-auto result326 = ItemDrop::createRandomizedDrop(this->root(), 
-                  std::move(*result325), position() + pos);
-if (!result326) return std::unexpected(std::move(result326.error()));
-auto result327 = result323->get().addEntity(std::move(*result326));
-if (!result327) return std::unexpected(std::move(result327.error()));
+for (auto const& drop : option) {
+  auto result319 = imgMetadata->imageSize(plantPiece.image);
+  if (!result319)
+    return std::unexpected(std::move(result319.error()));
+  auto size = std::move(*result319);
+  auto result320 = this->root().random().randf(-0.2f, 0.2f);
+  if (!result320)
+    return std::unexpected(std::move(result320.error()));
+  auto result321 = this->root().random().randf(-0.2f, 0.2f);
+  if (!result321)
+    return std::unexpected(std::move(result321.error()));
+  Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / TilePixels).rotate(m_movementController->rotation())
+    + Vec2F(std::move(*result320), std::move(*result321));
+  auto result322 = drop.getString("item");
+  if (!result322)
+    return std::unexpected(std::move(result322.error()));
+  if (std::move(*result322) == "sapling") {
+    auto result323 = world();
+    if (!result323)
+      return std::unexpected(std::move(result323.error()));
+    auto result324 = drop.getInt("count", 1);
+    if (!result324)
+      return std::unexpected(std::move(result324.error()));
+    auto result325 =
+      ItemDescriptor::create("sapling", static_cast<std::size_t>(std::move(*result324)), m_saplingConfig);
+    if (!result325)
+      return std::unexpected(std::move(result325.error()));
+    auto result326 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result325), position() + pos);
+    if (!result326)
+      return std::unexpected(std::move(result326.error()));
+    auto result327 = result323->get().addEntity(std::move(*result326));
+    if (!result327)
+      return std::unexpected(std::move(result327.error()));
+  } else {
+    auto result328 = world();
+    if (!result328)
+      return std::unexpected(std::move(result328.error()));
+    auto result329 = drop.getString("item");
+    if (!result329)
+      return std::unexpected(std::move(result329.error()));
+    auto result330 = drop.getInt("count", 1);
+    if (!result330)
+      return std::unexpected(std::move(result330.error()));
+    auto result331 = ItemDescriptor::create(std::move(*result329), static_cast<std::size_t>(std::move(*result330)));
+    if (!result331)
+      return std::unexpected(std::move(result331.error()));
+    auto result332 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result331), position() + pos);
+    if (!result332)
+      return std::unexpected(std::move(result332.error()));
+    auto result333 = result328->get().addEntity(std::move(*result332));
+    if (!result333)
+      return std::unexpected(std::move(result333.error()));
+  }
 }
-            else
-              {
-auto result328 = world();
-if (!result328) return std::unexpected(std::move(result328.error()));
-auto result329 = drop.getString("item");
-if (!result329) return std::unexpected(std::move(result329.error()));
-auto result330 = drop.getInt("count", 1);
-if (!result330) return std::unexpected(std::move(result330.error()));
-auto result331 = ItemDescriptor::create(std::move(*result329), (std::size_t)std::move(*result330));
-if (!result331) return std::unexpected(std::move(result331.error()));
-auto result332 = ItemDrop::createRandomizedDrop(this->root(), 
-                  std::move(*result331), position() + pos);
-if (!result332) return std::unexpected(std::move(result332.error()));
-auto result333 = result328->get().addEntity(std::move(*result332));
-if (!result333) return std::unexpected(std::move(result333.error()));
-}
-          }
         }
       }
     }

@@ -29,7 +29,7 @@ import star.container_entity;
 
 namespace Star {
 
-typedef List<std::shared_ptr<Item>> ContainerResult;
+using ContainerResult = List<std::shared_ptr<Item>>;
 
 class ContainerInteractor {
 public:

@@ -5,7 +5,7 @@ import star.math_common;
 
 namespace Star {
 
-typedef std::uint8_t LiquidId;
+using LiquidId = std::uint8_t;
 inline constexpr LiquidId EmptyLiquidId = 0;
 
 struct LiquidLevel {

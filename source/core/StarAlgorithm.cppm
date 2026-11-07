@@ -324,7 +324,7 @@ T take(T& t) {
 template <typename Functor>
 class FinallyGuard {
 public:
-  FinallyGuard(Functor functor) : functor(std::move(functor)), dismiss(false) {}
+  FinallyGuard(Functor functor) : functor(std::move(functor)) {}
 
   FinallyGuard(FinallyGuard&& o) : functor(std::move(o.functor)), dismiss(o.dismiss) {
     o.cancel();
@@ -350,11 +350,10 @@ public:
 
 private:
   Functor functor;
-  bool dismiss;
+  bool dismiss = false;
 };
 
-template <typename Functor>
-FinallyGuard<typename std::decay<Functor>::type> finally(Functor&& f) {
+template <typename Functor> FinallyGuard<std::decay_t<Functor>> finally(Functor&& f) {
   return FinallyGuard<Functor>(std::forward<Functor>(f));
 }
 

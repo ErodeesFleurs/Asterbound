@@ -179,7 +179,7 @@ private:
   // An existing (even empty) entry is initialized for the current regions.
   // Missing entries are built only when that liquid is due to run.
   BAHashMap<LiquidId, BAOrderedHashSet<Vec2I>> m_unlimitedActiveCells;
-  std::uint64_t m_step;
+  std::uint64_t m_step = 0;
 
   std::unique_ptr<WorkingCells> m_workingCells;
   List<std::reference_wrapper<WorkingCell>> m_currentActiveCells;
@@ -188,8 +188,7 @@ private:
   BAHashSet<std::tuple<Vec2I, LiquidId, Vec2I>> m_liquidCollisions;
 };
 
-template <typename LiquidId>
-CellularLiquidWorld<LiquidId>::~CellularLiquidWorld() {}
+template <typename LiquidId> CellularLiquidWorld<LiquidId>::~CellularLiquidWorld() = default;
 
 template <typename LiquidId>
 Vec2I CellularLiquidWorld<LiquidId>::uniqueLocation(Vec2I const& location) const {
@@ -208,8 +207,9 @@ template <typename LiquidId>
 [[nodiscard]] std::expected<void, StarException> CellularLiquidWorld<LiquidId>::liquidCollision(Vec2I const&, LiquidId, Vec2I const&) { return {}; }
 
 template <typename LiquidId>
-LiquidCellEngine<LiquidId>::LiquidCellEngine(std::uint64_t randomSeed, LiquidCellEngineParameters parameters, std::shared_ptr<CellularLiquidWorld<LiquidId>> cellWorld)
-  : m_random(randomSeed), m_engineParameters(parameters), m_cellWorld(cellWorld), m_step(0) {}
+LiquidCellEngine<LiquidId>::LiquidCellEngine(std::uint64_t randomSeed, LiquidCellEngineParameters parameters,
+                                             std::shared_ptr<CellularLiquidWorld<LiquidId>> cellWorld)
+    : m_random(randomSeed), m_engineParameters(parameters), m_cellWorld(cellWorld) {}
 
 template <typename LiquidId>
 unsigned LiquidCellEngine<LiquidId>::liquidTickDelta(LiquidId liquid) {

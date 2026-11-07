@@ -250,9 +250,7 @@ std::expected<void, StarException> WorldServerThread::close() {
   return {};
 }
 
-void WorldServerThread::setPause(std::shared_ptr<const std::atomic<bool>> pause) {
-  m_pause = pause;
-}
+void WorldServerThread::setPause(std::shared_ptr<const std::atomic<bool>> pause) { m_pause = std::move(pause); }
 
 bool WorldServerThread::serverErrorOccurred() {
   return m_errorOccurred;
@@ -413,7 +411,7 @@ std::expected<void, StarException> WorldServerThread::executeAction(WorldServerA
 void WorldServerThread::setUpdateAction(WorldServerAction updateAction) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_updateAction = updateAction;
+  m_updateAction = std::move(updateAction);
 }
 
 void WorldServerThread::passMessages(List<Message>&& messages) {
@@ -553,12 +551,12 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
     fidelityScore += spareTime;
     if (fidelityScore <= *fidelityDecrementScore) {
       if (automaticFidelity > WorldServerFidelity::Minimum)
-        automaticFidelity = (WorldServerFidelity)((int)automaticFidelity - 1);
+        automaticFidelity = static_cast<WorldServerFidelity>(static_cast<int>(automaticFidelity) - 1);
       fidelityScore = 0.0;
     }
     if (fidelityScore >= *fidelityIncrementScore) {
       if (automaticFidelity < WorldServerFidelity::High)
-        automaticFidelity = (WorldServerFidelity)((int)automaticFidelity + 1);
+        automaticFidelity = static_cast<WorldServerFidelity>(static_cast<int>(automaticFidelity) + 1);
       fidelityScore = 0.0;
     }
     std::int64_t spareMilliseconds = std::floor(spareTime * 1000);

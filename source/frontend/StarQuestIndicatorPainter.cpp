@@ -206,8 +206,10 @@ std::expected<void, StarException> QuestIndicatorPainter::update(float dt, std::
       auto animation = indicatorAnimation(m_guiContext.get().root(), indicator.indicatorImage);
       if (!animation)
         return std::unexpected(std::move(animation.error()));
-      m_indicators[entity->entityId()] = Indicator{
-          entity->entityId(), indicator.worldPosition, indicator.indicatorImage, std::move(*animation)};
+      m_indicators[entity->entityId()] = Indicator{.entityId = entity->entityId(),
+                                                   .worldPosition = indicator.worldPosition,
+                                                   .indicatorName = indicator.indicatorImage,
+                                                   .animation = std::move(*animation)};
     }
   }
 

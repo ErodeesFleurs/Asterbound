@@ -23,10 +23,10 @@ namespace Star {
 template <typename PointData, typename DataType = float>
 class Random2dPointGenerator {
 public:
-  typedef Star::Polygon<DataType> Poly;
-  typedef Star::Vector<DataType, 2> Point;
-  typedef Star::Rect<DataType> Rect;
-  typedef List<std::pair<Point, PointData>> PointSet;
+  using Poly = Star::Polygon<DataType>;
+  using Point = Star::Vector<DataType, 2>;
+  using Rect = Star::Rect<DataType>;
+  using PointSet = List<std::pair<Point, PointData>>;
   Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cellSize, Vec2I const& densityRange);
 
   // Each point will in the area will be generated in a predictable order, and

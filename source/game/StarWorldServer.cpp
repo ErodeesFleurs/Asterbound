@@ -58,10 +58,10 @@ import star.a_star;
 import star.lock_file;
 import star.byte_array;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_CStream = ZSTD_CCtx;
+using ZSTD_DStream = ZSTD_DCtx;
 import star.zstd_compression;
 
 import star.collision_block;
@@ -359,7 +359,7 @@ void WorldServer::setReferenceClock(std::shared_ptr<Clock> clock) {
   if (m_emptyWeather)
     m_emptyWeather->setReferenceClock(clock);
   m_sky->setReferenceClock(clock);
-  m_referenceClock = clock;
+  m_referenceClock = std::move(clock);
 }
 
 std::expected<void, StarException> WorldServer::setupWeatherDomains(bool preserveNonSurface) {
@@ -633,7 +633,7 @@ std::expected<bool, StarException> WorldServer::spawnTargetValid(SpawnTarget con
     auto result38 = m_worldStorage->loadUniqueEntity(std::get<SpawnTargetUniqueEntity>(spawnTarget));
     if (!result38)
       return std::unexpected(std::move(result38.error()));
-    return (bool)m_entityMap->get<WarpTargetEntity>(std::move(*result38));
+    return static_cast<bool>(m_entityMap->get<WarpTargetEntity>(std::move(*result38)));
   }
   return true;
 }
@@ -869,7 +869,7 @@ ClientSubWorldId WorldServer::clientSubWorld(ConnectionId clientId) const {
 
 List<EntityId> WorldServer::players() const {
   List<EntityId> playerIds;
-  for (auto pair : m_clientInfo)
+  for (auto const& pair : m_clientInfo)
     playerIds.append(pair.second->clientState->playerId());
   return playerIds;
 }
@@ -1167,7 +1167,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto result106 = atTile<WireEntity>(disconnectWires->entityPosition);
       if (!result106)
         return std::unexpected(std::move(result106.error()));
-      for (auto wireEntity : std::move(*result106)) {
+      for (auto const& wireEntity : std::move(*result106)) {
         auto result107 = wireEntity->connectionsForNode(disconnectWires->wireNode);
         if (!result107)
           return std::unexpected(std::move(result107.error()));
@@ -1178,8 +1178,11 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           auto result109 = atTile<WireEntity>(connection.entityLocation);
           if (!result109)
             return std::unexpected(std::move(result109.error()));
-          for (auto connectedEntity : std::move(*result109)) {
-            auto result110 = connectedEntity->removeNodeConnection({otherWireDirection(disconnectWires->wireNode.direction), connection.nodeIndex}, WireConnection{disconnectWires->entityPosition, disconnectWires->wireNode.nodeIndex});
+          for (auto const& connectedEntity : std::move(*result109)) {
+            auto result110 = connectedEntity->removeNodeConnection(
+              {.direction = otherWireDirection(disconnectWires->wireNode.direction), .nodeIndex = connection.nodeIndex},
+              WireConnection{.entityLocation = disconnectWires->entityPosition,
+                             .nodeIndex = disconnectWires->wireNode.nodeIndex});
             if (!result110)
               return std::unexpected(std::move(result110.error()));
           }
@@ -1189,15 +1192,19 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto result111 = atTile<WireEntity>(connectWire->inputConnection.entityLocation);
       if (!result111)
         return std::unexpected(std::move(result111.error()));
-      for (auto source : std::move(*result111)) {
+      for (auto const& source : std::move(*result111)) {
         auto result112 = atTile<WireEntity>(connectWire->outputConnection.entityLocation);
         if (!result112)
           return std::unexpected(std::move(result112.error()));
-        for (auto target : std::move(*result112)) {
-          auto result113 = source->addNodeConnection(WireNode{WireDirection::Input, connectWire->inputConnection.nodeIndex}, connectWire->outputConnection);
+        for (auto const& target : std::move(*result112)) {
+          auto result113 = source->addNodeConnection(
+            WireNode{.direction = WireDirection::Input, .nodeIndex = connectWire->inputConnection.nodeIndex},
+            connectWire->outputConnection);
           if (!result113)
             return std::unexpected(std::move(result113.error()));
-          auto result114 = target->addNodeConnection(WireNode{WireDirection::Output, connectWire->outputConnection.nodeIndex}, connectWire->inputConnection);
+          auto result114 = target->addNodeConnection(
+            WireNode{.direction = WireDirection::Output, .nodeIndex = connectWire->outputConnection.nodeIndex},
+            connectWire->inputConnection);
           if (!result114)
             return std::unexpected(std::move(result114.error()));
         }
@@ -1260,7 +1267,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
               return std::unexpected(std::move(result120.error()));
           }
         } else if (!cinematicArg.isNull()) {
-          auto result121 = rejectMessage(strf("non-string/non-object cinematic argument of type {}", (int)cinematicArg.type()));
+          auto result121 = rejectMessage(
+            strf("non-string/non-object cinematic argument of type {}", static_cast<int>(cinematicArg.type())));
           if (!result121)
             return std::unexpected(std::move(result121.error()));
         }
@@ -1322,7 +1330,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           }
         } else {
           valid = false;
-          auto result131 = rejectMessage(strf("invalid playAltMusic argument of type {}", (int)tracksArg.type()));
+          auto result131 =
+            rejectMessage(strf("invalid playAltMusic argument of type {}", static_cast<int>(tracksArg.type())));
           if (!result131)
             return std::unexpected(std::move(result131.error()));
         }
@@ -1343,7 +1352,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
               return std::unexpected(std::move(result133.error()));
           }
         } else {
-          auto result134 = rejectMessage(strf("non-string warp argument of type {}", (int)warpArg.type()));
+          auto result134 = rejectMessage(strf("non-string warp argument of type {}", static_cast<int>(warpArg.type())));
           if (!result134)
             return std::unexpected(std::move(result134.error()));
         }
@@ -2077,7 +2086,7 @@ void WorldServer::setSpawningEnabled(bool spawningEnabled) {
 }
 
 void WorldServer::setPropertyListener(String const& propertyName, WorldPropertyListener listener) {
-  m_worldPropertyListeners[propertyName] = listener;
+  m_worldPropertyListeners[propertyName] = std::move(listener);
 }
 
 std::expected<TileModificationList, StarException> WorldServer::validTileModifications(TileModificationList const& modificationList, bool allowEntityOverlap) const {
@@ -2140,7 +2149,7 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       auto result226 = destroyBlock(placeMaterial.layer, pos, harvested, !tileDamageIsPenetrating(damage.damageType()), false);
       if (!result226)
         return std::unexpected(std::move(result226.error()));
-      for (auto drop : std::move(*result226)) {
+      for (auto const& drop : std::move(*result226)) {
         auto result227 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result227)
           return std::unexpected(std::move(result227.error()));
@@ -2497,7 +2506,7 @@ std::expected<bool, StarException> WorldServer::placeDungeon(String const& dunge
 }
 
 std::expected<void, StarException> WorldServer::addBiomeRegion(Vec2I const& position, String const& biomeName, String const& subBlockSelector, int width) {
-  width = std::min(width, (int)m_worldTemplate->size()[0]);
+  width = std::min(width, static_cast<int>(m_worldTemplate->size()[0]));
 
   auto result265 = m_worldTemplate->previewAddBiomeRegion(position, width);
   if (!result265)
@@ -2511,7 +2520,7 @@ std::expected<void, StarException> WorldServer::addBiomeRegion(Vec2I const& posi
     return {};
   }
 
-  for (auto region : regions) {
+  for (auto const& region : regions) {
     auto result267 = m_worldStorage->sectorsForRegion(region);
     if (!result267)
       return std::unexpected(std::move(result267.error()));
@@ -2529,7 +2538,7 @@ std::expected<void, StarException> WorldServer::addBiomeRegion(Vec2I const& posi
 }
 
 std::expected<void, StarException> WorldServer::expandBiomeRegion(Vec2I const& position, int newWidth) {
-  newWidth = std::min(newWidth, (int)m_worldTemplate->size()[0]);
+  newWidth = std::min(newWidth, static_cast<int>(m_worldTemplate->size()[0]));
 
   auto result270 = m_worldTemplate->previewExpandBiomeRegion(position, newWidth);
   if (!result270)
@@ -2543,7 +2552,7 @@ std::expected<void, StarException> WorldServer::expandBiomeRegion(Vec2I const& p
     return {};
   }
 
-  for (auto region : regions) {
+  for (auto const& region : regions) {
     auto result272 = m_worldStorage->sectorsForRegion(region);
     if (!result272)
       return std::unexpected(std::move(result272.error()));
@@ -2567,7 +2576,7 @@ std::expected<bool, StarException> WorldServer::pregenerateAddBiome(Vec2I const&
   auto regions = std::move(*result275);
 
   bool generationComplete = true;
-  for (auto region : regions) {
+  for (auto const& region : regions) {
     bool condition277 = static_cast<bool>(generationComplete);
     if (condition277) {
       auto result276 = signalRegion(region);
@@ -2588,7 +2597,7 @@ std::expected<bool, StarException> WorldServer::pregenerateExpandBiome(Vec2I con
   auto regions = std::move(*result278);
 
   bool generationComplete = true;
-  for (auto region : regions) {
+  for (auto const& region : regions) {
     bool condition280 = static_cast<bool>(generationComplete);
     if (condition280) {
       auto result279 = signalRegion(region);
@@ -2904,7 +2913,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   if (!liquidWorld)
     return std::unexpected(std::move(liquidWorld.error()));
   m_liquidEngine = std::make_shared<LiquidCellEngine<LiquidId>>(liquidSeed, liquidsDatabase->liquidEngineParameters(), std::move(*liquidWorld));
-  for (auto liquidSettings : liquidsDatabase->allLiquidSettings())
+  for (auto const& liquidSettings : liquidsDatabase->allLiquidSettings())
     m_liquidEngine->setLiquidTickDelta(liquidSettings->id, liquidSettings->tickDelta);
 
   auto fallingBlocksWorld = FallingBlocksWorld::create(*this);
@@ -2932,7 +2941,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto initialize = [&, &world = *this]() -> std::expected<void, StarException> {
   world.m_spawner->init(std::make_shared<SpawnerWorld>(world));
 
-  RandomSource rnd = RandomSource(world.m_worldTemplate->worldSeed());
+  auto rnd = RandomSource(world.m_worldTemplate->worldSeed());
 
   if (firstTime) {
     world.m_generatingDungeon = true;
@@ -2981,7 +2990,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
           // floating dungeon worlds should force immediate generation (since there won't be terrain) to avoid
           // bottlenecking "generation" of empty generation levels during loading
           if (world.isFloatingDungeonWorld()) {
-            for (auto region : generateResult->first) {
+            for (auto const& region : generateResult->first) {
               auto result327 = world.generateRegion(region);
               if (!result327)
                 return std::unexpected(std::move(result327.error()));
@@ -3229,8 +3238,9 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       if (!result352)
         return std::unexpected(std::move(result352.error()));
       if (!std::move(*result352)->isValidLiquidId(plpacket.liquid)) {
-        auto result353 = this->root().logger().warn("WorldServer: rejected PlaceLiquid with invalid liquid id {} at ({}, {})",
-                             (int)plpacket.liquid, pos[0], pos[1]);
+        auto result353 =
+          this->root().logger().warn("WorldServer: rejected PlaceLiquid with invalid liquid id {} at ({}, {})",
+                                     static_cast<int>(plpacket.liquid), pos[0], pos[1]);
         if (!result353)
           return std::unexpected(std::move(result353.error()));
         continue;
@@ -3905,7 +3915,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       auto result417 = destroyBlock(TileLayer::Foreground, pos, harvested, !tileDamageIsPenetrating(tile->get().foregroundDamage.damageType()), true);
       if (!result417)
         return std::unexpected(std::move(result417.error()));
-      for (auto drop : std::move(*result417)) {
+      for (auto const& drop : std::move(*result417)) {
         auto result418 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result418)
           return std::unexpected(std::move(result418.error()));
@@ -3960,7 +3970,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       auto result427 = destroyBlock(TileLayer::Background, pos, harvested, !tileDamageIsPenetrating(tile->get().backgroundDamage.damageType()), true);
       if (!result427)
         return std::unexpected(std::move(result427.error()));
-      for (auto drop : std::move(*result427)) {
+      for (auto const& drop : std::move(*result427)) {
         auto result428 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result428)
           return std::unexpected(std::move(result428.error()));
@@ -4020,7 +4030,7 @@ std::expected<void, StarException> WorldServer::checkEntityBreaks(RectF const& r
   auto result437 = m_entityMap->query<TileEntity>(rect);
   if (!result437)
     return std::unexpected(std::move(result437.error()));
-  for (auto tileEntity : std::move(*result437)) {
+  for (auto const& tileEntity : std::move(*result437)) {
     auto result438 = tileEntity->checkBroken();
     if (!result438)
       return std::unexpected(std::move(result438.error()));
@@ -4305,7 +4315,7 @@ void WorldServer::timer(float delay, WorldAction worldAction) {
 }
 
 std::expected<void, StarException> WorldServer::startFlyingSky(bool enterHyperspace, bool startInWarp, Json settings) {
-  auto result459 = m_sky->startFlying(enterHyperspace, startInWarp, settings);
+  auto result459 = m_sky->startFlying(enterHyperspace, startInWarp, std::move(settings));
   if (!result459)
     return std::unexpected(std::move(result459.error()));
   return {};
@@ -4402,7 +4412,7 @@ void WorldServer::setPlayerStart(Vec2F const& startPosition, bool respawnInWorld
   m_playerStart = startPosition;
   m_respawnInWorld = respawnInWorld;
   m_adjustPlayerStart = false;
-  for (auto pair : m_clientInfo)
+  for (auto const& pair : m_clientInfo)
     pair.second->outgoingPackets.append(std::make_shared<SetPlayerStartPacket>(m_playerStart, m_respawnInWorld));
 }
 
@@ -4677,7 +4687,7 @@ std::expected<bool, StarException> WorldServer::isVisibleToPlayer(RectF const& r
     auto result510 = p.second->monitoringRegions(m_entityMap);
     if (!result510)
       return std::unexpected(std::move(result510.error()));
-    for (auto playerRegion : std::move(*result510)) {
+    for (auto const& playerRegion : std::move(*result510)) {
       auto result511 = m_geometry.rectIntersectsRect(RectF(playerRegion), region);
       if (!result511)
         return std::unexpected(std::move(result511.error()));
@@ -4835,20 +4845,22 @@ std::expected<void, StarException> WorldServer::setTemplate(std::shared_ptr<Worl
 }
 
 std::expected<void, StarException> WorldServer::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec2I const& inputPosition, std::size_t inputIndex) {
-  WireConnection output = {outputPosition, outputIndex};
-  WireConnection input = {inputPosition, inputIndex};
+  WireConnection output = {.entityLocation = outputPosition, .nodeIndex = outputIndex};
+  WireConnection input = {.entityLocation = inputPosition, .nodeIndex = inputIndex};
   auto result520 = atTile<WireEntity>(input.entityLocation);
   if (!result520)
     return std::unexpected(std::move(result520.error()));
-  for (auto source : std::move(*result520)) {
+  for (auto const& source : std::move(*result520)) {
     auto result521 = atTile<WireEntity>(output.entityLocation);
     if (!result521)
       return std::unexpected(std::move(result521.error()));
-    for (auto target : std::move(*result521)) {
-      auto result522 = source->addNodeConnection(WireNode{WireDirection::Input, input.nodeIndex}, output);
+    for (auto const& target : std::move(*result521)) {
+      auto result522 =
+        source->addNodeConnection(WireNode{.direction = WireDirection::Input, .nodeIndex = input.nodeIndex}, output);
       if (!result522)
         return std::unexpected(std::move(result522.error()));
-      auto result523 = target->addNodeConnection(WireNode{WireDirection::Output, output.nodeIndex}, input);
+      auto result523 =
+        target->addNodeConnection(WireNode{.direction = WireDirection::Output, .nodeIndex = output.nodeIndex}, input);
       if (!result523)
         return std::unexpected(std::move(result523.error()));
     }

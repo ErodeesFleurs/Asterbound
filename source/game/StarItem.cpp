@@ -208,7 +208,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   return {};
 }
 
-Item::~Item() {}
+Item::~Item() = default;
 
 Root& Item::root() const {
   return m_root.get();

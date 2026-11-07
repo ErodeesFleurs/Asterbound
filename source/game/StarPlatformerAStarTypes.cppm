@@ -38,7 +38,7 @@ struct Edge {
   Node target;
 };
 
-typedef AStar::Path<Edge> Path;
+using Path = AStar::Path<Edge>;
 
 struct Parameters {
   friend bool operator==(Parameters const& lhs, Parameters const& rhs);

@@ -376,7 +376,7 @@ bool PlayerInventory::slotValid(InventorySlot const& slot) const {
   if (std::holds_alternative<BagSlot>(slot)) {
     auto const& bagSlot = std::get<BagSlot>(slot);
     if (auto bag = bagContents(bagSlot.first)) {
-      if ((std::size_t)bagSlot.second >= bag->size())
+      if (static_cast<std::size_t>(bagSlot.second) >= bag->size())
         return false;
     }
     else return false;
@@ -506,7 +506,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
   auto one = descriptor.singular();
 
   Map<String, std::uint64_t> consumeFromItemBags;
-  for (auto pair : m_bags)
+  for (auto const& pair : m_bags)
     consumeFromItemBags[pair.first] = pair.second->available(one);
 
   std::uint64_t consumeFromEquipment = 0;
@@ -524,7 +524,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
     consumeFromTrash += m_trashSlot->matches(one, exactMatch) ? m_trashSlot->count() : 0;
 
   auto totalAvailable = consumeFromEquipment + consumeFromSwap + consumeFromTrash;
-  for (auto pair : consumeFromItemBags)
+  for (auto const& pair : consumeFromItemBags)
     totalAvailable += pair.second;
 
   if (totalAvailable < descriptor.count())
@@ -849,7 +849,7 @@ std::shared_ptr<Item> PlayerInventory::essentialItem(EssentialItem essentialItem
 }
 
 void PlayerInventory::setEssentialItem(EssentialItem essentialItem, std::shared_ptr<Item> item) {
-  m_essential[essentialItem] = item;
+  m_essential[essentialItem] = std::move(item);
 }
 
 StringMap<std::uint64_t> PlayerInventory::availableCurrencies() const {
@@ -1055,14 +1055,14 @@ List<std::shared_ptr<Item>> PlayerInventory::pullOverflow() {
 }
 
 bool PlayerInventory::equipmentVisibility(EquipmentSlot slot) const {
-  return (m_equipmentVisibilityMask >> (std::uint8_t)slot) & 0x1;
+  return (m_equipmentVisibilityMask >> static_cast<std::uint8_t>(slot)) & 0x1;
 }
 
 void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   if (visible)
-    m_equipmentVisibilityMask |= (1 << (std::uint8_t)slot);
+    m_equipmentVisibilityMask |= (1 << static_cast<std::uint8_t>(slot));
   else
-    m_equipmentVisibilityMask &= ~(1 << (std::uint8_t)slot);
+    m_equipmentVisibilityMask &= ~(1 << static_cast<std::uint8_t>(slot));
 }
 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::load(Json const& store) {

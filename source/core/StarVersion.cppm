@@ -8,8 +8,7 @@ extern std::string_view const StarVersionString;
 extern std::string_view const StarSourceIdentifierString;
 extern std::string_view const StarArchitectureString;
 
-typedef std::uint32_t VersionNumber;
-
+using VersionNumber = std::uint32_t;
 }
 
 export module star.version;

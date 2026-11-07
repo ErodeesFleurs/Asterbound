@@ -147,7 +147,7 @@ bool Json::operator==(const Json& v) const {
         auto const& floating = type() == Type::Float ? *this : v;
         auto i = std::get<std::int64_t>(integer.m_data);
         auto d = std::get<double>(floating.m_data);
-        return d >= -0x1p63 && d < 0x1p63 && d == (double)i && (std::int64_t)d == i;
+        return d >= -0x1p63 && d < 0x1p63 && d == static_cast<double>(i) && static_cast<std::int64_t>(d) == i;
       }
     return false;
   } else {
@@ -216,36 +216,23 @@ std::expected<Json, StarException> Json::parseJson(String const& json) {
   return inputUtf8Json(bytes.begin(), bytes.end(), JsonParseType::Top);
 }
 
-Json::Json() {}
+Json::Json() = default;
 
 Json::Json(double d) {
   m_data = d;
 }
 
+Json::Json(int i) { m_data = static_cast<std::int64_t>(i); }
 
-Json::Json(int i) {
-  m_data = (std::int64_t)i;
-}
+Json::Json(long i) { m_data = static_cast<std::int64_t>(i); }
 
-Json::Json(long i) {
-  m_data = (std::int64_t)i;
-}
+Json::Json(long long i) { m_data = static_cast<std::int64_t>(i); }
 
-Json::Json(long long i) {
-  m_data = (std::int64_t)i;
-}
+Json::Json(unsigned int i) { m_data = static_cast<std::int64_t>(i); }
 
-Json::Json(unsigned int i) {
-  m_data = (std::int64_t)i;
-}
+Json::Json(unsigned long i) { m_data = static_cast<std::int64_t>(i); }
 
-Json::Json(unsigned long i) {
-  m_data = (std::int64_t)i;
-}
-
-Json::Json(unsigned long long i) {
-  m_data = (std::int64_t)i;
-}
+Json::Json(unsigned long long i) { m_data = static_cast<std::int64_t>(i); }
 
 Json::Json(std::string_view s) {
   m_data = std::make_shared<String const>(s);
@@ -278,7 +265,7 @@ std::expected<double, StarException> Json::toDouble() const {
   if (type() == Type::Float)
     return std::get<double>(m_data);
   if (type() == Type::Int)
-    return (double)std::get<std::int64_t>(m_data);
+    return static_cast<double>(std::get<std::int64_t>(m_data));
   return std::unexpected(JsonException::format("Improper conversion to double from {}", typeName()));
 }
 
@@ -286,7 +273,7 @@ std::expected<float, StarException> Json::toFloat() const {
   auto value = toDouble();
   if (!value)
     return std::unexpected(std::move(value.error()));
-  return (float)*value;
+  return static_cast<float>(*value);
 }
 
 std::expected<bool, StarException> Json::toBool() const {
@@ -300,10 +287,10 @@ std::expected<std::int64_t, StarException> Json::toInt() const {
     auto value = std::get<double>(m_data);
     if (!(value >= -0x1p63 && value < 0x1p63))
       return std::unexpected(JsonException::format("Cannot convert out-of-range float {} to int", value));
-    return (std::int64_t)value;
+    return static_cast<std::int64_t>(value);
   }
   if (type() == Type::Int)
-    return (std::int64_t)std::get<std::int64_t>(m_data);
+    return static_cast<std::int64_t>(std::get<std::int64_t>(m_data));
   return std::unexpected(JsonException::format("Improper conversion to int from {}", typeName()));
 }
 
@@ -312,10 +299,10 @@ std::expected<std::uint64_t, StarException> Json::toUInt() const {
     auto value = std::get<double>(m_data);
     if (!(value > -1.0 && value < 0x1p64))
       return std::unexpected(JsonException::format("Cannot convert out-of-range float {} to unsigned int", value));
-    return (std::uint64_t)value;
+    return static_cast<std::uint64_t>(value);
   }
   if (type() == Type::Int)
-    return (std::uint64_t)std::get<std::int64_t>(m_data);
+    return static_cast<std::uint64_t>(std::get<std::int64_t>(m_data));
   return std::unexpected(JsonException::format("Improper conversion to unsigned int from {}", typeName()));
 }
 
@@ -738,9 +725,7 @@ std::expected<Json, StarException> Json::eraseIndex(std::size_t index) const {
   return Json(std::move(*array));
 }
 
-Json::Type Json::type() const {
-  return (Type)m_data.index();
-}
+Json::Type Json::type() const { return static_cast<Type>(m_data.index()); }
 
 String Json::typeName() const {
   return typeName(type());
@@ -851,7 +836,7 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Json const& value) {
-  auto header = ds.write<std::uint8_t>((std::uint8_t)value.type() + 1);
+  auto header = ds.write<std::uint8_t>(static_cast<std::uint8_t>(value.type()) + 1);
   if (!header)
     return std::unexpected(std::move(header.error()));
   switch (value.type()) {
@@ -935,7 +920,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto typeIndex = *header;
   if (typeIndex > 0)
     --typeIndex;
-  auto type = (Json::Type)typeIndex;
+  auto type = static_cast<Json::Type>(typeIndex);
   switch (type) {
     case Json::Type::Float: {
       auto item = ds.read<double>();
@@ -1031,7 +1016,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 void Json::getHash(XXHash3& hasher) const {
-  Json::Type type = (Json::Type)m_data.index();
+  Json::Type type = static_cast<Json::Type>(m_data.index());
   if (type == Json::Type::Float) {
     if (auto integer = exactJsonInteger(std::get<double>(m_data))) {
       // Preserve the old integer domain and bytes, recursively for containers.

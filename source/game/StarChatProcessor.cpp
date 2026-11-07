@@ -49,7 +49,7 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
 
-  for (auto channel : clientChannels(clientId))
+  for (auto const& channel : clientChannels(clientId))
     leaveChannel(clientId, channel);
 
   auto clientInfoResult = m_clients.take(clientId);
@@ -266,7 +266,7 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendi
 void ChatProcessor::setCommandHandler(CommandHandler commandHandler) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_commandHandler = commandHandler;
+  m_commandHandler = std::move(commandHandler);
 }
 
 void ChatProcessor::clearCommandHandler() {

@@ -152,23 +152,23 @@ WorkerPoolPromise<HttpResponse> HttpClient::requestAsync(HttpRequest const& requ
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::getAsync(String const& url, StringMap<String> const& headers) {
-  return requestAsync({"GET", url, headers, {}});
+  return requestAsync({.method = "GET", .url = url, .headers = headers, .body = {}});
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::postAsync(String const& url, String const& body, StringMap<String> const& headers) {
-  return requestAsync({"POST", url, headers, body});
+  return requestAsync({.method = "POST", .url = url, .headers = headers, .body = body});
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::putAsync(String const& url, String const& body, StringMap<String> const& headers) {
-  return requestAsync({"PUT", url, headers, body});
+  return requestAsync({.method = "PUT", .url = url, .headers = headers, .body = body});
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::deleteAsync(String const& url, StringMap<String> const& headers) {
-  return requestAsync({"DELETE", url, headers, {}});
+  return requestAsync({.method = "DELETE", .url = url, .headers = headers, .body = {}});
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::patchAsync(String const& url, String const& body, StringMap<String> const& headers) {
-  return requestAsync({"PATCH", url, headers, body});
+  return requestAsync({.method = "PATCH", .url = url, .headers = headers, .body = body});
 }
 
 }

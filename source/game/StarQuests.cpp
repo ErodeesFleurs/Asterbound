@@ -44,10 +44,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.worker_pool;
@@ -663,9 +663,7 @@ std::optional<Uuid> Quest::serverUuid() const {
   return m_serverUuid;
 }
 
-void Quest::setWorldId(std::optional<WorldId> worldId) {
-  m_worldId = worldId;
-}
+void Quest::setWorldId(std::optional<WorldId> worldId) { m_worldId = std::move(worldId); }
 
 void Quest::setLocation(std::optional<std::pair<Vec3I, SystemLocation>> location) {
   m_location = std::move(location);

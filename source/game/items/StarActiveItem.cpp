@@ -184,7 +184,8 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto scripts = instanceValue("scripts").and_then(jsonToStringList);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    auto configured = m_script.setScripts(scripts->transformed(std::bind(&AssetPath::relativeTo, directory(), std::placeholders::_1)));
+    auto configured = m_script.setScripts(scripts->transformed(
+      [directory = directory()](String const& script) { return AssetPath::relativeTo(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -206,7 +207,11 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto itemCallbacks = LuaBindings::makeItemCallbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("item", std::move(callbacks)); });
     if (!itemCallbacks)
       return std::unexpected(std::move(itemCallbacks.error()));
-    auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2)).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("config", std::move(callbacks)); });
+    auto configCallbacks =
+      LuaBindings::makeConfigCallbacks([this](String const& name,
+                                              Json const& defaultValue) -> std::expected<Json, StarException> {
+        return instanceValue(name, defaultValue);
+      }).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("config", std::move(callbacks)); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     auto animatorCallbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("animator", std::move(callbacks)); });
@@ -245,7 +250,8 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto scripts = jsonToStringList(*animationScripts);
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
-      auto configured = m_scriptedAnimator.setScripts(scripts->transformed(std::bind(&AssetPath::relativeTo, directory(), std::placeholders::_1)));
+      auto configured = m_scriptedAnimator.setScripts(scripts->transformed(
+        [directory = directory()](String const& script) { return AssetPath::relativeTo(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -260,7 +266,13 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto activeCallbacks = makeScriptedAnimationCallbacks().and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("activeItemAnimation", std::move(callbacks)); });
       if (!activeCallbacks)
         return std::unexpected(std::move(activeCallbacks.error()));
-      auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2)).and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("config", std::move(callbacks)); });
+      auto configCallbacks =
+        LuaBindings::makeConfigCallbacks([this](String const& name,
+                                                Json const& defaultValue) -> std::expected<Json, StarException> {
+          return instanceValue(name, defaultValue);
+        }).and_then([&](LuaCallbacks callbacks) {
+          return m_scriptedAnimator.addCallbacks("config", std::move(callbacks));
+        });
       if (!configCallbacks)
         return std::unexpected(std::move(configCallbacks.error()));
       auto animationInitialized = m_scriptedAnimator.init(itemWorld->get());
@@ -895,7 +907,9 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(itemHand.error()));
       if (auto otherHandItem = itemOwner->get().handItem(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
         if (auto otherActiveItem = as<ActiveItem>(otherHandItem))
-          return otherActiveItem->m_script.invoke(function, args).transform([](std::optional<LuaValue> value) { return value.value_or(LuaValue{}); });
+          return otherActiveItem->m_script.invoke(function, args).transform([](std::optional<LuaValue> value) {
+            return std::move(value).value_or(LuaValue{});
+          });
       }
       return LuaValue{};
     }); !added)

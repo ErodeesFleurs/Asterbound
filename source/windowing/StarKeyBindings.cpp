@@ -135,7 +135,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
     auto number = value->toUInt();
     if (!number)
       return std::unexpected(std::move(number.error()));
-    key = (Key)*number;
+    key = static_cast<Key>(*number);
   } else {
     auto repr = value->repr();
     if (!repr)
@@ -158,7 +158,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
       return std::unexpected(std::move(parsed.error()));
     mods |= *parsed;
   }
-  return KeyChord{key, mods};
+  return KeyChord{.key = key, .mods = mods};
 }
 
 std::expected<Json, StarException> inputDescriptorToJson(KeyChord const& chord) {
@@ -217,12 +217,12 @@ std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json c
 }
 
 Set<InterfaceAction> KeyBindings::actions(Key key) const {
-  return actions(KeyChord{key, KeyMod::NoMod});
+  return actions(KeyChord{.key = key, .mods = KeyMod::NoMod});
 }
 
 Set<InterfaceAction> KeyBindings::actions(InputEvent const& event) const {
   if (std::holds_alternative<KeyDownEvent>(event))
-    return actions(KeyChord{std::get<KeyDownEvent>(event).key, std::get<KeyDownEvent>(event).mods});
+    return actions(KeyChord{.key = std::get<KeyDownEvent>(event).key, .mods = std::get<KeyDownEvent>(event).mods});
   return {};
 }
 

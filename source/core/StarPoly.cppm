@@ -15,9 +15,9 @@ namespace Star {
 template <typename DataType>
 class Polygon {
 public:
-  typedef Vector<DataType, 2> Vertex;
-  typedef Star::Line<DataType, 2> Line;
-  typedef Star::Box<DataType, 2> Rect;
+  using Vertex = Vector<DataType, 2>;
+  using Line = Star::Line<DataType, 2>;
+  using Rect = Star::Box<DataType, 2>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -37,9 +37,9 @@ public:
     std::optional<std::size_t> intersectedSide;
   };
 
-  typedef List<Vertex> VertexList;
-  typedef typename VertexList::iterator iterator;
-  typedef typename VertexList::const_iterator const_iterator;
+  using VertexList = List<Vertex>;
+  using iterator = typename VertexList::iterator;
+  using const_iterator = typename VertexList::const_iterator;
 
   static Polygon convexHull(VertexList points);
   static Polygon clip(Polygon inputPoly, Polygon convexClipPoly);
@@ -160,9 +160,9 @@ private:
 template <typename DataType>
 std::ostream& operator<<(std::ostream& os, Polygon<DataType> const& poly);
 
-typedef Polygon<int> PolyI;
-typedef Polygon<float> PolyF;
-typedef Polygon<double> PolyD;
+using PolyI = Polygon<int>;
+using PolyF = Polygon<float>;
+using PolyD = Polygon<double>;
 
 template <typename DataType>
 Polygon<DataType> Polygon<DataType>::convexHull(VertexList points) {
@@ -226,8 +226,7 @@ Polygon<DataType> Polygon<DataType>::clip(Polygon inputPoly, Polygon convexClipP
   return Polygon(std::move(outputVertexes));
 }
 
-template <typename DataType>
-Polygon<DataType>::Polygon() {}
+template <typename DataType> Polygon<DataType>::Polygon() = default;
 
 template <typename DataType>
 Polygon<DataType>::Polygon(Polygon const& rhs)
@@ -423,11 +422,7 @@ bool Polygon<DataType>::operator==(Polygon<DataType> const& rhs) const {
   return m_vertexes == rhs.m_vertexes;
 }
 
-template <typename DataType>
-Polygon<DataType>& Polygon<DataType>::operator=(Polygon const& rhs) {
-  m_vertexes = rhs.m_vertexes;
-  return *this;
-}
+template <typename DataType> Polygon<DataType>& Polygon<DataType>::operator=(Polygon const& rhs) = default;
 
 template <typename DataType>
 Polygon<DataType>& Polygon<DataType>::operator=(Polygon&& rhs) {

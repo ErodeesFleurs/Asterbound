@@ -26,10 +26,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.lua;
@@ -150,8 +150,8 @@ public:
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<UniverseClient, Universe>(this, key); }
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<UniverseClient>(); }
 
-  typedef LuaMessageScript ScriptComponent;
-  
+  using ScriptComponent = LuaMessageScript;
+
   [[nodiscard]] static std::expected<std::shared_ptr<UniverseClient>, StarException> create(Root& root, std::shared_ptr<PlayerStorage> playerStorage, std::shared_ptr<Statistics> statistics, String const& customWorldStorageDir);
   ~UniverseClient() override;
 
@@ -219,8 +219,8 @@ public:
   [[nodiscard]] std::expected<bool, StarException> switchPlayer(std::size_t index);
   [[nodiscard]] std::expected<bool, StarException> switchPlayer(String const& name);
 
-  typedef std::function<void()> Callback;
-  typedef std::function<std::expected<void, StarException>(bool)> ReloadPlayerCallback;
+  using Callback = std::function<void()>;
+  using ReloadPlayerCallback = std::function<std::expected<void, StarException>(bool)>;
   ReloadPlayerCallback& playerReloadPreCallback();
   ReloadPlayerCallback& playerReloadCallback();
 

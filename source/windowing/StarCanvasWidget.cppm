@@ -124,22 +124,23 @@ private:
   List<ClickEvent> m_clickEvents;
   List<KeyEvent> m_keyEvents;
 
-  typedef std::tuple<RectF, Vec4B> RectOp;
-  typedef std::tuple<String, Vec2F, float, Vec4B, bool> ImageOp;
-  typedef std::tuple<String, RectF, RectF, Vec4B> ImageRectOp;
-  typedef std::tuple<Drawable, Vec2F> DrawableOp;
-  typedef std::tuple<String, float, Vec2D, RectF, Vec4B> TiledImageOp;
-  typedef std::tuple<Vec2F, Vec2F, Vec4B, float> LineOp;
-  typedef std::tuple<PolyF, Vec4B, float> PolyOp;
-  typedef std::tuple<List<std::tuple<Vec2F, Vec2F, Vec2F>>, Vec4B> TrianglesOp;
-  typedef std::tuple<String, TextPositioning, TextStyle> TextOp;
+  using RectOp = std::tuple<RectF, Vec4B>;
+  using ImageOp = std::tuple<String, Vec2F, float, Vec4B, bool>;
+  using ImageRectOp = std::tuple<String, RectF, RectF, Vec4B>;
+  using DrawableOp = std::tuple<Drawable, Vec2F>;
+  using TiledImageOp = std::tuple<String, float, Vec2D, RectF, Vec4B>;
+  using LineOp = std::tuple<Vec2F, Vec2F, Vec4B, float>;
+  using PolyOp = std::tuple<PolyF, Vec4B, float>;
+  using TrianglesOp = std::tuple<List<std::tuple<Vec2F, Vec2F, Vec2F>>, Vec4B>;
+  using TextOp = std::tuple<String, TextPositioning, TextStyle>;
   struct PushClipOp {
     RectF rect;
     std::optional<std::size_t> parent;
   };
   struct PopClipOp { std::optional<RectF> rect; };
 
-  typedef std::variant<std::monostate, RectOp, ImageOp, ImageRectOp, DrawableOp, TiledImageOp, LineOp, PolyOp, TrianglesOp, TextOp, PushClipOp, PopClipOp> RenderOp;
+  using RenderOp = std::variant<std::monostate, RectOp, ImageOp, ImageRectOp, DrawableOp, TiledImageOp, LineOp, PolyOp,
+                                TrianglesOp, TextOp, PushClipOp, PopClipOp>;
   List<RenderOp> m_renderOps;
   std::optional<std::size_t> m_clipHead;
 };

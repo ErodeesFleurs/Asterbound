@@ -131,7 +131,7 @@ namespace Star {
       Key key;
       Data data;
     };
-    typedef List<DataElement> DataList;
+    using DataList = List<DataElement>;
 
     struct DataCollector {
       [[nodiscard]] std::expected<void, StarException> operator()(Key const& k, Data const& d);

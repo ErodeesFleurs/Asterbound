@@ -74,7 +74,7 @@ EntityMap::EntityMap(Vec2U const& worldSize, EntityId beginIdSpace, EntityId end
     m_endIdSpace(endIdSpace) {}
 
 std::expected<EntityId, StarException> EntityMap::reserveEntityId() {
-  if (m_spatialMap.size() >= (std::size_t)(m_endIdSpace - m_beginIdSpace))
+  if (m_spatialMap.size() >= static_cast<std::size_t>(m_endIdSpace - m_beginIdSpace))
     return std::unexpected(EntityMapException("No more entity id space in EntityMap::reserveEntityId"));
 
   EntityId id = m_nextId;
@@ -86,7 +86,7 @@ std::expected<EntityId, StarException> EntityMap::reserveEntityId() {
 }
 
 std::expected<std::optional<EntityId>, StarException> EntityMap::maybeReserveEntityId(EntityId entityId) {
-  if (m_spatialMap.size() >= (std::size_t)(m_endIdSpace - m_beginIdSpace))
+  if (m_spatialMap.size() >= static_cast<std::size_t>(m_endIdSpace - m_beginIdSpace))
     return std::unexpected(EntityMapException("No more entity id space in EntityMap::reserveEntityId"));
 
   if (entityId == NullEntityId || m_spatialMap.contains(entityId))
@@ -118,8 +118,9 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
     return std::unexpected(EntityMapException::format("Duplicate entity id '{}' in EntityMap::addEntity", entityId));
 
   if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
-    return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the maximum entity bound box size in EntityMap::addEntity",
-        entity->entityId(), (int)entity->entityType()));
+    return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
+                                                      "maximum entity bound box size in EntityMap::addEntity",
+                                                      entity->entityId(), static_cast<int>(entity->entityType())));
   }
 
   if (entityId == NullEntityId)
@@ -162,8 +163,9 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
     auto boundBox = entity->metaBoundBox();
 
     if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
-      return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the maximum entity bound box size in EntityMap::addEntity",
-          entity->entityId(), (int)entity->entityType()));
+      return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
+                                                        "maximum entity bound box size in EntityMap::addEntity",
+                                                        entity->entityId(), static_cast<int>(entity->entityType())));
     }
 
     auto entityId = entity->entityId();

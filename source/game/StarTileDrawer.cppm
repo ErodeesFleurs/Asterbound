@@ -80,11 +80,11 @@ class Root;
 
 class TileDrawer {
 public:
-  typedef std::uint64_t QuadZLevel;
-  typedef HashMap<QuadZLevel, List<Drawable>> Drawables;
+  using QuadZLevel = std::uint64_t;
+  using Drawables = HashMap<QuadZLevel, List<Drawable>>;
 
-  typedef std::size_t MaterialRenderPieceIndex;
-  typedef List<std::pair<std::shared_ptr<MaterialRenderPiece const>, Vec2F>> MaterialPieceResultList;
+  using MaterialRenderPieceIndex = std::size_t;
+  using MaterialPieceResultList = List<std::pair<std::shared_ptr<MaterialRenderPiece const>, Vec2F>>;
 
   enum class TerrainLayer { Background, Midground, Foreground };
 

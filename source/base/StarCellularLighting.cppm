@@ -124,7 +124,7 @@ public:
   explicit CellularLightingCalculator();
   explicit CellularLightingCalculator(bool monochrome);
 
-  typedef ColoredCellularLightArray::Cell Cell;
+  using Cell = ColoredCellularLightArray::Cell;
 
   [[nodiscard]] std::expected<void, StarException> setMonochrome(bool monochrome);
 
@@ -166,7 +166,7 @@ private:
 // uses scalar lights with no color calculation.
 class CellularLightIntensityCalculator {
 public:
-  typedef ScalarCellularLightArray::Cell Cell;
+  using Cell = ScalarCellularLightArray::Cell;
 
   [[nodiscard]] std::expected<void, StarException> setParameters(Json const& config);
 
@@ -195,9 +195,11 @@ inline std::size_t CellularLightingCalculator::baseIndexFor(Vec2I const& positio
 
 inline void CellularLightingCalculator::setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle) {
   if (m_monochrome)
-    m_lightArray.rightRef().cellAtIndex(cellIndex) = ScalarCellularLightArray::Cell{light.sum() / 3, obstacle};
+    m_lightArray.rightRef().cellAtIndex(cellIndex) =
+      ScalarCellularLightArray::Cell{.light = light.sum() / 3, .obstacle = obstacle};
   else
-    m_lightArray.leftRef().cellAtIndex(cellIndex) = ColoredCellularLightArray::Cell{light, obstacle};
+    m_lightArray.leftRef().cellAtIndex(cellIndex) =
+      ColoredCellularLightArray::Cell{.light = light, .obstacle = obstacle};
 }
 
 }

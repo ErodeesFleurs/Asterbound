@@ -54,10 +54,10 @@ import star.weighted_pool;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.math_common;
@@ -681,8 +681,8 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
       return std::unexpected(std::move(result.error()));
   }
 
-  m_netGroup.setNeedsLoadCallback(std::bind(&Player::getNetStates, std::ref(*this), std::placeholders::_1));
-  m_netGroup.setNeedsStoreCallback(std::bind(&Player::setNetStates, std::ref(*this)));
+  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
   return {};
 }
 
@@ -987,9 +987,7 @@ std::shared_ptr<Statistics> Player::statistics() const {
   return m_statistics;
 }
 
-void Player::setStatistics(std::shared_ptr<Statistics> statistics) {
-  m_statistics = statistics;
-}
+void Player::setStatistics(std::shared_ptr<Statistics> statistics) { m_statistics = std::move(statistics); }
 
 void Player::setUniverseClient(std::optional<std::reference_wrapper<UniverseClient>> client) {
   m_client = client;
@@ -1307,9 +1305,7 @@ std::expected<void, StarException> Player::kill() {
   return m_statusController->setResource("health", 0);
 }
 
-bool Player::wireToolInUse() const {
-  return (bool)as<WireTool>(m_tools->primaryHandItem());
-}
+bool Player::wireToolInUse() const { return static_cast<bool>(as<WireTool>(m_tools->primaryHandItem())); }
 
 void Player::setWireConnector(std::optional<std::reference_wrapper<WireConnector>> wireConnector) const {
   if (auto wireTool = as<WireTool>(m_tools->primaryHandItem()))
@@ -1642,7 +1638,8 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
   if (auto result = m_techController->reloadTech(); !result)
     return std::unexpected(std::move(result.error()));
   float moneyCost = m_inventory->currency("money") * modeConfig().reviveCostPercentile;
-  m_inventory->consumeCurrency("money", std::min((std::uint64_t)std::round(moneyCost), m_inventory->currency("money")));
+  m_inventory->consumeCurrency(
+    "money", std::min(static_cast<std::uint64_t>(std::round(moneyCost)), m_inventory->currency("money")));
   return {};
 }
 
@@ -2705,7 +2702,7 @@ std::expected<std::shared_ptr<Item>, StarException> Player::pickupItems(std::sha
     if (!sound.empty()) {
       if (auto result = m_effectsAnimator->setSoundPool("pickup", {sound}); !result)
         return std::unexpected(std::move(result.error()));
-      float pitch = 1.f - ((float)items->count() / (float)items->maxStack()) * 0.5f;
+      float pitch = 1.f - (static_cast<float>(items->count()) / static_cast<float>(items->maxStack())) * 0.5f;
       auto varianceResult = root().random().randf(0.8f, 1.2f);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
@@ -2905,7 +2902,7 @@ std::expected<void, StarException> Player::refreshArmor() {
 
   bool shouldSetArmorSecrets = m_clientContext && m_clientContext->netCompatibilityRules().version() < 9;
   for (std::uint8_t i = 0; i != 20; ++i) {
-    auto slot = (EquipmentSlot)i;
+    auto slot = static_cast<EquipmentSlot>(i);
     auto item = m_inventory->equipment(slot);
     bool visible = m_inventory->equipmentVisibility(slot);
     if (m_armor->setItem(i, item, visible)) {
@@ -3898,7 +3895,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
     return std::unexpected(std::move(elementsLastResult.error()));
   auto elementsLast = std::move(elementsLastResult->get());
   m_currentNetHumanoid = std::move(elementsLast);
-  m_state = (State)m_stateNetState.get();
+  m_state = static_cast<State>(m_stateNetState.get());
   m_shifting = m_shiftingNetState.get();
   m_aimPosition[0] = m_xAimPositionNetState.get();
   m_aimPosition[1] = m_yAimPositionNetState.get();
@@ -3955,7 +3952,7 @@ std::expected<void, StarException> Player::setNetStates() {
       default: break;
     }
   }
-  m_stateNetState.set((unsigned)state);
+  m_stateNetState.set(static_cast<unsigned>(state));
   m_shiftingNetState.set(m_shifting);
   m_xAimPositionNetState.set(m_aimPosition[0]);
   m_yAimPositionNetState.set(m_aimPosition[1]);
@@ -4008,7 +4005,7 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
 std::expected<void, StarException> Player::setNetArmorSecrets(bool includeEmpty) {
   if (m_clientContext && m_clientContext->netCompatibilityRules().version() < 9) {
     for (std::uint8_t i = 0; i != 12; ++i) {
-      auto slot = EquipmentSlot((std::uint8_t)EquipmentSlot::Cosmetic1 + i);
+      auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
       auto storedResult = m_inventory->itemsAt(slot);
       if (!storedResult)
         return std::unexpected(std::move(storedResult.error()));
@@ -4033,7 +4030,7 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
     if (!EquipmentSlotNames)
       return std::unexpected(EquipmentSlotNames.error());
     for (std::uint8_t i = 0; i != 12; ++i) {
-      auto slot = EquipmentSlot((std::uint8_t)EquipmentSlot::Cosmetic1 + i);
+      auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
       auto slotNameResult = EquipmentSlotNames->getRight(slot);
       if (!slotNameResult)
         return std::unexpected(std::move(slotNameResult.error()));
@@ -5084,7 +5081,7 @@ std::optional<StringView> Player::getSecretPropertyView(String const& name) cons
     auto const& view = tag->get().utf8();
     DataStreamExternalBuffer buffer{std::span<char const>(view)};
     auto type = buffer.read<std::uint8_t>();
-    if (!type || (Json::Type)(*type - 1) != Json::Type::String)
+    if (!type || static_cast<Json::Type>(*type - 1) != Json::Type::String)
       return {};
     auto len = buffer.readVlqU();
     if (!len)

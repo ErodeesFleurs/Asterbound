@@ -120,11 +120,11 @@ std::expected<std::shared_ptr<ServerWeather>, StarException> ServerWeather::crea
 
 void ServerWeather::setup(WeatherPool weatherPool, float undergroundLevel, WorldGeometry worldGeometry,
     WeatherEffectsActiveQuery weatherEffectsActiveQuery) {
-  m_weatherPool = weatherPool;
+  m_weatherPool = std::move(weatherPool);
   m_undergroundLevel = undergroundLevel;
 
   m_worldGeometry = worldGeometry;
-  m_weatherEffectsActiveQuery = weatherEffectsActiveQuery;
+  m_weatherEffectsActiveQuery = std::move(weatherEffectsActiveQuery);
 
   m_currentWeatherIndex = NPos;
   m_currentWeatherType = {};
@@ -447,7 +447,7 @@ std::expected<std::shared_ptr<ClientWeather>, StarException> ClientWeather::crea
 
 void ClientWeather::setup(WorldGeometry worldGeometry, WeatherEffectsActiveQuery weatherEffectsActiveQuery) {
   m_worldGeometry = worldGeometry;
-  m_weatherEffectsActiveQuery = weatherEffectsActiveQuery;
+  m_weatherEffectsActiveQuery = std::move(weatherEffectsActiveQuery);
   m_currentTime = 0.0;
 }
 

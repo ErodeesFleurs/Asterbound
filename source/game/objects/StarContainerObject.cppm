@@ -128,7 +128,7 @@ protected:
 
 private:
   explicit ContainerObject(Root& rootContext);
-  typedef std::function<void(ContainerObject&)> ContainerCallback;
+  using ContainerCallback = std::function<void(ContainerObject&)>;
 
   [[nodiscard]] std::expected<ItemRecipe, StarException> recipeForMaterials(List<std::shared_ptr<Item>> const& inputItems);
   [[nodiscard]] std::expected<void, StarException> tickCrafting(float dt);

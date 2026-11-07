@@ -24,7 +24,7 @@ public:
   static const std::uint32_t SERVERDATA_AUTH_RESPONSE = 0x02;
   static const std::uint32_t SERVERDATA_AUTH_FAILURE = 0xffffffff;
   [[nodiscard]] static std::expected<std::shared_ptr<ServerRconClient>, StarException> create(UniverseServer& universe, std::shared_ptr<TcpSocket> socket);
-  ~ServerRconClient();
+  ~ServerRconClient() override;
 
   [[nodiscard]] std::expected<void, StarException> start();
   void stop();
@@ -67,7 +67,7 @@ private:
 class ServerRconThread : public Thread {
 public:
   [[nodiscard]] static std::expected<std::unique_ptr<ServerRconThread>, StarException> create(UniverseServer& universe, HostAddressWithPort const& address);
-  ~ServerRconThread();
+  ~ServerRconThread() override;
 
   [[nodiscard]] std::expected<void, StarException> start();
   [[nodiscard]] std::expected<void, StarException> stop();

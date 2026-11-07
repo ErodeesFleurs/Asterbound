@@ -160,7 +160,7 @@ std::expected<bool, StarException> ArmorWearer::setupHumanoid(Humanoid& humanoid
 
     if (armor.visible && armor.isCosmetic && item && item->visible(i >= 8)) {
       for (auto armorType : item->armorTypesToHide())
-        ++wornCosmeticTypes[(std::uint8_t)armorType];
+        ++wornCosmeticTypes[static_cast<std::uint8_t>(armorType)];
     }
   }
 
@@ -187,7 +187,7 @@ std::expected<bool, StarException> ArmorWearer::setupHumanoid(Humanoid& humanoid
       auto& item = armor.item;
       bool allowed = armor.visible && item && item->visible(i >= 8) && !(forceNude && !item->bypassNude());
       if (allowed && !armor.isCosmetic) {
-        std::uint8_t typeIndex = (std::uint8_t)armor.item->armorType();
+        std::uint8_t typeIndex = static_cast<std::uint8_t>(armor.item->armorType());
         std::uint8_t prevWorn = m_wornCosmeticTypes[typeIndex];
         std::uint8_t curWorn = wornCosmeticTypes[typeIndex];
         if (curWorn == 0) {
@@ -243,7 +243,7 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effectEmi
     auto& armor = m_armors[i];
     if (auto item = as<EffectSourceItem>(armor.item)) {
       auto armorType = armor.item->armorType();
-      if (!armor.visible || (!armor.isCosmetic && m_wornCosmeticTypes[(std::uint8_t)armorType] > 0))
+      if (!armor.visible || (!armor.isCosmetic && m_wornCosmeticTypes[static_cast<std::uint8_t>(armorType)] > 0))
         continue;
       auto newEffects = item->effectSources();
       if (!newEffects)
@@ -453,7 +453,7 @@ ItemDescriptor ArmorWearer::backCosmeticItemDescriptor() const {
 }
 
 bool ArmorWearer::setCosmeticItem(std::uint8_t slot, std::shared_ptr<ArmorItem> cosmeticItem) {
-  return setItem(slot + 8, cosmeticItem, true);
+  return setItem(slot + 8, std::move(cosmeticItem), true);
 }
 
 std::shared_ptr<ArmorItem> ArmorWearer::cosmeticItem(std::uint8_t slot) const {

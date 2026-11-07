@@ -69,9 +69,8 @@ namespace Star {
 Sky::Sky(Root& root) : m_root(root) {
   m_netInit = false;
 
-
-  m_netGroup.setNeedsLoadCallback(std::bind(&Sky::readNetStates, this));
-  m_netGroup.setNeedsStoreCallback(std::bind(&Sky::writeNetStates, this));
+  m_netGroup.setNeedsLoadCallback([this](bool) { return readNetStates(); });
+  m_netGroup.setNeedsStoreCallback([this]() { return writeNetStates(); });
 }
 
 std::expected<std::shared_ptr<Sky>, StarException> Sky::create(Root& root) {
@@ -129,12 +128,12 @@ std::expected<void, StarException> Sky::startFlying(bool enterHyperspace, bool s
 }
 
 std::expected<void, StarException> Sky::stopFlyingAt(std::optional<SkyParameters> dest) {
-  m_destWorld = dest;
+  m_destWorld = std::move(dest);
   return {};
 }
 
 std::expected<void, StarException> Sky::jumpTo(SkyParameters skyParameters) {
-  m_skyParameters = skyParameters;
+  m_skyParameters = std::move(skyParameters);
   return skyParametersUpdated();
 }
 
@@ -236,7 +235,7 @@ std::expected<void, StarException> Sky::update(double dt) {
       m_worldOffset -= m_worldOffset * m_numericSettings.correctionPower;
     } else if (m_flyingType == FlyingType::Warp) {
       float percentage = 0.0;
-      float dir = (int)m_warpPhase < 0 ? -1.0 : 1.0;
+      float dir = static_cast<int>(m_warpPhase) < 0 ? -1.0 : 1.0;
       if (m_warpPhase == WarpPhase::SpeedingUp)
         percentage = std::powf(m_flyingTimer / speedupTime(), 2.0);
       else if (m_warpPhase == WarpPhase::Maintain)
@@ -319,7 +318,7 @@ std::uint32_t Sky::day() const {
 float Sky::timeOfDay() const {
   if (!m_skyParameters.dayLength)
     return 0;
-  return std::fmod(epochTime(), (double)dayLength());
+  return std::fmod(epochTime(), static_cast<double>(dayLength()));
 }
 
 double Sky::epochTime() const {
@@ -626,13 +625,13 @@ std::expected<void, StarException> Sky::writeNetStates() {
     m_skyParametersUpdated = false;
   }
 
-  m_skyTypeNetState.set((int)m_skyType);
+  m_skyTypeNetState.set(static_cast<int>(m_skyType));
   m_timeNetState.set(m_time);
   m_enterHyperspaceNetState.set(m_enterHyperspace);
   m_startInWarpNetState.set(m_startInWarp);
 
-  m_flyingTypeNetState.set((unsigned)m_flyingType);
-  m_warpPhaseNetState.set((int)m_warpPhase);
+  m_flyingTypeNetState.set(static_cast<unsigned>(m_flyingType));
+  m_warpPhaseNetState.set(static_cast<int>(m_warpPhase));
 
   m_flyingTimerNetState.set(m_flyingTimer);
   m_worldMoveNetState.set(m_worldMoveOffset);
@@ -651,13 +650,13 @@ std::expected<void, StarException> Sky::readNetStates() {
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
 
-  m_skyType = (SkyType)m_skyTypeNetState.get();
+  m_skyType = static_cast<SkyType>(m_skyTypeNetState.get());
   m_time = m_timeNetState.get();
   m_enterHyperspace = m_enterHyperspaceNetState.get();
   m_startInWarp = m_startInWarpNetState.get();
 
-  m_flyingType = (FlyingType)m_flyingTypeNetState.get();
-  m_warpPhase = (WarpPhase)m_warpPhaseNetState.get();
+  m_flyingType = static_cast<FlyingType>(m_flyingTypeNetState.get());
+  m_warpPhase = static_cast<WarpPhase>(m_warpPhaseNetState.get());
   auto state = stateUpdate();
   if (!state) return std::unexpected(std::move(state.error()));
 

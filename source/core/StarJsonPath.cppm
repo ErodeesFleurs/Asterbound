@@ -16,7 +16,7 @@ namespace JsonPath {
     Object
   };
 
-  typedef std::function<std::expected<TypeHint, StarException>(String&, String const&, Utf8Cursor&)> PathParser;
+  using PathParser = std::function<std::expected<TypeHint, StarException>(String&, String const&, Utf8Cursor&)>;
 
   struct ParsingExceptionTag {
     static constexpr std::string_view name() { return "ParsingException"; }

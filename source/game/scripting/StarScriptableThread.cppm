@@ -26,7 +26,7 @@ public:
   using ScriptComponent = LuaMessageScript;
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScriptableThread>, StarException> create(Json parameters, LuaBaseComponent& parent);
-  ~ScriptableThread();
+  ~ScriptableThread() override;
 
   [[nodiscard]] std::expected<bool, StarException> start();
   // Stops and joins the worker; closing cancels queued messages, failures fail them.

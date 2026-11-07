@@ -43,8 +43,8 @@ struct SocketPollResultEntry {
   bool exception;
 };
 
-typedef Map<std::shared_ptr<Socket>, SocketPollQueryEntry> SocketPollQuery;
-typedef Map<std::shared_ptr<Socket>, SocketPollResultEntry> SocketPollResult;
+using SocketPollQuery = Map<std::shared_ptr<Socket>, SocketPollQueryEntry>;
+using SocketPollResult = Map<std::shared_ptr<Socket>, SocketPollResultEntry>;
 
 class Socket {
 public:

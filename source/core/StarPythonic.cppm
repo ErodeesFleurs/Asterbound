@@ -22,7 +22,7 @@ template <typename Res, typename In>
 [[nodiscard]] auto slice(In const& r, SliceIndex a, SliceIndex b = SliceIndex(), int j = 1)
     -> std::conditional_t<std::is_void_v<decltype(std::declval<Res&>().push_back(r[0]))>, Res, std::expected<Res, StarException>> {
   using AppendResult = decltype(std::declval<Res&>().push_back(r[0]));
-  int size = (int)r.size();
+  int size = static_cast<int>(r.size());
   int start, end;
 
   // A zero stride preserves the existing successful empty-slice behavior.

@@ -59,7 +59,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<ImageStretchWidget>, StarException> create(GuiContext& context, ImageStretchSet const& imageStretchSet, GuiDirection direction);
   void setImageStretchSet(String const& beginImage, String const& innerImage, String const& endImage);
 
-  virtual ~ImageStretchWidget() {}
+  ~ImageStretchWidget() override = default;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;

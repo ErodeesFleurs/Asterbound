@@ -164,12 +164,16 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = metadataKey();
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    auto operationResult2 = writeWorldMetadata(WorldMetadataStore{worldSize, VersionedJson()});
-    if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-    auto operationResult3 = db.insert((*operationResult1), (*operationResult2));
-    if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
+    auto metadataRecordKey = metadataKey();
+    if (!metadataRecordKey)
+      return std::unexpected(std::move(metadataRecordKey.error()));
+    auto serializedMetadata =
+      writeWorldMetadata(WorldMetadataStore{.worldSize = worldSize, .userMetadata = VersionedJson()});
+    if (!serializedMetadata)
+      return std::unexpected(std::move(serializedMetadata.error()));
+    auto metadataInserted = db.insert((*metadataRecordKey), (*serializedMetadata));
+    if (!metadataInserted)
+      return std::unexpected(std::move(metadataInserted.error()));
   }
   {
     auto operationResult1 = db.commit();
@@ -265,12 +269,15 @@ std::expected<VersionedJson, StarException> WorldStorage::worldMetadata() {
 }
 
 std::expected<void, StarException> WorldStorage::setWorldMetadata(VersionedJson const& metadata) {
-  auto operationResult1 = metadataKey();
-  if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  auto operationResult2 = writeWorldMetadata({Vec2U(m_tileArray->size()), metadata});
-  if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-  auto operationResult3 = m_db.insert((*operationResult1), (*operationResult2));
-  if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
+  auto metadataRecordKey = metadataKey();
+  if (!metadataRecordKey)
+    return std::unexpected(std::move(metadataRecordKey.error()));
+  auto serializedMetadata = writeWorldMetadata({.worldSize = Vec2U(m_tileArray->size()), .userMetadata = metadata});
+  if (!serializedMetadata)
+    return std::unexpected(std::move(serializedMetadata.error()));
+  auto metadataInserted = m_db.insert((*metadataRecordKey), (*serializedMetadata));
+  if (!metadataInserted)
+    return std::unexpected(std::move(metadataInserted.error()));
   return {};
 }
 
@@ -1107,9 +1114,10 @@ std::expected<std::pair<bool, std::size_t>, StarException> WorldStorage::generat
   metadata.timeToLive = std::move((*metadatatimeToLiveResult1));
 
   std::size_t totalGeneratedLevels = 0;
-  for (std::uint8_t i = (std::uint8_t)metadata.generationLevel + 1; i <= (std::uint8_t)targetGenerationLevel; ++i) {
-    SectorGenerationLevel currentGeneration = (SectorGenerationLevel)i;
-    SectorGenerationLevel stepDownGeneration = (SectorGenerationLevel)(i - 1);
+  for (std::uint8_t i = static_cast<std::uint8_t>(metadata.generationLevel) + 1;
+       i <= static_cast<std::uint8_t>(targetGenerationLevel); ++i) {
+    auto currentGeneration = static_cast<SectorGenerationLevel>(i);
+    auto stepDownGeneration = static_cast<SectorGenerationLevel>(i - 1);
 
     if (stepDownGeneration != SectorGenerationLevel::None) {
       auto autoadjacentResult1 = adjacentSectors(sector);
@@ -1148,9 +1156,10 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
   auto metadatatimeToLiveResult1 = randomizedSectorTTL();
   if (!metadatatimeToLiveResult1) return std::unexpected(std::move(metadatatimeToLiveResult1.error()));
   metadata.timeToLive = std::move((*metadatatimeToLiveResult1));
-  for (std::uint8_t i = (std::uint8_t)metadata.loadLevel + 1; i <= (std::uint8_t)targetLoadLevel; ++i) {
-    auto currentLoad = (SectorLoadLevel)i;
-    auto stepDownLoad = (SectorLoadLevel)(i - 1);
+  for (std::uint8_t i = static_cast<std::uint8_t>(metadata.loadLevel) + 1;
+       i <= static_cast<std::uint8_t>(targetLoadLevel); ++i) {
+    auto currentLoad = static_cast<SectorLoadLevel>(i);
+    auto stepDownLoad = static_cast<SectorLoadLevel>(i - 1);
     if (stepDownLoad != SectorLoadLevel::None) {
       auto autoadjacentResult1 = adjacentSectors(sector);
       if (!autoadjacentResult1) return std::unexpected(std::move(autoadjacentResult1.error()));

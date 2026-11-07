@@ -14,12 +14,11 @@ namespace Star {
 template <typename T, std::size_t N>
 class Box {
 public:
-  typedef Vector<T, N> Coord;
-  typedef Star::Line<T, N> Line;
-  typedef typename Line::IntersectResult LineIntersectResult;
+  using Coord = Vector<T, N>;
+  using Line = Star::Line<T, N>;
+  using LineIntersectResult = typename Line::IntersectResult;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable2D = typename std::enable_if<P == 2 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable2D = std::enable_if_t<P == 2 && N == P, T2>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -268,10 +267,10 @@ std::ostream& operator<<(std::ostream& os, Box<T, N> const& box);
 template<typename T>
 using Rect = Box<T, 2>;
 
-typedef Rect<int> RectI;
-typedef Rect<unsigned> RectU;
-typedef Rect<float> RectF;
-typedef Rect<double> RectD;
+using RectI = Rect<int>;
+using RectU = Rect<unsigned>;
+using RectF = Rect<float>;
+using RectD = Rect<double>;
 
 template <typename T, std::size_t N>
 Box<T, N> Box<T, N>::null() {
@@ -322,8 +321,7 @@ Box<T, N> Box<T, N>::withCenter(Coord const& center, Coord const& size) {
   return Box(center - size / 2, center + size / 2);
 }
 
-template <typename T, std::size_t N>
-Box<T, N>::Box() {}
+template <typename T, std::size_t N> Box<T, N>::Box() = default;
 
 template <typename T, std::size_t N>
 Box<T, N>::Box(Coord const& min, Coord const& max)
@@ -333,12 +331,7 @@ template <typename T, std::size_t N>
 Box<T, N>::Box(Box const& b)
   : m_min(b.min()), m_max(b.max()) {}
 
-template <typename T, std::size_t N>
-Box<T, N>& Box<T, N>::operator=(Box<T, N> const& b) {
-  m_min = b.m_min;
-  m_max = b.m_max;
-  return *this;
-}
+template <typename T, std::size_t N> Box<T, N>& Box<T, N>::operator=(Box<T, N> const& b) = default;
 
 template <typename T, std::size_t N>
 template <typename T2>

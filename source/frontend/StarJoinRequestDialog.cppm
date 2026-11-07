@@ -54,7 +54,7 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<JoinRequestDialog>, StarException> create(GuiContext& guiContext);
 
-  virtual ~JoinRequestDialog() {}
+  ~JoinRequestDialog() override = default;
 
   [[nodiscard]] std::expected<void, StarException> displayRequest(String const& userName, std::function<std::expected<void, StarException>(P2PJoinRequestReply)> callback);
 

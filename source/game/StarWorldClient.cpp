@@ -59,10 +59,10 @@ import star.lua;
 import star.periodic;
 import star.byte_array;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 
 import star.lua_root;
@@ -271,8 +271,8 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   
   m_collisionDebug = false;
   m_inWorld = false;
-  
-  m_luaRoot = luaRoot;
+
+  m_luaRoot = std::move(luaRoot);
   auto result5 = LuaBindings::makeUniverseClientThreadCallbacks(this->root(), universe);
   if (!result5)
     return std::unexpected(std::move(result5.error()));
@@ -281,9 +281,9 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   if (!result6)
     return std::unexpected(std::move(result6.error()));
   m_luaThreadCallbacks["celestial"] = (std::move(*result6));
-  
-  m_mainPlayer = mainPlayer;
-  
+
+  m_mainPlayer = std::move(mainPlayer);
+
   centerClientWindowOnPlayer(Vec2U(100, 100));
   
   m_collisionGenerator.init([&self = *this](int x, int y)  -> std::expected<CollisionKind, StarException> {
@@ -300,8 +300,9 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result7 = m_clientConfig.getFloat("modifiedTilePredictionTimeout");
   if (!result7)
     return std::unexpected(std::move(result7.error()));
-  m_modifiedTilePredictionTimeout = (int)std::round((std::move(*result7)) / this->root().timing().timestep);
-  
+  m_modifiedTilePredictionTimeout =
+    static_cast<int>(std::round((std::move(*result7)) / this->root().timing().timestep));
+
   m_latency = std::chrono::milliseconds::zero();
   
   auto result8 = m_clientConfig.getObject("blockDamageParticle");
@@ -484,8 +485,9 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   auto result42 = m_clientConfig.getFloat("modifiedTilePredictionTimeout");
   if (!result42)
     return std::unexpected(std::move(result42.error()));
-  m_modifiedTilePredictionTimeout = (int)std::round((std::move(*result42)) / this->root().timing().timestep);
-  
+  m_modifiedTilePredictionTimeout =
+    static_cast<int>(std::round((std::move(*result42)) / this->root().timing().timestep));
+
   m_latency = std::chrono::milliseconds::zero();
   
   auto result43 = m_clientConfig.getFloat("damageNotificationBatchDuration");
@@ -641,7 +643,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
           directives = std::cref(*globalDirectives);
     }
     if (directives) {
-      int directiveIndex = unsigned(entity->entityId()) % directives->get().size();
+      int directiveIndex = static_cast<unsigned>(entity->entityId()) % directives->get().size();
       for (auto& p : renderCallback.particles)
         p.directives.append(directives->get()[directiveIndex]);
     }
@@ -670,7 +672,7 @@ std::shared_ptr<WorldTemplate const> WorldClient::currentTemplate() const {
 }
 
 void WorldClient::setTemplate(Json newTemplate) {
-  m_outgoingPackets.push_back(std::make_shared<UpdateWorldTemplatePacket>(newTemplate));
+  m_outgoingPackets.push_back(std::make_shared<UpdateWorldTemplatePacket>(std::move(newTemplate)));
 }
 
 std::shared_ptr<Sky const> WorldClient::currentSky() const {
@@ -1202,7 +1204,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
               return std::unexpected(std::move(result65.error()));
             image = strf("/rendering/sprites/error_{}.png", *result65);
           }
-          Color color = Color::rgbf(0.8f + (float)std::sin(self.m_currentTime * std::numbers::pi * 2.0) * 0.2f, 0.0f, 0.0f);
+          Color color = Color::rgbf(
+            0.8f + static_cast<float>(std::sin(self.m_currentTime * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
           auto result66 = self.root().imageMetadataDatabase();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
@@ -1219,7 +1222,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       
       for (auto& p : ed.layers) {
         if (directives) {
-          int directiveIndex = unsigned(entity->entityId()) % directives->get().size();
+          int directiveIndex = static_cast<unsigned>(entity->entityId()) % directives->get().size();
           for (auto& d : p.second) {
             if (d.isImage()) {
               auto result69 = self.root().imageMetadataDatabase();
@@ -1291,7 +1294,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   
   for (auto& pair : m_predictedTiles) {
     Vec2I tileArrayPos(m_geometry.pdiff(pair.first[0], renderData.tileMinPosition[0]), pair.first[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < (int)renderData.tiles.size(0) && tileArrayPos[1] >= 0 && tileArrayPos[1] < (int)renderData.tiles.size(1)) {
+    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.size(0)) && tileArrayPos[1] >= 0
+        && tileArrayPos[1] < static_cast<int>(renderData.tiles.size(1))) {
       RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
       PredictedTile& p = pair.second;
       if (p.liquid) {
@@ -1311,7 +1315,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   
   for (auto const& previewTile : m_previewTiles) {
     Vec2I tileArrayPos(m_geometry.pdiff(previewTile.position[0], renderData.tileMinPosition[0]), previewTile.position[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < (int)renderData.tiles.size(0) && tileArrayPos[1] >= 0 && tileArrayPos[1] < (int)renderData.tiles.size(1)) {
+    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.size(0)) && tileArrayPos[1] >= 0
+        && tileArrayPos[1] < static_cast<int>(renderData.tiles.size(1))) {
       RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
       
       auto material = previewTile.matId;
@@ -1455,7 +1460,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       auto result87 = (std::move(*result86))->evaluate(m_sky->timeOfDay() / m_sky->dayLength());
       if (!result87)
         return std::unexpected(std::move(result87.error()));
-      layer.alpha *= std::clamp((float)(std::move(*result87)), 0.0f, 1.0f);
+      layer.alpha *= std::clamp(static_cast<float>(std::move(*result87)), 0.0f, 1.0f);
     }
   }
   
@@ -1515,13 +1520,13 @@ void WorldClient::setInteractiveHighlightMode(bool enabled) {
 void WorldClient::setParallax(std::shared_ptr<Parallax> newParallax) {
   if (newParallax) {
     if (!m_currentParallax) {
-      m_currentParallax = newParallax;
+      m_currentParallax = std::move(newParallax);
     } else if (m_parallaxFadeTimer.ready() && newParallax != m_currentParallax) {
-      m_nextParallax = newParallax;
+      m_nextParallax = std::move(newParallax);
       m_parallaxFadeTimer.reset();
     } else if (m_nextParallax && newParallax == m_currentParallax) {
       m_currentParallax = m_nextParallax;
-      m_nextParallax = newParallax;
+      m_nextParallax = std::move(newParallax);
       m_parallaxFadeTimer.invert();
     }
   }
@@ -1933,7 +1938,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
                 client.m_entityMessagePromises[uuid] = promise;
               }
             };
-            std::visit(QueueEntityResponse{*this, entityMessagePacket->uuid}, *response);
+            std::visit(QueueEntityResponse{.client = *this, .uuid = entityMessagePacket->uuid}, *response);
           } else {
             m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
               std::unexpected(String("Message not handled by entity")), entityMessagePacket->uuid));
@@ -2041,7 +2046,8 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         m_latency = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - (std::move(*result150));
       }
     } else {
-      auto result151 = this->root().logger().error("Improper packet type {} received by client", (int)packet->type());
+      auto result151 =
+        this->root().logger().error("Improper packet type {} received by client", static_cast<int>(packet->type()));
       if (!result151)
         return std::unexpected(std::move(result151.error()));
     }
@@ -2111,8 +2117,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   if (!result153)
     return std::unexpected(std::move(result153.error()));
   auto assets = (std::move(*result153));
-  
-  auto expireTime = std::min(std::chrono::duration<float, std::milli>(float((m_latency + std::chrono::milliseconds(800)).count())), std::chrono::duration<float, std::milli>(2000.f));
+
+  auto expireTime = std::min(
+    std::chrono::duration<float, std::milli>(static_cast<float>((m_latency + std::chrono::milliseconds(800)).count())),
+    std::chrono::duration<float, std::milli>(2000.f));
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   eraseWhere(m_predictedTiles, [&, &self = *this](auto& pair) {
     float expiry = std::chrono::duration<float, std::milli>(float((now - pair.second.time).count())) / expireTime;
@@ -2313,7 +2321,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!result169)
         return std::unexpected(std::move(result169.error()));
       auto dropList = (std::move(*result169));
-      for (auto itemDrop : dropList) {
+      for (auto const& itemDrop : dropList) {
         auto distSquared = m_geometry.diff(itemDrop->position(), playerPos).magnitudeSquared();
         
         // If the drop is within DropDist and not owned, request it.
@@ -2329,7 +2337,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
                 return std::unexpected(std::move(result174.error()));
               if ((std::move(*result174)) != 0) {
                 m_startupHiddenEntities.erase(itemDrop->entityId());
-                auto result175 = itemDrop->takeBy(m_mainPlayer->entityId(), (float)m_latency.count() / 1000);
+                auto result175 =
+                  itemDrop->takeBy(m_mainPlayer->entityId(), static_cast<float>(m_latency.count()) / 1000);
                 if (!result175)
                   return std::unexpected(std::move(result175.error()));
                 m_outgoingPackets.append(std::make_shared<RequestDropPacket>(itemDrop->entityId()));
@@ -2394,7 +2403,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       }
       if (auto const& parameters = m_worldTemplate->worldParameters()) {
         if (auto const& directives = parameters->globalDirectives; directives && !directives->empty()) {
-          auto index = unsigned(entity->entityId()) % directives->size();
+          auto index = static_cast<unsigned>(entity->entityId()) % directives->size();
           for (auto& particle : m_eventRenderCallback.particles)
             particle.directives.append((*directives)[index]);
         }
@@ -2545,13 +2554,13 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     }
     return {};
   });
-  for (auto monitoredRegion : monitoredRegions) {
+  for (auto const& monitoredRegion : monitoredRegions) {
     auto result195 = m_tileArray->validSectorsFor(monitoredRegion.padded(WorldSectorSize));
     if (!result195)
       return std::unexpected(std::move(result195.error()));
     neededSectors.addAll((std::move(*result195)));
   }
-  
+
   auto loadedSectors = m_tileArray->loadedSectors();
   for (auto sector : loadedSectors) {
     if (!neededSectors.contains(sector)) {
@@ -2783,8 +2792,8 @@ std::expected<bool, StarException> WorldClient::waitForLighting(std::optional<st
     for (auto& previewTile : m_previewTiles) {
       if (previewTile.updateLight) {
         Vec2I lightArrayPos(m_geometry.pdiff(previewTile.position[0], m_lightMinPosition[0]), previewTile.position[1] - m_lightMinPosition[1]);
-        if (lightArrayPos[0] >= 0 && lightArrayPos[0] < (int)m_lightMap.width()
-                 && lightArrayPos[1] >= 0 && lightArrayPos[1] < (int)m_lightMap.height()) {
+        if (lightArrayPos[0] >= 0 && lightArrayPos[0] < static_cast<int>(m_lightMap.width()) && lightArrayPos[1] >= 0
+            && lightArrayPos[1] < static_cast<int>(m_lightMap.height())) {
           auto result202 = m_lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::v3bToFloat(previewTile.light));
           if (!result202)
             return std::unexpected(std::move(result202.error()));
@@ -2891,9 +2900,10 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
   if (!inWorld()) {
     return {};
   }
-  
-  auto renderParticle = [&self = *this](Vec2F position, float amount, String const& damageNumberParticleKind) -> std::expected<void, StarException> {
-    int displayValue = (int)std::ceil(amount - 0.1f);
+
+  auto renderParticle = [&self = *this](Vec2F position, float amount,
+                                        String const& damageNumberParticleKind) -> std::expected<void, StarException> {
+    int displayValue = static_cast<int>(std::ceil(amount - 0.1f));
     if (displayValue <= 0) {
       return {};
     }
@@ -2912,7 +2922,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
     self.m_particles->add(particle);
     return {};
   };
-  
+
   for (auto it = m_damageNumbers.begin(); it != m_damageNumbers.end();) {
     auto const& entry = *it;
     if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - entry.second.timestamp > m_damageNotificationBatchDuration) {
@@ -2947,8 +2957,10 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
     if (!result218)
       return std::unexpected(std::move(result218.error()));
     auto damageNumberParticleKind = result218->get();
-    auto damageNumberKey = DamageNumberKey{ damageNumberParticleKind, damageNotification.sourceEntityId, damageNotification.targetEntityId};
-    
+    auto damageNumberKey = DamageNumberKey{.damageNumberParticleKind = damageNumberParticleKind,
+                                           .sourceEntityId = damageNotification.sourceEntityId,
+                                           .targetEntityId = damageNotification.targetEntityId};
+
     DamageNumber number;
     if (m_damageNumbers.contains(damageNumberKey)) {
       auto result219 = m_damageNumbers.take(damageNumberKey);
@@ -3015,7 +3027,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
         }
       }
       if (directives) {
-        int directiveIndex = unsigned(damageNotification.targetEntityId) % directives->get().size();
+        int directiveIndex = static_cast<unsigned>(damageNotification.targetEntityId) % directives->get().size();
         for (auto& p : hitParticles) {
           p.directives.append(directives->get()[directiveIndex]);
         }
@@ -3266,7 +3278,8 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   Vec2I regionMin = m_lightingCalculator.calculationRegion().min();
   auto resolvePosition = [&, &self = *this](Vec2F const& pos) -> Vec2F {
     float xFloor = std::floor(pos[0]);
-    float xOffset = (float)self.m_geometry.pdiff((int)xFloor, regionMin[0]) + (pos[0] - xFloor);
+    float xOffset =
+      static_cast<float>(self.m_geometry.pdiff(static_cast<int>(xFloor), regionMin[0])) + (pos[0] - xFloor);
     return Vec2F(regionMin[0] + xOffset, pos[1]);
   };
   
@@ -4098,8 +4111,8 @@ void WorldClient::disconnectAllWires(Vec2I wireEntityPosition, WireNode const& n
 }
 
 void WorldClient::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec2I const& inputPosition, std::size_t inputIndex) {
-  WireConnection output = {outputPosition, outputIndex};
-  WireConnection input = {inputPosition, inputIndex};
+  WireConnection output = {.entityLocation = outputPosition, .nodeIndex = outputIndex};
+  WireConnection input = {.entityLocation = inputPosition, .nodeIndex = inputIndex};
   connectWire(output, input);
 }
 
@@ -4133,7 +4146,7 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
 
 std::expected<bool, StarException> WorldClient::handleSecretBroadcast(std::shared_ptr<Player> player, StringView broadcast) {
   if (m_broadcastCallback) {
-    return m_broadcastCallback(player, broadcast);
+    return m_broadcastCallback(std::move(player), broadcast);
   } else {
     return false;
   }

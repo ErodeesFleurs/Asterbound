@@ -66,7 +66,7 @@ template <ParseKind Kind> Fixture parseFixture(std::size_t count) {
     if constexpr (Kind == ParseKind::Numbers) {
       constexpr std::array<std::string_view, 6> spelling{"0", "-17", "1.25", "6.25e2", "-0.0", "9223372036854775807"};
       std::array<Json, 6> values{Json(0),     Json(-17),  Json(1.25),
-                                 Json(625.0), Json(-0.0), Json(std::int64_t(9223372036854775807ll))};
+                                 Json(625.0), Json(-0.0), Json(static_cast<std::int64_t>(9223372036854775807ll))};
       text += spelling[i % spelling.size()];
       expected.append(values[i % values.size()]);
     } else if constexpr (Kind == ParseKind::Unicode) {

@@ -32,7 +32,7 @@ enum class KeyboardCaptureMode {
   TextInput
 };
 
-typedef std::function<std::expected<void, StarException>(Widget&)> WidgetCallbackFunc;
+using WidgetCallbackFunc = std::function<std::expected<void, StarException>(Widget&)>;
 
 class Widget : public std::enable_shared_from_this<Widget> {
 public:

@@ -270,6 +270,10 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 ### C++ implementation boundaries
 
 - Keep non-template module definitions in implementation units with their own direct imports. Register those units as private CMake sources with `CXX_SCAN_FOR_MODULES` enabled; importing an interface does not expose its implementation dependencies.
+- Prefer exact `using` aliases, standard `_t` / `_v` type traits and explicit `override`. Default special members only after checking construction state and value-initialization semantics; raw storage and deliberately user-provided constructors are not mechanical replacements.
+- Move owning by-value parameters at their final handoff, not earlier or on repeated invocation. Borrow expensive read-only range elements only while their owner remains retained; callbacks that mutate their source still need independent snapshots.
+- Replace `std::bind` with fixed-signature lambdas that own independent captures. Preserve parameter conversions, mutable stored-lvalue invocation and checked `std::expected` returns rather than using blanket reference captures or generic forwarding.
+- Designated aggregate initialization must preserve member order and omitted-member initialization. Explicit casts must retain the original numeric conversion boundaries and native API representation requirements.
 - Reuse the checked `Star::transform` for owning transforms. `transformInto` appends and preserves the committed prefix on insertion failure; do not introduce eager capacity errors. Computed-key sorting constructs keys only after successful evaluation.
 - Fixed ASCII enum labels use `sortedEnumNames`, `enumName<Names>` and `enumValue<Names>`. Retain canonical output spelling and case-insensitive input; runtime-extensible tables still need `EnumMap`.
 - Qt connections use typed signals and an explicit receiver context. Keep `Q_OBJECT` and moc where custom signals or reflection require them, not merely for ordinary receiver methods.

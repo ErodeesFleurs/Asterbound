@@ -63,7 +63,7 @@ enum class MainInterfacePanes {
 
 extern std::expected<EnumMap<MainInterfacePanes>, StarException> const MainInterfacePanesNames;
 
-typedef RegisteredPaneManager<MainInterfacePanes> MainInterfacePaneManager;
+using MainInterfacePaneManager = RegisteredPaneManager<MainInterfacePanes>;
 
 struct MainInterfaceConfig {
   [[nodiscard]] static std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> loadFromAssets(GuiContext& context);

@@ -34,7 +34,7 @@ struct AmbientNoisesDescription {
   int trackLoops = -1;
 };
 
-typedef AmbientTrackGroup WeatherNoisesDescription;
+using WeatherNoisesDescription = AmbientTrackGroup;
 
 // manages the running ambient sounds
 class AmbientManager {

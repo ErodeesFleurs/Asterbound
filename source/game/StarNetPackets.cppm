@@ -640,7 +640,7 @@ struct TileArrayUpdatePacket : PacketBase<PacketType::TileArrayUpdate> {
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<TileArrayUpdatePacket, PacketBase<PacketType::TileArrayUpdate>>(this, key); }
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<TileArrayUpdatePacket>(); }
 
-  typedef MultiArray<NetTile, 2> TileArray;
+  using TileArray = MultiArray<NetTile, 2>;
 
   TileArrayUpdatePacket();
 

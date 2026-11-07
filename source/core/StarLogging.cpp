@@ -22,7 +22,7 @@ namespace Star {
 LogSink::LogSink()
   : m_level(LogLevel::Info) {}
 
-LogSink::~LogSink() {}
+LogSink::~LogSink() = default;
 
 void LogSink::setLevel(LogLevel level) {
   m_level = level;
@@ -173,7 +173,7 @@ void SpatialLogger::logPoly(std::string_view space, PolyF const& poly, Vec4B con
 
   for (std::size_t i = 0; i < poly.sides(); ++i) {
     auto side = poly.side(i);
-    lines.append(Line{side.min(), side.max(), color});
+    lines.append(Line{.begin = side.min(), .end = side.max(), .color = color});
   }
 
   while (lines.size() > MaximumLines)
@@ -186,7 +186,7 @@ void SpatialLogger::logLine(std::string_view space, Line2F const& line, Vec4B co
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
 
-  lines.append(Line{line.min(), line.max(), color});
+  lines.append(Line{.begin = line.min(), .end = line.max(), .color = color});
 
   while (lines.size() > MaximumLines)
     lines.erase(lines.begin());
@@ -198,7 +198,7 @@ void SpatialLogger::logLine(std::string_view space, Vec2F const& begin, Vec2F co
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
 
-  lines.append(Line{begin, end, color});
+  lines.append(Line{.begin = begin, .end = end, .color = color});
 
   while (lines.size() > MaximumLines)
     lines.erase(lines.begin());
@@ -210,7 +210,7 @@ void SpatialLogger::logPoint(std::string_view space, Vec2F const& position, Vec4
   std::lock_guard locker(s_mutex);
   auto& points = s_points[space];
 
-  points.append(Point{position, color});
+  points.append(Point{.position = position, .color = color});
   while (points.size() > MaximumPoints)
     points.erase(points.begin());
 }
@@ -221,7 +221,7 @@ void SpatialLogger::logText(std::string_view space, String text, Vec2F const& po
   std::lock_guard locker(s_mutex);
   auto& texts = s_logText[space];
 
-  texts.append(LogText{text, position, color});
+  texts.append(LogText{.text = std::move(text), .position = position, .color = color});
 
   while (texts.size() > MaximumText)
     texts.erase(texts.begin());

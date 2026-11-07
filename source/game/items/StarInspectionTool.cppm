@@ -423,9 +423,11 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
           auto logName = entity->inspectionLogName();
           if (!logName)
             return std::unexpected(std::move(logName.error()));
-          return InspectionResult{description->value_or(String{}), std::move(*logName), entity->entityId()};
+          return InspectionResult{.message = description->value_or(String{}),
+                                  .objectName = std::move(*logName),
+                                  .entityId = entity->entityId()};
         }
-        return InspectionResult{description->value_or(String{}), {}, {}};
+        return InspectionResult{.message = description->value_or(String{}), .objectName = {}, .entityId = {}};
       }
     }
     return {};
@@ -479,7 +481,9 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     outOfRange = *level < m_minimumInspectionLevel;
   }
   if (outOfRange)
-    return inspectionFailureText("outOfRangeText", species).transform([](String message) { return InspectionResult{std::move(message), {}}; });
+    return inspectionFailureText("outOfRangeText", species).transform([](String message) {
+      return InspectionResult{.message = std::move(message), .objectName = {}};
+    });
   MaterialId fgMaterial = itemWorld->get().material(Vec2I::floor(position), TileLayer::Foreground);
   MaterialId fgMod = itemWorld->get().mod(Vec2I(position.floor()), TileLayer::Foreground);
   auto materialDatabase = root().materialDatabase();
@@ -487,21 +491,29 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     return std::unexpected(std::move(materialDatabase.error()));
   if (isRealMaterial(fgMaterial)) {
     auto description = isRealMod(fgMod) ? (*materialDatabase)->modDescription(fgMod, species) : (*materialDatabase)->materialDescription(fgMaterial, species);
-    return std::move(description).transform([](String message) { return InspectionResult{std::move(message), {}}; });
+    return std::move(description).transform([](String message) {
+      return InspectionResult{.message = std::move(message), .objectName = {}};
+    });
   }
   auto liquidLevel = itemWorld->get().liquidLevel(Vec2I::floor(position));
   auto liquidsDatabase = root().liquidsDatabase();
   if (!liquidsDatabase)
     return std::unexpected(std::move(liquidsDatabase.error()));
   if (liquidLevel.liquid != EmptyLiquidId)
-    return (*liquidsDatabase)->liquidDescription(liquidLevel.liquid, species).transform([](String message) { return InspectionResult{std::move(message), {}}; });
+    return (*liquidsDatabase)->liquidDescription(liquidLevel.liquid, species).transform([](String message) {
+      return InspectionResult{.message = std::move(message), .objectName = {}};
+    });
   MaterialId bgMaterial = itemWorld->get().material(Vec2I::floor(position), TileLayer::Background);
   MaterialId bgMod = itemWorld->get().mod(Vec2I(position.floor()), TileLayer::Background);
   if (isRealMaterial(bgMaterial)) {
     auto description = isRealMod(bgMod) ? (*materialDatabase)->modDescription(bgMod, species) : (*materialDatabase)->materialDescription(bgMaterial, species);
-    return std::move(description).transform([](String message) { return InspectionResult{std::move(message), {}}; });
+    return std::move(description).transform([](String message) {
+      return InspectionResult{.message = std::move(message), .objectName = {}};
+    });
   }
-  return inspectionFailureText("nothingThereText", species).transform([](String message) { return InspectionResult{std::move(message), {}}; });
+  return inspectionFailureText("nothingThereText", species).transform([](String message) {
+    return InspectionResult{.message = std::move(message), .objectName = {}};
+  });
 }
 
 std::expected<String, StarException> InspectionTool::inspectionFailureText(String const& failureType, String const& species) const {

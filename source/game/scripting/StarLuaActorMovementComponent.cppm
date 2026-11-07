@@ -98,9 +98,12 @@ private:
     self.m_movementController->get().setRotation(rotation);
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("setAnchorState", [&self = *this](EntityId entity, std::size_t position) {
-    return self.m_movementController->get().setAnchorState({entity, position});
-  }); !result)
+  if (auto result = callbacks.registerCallback("setAnchorState",
+                                               [&self = *this](EntityId entity, std::size_t position) {
+                                                 return self.m_movementController->get().setAnchorState(
+                                                   {.entityId = entity, .positionIndex = position});
+                                               });
+      !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("resetAnchorState", [&self = *this]() { return self.m_movementController->get().resetAnchorState(); }); !result)
     return std::unexpected(std::move(result.error()));

@@ -42,7 +42,7 @@ import star.image_metadata_database;
 import star.algorithm;
 namespace Star {
 
-WorldStructure::WorldStructure() {}
+WorldStructure::WorldStructure() = default;
 
 std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, String const& configPath) {
   WorldStructure result;
@@ -74,7 +74,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autofullbrightResult1 = overlaySettings.getBool("fullbright", false);
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
-    Overlay overlay{position, std::move(image), fullbright};
+    Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
     result.m_backgroundOverlays.append(overlay);
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
@@ -96,7 +96,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autofullbrightResult1 = overlaySettings.getBool("fullbright", false);
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
-    Overlay overlay{position, std::move(image), fullbright};
+    Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
     result.m_foregroundOverlays.append(overlay);
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
@@ -202,21 +202,42 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autokeyField11Result2 = jsonToStringList((*autokeyField11Result1));
     if (!autokeyField11Result2) return std::unexpected(std::move(autokeyField11Result2.error()));
     auto keyField11 = std::move((*autokeyField11Result2));
-    auto autokeyField12Result1 = blockKeyConfig.getUInt("foregroundMatColor", 0);
-    if (!autokeyField12Result1) return std::unexpected(std::move(autokeyField12Result1.error()));
-    auto keyField12 = std::move(MaterialColorVariant((*autokeyField12Result1)));
-    auto autokeyField13Result1 = blockKeyConfig.getUInt("backgroundMatColor", 0);
-    if (!autokeyField13Result1) return std::unexpected(std::move(autokeyField13Result1.error()));
-    auto keyField13 = std::move(MaterialColorVariant((*autokeyField13Result1)));
-    auto autokeyField14Result1 = blockKeyConfig.getUInt("foregroundMatHue", 0);
-    if (!autokeyField14Result1) return std::unexpected(std::move(autokeyField14Result1.error()));
-    auto keyField14 = std::move(MaterialHue((*autokeyField14Result1)));
-    auto autokeyField15Result1 = blockKeyConfig.getUInt("backgroundMatHue", 0);
-    if (!autokeyField15Result1) return std::unexpected(std::move(autokeyField15Result1.error()));
-    auto keyField15 = std::move(MaterialHue((*autokeyField15Result1)));
+    auto foregroundColor = blockKeyConfig.getUInt("foregroundMatColor", 0);
+    if (!foregroundColor)
+      return std::unexpected(std::move(foregroundColor.error()));
+    auto keyField12 = std::move(static_cast<MaterialColorVariant>(*foregroundColor));
+    auto backgroundColor = blockKeyConfig.getUInt("backgroundMatColor", 0);
+    if (!backgroundColor)
+      return std::unexpected(std::move(backgroundColor.error()));
+    auto keyField13 = std::move(static_cast<MaterialColorVariant>(*backgroundColor));
+    auto foregroundHue = blockKeyConfig.getUInt("foregroundMatHue", 0);
+    if (!foregroundHue)
+      return std::unexpected(std::move(foregroundHue.error()));
+    auto keyField14 = std::move(static_cast<MaterialHue>(*foregroundHue));
+    auto backgroundHue = blockKeyConfig.getUInt("backgroundMatHue", 0);
+    if (!backgroundHue)
+      return std::unexpected(std::move(backgroundHue.error()));
+    auto keyField15 = std::move(static_cast<MaterialHue>(*backgroundHue));
     auto keyField16 = std::move(foregroundModId);
     auto keyField17 = std::move(backgroundModId);
-    BlockKey blockKey{keyField0, keyField1, keyField2, keyField3, keyField4, keyField5, keyField6, keyField7, keyField8, keyField9, keyField10, keyField11, keyField12, keyField13, keyField14, keyField15, keyField16, keyField17};
+    BlockKey blockKey{.anchor = keyField0,
+                      .foregroundBlock = keyField1,
+                      .foregroundMat = keyField2,
+                      .foregroundResidual = keyField3,
+                      .backgroundBlock = keyField4,
+                      .backgroundMat = keyField5,
+                      .backgroundResidual = keyField6,
+                      .object = keyField7,
+                      .objectDirection = keyField8,
+                      .objectParameters = keyField9,
+                      .objectResidual = keyField10,
+                      .flags = keyField11,
+                      .foregroundMatColor = keyField12,
+                      .backgroundMatColor = keyField13,
+                      .foregroundMatHue = keyField14,
+                      .backgroundMatHue = keyField15,
+                      .foregroundMatMod = keyField16,
+                      .backgroundMatMod = keyField17};
     auto autocolorResult1 = blockKeyConfig.get("value");
     if (!autocolorResult1) return std::unexpected(std::move(autocolorResult1.error()));
     auto autocolorResult2 = jsonToColor((*autocolorResult1));
@@ -234,25 +255,24 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autoblocksImageResult2 = assets->image(AssetPath::relativeTo(configPath, (*autoblocksImageResult1)));
     if (!autoblocksImageResult2) return std::unexpected(std::move(autoblocksImageResult2.error()));
     auto blocksImage = std::move((*autoblocksImageResult2));
-    const BlockKey defaultBlockKey = {false,
-        false,
-        StructureMaterialId,
-        false,
-        false,
-        StructureMaterialId,
-        false,
-        String(),
-        Direction::Left,
-        Json(),
-        false,
-        StringList(),
-        MaterialColorVariant(0),
-        MaterialColorVariant(0),
-        MaterialHue(0),
-        MaterialHue(0),
-        NoModId,
-        NoModId
-      };
+    const BlockKey defaultBlockKey = {.anchor = false,
+                                      .foregroundBlock = false,
+                                      .foregroundMat = StructureMaterialId,
+                                      .foregroundResidual = false,
+                                      .backgroundBlock = false,
+                                      .backgroundMat = StructureMaterialId,
+                                      .backgroundResidual = false,
+                                      .object = String(),
+                                      .objectDirection = Direction::Left,
+                                      .objectParameters = Json(),
+                                      .objectResidual = false,
+                                      .flags = StringList(),
+                                      .foregroundMatColor = static_cast<MaterialColorVariant>(0),
+                                      .backgroundMatColor = static_cast<MaterialColorVariant>(0),
+                                      .foregroundMatHue = static_cast<MaterialHue>(0),
+                                      .backgroundMatHue = static_cast<MaterialHue>(0),
+                                      .foregroundMatMod = NoModId,
+                                      .backgroundMatMod = NoModId};
 
     for (std::size_t y = 0; y < blocksImage->height(); ++y) {
       for (std::size_t x = 0; x < blocksImage->width(); ++x) {
@@ -271,13 +291,26 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
         }
 
         if (blockKey.foregroundBlock)
-          result.m_foregroundBlocks.append({pos, blockKey.foregroundMat, blockKey.foregroundResidual, blockKey.foregroundMatColor, blockKey.foregroundMatHue, blockKey.foregroundMatMod});
+          result.m_foregroundBlocks.append({.position = pos,
+                                            .materialId = blockKey.foregroundMat,
+                                            .residual = blockKey.foregroundResidual,
+                                            .materialColor = blockKey.foregroundMatColor,
+                                            .materialHue = blockKey.foregroundMatHue,
+                                            .materialMod = blockKey.foregroundMatMod});
         if (blockKey.backgroundBlock)
-          result.m_backgroundBlocks.append({pos, blockKey.backgroundMat, blockKey.backgroundResidual, blockKey.backgroundMatColor, blockKey.foregroundMatHue, blockKey.foregroundMatMod});
+          result.m_backgroundBlocks.append({.position = pos,
+                                            .materialId = blockKey.backgroundMat,
+                                            .residual = blockKey.backgroundResidual,
+                                            .materialColor = blockKey.backgroundMatColor,
+                                            .materialHue = blockKey.foregroundMatHue,
+                                            .materialMod = blockKey.foregroundMatMod});
 
         if (!blockKey.object.empty())
-          result.m_objects.append(Object{
-              pos, blockKey.object, blockKey.objectDirection, blockKey.objectParameters, blockKey.objectResidual});
+          result.m_objects.append(Object{.position = pos,
+                                         .name = blockKey.object,
+                                         .direction = blockKey.objectDirection,
+                                         .parameters = blockKey.objectParameters,
+                                         .residual = blockKey.objectResidual});
 
         for (auto const& flag : blockKey.flags)
           result.m_flaggedBlocks[flag].append(pos);
@@ -306,13 +339,14 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     auto autofield0Result2 = jsonToVec2F((*autofield0Result1));
     if (!autofield0Result2) return std::unexpected(std::move(autofield0Result2.error()));
     auto field0 = std::move((*autofield0Result2));
-    auto autofield1Result1 = v.getString("image");
-    if (!autofield1Result1) return std::unexpected(std::move(autofield1Result1.error()));
-    auto field1 = std::move((*autofield1Result1));
+    auto imagePath = v.getString("image");
+    if (!imagePath)
+      return std::unexpected(std::move(imagePath.error()));
+    auto field1 = std::move((*imagePath));
     auto autofield2Result1 = v.getBool("fullbright");
     if (!autofield2Result1) return std::unexpected(std::move(autofield2Result1.error()));
     auto field2 = std::move((*autofield2Result1));
-    return Overlay{std::move(field0), std::move(field1), std::move(field2)};
+    return Overlay{.min = std::move(field0), .image = std::move(field1), .fullbright = std::move(field2)};
   };
   auto blockFromJson = [](Json const& v) -> std::expected<Block, StarException> {
     auto autofield0Result1 = v.get("position");
@@ -320,22 +354,31 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     auto autofield0Result2 = jsonToVec2I((*autofield0Result1));
     if (!autofield0Result2) return std::unexpected(std::move(autofield0Result2.error()));
     auto field0 = std::move((*autofield0Result2));
-    auto autofield1Result1 = v.getUInt("materialId");
-    if (!autofield1Result1) return std::unexpected(std::move(autofield1Result1.error()));
-    auto field1 = std::move(MaterialId((*autofield1Result1)));
+    auto materialId = v.getUInt("materialId");
+    if (!materialId)
+      return std::unexpected(std::move(materialId.error()));
+    auto field1 = std::move(static_cast<MaterialId>(*materialId));
     auto autofield2Result1 = v.getBool("residual");
     if (!autofield2Result1) return std::unexpected(std::move(autofield2Result1.error()));
     auto field2 = std::move((*autofield2Result1));
-    auto autofield3Result1 = v.getUInt("materialColor", 0);
-    if (!autofield3Result1) return std::unexpected(std::move(autofield3Result1.error()));
-    auto field3 = std::move(MaterialColorVariant((*autofield3Result1)));
-    auto autofield4Result1 = v.getUInt("materialHue", 0);
-    if (!autofield4Result1) return std::unexpected(std::move(autofield4Result1.error()));
-    auto field4 = std::move(MaterialHue((*autofield4Result1)));
-    auto autofield5Result1 = v.getUInt("modId", NoModId);
-    if (!autofield5Result1) return std::unexpected(std::move(autofield5Result1.error()));
-    auto field5 = std::move(ModId((*autofield5Result1)));
-    return Block{std::move(field0), std::move(field1), std::move(field2), std::move(field3), std::move(field4), std::move(field5)};
+    auto materialColor = v.getUInt("materialColor", 0);
+    if (!materialColor)
+      return std::unexpected(std::move(materialColor.error()));
+    auto field3 = std::move(static_cast<MaterialColorVariant>(*materialColor));
+    auto materialHue = v.getUInt("materialHue", 0);
+    if (!materialHue)
+      return std::unexpected(std::move(materialHue.error()));
+    auto field4 = std::move(static_cast<MaterialHue>(*materialHue));
+    auto materialMod = v.getUInt("modId", NoModId);
+    if (!materialMod)
+      return std::unexpected(std::move(materialMod.error()));
+    auto field5 = std::move(static_cast<ModId>(*materialMod));
+    return Block{.position = std::move(field0),
+                 .materialId = std::move(field1),
+                 .residual = std::move(field2),
+                 .materialColor = std::move(field3),
+                 .materialHue = std::move(field4),
+                 .materialMod = std::move(field5)};
   };
   auto objectFromJson = [](Json const& v) -> std::expected<Object, StarException> {
     auto autofield0Result1 = v.get("position");
@@ -357,7 +400,11 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     auto autofield4Result1 = v.getBool("residual", false);
     if (!autofield4Result1) return std::unexpected(std::move(autofield4Result1.error()));
     auto field4 = std::move((*autofield4Result1));
-    return Object{std::move(field0), std::move(field1), std::move(field2), std::move(field3), std::move(field4)};
+    return Object{.position = std::move(field0),
+                  .name = std::move(field1),
+                  .direction = std::move(field2),
+                  .parameters = std::move(field3),
+                  .residual = std::move(field4)};
   };
   auto resultm_regionResult1 = store.get("region");
   if (!resultm_regionResult1) return std::unexpected(std::move(resultm_regionResult1.error()));

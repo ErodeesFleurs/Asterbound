@@ -471,9 +471,7 @@ std::expected<void, StarException> Pane::setBG(String const& header, String cons
   return {};
 }
 
-Pane::BGResult Pane::getBG() const {
-  return {m_bgHeader, m_bgBody, m_bgFooter};
-}
+Pane::BGResult Pane::getBG() const { return {.header = m_bgHeader, .body = m_bgBody, .footer = m_bgFooter}; }
 
 void Pane::lockPosition() {
   m_lockPosition = true;

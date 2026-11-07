@@ -21,7 +21,7 @@ GuiDirection otherDirection(GuiDirection direction) {
       if constexpr (Star::DebugEnabled) {
         Star::starAssertFailed((false));
       }
-      return (GuiDirection)-1;
+      return static_cast<GuiDirection>(-1);
   }
 }
 

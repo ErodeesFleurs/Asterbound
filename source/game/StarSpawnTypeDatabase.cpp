@@ -30,7 +30,8 @@ import star.spawn_type_database;
 
 namespace Star {
 
-SpawnParameters::SpawnParameters(Set<Area> areas, Region region, Time time) : areas(areas), region(region), time(time) {}
+SpawnParameters::SpawnParameters(Set<Area> areas, Region region, Time time)
+    : areas(std::move(areas)), region(region), time(time) {}
 
 SpawnParameters::SpawnParameters()
   : areas{Area::Surface, Area::Ceiling, Area::Air, Area::Liquid, Area::Solid}, region(Region::All), time(Time::All) {}
@@ -142,7 +143,7 @@ std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
   return result;
 }
 
-SpawnProfile::SpawnProfile() {}
+SpawnProfile::SpawnProfile() = default;
 
 std::expected<SpawnProfile, StarException> SpawnProfile::create(Json const& config) {
   auto typesConfig = config.get("spawnTypes", JsonArray());

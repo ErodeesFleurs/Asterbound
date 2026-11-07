@@ -38,10 +38,10 @@ import star.ordered_set;
 import star.rpc_promise;
 import star.byte_array;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.logging;
@@ -148,7 +148,7 @@ void PacketStatCollector::calculate() {
 
       m_stats.packetBytesPerSecond[pair.first] = std::round(pair.second / elapsedTime.count());
     }
-    m_stats.bytesPerSecond = std::round(float(m_totalBytes) / elapsedTime.count());
+    m_stats.bytesPerSecond = std::round(static_cast<float>(m_totalBytes) / elapsedTime.count());
     m_totalBytes = 0;
     m_unmixed.clear();
   }
@@ -340,7 +340,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
       auto typeWritten = outBuffer.write(packetType);
       if (!typeWritten)
         return std::unexpected(std::move(typeWritten.error()));
-      auto lengthWritten = outBuffer.writeVlqI((int)packetBuffer.size());
+      auto lengthWritten = outBuffer.writeVlqI(static_cast<int>(packetBuffer.size()));
       if (!lengthWritten)
         return std::unexpected(std::move(lengthWritten.error()));
       auto bodyWritten = outBuffer.writeData(packetBuffer.span());
@@ -387,7 +387,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
         return std::unexpected(std::move(typeWritten.error()));
 
       if (!compressedPackets.empty() && (mustCompress || compressedPackets.size() < packetBuffer.size())) {
-        auto lengthWritten = outBuffer.writeVlqI(-(int)(compressedPackets.size()));
+        auto lengthWritten = outBuffer.writeVlqI(-static_cast<int>(compressedPackets.size()));
         if (!lengthWritten)
           return std::unexpected(std::move(lengthWritten.error()));
         auto bodyWritten = outBuffer.writeData(compressedPackets.span());
@@ -395,7 +395,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
           return std::unexpected(std::move(bodyWritten.error()));
         m_outgoingStats.mix(currentType, compressedPackets.size(), true);
       } else {
-        auto lengthWritten = outBuffer.writeVlqI((int)(packetBuffer.size()));
+        auto lengthWritten = outBuffer.writeVlqI(static_cast<int>(packetBuffer.size()));
         if (!lengthWritten)
           return std::unexpected(std::move(lengthWritten.error()));
         auto bodyWritten = outBuffer.writeData(packetBuffer.span());
@@ -436,8 +436,8 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       }
       bool packetCompressed = *length < 0;
       // Avoid negating INT64_MIN while rejecting oversized frames normally.
-      std::uint64_t packetSize = packetCompressed
-        ? std::uint64_t(-(*length + 1)) + 1 : std::uint64_t(*length);
+      std::uint64_t packetSize =
+        packetCompressed ? static_cast<std::uint64_t>(-(*length + 1)) + 1 : static_cast<std::uint64_t>(*length);
       auto packetName = [&]() -> std::expected<String, StarException> {
         if (!PacketTypeNames)
           return std::unexpected(PacketTypeNames.error());

@@ -5,10 +5,10 @@ import star.json_extra;
 import star.byte_array;
 import star.data_stream_devices;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.string;
 import star.encode;
@@ -209,7 +209,8 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
   if (!y) return std::unexpected(std::move(y.error()));
   int originX = *x, originY = *y;
   unsigned layerWidth = *width, layerHeight = *height;
-  result->m_rect = RectI({originX, originY}, {originX + (int)layerWidth - 1, originY + (int)layerHeight - 1});
+  result->m_rect = RectI({originX, originY},
+                         {originX + static_cast<int>(layerWidth) - 1, originY + static_cast<int>(layerHeight) - 1});
   auto name = layer.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));
   result->m_name = std::move(*name);
@@ -248,7 +249,8 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
       bytes = std::move(*decoded);
     }
     for (std::size_t i = 0; i + 3 < bytes.size(); i += 4) {
-      std::uint32_t gid = (std::uint8_t)bytes[i] | ((std::uint8_t)bytes[i + 1] << 8) | ((std::uint8_t)bytes[i + 2] << 16) | ((std::uint8_t)bytes[i + 3] << 24);
+      std::uint32_t gid = static_cast<std::uint8_t>(bytes[i]) | (static_cast<std::uint8_t>(bytes[i + 1]) << 8)
+        | (static_cast<std::uint8_t>(bytes[i + 2]) << 16) | (static_cast<std::uint8_t>(bytes[i + 3]) << 24);
       result->m_tileData.append(gid & ~TileFlip::AllBits);
     }
   }
@@ -393,7 +395,7 @@ std::expected<std::shared_ptr<TMXObject>, StarException> TMXObject::create(Root&
   auto layer = getLayer(groupProperties, *objectProperties);
   if (!layer) return std::unexpected(std::move(layer.error()));
   result->m_layer = *layer;
-  auto info = getTileObjectInfo(tmx, tilesets, *layer);
+  auto info = getTileObjectInfo(tmx, std::move(tilesets), *layer);
   if (!info) return std::unexpected(std::move(info.error()));
   Tiled::Properties properties;
   if (*objectProperties) {
@@ -475,7 +477,7 @@ std::expected<Vec2I, StarException> TMXObject::getImagePosition(Tiled::Propertie
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = properties.opt<float>("imagePositionY");
   if (!y) return std::unexpected(std::move(y.error()));
-  return Vec2I((int)(x->value_or(0) / TilePixels), -(int)(y->value_or(0) / TilePixels));
+  return Vec2I(static_cast<int>(x->value_or(0) / TilePixels), -static_cast<int>(y->value_or(0) / TilePixels));
 }
 
 std::expected<ObjectKind, StarException> TMXObject::getObjectKind(Json const& tmx, std::optional<Json> const& objectProperties) {

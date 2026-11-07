@@ -26,13 +26,25 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
 
   auto& input = owner;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>("bindDown", std::bind(std::mem_fn(&Input::bindDown), std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>(
+        "bindDown",
+        [&input](String const& categoryId, String const& bindId) { return input.bindDown(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool,            String, String>("bindHeld", std::bind(std::mem_fn(&Input::bindHeld), std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool, String, String>(
+        "bindHeld",
+        [&input](String const& categoryId, String const& bindId) { return input.bindHeld(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool,            String, String>("bind",     std::bind(std::mem_fn(&Input::bindHeld), std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool, String, String>(
+        "bind",
+        [&input](String const& categoryId, String const& bindId) { return input.bindHeld(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>("bindUp",   std::bind(std::mem_fn(&Input::bindUp),   std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>(
+        "bindUp",
+        [&input](String const& categoryId, String const& bindId) { return input.bindUp(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration = callbacks.registerCallback("keyDown", [&input](String const& keyName, std::optional<StringList> const& modNames) -> std::expected<std::optional<unsigned>, StarException> {
@@ -96,13 +108,27 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   }); !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String>("resetBinds",      std::bind(std::mem_fn(&Input::resetBinds),      std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String>(
+        "resetBinds",
+        [&input](String const& categoryId, String const& bindId) { return input.resetBinds(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String, Json>("setBinds",  std::bind(std::mem_fn(&Input::setBinds),        std::ref(input), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String, Json>(
+        "setBinds",
+        [&input](String const& categoryId, String const& bindId, Json const& binds) {
+          return input.setBinds(categoryId, bindId, binds);
+        });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>("getDefaultBinds", std::bind(std::mem_fn(&Input::getDefaultBinds), std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>(
+        "getDefaultBinds",
+        [&input](String const& categoryId, String const& bindId) { return input.getDefaultBinds(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>("getBinds",        std::bind(std::mem_fn(&Input::getBinds),        std::ref(input), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>(
+        "getBinds",
+        [&input](String const& categoryId, String const& bindId) { return input.getBinds(categoryId, bindId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration = callbacks.registerCallback("events", [&input]() -> std::expected<Json, StarException> {
@@ -122,9 +148,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   }); !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallbackWithSignature<Vec2F>("mousePosition", std::bind(std::mem_fn(&Input::mousePosition), std::ref(input))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<Vec2F>("mousePosition", [&input]() { return input.mousePosition(); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<unsigned, String>("getTag", std::bind(std::mem_fn(&Input::getTag), std::ref(input), std::placeholders::_1)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<unsigned, String>(
+        "getTag", [&input](String const& name) { return input.getTag(name); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
 
   return callbacks;

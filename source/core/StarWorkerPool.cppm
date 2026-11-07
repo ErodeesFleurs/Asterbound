@@ -93,7 +93,7 @@ private:
   class WorkerThread : public Thread {
   public:
     WorkerThread(WorkerPool& parent, std::stop_token stopToken);
-    ~WorkerThread();
+    ~WorkerThread() override;
     [[nodiscard]] std::expected<void, StarException> run() override;
     WorkerPool& parent;
     std::stop_token stopToken;

@@ -12,25 +12,19 @@ namespace Star {
 template <typename T, std::size_t N>
 class Vector : public Array<T, N> {
 public:
-  typedef Array<T, N> Base;
+  using Base = Array<T, N>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable2D = typename std::enable_if<P == 2 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable2D = std::enable_if_t<P == 2 && N == P, T2>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable3D = typename std::enable_if<P == 3 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable3D = std::enable_if_t<P == 3 && N == P, T2>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable4D = typename std::enable_if<P == 4 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable4D = std::enable_if_t<P == 4 && N == P, T2>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable2DOrHigher = typename std::enable_if<P >= 2 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable2DOrHigher = std::enable_if_t<P >= 2 && N == P, T2>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable3DOrHigher = typename std::enable_if<P >= 3 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable3DOrHigher = std::enable_if_t<P >= 3 && N == P, T2>;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable4DOrHigher = typename std::enable_if<P >= 4 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable4DOrHigher = std::enable_if_t<P >= 4 && N == P, T2>;
 
   static Vector filled(T const& t);
 
@@ -218,26 +212,26 @@ public:
   using Base::empty;
 };
 
-typedef Vector<int, 2> Vec2I;
-typedef Vector<unsigned, 2> Vec2U;
-typedef Vector<float, 2> Vec2F;
-typedef Vector<double, 2> Vec2D;
-typedef Vector<std::uint8_t, 2> Vec2B;
-typedef Vector<std::size_t, 2> Vec2S;
+using Vec2I = Vector<int, 2>;
+using Vec2U = Vector<unsigned, 2>;
+using Vec2F = Vector<float, 2>;
+using Vec2D = Vector<double, 2>;
+using Vec2B = Vector<std::uint8_t, 2>;
+using Vec2S = Vector<std::size_t, 2>;
 
-typedef Vector<int, 3> Vec3I;
-typedef Vector<unsigned, 3> Vec3U;
-typedef Vector<float, 3> Vec3F;
-typedef Vector<double, 3> Vec3D;
-typedef Vector<std::uint8_t, 3> Vec3B;
-typedef Vector<std::size_t, 3> Vec3S;
+using Vec3I = Vector<int, 3>;
+using Vec3U = Vector<unsigned, 3>;
+using Vec3F = Vector<float, 3>;
+using Vec3D = Vector<double, 3>;
+using Vec3B = Vector<std::uint8_t, 3>;
+using Vec3S = Vector<std::size_t, 3>;
 
-typedef Vector<int, 4> Vec4I;
-typedef Vector<unsigned, 4> Vec4U;
-typedef Vector<float, 4> Vec4F;
-typedef Vector<double, 4> Vec4D;
-typedef Vector<std::uint8_t, 4> Vec4B;
-typedef Vector<std::size_t, 4> Vec4S;
+using Vec4I = Vector<int, 4>;
+using Vec4U = Vector<unsigned, 4>;
+using Vec4F = Vector<float, 4>;
+using Vec4D = Vector<double, 4>;
+using Vec4B = Vector<std::uint8_t, 4>;
+using Vec4S = Vector<std::size_t, 4>;
 
 template <typename T, std::size_t N>
 std::ostream& operator<<(std::ostream& os, Vector<T, N> const& v);
@@ -323,8 +317,7 @@ Vector<T, N> Vector<T, N>::copyFrom(Iterator p) {
   return v;
 }
 
-template <typename T, std::size_t N>
-Vector<T, N>::Vector() {}
+template <typename T, std::size_t N> Vector<T, N>::Vector() = default;
 
 template <typename T, std::size_t N>
 Vector<T, N>::Vector(T const& e1)

@@ -113,8 +113,8 @@ private:
   std::unique_ptr<Float[]> g1;
 };
 
-typedef Perlin<float> PerlinF;
-typedef Perlin<double> PerlinD;
+using PerlinF = Perlin<float>;
+using PerlinD = Perlin<double>;
 
 template <typename Float>
 Float Perlin<Float>::s_curve(Float t) {

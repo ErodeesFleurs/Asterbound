@@ -126,7 +126,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
       if (!drawnCount)
         return std::unexpected(std::move(drawnCount.error()));
       float numberOfWorms = *drawnCount * commonality;
-      int intNumberOfWorms = (int)numberOfWorms;
+      int intNumberOfWorms = static_cast<int>(numberOfWorms);
       if (rs.randf() < (numberOfWorms - intNumberOfWorms))
         intNumberOfWorms++;
       for (int n = 0; n < intNumberOfWorms; ++n) {

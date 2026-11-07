@@ -21,7 +21,7 @@ struct PlaceDungeonFlagAction {
   Vec2I targetPosition;
 };
 
-typedef std::variant<std::monostate, PlaceDungeonFlagAction> UniverseFlagAction;
+using UniverseFlagAction = std::variant<std::monostate, PlaceDungeonFlagAction>;
 
 [[nodiscard]] std::expected<UniverseFlagAction, StarException> parseUniverseFlagAction(Json const& json);
 

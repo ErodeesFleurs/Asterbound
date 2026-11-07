@@ -103,7 +103,7 @@ public:
 
   File();
   File(String filename);
-  virtual ~File() noexcept;
+  ~File() noexcept override;
 
   String fileName() const;
   [[nodiscard]] std::expected<void, StarException> setFilename(String filename);

@@ -92,7 +92,7 @@ import star.platformer_astar;
 import star.algorithm;
 namespace Star {
 
-ActorJumpProfile::ActorJumpProfile() {}
+ActorJumpProfile::ActorJumpProfile() = default;
 
 std::expected<ActorJumpProfile, StarException> ActorJumpProfile::create(Json const& config) {
   ActorJumpProfile value;
@@ -194,7 +194,7 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::s
   return create(Json(std::move(*object)));
 }
 
-ActorMovementParameters::ActorMovementParameters() {}
+ActorMovementParameters::ActorMovementParameters() = default;
 
 std::expected<ActorMovementParameters, StarException> ActorMovementParameters::create(Json const& config) {
   ActorMovementParameters value;
@@ -1301,7 +1301,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       m_walking.set(!running && m_controlMove);
       m_crouching.set(m_controlCrouch && !m_controlMove);
     }
-    m_flying.set((bool)m_controlFly);
+    m_flying.set(static_cast<bool>(m_controlFly));
 
     bool falling = (yVelocity() < (*activeParameters.fallStatusSpeedMin)) && !m_groundMovement.get();
     m_falling.set(falling);

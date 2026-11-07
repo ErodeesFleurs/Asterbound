@@ -157,7 +157,7 @@ std::expected<Biome, StarException> Biome::create(Root& root, Json const& store)
     if (!mod) return std::unexpected(std::move(mod.error()));
     auto density = entry.getFloat(1);
     if (!density) return std::unexpected(std::move(density.error()));
-    result.ores.append({(ModId)*mod, *density});
+    result.ores.append({static_cast<ModId>(*mod), *density});
   }
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));

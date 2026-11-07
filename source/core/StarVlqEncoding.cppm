@@ -18,9 +18,9 @@ std::size_t writeVlqU(std::uint64_t x, OutputIterator out) {
   std::size_t i = vlqUSize(x) - 1;
 
   for (std::size_t j = 0; j < i; ++j)
-    *out++ = (std::uint8_t)((x >> ((i - j) * 7)) & 127) | 128;
+    *out++ = static_cast<std::uint8_t>(((x >> ((i - j) * 7)) & 127)) | 128;
 
-  *out++ = (std::uint8_t)(x & 127);
+  *out++ = static_cast<std::uint8_t>((x & 127));
   return i + 1;
 }
 
@@ -33,7 +33,7 @@ std::size_t readVlqU(std::uint64_t& x, InputIterator in, std::size_t maxBytes = 
   x = 0;
   for (std::size_t i = 0; i < std::min<std::size_t>(10, maxBytes); ++i) {
     std::uint8_t oct = *in++;
-    x = (x << 7) | (std::uint64_t)(oct & 127);
+    x = (x << 7) | static_cast<std::uint64_t>((oct & 127));
     if (!(oct & 128))
       return i + 1;
   }
@@ -84,9 +84,9 @@ std::size_t readVlqI(std::int64_t& v, InputIterator in, std::size_t maxBytes = 1
 
   // If negative, then need to undo the +1 transformation to encode -2^63
   if (negative)
-    v = -(std::int64_t)(source >> 1) - 1;
+    v = -static_cast<std::int64_t>((source >> 1)) - 1;
   else
-    v = (std::int64_t)(source >> 1);
+    v = static_cast<std::int64_t>((source >> 1));
 
   return bytes;
 }

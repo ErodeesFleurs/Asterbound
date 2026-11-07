@@ -388,8 +388,8 @@ std::expected<WhitespaceStyle, StarException> detectWhitespace(FormattedJson::El
     if (*newline != NPos)
       beforeValue += "  ";
     if (array)
-      return WhitespaceStyle{"", "", beforeValue, ""};
-    return WhitespaceStyle{beforeValue, "", "", ""};
+      return WhitespaceStyle{.beforeKey = "", .beforeColon = "", .beforeValue = beforeValue, .beforeComma = ""};
+    return WhitespaceStyle{.beforeKey = beforeValue, .beforeColon = "", .beforeValue = "", .beforeComma = ""};
   }
 
   FormattedJson::ElementLocation commaLoc = indexOf<CommaElement>(elements, valueLoc);

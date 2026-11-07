@@ -280,7 +280,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           if (!value) return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
         }
-        database.m_liquidMaterialInteractions[{(LiquidId)*liquid, material.id}] = interaction;
+        database.m_liquidMaterialInteractions[{static_cast<LiquidId>(*liquid), material.id}] = interaction;
       }
       return {};
     };
@@ -417,7 +417,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           if (!value) return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
         }
-        database.m_liquidModInteractions[{(LiquidId)*liquid, mod.id}] = interaction;
+        database.m_liquidModInteractions[{static_cast<LiquidId>(*liquid), mod.id}] = interaction;
       }
       return {};
     };
@@ -525,7 +525,7 @@ bool MaterialDatabase::isModName(String const& name) const {
 
 bool MaterialDatabase::isValidModId(ModId mod) const {
   if (isRealMod(mod))
-    return mod < m_mods.size() && (bool)m_mods[mod];
+    return mod < m_mods.size() && static_cast<bool>(m_mods[mod]);
   else
     return m_metaModIndex.hasRightValue(mod);
 }
@@ -762,8 +762,9 @@ std::expected<bool, StarException> MaterialDatabase::supportsMod(MaterialId mate
   return info->get().supportsMods;
 }
 
-MaterialDatabase::MetaMaterialInfo::MetaMaterialInfo(String name, MaterialId id, CollisionKind collisionKind, bool blocksLiquidFlow)
-  : name(name), id(id), collisionKind(collisionKind), blocksLiquidFlow(blocksLiquidFlow) {}
+MaterialDatabase::MetaMaterialInfo::MetaMaterialInfo(String name, MaterialId id, CollisionKind collisionKind,
+                                                     bool blocksLiquidFlow)
+    : name(std::move(name)), id(id), collisionKind(collisionKind), blocksLiquidFlow(blocksLiquidFlow) {}
 
 MaterialDatabase::MaterialInfo::MaterialInfo() : id(NullMaterialId), tillableMod(NoModId), falling(), cascading() {}
 

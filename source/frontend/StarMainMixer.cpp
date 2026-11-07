@@ -244,10 +244,13 @@ std::expected<void, StarException> MainMixer::update(float dt, bool muteSfx, boo
     currentWorld = m_universeClient->worldClient();
 
   if (currentWorld) {
-    for (auto audioInstance : currentWorld->pullPendingAudio())
-      { auto played = m_mixer->play(audioInstance); if (!played) return std::unexpected(std::move(played.error())); }
+    for (auto const& audioInstance : currentWorld->pullPendingAudio()) {
+      auto played = m_mixer->play(audioInstance);
+      if (!played)
+        return std::unexpected(std::move(played.error()));
+    }
 
-    for (auto audioInstance : currentWorld->pullPendingMusic()) {
+    for (auto const& audioInstance : currentWorld->pullPendingMusic()) {
       audioInstance->setMixerGroup(MixerGroup::Music);
       { auto played = m_mixer->play(audioInstance); if (!played) return std::unexpected(std::move(played.error())); }
     }

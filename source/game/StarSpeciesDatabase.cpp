@@ -310,22 +310,10 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::generateH
   if (!generator) return std::unexpected(std::move(generator.error()));
   auto name = (*generator)->generateName((*definition)->nameGen(chosenGender), randSource);
   if (!name) return std::unexpected(std::move(name.error()));
-  return createHumanoid(
-    std::move(*name),
-    speciesChoice,
-    (unsigned)chosenGender,
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    {},
-    itemCatalog
-  );
+  return createHumanoid(std::move(*name), speciesChoice, static_cast<unsigned>(chosenGender), randSource.randu32(),
+                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(),
+                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(), {},
+                        itemCatalog);
 }
 
 std::expected<std::shared_ptr<SpeciesDefinition>, StarException> SpeciesDefinition::create(Root& root, Json const& config) {
@@ -532,13 +520,9 @@ String SpeciesDefinition::kind() const {
   return m_kind;
 }
 
-String SpeciesDefinition::nameGen(Gender gender) const {
-  return m_nameGen[(unsigned)gender];
-}
+String SpeciesDefinition::nameGen(Gender gender) const { return m_nameGen[static_cast<unsigned>(gender)]; }
 
-String SpeciesDefinition::ouchNoise(Gender gender) const {
-  return m_ouchNoises[(unsigned)gender];
-}
+String SpeciesDefinition::ouchNoise(Gender gender) const { return m_ouchNoises[static_cast<unsigned>(gender)]; }
 
 SpeciesOption const& SpeciesDefinition::options() const {
   return m_options;

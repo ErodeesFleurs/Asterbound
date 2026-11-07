@@ -65,7 +65,7 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-CelestialDatabase::~CelestialDatabase() {}
+CelestialDatabase::~CelestialDatabase() = default;
 
 RectI CelestialDatabase::xyRange() const {
   auto range = m_baseInformation.xyCoordRange;

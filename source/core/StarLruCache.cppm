@@ -12,8 +12,8 @@ namespace Star {
 template <typename OrderedMapType>
 class LruCacheBase {
 public:
-  typedef typename OrderedMapType::key_type Key;
-  typedef typename OrderedMapType::mapped_type Value;
+  using Key = typename OrderedMapType::key_type;
+  using Value = typename OrderedMapType::mapped_type;
 
   LruCacheBase();
   LruCacheBase(std::size_t maxSize);

@@ -160,7 +160,7 @@ struct Particle {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Particle const& particle);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Particle& particle);
 
-typedef std::function<Particle()> ParticleVariantCreator;
+using ParticleVariantCreator = std::function<Particle()>;
 ParticleVariantCreator makeParticleVariantCreator(Root& root, Particle particle, Particle variance);
 
 }

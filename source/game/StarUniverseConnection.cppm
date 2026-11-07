@@ -38,10 +38,10 @@ import star.ordered_set;
 import star.rpc_promise;
 import star.byte_array;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 
@@ -131,7 +131,8 @@ public:
   // deadlocking, but not the owner-side close().  The receive callback will not
   // be called for any client until the previous callback for that client is
   // complete.
-  typedef std::function<std::expected<void, StarException>(UniverseConnectionServer&, ConnectionId, List<std::shared_ptr<Packet>>)> PacketReceiveCallback;
+  using PacketReceiveCallback = std::function<std::expected<void, StarException>(
+    UniverseConnectionServer&, ConnectionId, List<std::shared_ptr<Packet>>)>;
 
   [[nodiscard]] static std::expected<std::shared_ptr<UniverseConnectionServer>, StarException> create(Logger& logger, PacketReceiveCallback packetReceiver, std::size_t numWorkerThreads = 0);
   ~UniverseConnectionServer();

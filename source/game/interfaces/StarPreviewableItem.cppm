@@ -30,7 +30,7 @@ public:
     return Star::typeName<PreviewableItem>();
   }
 
-  virtual ~PreviewableItem() {}
+  virtual ~PreviewableItem() = default;
   [[nodiscard]]
   virtual std::expected<List<Drawable>, StarException> preview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, std::shared_ptr<Player> const& viewer = {}) const = 0;
 };

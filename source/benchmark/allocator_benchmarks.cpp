@@ -55,7 +55,7 @@ struct Statistics {
     for (std::size_t i = 0; i < Capacity; ++i) {
       auto& entry = entries[(start + i) & (Capacity - 1)];
       if (!entry.occupied) {
-        entry = {pointer, bytes, true, true};
+        entry = {.pointer = pointer, .bytes = bytes, .occupied = true, .used = true};
         return;
       }
     }
@@ -281,7 +281,7 @@ constexpr std::pmr::pool_options poolOptions() {
     static_assert(sizeof(StatisticsPair) + 2 * sizeof(void*) <= 128);
     // Cap chunk growth, not total retained bytes: the resource may retain
     // multiple chunks until destruction. Never describe this as a hard limit.
-    return {32, 128};
+    return {.max_blocks_per_chunk = 32, .largest_required_pool_block = 128};
   } else {
     return {};
   }

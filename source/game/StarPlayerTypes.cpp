@@ -117,7 +117,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
   auto level = upgrades.optUInt("shipLevel");
   if (!level)
     return std::unexpected(std::move(level.error()));
-  shipLevel = std::max(shipLevel, (unsigned)level->value_or(shipLevel));
+  shipLevel = std::max(shipLevel, static_cast<unsigned>(level->value_or(shipLevel)));
   auto fuel = upgrades.optUInt("maxFuel");
   if (!fuel)
     return std::unexpected(std::move(fuel.error()));
@@ -125,7 +125,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
   auto crew = upgrades.optUInt("crewSize");
   if (!crew)
     return std::unexpected(std::move(crew.error()));
-  crewSize = std::max(crewSize, (unsigned)crew->value_or(crewSize));
+  crewSize = std::max(crewSize, static_cast<unsigned>(crew->value_or(crewSize)));
   auto efficiency = upgrades.optFloat("fuelEfficiency");
   if (!efficiency)
     return std::unexpected(std::move(efficiency.error()));

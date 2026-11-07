@@ -143,7 +143,12 @@ private:
     auto ambience = table.get<std::optional<float>>("beamAmbience");
     if (!ambience)
       return std::unexpected(std::move(ambience.error()));
-    self.m_lightSources.append({*position, color->toRgbF(), (LightType)point->value_or(false), beam->value_or(float{}), angle->value_or(float{}), ambience->value_or(float{})});
+    self.m_lightSources.append({.position = *position,
+                                .color = color->toRgbF(),
+                                .type = static_cast<LightType>(point->value_or(false)),
+                                .pointBeam = beam->value_or(float{}),
+                                .beamAngle = angle->value_or(float{}),
+                                .beamAmbience = ambience->value_or(float{})});
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));

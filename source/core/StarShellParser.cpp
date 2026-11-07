@@ -25,7 +25,7 @@ auto ShellParser::tokenize(String const& command) -> std::expected<List<Token>, 
     auto token = word();
     if (!token)
       return std::unexpected(std::move(token.error()));
-    res.append(Token{TokenType::Word, std::move(*token)});
+    res.append(Token{.type = TokenType::Word, .token = std::move(*token)});
   }
 
   return res;

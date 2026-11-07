@@ -506,7 +506,7 @@ std::istream& operator>>(std::istream& is, String& text) { std::string bytes; is
 StringList::StringList() = default;
 StringList::StringList(Base const& list) : Base(list) {}
 StringList::StringList(Base&& list) : Base(std::move(list)) {}
-StringList::StringList(StringList const& list) : Base(list) {}
+StringList::StringList(StringList const& list) = default;
 StringList::StringList(StringList&& list) : Base(std::move(list)) {}
 std::expected<StringList, StarException> StringList::create(std::span<std::u32string_view const> strings) {
   StringList result;
@@ -518,7 +518,7 @@ StringList::StringList(std::size_t count, String const& text) : Base(count, text
 StringList::StringList(std::initializer_list<String> list) : Base(list) {}
 StringList& StringList::operator=(Base const& list) { Base::operator=(list); return *this; }
 StringList& StringList::operator=(Base&& list) { Base::operator=(std::move(list)); return *this; }
-StringList& StringList::operator=(StringList const& list) { Base::operator=(list); return *this; }
+StringList& StringList::operator=(StringList const& list) = default;
 StringList& StringList::operator=(StringList&& list) { Base::operator=(std::move(list)); return *this; }
 StringList& StringList::operator=(std::initializer_list<String> list) { Base::operator=(list); return *this; }
 std::expected<bool, StarException> StringList::contains(String const& text, String::CaseSensitivity cs) const {

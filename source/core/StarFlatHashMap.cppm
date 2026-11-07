@@ -11,35 +11,36 @@ namespace Star {
 template <typename Key, typename Mapped, typename Hash = hash<Key>, typename Equals = std::equal_to<>, typename Allocator = std::allocator<Key>>
 class FlatHashMap {
 public:
-  typedef Key key_type;
-  typedef Mapped mapped_type;
-  typedef std::pair<key_type const, mapped_type> value_type;
-  typedef std::size_t size_type;
-  typedef std::ptrdiff_t difference_type;
-  typedef Hash hasher;
-  typedef Equals key_equal;
-  typedef Allocator allocator_type;
-  typedef value_type& reference;
-  typedef value_type const& const_reference;
-  typedef value_type* pointer;
-  typedef value_type const* const_pointer;
+  using key_type = Key;
+  using mapped_type = Mapped;
+  using value_type = std::pair<key_type const, mapped_type>;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using hasher = Hash;
+  using key_equal = Equals;
+  using allocator_type = Allocator;
+  using reference = value_type&;
+  using const_reference = value_type const&;
+  using pointer = value_type*;
+  using const_pointer = value_type const*;
 
 private:
-  typedef std::pair<key_type, mapped_type> TableValue;
+  using TableValue = std::pair<key_type, mapped_type>;
 
   struct GetKey {
     key_type const& operator()(TableValue const& value) const;
   };
 
-  typedef FlatHashTable<TableValue, key_type, GetKey, Hash, Equals, typename std::allocator_traits<Allocator>::template rebind_alloc<TableValue>> Table;
+  using Table = FlatHashTable<TableValue, key_type, GetKey, Hash, Equals,
+                              typename std::allocator_traits<Allocator>::template rebind_alloc<TableValue>>;
 
 public:
   struct const_iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashMap::value_type const value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashMap::value_type const;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
 
     bool operator==(const_iterator const& rhs) const;
     bool operator!=(const_iterator const& rhs) const;
@@ -54,11 +55,11 @@ public:
   };
 
   struct iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashMap::value_type value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashMap::value_type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
 
     bool operator==(iterator const& rhs) const;
     bool operator!=(iterator const& rhs) const;
@@ -121,10 +122,10 @@ public:
   void clear();
 
   std::pair<iterator, bool> insert(value_type const& value);
-  template <typename T, typename = typename std::enable_if<std::is_constructible<TableValue, T&&>::value>::type>
+  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
   std::pair<iterator, bool> insert(T&& value);
   iterator insert(const_iterator hint, value_type const& value);
-  template <typename T, typename = typename std::enable_if<std::is_constructible<TableValue, T&&>::value>::type>
+  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
   iterator insert(const_iterator hint, T&& value);
   template <typename InputIt>
   void insert(InputIt first, InputIt last);
@@ -247,7 +248,7 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator->() const -> value_type* {
-  return (value_type*)(&*inner);
+  return reinterpret_cast<value_type*>(&*inner);
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
@@ -280,7 +281,7 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator*() co
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator->() const -> value_type* {
-  return (value_type*)(&*inner);
+  return reinterpret_cast<value_type*>(&*inner);
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>

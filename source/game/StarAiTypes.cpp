@@ -15,7 +15,7 @@ import star.ai_types;
 
 namespace Star {
 
-AiState::AiState() {}
+AiState::AiState() = default;
 
 std::expected<AiState, StarException> AiState::create(Json const& v) {
   AiState result;

@@ -58,7 +58,7 @@ Json AmbientTrackGroup::toJson() const {
   return JsonObject{{"tracks", jsonFromStringList(tracks)}};
 }
 
-AmbientNoisesDescription::AmbientNoisesDescription() : trackLoops(-1) {}
+AmbientNoisesDescription::AmbientNoisesDescription() = default;
 
 AmbientNoisesDescription::AmbientNoisesDescription(AmbientTrackGroup day, AmbientTrackGroup night, int loops)
   : daySounds(std::move(day)), nightSounds(std::move(night)), trackLoops(loops) {}
@@ -141,7 +141,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
   }
   if (!m_currentTrack) {
     m_currentTrackName = "";
-    if (tracks.size() > 0) {
+    if (!tracks.empty()) {
       while ((m_recentTracks.size() / 2) >= tracks.size()) {
         auto removed = m_recentTracks.removeFirst();
         if (!removed)

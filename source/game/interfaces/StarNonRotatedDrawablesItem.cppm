@@ -27,7 +27,7 @@ public:
     return Star::typeName<NonRotatedDrawablesItem>();
   }
 
-  virtual ~NonRotatedDrawablesItem() {}
+  virtual ~NonRotatedDrawablesItem() = default;
   [[nodiscard]]
   virtual std::expected<List<Drawable>, StarException> nonRotatedDrawables() const = 0;
 };

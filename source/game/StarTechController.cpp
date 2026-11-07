@@ -251,9 +251,7 @@ std::expected<void, StarException> TechController::reloadTech() {
   return setLoadedTech(loadedTech(), true);
 }
 
-bool TechController::techOverridden() const {
-  return (bool)m_overriddenTech;
-}
+bool TechController::techOverridden() const { return static_cast<bool>(m_overriddenTech); }
 
 std::expected<void, StarException> TechController::setOverrideTech(StringList const& techModules) {
   if (!m_overriddenTech)

@@ -10,7 +10,7 @@ struct FlatHashTable {
 private:
   static std::size_t const EmptyHashValue = 0;
   static std::size_t const EndHashValue = 1;
-  static std::size_t const FilledHashBit = (std::size_t)1 << (sizeof(std::size_t) * 8 - 1);
+  static std::size_t const FilledHashBit = static_cast<std::size_t>(1) << (sizeof(std::size_t) * 8 - 1);
 
   struct Bucket {
     Bucket();
@@ -42,7 +42,7 @@ private:
     std::size_t hash;
   };
 
-  typedef std::vector<Bucket, typename std::allocator_traits<Allocator>::template rebind_alloc<Bucket>> Buckets;
+  using Buckets = std::vector<Bucket, typename std::allocator_traits<Allocator>::template rebind_alloc<Bucket>>;
 
 public:
   struct const_iterator {
@@ -121,7 +121,7 @@ private:
   void checkCapacity(std::size_t additionalCapacity);
 
   Buckets m_buckets;
-  std::size_t m_filledCount;
+  std::size_t m_filledCount = 0;
 
   GetKey m_getKey;
   Hash m_hash;
@@ -305,10 +305,10 @@ FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::iterator::operator t
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
-FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::FlatHashTable(std::size_t bucketCount,
-    GetKey const& getKey, Hash const& hash, Equals const& equal, Allocator const& alloc)
-  : m_buckets(alloc), m_filledCount(0), m_getKey(getKey),
-    m_hash(hash), m_equals(equal) {
+FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::FlatHashTable(std::size_t bucketCount, GetKey const& getKey,
+                                                                          Hash const& hash, Equals const& equal,
+                                                                          Allocator const& alloc)
+    : m_buckets(alloc), m_getKey(getKey), m_hash(hash), m_equals(equal) {
   if (bucketCount != 0)
     checkCapacity(bucketCount);
 }
@@ -436,7 +436,7 @@ template <typename Value, typename Key, typename GetKey, typename Hash, typename
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::erase(const_iterator first, const_iterator last) -> iterator {
   while (first != last)
     first = erase(first);
-  return iterator{(Bucket*)first.current};
+  return iterator{const_cast<Bucket*>(first.current)};
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
@@ -550,7 +550,7 @@ void FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::checkCapacity(s
   else
     newSize = MinCapacity;
 
-  while ((double)(m_filledCount + additionalCapacity) / (double)newSize > MaxFillLevel)
+  while (static_cast<double>((m_filledCount + additionalCapacity)) / static_cast<double>(newSize) > MaxFillLevel)
     newSize *= 2;
 
   if (newSize == m_buckets.size() - 1)

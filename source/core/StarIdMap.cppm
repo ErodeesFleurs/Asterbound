@@ -19,15 +19,15 @@ using IdMapException = StarError<IdMapExceptionTag, StarException>;
 template <typename BaseMap>
 class IdMapWrapper : private BaseMap {
 public:
-  typedef typename BaseMap::iterator iterator;
-  typedef typename BaseMap::const_iterator const_iterator;
-  typedef typename BaseMap::key_type key_type;
-  typedef typename BaseMap::value_type value_type;
-  typedef typename BaseMap::mapped_type mapped_type;
+  using iterator = typename BaseMap::iterator;
+  using const_iterator = typename BaseMap::const_iterator;
+  using key_type = typename BaseMap::key_type;
+  using value_type = typename BaseMap::value_type;
+  using mapped_type = typename BaseMap::mapped_type;
 
-  typedef key_type IdType;
-  typedef value_type ValueType;
-  typedef mapped_type MappedType;
+  using IdType = key_type;
+  using ValueType = value_type;
+  using MappedType = mapped_type;
 
   IdMapWrapper();
   [[nodiscard]] static std::expected<IdMapWrapper, StarException> create(IdType min, IdType max);

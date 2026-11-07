@@ -49,7 +49,7 @@ bool Directives::Shared::empty() const {
   return entries.empty();
 }
 
-Directives::Shared::Shared() {}
+Directives::Shared::Shared() = default;
 
 Directives::Shared::Shared(List<Entry>&& givenEntries, String&& givenString) {
   entries = std::move(givenEntries);
@@ -57,7 +57,7 @@ Directives::Shared::Shared(List<Entry>&& givenEntries, String&& givenString) {
   hash = string.empty() ? 0 : xxHash3(std::span<char const>(string.utf8()));
 }
 
-Directives::Directives() {}
+Directives::Directives() = default;
 
 Directives::Directives(String const& directives) {
   parse(String(directives));
@@ -79,7 +79,7 @@ Directives::Directives(Directives const& directives) {
   *this = directives;
 }
 
-Directives::~Directives() {}
+Directives::~Directives() = default;
 
 Directives& Directives::operator=(String const& s) {
   if (m_shared && m_shared->string == s)
@@ -112,10 +112,7 @@ Directives& Directives::operator=(Directives&& other) noexcept {
   return *this;
 }
 
-Directives& Directives::operator=(Directives const& other) {
-  m_shared = other.m_shared;
-  return *this;
-}
+Directives& Directives::operator=(Directives const& other) = default;
 
 void Directives::loadOperations() const {
   if (!m_shared)
@@ -276,8 +273,8 @@ bool operator==(Directives const& directives, String const& string) {
   return directives.equals(string);
 }
 
-DirectivesGroup::DirectivesGroup() : m_count(0) {}
-DirectivesGroup::DirectivesGroup(String const& directives) : m_count(0) {
+DirectivesGroup::DirectivesGroup() = default;
+DirectivesGroup::DirectivesGroup(String const& directives) {
   if (directives.empty())
     return;
 
@@ -287,7 +284,7 @@ DirectivesGroup::DirectivesGroup(String const& directives) : m_count(0) {
     m_count = m_directives.back().size();
   }
 }
-DirectivesGroup::DirectivesGroup(String&& directives) : m_count(0) {
+DirectivesGroup::DirectivesGroup(String&& directives) {
   if (directives.empty()) {
     directives.clear();
     return;
@@ -354,7 +351,7 @@ void DirectivesGroup::addToString(String& string) const {
 
 std::expected<Image, StarException> DirectivesGroup::applyNewImage(Image const& image, ImageReferenceCallback refCallback) const {
   Image result = image;
-  auto applied = applyExistingImage(result, refCallback);
+  auto applied = applyExistingImage(result, std::move(refCallback));
   if (!applied)
     return std::unexpected(std::move(applied.error()));
   return result;

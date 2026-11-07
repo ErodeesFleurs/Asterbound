@@ -128,7 +128,7 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
     auto removed = p.second->removeCallbacks(group);
     if (!removed)
       return rollback(std::move(removed.error()));
-    changed.append({p.second, *removed, false});
+    changed.append({.component = p.second, .callbacks = *removed, .threadCallbacks = false});
     auto removedThread = p.second->removeThreadCallbacks(group);
     if (!removedThread)
       return rollback(std::move(removedThread.error()));

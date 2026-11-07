@@ -75,14 +75,7 @@ bool ServerTile::isColliding(CollisionSet const& collisionSet) const {
   return Star::isColliding(getCollision(), collisionSet);
 }
 
-ServerTile& ServerTile::operator=(ServerTile const& serverTile) {
-  WorldTile::operator=(serverTile);
-
-  liquid = serverTile.liquid;
-  rootSource = serverTile.rootSource;
-  objectCollision = serverTile.objectCollision;
-  return *this;
-}
+ServerTile& ServerTile::operator=(ServerTile const& serverTile) = default;
 
 std::expected<void, StarException> ServerTile::write(DataStream& ds) const {
   auto result = ds << foreground << foregroundHueShift << foregroundColorVariant

@@ -126,7 +126,7 @@ struct ServerTile : public WorldTile {
   // Do not serialize - calculated at runtime
   CollisionKind objectCollision;
 };
-typedef TileSectorArray<ServerTile, WorldSectorSize> ServerTileSectorArray;
+using ServerTileSectorArray = TileSectorArray<ServerTile, WorldSectorSize>;
 
 struct ClientTile : public WorldTile {
   ClientTile();
@@ -141,7 +141,7 @@ struct ClientTile : public WorldTile {
 
   float gravity;
 };
-typedef TileSectorArray<ClientTile, WorldSectorSize> ClientTileSectorArray;
+using ClientTileSectorArray = TileSectorArray<ClientTile, WorldSectorSize>;
 
 // Tile structure to transfer all data from client to server
 struct NetTile {
@@ -239,7 +239,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 [[nodiscard]]
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RenderTile const& tile);
 
-typedef MultiArray<RenderTile, 2> RenderTileArray;
+using RenderTileArray = MultiArray<RenderTile, 2>;
 
 inline WorldTile::WorldTile()
   : foreground(NullMaterialId),
@@ -252,8 +252,6 @@ inline WorldTile::WorldTile()
     backgroundMod(NoModId),
     backgroundModHueShift(),
     backgroundColorVariant(DefaultMaterialColorVariant),
-    collision(CollisionKind::Null),
-    collisionCacheDirty(true),
     blockBiomeIndex(),
     environmentBiomeIndex(),
     dungeonId(NoDungeonId) {}

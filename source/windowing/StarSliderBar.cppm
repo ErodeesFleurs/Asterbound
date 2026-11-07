@@ -76,9 +76,9 @@ public:
 
   void setCallback(WidgetCallbackFunc callback);
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
+  [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
 
 private:
   explicit SliderBarWidget(GuiContext& context);

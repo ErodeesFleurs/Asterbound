@@ -101,7 +101,7 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<LiquidItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& settings);
-  virtual ~LiquidItem() {}
+  ~LiquidItem() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
@@ -232,7 +232,7 @@ std::expected<void, StarException> LiquidItem::fire(FireMode mode, bool shifting
     return std::unexpected(std::move(range.error()));
   if (!*range)
     return {};
-  PlaceLiquid placeLiquid{liquidId(), liquidQuantity()};
+  PlaceLiquid placeLiquid{.liquid = liquidId(), .liquidLevel = liquidQuantity()};
   TileModificationList modifications;
   float radius = shifting ? m_altBlockRadius : m_blockRadius;
   if (!multiplaceEnabled())

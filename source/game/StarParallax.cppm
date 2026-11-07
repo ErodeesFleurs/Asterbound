@@ -55,7 +55,7 @@ struct ParallaxLayer {
   bool lightMapped;
   float fadePercent;
 };
-typedef List<ParallaxLayer> ParallaxLayers;
+using ParallaxLayers = List<ParallaxLayer>;
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ParallaxLayer& parallaxLayer);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ParallaxLayer const& parallaxLayer);

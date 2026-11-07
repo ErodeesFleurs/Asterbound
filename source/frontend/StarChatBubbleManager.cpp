@@ -407,7 +407,7 @@ std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAl
 
   auto evaluated = fadeFunction->evaluate(distanceFactor);
   if (!evaluated) return std::unexpected(std::move(evaluated.error()));
-  return std::clamp((int)*evaluated, 0, 255);
+  return std::clamp(static_cast<int>(*evaluated), 0, 255);
 }
 std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   if (m_bubbles.empty() && m_portraitBubbles.empty())
@@ -444,7 +444,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
     });
   if (!rendered) return std::unexpected(std::move(rendered.error()));
 
-  for (auto portraitBubble : m_portraitBubbles) {
+  for (auto const& portraitBubble : m_portraitBubbles) {
     if (portraitBubble.onscreen) {
       auto position = portraitBubble.position;
       if (auto entity = world.entity(portraitBubble.entity))
@@ -452,7 +452,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
       Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
       int frame = 0;
       if (portraitBubble.age <= m_portraitChatterDuration)
-        frame = int((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
+        frame = static_cast<int>((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
       // 255 here because portrait bubbles are always full opacity
       for (auto const& bubbleImage : portraitBubble.backgroundImages) {
         auto frameImage = std::get<0>(bubbleImage).replace("<frame>", toString(frame));
@@ -578,7 +578,13 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         if (!bounds) return std::unexpected(std::move(bounds.error()));
         boundBox.combine(*bounds);
       }
-      Bubble bubble = {sayAction.entity, sayAction.text, sayAction.config, 0, std::move(backgroundImages), std::move(bubbleTexts), false};
+      Bubble bubble = {.entity = sayAction.entity,
+                       .text = sayAction.text,
+                       .config = sayAction.config,
+                       .age = 0,
+                       .backgroundImages = std::move(backgroundImages),
+                       .bubbleText = std::move(bubbleTexts),
+                       .onscreen = false};
       List<BubbleState<Bubble>> oldBubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
           return bubble.entity == sayAction.entity;
         });
@@ -610,17 +616,15 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       for (auto& bubbleText : bubbleTexts)
         std::get<3>(bubbleText) += Vec2F(-m_portraitBackgroundSize[0] / 2, 0);
 
-      m_portraitBubbles.prepend({
-          portraitAction.entity,
-          portraitAction.portrait,
-          portraitAction.text,
-          portraitAction.position,
-          portraitAction.config,
-          0,
-          std::move(backgroundImages),
-          std::move(bubbleTexts),
-          false
-        });
+      m_portraitBubbles.prepend({.entity = portraitAction.entity,
+                                 .portrait = portraitAction.portrait,
+                                 .text = portraitAction.text,
+                                 .position = portraitAction.position,
+                                 .config = portraitAction.config,
+                                 .age = 0,
+                                 .backgroundImages = std::move(backgroundImages),
+                                 .bubbleText = std::move(bubbleTexts),
+                                 .onscreen = false});
     }
 
     if (!silent) {
@@ -664,7 +668,7 @@ std::expected<void, StarException> ChatBubbleManager::drawBubbleImage(Vec2F scre
 
 std::expected<void, StarException> ChatBubbleManager::drawBubbleText(Vec2F screenPos, BubbleText const& text, float pixelRatio, int alpha, bool isPortrait) {
   TextStyle style = std::get<1>(text);
-  style.color[3] *= ((float)alpha / 255.f);
+  style.color[3] *= (static_cast<float>(alpha) / 255.f);
   auto styled = m_guiContext.get().setTextStyle(style, pixelRatio);
   if (!styled) return std::unexpected(std::move(styled.error()));
   TextPositioning tp = isPortrait ? m_portraitTextTemplate : m_textTemplate;

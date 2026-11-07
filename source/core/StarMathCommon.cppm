@@ -44,13 +44,13 @@ bool nearEqual(T x, T2 y, unsigned ulp) {
 template <typename T, typename T2>
   requires (std::numeric_limits<T>::is_integer && !std::numeric_limits<T2>::is_integer)
 bool nearEqual(T x, T2 y, unsigned ulp) {
-  return nearEqual((double)x, y, ulp);
+  return nearEqual(static_cast<double>(x), y, ulp);
 }
 
 template <typename T, typename T2>
   requires (!std::numeric_limits<T>::is_integer && std::numeric_limits<T2>::is_integer)
 bool nearEqual(T x, T2 y, unsigned ulp) {
-  return nearEqual(x, (double)y, ulp);
+  return nearEqual(x, static_cast<double>(y), ulp);
 }
 
 template <typename T, typename T2>
@@ -86,10 +86,7 @@ constexpr T cube(T const& x) {
   return x * x * x;
 }
 
-template <typename Float>
-int ipart(Float f) {
-  return (int)std::floor(f);
-}
+template <typename Float> int ipart(Float f) { return static_cast<int>(std::floor(f)); }
 
 template <typename Float>
 Float fpart(Float f) {
@@ -242,7 +239,7 @@ T approachAngle(T goal, T current, T rate) {
 inline std::uint8_t floatToByte(float val, bool doClamp = false) {
   if (doClamp)
     val = std::clamp(val, 0.0f, 1.0f);
-  return (std::uint8_t)(val * 255.0f);
+  return static_cast<std::uint8_t>((val * 255.0f));
 }
 
 // Used in color conversion from uint8_t to normalized float.

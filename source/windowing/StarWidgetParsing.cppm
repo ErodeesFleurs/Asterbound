@@ -63,12 +63,13 @@ struct WidgetConstructResult {
   float zlevel;
 };
 
-typedef std::function<std::expected<WidgetConstructResult, StarException>(String const& name, Json const& config)> ConstuctorFunc;
+using ConstuctorFunc =
+  std::function<std::expected<WidgetConstructResult, StarException>(String const& name, Json const& config)>;
 
 class WidgetParser {
 public:
   WidgetParser(GuiContext& context);
-  virtual ~WidgetParser() {}
+  virtual ~WidgetParser() = default;
 
   [[nodiscard]] virtual std::expected<void, StarException> construct(Json const& config, Widget& widget);
   void registerCallback(String const& name, WidgetCallbackFunc callback);

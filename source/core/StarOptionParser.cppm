@@ -72,7 +72,7 @@ private:
     String description;
   };
 
-  typedef std::variant<Switch, Parameter> Option;
+  using Option = std::variant<Switch, Parameter>;
 
   String m_commandName;
   String m_summary;

@@ -16,19 +16,19 @@ namespace Star {
 template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
 class OrderedSetWrapper {
 public:
-  typedef Value value_type;
+  using value_type = Value;
 
-  typedef LinkedList<value_type, typename std::allocator_traits<Allocator>::template rebind_alloc<value_type>> OrderType;
-  typedef Map<
-      std::reference_wrapper<value_type const>, typename OrderType::const_iterator, Args...,
-      typename std::allocator_traits<Allocator>::template rebind_alloc<std::pair<std::reference_wrapper<value_type const> const, typename OrderType::const_iterator>>
-    > MapType;
+  using OrderType =
+    LinkedList<value_type, typename std::allocator_traits<Allocator>::template rebind_alloc<value_type>>;
+  using MapType = Map<std::reference_wrapper<value_type const>, typename OrderType::const_iterator, Args...,
+                      typename std::allocator_traits<Allocator>::template rebind_alloc<
+                        std::pair<std::reference_wrapper<value_type const> const, typename OrderType::const_iterator>>>;
 
-  typedef typename OrderType::const_iterator const_iterator;
-  typedef const_iterator iterator;
+  using const_iterator = typename OrderType::const_iterator;
+  using iterator = const_iterator;
 
-  typedef typename OrderType::const_reverse_iterator const_reverse_iterator;
-  typedef const_reverse_iterator reverse_iterator;
+  using const_reverse_iterator = typename OrderType::const_reverse_iterator;
+  using reverse_iterator = const_reverse_iterator;
 
   template <typename Collection>
   static OrderedSetWrapper from(Collection const& c);
@@ -133,7 +133,7 @@ auto OrderedSetWrapper<Map, Value, Allocator, Args...>::from(Collection const& c
 }
 
 template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
-OrderedSetWrapper<Map, Value, Allocator, Args...>::OrderedSetWrapper() {}
+OrderedSetWrapper<Map, Value, Allocator, Args...>::OrderedSetWrapper() = default;
 
 template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
 OrderedSetWrapper<Map, Value, Allocator, Args...>::OrderedSetWrapper(OrderedSetWrapper const& set) {

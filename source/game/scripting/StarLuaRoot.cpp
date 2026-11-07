@@ -195,7 +195,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
 }
 
 std::expected<LuaContext, StarException> LuaRoot::createContext(String const& script, std::stop_token loadLifetime) {
-  return createContext(StringList{script}, loadLifetime);
+  return createContext(StringList{script}, std::move(loadLifetime));
 }
 
 std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const& scriptPaths,
@@ -347,7 +347,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
         }
       }
       if (!found)
-        summary.locations.push_back({path.utf8(), -1, diagnostic->get().utf8()});
+        summary.locations.push_back({.source = path.utf8(), .line = -1, .provider = diagnostic->get().utf8()});
       return std::unexpected(std::move(bytes.error()).withSummary(std::move(summary)).withContext(
           strf("Lua source '{}': {}", path, diagnostic->get())));
     }

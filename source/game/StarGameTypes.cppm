@@ -11,8 +11,8 @@ import std;
 
 namespace Star {
 
-typedef std::variant<String,RpcPromise<String>> ServerCommandResult;
-typedef std::variant<Json,RpcPromise<Json>> ChainableJsonMessageResponse;
+using ServerCommandResult = std::variant<String, RpcPromise<String>>;
+using ChainableJsonMessageResponse = std::variant<Json, RpcPromise<Json>>;
 
 enum class Direction : std::uint8_t {
   Left,
@@ -143,7 +143,7 @@ inline constexpr float SystemWorldTimestep = 1.0f / 20.0f;
 
 inline constexpr std::size_t WorldSectorSize = 32;
 
-typedef std::int32_t EntityId;
+using EntityId = std::int32_t;
 inline constexpr EntityId NullEntityId = 0;
 inline constexpr EntityId MinServerEntityId = 1;
 inline constexpr EntityId MaxServerEntityId = std::numeric_limits<EntityId>::max();
@@ -156,7 +156,7 @@ enum class EntityMode {
   Slave
 };
 
-typedef std::uint16_t ConnectionId;
+using ConnectionId = std::uint16_t;
 inline constexpr ConnectionId ServerConnectionId = 0;
 // Minimum and maximum valid client ids
 inline constexpr ConnectionId MinClientConnectionId = 1;
@@ -176,7 +176,7 @@ inline ConnectionId subWorldToMainConnectionId(ConnectionId const& id) {
 
 // for client sub-world threads. indexes by *world* rather than by thread.
 // this should allow the client to possibly split the subworlds to multiple threads in the future.
-typedef std::uint16_t ClientSubWorldId;
+using ClientSubWorldId = std::uint16_t;
 inline constexpr ConnectionId MainClientWorldId = 0;
 inline constexpr ConnectionId MinClientSubWorldId = 1;
 inline constexpr ConnectionId MaxClientSubWorldId = std::numeric_limits<ClientSubWorldId>::max();
@@ -186,7 +186,7 @@ inline Vec2F centerOfTile(Vec2T const& tile) {
   return Vec2F(tile.floor()) + Vec2F::filled(0.5);
 }
 
-typedef std::uint16_t DungeonId;
+using DungeonId = std::uint16_t;
 
 inline constexpr DungeonId NoDungeonId = 65535;
 inline constexpr DungeonId SpawnDungeonId = 65534;

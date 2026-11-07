@@ -627,7 +627,7 @@ if (!result538) return std::unexpected(std::move(result538.error()));
 auto result539 = result538->get().toDouble();
 if (!result539) return std::unexpected(std::move(result539.error()));
 auto result540 = rnd.randInt(4);
-branchYOffset += (std::move(*result539) / TilePixels) / (float)(1 + result540);
+branchYOffset += (std::move(*result539) / TilePixels) / static_cast<float>(1 + result540);
         }
       }
       segment++;
@@ -1479,8 +1479,8 @@ if (!result370) return std::unexpected(std::move(result370.error()));
 res.structuralSegment = std::move(*result370);
       auto result371 = v.getInt("kind");
 if (!result371) return std::unexpected(std::move(result371.error()));
-res.kind = (PlantPieceKind)std::move(*result371);
-      auto result372 = v.getInt("segmentIdx");
+res.kind = static_cast<PlantPieceKind>(std::move(*result371));
+auto result372 = v.getInt("segmentIdx");
 if (!result372) return std::unexpected(std::move(result372.error()));
 res.segmentIdx = std::move(*result372);
       auto result373 = v.getBool("flip");
@@ -1544,9 +1544,9 @@ if (!result593) return std::unexpected(std::move(result593.error()));
   auto result594 = m_netGroup.addNetElement(m_tileDamageEventNetState);
 if (!result594) return std::unexpected(std::move(result594.error()));
 
-  m_netGroup.setNeedsStoreCallback(std::bind(&Plant::setNetStates, std::ref(*this)));
-  m_netGroup.setNeedsLoadCallback(std::bind(&Plant::getNetStates, std::ref(*this)));
-  return {};
+m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
+m_netGroup.setNeedsLoadCallback([this](bool) { return getNetStates(); });
+return {};
 }
 
 std::expected<void, StarException> Plant::getNetStates() {

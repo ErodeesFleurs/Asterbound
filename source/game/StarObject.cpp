@@ -386,8 +386,8 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   auto operation27 = m_netGroup.addNetElement(*m_networkedAnimator);
   if (!operation27)
     return std::unexpected(std::move(operation27.error()));
-  m_netGroup.setNeedsLoadCallback(std::bind(&Object::getNetStates, std::ref(*this), std::placeholders::_1));
-  m_netGroup.setNeedsStoreCallback(std::bind(&Object::setNetStates, std::ref(*this)));
+  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
   auto modeConfigResult = configValue("clientEntityMode", "ClientSlaveOnly");
   if (!modeConfigResult)
     return std::unexpected(std::move(modeConfigResult.error()));
@@ -554,7 +554,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation5 = m_scriptComponent.addCallbacks("object", std::move(objectCallbacks));
       if (!operation5)
         return std::unexpected(std::move(operation5.error()));
-      auto configCallbacksResult = LuaBindings::makeConfigCallbacks(std::bind(&Object::configValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2));
+      auto configCallbacksResult = LuaBindings::makeConfigCallbacks(
+        [this](String const& name, Json const& def) { return configValue(name, def); });
       if (!configCallbacksResult)
         return std::unexpected(std::move(configCallbacksResult.error()));
       auto configCallbacks = std::move(*configCallbacksResult);
@@ -597,7 +598,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation12 = m_scriptedAnimator.addCallbacks("objectAnimator", std::move(objectAnimatorCallbacks));
       if (!operation12)
         return std::unexpected(std::move(operation12.error()));
-      auto configCallbacksResult = LuaBindings::makeConfigCallbacks(std::bind(&Object::configValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2));
+      auto configCallbacksResult = LuaBindings::makeConfigCallbacks(
+        [this](String const& name, Json const& def) { return configValue(name, def); });
       if (!configCallbacksResult)
         return std::unexpected(std::move(configCallbacksResult.error()));
       auto configCallbacks = std::move(*configCallbacksResult);
@@ -615,7 +617,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!operation15)
         return std::unexpected(std::move(operation15.error()));
     }
-    m_xTilePosition.set(world.geometry().xwrap((int)m_xTilePosition.get()));
+    m_xTilePosition.set(world.geometry().xwrap(static_cast<int>(m_xTilePosition.get())));
     auto partsConfigResult = configValue("animationParts", JsonObject());
     if (!partsConfigResult)
       return std::unexpected(std::move(partsConfigResult.error()));
@@ -1497,7 +1499,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
       if (!nodeIndexResult)
         return std::unexpected(std::move(nodeIndexResult.error()));
       auto nodeIndex = std::move(*nodeIndexResult);
-      connections.append(WireConnection{location, (std::size_t)nodeIndex});
+      connections.append(WireConnection{.entityLocation = location, .nodeIndex = static_cast<std::size_t>(nodeIndex)});
     }
     node.connections.set(std::move(connections));
     auto stateResult = inputNodes[i].getBool("state");
@@ -1530,7 +1532,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
       if (!nodeIndexResult)
         return std::unexpected(std::move(nodeIndexResult.error()));
       auto nodeIndex = std::move(*nodeIndexResult);
-      connections.append(WireConnection{location, (std::size_t)nodeIndex});
+      connections.append(WireConnection{.entityLocation = location, .nodeIndex = static_cast<std::size_t>(nodeIndex)});
     }
     node.connections.set(std::move(connections));
     auto stateResult = outputNodes[i].getBool("state");

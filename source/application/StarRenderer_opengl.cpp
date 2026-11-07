@@ -1688,13 +1688,17 @@ std::expected<void, StarException> OpenGlRenderer::renderGlBuffer(GlRenderBuffer
       glEnableVertexAttribArray(m_dataAttribute);
 
     if (m_positionAttribute != -1)
-      glVertexAttribPointer(m_positionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, pos));
+      glVertexAttribPointer(m_positionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, pos)));
     if (m_texCoordAttribute != -1)
-      glVertexAttribPointer(m_texCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, uv));
+      glVertexAttribPointer(m_texCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, uv)));
     if (m_colorAttribute != -1)
-      glVertexAttribPointer(m_colorAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, color));
+      glVertexAttribPointer(m_colorAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, color)));
     if (m_dataAttribute != -1)
-      glVertexAttribIPointer(m_dataAttribute, 1, GL_INT, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, pack));
+      glVertexAttribIPointer(m_dataAttribute, 1, GL_INT, sizeof(GlRenderVertex),
+                             reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, pack)));
 
     glDrawArrays(GL_TRIANGLES, 0, vb.vertexCount);
   }

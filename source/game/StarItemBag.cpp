@@ -229,7 +229,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::swapItems(std::size
     return std::unexpected(std::move(slot.error()));
   auto& storedItem = slot->get();
 
-  auto swapItems = items;
+  auto swapItems = std::move(items);
   if (!swapItems || swapItems->empty()) {
     // If we are passed in nothing, simply return what's there, if anything.
     swapItems = storedItem;

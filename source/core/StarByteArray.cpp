@@ -87,14 +87,14 @@ void ByteArray::reset() {
 void ByteArray::reserve(std::size_t newCapacity) {
   if (newCapacity > m_capacity) {
     if (!m_data) {
-      auto newMem = (char*)Star::malloc(newCapacity);
+      auto newMem = static_cast<char*>(Star::malloc(newCapacity));
       if (!newMem)
         fatalError("Could not allocate ByteArray capacity", false);
       m_data = newMem;
       m_capacity = newCapacity;
     } else {
-      newCapacity = std::max({m_capacity * 2, newCapacity, (std::size_t)8});
-      auto newMem = (char*)Star::realloc(m_data, newCapacity);
+      newCapacity = std::max({m_capacity * 2, newCapacity, static_cast<std::size_t>(8)});
+      auto newMem = static_cast<char*>(Star::realloc(m_data, newCapacity));
       if (!newMem)
         fatalError("Could not allocate ByteArray capacity", false);
       m_data = newMem;

@@ -276,8 +276,8 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     return {};
 
   List<Particle> beamLeftovers;
-  for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun * 2 - .5); i++) {
-    float pos = (float)i / (float)(int)(curveLen * m_targetSegmentRun * 2 + .5);
+  for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun * 2 - .5); i++) {
+    float pos = static_cast<float>(i) / static_cast<float>(static_cast<int>(curveLen * m_targetSegmentRun * 2 + .5));
     float curveLoc = m_beamCurve.arcLenPara(pos);
     Particle beamParticle;
     beamParticle.type = Particle::Type::Ember;
@@ -386,7 +386,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
 
       String endImage = "";
       if (m_endType != EndType::Invalid) {
-        endImage = m_endImages[(unsigned)m_endType];
+        endImage = m_endImages[static_cast<unsigned>(m_endType)];
       }
 
       if (!endImage.empty()) {
@@ -422,8 +422,10 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
         Vec4B secondStripe = innerStripe.toRgba();
 
-        for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun - .5); i++) { // one less than full length
-          float pos = (float)i / (float)(int)(curveLen * m_targetSegmentRun + .5); // project the discrete steps evenly
+        for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun - .5); i++) {// one less than full length
+          float pos = static_cast<float>(i)
+            / static_cast<float>(
+                        static_cast<int>(curveLen * m_targetSegmentRun + .5));// project the discrete steps evenly
 
           Vec2F currentLoc =
               m_beamCurve.pointAt(pos) + Vec2F(rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter),

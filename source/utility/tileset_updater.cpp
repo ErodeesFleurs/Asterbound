@@ -364,7 +364,7 @@ std::expected<void, StarException> TilesetUpdater::defineAssetSource(String cons
   auto entries = File::dirList(imageDir);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
-  for (std::pair<String, bool> entry : *entries) {
+  for (std::pair<String, bool> const& entry : *entries) {
     // Never follow a symlinked directory: it can point outside of the asset
     // source, or at one of its own parents.
     auto symlink = File::isSymlink(unixFileJoin(imageDir, entry.first));
@@ -386,7 +386,7 @@ std::expected<void, StarException> TilesetUpdater::defineAssetSource(String cons
       auto images = File::dirList(databasePath);
       if (!images)
         return std::unexpected(std::move(images.error()));
-      for (std::pair<String, bool> image : *images) {
+      for (std::pair<String, bool> const& image : *images) {
         if (image.second || !image.first.utf8().ends_with(".png"))
           return std::unexpected(StarException::format("Unexpected entry in tile image database: {}", image.first));
         String tileName(image.first.utf8().substr(0, image.first.utf8().size() - 4));

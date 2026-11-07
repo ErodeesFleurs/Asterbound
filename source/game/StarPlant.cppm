@@ -115,7 +115,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
 
-  [[nodiscard]] virtual std::expected<String, StarException> description() const override;
+  [[nodiscard]] std::expected<String, StarException> description() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;

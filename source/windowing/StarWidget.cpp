@@ -462,7 +462,7 @@ std::expected<bool, StarException> Widget::containsChild(String const& name) {
   auto child = fetchChild(name);
   if (!child)
     return std::unexpected(std::move(child.error()));
-  return bool(*child);
+  return static_cast<bool>(*child);
 }
 
 std::expected<std::shared_ptr<Widget>, StarException> Widget::fetchChild(String const& name) {
@@ -551,7 +551,7 @@ String Widget::fullName() const {
 String Widget::toStringImpl(int indentLevel) const {
   auto leader = String(" ") * indentLevel;
   String childrenString;
-  for (auto child : m_members) {
+  for (auto const& child : m_members) {
     childrenString.append(child->toStringImpl(indentLevel + 4));
   }
   String output = strf(R"OUTPUT({}{} : {{

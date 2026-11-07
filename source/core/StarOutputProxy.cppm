@@ -61,7 +61,7 @@ OutputAnyDetail::Wrapper<T> outputAny(T const& t) {
 }
 
 struct OutputProxy {
-  typedef std::function<void(std::ostream&)> PrintFunction;
+  using PrintFunction = std::function<void(std::ostream&)>;
 
   template <typename Printer>
     requires std::invocable<Printer&, std::ostream&>

@@ -21,19 +21,27 @@ void OptionParser::setAdditionalHelp(String help) {
 }
 
 std::expected<void, StarException> OptionParser::addSwitch(String const& flag, String description) {
-  if (!m_options.insert(flag, Switch{flag, std::move(description)}).second)
+  if (!m_options.insert(flag, Switch{.flag = flag, .description = std::move(description)}).second)
     return std::unexpected(OptionParserException::format("Duplicate switch '-{}' added", flag));
   return {};
 }
 
 std::expected<void, StarException> OptionParser::addParameter(String const& flag, String argument, RequirementMode requirementMode, String description) {
-  if (!m_options.insert(flag, Parameter{flag, std::move(argument), requirementMode, std::move(description)}).second)
+  if (!m_options
+         .insert(flag,
+                 Parameter{.flag = flag,
+                           .argument = std::move(argument),
+                           .requirementMode = requirementMode,
+                           .description = std::move(description)})
+         .second)
     return std::unexpected(OptionParserException::format("Duplicate flag '-{}' added", flag));
   return {};
 }
 
 void OptionParser::addArgument(String argument, RequirementMode requirementMode, String description) {
-  m_arguments.append(Argument{std::move(argument), requirementMode, std::move(description)});
+  m_arguments.append(Argument{.argumentName = std::move(argument),
+                              .requirementMode = requirementMode,
+                              .description = std::move(description)});
 }
 
 std::expected<std::pair<OptionParser::Options, StringList>, StarException> OptionParser::parseOptions(StringList const& arguments) const {

@@ -27,7 +27,7 @@ public:
   std::string_view dynamicTypeName() const noexcept override {
     return Star::typeName<PackedAssetSource>();
   }
-  typedef std::function<void(std::size_t, std::size_t, String, String)> BuildProgressCallback;
+  using BuildProgressCallback = std::function<void(std::size_t, std::size_t, String, String)>;
 
   // Build a packed file, sorting specified extensions before all others and
   // sorting names case-insensitively within each extension group.
@@ -98,7 +98,9 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
     auto foldedPath = path.toLower();
     if (!foldedPath)
       return std::unexpected(std::move(foldedPath.error()));
-    entries.push_back({path, order ? *order : extensionOrdering.size(), std::move(*foldedPath)});
+    entries.push_back({.path = path,
+                       .extensionOrder = order ? *order : extensionOrdering.size(),
+                       .foldedPath = std::move(*foldedPath)});
   }
   std::sort(entries.begin(), entries.end(), [](Entry const& a, Entry const& b) {
     return std::tie(a.extensionOrder, a.foldedPath) < std::tie(b.extensionOrder, b.foldedPath);

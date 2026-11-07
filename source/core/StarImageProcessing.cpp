@@ -97,10 +97,10 @@ ImageOperation imageOperationFromString(StringView string) {
         else {
           auto from = Color::hexToVec4B(*source);
           if (!from)
-            return ErrorImageOperation{std::move(from.error())};
+            return ErrorImageOperation{.cause = std::move(from.error())};
           auto to = Color::hexToVec4B(hex);
           if (!to)
-            return ErrorImageOperation{std::move(to.error())};
+            return ErrorImageOperation{.cause = std::move(to.error())};
           operation.colorReplaceMap[*from] = *to;
           source.reset();
         }
@@ -118,7 +118,7 @@ ImageOperation imageOperationFromString(StringView string) {
       bits.emplace_back(text.substr(begin, end - begin));
     begin = end + 1;
   }
-  auto error = [](StarException cause) -> ImageOperation { return ErrorImageOperation{std::move(cause)}; };
+  auto error = [](StarException cause) -> ImageOperation { return ErrorImageOperation{.cause = std::move(cause)}; };
   if (bits.empty())
     return error(ImageOperationException("Missing image operation"));
   auto type = bits[0];
@@ -164,7 +164,8 @@ ImageOperation imageOperationFromString(StringView string) {
     auto secondAmount = lexicalCast<float>(bits[4]);
     if (!secondAmount)
       return error(std::move(secondAmount.error()));
-    return ScanLinesImageOperation{fade, FadeToColorImageOperation(secondColor->toRgb(), *secondAmount)};
+    return ScanLinesImageOperation{.fade1 = fade,
+                                   .fade2 = FadeToColorImageOperation(secondColor->toRgb(), *secondAmount)};
   }
   if (type == "addmask" || type == "submask" || type == "blendmult" || type == "blendscreen") {
     StringList references;
@@ -185,8 +186,14 @@ ImageOperation imageOperationFromString(StringView string) {
       offset[i - 2] = *value;
     }
     if (type == "addmask" || type == "submask")
-      return AlphaMaskImageOperation{type == "addmask" ? AlphaMaskImageOperation::Additive : AlphaMaskImageOperation::Subtractive, std::move(references), offset};
-    return BlendImageOperation{type == "blendmult" ? BlendImageOperation::Multiply : BlendImageOperation::Screen, std::move(references), offset};
+      return AlphaMaskImageOperation{.mode = type == "addmask" ? AlphaMaskImageOperation::Additive
+                                                               : AlphaMaskImageOperation::Subtractive,
+                                     .maskImages = std::move(references),
+                                     .offset = offset};
+    return BlendImageOperation{.mode =
+                                 type == "blendmult" ? BlendImageOperation::Multiply : BlendImageOperation::Screen,
+                               .blendImages = std::move(references),
+                               .offset = offset};
   }
   if (type == "border" || type == "outline") {
     auto pixels = lexicalCast<unsigned>(bits[1]);
@@ -198,7 +205,11 @@ ImageOperation imageOperationFromString(StringView string) {
     auto end = bits.size() > 3 ? Color::fromHex(bits[3]) : start;
     if (!end)
       return error(std::move(end.error()));
-    return BorderImageOperation{*pixels, start->toRgba(), end->toRgba(), type == "outline", false};
+    return BorderImageOperation{.pixels = *pixels,
+                                .startColor = start->toRgba(),
+                                .endColor = end->toRgba(),
+                                .outlineOnly = type == "outline",
+                                .includeTransparent = false};
   }
   if (type == "crop") {
     float values[4]{};
@@ -226,7 +237,7 @@ ImageOperation imageOperationFromString(StringView string) {
       return error(std::move(second.error()));
     auto mode = type == "scalenearest" ? ScaleImageOperation::Nearest
       : type == "scalebicubic" ? ScaleImageOperation::Bicubic : ScaleImageOperation::Bilinear;
-    return ScaleImageOperation{mode, Vec2F(*value, *second)};
+    return ScaleImageOperation{.mode = mode, .scale = Vec2F(*value, *second)};
   }
   return NullImageOperation{};
 }
@@ -484,7 +495,7 @@ static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation co
   }
 
   std::int64_t offsetX = op.offset[0], offsetY = op.offset[1];
-  PixelRect changed{image.width(), image.height(), 0, 0};
+  PixelRect changed{.x0 = image.width(), .y0 = image.height(), .x1 = 0, .y1 = 0};
   for (auto blend : blendImages) {
     changed.x0 = std::min(changed.x0, std::max<std::int64_t>(0, -offsetX));
     changed.y0 = std::min(changed.y0, std::max<std::int64_t>(0, -offsetY));
@@ -583,7 +594,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     if (replaceMap.empty())
       return {};
     if (image.bytesPerPixel() == 4)
-      replaceColors(replaceMap, image, {0, 0, image.width(), image.height()});
+      replaceColors(replaceMap, image, {.x0 = 0, .y0 = 0, .x1 = image.width(), .y1 = image.height()});
     else
       image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
         if (auto replacement = replaceMap.maybe(pixel))
@@ -636,8 +647,8 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
     image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
       pixel = pixel.combine(op->get().color, [](std::uint8_t a, std::uint8_t b) -> std::uint8_t {
-          return (std::uint8_t)(((int)a * (int)b) / 255);
-        });
+        return static_cast<std::uint8_t>((static_cast<int>(a) * static_cast<int>(b)) / 255);
+      });
     });
 
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {

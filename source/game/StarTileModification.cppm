@@ -57,9 +57,8 @@ struct PlaceLiquid {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, PlaceLiquid& tileLiquidPlacement);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, PlaceLiquid const& tileLiquidPlacement);
 
-typedef std::variant<std::monostate, PlaceMaterial, PlaceMod, PlaceMaterialColor, PlaceLiquid> TileModification;
-typedef List<std::pair<Vec2I, TileModification>> TileModificationList;
-
+using TileModification = std::variant<std::monostate, PlaceMaterial, PlaceMod, PlaceMaterialColor, PlaceLiquid>;
+using TileModificationList = List<std::pair<Vec2I, TileModification>>;
 }
 
 export module star.tile_modification;

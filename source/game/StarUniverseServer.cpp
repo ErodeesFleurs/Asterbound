@@ -27,10 +27,10 @@ import star.data_stream_devices;
 
 import std;
 import star.optional;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.set;
@@ -285,13 +285,19 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
     return std::unexpected(std::move(commands.error()));
   m_commandProcessor = std::move(*commands);
   m_chatProcessor = std::make_shared<ChatProcessor>(m_root.random());
-  m_chatProcessor->setCommandHandler(std::bind(&CommandProcessor::userCommand, std::ref(*m_commandProcessor), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  m_chatProcessor->setCommandHandler(
+    [processor = m_commandProcessor.get()](ConnectionId clientId, String const& command, String const& arguments) {
+      return processor->userCommand(clientId, command, arguments);
+    });
   auto networkThreads = universeConfig->optUInt("networkWorkerThreads");
   if (!networkThreads)
     return std::unexpected(std::move(networkThreads.error()));
-  auto connections = UniverseConnectionServer::create(m_root.logger(),
-      std::bind(&UniverseServer::packetsReceived, std::ref(*this), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-      networkThreads->value_or(0));
+  auto connections = UniverseConnectionServer::create(
+    m_root.logger(),
+    [this](UniverseConnectionServer& connectionServer, ConnectionId clientId, List<std::shared_ptr<Packet>> packets) {
+      return packetsReceived(connectionServer, clientId, std::move(packets));
+    },
+    networkThreads->value_or(0));
   if (!connections)
     return std::unexpected(std::move(connections.error()));
   m_connectionServer = std::move(*connections);
@@ -2472,8 +2478,8 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
   // Clear out all temporary worlds shut down more than tempWorldDeleteTime time ago.
   // Keep around worlds that are currently running or are active in system worlds
   Set<InstanceWorldId> systemLocationWorlds;
-  for (auto p : m_systemWorlds) {
-    for (auto instanceWorldId : p.second->activeInstanceWorlds()) {
+  for (auto const& p : m_systemWorlds) {
+    for (auto const& instanceWorldId : p.second->activeInstanceWorlds()) {
       if (m_tempWorldIndex.contains(instanceWorldId))
         systemLocationWorlds.add(instanceWorldId);
     }
@@ -3025,7 +3031,7 @@ std::expected<void, StarException> UniverseServer::removeTimedBan() {
 std::expected<void, StarException> UniverseServer::addCelestialRequests(ConnectionId clientId, List<CelestialRequest> requests) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
-  for (auto request : requests) {
+  for (auto const& request : requests) {
     m_pendingCelestialRequests[clientId].append(m_workerPool.addProducer<CelestialResponse>([&database = *m_celestialDatabase, request]() {
       return database.respondToRequest(request);
     }));

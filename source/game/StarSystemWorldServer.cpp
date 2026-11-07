@@ -551,7 +551,7 @@ std::expected<void, StarException> SystemWorldServer::placeInitialObjects() {
     auto pool = jsonToWeightedPool<String>(*objectPoolData);
     if (!pool)
       return std::unexpected(std::move(pool.error()));
-    for (int i = 0; i < (int)*count; ++i) {
+    for (int i = 0; i < static_cast<int>(*count); ++i) {
       Uuid uuid(root().random());
       auto config = systemObjectConfig(pool->select(random), uuid);
       if (!config)

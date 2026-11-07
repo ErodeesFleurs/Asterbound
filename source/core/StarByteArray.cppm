@@ -12,9 +12,9 @@ namespace Star {
 // ByteArray grows.
 class ByteArray {
 public:
-  typedef char value_type;
-  typedef char* iterator;
-  typedef char const* const_iterator;
+  using value_type = char;
+  using iterator = char*;
+  using const_iterator = char const*;
 
   // Constructs bytes from text without or with a trailing NUL byte.
   static ByteArray fromCString(std::string_view str);

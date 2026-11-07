@@ -111,7 +111,7 @@ std::expected<List<Vec2I>, StarException> World::findEmptyTiles(Vec2I pos, unsig
     return res;
 
   // searches manhattan distance counterclockwise from right
-  for (int distance = 1; distance <= (int)maxDist; distance++) {
+  for (int distance = 1; distance <= static_cast<int>(maxDist); distance++) {
     const int totalSpots = 4 * distance;
     int xDiff = distance;
     int yDiff = 0;
@@ -158,19 +158,21 @@ std::expected<TileDamageResult, StarException> World::damageTile(Vec2I const& ti
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> World::closestEntityInSight(Vec2F const& center, float radius, CollisionSet const& collisionSet, EntityFilter selector) const {
-  return closestEntity(center, radius, [=, this](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
-    if (selector) {
-      auto accepted = selector(entity);
-      if (!accepted)
-        return std::unexpected(std::move(accepted.error()));
-      if (!*accepted)
-        return false;
-    }
-    auto collision = lineTileCollision(center, entity->position(), collisionSet);
-    if (!collision)
-      return std::unexpected(std::move(collision.error()));
-    return !*collision;
-  });
+  return closestEntity(center, radius,
+                       [this, center, collisionSet, selector = std::move(selector)](
+                         std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
+                         if (selector) {
+                           auto accepted = selector(entity);
+                           if (!accepted)
+                             return std::unexpected(std::move(accepted.error()));
+                           if (!*accepted)
+                             return false;
+                         }
+                         auto collision = lineTileCollision(center, entity->position(), collisionSet);
+                         if (!collision)
+                           return std::unexpected(std::move(collision.error()));
+                         return !*collision;
+                       });
 }
 
 std::expected<bool, StarException> World::pointCollision(Vec2F const& point, CollisionSet const& collisionSet) const {

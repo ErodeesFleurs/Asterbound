@@ -89,10 +89,11 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       if (!config) return std::unexpected(std::move(config.error()));
       auto id = config->getUInt("liquidId");
       if (!id) return std::unexpected(std::move(id.error()));
-      if (*id != (LiquidId)*id)
-        return std::unexpected(LiquidException(strf("Liquid id {} does not fall in the valid range, wrapped to {}\n", *id, (LiquidId)*id)));
+      if (*id != static_cast<LiquidId>(*id))
+        return std::unexpected(LiquidException(
+          strf("Liquid id {} does not fall in the valid range, wrapped to {}\n", *id, static_cast<LiquidId>(*id))));
       auto entry = std::make_shared<LiquidSettings>();
-      entry->id = (LiquidId)*id;
+      entry->id = static_cast<LiquidId>(*id);
       {
         auto value = config->getString("name");
         if (!value) return std::unexpected(std::move(value.error()));
@@ -164,7 +165,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
             return std::unexpected(LiquidException::format("Neither resultMaterial or resultLiquid specified in liquid interaction of liquid {}", entry->id));
           interactionResult = makeRight<LiquidId>(**liquidResult);
         }
-        entry->interactions[(LiquidId)*liquid] = std::move(interactionResult);
+        entry->interactions[static_cast<LiquidId>(*liquid)] = std::move(interactionResult);
       }
       result->m_settings.set(entry->id, entry);
       auto added = result->m_liquidNames.add(entry->name, entry->id);

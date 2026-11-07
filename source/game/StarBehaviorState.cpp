@@ -210,7 +210,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runNode(BehaviorNode con
   return *status;
 }
 std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode const& node, NodeState& state) {
-  auto id = (std::uint64_t)&node;
+  auto id = reinterpret_cast<std::uint64_t>(&node);
   auto blackboard = board();
   if (!blackboard) return std::unexpected(std::move(blackboard.error()));
   ActionReturn result(NodeStatus::Invalid, LuaNil);
@@ -245,7 +245,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
   return std::get<0>(result);
 }
 std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNode const& node, NodeState& state) {
-  auto id = (std::uint64_t)&node;
+  auto id = reinterpret_cast<std::uint64_t>(&node);
   NodeStatus status = NodeStatus::Running;
   if (!state) {
     auto blackboard = board();

@@ -17,21 +17,20 @@ namespace Star {
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 class OrderedMapWrapper {
 public:
-  typedef Key key_type;
-  typedef Value mapped_type;
-  typedef std::pair<key_type const, mapped_type> value_type;
+  using key_type = Key;
+  using mapped_type = Value;
+  using value_type = std::pair<key_type const, mapped_type>;
 
-  typedef LinkedList<value_type, Allocator> OrderType;
-  typedef Map<
-      std::reference_wrapper<key_type const>, typename OrderType::iterator, MapArgs...,
-      typename std::allocator_traits<Allocator>::template rebind_alloc<std::pair<std::reference_wrapper<key_type const> const, typename OrderType::iterator>>
-    > MapType;
+  using OrderType = LinkedList<value_type, Allocator>;
+  using MapType = Map<std::reference_wrapper<key_type const>, typename OrderType::iterator, MapArgs...,
+                      typename std::allocator_traits<Allocator>::template rebind_alloc<
+                        std::pair<std::reference_wrapper<key_type const> const, typename OrderType::iterator>>>;
 
-  typedef typename OrderType::iterator iterator;
-  typedef typename OrderType::const_iterator const_iterator;
+  using iterator = typename OrderType::iterator;
+  using const_iterator = typename OrderType::const_iterator;
 
-  typedef typename OrderType::reverse_iterator reverse_iterator;
-  typedef typename OrderType::const_reverse_iterator const_reverse_iterator;
+  using reverse_iterator = typename OrderType::reverse_iterator;
+  using const_reverse_iterator = typename OrderType::const_reverse_iterator;
 
   template <typename Collection>
   static OrderedMapWrapper from(Collection const& c);
@@ -199,7 +198,7 @@ auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::from(Collection 
 }
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
-OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::OrderedMapWrapper() {}
+OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::OrderedMapWrapper() = default;
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
 OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::OrderedMapWrapper(OrderedMapWrapper const& map) {

@@ -46,8 +46,8 @@ namespace Text {
   String stripEscapeCodes(String const& s);
   inline bool isEscapeCode(Utf32Type c) { return c == CmdEsc || c == StartEsc; }
 
-  typedef std::function<std::expected<bool, StarException>(StringView text)> TextCallback;
-  typedef std::function<std::expected<bool, StarException>(StringView commands)> CommandsCallback;
+  using TextCallback = std::function<std::expected<bool, StarException>(StringView text)>;
+  using CommandsCallback = std::function<std::expected<bool, StarException>(StringView commands)>;
   [[nodiscard]] std::expected<bool, StarException> processText(StringView text, TextCallback textFunc, CommandsCallback commandsFunc = CommandsCallback(), bool includeCommandSides = false);
 }
 

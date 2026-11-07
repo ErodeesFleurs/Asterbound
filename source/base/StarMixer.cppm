@@ -105,9 +105,11 @@ private:
 // Thread safe mixer class with basic effects support.
 class Mixer {
 public:
-  typedef std::function<std::expected<void, StarException>(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels)> ExtraMixFunction;
-  typedef std::function<std::expected<void, StarException>(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels)> EffectFunction;
-  typedef std::function<std::expected<float, StarException>(unsigned, Vec2F, float)> PositionalAttenuationFunction;
+  using ExtraMixFunction = std::function<std::expected<void, StarException>(std::span<std::int16_t> buffer,
+                                                                            std::size_t frames, unsigned channels)>;
+  using EffectFunction = std::function<std::expected<void, StarException>(std::span<std::int16_t> buffer,
+                                                                          std::size_t frames, unsigned channels)>;
+  using PositionalAttenuationFunction = std::function<std::expected<float, StarException>(unsigned, Vec2F, float)>;
 
   Mixer(Logger& logger, unsigned sampleRate, unsigned channels);
 

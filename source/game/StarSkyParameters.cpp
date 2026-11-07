@@ -51,7 +51,7 @@ import star.root;
 import star.static_random;
 namespace Star {
 
-SkyParameters::SkyParameters() : seed(), skyType(SkyType::Barren), skyColoring(makeRight(Color::Black)), settings(JsonObject()) {}
+SkyParameters::SkyParameters() : seed(), skyColoring(makeRight(Color::Black)), settings(JsonObject()) {}
 
 std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase) {
   SkyParameters sky;
@@ -120,7 +120,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
 
 SkyParameters::SkyParameters(SkyParameters const& oldSkyParameters, std::shared_ptr<VisitableWorldParameters const> newVisitableParameters) : SkyParameters() {
   *this = oldSkyParameters;
-  readVisitableParameters(newVisitableParameters);
+  readVisitableParameters(std::move(newVisitableParameters));
 }
 
 std::expected<SkyParameters, StarException> SkyParameters::create(Json const& config) {

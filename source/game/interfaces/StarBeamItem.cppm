@@ -95,19 +95,20 @@ public:
   enum class EndType { Invalid = -1, Object, Tile, TileGroup, Wire };
 
   explicit BeamItem(Root& root);
-  virtual ~BeamItem() = default;
+  ~BeamItem() override = default;
 
   [[nodiscard]]
-  virtual std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
+  std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
   [[nodiscard]]
-  virtual std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
+  std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting,
+                                            HashSet<MoveControlType> const& moves) override;
 
   // Called once after the owner's fixed-tick item control/fire work.
   [[nodiscard]]
   std::expected<void, StarException> updateBeamEffects(bool visible);
 
   [[nodiscard]]
-  virtual std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
+  std::expected<List<Drawable>, StarException> nonRotatedDrawables() const override;
 
   [[nodiscard]]
   virtual std::expected<float, StarException> getAngle(float angle);

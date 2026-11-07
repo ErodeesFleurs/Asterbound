@@ -38,24 +38,24 @@ std::uint64_t staticRandomU64(T const& d, TL const&... rest) {
 
 template <typename T, typename... TL>
 std::int32_t staticRandomI32(T const& d, TL const&... rest) {
-  return (std::int32_t)staticRandomU32(d, rest...);
+  return static_cast<std::int32_t>(staticRandomU32(d, rest...));
 }
 
 template <typename T, typename... TL>
 std::int32_t staticRandomI32Range(std::int32_t min, std::int32_t max, T const& d, TL const&... rest) {
-  std::uint64_t denom = (std::uint64_t)(-1) / ((std::uint64_t)(max - min) + 1);
-  return (std::int32_t)(staticRandomU64(d, rest...) / denom + min);
+  std::uint64_t denom = static_cast<std::uint64_t>((-1)) / (static_cast<std::uint64_t>((max - min)) + 1);
+  return static_cast<std::int32_t>((staticRandomU64(d, rest...) / denom + min));
 }
 
 template <typename T, typename... TL>
 std::uint32_t staticRandomU32Range(std::uint32_t min, std::uint32_t max, T const& d, TL const&... rest) {
-  std::uint64_t denom = (std::uint64_t)(-1) / ((std::uint64_t)(max - min) + 1);
+  std::uint64_t denom = static_cast<std::uint64_t>((-1)) / (static_cast<std::uint64_t>((max - min)) + 1);
   return staticRandomU64(d, rest...) / denom + min;
 }
 
 template <typename T, typename... TL>
 std::int64_t staticRandomI64(T const& d, TL const&... rest) {
-  return (std::int64_t)staticRandomU64(d, rest...);
+  return static_cast<std::int64_t>(staticRandomU64(d, rest...));
 }
 
 // Generates values in the range [0.0, 1.0]
@@ -85,7 +85,7 @@ template <typename Container, typename T, typename... TL>
   if (container.empty())
     return std::unexpected(StarException::format("staticRandomFrom called on an empty container"));
   auto i = container.begin();
-  std::advance(i, staticRandomI32Range(0, (std::int32_t)(container.size() - 1), d, rest...));
+  std::advance(i, staticRandomI32Range(0, static_cast<std::int32_t>((container.size() - 1)), d, rest...));
   return std::reference_wrapper<typename Container::value_type>(*i);
 }
 
@@ -94,7 +94,7 @@ template <typename Container, typename T, typename... TL>
   if (container.empty())
     return std::unexpected(StarException::format("staticRandomFrom called on an empty container"));
   auto i = container.begin();
-  std::advance(i, staticRandomI32Range(0, (std::int32_t)(container.size() - 1), d, rest...));
+  std::advance(i, staticRandomI32Range(0, static_cast<std::int32_t>((container.size() - 1)), d, rest...));
   return std::reference_wrapper<typename Container::value_type const>(*i);
 }
 
@@ -112,11 +112,11 @@ typename Container::value_type staticRandomValueFrom(Container const& container,
 template <typename T>
 class URBG {
 public:
-  typedef std::function <T()> Function;
+  using Function = std::function<T()>;
 
   URBG(Function func) : m_func(func) {};
 
-  typedef T result_type;
+  using result_type = T;
   static constexpr T min() { return std::numeric_limits<T>::min(); };
   static constexpr T max() { return std::numeric_limits<T>::max(); };
   T operator()() { return m_func(); };

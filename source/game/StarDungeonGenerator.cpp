@@ -429,7 +429,7 @@ namespace Dungeon {
 
   std::expected<void, StarException> RandomBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (m_brushes.empty()) return std::unexpected(DungeonException("Random brush has no options"));
-    std::size_t rnd = (std::size_t)staticRandomI32(m_seed, position[0], position[1]);
+    std::size_t rnd = static_cast<std::size_t>(staticRandomI32(m_seed, position[0], position[1]));
     return m_brushes[rnd % m_brushes.size()]->paint(position, phase, writer);
   }
 
@@ -448,7 +448,7 @@ namespace Dungeon {
 
   FrontBrush::FrontBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
     m_material = material;
-    m_mod = mod;
+    m_mod = std::move(mod);
     m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
     m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
     m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
@@ -476,7 +476,7 @@ namespace Dungeon {
 
   BackBrush::BackBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
     m_material = material;
-    m_mod = mod;
+    m_mod = std::move(mod);
     m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
     m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
     m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
@@ -603,7 +603,7 @@ namespace Dungeon {
 
   SurfaceBrush::SurfaceBrush(std::optional<int> variant, std::optional<String> mod) {
     m_variant = variant.value_or(0);
-    m_mod = mod;
+    m_mod = std::move(mod);
   }
 
   std::expected<void, StarException> SurfaceBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
@@ -627,7 +627,7 @@ namespace Dungeon {
 
   SurfaceBackgroundBrush::SurfaceBackgroundBrush(std::optional<int> variant, std::optional<String> mod) {
     m_variant = variant.value_or(0);
-    m_mod = mod;
+    m_mod = std::move(mod);
   }
 
   std::expected<void, StarException> SurfaceBackgroundBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
@@ -673,7 +673,7 @@ namespace Dungeon {
     return {};
   }
 
-  InvalidBrush::InvalidBrush(std::optional<String> nameHint) : m_nameHint(nameHint) {}
+  InvalidBrush::InvalidBrush(std::optional<String> nameHint) : m_nameHint(std::move(nameHint)) {}
 
   std::expected<void, StarException> InvalidBrush::paint(Vec2I, Phase, DungeonGeneratorWriter& writer) const {
     if (m_nameHint) return writer.root().logger().error("Invalid tile '{}'", *m_nameHint);
@@ -701,7 +701,7 @@ namespace Dungeon {
   }
 
   bool Tile::usesPlaces() const {
-    if (brushes.size() == 0)
+    if (brushes.empty())
       return false;
     for (std::size_t i = 0; i < rules.size(); i++)
       if (rules[i]->overdrawable())
@@ -709,9 +709,7 @@ namespace Dungeon {
     return true;
   }
 
-  bool Tile::modifiesPlaces() const {
-    return brushes.size() != 0;
-  }
+  bool Tile::modifiesPlaces() const { return !brushes.empty(); }
 
   bool Tile::collidesWithPlaces() const {
     return usesPlaces();
@@ -988,7 +986,7 @@ namespace Dungeon {
     int dya = position[1];
     int dyb = size[1] - position[1];
 
-    int m = std::min(std::min(dxa, dxb), std::min(dya, dyb));
+    int m = std::min({dxa, dxb, dya, dyb});
     if (dxa == m)
       return Direction::Left;
     if (dxb == m)
@@ -1003,9 +1001,11 @@ namespace Dungeon {
   std::expected<Direction, StarException> Part::pickByNeighbours(Vec2I pos) const {
     int x = pos.x(), y = pos.y();
     if (x == 0) return Direction::Left;
-    if (x == (int)size().x() - 1) return Direction::Right;
+    if (x == static_cast<int>(size().x()) - 1)
+      return Direction::Right;
     if (y == 0) return Direction::Down;
-    if (y == (int)size().y() - 1) return Direction::Up;
+    if (y == static_cast<int>(size().y()) - 1)
+      return Direction::Up;
     // Preserve the directional scan order and short-circuit tile inspection.
     for (auto const& check : {std::pair{Vec2I{1, 0}, Direction::Left}, std::pair{Vec2I{-1, 0}, Direction::Right},
         std::pair{Vec2I{0, 1}, Direction::Down}, std::pair{Vec2I{0, -1}, Direction::Up}}) {
@@ -1034,7 +1034,8 @@ namespace Dungeon {
           if (!picked) return std::unexpected(std::move(picked.error()));
           direction = *picked;
         }
-        auto logged = this->root().logger().debug("Found connector on {} at {} group {} direction {}", m_name, position, tile.connector->value, (int)direction);
+        auto logged = this->root().logger().debug("Found connector on {} at {} group {} direction {}", m_name, position,
+                                                  tile.connector->value, static_cast<int>(direction));
         if (!logged) return std::unexpected(std::move(logged.error()));
         m_connections.append(std::make_shared<Connector>(*this, tile.connector->value, tile.connector->forwardOnly, direction, position));
       }
@@ -1058,15 +1059,15 @@ namespace Dungeon {
           cc++;
         }
         if (tile.requiresOpen()) {
-          if ((int)y < lowestAir)
+          if (y < lowestAir)
             lowestAir = y;
         }
         if (tile.requiresSolid()) {
-          if ((int)y > highestGound)
+          if (y > highestGound)
             highestGound = y;
         }
         if (tile.requiresLiquid()) {
-          if ((int)y > highestLiquid)
+          if (y > highestLiquid)
             highestLiquid = y;
         }
         return false;
@@ -1077,7 +1078,7 @@ namespace Dungeon {
     if (highestGound == -1)
       highestGound = lowestAir - 1;
 
-    if (lowestAir == (int)m_size[1])
+    if (lowestAir == static_cast<int>(m_size[1]))
       lowestAir = highestGound + 1;
 
     if (cc == 0) {
@@ -1114,7 +1115,7 @@ namespace Dungeon {
   }
 
   Connector::Connector(Part const& part, String value, bool forwardOnly, Direction direction, Vec2I offset)
-    : m_value(value), m_forwardOnly(forwardOnly), m_direction(direction), m_offset(offset), m_part(part) {}
+      : m_value(std::move(value)), m_forwardOnly(forwardOnly), m_direction(direction), m_offset(offset), m_part(part) {}
 
   std::expected<bool, StarException> Connector::connectsTo(std::shared_ptr<Connector const> connector) const {
     if (m_forwardOnly)
@@ -1157,8 +1158,11 @@ namespace Dungeon {
     return m_offset;
   }
 
-  DungeonGeneratorWriter::DungeonGeneratorWriter(Root& root, std::shared_ptr<DungeonGeneratorWorldFacade> facade, std::optional<int> terrainMarkingSurfaceLevel, std::optional<int> terrainSurfaceSpaceExtends)
-    : m_root(root), m_facade(facade), m_terrainMarkingSurfaceLevel(terrainMarkingSurfaceLevel), m_terrainSurfaceSpaceExtends(terrainSurfaceSpaceExtends) {
+  DungeonGeneratorWriter::DungeonGeneratorWriter(Root& root, std::shared_ptr<DungeonGeneratorWorldFacade> facade,
+                                                 std::optional<int> terrainMarkingSurfaceLevel,
+                                                 std::optional<int> terrainSurfaceSpaceExtends)
+      : m_root(root), m_facade(std::move(facade)), m_terrainMarkingSurfaceLevel(terrainMarkingSurfaceLevel),
+        m_terrainSurfaceSpaceExtends(terrainSurfaceSpaceExtends) {
     m_currentBounds.setMin(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
     m_currentBounds.setMax(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
   }
@@ -1432,7 +1436,7 @@ namespace Dungeon {
       if (auto applied = m_facade->placeObject(displace(pos), object.objectName, object.direction, object.parameters); !applied) return std::unexpected(std::move(applied.error()));
     }
 
-    for (auto entry : m_vehicles) {
+    for (auto const& entry : m_vehicles) {
       String vehicleName;
       Json parameters;
       std::tie(vehicleName, parameters) = entry.second;
@@ -1789,7 +1793,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
   Vec2I origin = basePos + Vec2I(anchor->size()) / 2;
 
   Set<Vec2I> closedConnectors;
-  while (openSet.size()) {
+  while (!openSet.empty()) {
     auto next = openSet.takeFirst();
     if (!next) return std::unexpected(std::move(next.error()));
     Dungeon::Part const& parentPart = next->first.get();
@@ -1803,7 +1807,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
       auto foundOptions = findConnectablePart(connector);
       if (!foundOptions) return std::unexpected(std::move(foundOptions.error()));
       auto options = std::move(*foundOptions);
-      while (options.size()) {
+      while (!options.empty()) {
         auto chosenOption = chooseOption(options, m_rand);
         if (!chosenOption) return std::unexpected(std::move(chosenOption.error()));
         auto option = std::move(*chosenOption);

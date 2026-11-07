@@ -51,7 +51,7 @@ template <>
   return WarpToPlayer(std::move(*uuid));
 }
 
-InstanceWorldId::InstanceWorldId() {}
+InstanceWorldId::InstanceWorldId() = default;
 
 InstanceWorldId::InstanceWorldId(String instance, std::optional<Uuid> uuid, std::optional<float> level)
   : instance(std::move(instance)), uuid(std::move(uuid)), level(std::move(level)) {}
@@ -212,19 +212,19 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
 }
 
 std::ostream& operator<<(std::ostream& os, CelestialWorldId const& worldId) {
-  os << (CelestialCoordinate)worldId;
+  os << static_cast<CelestialCoordinate>(worldId);
   return os;
 }
 
 
 std::ostream& operator<<(std::ostream& os, ClientShipWorldId const& worldId) {
-  os << ((Uuid)worldId).hex();
+  os << static_cast<Uuid>(worldId).hex();
   return os;
 }
 
 
 std::ostream& operator<<(std::ostream& os, CustomWorldId const& worldId) {
-  os << (String)worldId;
+  os << static_cast<String>(worldId);
   return os;
 }
 
@@ -277,7 +277,7 @@ String printSpawnTarget(SpawnTarget spawnTarget) {
     return "";
 }
 
-WarpToWorld::WarpToWorld() {}
+WarpToWorld::WarpToWorld() = default;
 
 WarpToWorld::WarpToWorld(WorldId world, SpawnTarget target) : world(std::move(world)), target(std::move(target)) {}
 

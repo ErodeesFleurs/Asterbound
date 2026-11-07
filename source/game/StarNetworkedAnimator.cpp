@@ -724,7 +724,8 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       sound.rangeMultiplier = 1.0f;
       auto pool = jsonToStringList(soundConfig);
       if (!pool) return std::unexpected(std::move(pool.error()));
-      sound.soundPool.set(pool->transformed(std::bind(&AssetPath::relativeTo, m_relativePath, std::placeholders::_1)));
+      sound.soundPool.set(pool->transformed(
+        [relativePath = m_relativePath](String const& path) { return AssetPath::relativeTo(relativePath, path); }));
       sound.volumeTarget.set(1.0f);
       sound.volumeRampTime.set(0.0f);
       sound.pitchMultiplierTarget.set(1.0f);
@@ -759,7 +760,8 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       if (!poolJson) return std::unexpected(std::move(poolJson.error()));
       auto pool = jsonToStringList(*poolJson);
       if (!pool) return std::unexpected(std::move(pool.error()));
-      sound.soundPool.set(pool->transformed(std::bind(&AssetPath::relativeTo, m_relativePath, std::placeholders::_1)));
+      sound.soundPool.set(pool->transformed(
+        [relativePath = m_relativePath](String const& path) { return AssetPath::relativeTo(relativePath, path); }));
     }
   }
   auto effectsConfig = config.get("effects", JsonObject());
@@ -1112,7 +1114,7 @@ void NetworkedAnimator::setLocalTag(String tagName, std::optional<String> tagVal
 }
 
 void NetworkedAnimator::setPartDrawables(String const& partName, List<Drawable> drawables) {
-  m_partDrawables.set(partName, drawables);
+  m_partDrawables.set(partName, std::move(drawables));
 }
 void NetworkedAnimator::addPartDrawables(String const& partName, List<Drawable> drawables) {
   m_partDrawables[partName].appendAll(drawables);

@@ -20,7 +20,7 @@ public:
     return Star::typeName<PreviewTileTool>();
   }
 
-  virtual ~PreviewTileTool() {}
+  virtual ~PreviewTileTool() = default;
   [[nodiscard]]
   virtual std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const = 0;
 };

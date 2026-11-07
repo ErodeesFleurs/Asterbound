@@ -173,7 +173,8 @@ HostAddressWithPort TcpSocket::remoteAddress() const {
 
 TcpSocket::TcpSocket(NetworkMode networkMode) : Socket(networkMode) {}
 
-TcpSocket::TcpSocket(NetworkMode networkMode, std::shared_ptr<SocketImpl> impl) : Socket(networkMode, impl, SocketMode::Connected) {}
+TcpSocket::TcpSocket(NetworkMode networkMode, std::shared_ptr<SocketImpl> impl)
+    : Socket(networkMode, std::move(impl), SocketMode::Connected) {}
 
 std::expected<void, StarException> TcpSocket::connect(HostAddressWithPort const& addressWithPort) {
   std::unique_lock locker(m_mutex);

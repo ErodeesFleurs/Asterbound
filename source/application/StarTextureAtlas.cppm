@@ -47,7 +47,7 @@ public:
     virtual bool expired() const = 0;
   };
 
-  typedef std::shared_ptr<Texture> TextureHandle;
+  using TextureHandle = std::shared_ptr<Texture>;
 
   TextureAtlasSet(unsigned cellSize, unsigned atlasNumCells);
 
@@ -142,7 +142,7 @@ private:
 
   unsigned m_atlasCellSize;
   unsigned m_atlasNumCells;
-  unsigned m_textureFitTries;
+  unsigned m_textureFitTries = 3;
 
   List<std::unique_ptr<TextureAtlas>> m_atlases;
   HashSet<std::shared_ptr<TextureEntry>> m_textures;
@@ -150,7 +150,7 @@ private:
 
 template <typename AtlasTextureHandle>
 TextureAtlasSet<AtlasTextureHandle>::TextureAtlasSet(unsigned cellSize, unsigned atlasNumCells)
-  : m_atlasCellSize(cellSize), m_atlasNumCells(atlasNumCells), m_textureFitTries(3) {}
+    : m_atlasCellSize(cellSize), m_atlasNumCells(atlasNumCells) {}
 
 template <typename AtlasTextureHandle>
 Vec2U TextureAtlasSet<AtlasTextureHandle>::atlasTextureSize() const {

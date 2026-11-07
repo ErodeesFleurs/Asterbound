@@ -106,7 +106,7 @@ std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String 
       continue;
     auto length = option.text.length();
     if (!length) return std::unexpected(std::move(length.error()));
-    float r = *p + (float)*length * 0.01f;
+    float r = *p + static_cast<float>(*length) * 0.01f;
     if (r > bestMatch) {
       bestMatch = r;
       result = option.emote;

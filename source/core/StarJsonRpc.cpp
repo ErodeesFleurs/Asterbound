@@ -12,7 +12,7 @@ import star.logging;
 
 namespace Star {
 
-JsonRpcInterface::~JsonRpcInterface() {}
+JsonRpcInterface::~JsonRpcInterface() = default;
 
 JsonRpc::JsonRpc(Logger& logger) : m_logger(logger), m_requestId(0) {}
 

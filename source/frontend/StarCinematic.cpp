@@ -201,7 +201,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto skipTo = timeSkipDefinition.getFloat("skipTo");
     if (!skipTo)
       return std::unexpected(std::move(skipTo.error()));
-    m_timeSkips.append(TimeSkip{*available, *skipTo});
+    m_timeSkips.append(TimeSkip{.availableTime = *available, .skipToTime = *skipTo});
   }
   std::sort(m_timeSkips.begin(), m_timeSkips.end(), [](TimeSkip const& a, TimeSkip const& b) {
     return a.availableTime < b.availableTime;
@@ -217,7 +217,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto zoom = cameraDefinition.getFloat("zoom", 1.0f);
     if (!zoom)
       return std::unexpected(std::move(zoom.error()));
-    CameraKeyFrame keyFrame{*timecode, *zoom, {}};
+    CameraKeyFrame keyFrame{.timecode = *timecode, .zoom = *zoom, .pan = {}};
     auto hasPan = cameraDefinition.contains("pan");
     if (!hasPan)
       return std::unexpected(std::move(hasPan.error()));
@@ -430,9 +430,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
   return {};
 }
 
-void Cinematic::setPlayer(std::shared_ptr<Player> player) {
-  m_player = player;
-}
+void Cinematic::setPlayer(std::shared_ptr<Player> player) { m_player = std::move(player); }
 
 void Cinematic::update(float) {
   m_currentTimeSkip = {};
@@ -738,7 +736,8 @@ void Cinematic::updateCamera(float timecode) {
 }
 
 float Cinematic::currentTimecode() const {
-  return std::min((float)m_timer.time() - m_backgroundFadeTime, m_completionTime - 2 * m_backgroundFadeTime);
+  return std::min(static_cast<float>(m_timer.time()) - m_backgroundFadeTime,
+                  m_completionTime - 2 * m_backgroundFadeTime);
 }
 
 Cinematic::PanelValues Cinematic::determinePanelValues(std::shared_ptr<Panel> panel, float timecode) {

@@ -1974,7 +1974,7 @@ public:
   template <typename Container>
   void prependAll(Container&& list) {
     for (auto i = std::rbegin(list); i != std::rend(list); ++i) {
-      if (std::is_rvalue_reference<Container&&>::value)
+      if (std::is_rvalue_reference_v<Container&&>)
         m_storage.push_front(std::move(*i));
       else
         m_storage.push_front(*i);

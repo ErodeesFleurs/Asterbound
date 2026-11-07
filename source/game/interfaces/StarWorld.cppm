@@ -53,7 +53,7 @@ class Root;
 class TileEntity;
 class ScriptedEntity;
 
-typedef std::function<std::expected<void, StarException>(World&)> WorldAction;
+using WorldAction = std::function<std::expected<void, StarException>(World&)>;
 
 class World {
 public:
@@ -62,7 +62,7 @@ public:
 
   explicit World(Root& root) : m_root(root) {}
   Root& root() const { return m_root; }
-  virtual ~World() {}
+  virtual ~World() = default;
 
   // Will remain constant throughout the life of the world.
   virtual ConnectionId connection() const = 0;

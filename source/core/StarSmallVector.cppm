@@ -12,16 +12,16 @@ namespace Star {
 template <typename Element, std::size_t MaxStackSize>
 class SmallVector {
 public:
-  typedef Element* iterator;
-  typedef Element const* const_iterator;
+  using iterator = Element*;
+  using const_iterator = Element const*;
 
-  typedef std::reverse_iterator<iterator> reverse_iterator;
-  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  typedef Element value_type;
+  using value_type = Element;
 
-  typedef Element& reference;
-  typedef Element const& const_reference;
+  using reference = Element&;
+  using const_reference = Element const&;
 
   SmallVector();
   SmallVector(SmallVector const& other);

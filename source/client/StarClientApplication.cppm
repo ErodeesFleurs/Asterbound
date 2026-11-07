@@ -47,7 +47,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> setPostProcessGroupEnabled(String const& group, bool const& enabled, std::optional<bool> const& save);
   [[nodiscard]] std::expected<bool, StarException> postProcessGroupEnabled(String const& group);
   [[nodiscard]] std::expected<Json, StarException> postProcessGroups();
-  virtual unsigned framesSkipped() const override;
+  unsigned framesSkipped() const override;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> startup(StringList const& cmdLineArgs) override;

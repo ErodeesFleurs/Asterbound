@@ -221,16 +221,12 @@ std::expected<bool, StarException> ItemSlotWidget::sendEvent(InputEvent const& e
   return false;
 }
 
-void ItemSlotWidget::setCallback(WidgetCallbackFunc callback) {
-  m_callback = callback;
-}
+void ItemSlotWidget::setCallback(WidgetCallbackFunc callback) { m_callback = std::move(callback); }
 
-void ItemSlotWidget::setRightClickCallback(WidgetCallbackFunc callback) {
-  m_rightClickCallback = callback;
-}
+void ItemSlotWidget::setRightClickCallback(WidgetCallbackFunc callback) { m_rightClickCallback = std::move(callback); }
 
 void ItemSlotWidget::setMiddleClickCallback(WidgetCallbackFunc callback) {
-  m_middleClickCallback = callback;
+  m_middleClickCallback = std::move(callback);
 }
 
 void ItemSlotWidget::setItem(std::shared_ptr<Item> const& item) {
@@ -290,7 +286,7 @@ void ItemSlotWidget::setHighlightEnabled(bool highlight) {
 
 std::expected<void, StarException> ItemSlotWidget::renderImpl() {
   auto drawCooldown = [&slot = *this]() -> std::expected<void, StarException> {
-    int frame = (int)std::roundf(slot.m_progress * 18);
+    int frame = static_cast<int>(std::roundf(slot.m_progress * 18));
     return slot.context().drawInterfaceQuad(AssetPath(String(strf("/interface/cooldown.png:{}", frame))), Vec2F(slot.screenPosition()));
   };
   if (m_item) {

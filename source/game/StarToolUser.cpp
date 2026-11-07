@@ -260,7 +260,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     return {};
 
   List<LightSource> lights;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
       auto sources = active->lights(interpolation);
       if (!sources) return std::unexpected(std::move(sources.error()));
@@ -578,7 +578,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
 
 [[nodiscard]] std::expected<bool, StarException> ToolUser::queryShieldHit(DamageSource const& source) const {
   if (m_suppress.get() || !m_user) return false;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto tool = as<ToolUserItem>(item)) {
       auto polygons = tool->shieldPolys();
       if (!polygons) return std::unexpected(std::move(polygons.error()));
@@ -762,7 +762,7 @@ bool ToolUser::firingAlt() const {
     return {};
 
   List<DamageSource> ds;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto sources = toolItem->damageSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
@@ -777,7 +777,7 @@ bool ToolUser::firingAlt() const {
     return {};
 
   List<PhysicsForceRegion> ds;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto regions = toolItem->forceRegions();
       if (!regions) return std::unexpected(std::move(regions.error()));

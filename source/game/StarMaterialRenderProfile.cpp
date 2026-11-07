@@ -172,7 +172,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   profile.colorVariants = 0;
   if (*multiColored) {
     {
-      auto value = spec.getUInt("colorVariants", (std::uint64_t)MaxMaterialColorVariant + 1);
+      auto value = spec.getUInt("colorVariants", static_cast<std::uint64_t>(MaxMaterialColorVariant) + 1);
       if (!value) return std::unexpected(std::move(value.error()));
       profile.colorVariants = std::move(*value);
     }
@@ -243,7 +243,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
       else if (*match3) {
         auto id = entryConfig.getUInt("id");
         if (!id) return std::unexpected(std::move(id.error()));
-        rule->entries.append({MaterialRule::RuleEqualsId{(std::uint16_t)*id}, *inverse});
+        rule->entries.append({MaterialRule::RuleEqualsId{static_cast<std::uint16_t>(*id)}, *inverse});
       }
       else if (auto match4 = type->equalsIgnoreCase("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
       else if (*match4) {

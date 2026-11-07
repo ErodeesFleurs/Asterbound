@@ -38,11 +38,11 @@ private:
   std::uint64_t m_epoch;
 };
 
-typedef std::uint32_t EntityRenderLayer;
+using EntityRenderLayer = std::uint32_t;
 
 inline constexpr unsigned RenderLayerUpperBits = 5;
 inline constexpr unsigned RenderLayerLowerBits = 32 - RenderLayerUpperBits;
-inline constexpr EntityRenderLayer RenderLayerLowerMask = (EntityRenderLayer)-1 >> RenderLayerUpperBits;
+inline constexpr EntityRenderLayer RenderLayerLowerMask = static_cast<EntityRenderLayer>(-1) >> RenderLayerUpperBits;
 
 inline constexpr EntityRenderLayer RenderLayerBackgroundOverlay = 1 << RenderLayerLowerBits;
 inline constexpr EntityRenderLayer RenderLayerBackgroundTile = 2 << RenderLayerLowerBits;

@@ -58,7 +58,7 @@ std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
 
 Json PlayerLog::toJson() const {
   auto collections = JsonObject();
-  for (auto pair : m_collections)
+  for (auto const& pair : m_collections)
     collections[pair.first] = jsonFromStringSet(pair.second);
 
   return JsonObject{{"deathCount", m_deathCount},

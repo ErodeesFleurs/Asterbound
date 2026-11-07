@@ -299,7 +299,7 @@ List<InstanceWorldId> SystemWorldServerThread::activeInstanceWorlds() const {
 }
 
 void SystemWorldServerThread::setUpdateAction(std::function<std::expected<void, StarException>(SystemWorldServerThread&)> updateAction) {
-  m_updateAction = updateAction;
+  m_updateAction = std::move(updateAction);
 }
 
 void SystemWorldServerThread::pushIncomingPacket(ConnectionId clientId, std::shared_ptr<Packet> packet) {

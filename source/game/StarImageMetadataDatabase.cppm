@@ -42,7 +42,7 @@ private:
   [[nodiscard]] std::expected<Vec2U, StarException> calculateImageSize(AssetPath const& path) const;
 
   // Path, position, fillLimit, and flip
-  typedef std::tuple<AssetPath, Vec2I, float, bool> SpacesEntry;
+  using SpacesEntry = std::tuple<AssetPath, Vec2I, float, bool>;
 
   Root& m_root;
   mutable std::mutex m_mutex;

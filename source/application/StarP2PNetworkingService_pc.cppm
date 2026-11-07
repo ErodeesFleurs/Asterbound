@@ -35,7 +35,7 @@ namespace Star {
 class PcP2PNetworkingService : public P2PNetworkingService {
 public:
   PcP2PNetworkingService(std::shared_ptr<PcPlatformServicesState> state);
-  ~PcP2PNetworkingService();
+  ~PcP2PNetworkingService() override;
 
   [[nodiscard]] std::expected<void, StarException> setJoinUnavailable() override;
   [[nodiscard]] std::expected<void, StarException> setJoinLocal(std::uint32_t capacity) override;
@@ -79,15 +79,16 @@ private:
 
     template <class Arg>
     JoinUnavailableWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<JoinUnavailableWrapper, typename std::decay<Arg>::type>::value,
-          "JoinUnavailable can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<JoinUnavailableWrapper, std::decay_t<Arg>>,
+                    "JoinUnavailable can not implicitly be assigned from std::monostate-derived classes or strong "
+                    "std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef JoinUnavailableWrapper<std::monostate> JoinUnavailable;
+  using JoinUnavailable = JoinUnavailableWrapper<std::monostate>;
   struct JoinLocal {
     bool operator==(JoinLocal const& rhs) const { return capacity == rhs.capacity; };
     std::uint32_t capacity;
@@ -118,16 +119,17 @@ private:
 
     template <class Arg>
     JoinRemoteWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<JoinRemoteWrapper, typename std::decay<Arg>::type>::value,
-          "JoinRemote can not implicitly be assigned from HostAddressWithPort-derived classes or strong HostAddressWithPort typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<JoinRemoteWrapper, std::decay_t<Arg>>,
+                    "JoinRemote can not implicitly be assigned from HostAddressWithPort-derived classes or strong "
+                    "HostAddressWithPort typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef JoinRemoteWrapper<HostAddressWithPort> JoinRemote;
-  typedef std::variant<JoinUnavailable, JoinLocal, JoinRemote> JoinLocation;
+  using JoinRemote = JoinRemoteWrapper<HostAddressWithPort>;
+  using JoinLocation = std::variant<JoinUnavailable, JoinLocal, JoinRemote>;
 
 #ifdef STAR_ENABLE_STEAM_INTEGRATION
 
@@ -175,7 +177,7 @@ private:
 
   struct DiscordP2PSocket : P2PSocket {
     DiscordP2PSocket() = default;
-    ~DiscordP2PSocket();
+    ~DiscordP2PSocket() override;
 
     bool isOpen() override;
     [[nodiscard]] std::expected<bool, StarException> sendMessage(ByteArray const& message) override;

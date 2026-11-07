@@ -12,7 +12,7 @@ import star.interpolation;
 
 namespace Star {
 
-AnimatedPartSet::AnimatedPartSet() {}
+AnimatedPartSet::AnimatedPartSet() = default;
 
 AnimatedPartSet& AnimatedPartSet::operator=(AnimatedPartSet const& other) {
   if (this != &other) {
@@ -133,7 +133,8 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
         if (!properties) return std::unexpected(std::move(properties.error()));
         auto frames = stateConfig.getObject("frameProperties", {});
         if (!frames) return std::unexpected(std::move(frames.error()));
-        newPart.partStates[stateTypeName][stateName] = PartState{std::move(*properties), std::move(*frames)};
+        newPart.partStates[stateTypeName][stateName] =
+          PartState{.partStateProperties = std::move(*properties), .partStateFrameProperties = std::move(*frames)};
       }
     }
     newPart.activePart.partName = partName;

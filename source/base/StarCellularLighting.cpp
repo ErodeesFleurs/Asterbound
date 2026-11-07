@@ -108,10 +108,10 @@ std::expected<void, StarException> CellularLightingCalculator::setParameters(Jso
 void CellularLightingCalculator::begin(RectI const& queryRegion) {
   m_queryRegion = queryRegion;
   if (m_monochrome) {
-    m_calculationRegion = RectI(queryRegion).padded((int)m_lightArray.rightRef().borderCells());
+    m_calculationRegion = RectI(queryRegion).padded(static_cast<int>(m_lightArray.rightRef().borderCells()));
     m_lightArray.rightRef().begin(m_calculationRegion.width(), m_calculationRegion.height());
   } else {
-    m_calculationRegion = RectI(queryRegion).padded((int)m_lightArray.leftRef().borderCells());
+    m_calculationRegion = RectI(queryRegion).padded(static_cast<int>(m_lightArray.leftRef().borderCells()));
     m_lightArray.leftRef().begin(m_calculationRegion.width(), m_calculationRegion.height());
   }
 }
@@ -123,17 +123,27 @@ RectI CellularLightingCalculator::calculationRegion() const {
 void CellularLightingCalculator::addSpreadLight(Vec2F const& position, Vec3F const& light) {
   Vec2F arrayPosition = position - Vec2F(m_calculationRegion.min());
   if (m_monochrome)
-    m_lightArray.rightRef().addSpreadLight({arrayPosition, light.max()});
+    m_lightArray.rightRef().addSpreadLight({.position = arrayPosition, .value = light.max()});
   else
-    m_lightArray.leftRef().addSpreadLight({arrayPosition, light});
+    m_lightArray.leftRef().addSpreadLight({.position = arrayPosition, .value = light});
 }
 
 void CellularLightingCalculator::addPointLight(Vec2F const& position, Vec3F const& light, float beam, float beamAngle, float beamAmbience, bool asSpread) {
   Vec2F arrayPosition = position - Vec2F(m_calculationRegion.min());
   if (m_monochrome)
-    m_lightArray.rightRef().addPointLight({arrayPosition, light.max(), beam, beamAngle, beamAmbience, asSpread});
+    m_lightArray.rightRef().addPointLight({.position = arrayPosition,
+                                           .value = light.max(),
+                                           .beam = beam,
+                                           .beamAngle = beamAngle,
+                                           .beamAmbience = beamAmbience,
+                                           .asSpread = asSpread});
   else
-    m_lightArray.leftRef().addPointLight({arrayPosition, light, beam, beamAngle, beamAmbience, asSpread});
+    m_lightArray.leftRef().addPointLight({.position = arrayPosition,
+                                          .value = light,
+                                          .beam = beam,
+                                          .beamAngle = beamAngle,
+                                          .beamAmbience = beamAmbience,
+                                          .asSpread = asSpread});
 }
 
 void CellularLightingCalculator::calculate(Image& output) {
@@ -228,7 +238,7 @@ std::expected<void, StarException> CellularLightIntensityCalculator::setParamete
 void CellularLightIntensityCalculator::begin(Vec2F const& queryPosition) {
   m_queryPosition = queryPosition;
   m_queryRegion = RectI::withSize(Vec2I::floor(queryPosition - Vec2F::filled(0.5f)), Vec2I(2, 2));
-  m_calculationRegion = RectI(m_queryRegion).padded((int)m_lightArray.borderCells());
+  m_calculationRegion = RectI(m_queryRegion).padded(static_cast<int>(m_lightArray.borderCells()));
 
   m_lightArray.begin(m_calculationRegion.width(), m_calculationRegion.height());
 }
@@ -249,12 +259,17 @@ void CellularLightIntensityCalculator::setCellColumn(Vec2I const& position, std:
 
 void CellularLightIntensityCalculator::addSpreadLight(Vec2F const& position, float light) {
   Vec2F arrayPosition = position - Vec2F(m_calculationRegion.min());
-  m_lightArray.addSpreadLight({arrayPosition, light});
+  m_lightArray.addSpreadLight({.position = arrayPosition, .value = light});
 }
 
 void CellularLightIntensityCalculator::addPointLight(Vec2F const& position, float light, float beam, float beamAngle, float beamAmbience) {
   Vec2F arrayPosition = position - Vec2F(m_calculationRegion.min());
-  m_lightArray.addPointLight({arrayPosition, light, beam, beamAngle, beamAmbience, false});
+  m_lightArray.addPointLight({.position = arrayPosition,
+                              .value = light,
+                              .beam = beam,
+                              .beamAngle = beamAngle,
+                              .beamAmbience = beamAmbience,
+                              .asSpread = false});
 }
 
 

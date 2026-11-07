@@ -16,7 +16,7 @@ public:
     return Star::typeName<EffectSourceItem>();
   }
 
-  virtual ~EffectSourceItem() {}
+  virtual ~EffectSourceItem() = default;
   [[nodiscard]]
   virtual std::expected<StringSet, StarException> effectSources() const = 0;
 };

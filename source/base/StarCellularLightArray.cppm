@@ -10,7 +10,7 @@ namespace Star {
 
 // Operations for simple scalar lighting.
 struct ScalarLightTraits {
-  typedef float Value;
+  using Value = float;
 
   static float spread(float source, float dest, float drop);
   static float subtract(float value, float drop);
@@ -26,7 +26,7 @@ struct ScalarLightTraits {
 // applied proportionally, so that color ratios stay the same, to prevent hues
 // changing as light spreads.
 struct ColoredLightTraits {
-  typedef Vec3F Value;
+  using Value = Vec3F;
 
   static Vec3F spread(Vec3F const& source, Vec3F const& dest, float drop);
   static Vec3F subtract(Vec3F value, float drop);
@@ -41,7 +41,7 @@ struct ColoredLightTraits {
 template <typename LightTraits>
 class CellularLightArray {
 public:
-  typedef typename LightTraits::Value LightValue;
+  using LightValue = typename LightTraits::Value;
 
   struct Cell {
     LightValue light;
@@ -135,8 +135,8 @@ private:
   bool m_pointAdditive;
 };
 
-typedef CellularLightArray<ColoredLightTraits> ColoredCellularLightArray;
-typedef CellularLightArray<ScalarLightTraits> ScalarCellularLightArray;
+using ColoredCellularLightArray = CellularLightArray<ColoredLightTraits>;
+using ScalarCellularLightArray = CellularLightArray<ScalarLightTraits>;
 
 inline float ScalarLightTraits::spread(float source, float dest, float drop) {
   return std::max(source - drop, dest);
@@ -220,7 +220,7 @@ void CellularLightArray<LightTraits>::setParameters(unsigned spreadPasses, float
 
 template <typename LightTraits>
 std::size_t CellularLightArray<LightTraits>::borderCells() const {
-  return (std::size_t)std::ceil(std::max(0.0f, std::max(m_spreadMaxAir, m_pointMaxAir)));
+  return static_cast<std::size_t>(std::ceil(std::max(0.0f, std::max(m_spreadMaxAir, m_pointMaxAir))));
 }
 
 template <typename LightTraits>
@@ -327,7 +327,8 @@ void CellularLightArray<LightTraits>::setSpreadLightingPoints() {
     // best)
     Vec2I pos(light.position.floor());
     float oneBlockAtt;
-    if (pos[0] >= 0 && pos[0] < (int)m_width && pos[1] >= 0 && pos[1] < (int)m_height && getObstacle(pos[0], pos[1]))
+    if (pos[0] >= 0 && pos[0] < static_cast<int>(m_width) && pos[1] >= 0 && pos[1] < static_cast<int>(m_height)
+        && getObstacle(pos[0], pos[1]))
       oneBlockAtt = 1.0f / m_spreadMaxObstacle;
     else
       oneBlockAtt = 1.0f / m_spreadMaxAir;
@@ -335,16 +336,16 @@ void CellularLightArray<LightTraits>::setSpreadLightingPoints() {
     // "pre fall-off" a 2x2 area of blocks to smooth out floating point
     // positions using the cellular algorithm
 
-    if (minX >= 0 && minX < (int)m_width && minY >= 0 && minY < (int)m_height)
+    if (minX >= 0 && minX < static_cast<int>(m_width) && minY >= 0 && minY < static_cast<int>(m_height))
       setLight(minX, minY, LightTraits::max(getLight(minX, minY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (1.0f - xdist) - (1.0f - ydist)))));
 
-    if (minX >= 0 && minX < (int)m_width && maxY >= 0 && maxY < (int)m_height)
+    if (minX >= 0 && minX < static_cast<int>(m_width) && maxY >= 0 && maxY < static_cast<int>(m_height))
       setLight(minX, maxY, LightTraits::max(getLight(minX, maxY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (1.0f - xdist) - (ydist)))));
 
-    if (maxX >= 0 && maxX < (int)m_width && minY >= 0 && minY < (int)m_height)
+    if (maxX >= 0 && maxX < static_cast<int>(m_width) && minY >= 0 && minY < static_cast<int>(m_height))
       setLight(maxX, minY, LightTraits::max(getLight(maxX, minY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (xdist) - (1.0f - ydist)))));
 
-    if (maxX >= 0 && maxX < (int)m_width && maxY >= 0 && maxY < (int)m_height)
+    if (maxX >= 0 && maxX < static_cast<int>(m_width) && maxY >= 0 && maxY < static_cast<int>(m_height))
       setLight(maxX, maxY, LightTraits::max(getLight(maxX, maxY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (xdist) - (ydist)))));
   }
 }
@@ -361,10 +362,10 @@ void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std
   float dropoffObstacleDiag = 1.0f / m_spreadMaxObstacle * std::numbers::sqrt2;
 
   // enlarge x/y min/max taking into ambient spread of light
-  xMin = xMin - std::min(xMin, (std::size_t)std::ceil(m_spreadMaxAir));
-  yMin = yMin - std::min(yMin, (std::size_t)std::ceil(m_spreadMaxAir));
-  xMax = std::min(m_width, xMax + (std::size_t)std::ceil(m_spreadMaxAir));
-  yMax = std::min(m_height, yMax + (std::size_t)std::ceil(m_spreadMaxAir));
+  xMin = xMin - std::min(xMin, static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
+  yMin = yMin - std::min(yMin, static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
+  xMax = std::min(m_width, xMax + static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
+  yMax = std::min(m_height, yMax + static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
 
   auto propagate = [&](Cell const& source, Cell& straightA, Cell& straightB, Cell& diagonalA, Cell& diagonalB) {
     float straightDropoff = source.obstacle ? dropoffObstacle : dropoffAir;

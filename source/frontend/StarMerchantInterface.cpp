@@ -203,7 +203,7 @@ std::expected<std::shared_ptr<MerchantPane>, StarException> MerchantPane::create
   auto base = pane->initializePane();
   if (!base)
     return std::unexpected(std::move(base.error()));
-  auto initialized = pane->initialize(worldClient, std::move(player), settings, sourceEntityId);
+  auto initialized = pane->initialize(std::move(worldClient), std::move(player), settings, sourceEntityId);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   return pane;
@@ -666,7 +666,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         if (!optArrayResult645)
           return std::unexpected(std::move(optArrayResult645.error()));
         if (auto quests = std::move(*optArrayResult645)) {
-          for (auto quest : *quests) {
+          for (auto const& quest : *quests) {
             {
               auto toStringResult646 = quest.toString();
               if (!toStringResult646)
@@ -857,7 +857,7 @@ std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   else
     m_buyButton->disable();
 
-  if (m_buyTotal > (int)m_player->inventory()->currency("money")) {
+  if (m_buyTotal > static_cast<int>(m_player->inventory()->currency("money"))) {
     m_buyTotalLabel->setColor(Color::Red);
     m_buyButton->disable();
   } else {
@@ -983,7 +983,7 @@ std::expected<int, StarException> MerchantPane::maxBuyCount() {
     auto unitPrice = std::move(*toUIntResult696);
     if (unitPrice == 0)
       return m_maxBuyCount;
-    return std::min(m_maxBuyCount, (int)std::floor(m_player->currency("money") / unitPrice));
+    return std::min(m_maxBuyCount, static_cast<int>(std::floor(m_player->currency("money") / unitPrice)));
   } else {
     return 0;
   }

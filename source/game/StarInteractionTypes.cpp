@@ -45,7 +45,7 @@ InteractAction::InteractAction() {
 }
 
 InteractAction::InteractAction(InteractActionType type, EntityId entityId, Json data)
-  : type(type), entityId(entityId), data(data) {}
+    : type(type), entityId(entityId), data(std::move(data)) {}
 
 std::expected<InteractAction, StarException> InteractAction::create(String const& typeName, EntityId entityId, Json data) {
   if (!InteractActionTypeNames) return std::unexpected(InteractActionTypeNames.error());

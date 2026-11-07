@@ -225,7 +225,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
 
 private:
-  typedef std::pair<std::optional<InventorySlot>, std::optional<InventorySlot>> CustomBarLink;
+  using CustomBarLink = std::pair<std::optional<InventorySlot>, std::optional<InventorySlot>>;
 
   template <typename> friend class NetElementTop;
   explicit PlayerInventory(Root& root);

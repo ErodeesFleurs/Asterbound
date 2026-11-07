@@ -114,7 +114,7 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<ObjectItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& objectParameters);
-  virtual ~ObjectItem() {}
+  ~ObjectItem() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;

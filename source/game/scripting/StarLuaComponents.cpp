@@ -72,7 +72,7 @@ std::expected<void, StarException> LuaBaseComponent::setScripts(StringList scrip
 std::expected<void, StarException> LuaBaseComponent::addCallbacks(String groupName, LuaCallbacks callbacks) {
   if (m_callbacks.contains(groupName))
     return std::unexpected(LuaComponentException::format("Duplicate callbacks named '{}' in LuaBaseComponent", groupName));
-  CallbackGroup group{std::move(callbacks), {}};
+  CallbackGroup group{.callbacks = std::move(callbacks), .scope = {}};
   // Installation can run Lua metamethods; revoke escaped values on rollback or session retirement.
   auto retire = [scope = group.scope]() mutable { scope.request_stop(); };
   auto rollback = finally([&] { retire(); });
@@ -157,7 +157,7 @@ std::expected<bool, StarException> LuaBaseComponent::removeThreadCallbacks(Strin
   return true;
 }
 
-bool LuaBaseComponent::autoReInit() const { return (bool)m_reloadTracker; }
+bool LuaBaseComponent::autoReInit() const { return static_cast<bool>(m_reloadTracker); }
 
 void LuaBaseComponent::setAutoReInit(bool enabled) {
   m_reloadSubscription.disconnect();
@@ -503,7 +503,9 @@ std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallback
     if (thread->get()->shouldExpire())
       return RpcPromise<Json>::createFailed("Thread is stopped");
     auto pair = RpcPromise<Json>::createPair();
-    if (auto passed = thread->get()->passMessage({message, JsonArray::from(std::move(args)), pair.second}); !passed)
+    if (auto passed = thread->get()->passMessage(
+          {.message = message, .args = JsonArray::from(std::move(args)), .promise = pair.second});
+        !passed)
       return std::unexpected(std::move(passed.error()));
     return pair.first;
   }); !result)
@@ -597,7 +599,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
   auto pair = RpcPromise<Json>::createPair();
   std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_threadMessages.append({thread, message, args, pair.second});
+  m_threadMessages.append({.originThread = thread, .message = message, .args = args, .promise = pair.second});
   return pair.first;
 }
 

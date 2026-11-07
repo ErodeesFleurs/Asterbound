@@ -114,13 +114,13 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
     for (int xspace = min[0]; xspace < max[0]; ++xspace) {
       float fillRatio = 0.0f;
 
-      for (int y = 0; y < (int)TilePixels; ++y) {
-        int ypixel = std::round(yspace * (int)TilePixels + y - position[1]);
+      for (int y = 0; y < static_cast<int>(TilePixels); ++y) {
+        int ypixel = std::round(yspace * static_cast<int>(TilePixels) + y - position[1]);
         if (ypixel < 0 || ypixel >= imageHeight)
           continue;
 
-        for (int x = 0; x < (int)TilePixels; ++x) {
-          int xpixel = std::round(xspace * (int)TilePixels + x - position[0]);
+        for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
+          int xpixel = std::round(xspace * static_cast<int>(TilePixels) + x - position[0]);
           if (flip)
             xpixel = imageWidth - 1 - xpixel;
 
@@ -290,9 +290,9 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
 
   struct OperationSizeAdjust {
     Vec2U& imageSize;
-    bool hasError;
+    bool hasError = false;
 
-    OperationSizeAdjust(Vec2U& size) : imageSize(size), hasError(false) {};
+    OperationSizeAdjust(Vec2U& size) : imageSize(size) {};
 
     void operator()(NullImageOperation const&) {}
 
@@ -334,11 +334,9 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
     }
 
     void operator()(CropImageOperation const& cio) {
-      if (cio.subset.isEmpty() ||
-          cio.subset.xMin() < 0 ||
-          cio.subset.yMin() < 0 ||
-          (unsigned)cio.subset.xMax() > imageSize[0] ||
-          (unsigned)cio.subset.yMax() > imageSize[1]) {
+      if (cio.subset.isEmpty() || cio.subset.xMin() < 0 || cio.subset.yMin() < 0
+          || static_cast<unsigned>(cio.subset.xMax()) > imageSize[0]
+          || static_cast<unsigned>(cio.subset.yMax()) > imageSize[1]) {
         hasError = true;
       } else {
         imageSize = Vec2U(cio.subset.size());

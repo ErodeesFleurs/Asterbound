@@ -36,17 +36,17 @@ public:
   [[nodiscard]] std::expected<void, StarException> fromJson(Json const& diskStore);
 
 private:
-  explicit EffectEmitter(Root& root) : m_root(root), m_direction(Direction::Right), m_collectsEvents(false) {}
+  explicit EffectEmitter(Root& root) : m_root(root) {}
   Root& m_root;
   Set<std::pair<String, String>> m_newSources;
   List<std::shared_ptr<EffectSource>> m_sources;
   NetElementData<Set<std::pair<String, String>>> m_activeSources;
 
   StringMap<Vec2F> m_positions;
-  Direction m_direction;
+  Direction m_direction = Direction::Right;
   Vec2F m_baseVelocity;
 
-  bool m_collectsEvents;
+  bool m_collectsEvents = false;
 };
 
 }

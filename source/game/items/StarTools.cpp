@@ -169,7 +169,7 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
   item->m_frameTiming = 0;
-  for (std::size_t i = 0; i < (std::size_t)item->m_frames; i++) {
+  for (std::size_t i = 0; i < static_cast<std::size_t>(item->m_frames); i++) {
     auto frame = item->m_image.replace("{frame}", toString(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
@@ -218,7 +218,10 @@ std::expected<List<Drawable>, StarException> MiningTool::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto const& image = m_frameTiming == 0 ? m_idleFrame : m_animationFrame[std::max(0, std::min(m_frames - 1, (int)std::floor((m_frameTiming / m_frameCycle) * m_frames)))];
+  auto const& image = m_frameTiming == 0
+    ? m_idleFrame
+    : m_animationFrame[std::max(
+        0, std::min(m_frames - 1, static_cast<int>(std::floor((m_frameTiming / m_frameCycle) * m_frames))))];
   auto drawable = Drawable::makeImage(**metadata, image, 1.0f / TilePixels, true, -handPosition() / TilePixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
@@ -349,7 +352,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
           return std::unexpected(std::move(miningParticleConfig.error()));
         if (*miningParticleConfig) {
           auto miningParticle = (*miningParticleConfig)->instance();
-          miningParticle.position += (Vec2F)pos;
+          miningParticle.position += Vec2F(pos);
           miningParticles.append(miningParticle);
         }
       }
@@ -443,7 +446,7 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
-  for (std::size_t i = 0; i < (std::size_t)item->m_frames; i++) {
+  for (std::size_t i = 0; i < static_cast<std::size_t>(item->m_frames); i++) {
     auto frame = item->m_image.replace("{frame}", toString(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
@@ -481,7 +484,10 @@ std::expected<List<Drawable>, StarException> HarvestingTool::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto const& image = m_frameTiming == 0 ? m_idleFrame : m_animationFrame[std::max(0, std::min(m_frames - 1, (int)std::floor((m_frameTiming / m_frameCycle) * m_frames)))];
+  auto const& image = m_frameTiming == 0
+    ? m_idleFrame
+    : m_animationFrame[std::max(
+        0, std::min(m_frames - 1, static_cast<int>(std::floor((m_frameTiming / m_frameCycle) * m_frames))))];
   auto drawable = Drawable::makeImage(**metadata, image, 1.0f / TilePixels, true, -handPosition() / TilePixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
@@ -967,7 +973,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
           return std::unexpected(std::move(miningParticleConfig.error()));
         if (*miningParticleConfig) {
           auto miningParticle = (*miningParticleConfig)->instance();
-          miningParticle.position += (Vec2F)pos;
+          miningParticle.position += Vec2F(pos);
           miningParticles.append(miningParticle);
         }
       }
@@ -1105,12 +1111,12 @@ std::expected<List<PreviewTile>, StarException> PaintingBeamTool::previewTiles(b
     if (!aimPosition)
       return std::unexpected(std::move(aimPosition.error()));
     for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
-      for (auto const& [layer, color] : {
-          std::pair{TileLayer::Foreground, (MaterialColorVariant)m_colorIndex},
-          std::pair{TileLayer::Background, (MaterialColorVariant)m_colorIndex},
-          std::pair{TileLayer::Foreground, DefaultMaterialColorVariant},
-          std::pair{TileLayer::Background, DefaultMaterialColorVariant}}) {
-        auto placeable = worldp.canModifyTile(pos, PlaceMaterialColor{layer, color}, true);
+      for (auto const& [layer, color] :
+           {std::pair{TileLayer::Foreground, static_cast<MaterialColorVariant>(m_colorIndex)},
+            std::pair{TileLayer::Background, static_cast<MaterialColorVariant>(m_colorIndex)},
+            std::pair{TileLayer::Foreground, DefaultMaterialColorVariant},
+            std::pair{TileLayer::Background, DefaultMaterialColorVariant}}) {
+        auto placeable = worldp.canModifyTile(pos, PlaceMaterialColor{.layer = layer, .color = color}, true);
         if (!placeable)
           return std::unexpected(std::move(placeable.error()));
         if (*placeable) {
@@ -1174,9 +1180,12 @@ std::expected<void, StarException> PaintingBeamTool::fire(FireMode mode, bool sh
           return std::unexpected(std::move(aimPosition.error()));
         for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
           TileModificationList modifications = {
-            {pos, PlaceMaterialColor{TileLayer::Foreground, (MaterialColorVariant)m_colorIndex}},
-            {pos, PlaceMaterialColor{TileLayer::Background, (MaterialColorVariant)m_colorIndex}}
-          };
+            {pos,
+             PlaceMaterialColor{.layer = TileLayer::Foreground,
+                                .color = static_cast<MaterialColorVariant>(m_colorIndex)}},
+            {pos,
+             PlaceMaterialColor{.layer = TileLayer::Background,
+                                .color = static_cast<MaterialColorVariant>(m_colorIndex)}}};
           auto failed = worldp.applyTileModifications(modifications, true);
           if (!failed)
             return std::unexpected(std::move(failed.error()));

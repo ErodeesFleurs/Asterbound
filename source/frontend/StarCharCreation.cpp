@@ -532,7 +532,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
       m_alty, m_hairChoice, m_heady, m_shirtChoice, m_shirtColor, m_pantsChoice, m_pantsColor, m_personality);
   if (!results)
     return std::unexpected(std::move(results.error()));
-  if (auto result = m_previewPlayer->setModeType((PlayerMode)m_modeChoice); !result)
+  if (auto result = m_previewPlayer->setModeType(static_cast<PlayerMode>(m_modeChoice)); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_previewPlayer->setHumanoidParameters(std::move(results->humanoidParameters)); !result)
     return std::unexpected(std::move(result.error()));

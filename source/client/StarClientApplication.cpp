@@ -815,9 +815,17 @@ std::expected<void, StarException> ClientApplication::update() {
       auto join = service->pullPendingJoin();
       if (!std::holds_alternative<std::monostate>(join)) {
         if (std::holds_alternative<P2PNetworkingPeerId>(join))
-          m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{std::move(std::get<P2PNetworkingPeerId>(join)), {}, {}, false};
+          m_pendingMultiPlayerConnection =
+            PendingMultiPlayerConnection{.server = std::move(std::get<P2PNetworkingPeerId>(join)),
+                                         .account = {},
+                                         .password = {},
+                                         .forceLegacy = false};
         else
-          m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{std::move(std::get<HostAddressWithPort>(join)), {}, {}, false};
+          m_pendingMultiPlayerConnection =
+            PendingMultiPlayerConnection{.server = std::move(std::get<HostAddressWithPort>(join)),
+                                         .account = {},
+                                         .password = {},
+                                         .forceLegacy = false};
         join.emplace<0>();
         auto changed = changeState(MainAppState::Title);
         if (!changed)
@@ -1194,7 +1202,8 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     auto passes = layer.getUInt("passes", 1);
     if (!passes)
       return std::unexpected(std::move(passes.error()));
-    m_postProcessLayers.append(PostProcessLayer{std::move(*effects), (unsigned)*passes, group});
+    m_postProcessLayers.append(
+      PostProcessLayer{.effects = std::move(*effects), .passes = static_cast<unsigned>(*passes), .group = group});
   }
   return loadEffectConfig("interface");
 }
@@ -1537,7 +1546,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
   m_cinematicOverlay->setPlayer(m_player);
-  m_timeSinceJoin = (std::int64_t)Time::millisecondsSinceEpoch() / 1000;
+  m_timeSinceJoin = static_cast<std::int64_t>(Time::millisecondsSinceEpoch()) / 1000;
   return true;
 }
 
@@ -1942,9 +1951,11 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
       auto address = HostAddressWithPort::lookup(*addressString, *port);
       if (!address)
         return setError("Error resolving server address", ExceptionDiagnostic(address.error()));
-      m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{
-        *address, m_titleScreen->multiPlayerAccount(), m_titleScreen->multiPlayerPassword(), m_titleScreen->multiPlayerForceLegacy()
-      };
+      m_pendingMultiPlayerConnection =
+        PendingMultiPlayerConnection{.server = *address,
+                                     .account = m_titleScreen->multiPlayerAccount(),
+                                     .password = m_titleScreen->multiPlayerPassword(),
+                                     .forceLegacy = m_titleScreen->multiPlayerForceLegacy()};
       if (auto saved = (*config)->setPath("title.multiPlayerAddress", m_titleScreen->multiPlayerAddress()); !saved)
         return std::unexpected(std::move(saved.error()));
       if (auto saved = (*config)->setPath("title.multiPlayerPort", m_titleScreen->multiPlayerPort()); !saved)
@@ -2154,7 +2165,8 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (isActionTakenEdge(InterfaceAction::EmoteSleep))
         m_player->addEmote(HumanoidEmote::Sleep);
 
-      if (int newZoomDirection = (int)m_input->bindHeld("opensb", "zoomIn") - (int)m_input->bindHeld("opensb", "zoomOut"))
+      if (int newZoomDirection = static_cast<int>(m_input->bindHeld("opensb", "zoomIn"))
+            - static_cast<int>(m_input->bindHeld("opensb", "zoomOut")))
         m_cameraZoomDirection = newZoomDirection;
     }
     if (m_cameraZoomDirection != 0) {
@@ -2164,7 +2176,9 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (!zoom)
         return std::unexpected(std::move(zoom.error()));
       float curZoom = *zoom,
-            newZoom = std::max(1.f, curZoom * std::powf(1.f + (float)m_cameraZoomDirection * 0.5f, std::min(1.f, dt * 5.f))),
+            newZoom = std::max(
+              1.f,
+              curZoom * std::powf(1.f + static_cast<float>(m_cameraZoomDirection) * 0.5f, std::min(1.f, dt * 5.f))),
             intZoom = std::max(1.f, (goingIn ? std::floor(curZoom) : std::ceil(curZoom)) + m_cameraZoomDirection);
       bool pastInt = goingIn ? newZoom + threshold > intZoom
                              : newZoom - threshold < intZoom;

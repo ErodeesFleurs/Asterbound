@@ -27,7 +27,7 @@ public:
   // Callback function to tell what kind of collision geometry is in a cell.
   // Will be called up to BlockInfluenceRadius outside of the given query
   // region.
-  typedef std::function<std::expected<CollisionKind, StarException>(int, int)> CollisionKindAccessor;
+  using CollisionKindAccessor = std::function<std::expected<CollisionKind, StarException>(int, int)>;
 
   void init(CollisionKindAccessor accessor);
 

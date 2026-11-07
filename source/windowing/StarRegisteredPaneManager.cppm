@@ -57,7 +57,7 @@ namespace Star {
 template <typename KeyT>
 class RegisteredPaneManager : public PaneManager {
 public:
-  typedef KeyT Key;
+  using Key = KeyT;
 
   explicit RegisteredPaneManager(GuiContext& context) : PaneManager(context) {}
 

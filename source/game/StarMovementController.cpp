@@ -71,7 +71,7 @@ std::expected<MovementParameters, StarException> MovementParameters::sensibleDef
   return create(Json(std::move(*object)));
 }
 
-MovementParameters::MovementParameters() {}
+MovementParameters::MovementParameters() = default;
 
 std::expected<MovementParameters, StarException> MovementParameters::create(Json const& config) {
   MovementParameters value;
@@ -894,7 +894,7 @@ std::expected<void, StarException> MovementController::tickSlave(float dt) {
 }
 
 void MovementController::setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEntities) {
-  m_ignorePhysicsEntities = ignorePhysicsEntities;
+  m_ignorePhysicsEntities = std::move(ignorePhysicsEntities);
 }
 
 std::expected<void, StarException> MovementController::forEachMovingCollision(RectF const& region, std::function<std::expected<bool, StarException>(MovingCollisionId id, PhysicsMovingCollision, PolyF, RectF)> callback) {
@@ -1329,8 +1329,14 @@ void MovementController::updatePositionInterpolators() {
   if (m_world)
     m_xPosition.setInterpolator(m_world->get().geometry().xLerpFunction(m_parameters.discontinuityThreshold));
   else
-    m_xPosition.setInterpolator(std::bind(lerpWithLimit<float, float>, m_parameters.discontinuityThreshold, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  m_yPosition.setInterpolator(std::bind(lerpWithLimit<float, float>, m_parameters.discontinuityThreshold, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    m_xPosition.setInterpolator(
+      [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+        return lerpWithLimit<float, float>(limit, offset, from, to);
+      });
+  m_yPosition.setInterpolator(
+    [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+      return lerpWithLimit<float, float>(limit, offset, from, to);
+    });
 }
 
 std::expected<void, StarException> MovementController::queryCollisions(RectF const& region) {

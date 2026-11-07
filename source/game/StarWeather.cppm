@@ -39,7 +39,7 @@ class Root;
 // the given tile location.  Other checks that enable / disable weather such as
 // whether or not the region is below the underground level are performed
 // separately of this, this is just to check the actual tile data.
-typedef std::function<std::expected<bool, StarException>(Vec2I)> WeatherEffectsActiveQuery;
+using WeatherEffectsActiveQuery = std::function<std::expected<bool, StarException>(Vec2I)>;
 
 class ServerWeather {
 public:

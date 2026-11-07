@@ -22,9 +22,9 @@ using JsonParsingException = StarError<JsonParsingExceptionTag, StarException>;
 
 class Json;
 
-typedef List<Json> JsonArray;
+using JsonArray = List<Json>;
 
-typedef StringMap<Json> JsonObject;
+using JsonObject = StringMap<Json>;
 
 // Class for holding representation of JSON data.  Immutable and implicitly
 // shared.
@@ -33,8 +33,8 @@ public:
   template <typename Container>
   struct IteratorWrapper {
     // Keep the immutable container alive when iterating a temporary Json.
-    typedef typename Container::const_iterator const_iterator;
-    typedef const_iterator iterator;
+    using const_iterator = typename Container::const_iterator;
+    using iterator = const_iterator;
 
     const_iterator begin() const;
     const_iterator end() const;

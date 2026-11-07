@@ -109,12 +109,10 @@ private:
 };
 
 inline IOMode operator|(IOMode a, IOMode b) {
-  return (IOMode)((std::uint8_t)a | (std::uint8_t)b);
+  return static_cast<IOMode>(static_cast<std::uint8_t>(a) | static_cast<std::uint8_t>(b));
 }
 
-inline bool operator&(IOMode a, IOMode b) {
-  return (std::uint8_t)a & (std::uint8_t)b;
-}
+inline bool operator&(IOMode a, IOMode b) { return static_cast<std::uint8_t>(a) & static_cast<std::uint8_t>(b); }
 
 inline IOMode IODevice::mode() const {
   return m_mode;

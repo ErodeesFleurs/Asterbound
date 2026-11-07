@@ -60,23 +60,23 @@ struct StatEffectiveMultiplier {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, StatEffectiveMultiplier& effectiveMultiplier);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, StatEffectiveMultiplier const& effectiveMultiplier);
 
-typedef std::variant<std::monostate, StatValueModifier, StatBaseMultiplier, StatEffectiveMultiplier> StatModifier;
+using StatModifier = std::variant<std::monostate, StatValueModifier, StatBaseMultiplier, StatEffectiveMultiplier>;
 
 [[nodiscard]] std::expected<StatModifier, StarException> jsonToStatModifier(Json const& config);
 [[nodiscard]] std::expected<Json, StarException> jsonFromStatModifier(StatModifier const& modifier);
 
-typedef std::uint32_t StatModifierGroupId;
-typedef IdMap<StatModifierGroupId, List<StatModifier>> StatModifierGroupMap;
+using StatModifierGroupId = std::uint32_t;
+using StatModifierGroupMap = IdMap<StatModifierGroupId, List<StatModifier>>;
 
 // Unique stat effects are identified uniquely by name.
-typedef String UniqueStatusEffect;
+using UniqueStatusEffect = String;
 
 // Second element here is *percentage* of duration remaining, based on the
 // highest duration that the effect has had
-typedef List<std::pair<UniqueStatusEffect, std::optional<float>>> ActiveUniqueStatusEffectSummary;
+using ActiveUniqueStatusEffectSummary = List<std::pair<UniqueStatusEffect, std::optional<float>>>;
 
 // Persistent status effects can either be a modifier effect or unique effect
-typedef std::variant<std::monostate, StatModifier, UniqueStatusEffect> PersistentStatusEffect;
+using PersistentStatusEffect = std::variant<std::monostate, StatModifier, UniqueStatusEffect>;
 
 // Reads either a name of a unique stat effect or a stat modifier object
 [[nodiscard]] std::expected<PersistentStatusEffect, StarException> jsonToPersistentStatusEffect(Json const& config);

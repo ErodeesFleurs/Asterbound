@@ -314,13 +314,14 @@ std::expected<void, StarException> WirePane::renderImpl() {
   auto const& camera = m_worldPainter->camera();
   auto entities = m_worldClient->query<WireEntity>(RectF(m_worldClient->clientWindow()));
   if (!entities) return std::unexpected(std::move(entities.error()));
-  auto badWire = Color::rgbf(0.6f + (float)std::sin(Time::monotonicTime() * std::numbers::pi * 2.0) * 0.4f, 0.0f, 0.0f);
-  float phase = 0.5f + 0.5f * std::sin((double)Time::monotonicMilliseconds() / 100.0);
+  auto badWire =
+    Color::rgbf(0.6f + static_cast<float>(std::sin(Time::monotonicTime() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
+  float phase = 0.5f + 0.5f * std::sin(static_cast<double>(Time::monotonicMilliseconds()) / 100.0);
   auto drawLineColor = Color::Red.mix(Color::White, phase);
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
       for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{direction, i};
+        WireNode node{.direction = direction, .nodeIndex = i};
         auto offset = entity->nodePosition(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
         Vec2I position = entity->tilePosition() + *offset;
@@ -338,7 +339,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
       for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{direction, i};
+        WireNode node{.direction = direction, .nodeIndex = i};
         auto offset = entity->nodePosition(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
         auto connections = entity->connectionsForNode(node);
@@ -356,15 +357,17 @@ std::expected<void, StarException> WirePane::renderImpl() {
         }
         for (auto const& connection : *connections) {
           if (direction == WireDirection::Input) wire = color->mix(Color::Black, 0.8f);
-          if (direction == WireDirection::Input) visitedConnections.add({{tile, i}, connection});
-          else if (visitedConnections.add({connection, {tile, i}})) continue;
+          if (direction == WireDirection::Input)
+            visitedConnections.add({{.entityLocation = tile, .nodeIndex = i}, connection});
+          else if (visitedConnections.add({connection, {.entityLocation = tile, .nodeIndex = i}}))
+            continue;
           Vec2I otherPosition = connection.entityLocation;
           auto sources = m_worldClient->atTile<WireEntity>(connection.entityLocation);
           if (!sources) return std::unexpected(std::move(sources.error()));
           if (auto source = sources->get(0)) {
             auto otherDirection = direction == WireDirection::Input ? WireDirection::Output : WireDirection::Input;
             if (connection.nodeIndex < source->nodeCount(otherDirection)) {
-              WireNode otherNode{otherDirection, connection.nodeIndex};
+              WireNode otherNode{.direction = otherDirection, .nodeIndex = connection.nodeIndex};
               auto otherOffset = source->nodePosition(otherNode);
               if (!otherOffset) return std::unexpected(std::move(otherOffset.error()));
               otherPosition += *otherOffset;
@@ -390,7 +393,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
     auto sources = m_worldClient->atTile<WireEntity>(m_sourceConnector.entityLocation);
     if (!sources) return std::unexpected(std::move(sources.error()));
     if (auto source = sources->get(0)) {
-      WireNode node{m_sourceDirection, m_sourceConnector.nodeIndex};
+      WireNode node{.direction = m_sourceDirection, .nodeIndex = m_sourceConnector.nodeIndex};
       auto offset = source->nodePosition(node);
       if (!offset) return std::unexpected(std::move(offset.error()));
       auto color = source->nodeColor(node);
@@ -410,7 +413,10 @@ std::expected<bool, StarException> WirePane::sendEvent(InputEvent const& event) 
 
 std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGeometry const& geometry, Vec2F pos, FireMode mode) {
   pos = geometry.xwrap(pos);
-  if (m_worldClient->isTileProtected((Vec2I)pos)) { m_connecting = false; return Protected; }
+  if (m_worldClient->isTileProtected(Vec2I(pos))) {
+    m_connecting = false;
+    return Protected;
+  }
   RectF bounds = {pos - Vec2F(16, 16), pos + Vec2F(16, 16)};
   auto entities = m_worldClient->query<WireEntity>(bounds);
   if (!entities) return std::unexpected(std::move(entities.error()));
@@ -421,7 +427,7 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
       for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{direction, i};
+        WireNode node{.direction = direction, .nodeIndex = i};
         auto offset = entity->nodePosition(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
         Vec2F center = centerOfTile(entity->tilePosition() + *offset);
@@ -436,7 +442,7 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
         }
         float distance = geometry.diff(center, pos).magnitudeSquared();
         if (!matchNode || distance < bestDist) {
-          matchNode = WireConnection{entity->tilePosition(), i};
+          matchNode = WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i};
           matchDirection = direction;
           bestDist = distance;
         }
@@ -445,7 +451,8 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
   }
   if (!matchNode) return Nothing;
   if (mode != FireMode::Primary) {
-    m_worldClient->disconnectAllWires(matchNode->entityLocation, WireNode{matchDirection, matchNode->nodeIndex});
+    m_worldClient->disconnectAllWires(matchNode->entityLocation,
+                                      WireNode{.direction = matchDirection, .nodeIndex = matchNode->nodeIndex});
     return Connect;
   }
   if (m_connecting) {

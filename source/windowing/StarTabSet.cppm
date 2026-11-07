@@ -77,7 +77,7 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<TabSetWidget>, StarException> create(GuiContext& context, TabSetConfig const& tabSetConfig);
 
-  virtual void setSize(Vec2I const& size) override;
+  void setSize(Vec2I const& size) override;
 
   [[nodiscard]] std::expected<void, StarException> addTab(String const& widgetName, std::shared_ptr<Widget> widget, String const& title);
 

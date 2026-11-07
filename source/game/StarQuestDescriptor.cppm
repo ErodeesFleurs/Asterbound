@@ -60,15 +60,15 @@ struct QuestItemTagWrapper : BaseType {
 
   template <class Arg>
   QuestItemTagWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<QuestItemTagWrapper, typename std::decay<Arg>::type>::value,
-        "QuestItemTag can not implicitly be assigned from String-derived classes or strong String typedefs");
+    static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                    || std::is_same_v<QuestItemTagWrapper, std::decay_t<Arg>>,
+                  "QuestItemTag can not implicitly be assigned from String-derived classes or strong String typedefs");
 
     BaseType::operator=(std::forward<Arg>(other));
     return *this;
   }
 };
-typedef QuestItemTagWrapper<String> QuestItemTag;
+using QuestItemTag = QuestItemTagWrapper<String>;
 
 // A collection of items
 template <typename BaseType>
@@ -97,15 +97,16 @@ struct QuestItemListWrapper : BaseType {
 
   template <class Arg>
   QuestItemListWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<QuestItemListWrapper, typename std::decay<Arg>::type>::value,
-        "QuestItemList can not implicitly be assigned from List<ItemDescriptor>-derived classes or strong List<ItemDescriptor> typedefs");
+    static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                    || std::is_same_v<QuestItemListWrapper, std::decay_t<Arg>>,
+                  "QuestItemList can not implicitly be assigned from List<ItemDescriptor>-derived classes or strong "
+                  "List<ItemDescriptor> typedefs");
 
     BaseType::operator=(std::forward<Arg>(other));
     return *this;
   }
 };
-typedef QuestItemListWrapper<List<ItemDescriptor>> QuestItemList;
+using QuestItemList = QuestItemListWrapper<List<ItemDescriptor>>;
 
 // The uniqueId of a specific entity
 struct QuestEntity {
@@ -160,9 +161,10 @@ struct QuestCoordinate {
   CelestialCoordinate coordinate;
 };
 
-typedef Json QuestJson;
+using QuestJson = Json;
 
-typedef std::variant<std::monostate, QuestItem, QuestItemTag, QuestItemList, QuestEntity, QuestLocation, QuestMonsterType, QuestNpcType, QuestCoordinate, QuestJson> QuestParamDetail;
+using QuestParamDetail = std::variant<std::monostate, QuestItem, QuestItemTag, QuestItemList, QuestEntity,
+                                      QuestLocation, QuestMonsterType, QuestNpcType, QuestCoordinate, QuestJson>;
 
 struct QuestParam {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, QuestParam& param);

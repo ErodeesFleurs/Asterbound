@@ -298,7 +298,7 @@ projectileConfig->lightType = result116->get();
     {
 auto result117 = config.getBool("pointLight", false);
 if (!result117) return std::unexpected(std::move(result117.error()));
-projectileConfig->lightType = (LightType)std::move(*result117);
+projectileConfig->lightType = static_cast<LightType>(std::move(*result117));
 }
 
   auto result118 = config.getString("persistentAudio", "");

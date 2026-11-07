@@ -203,19 +203,19 @@ template <typename IntegralType>
 }
 template <typename IntegralType>
 [[nodiscard]] std::expected<void, StarException> DataStream::vuwrite(IntegralType const& data) {
-  auto result = writeVlqU((std::uint64_t)data);
+  auto result = writeVlqU(static_cast<std::uint64_t>(data));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
 template <typename IntegralType>
 [[nodiscard]] std::expected<void, StarException> DataStream::viwrite(IntegralType const& data) {
-  auto result = writeVlqI((std::int64_t)data);
+  auto result = writeVlqI(static_cast<std::int64_t>(data));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
 template <typename IntegralType>
 [[nodiscard]] std::expected<void, StarException> DataStream::vswrite(IntegralType const& data) {
-  auto result = writeVlqS((std::size_t)data);
+  auto result = writeVlqS(static_cast<std::size_t>(data));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -231,7 +231,7 @@ template <typename FloatType>
   auto rounded = std::round(data / base);
   if (!std::isfinite(rounded) || rounded < -0x1p63 || rounded >= 0x1p63)
     return std::unexpected(DataStreamException("Fixed-point stream value is outside signed 64-bit range"));
-  return viwrite((std::int64_t)rounded);
+  return viwrite(static_cast<std::int64_t>(rounded));
 }
 template <typename PointerType, typename ReadFunction>
 [[nodiscard]] std::expected<void, StarException> DataStream::pread(PointerType& pointer, ReadFunction function) {

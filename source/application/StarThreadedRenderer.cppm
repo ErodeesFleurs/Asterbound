@@ -36,7 +36,7 @@ public:
   };
 
   ThreadedRenderer(std::shared_ptr<OpenGlRenderer> backend, MainThreadDispatcher& dispatcher);
-  ~ThreadedRenderer();
+  ~ThreadedRenderer() override;
   ThreadedRenderer(ThreadedRenderer const&) = delete;
   ThreadedRenderer& operator=(ThreadedRenderer const&) = delete;
 

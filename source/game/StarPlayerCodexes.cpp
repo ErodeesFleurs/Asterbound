@@ -141,7 +141,7 @@ std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String con
 }
 
 std::shared_ptr<Codex const> PlayerCodexes::firstNewCodex() const {
-  for (auto pair : m_codexes) {
+  for (auto const& pair : m_codexes) {
     if (!pair.second.second)
       return pair.second.first;
   }

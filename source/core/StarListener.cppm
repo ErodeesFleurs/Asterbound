@@ -16,7 +16,7 @@ public:
   CallbackListener(std::function<std::expected<void, StarException>()> callback);
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> trigger() override;
+  [[nodiscard]] std::expected<void, StarException> trigger() override;
 
 private:
   std::function<std::expected<void, StarException>()> callback;
@@ -29,7 +29,7 @@ public:
   bool pullTriggered();
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> trigger() override;
+  [[nodiscard]] std::expected<void, StarException> trigger() override;
 
 private:
   std::atomic<bool> triggered;

@@ -253,9 +253,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
   }
 }
 
-bool CelestialParameters::isVisitable() const {
-  return (bool)m_visitableParameters;
-}
+bool CelestialParameters::isVisitable() const { return static_cast<bool>(m_visitableParameters); }
 
 std::shared_ptr<VisitableWorldParameters const> CelestialParameters::visitableParameters() const {
   return m_visitableParameters;

@@ -24,7 +24,7 @@ namespace Star {
 class WorldServer;
 struct Packet;
 enum class WorldServerFidelity;
-typedef HashMap<ByteArray, std::optional<ByteArray>> WorldChunks;
+using WorldChunks = HashMap<ByteArray, std::optional<ByteArray>>;
 
 // Runs a WorldServer in a separate thread. World failures are logged at the
 // original recovery boundaries and are also returned to synchronous callers.
@@ -36,11 +36,11 @@ public:
     RpcPromiseKeeper<Json> promise;
   };
 
-  typedef std::function<std::expected<void, StarException>(WorldServerThread&, WorldServer&)> WorldServerAction;
+  using WorldServerAction = std::function<std::expected<void, StarException>(WorldServerThread&, WorldServer&)>;
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<WorldServerThread>, StarException> create(std::shared_ptr<WorldServer> server, WorldId worldId);
-  ~WorldServerThread();
+  ~WorldServerThread() override;
 
   WorldId worldId() const;
 

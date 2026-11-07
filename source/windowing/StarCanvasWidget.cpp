@@ -95,7 +95,7 @@ void CanvasWidget::pushClipRect(RectF const& rect) {
     clipped.limit(std::get<PushClipOp>(m_renderOps[*m_clipHead]).rect);
   clipped = RectF(clipped.min(), clipped.max().piecewiseMax(clipped.min()));
   auto index = m_renderOps.size();
-  m_renderOps.append(PushClipOp{clipped, m_clipHead});
+  m_renderOps.append(PushClipOp{.rect = clipped, .parent = m_clipHead});
   m_clipHead = index;
 }
 
@@ -164,7 +164,7 @@ void CanvasWidget::drawText(String s, TextPositioning position, unsigned fontSiz
   style.color = color;
   style.shadow = fontModeToColor(mode).toRgba();
   style.lineSpacing = lineSpacing;
-  style.font = font;
+  style.font = std::move(font);
   style.directives = processingDirectives;
   m_renderOps.append(std::make_tuple(std::move(s), std::move(position), std::move(style)));
 }
@@ -204,14 +204,18 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
   if (std::holds_alternative<MouseButtonDownEvent>(event)) {
     auto const& mouseButtonDown = std::get<MouseButtonDownEvent>(event);
     if (inMember(*context.mousePosition(event, interfaceScale)) && m_captureMouse) {
-      m_clickEvents.append({*context.mousePosition(event, interfaceScale) - screenPosition(), mouseButtonDown.mouseButton, true});
+      m_clickEvents.append({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
+                            .button = mouseButtonDown.mouseButton,
+                            .buttonDown = true});
       m_clickEvents.limitSizeBack(MaximumEventBuffer);
       return true;
     }
   } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
     auto const& mouseButtonUp = std::get<MouseButtonUpEvent>(event);
     if (m_captureMouse) {
-      m_clickEvents.append({*context.mousePosition(event, interfaceScale) - screenPosition(), mouseButtonUp.mouseButton, false});
+      m_clickEvents.append({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
+                            .button = mouseButtonUp.mouseButton,
+                            .buttonDown = false});
       m_clickEvents.limitSizeBack(MaximumEventBuffer);
       return true;
     }
@@ -221,13 +225,13 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
   } else if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
     if (m_captureKeyboard) {
-      m_keyEvents.append({keyDown.key, true});
+      m_keyEvents.append({.key = keyDown.key, .keyDown = true});
       return true;
     }
   } else if (std::holds_alternative<KeyUpEvent>(event)) {
     auto const& keyUp = std::get<KeyUpEvent>(event);
     if (m_captureKeyboard) {
-      m_keyEvents.append({keyUp.key, false});
+      m_keyEvents.append({.key = keyUp.key, .keyDown = false});
       m_keyEvents.limitSizeBack(MaximumEventBuffer);
       return true;
     }
@@ -349,7 +353,8 @@ std::expected<void, StarException> CanvasWidget::renderTiledImage(Vec2F const& r
 
   for (int x = 0; x < textureCount[0]; ++x) {
     for (int y = 0; y < textureCount[1]; ++y) {
-      Vec2F screenPos = screenLowerLeft + texScaledSize.piecewiseMultiply({(float)x, (float)y});
+      Vec2F screenPos =
+        screenLowerLeft + texScaledSize.piecewiseMultiply({static_cast<float>(x), static_cast<float>(y)});
       RectF screenRect = RectF::withSize(screenPos, texScaledSize);
 
       RectF limitedScreenRect;

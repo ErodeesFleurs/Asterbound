@@ -20,7 +20,7 @@ public:
   static std::expected<std::shared_ptr<Rebuilder>, StarException> create(Root& root, String const& id, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt);
   ~Rebuilder() = default;
 
-  typedef std::function<std::expected<void, StarException>(Json const&)> AttemptCallback;
+  using AttemptCallback = std::function<std::expected<void, StarException>(Json const&)>;
   [[nodiscard]]
   std::expected<bool, StarException> rebuild(Json store, StarException lastError, AttemptCallback attempt) const;
 

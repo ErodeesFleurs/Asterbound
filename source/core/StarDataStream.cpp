@@ -55,7 +55,9 @@ std::expected<std::reference_wrapper<DataStream>, StarException> readNumber(Data
 }
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(bool value) { return writeNumber(*this, (std::uint8_t)value); }
+std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(bool value) {
+  return writeNumber(*this, static_cast<std::uint8_t>(value));
+}
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(char value) { return writeNumber(*this, value); }
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(std::int8_t value) { return writeNumber(*this, value); }
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(std::uint8_t value) { return writeNumber(*this, value); }

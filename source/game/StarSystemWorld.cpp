@@ -86,8 +86,8 @@ std::expected<CelestialOrbit, StarException> CelestialOrbit::fromJson(Json const
   auto position = jsonToVec2F(*positionData);
   if (!position)
     return std::unexpected(std::move(position.error()));
-  
-  return CelestialOrbit{std::move(*target), (int)*direction, *time, *position};
+
+  return CelestialOrbit{std::move(*target), static_cast<int>(*direction), *time, *position};
 }
 
 Json CelestialOrbit::toJson() const {

@@ -393,9 +393,7 @@ void ServerClientContext::setShipUpgrades(ShipUpgrades upgrades) {
   m_shipUpgrades.set(upgrades);
 }
 
-void ServerClientContext::setShipSpecies(String shipSpecies) {
-  m_shipSpecies = shipSpecies;
-}
+void ServerClientContext::setShipSpecies(String shipSpecies) { m_shipSpecies = std::move(shipSpecies); }
 
 WorldChunks ServerClientContext::shipChunks() const {
   std::unique_lock locker(m_mutex, std::defer_lock);

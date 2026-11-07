@@ -431,13 +431,9 @@ void TextBoxWidget::setOnEscapeKeyCallback(WidgetCallbackFunc onEscapeKey) {
   m_onEscapeKey = std::move(onEscapeKey);
 }
 
-void TextBoxWidget::setNextFocus(std::optional<String> nextFocus) {
-  m_nextFocus = nextFocus;
-}
+void TextBoxWidget::setNextFocus(std::optional<String> nextFocus) { m_nextFocus = std::move(nextFocus); }
 
-void TextBoxWidget::setPrevFocus(std::optional<String> prevFocus) {
-  m_prevFocus = prevFocus;
-}
+void TextBoxWidget::setPrevFocus(std::optional<String> prevFocus) { m_prevFocus = std::move(prevFocus); }
 
 std::expected<void, StarException> TextBoxWidget::mouseOver() {
   auto over = Widget::mouseOver();

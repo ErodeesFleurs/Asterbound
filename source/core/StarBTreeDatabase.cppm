@@ -108,8 +108,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> close(bool closeDevice = false);
 
 private:
-  typedef std::uint32_t BlockIndex;
-  static BlockIndex const InvalidBlockIndex = (BlockIndex)(-1);
+  using BlockIndex = std::uint32_t;
+  static BlockIndex const InvalidBlockIndex = static_cast<BlockIndex>(-1);
   static std::uint32_t const HeaderSize = 512;
 
   // 8 byte magic file identifier
@@ -157,7 +157,7 @@ private:
       ByteArray key;
       BlockIndex pointer;
     };
-    typedef List<Element> ElementList;
+    using ElementList = List<Element>;
 
     BlockIndex self;
     std::uint8_t level;
@@ -187,19 +187,19 @@ private:
       ByteArray key;
       ByteArray data;
     };
-    typedef List<Element> ElementList;
+    using ElementList = List<Element>;
 
     BlockIndex self;
     ElementList elements;
   };
 
   struct BTreeImpl {
-    typedef ByteArray Key;
-    typedef ByteArray Data;
-    typedef BlockIndex Pointer;
+    using Key = ByteArray;
+    using Data = ByteArray;
+    using Pointer = BlockIndex;
 
-    typedef std::shared_ptr<IndexNode> Index;
-    typedef std::shared_ptr<LeafNode> Leaf;
+    using Index = std::shared_ptr<IndexNode>;
+    using Leaf = std::shared_ptr<LeafNode>;
 
     explicit BTreeImpl(BTreeDatabase& database) : parent(database) {}
 

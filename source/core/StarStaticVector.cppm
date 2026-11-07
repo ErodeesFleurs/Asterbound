@@ -15,16 +15,16 @@ using StaticVectorSizeException = StarError<StaticVectorSizeExceptionTag, StarEx
 template <typename Element, std::size_t MaxSize>
 class StaticVector {
 public:
-  typedef Element* iterator;
-  typedef Element const* const_iterator;
+  using iterator = Element*;
+  using const_iterator = Element const*;
 
-  typedef std::reverse_iterator<iterator> reverse_iterator;
-  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  typedef Element value_type;
+  using value_type = Element;
 
-  typedef Element& reference;
-  typedef Element const& const_reference;
+  using reference = Element&;
+  using const_reference = Element const&;
 
   static constexpr std::size_t MaximumSize = MaxSize;
 
@@ -117,13 +117,11 @@ private:
     --m_size;
     std::destroy_at(ptr() + m_size);
   }
-  std::size_t m_size;
+  std::size_t m_size = 0;
   alignas(Element) std::byte m_elements[MaxSize ? MaxSize * sizeof(Element) : alignof(Element)];
 };
 
-template <typename Element, std::size_t MaxSize>
-StaticVector<Element, MaxSize>::StaticVector()
-  : m_size(0) {}
+template <typename Element, std::size_t MaxSize> StaticVector<Element, MaxSize>::StaticVector() {}
 
 template <typename Element, std::size_t MaxSize>
 StaticVector<Element, MaxSize>::~StaticVector() {

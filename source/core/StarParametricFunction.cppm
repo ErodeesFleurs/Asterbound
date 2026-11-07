@@ -13,8 +13,8 @@ namespace Star {
 template <typename IndexType, typename ValueType = IndexType>
 class ParametricTable {
 public:
-  typedef IndexType Index;
-  typedef ValueType Value;
+  using Index = IndexType;
+  using Value = ValueType;
 
   ParametricTable();
 
@@ -51,8 +51,8 @@ public:
   [[nodiscard]] std::expected<std::reference_wrapper<ValueType const>, StarException> get(IndexType index) const;
 
 protected:
-  typedef std::vector<IndexType> IndexList;
-  typedef std::vector<ValueType> ValueList;
+  using IndexList = std::vector<IndexType>;
+  using ValueList = std::vector<ValueType>;
 
   IndexList const& indexes() const;
   ValueList const& values() const;
@@ -71,7 +71,7 @@ private:
 template <typename IndexType, typename ValueType = IndexType>
 class ParametricFunction : public ParametricTable<IndexType, ValueType> {
 public:
-  typedef ParametricTable<IndexType, ValueType> Base;
+  using Base = ParametricTable<IndexType, ValueType>;
 
   ParametricFunction();
   ParametricFunction(
@@ -103,8 +103,7 @@ private:
   BoundMode m_boundMode;
 };
 
-template <typename IndexType, typename ValueType>
-ParametricTable<IndexType, ValueType>::ParametricTable() {}
+template <typename IndexType, typename ValueType> ParametricTable<IndexType, ValueType>::ParametricTable() = default;
 
 template <typename IndexType, typename ValueType>
 template <typename OtherIndexType, typename OtherValueType>

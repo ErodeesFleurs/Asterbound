@@ -105,45 +105,49 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {});
 
-  virtual EntityType entityType() const override;
-  virtual ClientEntityMode clientEntityMode() const override;
+  EntityType entityType() const override;
+  ClientEntityMode clientEntityMode() const override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
-  [[nodiscard]] virtual std::expected<void, StarException> uninit() override;
+  [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
+  [[nodiscard]] std::expected<void, StarException> uninit() override;
 
-  virtual Vec2F position() const override;
-  virtual RectF metaBoundBox() const override;
+  Vec2F position() const override;
+  RectF metaBoundBox() const override;
 
-  [[nodiscard]] virtual std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
-  [[nodiscard]] virtual std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException>
+  writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f,
+                                                                NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] virtual std::expected<String, StarException> name() const override;
-  [[nodiscard]] virtual std::expected<String, StarException> description() const override;
+  [[nodiscard]] std::expected<String, StarException> name() const override;
+  [[nodiscard]] std::expected<String, StarException> description() const override;
 
-  virtual bool inspectable() const override;
-  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspectionLogName() const override;
-  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspectionDescription(String const& species) const override;
+  bool inspectable() const override;
+  [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionLogName() const override;
+  [[nodiscard]] std::expected<std::optional<String>, StarException>
+  inspectionDescription(String const& species) const override;
 
-  [[nodiscard]] virtual std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] virtual std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<void, StarException>
+  destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> checkBroken() override;
+  [[nodiscard]] std::expected<bool, StarException> checkBroken() override;
 
-  virtual Vec2I tilePosition() const override;
+  Vec2I tilePosition() const override;
 
-  virtual List<Vec2I> spaces() const override;
-  virtual List<MaterialSpace> materialSpaces() const override;
-  virtual List<Vec2I> roots() const override;
+  List<Vec2I> spaces() const override;
+  List<MaterialSpace> materialSpaces() const override;
+  List<Vec2I> roots() const override;
 
   Direction direction() const;
   void setDirection(Direction direction);
@@ -162,50 +166,55 @@ public:
 
   virtual std::shared_ptr<ObjectOrientation> currentOrientation() const;
 
-  [[nodiscard]] virtual std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
-  virtual PolyF statusEffectArea() const override;
+  [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
+  PolyF statusEffectArea() const override;
 
-  [[nodiscard]] virtual std::expected<List<DamageSource>, StarException> damageSources() const override;
+  [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
 
-  [[nodiscard]] virtual std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
+  [[nodiscard]] std::expected<std::optional<HitType>, StarException>
+  queryHit(DamageSource const& source) const override;
   [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
 
-  [[nodiscard]] virtual std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage) override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException>
+  applyDamage(DamageRequest const& damage) override;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
-  [[nodiscard]] virtual std::expected<bool, StarException> canBeDamaged() const override;
+  [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition,
+                                                               TileDamage const& tileDamage) override;
+  [[nodiscard]] std::expected<bool, StarException> canBeDamaged() const override;
 
   RectF interactiveBoundBox() const override;
 
   bool isInteractive() const override;
-  [[nodiscard]] virtual std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
+  [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   List<Vec2I> interactiveSpaces() const override;
 
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
 
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition() const override;
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
-  virtual List<ChatAction> pullPendingChatActions() override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
+  List<ChatAction> pullPendingChatActions() override;
 
   [[nodiscard]] std::expected<void, StarException> breakObject(bool smash = true);
 
-  virtual std::size_t nodeCount(WireDirection direction) const override;
-  [[nodiscard]] virtual std::expected<Vec2I, StarException> nodePosition(WireNode wireNode) const override;
-  [[nodiscard]] virtual std::expected<List<WireConnection>, StarException> connectionsForNode(WireNode wireNode) const override;
-  [[nodiscard]] virtual std::expected<bool, StarException> nodeState(WireNode wireNode) const override;
+  std::size_t nodeCount(WireDirection direction) const override;
+  [[nodiscard]] std::expected<Vec2I, StarException> nodePosition(WireNode wireNode) const override;
+  [[nodiscard]] std::expected<List<WireConnection>, StarException> connectionsForNode(WireNode wireNode) const override;
+  [[nodiscard]] std::expected<bool, StarException> nodeState(WireNode wireNode) const override;
 
-  [[nodiscard]] virtual std::expected<String, StarException> nodeIcon(WireNode wireNode) const override;
-  [[nodiscard]] virtual std::expected<Color, StarException> nodeColor(WireNode wireNode) const override;
+  [[nodiscard]] std::expected<String, StarException> nodeIcon(WireNode wireNode) const override;
+  [[nodiscard]] std::expected<Color, StarException> nodeColor(WireNode wireNode) const override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> addNodeConnection(WireNode wireNode, WireConnection nodeConnection) override;
-  [[nodiscard]] virtual std::expected<void, StarException> removeNodeConnection(WireNode wireNode, WireConnection nodeConnection) override;
+  [[nodiscard]] std::expected<void, StarException> addNodeConnection(WireNode wireNode,
+                                                                     WireConnection nodeConnection) override;
+  [[nodiscard]] std::expected<void, StarException> removeNodeConnection(WireNode wireNode,
+                                                                        WireConnection nodeConnection) override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> evaluate(WireCoordinator& coordinator) override;
+  [[nodiscard]] std::expected<void, StarException> evaluate(WireCoordinator& coordinator) override;
 
-  [[nodiscard]] virtual std::expected<List<QuestArcDescriptor>, StarException> offeredQuests() const override;
-  [[nodiscard]] virtual std::expected<StringSet, StarException> turnInQuests() const override;
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> questIndicatorPosition() const override;
+  [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offeredQuests() const override;
+  [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
 
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
 

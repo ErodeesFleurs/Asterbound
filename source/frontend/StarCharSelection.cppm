@@ -53,9 +53,9 @@ public:
     return Star::typeName<CharSelectionPane>();
   }
 
-  typedef std::function<std::expected<void, StarException>()> CreateCharCallback;
-  typedef std::function<std::expected<void, StarException>(std::shared_ptr<Player> const&)> SelectCharacterCallback;
-  typedef std::function<std::expected<void, StarException>(Uuid)> DeleteCharacterCallback;
+  using CreateCharCallback = std::function<std::expected<void, StarException>()>;
+  using SelectCharacterCallback = std::function<std::expected<void, StarException>(std::shared_ptr<Player> const&)>;
+  using DeleteCharacterCallback = std::function<std::expected<void, StarException>(Uuid)>;
 
   [[nodiscard]] static std::expected<std::shared_ptr<CharSelectionPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<PlayerStorage> playerStorage, CreateCharCallback createCallback,
       SelectCharacterCallback selectCallback, DeleteCharacterCallback deleteCallback);

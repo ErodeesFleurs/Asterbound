@@ -586,7 +586,8 @@ std::expected<void, StarException> AiInterface::selectRecruit() {
   auto name = m_selectedRecruit->name();
   if (!name) return std::unexpected(std::move(name.error()));
   auto speech = description->value_or(m_defaultRecruitDescription);
-  auto result = setCurrentSpeech("recruitText", {m_aiDatabase->defaultAnimation(), speech, 1.0f});
+  auto result = setCurrentSpeech(
+    "recruitText", {.animation = m_aiDatabase->defaultAnimation(), .text = speech, .speedModifier = 1.0f});
   if (!result) return std::unexpected(std::move(result.error()));
   result = m_recruitNameLabel->setText(name->value_or(m_defaultRecruitName));
   if (!result) return std::unexpected(std::move(result.error()));

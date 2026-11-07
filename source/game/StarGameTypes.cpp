@@ -9,7 +9,7 @@ std::expected<std::pair<EntityId, EntityId>, StarException> connectionEntitySpac
   if (connectionId == ServerConnectionId) {
     return std::pair{MinServerEntityId, MaxServerEntityId};
   } else if (connectionId >= MinClientConnectionId && connectionId <= MaxClientSubWorldConnectionId) {
-    EntityId beginIdSpace = (EntityId)connectionId * -65536;
+    EntityId beginIdSpace = static_cast<EntityId>(connectionId) * -65536;
     EntityId endIdSpace = beginIdSpace + 65535;
     return std::pair{beginIdSpace, endIdSpace};
   } else {

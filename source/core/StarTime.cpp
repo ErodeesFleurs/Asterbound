@@ -51,15 +51,15 @@ String printDuration(double time) {
   String milliseconds;
 
   if (time >= 3600) {
-    int numHours = (int)time / 3600;
+    int numHours = static_cast<int>(time) / 3600;
     hours = strf("{} hour{}", numHours, numHours == 1 ? "" : "s");
   }
   if (time >= 60) {
-    int numMinutes = (int)(time / 60) % 60;
+    int numMinutes = static_cast<int>((time / 60)) % 60;
     minutes = strf("{} minute{}", numMinutes, numMinutes == 1 ? "" : "s");
   }
   if (time >= 1) {
-    int numSeconds = (int)time % 60;
+    int numSeconds = static_cast<int>(time) % 60;
     seconds = strf("{} second{}", numSeconds, numSeconds == 1 ? "" : "s");
   }
 
@@ -202,13 +202,9 @@ Timer::Timer() : Clock(false) {
   setTime(0.0);
 }
 
-Timer::Timer(Timer const& timer)
-  : Clock(timer) {}
+Timer::Timer(Timer const& timer) = default;
 
-Timer& Timer::operator=(Timer const& timer) {
-  Clock::operator=(timer);
-  return *this;
-}
+Timer& Timer::operator=(Timer const& timer) = default;
 
 void Timer::restart(double timeLeft) {
   Clock::setTime(-timeLeft);

@@ -35,10 +35,10 @@ namespace Star {
 struct Biome;
 struct TerrainSelector;
 
-typedef std::uint8_t BiomeIndex;
+using BiomeIndex = std::uint8_t;
 inline constexpr BiomeIndex NullBiomeIndex = 0;
 
-typedef std::uint32_t TerrainSelectorIndex;
+using TerrainSelectorIndex = std::uint32_t;
 inline constexpr TerrainSelectorIndex NullTerrainSelectorIndex = 0;
 
 struct WorldRegionLiquids {

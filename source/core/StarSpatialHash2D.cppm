@@ -20,11 +20,11 @@ namespace Star {
 template <typename KeyT, typename ScalarT, typename ValueT, typename IntT = int, std::size_t AllocatorBlockSize = 4096>
 class SpatialHash2D {
 public:
-  typedef KeyT Key;
-  typedef ScalarT Scalar;
-  typedef Box<ScalarT, 2> Rect;
-  typedef typename Rect::Coord Coord;
-  typedef ValueT Value;
+  using Key = KeyT;
+  using Scalar = ScalarT;
+  using Rect = Box<ScalarT, 2>;
+  using Coord = typename Rect::Coord;
+  using Value = ValueT;
 
   struct Entry {
     Entry();
@@ -33,7 +33,8 @@ public:
     Value value;
   };
 
-  typedef StableHashMap<Key, Entry, hash<Key>, std::equal_to<Key>, BlockAllocator<std::pair<Key const, Entry>, AllocatorBlockSize>> EntryMap;
+  using EntryMap = StableHashMap<Key, Entry, hash<Key>, std::equal_to<Key>,
+                                 BlockAllocator<std::pair<Key const, Entry>, AllocatorBlockSize>>;
 
   SpatialHash2D(Scalar const& sectorSize);
 
@@ -92,11 +93,11 @@ public:
   void setSectorSize(Scalar const& sectorSize);
 
 private:
-  typedef Vector<IntT, 2> Sector;
-  typedef Box<IntT, 2> SectorRange;
+  using Sector = Vector<IntT, 2>;
+  using SectorRange = Box<IntT, 2>;
   // Stable entry addresses identify nodes in this secondary container index.
-  typedef HashSet<Entry const*, hash<Entry const*>, std::equal_to<Entry const*>> SectorEntrySet;
-  typedef HashMap<Sector, SectorEntrySet> SectorMap;
+  using SectorEntrySet = HashSet<Entry const*, hash<Entry const*>, std::equal_to<Entry const*>>;
+  using SectorMap = HashMap<Sector, SectorEntrySet>;
 
   SectorRange getSectors(Rect const& r) const;
 

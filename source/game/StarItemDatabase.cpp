@@ -437,7 +437,7 @@ bool ItemDatabase::hasRecipeToMake(ItemDescriptor const& item, StringSet const& 
   auto si = item.singular();
   for (auto const& recipe : m_recipes)
     if (recipe.output.singular() == si)
-      for (auto allowedType : allowedTypes)
+      for (auto const& allowedType : allowedTypes)
         if (recipe.groups.contains(allowedType))
           return true;
   return false;
@@ -646,7 +646,8 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
       return std::unexpected(std::move(itemCallbacks.error()));
     if (auto added = script.addCallbacks("item", std::move(*itemCallbacks)); !added)
       return std::unexpected(std::move(added.error()));
-    auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(augment), std::placeholders::_1, std::placeholders::_2));
+    auto configCallbacks = LuaBindings::makeConfigCallbacks(
+      [&augment](String const& name, Json const& def) { return augment.instanceValue(name, def); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     return script.addCallbacks("config", std::move(*configCallbacks));
@@ -746,7 +747,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::createItem(Ite
   case ItemType::UnlockItem: return UnlockItem::create(m_root, config.config, config.directory, config.parameters);
   case ItemType::ActiveItem: return ActiveItem::create(m_root, config.config, config.directory, config.parameters);
   case ItemType::AugmentItem: return AugmentItem::create(m_root, config.config, config.directory, config.parameters);
-  default: return std::unexpected(ItemException::format("Unknown item type {}", (int)type));
+  default: return std::unexpected(ItemException::format("Unknown item type {}", static_cast<int>(type)));
   }
 }
 

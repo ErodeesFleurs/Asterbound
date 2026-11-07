@@ -12,7 +12,7 @@ namespace Star {
 template <typename T, std::size_t N>
 class Line {
 public:
-  typedef Vector<T, N> VectorType;
+  using VectorType = Vector<T, N>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -274,9 +274,9 @@ private:
   VectorType m_max;
 };
 
-typedef Line<float, 2> Line2F;
-typedef Line<double, 2> Line2D;
-typedef Line<int, 2> Line2I;
+using Line2F = Line<float, 2>;
+using Line2D = Line<double, 2>;
+using Line2I = Line<int, 2>;
 
 template <typename T, std::size_t N>
 std::ostream& operator<<(std::ostream& os, Line<T, N> const& l) {

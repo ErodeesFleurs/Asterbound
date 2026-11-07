@@ -20,12 +20,12 @@ namespace Star {
 template <typename BaseMap>
 class NetElementMapWrapper : public NetElement, private BaseMap {
 public:
-  typedef typename BaseMap::iterator iterator;
-  typedef typename BaseMap::const_iterator const_iterator;
+  using iterator = typename BaseMap::iterator;
+  using const_iterator = typename BaseMap::const_iterator;
 
-  typedef typename BaseMap::key_type key_type;
-  typedef typename BaseMap::mapped_type mapped_type;
-  typedef typename BaseMap::value_type value_type;
+  using key_type = typename BaseMap::key_type;
+  using mapped_type = typename BaseMap::mapped_type;
+  using value_type = typename BaseMap::value_type;
 
   void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
@@ -101,7 +101,7 @@ private:
   };
   struct ClearChange {};
 
-  typedef std::variant<SetChange, RemoveChange, ClearChange> ElementChange;
+  using ElementChange = std::variant<SetChange, RemoveChange, ClearChange>;
 
   [[nodiscard]] static std::expected<void, StarException> writeSetChange(DataStream& ds, key_type const& key,
                                                                          mapped_type const& value);
@@ -492,7 +492,8 @@ void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
 
   m_changeData.append({currentVersion, std::move(change)});
 
-  m_changeDataLastVersion = std::max<std::int64_t>((std::int64_t)currentVersion - MaxChangeDataVersions, 0);
+  m_changeDataLastVersion =
+    std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
   while (!m_changeData.empty() && m_changeData.front().first < m_changeDataLastVersion)
     m_changeData.pop_front();
 }

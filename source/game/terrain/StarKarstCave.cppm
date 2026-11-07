@@ -42,7 +42,8 @@ private:
   };
 
   struct Sector {
-    Sector(KarstCaveSelector const& parent, Vec2I sector) : parent(parent), sector(sector), values(square(parent.m_sectorSize)), m_maxValue(0) {}
+    Sector(KarstCaveSelector const& parent, Vec2I sector)
+        : parent(parent), sector(sector), values(square(parent.m_sectorSize)) {}
     [[nodiscard]] static std::expected<Sector, StarException> create(KarstCaveSelector const& parent, Vec2I sector);
 
     float get(int x, int y);
@@ -54,7 +55,7 @@ private:
     Vec2I sector;
     List<float> values;
 
-    float m_maxValue;
+    float m_maxValue = 0;
   };
 
   [[nodiscard]] std::expected<std::reference_wrapper<LayerPerlins const>, StarException> layerPerlins(int y) const;
@@ -237,7 +238,10 @@ std::expected<std::reference_wrapper<KarstCaveSelector::LayerPerlins const>, Sta
     auto caveFloor = PerlinF::create(m_caveFloorVariationPerlinConfig, staticRandomU64(y, m_seed, "CaveFloorVariation"));
     if (!caveFloor)
       return std::unexpected(std::move(caveFloor.error()));
-    return LayerPerlins{std::move(*decision), std::move(*layerHeight), std::move(*caveHeight), std::move(*caveFloor)};
+    return LayerPerlins{.caveDecision = std::move(*decision),
+                        .layerHeightVariation = std::move(*layerHeight),
+                        .caveHeightVariation = std::move(*caveHeight),
+                        .caveFloorVariation = std::move(*caveFloor)};
   });
   if (!result)
     return std::unexpected(std::move(result.error()));

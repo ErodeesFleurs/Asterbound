@@ -159,7 +159,7 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
       return std::unexpected(std::move(read.error()));
     if (!*read)
       return std::nullopt;
-    return InventorySlot(BagSlot(std::move(name), (std::uint8_t)index));
+    return InventorySlot(BagSlot(std::move(name), static_cast<std::uint8_t>(index)));
   }
   return std::nullopt;
 }
@@ -284,7 +284,7 @@ template <> struct LuaUserDataMethods<LuaPathFinder> {
 std::expected<void, StarException>
 LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::from(LuaStack stack,
                                                                  std::shared_ptr<PlatformerAStar::PathFinder> finder) {
-  return stack.pushUserData(LuaPathFinder{std::move(finder), stack.engine().promiseLifetime()});
+  return stack.pushUserData(LuaPathFinder{.finder = std::move(finder), .lifetime = stack.engine().promiseLifetime()});
 }
 
 std::expected<std::optional<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException>
@@ -487,7 +487,7 @@ std::expected<void, StarException> LuaConverter<EphemeralStatusEffect>::from(Lua
 std::expected<std::optional<EphemeralStatusEffect>, StarException>
 LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
   if (v.is<LuaString>())
-    return EphemeralStatusEffect{UniqueStatusEffect(v.toString()), {}};
+    return EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect(v.toString()), .duration = {}};
   if (!v.is<LuaTable>())
     return std::nullopt;
   auto const& table = v;
@@ -503,7 +503,7 @@ LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
       return std::unexpected(std::move(duration.error()));
   }
   if (*effect && *duration)
-    return EphemeralStatusEffect{std::move(**effect), std::move(**duration)};
+    return EphemeralStatusEffect{.uniqueEffect = std::move(**effect), .duration = std::move(**duration)};
   return std::nullopt;
 }
 

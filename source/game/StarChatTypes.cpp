@@ -49,11 +49,13 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 
 ChatReceivedMessage::ChatReceivedMessage() : fromConnection() {}
 
-ChatReceivedMessage::ChatReceivedMessage(MessageContext context, ConnectionId fromConnection, String const& fromNick, String const& text)
-  : context(context), fromConnection(fromConnection), fromNick(fromNick), text(text) {}
+ChatReceivedMessage::ChatReceivedMessage(MessageContext context, ConnectionId fromConnection, String const& fromNick,
+                                         String const& text)
+    : context(std::move(context)), fromConnection(fromConnection), fromNick(fromNick), text(text) {}
 
-ChatReceivedMessage::ChatReceivedMessage(MessageContext context, ConnectionId fromConnection, String const& fromNick, String const& text, String const& portrait)
-  : context(context), fromConnection(fromConnection), fromNick(fromNick), portrait(portrait), text(text) {}
+ChatReceivedMessage::ChatReceivedMessage(MessageContext context, ConnectionId fromConnection, String const& fromNick,
+                                         String const& text, String const& portrait)
+    : context(std::move(context)), fromConnection(fromConnection), fromNick(fromNick), portrait(portrait), text(text) {}
 
 std::expected<ChatReceivedMessage, StarException> ChatReceivedMessage::create(Json const& json) {
   ChatReceivedMessage message;

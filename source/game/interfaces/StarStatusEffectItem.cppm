@@ -21,7 +21,7 @@ public:
     return Star::typeName<StatusEffectItem>();
   }
 
-  virtual ~StatusEffectItem() {}
+  virtual ~StatusEffectItem() = default;
   [[nodiscard]]
   virtual std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const = 0;
 };

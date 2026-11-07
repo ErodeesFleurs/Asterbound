@@ -11,9 +11,7 @@ import star.vector;
 import star.rect;
 namespace Star {
 
-void CollisionGenerator::init(CollisionKindAccessor accessor) {
-  m_accessor = accessor;
-}
+void CollisionGenerator::init(CollisionKindAccessor accessor) { m_accessor = std::move(accessor); }
 
 std::expected<List<CollisionBlock>, StarException> CollisionGenerator::getBlocks(RectI const& region) const {
   if (region.isNull())

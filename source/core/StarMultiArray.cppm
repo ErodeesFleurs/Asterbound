@@ -22,21 +22,21 @@ using MultiArrayException = StarError<MultiArrayExceptionTag, StarException>;
 template <typename ElementT, std::size_t RankN>
 class MultiArray {
 public:
-  typedef List<ElementT> Storage;
+  using Storage = List<ElementT>;
 
-  typedef ElementT Element;
+  using Element = ElementT;
   static std::size_t const Rank = RankN;
 
-  typedef Array<std::size_t, Rank> IndexArray;
-  typedef Array<std::size_t, Rank> SizeArray;
+  using IndexArray = Array<std::size_t, Rank>;
+  using SizeArray = Array<std::size_t, Rank>;
 
   using Extents = std::dextents<std::size_t, Rank>;
   using View = std::mdspan<Element, Extents, std::layout_right>;
   using ConstView = std::mdspan<Element const, Extents, std::layout_right>;
 
-  typedef typename Storage::iterator iterator;
-  typedef typename Storage::const_iterator const_iterator;
-  typedef Element value_type;
+  using iterator = typename Storage::iterator;
+  using const_iterator = typename Storage::const_iterator;
+  using value_type = Element;
 
   MultiArray();
   template <typename... T>
@@ -149,23 +149,23 @@ private:
   SizeArray m_shape;
 };
 
-typedef MultiArray<int, 2> MultiArray2I;
-typedef MultiArray<std::size_t, 2> MultiArray2S;
-typedef MultiArray<unsigned, 2> MultiArray2U;
-typedef MultiArray<float, 2> MultiArray2F;
-typedef MultiArray<double, 2> MultiArray2D;
+using MultiArray2I = MultiArray<int, 2>;
+using MultiArray2S = MultiArray<std::size_t, 2>;
+using MultiArray2U = MultiArray<unsigned, 2>;
+using MultiArray2F = MultiArray<float, 2>;
+using MultiArray2D = MultiArray<double, 2>;
 
-typedef MultiArray<int, 3> MultiArray3I;
-typedef MultiArray<std::size_t, 3> MultiArray3S;
-typedef MultiArray<unsigned, 3> MultiArray3U;
-typedef MultiArray<float, 3> MultiArray3F;
-typedef MultiArray<double, 3> MultiArray3D;
+using MultiArray3I = MultiArray<int, 3>;
+using MultiArray3S = MultiArray<std::size_t, 3>;
+using MultiArray3U = MultiArray<unsigned, 3>;
+using MultiArray3F = MultiArray<float, 3>;
+using MultiArray3D = MultiArray<double, 3>;
 
-typedef MultiArray<int, 4> MultiArray4I;
-typedef MultiArray<std::size_t, 4> MultiArray4S;
-typedef MultiArray<unsigned, 4> MultiArray4U;
-typedef MultiArray<float, 4> MultiArray4F;
-typedef MultiArray<double, 4> MultiArray4D;
+using MultiArray4I = MultiArray<int, 4>;
+using MultiArray4S = MultiArray<std::size_t, 4>;
+using MultiArray4U = MultiArray<unsigned, 4>;
+using MultiArray4F = MultiArray<float, 4>;
+using MultiArray4D = MultiArray<double, 4>;
 
 template <typename Element, std::size_t Rank>
 std::ostream& operator<<(std::ostream& os, MultiArray<Element, Rank> const& array);

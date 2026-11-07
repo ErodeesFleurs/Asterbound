@@ -60,19 +60,31 @@ inline bool compareKeyMod(KeyMod input, KeyMod test) {
 
 Json keyModsToJson(KeyMod mod) {
   JsonArray array;
-  
-  if (bool(mod & KeyMod::LShift)) array.emplace_back("LShift");
-  if (bool(mod & KeyMod::RShift)) array.emplace_back("RShift");
-  if (bool(mod & KeyMod::LCtrl )) array.emplace_back("LCtrl" );
-  if (bool(mod & KeyMod::RCtrl )) array.emplace_back("RCtrl" );
-  if (bool(mod & KeyMod::LAlt  )) array.emplace_back("LAlt"  );
-  if (bool(mod & KeyMod::RAlt  )) array.emplace_back("RAlt"  );
-  if (bool(mod & KeyMod::LGui  )) array.emplace_back("LGui"  );
-  if (bool(mod & KeyMod::RGui  )) array.emplace_back("RGui"  );
-  if (bool(mod & KeyMod::Num   )) array.emplace_back("Num"   );
-  if (bool(mod & KeyMod::Caps  )) array.emplace_back("Caps"  );
-  if (bool(mod & KeyMod::AltGr )) array.emplace_back("AltGr" );
-  if (bool(mod & KeyMod::Scroll)) array.emplace_back("Scroll");
+
+  if (static_cast<bool>(mod & KeyMod::LShift))
+    array.emplace_back("LShift");
+  if (static_cast<bool>(mod & KeyMod::RShift))
+    array.emplace_back("RShift");
+  if (static_cast<bool>(mod & KeyMod::LCtrl))
+    array.emplace_back("LCtrl");
+  if (static_cast<bool>(mod & KeyMod::RCtrl))
+    array.emplace_back("RCtrl");
+  if (static_cast<bool>(mod & KeyMod::LAlt))
+    array.emplace_back("LAlt");
+  if (static_cast<bool>(mod & KeyMod::RAlt))
+    array.emplace_back("RAlt");
+  if (static_cast<bool>(mod & KeyMod::LGui))
+    array.emplace_back("LGui");
+  if (static_cast<bool>(mod & KeyMod::RGui))
+    array.emplace_back("RGui");
+  if (static_cast<bool>(mod & KeyMod::Num))
+    array.emplace_back("Num");
+  if (static_cast<bool>(mod & KeyMod::Caps))
+    array.emplace_back("Caps");
+  if (static_cast<bool>(mod & KeyMod::AltGr))
+    array.emplace_back("AltGr");
+  if (static_cast<bool>(mod & KeyMod::Scroll))
+    array.emplace_back("Scroll");
 
   return array.empty() ? Json() : std::move(array);
 }
@@ -385,9 +397,7 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
   if (!userBindings) return std::unexpected(std::move(userBindings.error()));
   auto configured = config.getObject("binds", {});
   if (!configured) return std::unexpected(std::move(configured.error()));
-  for (auto const& pair : *configured) {
-    String const& bindId = pair.first;
-    Json const& bindConfig = pair.second;
+  for (auto const& [bindId, bindConfig] : *configured) {
     if (!bindConfig.isType(Json::Type::Object)) continue;
     auto built = BindEntry::create(owner, bindId, bindConfig, *this);
     if (!built) return std::unexpected(std::move(built.error()));

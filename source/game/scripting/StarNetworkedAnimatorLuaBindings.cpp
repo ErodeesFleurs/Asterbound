@@ -197,13 +197,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeNetworkedAnimatorCal
   LuaCallbacks callbacks;
 
   if (auto result = callbacks.registerCallbackWithSignature<bool, String, String, bool, bool>(
-      "setAnimationState", std::bind(&NetworkedAnimator::setState, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)); !result) return std::unexpected(std::move(result.error()));
+        "setAnimationState",
+        [&networkedAnimator](String const& type, String const& state, bool startNew, bool reverse) {
+          return networkedAnimator.setState(type, state, startNew, reverse);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = Detail::registerAnimatorStateCallbacks(callbacks, networkedAnimator, Detail::AnimatorStateCallbackOrder::Networked); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.registerCallbackWithSignature<void, String, std::optional<String>>(
-      "setGlobalTag", std::bind(&NetworkedAnimator::setGlobalTag, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setGlobalTag",
+        [&networkedAnimator](String&& name, std::optional<String>&& value) {
+          return networkedAnimator.setGlobalTag(std::move(name), std::move(value));
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, String, std::optional<String>>(
-      "setPartTag", std::bind(&NetworkedAnimator::setPartTag, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)); !result) return std::unexpected(std::move(result.error()));
+        "setPartTag",
+        [&networkedAnimator](String const& part, String&& name, std::optional<String>&& value) {
+          return networkedAnimator.setPartTag(part, std::move(name), std::move(value));
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("setFlipped",
       [&networkedAnimator](bool flipped, std::optional<float> relativeCenterLine) {
         networkedAnimator.setFlipped(flipped, relativeCenterLine.value_or(0.0f));
@@ -211,16 +226,34 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeNetworkedAnimatorCal
   if (auto result = Detail::registerAnimatorPlaybackQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.registerCallbackWithSignature<void, float>(
-      "setAnimationRate", std::bind(&NetworkedAnimator::setAnimationRate, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "setAnimationRate", [&networkedAnimator](float rate) { return networkedAnimator.setAnimationRate(rate); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, float, bool>(
-      "rotateGroup", std::bind(&NetworkedAnimator::rotateGroup, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)); !result) return std::unexpected(std::move(result.error()));
+        "rotateGroup",
+        [&networkedAnimator](String const& group, float angle, bool immediate) {
+          return networkedAnimator.rotateGroup(group, angle, immediate);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String>(
-      "currentRotationAngle", std::bind(&NetworkedAnimator::currentRotationAngle, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "currentRotationAngle",
+        [&networkedAnimator](String const& group) { return networkedAnimator.currentRotationAngle(group); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "hasTransformationGroup", std::bind(&NetworkedAnimator::hasTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "hasTransformationGroup",
+        [&networkedAnimator](String const& group) { return networkedAnimator.hasTransformationGroup(group); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, Vec2F>("translateTransformationGroup",
-      std::bind(&NetworkedAnimator::translateTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, Vec2F>(
+        "translateTransformationGroup",
+        [&networkedAnimator](String const& group, Vec2F const& translation) {
+          return networkedAnimator.translateTransformationGroup(group, translation);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("rotateTransformationGroup",
       [&networkedAnimator](String const& transformationGroup, float rotation, std::optional<Vec2F> const& rotationCenter) {
         return networkedAnimator.rotateTransformationGroup(transformationGroup, rotation, rotationCenter.value_or(Vec2F{}));
@@ -239,42 +272,111 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeNetworkedAnimatorCal
         return networkedAnimator.scaleTransformationGroup(transformationGroup, *scalar, scaleCenter.value_or(Vec2F{}));
       }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, float, float, float, float, float, float>(
-      "transformTransformationGroup",
-      std::bind(&NetworkedAnimator::transformTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6, std::placeholders::_7)); !result) return std::unexpected(std::move(result.error()));
+        "transformTransformationGroup",
+        [&networkedAnimator](String const& group, float a, float b, float c, float d, float tx, float ty) {
+          return networkedAnimator.transformTransformationGroup(group, a, b, c, d, tx, ty);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String>(
-      "resetTransformationGroup", std::bind(&NetworkedAnimator::resetTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resetTransformationGroup",
+        [&networkedAnimator](String const& group) { return networkedAnimator.resetTransformationGroup(group); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, Mat3F>(
-      "setTransformationGroup", std::bind(&NetworkedAnimator::setTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setTransformationGroup",
+        [&networkedAnimator](String const& group, Mat3F transform) {
+          return networkedAnimator.setTransformationGroup(group, transform);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<Mat3F, String>(
-      "getTransformationGroup", std::bind(&NetworkedAnimator::getTransformationGroup, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "getTransformationGroup",
+        [&networkedAnimator](String const& group) { return networkedAnimator.getTransformationGroup(group); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
   if (auto result = Detail::registerAnimatorLocalTransformationCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
 
-
   if (auto result = callbacks.registerCallbackWithSignature<void, String, bool>(
-      "setParticleEmitterActive", std::bind(&NetworkedAnimator::setParticleEmitterActive, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, float>("setParticleEmitterEmissionRate",
-      std::bind(&NetworkedAnimator::setParticleEmitterEmissionRate, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, unsigned>("setParticleEmitterBurstCount",
-      std::bind(&NetworkedAnimator::setParticleEmitterBurstCount, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, RectF>("setParticleEmitterOffsetRegion",
-      std::bind(&NetworkedAnimator::setParticleEmitterOffsetRegion, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String>(
-      "burstParticleEmitter", std::bind(&NetworkedAnimator::burstParticleEmitter, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, bool>(
-      "setLightActive", std::bind(&NetworkedAnimator::setLightActive, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, Vec2F>(
-      "setLightPosition", std::bind(&NetworkedAnimator::setLightPosition, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, Color>(
-      "setLightColor", std::bind(&NetworkedAnimator::setLightColor, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setParticleEmitterActive",
+        [&networkedAnimator](String const& emitter, bool active) {
+          return networkedAnimator.setParticleEmitterActive(emitter, active);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, float>(
-      "setLightPointAngle", std::bind(&NetworkedAnimator::setLightPointAngle, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "hasSound", std::bind(&NetworkedAnimator::hasSound, std::ref(networkedAnimator), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, StringList>(
-      "setSoundPool", std::bind(&NetworkedAnimator::setSoundPool, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setParticleEmitterEmissionRate",
+        [&networkedAnimator](String const& emitter, float rate) {
+          return networkedAnimator.setParticleEmitterEmissionRate(emitter, rate);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, unsigned>(
+        "setParticleEmitterBurstCount",
+        [&networkedAnimator](String const& emitter, unsigned count) {
+          return networkedAnimator.setParticleEmitterBurstCount(emitter, count);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, RectF>(
+        "setParticleEmitterOffsetRegion",
+        [&networkedAnimator](String const& emitter, RectF const& region) {
+          return networkedAnimator.setParticleEmitterOffsetRegion(emitter, region);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String>(
+        "burstParticleEmitter",
+        [&networkedAnimator](String const& emitter) { return networkedAnimator.burstParticleEmitter(emitter); });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, bool>(
+        "setLightActive",
+        [&networkedAnimator](String const& light, bool active) {
+          return networkedAnimator.setLightActive(light, active);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, Vec2F>(
-      "setSoundPosition", std::bind(&NetworkedAnimator::setSoundPosition, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setLightPosition",
+        [&networkedAnimator](String const& light, Vec2F position) {
+          return networkedAnimator.setLightPosition(light, position);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, Color>(
+        "setLightColor",
+        [&networkedAnimator](String const& light, Color color) {
+          return networkedAnimator.setLightColor(light, color);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, float>(
+        "setLightPointAngle",
+        [&networkedAnimator](String const& light, float angle) {
+          return networkedAnimator.setLightPointAngle(light, angle);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
+        "hasSound", [&networkedAnimator](String const& sound) { return networkedAnimator.hasSound(sound); });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, StringList>(
+        "setSoundPool",
+        [&networkedAnimator](String const& sound, StringList&& pool) {
+          return networkedAnimator.setSoundPool(sound, std::move(pool));
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, String, Vec2F>(
+        "setSoundPosition",
+        [&networkedAnimator](String const& sound, Vec2F position) {
+          return networkedAnimator.setSoundPosition(sound, position);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("playSound",
       [&networkedAnimator](String const& sound, std::optional<int> loops) {
         return networkedAnimator.playSound(sound, loops.value_or(0));
@@ -295,7 +397,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeNetworkedAnimatorCal
       }); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.registerCallbackWithSignature<void, String, bool>(
-      "setEffectActive", std::bind(&NetworkedAnimator::setEffectEnabled, std::ref(networkedAnimator), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setEffectActive",
+        [&networkedAnimator](String const& effect, bool active) {
+          return networkedAnimator.setEffectEnabled(effect, active);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = Detail::registerAnimatorPartQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = Detail::registerAnimatorDrawableCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));

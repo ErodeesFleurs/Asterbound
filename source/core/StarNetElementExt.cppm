@@ -17,10 +17,11 @@ public:
   [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
   [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  typedef std::function<std::expected<void, StarException>(DataStream&, NetCompatibilityRules)> NetStorer;
-  typedef std::function<std::expected<void, StarException>(DataStream&, NetCompatibilityRules)> NetLoader;
-  typedef std::function<std::expected<bool, StarException>(DataStream&, std::uint64_t, NetCompatibilityRules)> NetDeltaWriter;
-  typedef std::function<std::expected<void, StarException>(DataStream&, float, NetCompatibilityRules)> NetDeltaReader;
+  using NetStorer = std::function<std::expected<void, StarException>(DataStream&, NetCompatibilityRules)>;
+  using NetLoader = std::function<std::expected<void, StarException>(DataStream&, NetCompatibilityRules)>;
+  using NetDeltaWriter =
+    std::function<std::expected<bool, StarException>(DataStream&, std::uint64_t, NetCompatibilityRules)>;
+  using NetDeltaReader = std::function<std::expected<void, StarException>(DataStream&, float, NetCompatibilityRules)>;
 
   void setNetStorer(NetStorer);
   void setNetLoader(NetLoader);

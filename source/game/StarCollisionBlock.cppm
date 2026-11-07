@@ -106,9 +106,7 @@ inline bool CollisionSet::contains(CollisionKind kind) const {
   return m_kinds & kindBit(kind);
 }
 
-inline std::uint8_t CollisionSet::kindBit(CollisionKind kind) {
-  return 1 << ((std::uint8_t)kind + 1);
-}
+inline std::uint8_t CollisionSet::kindBit(CollisionKind kind) { return 1 << (static_cast<std::uint8_t>(kind) + 1); }
 
 inline bool isColliding(CollisionKind kind, CollisionSet const& collisionSet) {
   return collisionSet.contains(kind);

@@ -45,7 +45,8 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeScriptedAnimatorCallbacks(NetworkedAnimator& networkedAnimator, std::function<std::expected<Json, StarException>(String const&, Json const&)> getParameter) {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.registerCallback("animationParameter", getParameter); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallback("animationParameter", std::move(getParameter)); !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = Detail::registerAnimatorPartQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = Detail::registerAnimatorStateCallbacks(callbacks, networkedAnimator, Detail::AnimatorStateCallbackOrder::Scripted); !result) return std::unexpected(std::move(result.error()));

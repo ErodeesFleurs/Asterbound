@@ -120,7 +120,9 @@ struct LuaHttpSession::Impl {
       return {};
     }
     auto promise = httpClient->requestAsync(request.httpRequest);
-    auto added = asyncRequests.add(request.id, {std::move(promise), request.rpcKeeper, request.scopedPromise});
+    auto added = asyncRequests.add(
+      request.id,
+      {.workerPromise = std::move(promise), .rpcKeeper = request.rpcKeeper, .scopedPromise = request.scopedPromise});
     if (!added) {
       if (auto failed = request.rpcKeeper.fail(strf("HTTP request failed: {}", added.error().what())); !failed)
         return std::unexpected(failed.error().withRelated(added.error(), "Original HTTP submission failure"));
@@ -148,9 +150,14 @@ struct LuaHttpSession::Impl {
       }
       id = nextRequestId++;
       // Register the native source before attaching the eager stop callback.
-      pendingRequests.append({id, std::move(request), keeper, *domain, {}, lifetime});
+      pendingRequests.append({.id = id,
+                              .httpRequest = std::move(request),
+                              .rpcKeeper = keeper,
+                              .domain = *domain,
+                              .scopedPromise = {},
+                              .lifetime = lifetime});
     }
-    LuaHttpProgress progress{std::move(owner), id};
+    LuaHttpProgress progress{.session = std::move(owner), .id = id};
     auto scoped = promise.withCancellation(lifetime, "Lua session stopped", progress);
     if (!scoped) {
       if (auto cancelled = progress.cancel(); !cancelled)
@@ -316,7 +323,8 @@ std::expected<void, StarException> LuaHttpSession::poll() {
       else if (!response->get().error.empty())
         settled = request.rpcKeeper.fail(strf("HTTP request failed: {}", response->get().error));
       else
-        settled = request.rpcKeeper.fulfill({response->get().statusCode, std::move(response->get().body)});
+        settled = request.rpcKeeper.fulfill(
+          {.statusCode = response->get().statusCode, .body = std::move(response->get().body)});
       if (!settled) {
         if (!error)
           error = std::move(settled.error());

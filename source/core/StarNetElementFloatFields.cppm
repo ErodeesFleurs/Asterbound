@@ -73,8 +73,8 @@ private:
   std::optional<Deque<std::pair<float, T>>> m_interpolationDataPoints;
 };
 
-typedef NetElementFloating<float> NetElementFloat;
-typedef NetElementFloating<double> NetElementDouble;
+using NetElementFloat = NetElementFloating<float>;
+using NetElementDouble = NetElementFloating<double>;
 
 template <typename T>
 NetElementFloating<T>::NetElementFloating(NetElementFloating&& other)

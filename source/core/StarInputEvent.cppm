@@ -356,7 +356,7 @@ inline constexpr auto MouseWheelNames = sortedEnumNames(std::to_array<std::pair<
 }));
 static_assert(validEnumNames<MouseWheelNames>());
 
-typedef std::uint32_t ControllerId;
+using ControllerId = std::uint32_t;
 
 enum class ControllerAxis : std::uint8_t {
   LeftX,
@@ -476,18 +476,9 @@ struct ControllerButtonUpEvent {
   ControllerButton controllerButton;
 };
 
-typedef std::variant<
-    KeyDownEvent,
-    KeyUpEvent,
-    TextInputEvent,
-    MouseMoveEvent,
-    MouseButtonDownEvent,
-    MouseButtonUpEvent,
-    MouseWheelEvent,
-    ControllerAxisEvent,
-    ControllerButtonDownEvent,
-    ControllerButtonUpEvent>
-    InputEvent;
+using InputEvent =
+  std::variant<KeyDownEvent, KeyUpEvent, TextInputEvent, MouseMoveEvent, MouseButtonDownEvent, MouseButtonUpEvent,
+               MouseWheelEvent, ControllerAxisEvent, ControllerButtonDownEvent, ControllerButtonUpEvent>;
 
 inline KeyMod operator|(KeyMod a, KeyMod b) {
   return static_cast<KeyMod>(std::to_underlying(a) | std::to_underlying(b));

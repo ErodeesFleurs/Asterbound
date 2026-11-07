@@ -194,7 +194,7 @@ std::expected<WorldLayout::BlockNoise, StarException> WorldLayout::BlockNoise::b
   return blockNoise;
 }
 
-WorldLayout::BlockNoise::BlockNoise() {}
+WorldLayout::BlockNoise::BlockNoise() = default;
 
 std::expected<WorldLayout::BlockNoise, StarException> WorldLayout::BlockNoise::create(Json const& store) {
   BlockNoise result;
@@ -234,7 +234,7 @@ std::expected<Json, StarException> WorldLayout::BlockNoise::toJson() const {
 }
 
 std::expected<Vec2I, StarException> WorldLayout::BlockNoise::apply(Vec2I const& input, Vec2U const& worldSize) const {
-  float angle = (input[0] / (float)worldSize[0]) * 2 * std::numbers::pi;
+  float angle = (input[0] / static_cast<float>(worldSize[0])) * 2 * std::numbers::pi;
   float xc = std::sin(angle) / (2 * std::numbers::pi) * worldSize[0];
   float zc = std::cos(angle) / (2 * std::numbers::pi) * worldSize[0];
 
@@ -272,68 +272,60 @@ std::expected<WorldLayout, StarException> WorldLayout::buildTerrestrialLayout(Ro
   WorldLayout layout(root);
   layout.m_worldSize = terrestrialParameters.worldSize;
 
-  auto addLayer = [&](TerrestrialWorldParameters::TerrestrialLayer const& terrestrialLayer) -> std::expected<void, StarException> {
+  auto addLayer =
+    [&](TerrestrialWorldParameters::TerrestrialLayer const& terrestrialLayer) -> std::expected<void, StarException> {
     RegionParams primaryRegionParams = {
-      terrestrialLayer.layerBaseHeight,
-      terrestrialParameters.threatLevel,
-      terrestrialLayer.primaryRegion.biome,
-      terrestrialLayer.primaryRegion.blockSelector,
-      terrestrialLayer.primaryRegion.fgCaveSelector,
-      terrestrialLayer.primaryRegion.bgCaveSelector,
-      terrestrialLayer.primaryRegion.fgOreSelector,
-      terrestrialLayer.primaryRegion.bgOreSelector,
-      terrestrialLayer.primaryRegion.subBlockSelector,
-      {
-        terrestrialLayer.primaryRegion.caveLiquid,
-        terrestrialLayer.primaryRegion.caveLiquidSeedDensity,
-        terrestrialLayer.primaryRegion.oceanLiquid,
-        terrestrialLayer.primaryRegion.oceanLiquidLevel,
-        terrestrialLayer.primaryRegion.encloseLiquids,
-        terrestrialLayer.primaryRegion.fillMicrodungeons
-      }
-    };
+      .baseHeight = terrestrialLayer.layerBaseHeight,
+      .threatLevel = terrestrialParameters.threatLevel,
+      .biomeName = terrestrialLayer.primaryRegion.biome,
+      .terrainSelector = terrestrialLayer.primaryRegion.blockSelector,
+      .fgCaveSelector = terrestrialLayer.primaryRegion.fgCaveSelector,
+      .bgCaveSelector = terrestrialLayer.primaryRegion.bgCaveSelector,
+      .fgOreSelector = terrestrialLayer.primaryRegion.fgOreSelector,
+      .bgOreSelector = terrestrialLayer.primaryRegion.bgOreSelector,
+      .subBlockSelector = terrestrialLayer.primaryRegion.subBlockSelector,
+      .regionLiquids = {.caveLiquid = terrestrialLayer.primaryRegion.caveLiquid,
+                        .caveLiquidSeedDensity = terrestrialLayer.primaryRegion.caveLiquidSeedDensity,
+                        .oceanLiquid = terrestrialLayer.primaryRegion.oceanLiquid,
+                        .oceanLiquidLevel = terrestrialLayer.primaryRegion.oceanLiquidLevel,
+                        .encloseLiquids = terrestrialLayer.primaryRegion.encloseLiquids,
+                        .fillMicrodungeons = terrestrialLayer.primaryRegion.fillMicrodungeons}};
 
     RegionParams primarySubRegionParams = {
-      terrestrialLayer.layerBaseHeight,
-      terrestrialParameters.threatLevel,
-      terrestrialLayer.primarySubRegion.biome,
-      terrestrialLayer.primarySubRegion.blockSelector,
-      terrestrialLayer.primarySubRegion.fgCaveSelector,
-      terrestrialLayer.primarySubRegion.bgCaveSelector,
-      terrestrialLayer.primarySubRegion.fgOreSelector,
-      terrestrialLayer.primarySubRegion.bgOreSelector,
-      terrestrialLayer.primarySubRegion.subBlockSelector,
-      {
-        terrestrialLayer.primarySubRegion.caveLiquid,
-        terrestrialLayer.primarySubRegion.caveLiquidSeedDensity,
-        terrestrialLayer.primarySubRegion.oceanLiquid,
-        terrestrialLayer.primarySubRegion.oceanLiquidLevel,
-        terrestrialLayer.primarySubRegion.encloseLiquids,
-        terrestrialLayer.primarySubRegion.fillMicrodungeons
-      }
-    };
+      .baseHeight = terrestrialLayer.layerBaseHeight,
+      .threatLevel = terrestrialParameters.threatLevel,
+      .biomeName = terrestrialLayer.primarySubRegion.biome,
+      .terrainSelector = terrestrialLayer.primarySubRegion.blockSelector,
+      .fgCaveSelector = terrestrialLayer.primarySubRegion.fgCaveSelector,
+      .bgCaveSelector = terrestrialLayer.primarySubRegion.bgCaveSelector,
+      .fgOreSelector = terrestrialLayer.primarySubRegion.fgOreSelector,
+      .bgOreSelector = terrestrialLayer.primarySubRegion.bgOreSelector,
+      .subBlockSelector = terrestrialLayer.primarySubRegion.subBlockSelector,
+      .regionLiquids = {.caveLiquid = terrestrialLayer.primarySubRegion.caveLiquid,
+                        .caveLiquidSeedDensity = terrestrialLayer.primarySubRegion.caveLiquidSeedDensity,
+                        .oceanLiquid = terrestrialLayer.primarySubRegion.oceanLiquid,
+                        .oceanLiquidLevel = terrestrialLayer.primarySubRegion.oceanLiquidLevel,
+                        .encloseLiquids = terrestrialLayer.primarySubRegion.encloseLiquids,
+                        .fillMicrodungeons = terrestrialLayer.primarySubRegion.fillMicrodungeons}};
 
     List<RegionParams> secondaryRegions;
     for (auto const& secondaryRegion : terrestrialLayer.secondaryRegions) {
       RegionParams secondaryRegionParams = {
-        terrestrialLayer.layerBaseHeight,
-        terrestrialParameters.threatLevel,
-        secondaryRegion.biome,
-        secondaryRegion.blockSelector,
-        secondaryRegion.fgCaveSelector,
-        secondaryRegion.bgCaveSelector,
-        secondaryRegion.fgOreSelector,
-        secondaryRegion.bgOreSelector,
-        secondaryRegion.subBlockSelector,
-        {
-          secondaryRegion.caveLiquid,
-          secondaryRegion.caveLiquidSeedDensity,
-          secondaryRegion.oceanLiquid,
-          secondaryRegion.oceanLiquidLevel,
-          secondaryRegion.encloseLiquids,
-          secondaryRegion.fillMicrodungeons
-        }
-      };
+        .baseHeight = terrestrialLayer.layerBaseHeight,
+        .threatLevel = terrestrialParameters.threatLevel,
+        .biomeName = secondaryRegion.biome,
+        .terrainSelector = secondaryRegion.blockSelector,
+        .fgCaveSelector = secondaryRegion.fgCaveSelector,
+        .bgCaveSelector = secondaryRegion.bgCaveSelector,
+        .fgOreSelector = secondaryRegion.fgOreSelector,
+        .bgOreSelector = secondaryRegion.bgOreSelector,
+        .subBlockSelector = secondaryRegion.subBlockSelector,
+        .regionLiquids = {.caveLiquid = secondaryRegion.caveLiquid,
+                          .caveLiquidSeedDensity = secondaryRegion.caveLiquidSeedDensity,
+                          .oceanLiquid = secondaryRegion.oceanLiquid,
+                          .oceanLiquidLevel = secondaryRegion.oceanLiquidLevel,
+                          .encloseLiquids = secondaryRegion.encloseLiquids,
+                          .fillMicrodungeons = secondaryRegion.fillMicrodungeons}};
 
       secondaryRegions.append(secondaryRegionParams);
     }
@@ -341,24 +333,21 @@ std::expected<WorldLayout, StarException> WorldLayout::buildTerrestrialLayout(Ro
     List<RegionParams> secondarySubRegions;
     for (auto const& secondarySubRegion : terrestrialLayer.secondarySubRegions) {
       RegionParams secondarySubRegionParams = {
-        terrestrialLayer.layerBaseHeight,
-        terrestrialParameters.threatLevel,
-        secondarySubRegion.biome,
-        secondarySubRegion.blockSelector,
-        secondarySubRegion.fgCaveSelector,
-        secondarySubRegion.bgCaveSelector,
-        secondarySubRegion.fgOreSelector,
-        secondarySubRegion.bgOreSelector,
-        secondarySubRegion.subBlockSelector,
-        {
-          secondarySubRegion.caveLiquid,
-          secondarySubRegion.caveLiquidSeedDensity,
-          secondarySubRegion.oceanLiquid,
-          secondarySubRegion.oceanLiquidLevel,
-          secondarySubRegion.encloseLiquids,
-          secondarySubRegion.fillMicrodungeons
-        }
-      };
+        .baseHeight = terrestrialLayer.layerBaseHeight,
+        .threatLevel = terrestrialParameters.threatLevel,
+        .biomeName = secondarySubRegion.biome,
+        .terrainSelector = secondarySubRegion.blockSelector,
+        .fgCaveSelector = secondarySubRegion.fgCaveSelector,
+        .bgCaveSelector = secondarySubRegion.bgCaveSelector,
+        .fgOreSelector = secondarySubRegion.fgOreSelector,
+        .bgOreSelector = secondarySubRegion.bgOreSelector,
+        .subBlockSelector = secondarySubRegion.subBlockSelector,
+        .regionLiquids = {.caveLiquid = secondarySubRegion.caveLiquid,
+                          .caveLiquidSeedDensity = secondarySubRegion.caveLiquidSeedDensity,
+                          .oceanLiquid = secondarySubRegion.oceanLiquid,
+                          .oceanLiquidLevel = secondarySubRegion.oceanLiquidLevel,
+                          .encloseLiquids = secondarySubRegion.encloseLiquids,
+                          .fillMicrodungeons = secondarySubRegion.fillMicrodungeons}};
 
       secondarySubRegions.append(secondarySubRegionParams);
     }
@@ -469,7 +458,21 @@ std::expected<WorldLayout, StarException> WorldLayout::buildAsteroidsLayout(Root
   auto autoasteroidRegionField8Result1 = asteroidTerrainConfig.getString("subBlockSelector");
   if (!autoasteroidRegionField8Result1) return std::unexpected(std::move(autoasteroidRegionField8Result1.error()));
   auto asteroidRegionField8 = std::move((*autoasteroidRegionField8Result1));
-  RegionParams asteroidRegion{(int)asteroidParameters.worldSize[1] / 2, asteroidParameters.threatLevel, asteroidParameters.asteroidBiome, asteroidRegionField3, asteroidRegionField4, asteroidRegionField5, asteroidRegionField6, asteroidRegionField7, asteroidRegionField8, {EmptyLiquidId, 0.0f, EmptyLiquidId, 0, false, false}};
+  RegionParams asteroidRegion{.baseHeight = static_cast<int>(asteroidParameters.worldSize[1]) / 2,
+                              .threatLevel = asteroidParameters.threatLevel,
+                              .biomeName = asteroidParameters.asteroidBiome,
+                              .terrainSelector = asteroidRegionField3,
+                              .fgCaveSelector = asteroidRegionField4,
+                              .bgCaveSelector = asteroidRegionField5,
+                              .fgOreSelector = asteroidRegionField6,
+                              .bgOreSelector = asteroidRegionField7,
+                              .subBlockSelector = asteroidRegionField8,
+                              .regionLiquids = {.caveLiquid = EmptyLiquidId,
+                                                .caveLiquidSeedDensity = 0.0f,
+                                                .oceanLiquid = EmptyLiquidId,
+                                                .oceanLiquidLevel = 0,
+                                                .encloseLiquids = false,
+                                                .fillMicrodungeons = false}};
 
   auto autoemptyRegionField3Result1 = emptyTerrainConfig.getString("terrainSelector");
   if (!autoemptyRegionField3Result1) return std::unexpected(std::move(autoemptyRegionField3Result1.error()));
@@ -489,7 +492,21 @@ std::expected<WorldLayout, StarException> WorldLayout::buildAsteroidsLayout(Root
   auto autoemptyRegionField8Result1 = emptyTerrainConfig.getString("subBlockSelector");
   if (!autoemptyRegionField8Result1) return std::unexpected(std::move(autoemptyRegionField8Result1.error()));
   auto emptyRegionField8 = std::move((*autoemptyRegionField8Result1));
-  RegionParams emptyRegion{(int)asteroidParameters.worldSize[1] / 2, asteroidParameters.threatLevel, asteroidParameters.asteroidBiome, emptyRegionField3, emptyRegionField4, emptyRegionField5, emptyRegionField6, emptyRegionField7, emptyRegionField8, {EmptyLiquidId, 0.0f, EmptyLiquidId, 0, false, false}};
+  RegionParams emptyRegion{.baseHeight = static_cast<int>(asteroidParameters.worldSize[1]) / 2,
+                           .threatLevel = asteroidParameters.threatLevel,
+                           .biomeName = asteroidParameters.asteroidBiome,
+                           .terrainSelector = emptyRegionField3,
+                           .fgCaveSelector = emptyRegionField4,
+                           .bgCaveSelector = emptyRegionField5,
+                           .fgOreSelector = emptyRegionField6,
+                           .bgOreSelector = emptyRegionField7,
+                           .subBlockSelector = emptyRegionField8,
+                           .regionLiquids = {.caveLiquid = EmptyLiquidId,
+                                             .caveLiquidSeedDensity = 0.0f,
+                                             .oceanLiquid = EmptyLiquidId,
+                                             .oceanLiquidLevel = 0,
+                                             .encloseLiquids = false,
+                                             .fillMicrodungeons = false}};
 
   {
     auto added = layout.addLayer(seed, 0, emptyRegion);
@@ -534,13 +551,21 @@ std::expected<WorldLayout, StarException> WorldLayout::buildFloatingDungeonLayou
   WorldLayout layout(root);
   layout.m_worldSize = floatingDungeonParameters.worldSize;
 
-  RegionParams biomeRegion{
-    (int)floatingDungeonParameters.dungeonSurfaceHeight,
-    floatingDungeonParameters.threatLevel,
-    floatingDungeonParameters.biome,
-    {}, {}, {}, {}, {}, {},
-    {EmptyLiquidId, 0.0f, EmptyLiquidId, 0, false, false}
-  };
+  RegionParams biomeRegion{.baseHeight = floatingDungeonParameters.dungeonSurfaceHeight,
+                           .threatLevel = floatingDungeonParameters.threatLevel,
+                           .biomeName = floatingDungeonParameters.biome,
+                           .terrainSelector = {},
+                           .fgCaveSelector = {},
+                           .bgCaveSelector = {},
+                           .fgOreSelector = {},
+                           .bgOreSelector = {},
+                           .subBlockSelector = {},
+                           .regionLiquids = {.caveLiquid = EmptyLiquidId,
+                                             .caveLiquidSeedDensity = 0.0f,
+                                             .oceanLiquid = EmptyLiquidId,
+                                             .oceanLiquidLevel = 0,
+                                             .encloseLiquids = false,
+                                             .fillMicrodungeons = false}};
 
   {
     auto added = layout.addLayer(seed, 0, biomeRegion);
@@ -749,13 +774,19 @@ std::expected<List<WorldLayout::RegionWeighting>, StarException> WorldLayout::ge
     rightCellWeight *= weightFactor / totalWeight;
 
     if (innerCellWeight > 0.0f)
-      weighting.append(RegionWeighting{innerCellWeight, innerCellXValue, std::cref(*layer.cells[innerCellIndex])});
+      weighting.append(RegionWeighting{.weight = innerCellWeight,
+                                       .xValue = innerCellXValue,
+                                       .region = std::cref(*layer.cells[innerCellIndex])});
 
     if (leftCellWeight > 0.0f)
-      weighting.append(RegionWeighting{leftCellWeight, leftCellXValue, std::cref(*layer.cells[leftCellIndex])});
+      weighting.append(RegionWeighting{.weight = leftCellWeight,
+                                       .xValue = leftCellXValue,
+                                       .region = std::cref(*layer.cells[leftCellIndex])});
 
     if (rightCellWeight > 0.0f)
-      weighting.append(RegionWeighting{rightCellWeight, rightCellXValue, std::cref(*layer.cells[rightCellIndex])});
+      weighting.append(RegionWeighting{.weight = rightCellWeight,
+                                       .xValue = rightCellXValue,
+                                       .region = std::cref(*layer.cells[rightCellIndex])});
   };
 
   auto yi = std::lower_bound(m_layers.begin(), m_layers.end(), y, [](WorldLayer const& layer, int y) {
@@ -872,7 +903,7 @@ std::expected<void, StarException> WorldLayout::addBiomeRegion(
       if (layer.layerMinHeight == targetLayer.yStart)
         terrestrialLayer = layer;
     };
-  for (auto undergroundLayer : terrestrialParameters.undergroundLayers)
+  for (auto const& undergroundLayer : terrestrialParameters.undergroundLayers)
     checkLayer(undergroundLayer);
   checkLayer(terrestrialParameters.subsurfaceLayer);
   checkLayer(terrestrialParameters.surfaceLayer);
@@ -1006,7 +1037,7 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
   // this->root().logger().info("boundaries before expansion are {}", targetLayer.boundaries);
 
   // TODO: this is a messy way to get the top of the layer, but maybe it's ok
-  int layerTop = (int)m_worldSize[1];
+  int layerTop = static_cast<int>(m_worldSize[1]);
   for (std::size_t i = 0; i < m_layers.size(); ++i) {
     if (m_layers[i].yStart == targetLayer.yStart && m_layers.size() > i + 1) {
       layerTop = m_layers[i + 1].yStart;
@@ -1015,11 +1046,11 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
   }
 
   // if the region is going to cover the full layer width, this is much simpler
-  if (newWidth == (int)m_worldSize[0]) {
+  if (newWidth == static_cast<int>(m_worldSize[0])) {
     targetLayer.cells = {targetLayer.cells[cellIndex]};
     targetLayer.boundaries = {};
 
-    regionRects.append(RectI{0, targetLayer.yStart, (int)m_worldSize[0], layerTop});
+    regionRects.append(RectI{0, targetLayer.yStart, static_cast<int>(m_worldSize[0]), layerTop});
   } else {
     auto targetRegion = targetLayer.cells[cellIndex];
 
@@ -1030,14 +1061,14 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     int lastBoundary = 0;
     std::size_t lastCellIndex = targetLayer.cells.size() - 1;
     for (std::size_t i = 0; i <= lastCellIndex; ++i) {
-      int nextBoundary = i == lastCellIndex ? (int)m_worldSize[0] : targetLayer.boundaries[i];
+      int nextBoundary = i == lastCellIndex ? static_cast<int>(m_worldSize[0]) : targetLayer.boundaries[i];
       if (i == cellIndex ||
           (i == 0 && cellIndex == lastCellIndex && targetLayer.cells[i] == targetRegion) ||
           (cellIndex == 0 && i == lastCellIndex && targetLayer.cells[i] == targetRegion))
 
-        targetCells.append(RegionCell{lastBoundary, nextBoundary, targetLayer.cells[i]});
+        targetCells.append(RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
       else
-        otherCells.append(RegionCell{lastBoundary, nextBoundary, targetLayer.cells[i]});
+        otherCells.append(RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
       lastBoundary = nextBoundary;
     }
 
@@ -1052,7 +1083,7 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 
     // check the current width to see how much (if any) to expand
     int currentWidth = 0;
-    for (auto regionCell : targetCells)
+    for (auto const& regionCell : targetCells)
       currentWidth += (regionCell.rBound - regionCell.lBound);
 
     if (currentWidth >= newWidth) {
@@ -1077,13 +1108,17 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 
     // split any target cells that now cross the world wrap
     List<RegionCell> wrappedTargetCells;
-    for (auto cell : targetCells) {
+    for (auto const& cell : targetCells) {
       if (cell.lBound < 0) {
-        wrappedTargetCells.append(RegionCell{0, cell.rBound, cell.region});
-        wrappedTargetCells.append(RegionCell{(int)m_worldSize[0] + cell.lBound, (int)m_worldSize[0], cell.region});
-      } else if (cell.rBound > (int)m_worldSize[0]) {
-        wrappedTargetCells.append(RegionCell{cell.lBound, (int)m_worldSize[0], cell.region});
-        wrappedTargetCells.append(RegionCell{0, cell.rBound - (int)m_worldSize[0], cell.region});
+        wrappedTargetCells.append(RegionCell{.lBound = 0, .rBound = cell.rBound, .region = cell.region});
+        wrappedTargetCells.append(RegionCell{.lBound = static_cast<int>(m_worldSize[0]) + cell.lBound,
+                                             .rBound = static_cast<int>(m_worldSize[0]),
+                                             .region = cell.region});
+      } else if (cell.rBound > static_cast<int>(m_worldSize[0])) {
+        wrappedTargetCells.append(
+          RegionCell{.lBound = cell.lBound, .rBound = static_cast<int>(m_worldSize[0]), .region = cell.region});
+        wrappedTargetCells.append(
+          RegionCell{.lBound = 0, .rBound = cell.rBound - static_cast<int>(m_worldSize[0]), .region = cell.region});
       } else {
         wrappedTargetCells.append(cell);
       }
@@ -1092,17 +1127,19 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     targetCells = wrappedTargetCells;
 
     // modify/delete any overlapped cells
-    for (auto targetCell : targetCells) {
+    for (auto const& targetCell : targetCells) {
       List<RegionCell> newOtherCells;
-      for (auto otherCell : otherCells) {
+      for (auto const& otherCell : otherCells) {
         bool rInside = otherCell.rBound <= targetCell.rBound && otherCell.rBound >= targetCell.lBound;
         bool lInside = otherCell.lBound <= targetCell.rBound && otherCell.lBound >= targetCell.lBound;
         if (rInside && lInside)
           continue;
         else if (rInside)
-          newOtherCells.append(RegionCell{otherCell.lBound, targetCell.lBound, otherCell.region});
+          newOtherCells.append(
+            RegionCell{.lBound = otherCell.lBound, .rBound = targetCell.lBound, .region = otherCell.region});
         else if (lInside)
-          newOtherCells.append(RegionCell{targetCell.rBound, otherCell.rBound, otherCell.region});
+          newOtherCells.append(
+            RegionCell{.lBound = targetCell.rBound, .rBound = otherCell.rBound, .region = otherCell.region});
         else
           newOtherCells.append(otherCell);
       }
@@ -1135,7 +1172,7 @@ BiomeIndex WorldLayout::registerBiome(std::shared_ptr<Biome const> biome) {
   if (foundIndex != NPos)
     return foundIndex + 1;
 
-  m_biomes.append(biome);
+  m_biomes.append(std::move(biome));
   return m_biomes.size();
 }
 
@@ -1144,7 +1181,7 @@ TerrainSelectorIndex WorldLayout::registerTerrainSelector(std::shared_ptr<Terrai
   if (foundIndex != NPos)
     return foundIndex + 1;
 
-  m_terrainSelectors.append(terrainSelector);
+  m_terrainSelectors.append(std::move(terrainSelector));
   return m_terrainSelectors.size();
 }
 
@@ -1311,7 +1348,7 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   int nextBoundary = std::move(intnextBoundaryResult1);
   layer.boundaries.append(nextBoundary);
   for (std::size_t i = 0; i + 1 < relativeRegionSizes.size(); ++i) {
-    int regionSize = (int)m_worldSize[0] * (relativeRegionSizes[i] / totalRelativeSize);
+    int regionSize = static_cast<int>(m_worldSize[0]) * (relativeRegionSizes[i] / totalRelativeSize);
     nextBoundary += regionSize;
     layer.boundaries.append(nextBoundary);
   }
@@ -1320,7 +1357,8 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   for (;;) {
     auto last = layer.boundaries.last();
     if (!last) return std::unexpected(std::move(last.error()));
-    if (last->get() <= (int)m_worldSize[0]) break;
+    if (last->get() <= static_cast<int>(m_worldSize[0]))
+      break;
     auto cell = layer.cells.takeLast();
     if (!cell) return std::unexpected(std::move(cell.error()));
     layer.cells.prepend(std::move(*cell));
@@ -1340,10 +1378,11 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   int yRange = std::move((*intyRangeResult3));
   int i = 0;
   int lastBoundary = 0;
-  for (auto region : layer.cells) {
-    int nextBoundary = std::move(i < (int)layer.boundaries.size() ? layer.boundaries[i] : m_worldSize[0]);
+  for (auto const& region : layer.cells) {
+    int nextBoundary = std::move(i < static_cast<int>(layer.boundaries.size()) ? layer.boundaries[i] : m_worldSize[0]);
     if (spawnBiomeIndexes.contains(region->blockBiomeIndex))
-      m_playerStartSearchRegions.append(RectI(lastBoundary, std::max(0, yBase - yRange), nextBoundary, std::min((int)m_worldSize[1], yBase + yRange)));
+      m_playerStartSearchRegions.append(RectI(lastBoundary, std::max(0, yBase - yRange), nextBoundary,
+                                              std::min(static_cast<int>(m_worldSize[1]), yBase + yRange)));
     lastBoundary = nextBoundary;
     i++;
   }
@@ -1373,14 +1412,14 @@ std::pair<std::size_t, int> WorldLayout::findContainingCell(WorldLayer const& la
 
 std::pair<std::size_t, int> WorldLayout::leftCell(WorldLayer const& layer, std::size_t cellIndex, int x) const {
   if (cellIndex == 0)
-    return {layer.cells.size() - 1, x + (int)m_worldSize[0]};
+    return {layer.cells.size() - 1, x + static_cast<int>(m_worldSize[0])};
   else
     return {cellIndex - 1, x};
 }
 
 std::pair<std::size_t, int> WorldLayout::rightCell(WorldLayer const& layer, std::size_t cellIndex, int x) const {
   if (cellIndex >= layer.cells.size() - 1)
-    return {0, x - (int)m_worldSize[0]};
+    return {0, x - static_cast<int>(m_worldSize[0])};
   else
     return {cellIndex + 1, x};
 }

@@ -57,7 +57,7 @@ public:
   }
 
   [[nodiscard]] static std::expected<std::shared_ptr<FuelWidget>, StarException> create(GuiContext& context);
-  virtual ~FuelWidget() {}
+  ~FuelWidget() override = default;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 

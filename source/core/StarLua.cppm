@@ -38,7 +38,7 @@ public:
     return typeName<LuaExecutionHost>();
   }
 };
-typedef RefPtr<LuaEngine> LuaEnginePtr;
+using LuaEnginePtr = RefPtr<LuaEngine>;
 
 // General Lua diagnostic category.
 struct LuaExceptionTag {
@@ -71,16 +71,17 @@ struct LuaConversionExceptionTag {
 };
 using LuaConversionException = StarError<LuaConversionExceptionTag, LuaException>;
 
-typedef std::monostate LuaNilType;
-typedef bool LuaBoolean;
-typedef lua_Integer LuaInt;
-typedef lua_Number LuaFloat;
+using LuaNilType = std::monostate;
+using LuaBoolean = bool;
+using LuaInt = lua_Integer;
+using LuaFloat = lua_Number;
 class LuaString;
 class LuaTable;
 class LuaFunction;
 class LuaThread;
 class LuaUserData;
-typedef std::variant<LuaNilType, LuaBoolean, LuaInt, LuaFloat, LuaString, LuaTable, LuaFunction, LuaThread, LuaUserData> LuaValue;
+using LuaValue =
+  std::variant<LuaNilType, LuaBoolean, LuaInt, LuaFloat, LuaString, LuaTable, LuaFunction, LuaThread, LuaUserData>;
 
 // Used to wrap multiple return values from calling a lua function or to pass
 // multiple values as arguments to a lua function from a container.  If this is
@@ -97,8 +98,7 @@ public:
 
 // Unpack a container and apply each of the arguments separately to a lua
 // function, similar to lua's unpack.
-template <typename Container>
-LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Container&& c);
+template <typename Container> LuaVariadic<typename std::decay_t<Container>::value_type> luaUnpack(Container&& c);
 
 // Similar to LuaVariadic, but a tuple type so automatic per-entry type
 // conversion is done.  This can only be used as the return value of a wrapped
@@ -106,7 +106,7 @@ LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Containe
 template <typename... Types>
 class LuaTupleReturn : public std::tuple<Types...> {
 public:
-  typedef std::tuple<Types...> Base;
+  using Base = std::tuple<Types...>;
 
   explicit LuaTupleReturn(Types const&... args);
   template <typename... UTypes>
@@ -133,8 +133,7 @@ template <typename... Types>
 LuaTupleReturn<Types&...> luaTie(Types&... args);
 
 // Constructs a LuaTupleReturn from the given arguments similar to make_tuple
-template <typename... Types>
-LuaTupleReturn<typename std::decay<Types>::type...> luaTupleReturn(Types&&... args);
+template <typename... Types> LuaTupleReturn<std::decay_t<Types>...> luaTupleReturn(Types&&... args);
 
 // Synchronous stack borrows. Views never escape their call; use own() when a
 // value must survive it. All allocating/metamethod operations stay protected.
@@ -227,7 +226,7 @@ struct LuaRegistryReference {
   };
 
   // Wrapped callbacks decode borrowed arguments and append their results.
-  typedef std::function<std::expected<int, StarException>(LuaStack)> LuaWrappedFunction;
+  using LuaWrappedFunction = std::function<std::expected<int, StarException>(LuaStack)>;
 }
 
 // Rendering may inspect tables and therefore reports recoverable Lua errors.
@@ -416,7 +415,7 @@ private:
 // LuaContext can (mostly) not affect any other.
 class LuaContext : protected LuaTable {
 public:
-  typedef std::function<std::expected<void, StarException>(LuaStackValue, StringView)> RequireFunction;
+  using RequireFunction = std::function<std::expected<void, StarException>(LuaStackValue, StringView)>;
 
   using LuaTable::LuaTable;
 
@@ -566,7 +565,7 @@ public:
   // functions that can affect the real world disabled.
   [[nodiscard]] static std::expected<LuaEnginePtr, StarException> create(bool safe = true);
 
-  ~LuaEngine();
+  ~LuaEngine() override;
 
   LuaEngine(LuaEngine const&) = delete;
   LuaEngine(LuaEngine&&) = default;
@@ -1578,10 +1577,9 @@ namespace LuaDetail {
   std::optional<LuaInt> asInteger(LuaValue const& v);
 }
 
-template <typename Container>
-LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Container&& c) {
-  LuaVariadic<typename std::decay<Container>::type::value_type> ret;
-  if (std::is_rvalue_reference<Container&&>::value) {
+template <typename Container> LuaVariadic<typename std::decay_t<Container>::value_type> luaUnpack(Container&& c) {
+  LuaVariadic<typename std::decay_t<Container>::value_type> ret;
+  if (std::is_rvalue_reference_v<Container&&>) {
     for (auto& e : c)
       ret.append(std::move(e));
   } else {
@@ -1654,9 +1652,8 @@ LuaTupleReturn<Types&...> luaTie(Types&... args) {
   return LuaTupleReturn<Types&...>(args...);
 }
 
-template <typename... Types>
-LuaTupleReturn<typename std::decay<Types>::type...> luaTupleReturn(Types&&... args) {
-  return LuaTupleReturn<typename std::decay<Types>::type...>(std::forward<Types>(args)...);
+template <typename... Types> LuaTupleReturn<std::decay_t<Types>...> luaTupleReturn(Types&&... args) {
+  return LuaTupleReturn<std::decay_t<Types>...>(std::forward<Types>(args)...);
 }
 
 namespace LuaDetail {

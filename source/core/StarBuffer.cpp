@@ -165,12 +165,7 @@ void Buffer::reset(ByteArray b) {
   m_bytes = std::move(b);
 }
 
-Buffer& Buffer::operator=(Buffer const& buffer) {
-  IODevice::operator=(buffer);
-  m_pos = buffer.m_pos;
-  m_bytes = buffer.m_bytes;
-  return *this;
-}
+Buffer& Buffer::operator=(Buffer const& buffer) = default;
 
 Buffer& Buffer::operator=(Buffer&& buffer) {
   IODevice::operator=(buffer);

@@ -984,7 +984,7 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
     auto pointLight = config.getBool("pointLight", false);
     if (!pointLight)
       return std::unexpected(std::move(pointLight.error()));
-    object.lightType = (LightType)*pointLight;
+    object.lightType = static_cast<LightType>(*pointLight);
   }
   auto pointBeam = config.getFloat("pointBeam", 0.0f);
   if (!pointBeam)
@@ -1134,10 +1134,10 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field9Result)
       return std::unexpected(std::move(field9Result.error()));
     auto field9 = std::move(*field9Result);
-          auto descriptor = ItemDescriptor::create(field7, (std::size_t)field8, field9);
-          if (!descriptor)
-            return std::unexpected(std::move(descriptor.error()));
-          group.append(std::move(*descriptor));
+    auto descriptor = ItemDescriptor::create(field7, static_cast<std::size_t>(field8), field9);
+    if (!descriptor)
+      return std::unexpected(std::move(descriptor.error()));
+    group.append(std::move(*descriptor));
         }
         objectConfig->breakDropOptions.append(std::move(group));
       }

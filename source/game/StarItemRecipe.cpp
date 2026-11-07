@@ -54,9 +54,7 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
     });
 }
 
-bool ItemRecipe::isNull() const {
-  return currencyInputs.size() == 0 && inputs.size() == 0 && output.isNull();
-}
+bool ItemRecipe::isNull() const { return currencyInputs.empty() && inputs.empty() && output.isNull(); }
 
 bool ItemRecipe::operator==(ItemRecipe const& rhs) const {
   return std::tie(currencyInputs, inputs, output) == std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);

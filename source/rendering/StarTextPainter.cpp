@@ -141,13 +141,8 @@ TextPositioning TextPositioning::translated(Vec2F translation) const {
 }
 
 TextPainter::TextPainter(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup)
-  : m_root(root),
-    m_renderer(renderer),
-    m_fontTextureGroup(root, textureGroup),
-    m_defaultRenderSettings(),
-    m_renderSettings(),
-    m_savedRenderSettings() {
-}
+    : m_root(root), m_renderer(std::move(renderer)), m_fontTextureGroup(root, std::move(textureGroup)),
+      m_defaultRenderSettings(), m_renderSettings(), m_savedRenderSettings() {}
 
 std::expected<std::shared_ptr<TextPainter>, StarException> TextPainter::create(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup) {
   auto painter = std::shared_ptr<TextPainter>(new TextPainter(root, std::move(renderer), std::move(textureGroup)));
@@ -550,7 +545,7 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
         auto color = Color::create(StringView(command));
         if (!color)
           return std::unexpected(std::move(color.error()));
-        color->setAlphaF(color->alphaF() * ((float)m_savedRenderSettings.color[3]) / 255);
+        color->setAlphaF(color->alphaF() * (static_cast<float>(m_savedRenderSettings.color[3])) / 255);
         m_renderSettings.color = color->toRgba();
       }
       return {};
@@ -639,7 +634,8 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
     auto measured = stringWidth(trimmedString, 0);
     if (!measured)
       return std::unexpected(std::move(measured.error()));
-    pos.pos[0] -= pos.hAnchor == HorizontalAnchor::RightAnchor ? (float)*measured : std::floor((float)*measured / 2);
+    pos.pos[0] -= pos.hAnchor == HorizontalAnchor::RightAnchor ? static_cast<float>(*measured)
+                                                               : std::floor(static_cast<float>(*measured) / 2);
     pos.hAnchor = HorizontalAnchor::LeftAnchor;
   }
 
@@ -700,13 +696,13 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
   if (position.hAnchor == HorizontalAnchor::RightAnchor)
     hOffset = -width;
   else if (position.hAnchor == HorizontalAnchor::HMidAnchor)
-    hOffset = -std::floor((float)width / 2);
+    hOffset = -std::floor(static_cast<float>(width) / 2);
 
   float vOffset = 0;
   if (position.vAnchor == VerticalAnchor::VMidAnchor)
-    vOffset = -std::floor((float)m_renderSettings.fontSize / 2);
+    vOffset = -std::floor(static_cast<float>(m_renderSettings.fontSize) / 2);
   else if (position.vAnchor == VerticalAnchor::TopAnchor)
-    vOffset = -(float)m_renderSettings.fontSize;
+    vOffset = -static_cast<float>(m_renderSettings.fontSize);
 
   std::optional<std::reference_wrapper<Directives const>> directives;
   if (m_renderSettings.directives)
@@ -744,7 +740,7 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
       return std::unexpected(std::move(rendered.error()));
   }
 
-  return RectF::withSize(pos, {(float)width, (int)m_renderSettings.fontSize});
+  return RectF::withSize(pos, {static_cast<float>(width), static_cast<int>(m_renderSettings.fontSize)});
 }
 
 void TextPainter::renderPrimitives() {

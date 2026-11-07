@@ -21,9 +21,9 @@ struct DynamicNode;
 struct RandomizeNode;
 struct BehaviorTree;
 
-typedef std::variant<SequenceNode, SelectorNode, ParallelNode, DynamicNode, RandomizeNode> CompositeNode;
+using CompositeNode = std::variant<SequenceNode, SelectorNode, ParallelNode, DynamicNode, RandomizeNode>;
 
-typedef std::variant<ActionNode, DecoratorNode, CompositeNode, std::shared_ptr<BehaviorTree const>> BehaviorNode;
+using BehaviorNode = std::variant<ActionNode, DecoratorNode, CompositeNode, std::shared_ptr<BehaviorTree const>>;
 
 enum class NodeParameterType : std::uint8_t {
   Json,
@@ -38,9 +38,9 @@ enum class NodeParameterType : std::uint8_t {
 };
 extern std::expected<EnumMap<NodeParameterType>, StarException> const NodeParameterTypeNames;
 
-typedef std::variant<String, Json> NodeParameterValue;
-typedef std::pair<NodeParameterType, NodeParameterValue> NodeParameter;
-typedef std::pair<NodeParameterType, std::pair<std::optional<String>, bool>> NodeOutput;
+using NodeParameterValue = std::variant<String, Json>;
+using NodeParameter = std::pair<NodeParameterType, NodeParameterValue>;
+using NodeOutput = std::pair<NodeParameterType, std::pair<std::optional<String>, bool>>;
 
 [[nodiscard]] std::expected<NodeParameterValue, StarException> nodeParameterValueFromJson(Json const& json);
 

@@ -232,7 +232,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
           if (!canvas)
             return std::unexpected(std::move(canvas.error()));
           if (*canvas)
-            return std::optional<LuaCanvas>(LuaCanvas{std::move(*canvas), engine.promiseLifetime(), lifetime, {}});
+            return std::optional<LuaCanvas>(LuaCanvas{.canvas = std::move(*canvas),
+                                                      .lifetime = engine.promiseLifetime(),
+                                                      .hostLifetime = lifetime,
+                                                      .owner = {}});
           return std::optional<LuaCanvas>{};
         });
       !r)
@@ -360,7 +363,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       mode = parsed->get();
     }
-    return client.sendChat(message, mode, speak, data);
+    return client.sendChat(message, mode, speak, std::move(data));
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
     auto parsed = Json::parseSequence(args);

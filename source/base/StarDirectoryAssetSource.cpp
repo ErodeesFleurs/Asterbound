@@ -145,7 +145,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
   auto entries = File::dirList(*fsDirectory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
-  for (auto entry : *entries) {
+  for (auto const& entry : *entries) {
     String assetPath = assetDirectory + entry.first;
     if (entry.second) {
       auto childDirectory = toFilesystem(assetPath);

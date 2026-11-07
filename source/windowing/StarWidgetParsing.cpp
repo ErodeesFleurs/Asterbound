@@ -667,7 +667,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto padding = paddingConfig->toInt();
   if (!padding)
     return std::unexpected(std::move(padding.error()));
-  auto upOffset = config.getFloat("upOffset", (float)(*imageSize)[0] + *padding);
+  auto upOffset = config.getFloat("upOffset", static_cast<float>((*imageSize)[0]) + *padding);
   if (!upOffset)
     return std::unexpected(std::move(upOffset.error()));
   auto leftBaseImage = config.getString("leftBase", *leftBase);

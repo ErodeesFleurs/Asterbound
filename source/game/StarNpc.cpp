@@ -1523,17 +1523,24 @@ if (!result302) return std::unexpected(std::move(result302.error()));
    return {};
 });
 if (!result303) return std::unexpected(std::move(result303.error()));
-  auto result305 = callbacks.registerCallback("setHumanoidParameter", [this](String key, std::optional<Json> value) -> std::expected<void, StarException> { auto result304 = setHumanoidParameter(key, value);
-if (!result304) return std::unexpected(std::move(result304.error()));
-   return {};
-});
+auto result305 = callbacks.registerCallback(
+  "setHumanoidParameter", [this](String key, std::optional<Json> value) -> std::expected<void, StarException> {
+    auto result304 = setHumanoidParameter(std::move(key), std::move(value));
+    if (!result304)
+      return std::unexpected(std::move(result304.error()));
+    return {};
+  });
 if (!result305) return std::unexpected(std::move(result305.error()));
-  auto result306 = callbacks.registerCallback("getHumanoidParameter", [this](String key) -> std::optional<Json> { return getHumanoidParameter(key); });
+auto result306 = callbacks.registerCallback(
+  "getHumanoidParameter", [this](String key) -> std::optional<Json> { return getHumanoidParameter(std::move(key)); });
 if (!result306) return std::unexpected(std::move(result306.error()));
-  auto result308 = callbacks.registerCallback("setHumanoidParameters", [this](JsonObject parameters) -> std::expected<void, StarException> { auto result307 = setHumanoidParameters(parameters);
-if (!result307) return std::unexpected(std::move(result307.error()));
-   return {};
-});
+auto result308 = callbacks.registerCallback("setHumanoidParameters",
+                                            [this](JsonObject parameters) -> std::expected<void, StarException> {
+                                              auto result307 = setHumanoidParameters(std::move(parameters));
+                                              if (!result307)
+                                                return std::unexpected(std::move(result307.error()));
+                                              return {};
+                                            });
 if (!result308) return std::unexpected(std::move(result308.error()));
   auto result309 = callbacks.registerCallback("getHumanoidParameters", [this]() -> JsonObject { return getHumanoidParameters(); });
 if (!result309) return std::unexpected(std::move(result309.error()));
@@ -1916,7 +1923,7 @@ if (!result407) return std::unexpected(std::move(result407.error()));
   auto result408 = EquipmentSlotNames->maybeLeftRef(entry);
   if (!result408) return std::unexpected(std::move(result408.error()));
   if (auto equipmentSlot = std::move(*result408)) {
-          return m_armor->itemDescriptor((std::uint8_t)equipmentSlot->get()).toJson();
+    return m_armor->itemDescriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
         } else {
     auto result409 = entry.equalsIgnoreCase("primary");
     if (!result409) return std::unexpected(std::move(result409.error()));
@@ -1997,7 +2004,8 @@ if (!result430) return std::unexpected(std::move(result430.error()));
   auto result431 = callbacks.registerCallback("setAggressive", [this](bool aggressive) { m_aggressive.set(aggressive); });
 if (!result431) return std::unexpected(std::move(result431.error()));
 
-  auto result432 = callbacks.registerCallback("setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(uniqueId); });
+auto result432 = callbacks.registerCallback(
+  "setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(std::move(uniqueId)); });
 if (!result432) return std::unexpected(std::move(result432.error()));
 
   auto result433 = callbacks.registerCallback("setAnimationParameter", [this](String name, Json value) {
@@ -2323,7 +2331,7 @@ std::expected<Vec2F, StarException> Npc::questIndicatorPosition() const {
 std::expected<bool, StarException> Npc::setItemSlot(String const& slot, ItemDescriptor itemDescriptor) {
   auto result490 = this->root().itemDatabase();
 if (!result490) return std::unexpected(std::move(result490.error()));
-auto result491 = std::move(*result490)->item(itemDescriptor, m_npcVariant.level, m_npcVariant.seed);
+auto result491 = std::move(*result490)->item(std::move(itemDescriptor), m_npcVariant.level, m_npcVariant.seed);
 if (!result491) return std::unexpected(std::move(result491.error()));
 auto item = std::move(*result491);
 
@@ -2332,7 +2340,7 @@ auto item = std::move(*result491);
   auto result492 = EquipmentSlotNames->maybeLeftRef(slot);
   if (!result492) return std::unexpected(std::move(result492.error()));
   if (auto equipmentSlot = std::move(*result492)) {
-      m_armor->setItem((std::uint8_t)equipmentSlot->get(), as<ArmorItem>(item));
+    m_armor->setItem(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
     } else {
     auto result493 = slot.equalsIgnoreCase("primary");
     if (!result493) return std::unexpected(std::move(result493.error()));
@@ -2687,7 +2695,7 @@ std::optional<Json> Npc::getHumanoidParameter(String key) {
 }
 
 std::expected<void, StarException> Npc::setHumanoidParameters(JsonObject parameters) {
-  m_npcVariant.humanoidParameters = parameters;
+  m_npcVariant.humanoidParameters = std::move(parameters);
 
   auto elements = m_netHumanoid.netElements();
   auto result528 = elements.last();

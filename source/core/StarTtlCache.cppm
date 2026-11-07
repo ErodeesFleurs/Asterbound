@@ -15,8 +15,8 @@ namespace Star {
 template <typename LruCacheType>
 class TtlCacheBase {
 public:
-  typedef typename LruCacheType::Key Key;
-  typedef typename LruCacheType::Value::second_type Value;
+  using Key = typename LruCacheType::Key;
+  using Value = typename LruCacheType::Value::second_type;
 
   explicit TtlCacheBase(RandomService& random);
   TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear = std::chrono::milliseconds(1000), std::size_t maxSize = NPos, bool ttlUpdateEnabled = true);

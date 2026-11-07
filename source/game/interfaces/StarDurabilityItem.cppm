@@ -15,7 +15,7 @@ public:
     return Star::typeName<DurabilityItem>();
   }
 
-  virtual ~DurabilityItem() {}
+  virtual ~DurabilityItem() = default;
   [[nodiscard]]
   virtual std::expected<float, StarException> durabilityStatus() = 0;
 };

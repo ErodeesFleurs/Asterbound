@@ -155,7 +155,7 @@ std::expected<void, StarException> ModsMenu::init() {
   auto workshopLinkButton = requireChild<ButtonWidget>("workshopbutton");
   if (!workshopLinkButton)
     return std::unexpected(std::move(workshopLinkButton.error()));
-  bool hasDesktopService = (bool)context().applicationController()->desktopService();
+  bool hasDesktopService = static_cast<bool>(context().applicationController()->desktopService());
   (*workshopLinkButton)->setEnabled(hasDesktopService);
   if (auto result = m_linkButton->setVisibility(hasDesktopService); !result)
     return std::unexpected(std::move(result.error()));

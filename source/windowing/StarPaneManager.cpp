@@ -250,9 +250,7 @@ List<std::shared_ptr<Pane>> PaneManager::getAllPanes() {
   return list;
 }
 
-void PaneManager::setBackgroundWidget(std::shared_ptr<Widget> bg) {
-  m_backgroundWidget = bg;
-}
+void PaneManager::setBackgroundWidget(std::shared_ptr<Widget> bg) { m_backgroundWidget = std::move(bg); }
 
 std::expected<void, StarException> PaneManager::dismissWhere(std::function<std::expected<bool, StarException>(std::shared_ptr<Pane> const&)> func) {
   if (!func)
@@ -536,7 +534,8 @@ std::expected<void, StarException> PaneManager::update(float dt) {
     auto width = m_context.windowWidth();
     if (!width)
       return std::unexpected(std::move(width.error()));
-    if (m_tooltipLastMousePos[0] + m_tooltipMouseOffset[0] + m_activeTooltip->size()[0] > (int)*width / m_context.interfaceScale()) {
+    if (m_tooltipLastMousePos[0] + m_tooltipMouseOffset[0] + m_activeTooltip->size()[0]
+        > static_cast<int>(*width) / m_context.interfaceScale()) {
       offsetDirection[0] = -1;
       offsetAdjust[0] = -m_activeTooltip->size()[0];
     }

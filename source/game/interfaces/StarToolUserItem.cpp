@@ -68,9 +68,7 @@ std::expected<void, StarException> ToolUserItem::uninit() {
 
 std::expected<void, StarException> ToolUserItem::update(float, FireMode, bool, HashSet<MoveControlType> const&) { return {}; }
 
-bool ToolUserItem::initialized() const {
-  return (bool)m_owner;
-}
+bool ToolUserItem::initialized() const { return static_cast<bool>(m_owner); }
 
 std::expected<std::reference_wrapper<ToolUserEntity>, StarException> ToolUserItem::owner() const {
   if (!m_owner)

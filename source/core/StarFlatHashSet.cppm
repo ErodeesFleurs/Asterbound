@@ -9,32 +9,32 @@ namespace Star {
 template <typename Key, typename Hash = hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = std::allocator<Key>>
 class FlatHashSet {
 public:
-  typedef Key key_type;
-  typedef Key value_type;
-  typedef std::size_t size_type;
-  typedef std::ptrdiff_t difference_type;
-  typedef Hash hasher;
-  typedef Equals key_equal;
-  typedef Allocator allocator_type;
-  typedef value_type& reference;
-  typedef value_type const& const_reference;
-  typedef value_type* pointer;
-  typedef value_type const* const_pointer;
+  using key_type = Key;
+  using value_type = Key;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using hasher = Hash;
+  using key_equal = Equals;
+  using allocator_type = Allocator;
+  using reference = value_type&;
+  using const_reference = value_type const&;
+  using pointer = value_type*;
+  using const_pointer = value_type const*;
 
 private:
   struct GetKey {
     key_type const& operator()(value_type const& value) const;
   };
 
-  typedef FlatHashTable<Key, Key, GetKey, Hash, Equals, Allocator> Table;
+  using Table = FlatHashTable<Key, Key, GetKey, Hash, Equals, Allocator>;
 
 public:
   struct const_iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashSet::value_type const value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashSet::value_type const;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
 
     bool operator==(const_iterator const& rhs) const;
     bool operator!=(const_iterator const& rhs) const;
@@ -49,11 +49,11 @@ public:
   };
 
   struct iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashSet::value_type value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashSet::value_type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
 
     bool operator==(iterator const& rhs) const;
     bool operator!=(iterator const& rhs) const;

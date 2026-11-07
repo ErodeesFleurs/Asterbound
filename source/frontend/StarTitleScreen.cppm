@@ -101,7 +101,7 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> textInputActive() const;
 
-  typedef RegisteredPaneManager<String> TitlePaneManager;
+  using TitlePaneManager = RegisteredPaneManager<String>;
   TitlePaneManager& paneManager();
 
   TitleState currentState() const;
@@ -151,7 +151,7 @@ private:
 
   float interfaceScale() const;
 
-  typedef LuaUpdateScript ScriptComponent;
+  using ScriptComponent = LuaUpdateScript;
   std::shared_ptr<ScriptComponent> m_scriptComponent;
 
   GuiContext& m_guiContext;

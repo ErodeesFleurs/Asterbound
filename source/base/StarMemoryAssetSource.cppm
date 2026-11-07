@@ -54,7 +54,8 @@ private:
 
 namespace Star {
 
-MemoryAssetSource::MemoryAssetSource(String const& name, JsonObject metadata) : m_name(name), m_metadata(metadata) {}
+MemoryAssetSource::MemoryAssetSource(String const& name, JsonObject metadata)
+    : m_name(name), m_metadata(std::move(metadata)) {}
 
 String MemoryAssetSource::name() const {
   return m_name;
@@ -94,7 +95,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> MemoryAssetSource::open(
     [[nodiscard]] std::expected<String, StarException> deviceName() const override { return name; }
 
     [[nodiscard]] std::expected<bool, StarException> atEnd() override {
-      return assetPos >= (StreamOffset)assetSize;
+      return assetPos >= static_cast<StreamOffset>(assetSize);
     }
 
     [[nodiscard]] std::expected<void, StarException> seek(StreamOffset p, IOSeek mode) override {
