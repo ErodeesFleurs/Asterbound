@@ -46,7 +46,7 @@ template <typename Error = MapException, typename T>
                                                  T const& value) {
   auto rendered = map_diagnostic_value(value);
   if (!rendered)
-    return std::move(rendered.error()).withContext(std::string(context));
+    return std::move(rendered.error()).with_context(std::string(context));
   return Error(Star::format(message, std::move(*rendered)));
 }
 

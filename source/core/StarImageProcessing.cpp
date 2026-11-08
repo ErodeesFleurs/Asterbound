@@ -152,7 +152,7 @@ ImageOperation imageOperationFromString(StringView string) {
     auto color = Color::fromHex(bits[1]);
     if (!color)
       return error(std::move(color.error()));
-    auto amount = lexicalCast<float>(bits[2]);
+    auto amount = lexical_cast<float>(bits[2]);
     if (!amount)
       return error(std::move(amount.error()));
     FadeToColorImageOperation fade(color->toRgb(), *amount);
@@ -161,7 +161,7 @@ ImageOperation imageOperationFromString(StringView string) {
     auto secondColor = Color::fromHex(bits[3]);
     if (!secondColor)
       return error(std::move(secondColor.error()));
-    auto secondAmount = lexicalCast<float>(bits[4]);
+    auto secondAmount = lexical_cast<float>(bits[4]);
     if (!secondAmount)
       return error(std::move(secondAmount.error()));
     return ScanLinesImageOperation{.fade1 = fade,
@@ -180,7 +180,7 @@ ImageOperation imageOperationFromString(StringView string) {
     }
     Vec2I offset;
     for (std::size_t i = 2; i < std::min<std::size_t>(bits.size(), 4); ++i) {
-      auto value = lexicalCast<int>(bits[i]);
+      auto value = lexical_cast<int>(bits[i]);
       if (!value)
         return error(std::move(value.error()));
       offset[i - 2] = *value;
@@ -196,7 +196,7 @@ ImageOperation imageOperationFromString(StringView string) {
                                .offset = offset};
   }
   if (type == "border" || type == "outline") {
-    auto pixels = lexicalCast<unsigned>(bits[1]);
+    auto pixels = lexical_cast<unsigned>(bits[1]);
     if (!pixels)
       return error(std::move(pixels.error()));
     auto start = Color::fromHex(bits[2]);
@@ -214,7 +214,7 @@ ImageOperation imageOperationFromString(StringView string) {
   if (type == "crop") {
     float values[4]{};
     for (unsigned i = 0; i < 4; ++i) {
-      auto value = lexicalCast<float>(bits[i + 1]);
+      auto value = lexical_cast<float>(bits[i + 1]);
       if (!value)
         return error(std::move(value.error()));
       values[i] = *value;
@@ -223,7 +223,7 @@ ImageOperation imageOperationFromString(StringView string) {
   }
   if (type == "hueshift" || type == "saturation" || type == "brightness" || type == "scale"
       || type == "scalenearest" || type == "scalebilinear" || type == "scalebicubic") {
-    auto value = lexicalCast<float>(bits[1]);
+    auto value = lexical_cast<float>(bits[1]);
     if (!value)
       return error(std::move(value.error()));
     if (type == "hueshift")
@@ -232,7 +232,7 @@ ImageOperation imageOperationFromString(StringView string) {
       return SaturationShiftImageOperation::saturationShift100(*value);
     if (type == "brightness")
       return BrightnessMultiplyImageOperation::brightnessMultiply100(*value);
-    auto second = bits.size() > 2 ? lexicalCast<float>(bits[2]) : value;
+    auto second = bits.size() > 2 ? lexical_cast<float>(bits[2]) : value;
     if (!second)
       return error(std::move(second.error()));
     auto mode = type == "scalenearest" ? ScaleImageOperation::Nearest

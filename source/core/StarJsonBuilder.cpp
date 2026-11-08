@@ -52,13 +52,13 @@ std::expected<void, StarException> JsonBuilderStream::putStringUtf8(std::string_
   return {};
 }
 std::expected<void, StarException> JsonBuilderStream::putDouble(std::string_view s) {
-  auto value = lexicalCast<double>(s);
+  auto value = lexical_cast<double>(s);
   if (!value) return std::unexpected(JsonParserException("bad double", ExceptionDiagnostic(value.error())));
   push(Json(*value));
   return {};
 }
 std::expected<void, StarException> JsonBuilderStream::putInteger(std::string_view s) {
-  auto value = lexicalCast<long long>(s);
+  auto value = lexical_cast<long long>(s);
   if (!value) return std::unexpected(JsonParserException("bad integer", ExceptionDiagnostic(value.error())));
   push(Json(*value));
   return {};

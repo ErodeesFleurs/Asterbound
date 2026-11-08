@@ -89,7 +89,7 @@ std::expected<void, StarException> QuestManager::init(Player& player, World& wor
     if (!initialized) {
       auto error = std::move(initialized.error());
       auto shutdown = uninit();
-      if (!shutdown) error = error.withRelated(shutdown.error(), "Error rolling back quest manager");
+      if (!shutdown) error = error.with_related(shutdown.error(), "Error rolling back quest manager");
       return std::unexpected(std::move(error));
     }
   }

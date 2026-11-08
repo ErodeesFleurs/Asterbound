@@ -343,7 +343,7 @@ template <typename Message, typename Receiver>
   for (auto& message : messages) {
     if (error) {
       if (auto failed = message.promise.fail("World message handling stopped"); !failed)
-        *error = error->withRelated(failed.error(), "World message drain also failed");
+        *error = error->with_related(failed.error(), "World message drain also failed");
       continue;
     }
     auto response = receiveMessage(message.message, message.args);
@@ -360,7 +360,7 @@ template <typename Message, typename Receiver>
     }
     if (!completion) {
       if (error)
-        *error = error->withRelated(completion.error(), "World message settlement also failed");
+        *error = error->with_related(completion.error(), "World message settlement also failed");
       else
         error = std::move(completion.error());
     }

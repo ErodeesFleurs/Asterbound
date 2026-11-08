@@ -480,7 +480,7 @@ std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId con
     return "Not enough arguments to /timewarp";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto timeResult = lexicalCast<double>(arguments[0]);
+    auto timeResult = lexical_cast<double>(arguments[0]);
     if (!timeResult) return std::unexpected(std::move(timeResult.error()));
     auto time = *timeResult;
     if (time == 0.0)
@@ -513,7 +513,7 @@ std::expected<String, StarException> CommandProcessor::timescale(ConnectionId co
   if (arguments.empty())
     return Star::format("Current timescale is {:6.6f}x", m_root.timing().timescale);
 
-  auto parsedScale = lexicalCast<float>(arguments[0]);
+  auto parsedScale = lexical_cast<float>(arguments[0]);
   if (!parsedScale) return std::unexpected(std::move(parsedScale.error()));
   float timescale = std::clamp(*parsedScale, 0.001f, 32.0f);
   auto set = m_universe.setTimescale(timescale);
@@ -533,7 +533,7 @@ std::expected<String, StarException> CommandProcessor::tickrate(ConnectionId con
   if (arguments.empty())
     return Star::format("Current tick rate is {:4.2f}Hz", 1.0f / m_root.timing().serverTimestep);
 
-  auto parsedRate = lexicalCast<float>(arguments[0]);
+  auto parsedRate = lexical_cast<float>(arguments[0]);
   if (!parsedRate) return std::unexpected(std::move(parsedRate.error()));
   float tickRate = std::clamp(*parsedRate, 5.f, 500.f);
   m_universe.setTickRate(tickRate);
@@ -572,7 +572,7 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
       auto it = slices.begin();
       DungeonId previous = 0;
       while (it != slices.end()) {
-        auto currentResult = lexicalCast<DungeonId>(*it);
+        auto currentResult = lexical_cast<DungeonId>(*it);
         if (!currentResult)
           return std::unexpected(std::move(currentResult.error()));
         DungeonId current = *currentResult;
@@ -622,7 +622,7 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
     return "Not enough arguments to /setdungeonid. Use /setdungeonid <dungeonId>";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto dungeonIdResult = lexicalCast<DungeonId>(arguments[0]);
+    auto dungeonIdResult = lexical_cast<DungeonId>(arguments[0]);
     if (!dungeonIdResult) return std::unexpected(std::move(dungeonIdResult.error()));
     DungeonId dungeonId = *dungeonIdResult;
 
@@ -681,7 +681,7 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
     std::optional<std::uint64_t> seed;
 
     if (arguments.size() >= 2) {
-      auto amountResult = lexicalCast<std::uint64_t>(arguments[1]);
+      auto amountResult = lexical_cast<std::uint64_t>(arguments[1]);
       if (!amountResult) return std::unexpected(std::move(amountResult.error()));
       amount = *amountResult;
     }
@@ -693,13 +693,13 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
     }
 
     if (arguments.size() >= 4) {
-      auto levelResult = lexicalCast<float>(arguments[3]);
+      auto levelResult = lexical_cast<float>(arguments[3]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
 
     if (arguments.size() >= 5) {
-      auto seedResult = lexicalCast<std::uint64_t>(arguments[4]);
+      auto seedResult = lexical_cast<std::uint64_t>(arguments[4]);
       if (!seedResult) return std::unexpected(std::move(seedResult.error()));
       seed = *seedResult;
     }
@@ -765,7 +765,7 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
     float level = 1;
 
     if (arguments.size() >= 2) {
-      auto levelResult = lexicalCast<float>(arguments[1]);
+      auto levelResult = lexical_cast<float>(arguments[1]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
@@ -836,7 +836,7 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
 
     float level = 1;
     if (arguments.size() >= 2) {
-      auto levelResult = lexicalCast<float>(arguments[1]);
+      auto levelResult = lexical_cast<float>(arguments[1]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
@@ -902,12 +902,12 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
       return "You must specify a species and NPC type to spawn.";
 
     if (arguments.size() >= 3) {
-      auto npcLevelResult = lexicalCast<float>(arguments[2]);
+      auto npcLevelResult = lexical_cast<float>(arguments[2]);
       if (!npcLevelResult) return std::unexpected(std::move(npcLevelResult.error()));
       npcLevel = *npcLevelResult;
     }
     if (arguments.size() >= 4) {
-      auto seedResult = lexicalCast<std::uint64_t>(arguments[3]);
+      auto seedResult = lexical_cast<std::uint64_t>(arguments[3]);
       if (!seedResult) return std::unexpected(std::move(seedResult.error()));
       seed = *seedResult;
     }
@@ -1098,7 +1098,7 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
 
     float quantity = 1.0f;
     if (arguments.size() > 1) {
-      if (auto maybeQuantity = maybeLexicalCast<float>(arguments[1]))
+      if (auto maybeQuantity = maybe_lexical_cast<float>(arguments[1]))
         quantity = *maybeQuantity;
       else
         return Star::format("Could not parse quantity value '{}'", arguments[1]);
@@ -1203,7 +1203,7 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
 
   std::optional<int> banTime;
   if (arguments.size() == 4) {
-    auto parsedTime = lexicalCast<int>(arguments[3]);
+    auto parsedTime = lexical_cast<int>(arguments[3]);
     if (!parsedTime) {
       if (parsedTime.error().is<BadLexicalCast>()) return Star::format("Invalid argument {} passed as ban time to /ban.", arguments[3]);
       return std::unexpected(std::move(parsedTime.error()));
@@ -1427,9 +1427,9 @@ std::expected<String, StarException> CommandProcessor::placeDungeon(ConnectionId
     if (!xText) return std::unexpected(std::move(xText.error()));
     auto yText = pos->at(1);
     if (!yText) return std::unexpected(std::move(yText.error()));
-    auto x = lexicalCast<int>(xText->get());
+    auto x = lexical_cast<int>(xText->get());
     if (!x) return std::unexpected(std::move(x.error()));
-    auto y = lexicalCast<int>(yText->get());
+    auto y = lexical_cast<int>(yText->get());
     if (!y) return std::unexpected(std::move(y.error()));
     targetPosition = Vec2I(*x, *y);
   }
@@ -1485,7 +1485,7 @@ std::expected<String, StarException> CommandProcessor::addBiomeRegion(Connection
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
   String biomeName = arguments[0];
-  auto widthResult = lexicalCast<int>(arguments[1]);
+  auto widthResult = lexical_cast<int>(arguments[1]);
   if (!widthResult) return std::unexpected(std::move(widthResult.error()));
   int width = *widthResult;
 
@@ -1515,7 +1515,7 @@ std::expected<String, StarException> CommandProcessor::expandBiomeRegion(Connect
   auto requiredArgument = arguments.at(0);
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
-  auto newWidthResult = lexicalCast<int>(arguments[0]);
+  auto newWidthResult = lexical_cast<int>(arguments[0]);
   if (!newWidthResult) return std::unexpected(std::move(newWidthResult.error()));
   int newWidth = *newWidthResult;
 
@@ -1640,7 +1640,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
     if (*cidPrefix) {
       auto text = player.substr(CidPrefix.size());
       if (!text) return std::unexpected(std::move(text.error()));
-      auto cid = maybeLexicalCast<ConnectionId>(*text).value_or(ServerConnectionId);
+      auto cid = maybe_lexical_cast<ConnectionId>(*text).value_or(ServerConnectionId);
       if (universe.isConnectedClient(cid)) return std::optional<ConnectionId>(cid);
     }
   }

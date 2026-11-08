@@ -339,7 +339,7 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
 #ifdef STAR_ENABLE_STEAM_INTEGRATION
   if (m_state->steamAvailable) {
     if (type == "steamid") {
-      auto parsed = lexicalCast<uint64>(peerId);
+      auto parsed = lexical_cast<uint64>(peerId);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       return std::unique_ptr<P2PSocket>(createSteamP2PSocket(CSteamID(*parsed)));
@@ -355,13 +355,13 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
       auto userPart = peerId.extract("_");
       if (!userPart)
         return std::unexpected(std::move(userPart.error()));
-      auto remoteUserId = lexicalCast<discord::UserId>(*userPart);
+      auto remoteUserId = lexical_cast<discord::UserId>(*userPart);
       if (!remoteUserId)
         return std::unexpected(std::move(remoteUserId.error()));
       auto lobbyPart = peerId.extract("_");
       if (!lobbyPart)
         return std::unexpected(std::move(lobbyPart.error()));
-      auto lobbyId = lexicalCast<discord::LobbyId>(*lobbyPart);
+      auto lobbyId = lexical_cast<discord::LobbyId>(*lobbyPart);
       if (!lobbyId)
         return std::unexpected(std::move(lobbyId.error()));
       return discordConnectRemote(*remoteUserId, *lobbyId, peerId);

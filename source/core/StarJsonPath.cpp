@@ -50,7 +50,7 @@ std::expected<TypeHint, StarException> parsePointer(String& buffer, String const
     if (!advanced)
       return std::unexpected(std::move(advanced.error()));
   }
-  auto index = maybeLexicalCast<std::size_t>(buffer);
+  auto index = maybe_lexical_cast<std::size_t>(buffer);
   if (index || (buffer == "-" && cursor.at_end()))
     return TypeHint::Array;
   return TypeHint::Object;
@@ -141,7 +141,7 @@ findPath(Json const& base, PathParser const& parser, String const& path) {
         return std::unexpected(
           TraversalException::format("Tried to get key '{}' in non-object type in pathGet(\"{}\")", buffer, path));
       }
-      auto index = maybeLexicalCast<std::size_t>(buffer);
+      auto index = maybe_lexical_cast<std::size_t>(buffer);
       if (!index) {
         if constexpr (Optional)
           return std::nullopt;

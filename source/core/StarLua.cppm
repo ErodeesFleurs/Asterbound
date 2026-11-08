@@ -914,9 +914,9 @@ struct LuaIntConverter {
     if (v.is<LuaString>()) {
       auto text = v.stringView().utf8();
       text = text.substr(0, text.find('\0'));
-      if (auto n = maybeLexicalCast<LuaInt>(text))
+      if (auto n = maybe_lexical_cast<LuaInt>(text))
         return static_cast<T>(*n);
-      if (auto n = maybeLexicalCast<LuaFloat>(text))
+      if (auto n = maybe_lexical_cast<LuaFloat>(text))
         return fromFloat(*n);
     }
     return std::nullopt;
@@ -967,9 +967,9 @@ struct LuaFloatConverter {
     if (v.is<LuaString>()) {
       auto text = v.stringView().utf8();
       text = text.substr(0, text.find('\0'));
-      if (auto n = maybeLexicalCast<LuaFloat>(text))
+      if (auto n = maybe_lexical_cast<LuaFloat>(text))
         return static_cast<T>(*n);
-      if (auto n = maybeLexicalCast<LuaInt>(text))
+      if (auto n = maybe_lexical_cast<LuaInt>(text))
         return static_cast<T>(*n);
     }
     return std::nullopt;

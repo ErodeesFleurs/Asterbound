@@ -195,7 +195,7 @@ std::expected<void, StarException> WorldClientThread::stop() {
   auto cleared = clearMessages();
   if (!joined) {
     if (!cleared)
-      return std::unexpected(joined.error().withRelated(cleared.error(), "Client world message drain also failed"));
+      return std::unexpected(joined.error().with_related(cleared.error(), "Client world message drain also failed"));
     return std::unexpected(std::move(joined.error()));
   }
   if (!cleared)
@@ -268,14 +268,14 @@ std::expected<void, StarException> WorldClientThread::run() {
   if (!result) {
     auto logged = m_worldClient->root().logger().errorException("WorldClientThread error", ExceptionDiagnostic(result.error()));
     if (!logged)
-      result = std::unexpected(result.error().withRelated(logged.error(), "World error logging also failed"));
+      result = std::unexpected(result.error().with_related(logged.error(), "World error logging also failed"));
     m_errorOccurred = true;
   }
   auto cleared = clearMessages();
   if (!cleared) {
     auto logged = m_worldClient->root().logger().errorException("WorldClientThread message drain failed", ExceptionDiagnostic(cleared.error()));
     if (!logged)
-      cleared = std::unexpected(cleared.error().withRelated(logged.error(), "World message drain logging also failed"));
+      cleared = std::unexpected(cleared.error().with_related(logged.error(), "World message drain logging also failed"));
     m_errorOccurred = true;
     if (result)
       return std::unexpected(std::move(cleared.error()));
@@ -325,7 +325,7 @@ std::expected<void, StarException> WorldClientThread::update() {
     queueLocker.unlock();
     m_errorOccurred = true;
     if (!logged)
-      return std::unexpected(incoming.error().withRelated(logged.error(), "World packet error logging also failed"));
+      return std::unexpected(incoming.error().with_related(logged.error(), "World packet error logging also failed"));
   }
 
   float dt = m_worldClient->root().timing().timestep * m_worldClient->root().timing().timescale;

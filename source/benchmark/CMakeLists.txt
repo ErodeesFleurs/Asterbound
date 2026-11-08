@@ -27,6 +27,7 @@ star_add_core_benchmark(vector_benchmarks)
 star_add_core_benchmark(set_benchmarks)
 star_add_core_benchmark(string_benchmarks)
 star_add_core_benchmark(format_benchmarks)
+star_add_core_benchmark(error_benchmarks)
 target_sources(file_benchmarks PRIVATE
   file_asset_benchmarks.cpp file_asset_batch_benchmarks.cpp file_commit_benchmarks.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)

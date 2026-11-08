@@ -202,7 +202,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
       result.uuid = std::move(*uuid);
     }
     if (rest->size() > 2 && !(*rest)[2].empty() && (*rest)[2] != "-") {
-      auto level = lexicalCast<float>((*rest)[2]);
+      auto level = lexical_cast<float>((*rest)[2]);
       if (!level)
         return std::unexpected(std::move(level.error()));
       if (*level < 0)
@@ -386,10 +386,10 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
         return std::unexpected(std::move(pos.error()));
       if (pos->size() != 2)
         return std::unexpected(StarException("Malformed positional warp target"));
-      auto x = lexicalCast<int>((*pos)[0]);
+      auto x = lexical_cast<int>((*pos)[0]);
       if (!x)
         return std::unexpected(std::move(x.error()));
-      auto y = lexicalCast<int>((*pos)[1]);
+      auto y = lexical_cast<int>((*pos)[1]);
       if (!y)
         return std::unexpected(std::move(y.error()));
       target = SpawnTargetPosition(Vec2F(*x, *y));
@@ -398,7 +398,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
       if (!xMatch)
         return std::unexpected(std::move(xMatch.error()));
       if (*xMatch) {
-        auto x = lexicalCast<int>(targetPart);
+        auto x = lexical_cast<int>(targetPart);
         if (!x)
           return std::unexpected(std::move(x.error()));
         target = SpawnTargetX(*x);

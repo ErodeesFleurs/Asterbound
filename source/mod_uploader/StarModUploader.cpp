@@ -423,7 +423,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     m_modIdLabel->setText(toQString(String(Star::format("<a href=\"{}\">{}</a>", modUrl, modIdString))));
   }
 
-  auto modId = lexicalCast<PublishedFileId_t>(modIdString);
+  auto modId = lexical_cast<PublishedFileId_t>(modIdString);
   if (!modId)
     return std::unexpected(std::move(modId.error()));
   auto temporary = File::temporary_directory(m_random);

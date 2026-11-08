@@ -250,7 +250,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
   if (!initialized) {
     auto cleaned = Object::uninit();
     if (!cleaned)
-      return std::unexpected(initialized.error().withContext(Star::format("Container initialization cleanup failed: {}", Star::output_exception(cleaned.error(), false))));
+      return std::unexpected(initialized.error().with_context(Star::format("Container initialization cleanup failed: {}", Star::output_exception(cleaned.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   return {};

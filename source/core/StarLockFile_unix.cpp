@@ -64,7 +64,7 @@ std::expected<bool, StarException> LockFile::lock(std::int64_t timeout) {
         if (error == EWOULDBLOCK)
           return std::unexpected(StarException::format("Could not close unavailable lock file {}, {}", m_filename, std::strerror(closeError)));
         if (auto written = Star::print(stderr, "Error closing failed lock acquisition: {}\n", std::strerror(closeError)); !written)
-          return std::unexpected(StarException::format("Could not lock file {}, {}", m_filename, std::strerror(error)).withContext(
+          return std::unexpected(StarException::format("Could not lock file {}, {}", m_filename, std::strerror(error)).with_context(
               Star::format("Could not report close failure ({}): {}", std::strerror(closeError), written.error().what())));
       }
       if (error == EWOULDBLOCK)
@@ -100,7 +100,7 @@ std::expected<void, StarException> LockFile::unlock() {
   if (unlinkError) {
     if (closeError) {
       if (auto written = Star::print(stderr, "Error closing lock file after unlink failure: {}\n", std::strerror(closeError)); !written)
-        return std::unexpected(StarException::format("Could not unlink lock file {}, {}", m_filename, std::strerror(unlinkError)).withContext(
+        return std::unexpected(StarException::format("Could not unlink lock file {}, {}", m_filename, std::strerror(unlinkError)).with_context(
             Star::format("Could not report close failure ({}): {}", std::strerror(closeError), written.error().what())));
     }
     return std::unexpected(StarException::format("Could not unlink lock file {}, {}", m_filename, std::strerror(unlinkError)));

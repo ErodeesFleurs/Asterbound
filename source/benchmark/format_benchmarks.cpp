@@ -75,11 +75,11 @@ void register_workloads() {
     for (auto _ : state) {
       Star::StarException error("root", false);
       for (unsigned i = 0; i != 64; ++i)
-        error = std::move(error).withContext("operation");
+        error = std::move(error).with_context("operation");
       benchmark::DoNotOptimize(error.what());
     }
   });
-  auto diagnostic = Star::ExceptionDiagnostic(Star::StarException("水\ncontext", false).withContext("operation"));
+  auto diagnostic = Star::ExceptionDiagnostic(Star::StarException("水\ncontext", false).with_context("operation"));
   register_format("Format/Diagnostic/CachedProxy", Star::output_exception(diagnostic, false));
   benchmark::RegisterBenchmark("Format/Json/Utf8", [](benchmark::State& state) {
     auto value = Star::Json(Star::String(std::string(700, 'x') + "水\n\""));

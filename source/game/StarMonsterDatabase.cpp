@@ -385,7 +385,7 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::randomMonster(Stri
       if (seedConfig->type() == Json::Type::String) {
         auto result51 = seedConfig->toString();
   if (!result51) return std::unexpected(std::move(result51.error()));
-  auto result52 = lexicalCast<std::uint64_t>(*result51);
+  auto result52 = lexical_cast<std::uint64_t>(*result51);
   if (!result52) return std::unexpected(std::move(result52.error()));
   seed = std::move(*result52);
       } else {

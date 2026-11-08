@@ -11,6 +11,35 @@ using namespace Star;
 static_assert(!std::is_base_of_v<std::exception, StarException>);
 static_assert(!std::is_constructible_v<ExceptionDiagnostic, std::exception const&>);
 static_assert(!std::is_constructible_v<StarException, std::string, std::exception const&>);
+static_assert(sizeof(StarException) == sizeof(std::shared_ptr<void const>));
+static_assert(sizeof(ExceptionDiagnostic) == sizeof(std::shared_ptr<void const>));
+
+namespace {
+template <typename Error>
+concept has_error_query = requires(StarException const& error) { error.template is<Error>(); };
+
+template <typename Tag, typename Base>
+concept has_error_category = requires { typename StarError<Tag, Base>; };
+
+struct NestedIoTag {
+  static constexpr std::string_view name() { return "NestedIoError"; }
+};
+using NestedIoError = StarError<NestedIoTag, IOException>;
+struct DeepIoTag {
+  static constexpr std::string_view name() { return "DeepIoError"; }
+};
+using DeepIoError = StarError<DeepIoTag, NestedIoError>;
+
+static_assert(has_error_query<StarException> && has_error_query<DeepIoError>);
+static_assert(!has_error_query<int> && !has_error_query<std::exception>);
+static_assert(has_error_query<IOException const> && has_error_query<IOException&>);
+static_assert(has_error_query<DeepIoError const&>);
+static_assert(!has_error_query<int const&> && !has_error_query<std::exception const&>);
+static_assert(has_error_category<NestedIoTag, IOException>);
+static_assert(!has_error_category<NestedIoTag, IOException const&>);
+static_assert(!has_error_category<NestedIoTag, std::exception>);
+static_assert(!has_error_category<int, StarException>);
+}
 
 TEST(ExceptionTest, OwningCausePreservesKindsAndBothTraceModes) {
   std::string expectedShort;
@@ -100,10 +129,10 @@ TEST(ExceptionTest, SummaryKeepsDeepestCauseAcrossOwnedWrappersAndContexts) {
   auto captured = [] {
     OutOfRangeException inner("deepest-cause-marker", false);
     IOException outer("outer-wrapper-marker", ExceptionDiagnostic(inner));
-    return ExceptionDiagnostic(std::move(outer).withContext("execution-context-marker"));
+    return ExceptionDiagnostic(std::move(outer).with_context("execution-context-marker"));
   }();
-  ASSERT_TRUE(captured.diagnosticSummary());
-  EXPECT_EQ(captured.diagnosticSummary()->reason, "deepest-cause-marker");
+  ASSERT_TRUE(captured.diagnostic_summary());
+  EXPECT_EQ(captured.diagnostic_summary()->reason, "deepest-cause-marker");
   auto brief = Star::exception_summary(captured);
   EXPECT_NE(brief.find("deepest-cause-marker"), std::string::npos);
   EXPECT_EQ(brief.find("outer-wrapper-marker"), std::string::npos);
@@ -121,21 +150,21 @@ TEST(ExceptionTest, StructuredSummaryDoesNotReplaceTypedOriginalDiagnostic) {
   summary.reason = "brief-reason-marker\nretained-multiline-reason";
   summary.operation = "init";
   summary.locations.push_back({"/scripts/failure.lua", 42, "actual-provider"});
-  auto enriched = original.withSummary(std::move(summary));
+  auto enriched = original.with_summary(std::move(summary));
   EXPECT_TRUE(enriched.is<OutOfRangeException>());
   EXPECT_EQ(Star::print_exception(enriched, true), originalText);
-  ASSERT_TRUE(enriched.diagnosticSummary());
-  EXPECT_EQ(enriched.diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_EQ(enriched.diagnosticSummary()->locations.front().line, 42);
+  ASSERT_TRUE(enriched.diagnostic_summary());
+  EXPECT_EQ(enriched.diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(enriched.diagnostic_summary()->locations.front().line, 42);
   auto brief = Star::exception_summary(enriched);
   EXPECT_NE(brief.find("brief-reason-marker"), std::string::npos);
   EXPECT_NE(brief.find("/scripts/failure.lua:42"), std::string::npos);
   EXPECT_NE(brief.find("actual-provider"), std::string::npos);
   EXPECT_EQ(brief.find("retained-multiline-reason"), std::string::npos);
-  EXPECT_EQ(original.diagnosticSummary()->reason, "original-detail-marker\nsecond-detail-marker");
+  EXPECT_EQ(original.diagnostic_summary()->reason, "original-detail-marker\nsecond-detail-marker");
   auto owned = ExceptionDiagnostic(enriched);
   enriched = StarException("replacement-marker", false);
-  EXPECT_EQ(owned.diagnosticSummary()->operation, "init");
+  EXPECT_EQ(owned.diagnostic_summary()->operation, "init");
   EXPECT_EQ(Star::print_exception(owned, true), originalText);
 }
 
@@ -155,11 +184,11 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
   logger.removeStdoutSink();
   auto sink = std::make_shared<RecordingSink>();
   logger.addSink(sink);
-  auto error = OutOfRangeException("diagnostic-reason", false).withContext("full-only-context");
-  auto summary = *error.diagnosticSummary();
+  auto error = OutOfRangeException("diagnostic-reason", false).with_context("full-only-context");
+  auto summary = *error.diagnostic_summary();
   summary.locations.push_back({"/scripts/diagnostic.lua", 17, "diagnostic-provider"});
   summary.locations.push_back({"/scripts/diagnostic-caller.lua", 29, "diagnostic-provider"});
-  error = std::move(error).withSummary(std::move(summary));
+  error = std::move(error).with_summary(std::move(summary));
   auto diagnostic = ExceptionDiagnostic(error);
 
   ASSERT_TRUE(logger.errorException("error-operation", diagnostic));
@@ -191,7 +220,7 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
     auto failed = logger.errorException("failing-operation", diagnostic);
     ASSERT_FALSE(failed);
     EXPECT_TRUE(failed.error().is<IOException>());
-    EXPECT_EQ(failed.error().diagnosticSummary()->reason, "diagnostic-sink-failure");
+    EXPECT_EQ(failed.error().diagnostic_summary()->reason, "diagnostic-sink-failure");
   }
 }
 
@@ -199,7 +228,7 @@ TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {
   auto retained = [] {
     StarException source = OutOfRangeException("copy-lifetime-root", false);
     for (int i = 0; i < 128; ++i)
-      source = std::move(source).withContext(Star::format("typed-context-{}", i));
+      source = std::move(source).with_context(Star::format("typed-context-{}", i));
     auto expected = Star::print_exception(source, false);
     auto copied = source;
     StarException assigned("replaced-before-copy", false);
@@ -213,12 +242,12 @@ TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {
     EXPECT_EQ(Star::print_exception(moved, false), expected);
     EXPECT_EQ(Star::print_exception(moveAssigned, false), expected);
     EXPECT_EQ(std::string(moveAssigned.what()), expected);
-    return std::move(moveAssigned).withContext("retained-final-context");
+    return std::move(moveAssigned).with_context("retained-final-context");
   }();
   EXPECT_TRUE(retained.is<OutOfRangeException>());
   EXPECT_TRUE(retained.is<StarException>());
   EXPECT_FALSE(retained.is<IOException>());
-  EXPECT_EQ(retained.diagnosticSummary()->reason, "copy-lifetime-root");
+  EXPECT_EQ(retained.diagnostic_summary()->reason, "copy-lifetime-root");
   auto text = Star::print_exception(retained, true);
   EXPECT_NE(text.find("copy-lifetime-root"), std::string::npos);
   EXPECT_NE(text.find("typed-context-0"), std::string::npos);
@@ -249,14 +278,14 @@ TEST(ExceptionTest, RelatedDiagnosticsRetainPrimaryClassificationAndBothTraceMod
   auto secondaryShort = Star::print_exception(secondary, false);
   auto primaryFull = Star::print_exception(primary, true);
   auto secondaryFull = Star::print_exception(secondary, true);
-  auto related = primary.withRelated(secondary, "related-operation-marker");
+  auto related = primary.with_related(secondary, "related-operation-marker");
   auto shortText = Star::print_exception(related, false);
   auto fullText = Star::print_exception(related, true);
   EXPECT_TRUE(related.is<OutOfRangeException>());
   EXPECT_TRUE(related.is<StarException>());
   EXPECT_FALSE(related.is<IOException>());
-  ASSERT_TRUE(related.diagnosticSummary());
-  EXPECT_EQ(related.diagnosticSummary()->reason, "primary-related-marker");
+  ASSERT_TRUE(related.diagnostic_summary());
+  EXPECT_EQ(related.diagnostic_summary()->reason, "primary-related-marker");
   EXPECT_NE(shortText.find(primaryShort), std::string::npos);
   EXPECT_NE(shortText.find(secondaryShort), std::string::npos);
   EXPECT_NE(shortText.find("related-operation-marker"), std::string::npos);
@@ -264,7 +293,7 @@ TEST(ExceptionTest, RelatedDiagnosticsRetainPrimaryClassificationAndBothTraceMod
   EXPECT_NE(fullText.find(secondaryFull), std::string::npos);
   EXPECT_NE(fullText.find("0x"), std::string::npos);
   EXPECT_EQ(std::string(related.what()), shortText);
-  auto owned = ExceptionDiagnostic(std::move(related).withRelated(
+  auto owned = ExceptionDiagnostic(std::move(related).with_related(
       StarException("third-related-marker", false), "second-related-operation"));
   primary = OutOfRangeException("replaced-primary", false);
   secondary = IOException("replaced-secondary", false);
@@ -276,7 +305,7 @@ TEST(ExceptionTest, RelatedDiagnosticsRetainPrimaryClassificationAndBothTraceMod
 
 TEST(ExceptionTest, RelatedDiagnosticCanOwnItsRvaluePrimaryAsSecondary) {
   StarException primary = OutOfRangeException("self-related-marker", false);
-  auto related = std::move(primary).withRelated(primary, "self-related-context");
+  auto related = std::move(primary).with_related(primary, "self-related-context");
   EXPECT_TRUE(related.is<OutOfRangeException>());
   auto text = Star::print_exception(related, true);
   auto first = text.find("self-related-marker");
@@ -285,10 +314,75 @@ TEST(ExceptionTest, RelatedDiagnosticCanOwnItsRvaluePrimaryAsSecondary) {
   EXPECT_EQ(Star::print_exception(related, false), text);
 }
 
+TEST(ExceptionTest, AliasedRvalueSummaryKeepsOriginalDiagnosticsIndependent) {
+  StarException source = OutOfRangeException("unchanged-original-details", false);
+  auto copy = source;
+  auto original = ExceptionDiagnostic(source);
+  auto proxy = Star::output_exception(original, false);
+  auto originalText = std::string(copy.what());
+  auto originalWhat = copy.what();
+  auto summary = *source.diagnostic_summary();
+  summary.reason = "independent-summary";
+  summary.operation = "summary-operation";
+  auto enriched = std::move(source).with_summary(std::move(summary));
+  EXPECT_TRUE(enriched.is<OutOfRangeException>());
+  EXPECT_EQ(enriched.diagnostic_summary()->reason, "independent-summary");
+  EXPECT_EQ(copy.diagnostic_summary()->reason, "unchanged-original-details");
+  EXPECT_EQ(original.diagnostic_summary()->reason, "unchanged-original-details");
+  EXPECT_EQ(std::string(copy.what()), originalWhat);
+  EXPECT_EQ(Star::print_exception(enriched, true), originalText);
+  EXPECT_EQ(std::format("{}", proxy), originalText);
+
+  auto related = std::move(enriched).with_related(enriched, "self-related-summary");
+  EXPECT_TRUE(related.is<OutOfRangeException>());
+  EXPECT_EQ(related.diagnostic_summary()->operation, "summary-operation");
+  EXPECT_EQ(copy.diagnostic_summary()->operation, "");
+  auto text = Star::print_exception(related, false);
+  auto first = text.find(originalText);
+  ASSERT_NE(first, std::string::npos);
+  EXPECT_NE(text.find(originalText, first + originalText.size()), std::string::npos);
+  EXPECT_EQ(text.find("independent-summary"), std::string::npos);
+}
+
+TEST(ExceptionTest, NestedCategoriesAreFinalBeforeSlicingOrEnrichment) {
+  auto check = [](StarException const& error) {
+    EXPECT_TRUE(error.is<DeepIoError>());
+    EXPECT_TRUE(error.is<DeepIoError const&>());
+    EXPECT_TRUE(error.is<NestedIoError>());
+    EXPECT_TRUE(error.is<NestedIoError const&>());
+    EXPECT_TRUE(error.is<IOException>());
+    EXPECT_TRUE(error.is<StarException>());
+    EXPECT_FALSE(error.is<OutOfRangeException>());
+    EXPECT_FALSE(error.is<OutOfRangeException const&>());
+  };
+  check(DeepIoError());
+  check(DeepIoError("typed-message", false));
+  check(DeepIoError::format("typed-format-{}", 7));
+  ExceptionDiagnostic cause(OutOfRangeException("deepest-nested-cause", false));
+  check(DeepIoError(cause));
+  DeepIoError leaf("typed-outer", cause);
+  check(leaf);
+  IOException sliced = leaf;
+  check(sliced);
+  std::expected<int, StarException> result = std::unexpected(sliced);
+  ASSERT_FALSE(result);
+  check(result.error());
+  auto summary = *result.error().diagnostic_summary();
+  EXPECT_EQ(summary.reason, "deepest-nested-cause");
+  summary.operation = "nested-operation";
+  auto enriched = std::move(result.error()).with_summary(std::move(summary))
+      .with_context("nested-context")
+      .with_related(IOException("related-base", false), "nested-related");
+  check(enriched);
+  EXPECT_EQ(enriched.diagnostic_summary()->reason, "deepest-nested-cause");
+  EXPECT_EQ(enriched.diagnostic_summary()->operation, "nested-operation");
+  EXPECT_EQ(sliced.diagnostic_summary()->operation, "");
+}
+
 TEST(ExceptionTest, ConcurrentFirstRenderingAndCopiesAreDeterministic) {
   auto shared = OutOfRangeException("concurrent-origin-marker")
-      .withContext("concurrent-context-marker")
-      .withRelated(IOException("concurrent-secondary-marker"), "concurrent-related-marker");
+      .with_context("concurrent-context-marker")
+      .with_related(IOException("concurrent-secondary-marker"), "concurrent-related-marker");
   constexpr std::size_t ThreadCount = 8;
   std::array<std::string, ThreadCount> shorts;
   std::array<std::string, ThreadCount> fulls;
@@ -314,7 +408,7 @@ TEST(ExceptionTest, ConcurrentFirstRenderingAndCopiesAreDeterministic) {
         auto diagnostic = ExceptionDiagnostic(copy);
         stable[i] = stable[i] && Star::print_exception(diagnostic, true) == fulls[i]
             && Star::print_exception(diagnostic, false) == shorts[i] && copy.what() == whats[i]
-            && diagnostic.diagnosticSummary()->reason == "concurrent-origin-marker";
+            && diagnostic.diagnostic_summary()->reason == "concurrent-origin-marker";
       }
     });
   }

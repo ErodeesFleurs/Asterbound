@@ -79,7 +79,7 @@ namespace Tiled {
   template <typename T>
   struct PropertyConverter {
     [[nodiscard]] static std::expected<T, StarException> to(String const& propertyValue) {
-      return lexicalCast<T>(propertyValue);
+      return lexical_cast<T>(propertyValue);
     }
     [[nodiscard]] static std::expected<String, StarException> from(T const& propertyValue) {
       return Star::to_string(propertyValue);

@@ -151,7 +151,7 @@ std::expected<void, StarException> PlayerDeployment::init(Player& player, World&
   if (!setup) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(setup.error().withContext(Star::format("Deployment initialization rollback failed: {}", cleanup.error().what())));
+      return std::unexpected(setup.error().with_context(Star::format("Deployment initialization rollback failed: {}", cleanup.error().what())));
   }
   return setup;
 }
@@ -180,7 +180,7 @@ std::expected<void, StarException> PlayerDeployment::uninit() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(result.error().what());
+        *error = error->with_context(result.error().what());
       else
         error = std::move(result.error());
     }

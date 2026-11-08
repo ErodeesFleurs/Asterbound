@@ -21,6 +21,10 @@ bool is_utf16_trail_surrogate(Utf32Type);
 [[nodiscard]] std::expected<Utf32Type, StarException> utf32_from_utf16_surrogate_pair(Utf32Type, Utf32Type);
 [[nodiscard]] std::expected<std::pair<Utf32Type, std::optional<Utf32Type>>, StarException> utf32_to_utf16_surrogate_pair(Utf32Type);
 
+namespace unicode_detail {
+enum class decode_error : unsigned char;
+}
+
 // Lazy checked cursor for short-circuit algorithms over unvalidated bytes.
 class Utf8Cursor {
 public:
@@ -42,7 +46,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> advance();
   [[nodiscard]] std::expected<void, StarException> retreat();
 private:
-  [[nodiscard]] std::expected<void, StarException> decode() const;
+  [[nodiscard]] unicode_detail::decode_error decode() const;
   std::string_view m_bytes;
   std::size_t m_offset = 0;
   mutable std::size_t m_width = 0;

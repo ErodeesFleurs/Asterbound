@@ -142,7 +142,7 @@ std::string Assets::sourceDiagnostic(AssetSource const& source,
 }
 
 StarException Assets::withAssetContext(StarException error, String const& path, std::string_view operation) const {
-  auto const& current = *error.diagnosticSummary();
+  auto const& current = *error.diagnostic_summary();
   bool addAsset = current.asset.empty();
   bool addOperation = current.operation.empty() && !operation.empty();
   bool addProvider = current.assetProvider.empty() && (addAsset || current.asset == path.utf8());
@@ -167,11 +167,11 @@ StarException Assets::withAssetContext(StarException error, String const& path, 
   if (addAsset || !provider.empty()) {
     auto context = provider.empty() ? Star::format("{} '{}'", operation, path)
         : Star::format("{} '{}' from {}", operation, path, provider);
-    error = std::move(error).withContext(std::move(context));
+    error = std::move(error).with_context(std::move(context));
   }
   if (!provider.empty())
     summary.assetProvider = std::move(provider);
-  return std::move(error).withSummary(std::move(summary));
+  return std::move(error).with_summary(std::move(summary));
 }
 
 
@@ -187,31 +187,31 @@ static void addSummarySource(ExceptionSummary& summary, std::string_view source,
 }
 
 static StarException resourceFailure(StarException error, String const& path) {
-  auto const& current = *error.diagnosticSummary();
+  auto const& current = *error.diagnostic_summary();
   if (current.kind != ExceptionSummaryKind::Native && !current.asset.empty())
     return error;
-  auto summary = *error.diagnosticSummary();
+  auto summary = *error.diagnostic_summary();
   if (summary.kind == ExceptionSummaryKind::Native)
     summary.kind = ExceptionSummaryKind::Resource;
   if (summary.asset.empty())
     summary.asset = path.utf8();
-  return std::move(error).withSummary(std::move(summary));
+  return std::move(error).with_summary(std::move(summary));
 }
 
 static StarException scriptSourceFailure(StarException error, String const& path, std::string const& provider) {
-  if (std::ranges::any_of(error.diagnosticSummary()->locations, [&](auto const& location) {
+  if (std::ranges::any_of(error.diagnostic_summary()->locations, [&](auto const& location) {
         return location.source == path.utf8() && location.provider == provider;
       }))
     return error;
-  auto summary = *error.diagnosticSummary();
+  auto summary = *error.diagnostic_summary();
   addSummarySource(summary, path.utf8(), provider);
-  return std::move(error).withSummary(std::move(summary));
+  return std::move(error).with_summary(std::move(summary));
 }
 
 static StarException luaPatchFailure(StarException error, String const& targetPath, String const& patchPath,
     AssetSource const& source, std::optional<std::reference_wrapper<String const>> sourcePath) {
   auto provider = Assets::sourceDiagnostic(source, sourcePath);
-  auto const& current = *error.diagnosticSummary();
+  auto const& current = *error.diagnostic_summary();
   auto patchBasePath = AssetPath::removeSubPath(patchPath);
   bool changeKind = current.kind != ExceptionSummaryKind::PatchSyntax && current.kind != ExceptionSummaryKind::PatchRuntime;
   bool changePatch = current.patch.empty();
@@ -230,9 +230,9 @@ static StarException luaPatchFailure(StarException error, String const& targetPa
     }
     if (changeSource)
       addSummarySource(summary, patchBasePath.utf8(), provider);
-    error = std::move(error).withSummary(std::move(summary));
+    error = std::move(error).with_summary(std::move(summary));
   }
-  return std::move(error).withContext(
+  return std::move(error).with_context(
       Star::format("Lua patch provider: target '{}', patch '{}', {}", targetPath, patchPath, provider));
 }
 
@@ -390,13 +390,13 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         auto data = source->get()->read(path);
         if (!data) {
           auto provider = sourceDiagnostic(*source->get(), std::cref(sourcePath));
-          auto error = std::move(data.error()).withContext(Star::format("Reading asset '{}' from {}", path, provider));
-          auto summary = *error.diagnosticSummary();
+          auto error = std::move(data.error()).with_context(Star::format("Reading asset '{}' from {}", path, provider));
+          auto summary = *error.diagnostic_summary();
           summary.kind = ExceptionSummaryKind::Resource;
           summary.asset = path.utf8();
           summary.assetProvider = std::move(provider);
           summary.operation = "Reading source asset bytes";
-          return std::unexpected(std::move(error).withSummary(std::move(summary)));
+          return std::unexpected(std::move(error).with_summary(std::move(summary)));
         }
         return String(std::string_view(data->begin(), data->end()));
       });
@@ -881,10 +881,10 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         if (!ran) {
           if (!ran.error().is<LuaException>())
             return std::unexpected(std::move(ran.error()));
-          auto summary = *ran.error().diagnosticSummary();
+          auto summary = *ran.error().diagnostic_summary();
           if (summary.operation.empty())
             summary.operation = Star::format("Running {} scripts", groupName);
-          ran.error() = std::move(ran.error()).withSummary(std::move(summary));
+          ran.error() = std::move(ran.error()).with_summary(std::move(summary));
           logged = m_logger.errorException(
               Star::format("Exception while running {} scripts from {}", groupName, sourceDiagnostic(*source, std::cref(sourcePath))),
               ExceptionDiagnostic(ran.error()));

@@ -1071,10 +1071,10 @@ std::expected<void, StarException> WorldStorage::initialize() {
 StarException WorldStorage::invalidate(StarException error, std::string context) {
   auto rollback = m_db.rollback();
   if (!rollback) {
-    error = rollback.error().withContext(Star::format("Rollback failed after {}", error.what()));
+    error = rollback.error().with_context(Star::format("Rollback failed after {}", error.what()));
   } else {
     auto closed = m_db.close();
-    if (!closed) error = closed.error().withContext(Star::format("Close failed after {}", error.what()));
+    if (!closed) error = closed.error().with_context(Star::format("Close failed after {}", error.what()));
   }
   return WorldStorageException(std::move(context), ExceptionDiagnostic(error));
 }

@@ -75,7 +75,7 @@ std::expected<EntityRenderLayer, StarException> parseRenderLayer(String renderLa
     auto amount = parts->at(1);
     if (!amount)
       return std::unexpected(std::move(amount.error()));
-    auto parsed = lexicalCast<int>(amount->get());
+    auto parsed = lexical_cast<int>(amount->get());
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     renderLayer = name->get();

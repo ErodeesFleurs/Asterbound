@@ -129,7 +129,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     } else {
       std::optional<std::uint64_t> seed;
       if (auto seedOption = options.parameters.find_ref("coordseed"); seedOption && !seedOption->get().empty()) {
-        auto parsed = lexicalCast<std::uint64_t>(seedOption->get()[0]);
+        auto parsed = lexical_cast<std::uint64_t>(seedOption->get()[0]);
         if (!parsed)
           return std::unexpected(std::move(parsed.error()));
         seed = *parsed;
@@ -160,10 +160,10 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto heightText = components->at(1);
       if (!heightText)
         return std::unexpected(std::move(heightText.error()));
-      auto width = lexicalCast<unsigned>(widthText->get());
+      auto width = lexical_cast<unsigned>(widthText->get());
       if (!width)
         return std::unexpected(std::move(width.error()));
-      auto height = lexicalCast<unsigned>(heightText->get());
+      auto height = lexical_cast<unsigned>(heightText->get());
       if (!height)
         return std::unexpected(std::move(height.error()));
       size = Vec2U(*width, *height).piecewise_clamp(Vec2U(0, 0), size);

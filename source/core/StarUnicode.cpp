@@ -7,22 +7,75 @@ import star.byte_array;
 import star.string;
 
 namespace Star {
-std::expected<void, StarException> Utf8Cursor::decode() const {
-  if (at_end()) return std::unexpected(UnicodeException("Cannot read past end of UTF-8 range"));
-  if (m_width != 0) return {};
-  auto width = utf8_decode_char(m_bytes.data() + m_offset, &m_point, m_bytes.size() - m_offset);
-  if (!width) return std::unexpected(std::move(width.error()));
+namespace unicode_detail {
+enum class decode_error : unsigned char {
+  none,
+  invalid_sequence,
+  missing_trailing_units,
+  invalid_codepoint,
+  past_end
+};
+
+// Keep per-codepoint validation independent of owning diagnostic construction.
+static std::expected<unsigned char, decode_error> decode_char(
+    Utf8Type const* bytes, Utf32Type* output, std::size_t remain) {
+  if (remain == 0 || (remain == NPos && *bytes == 0)) return 0;
+  auto first = static_cast<unsigned char>(bytes[0]);
+  unsigned char count;
+  std::uint32_t point;
+  std::uint32_t minimum;
+  if (first < 0x80) { count = 1; point = first; minimum = 0; }
+  else if ((first & 0xe0) == 0xc0) { count = 2; point = first & 0x1f; minimum = 0x80; }
+  else if ((first & 0xf0) == 0xe0) { count = 3; point = first & 0x0f; minimum = 0x800; }
+  else if ((first & 0xf8) == 0xf0) { count = 4; point = first & 7; minimum = 0x10000; }
+  else return std::unexpected(decode_error::invalid_sequence);
+  if (remain != NPos && remain < count)
+    return std::unexpected(decode_error::missing_trailing_units);
+  for (unsigned i = 1; i != count; ++i) {
+    auto next = static_cast<unsigned char>(bytes[i]);
+    if (remain == NPos && next == 0)
+      return std::unexpected(decode_error::missing_trailing_units);
+    if ((next & 0xc0) != 0x80)
+      return std::unexpected(decode_error::invalid_sequence);
+    point = (point << 6) | (next & 0x3f);
+  }
+  if (point < minimum || point > 0x10ffff)
+    return std::unexpected(decode_error::invalid_codepoint);
+  *output = static_cast<Utf32Type>(point);
+  return count;
+}
+
+// Only public checked boundaries turn these codes into owning diagnostics.
+static char const* decode_message(decode_error error) {
+  switch (error) {
+    case decode_error::invalid_sequence: return "Invalid UTF-8 code unit sequence";
+    case decode_error::missing_trailing_units: return "UTF-8 string missing trailing code units";
+    case decode_error::invalid_codepoint: return "Invalid UTF-8 code point";
+    case decode_error::past_end: return "Cannot read past end of UTF-8 range";
+    case decode_error::none: std::unreachable();
+  }
+  std::unreachable();
+}
+}
+
+unicode_detail::decode_error Utf8Cursor::decode() const {
+  if (at_end()) return unicode_detail::decode_error::past_end;
+  if (m_width != 0) return unicode_detail::decode_error::none;
+  auto width = unicode_detail::decode_char(m_bytes.data() + m_offset, &m_point, m_bytes.size() - m_offset);
+  if (!width) return width.error();
   m_width = *width;
-  return {};
+  return unicode_detail::decode_error::none;
 }
 std::expected<Utf32Type, StarException> Utf8Cursor::read() const {
-  auto result = decode();
-  if (!result) return std::unexpected(std::move(result.error()));
+  auto error = decode();
+  if (error != unicode_detail::decode_error::none)
+    return std::unexpected(UnicodeException(unicode_detail::decode_message(error)));
   return m_point;
 }
 std::expected<void, StarException> Utf8Cursor::advance() {
-  auto result = decode();
-  if (!result) return std::unexpected(std::move(result.error()));
+  auto error = decode();
+  if (error != unicode_detail::decode_error::none)
+    return std::unexpected(UnicodeException(unicode_detail::decode_message(error)));
   m_offset += m_width;
   m_width = 0;
   return {};
@@ -32,8 +85,8 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
   auto offset = m_offset - 1;
   while (offset != 0 && (static_cast<unsigned char>(m_bytes[offset]) & 0xc0) == 0x80) --offset;
   Utf32Type point;
-  auto width = utf8_decode_char(m_bytes.data() + offset, &point, m_offset - offset);
-  if (!width) return std::unexpected(std::move(width.error()));
+  auto width = unicode_detail::decode_char(m_bytes.data() + offset, &point, m_offset - offset);
+  if (!width) return std::unexpected(UnicodeException(unicode_detail::decode_message(width.error())));
   if (*width != m_offset - offset) return std::unexpected(UnicodeException("Invalid UTF-8 boundary"));
   m_offset = offset;
   m_width = *width;
@@ -42,38 +95,17 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
 }
 
 std::expected<std::size_t, StarException> utf8_decode_char(Utf8Type const* bytes, Utf32Type* output, std::size_t remain) {
-  if (remain == 0 || (remain == NPos && *bytes == 0)) return 0;
-  auto first = static_cast<unsigned char>(bytes[0]);
-  unsigned count;
-  std::uint32_t point;
-  std::uint32_t minimum;
-  if (first < 0x80) { count = 1; point = first; minimum = 0; }
-  else if ((first & 0xe0) == 0xc0) { count = 2; point = first & 0x1f; minimum = 0x80; }
-  else if ((first & 0xf0) == 0xe0) { count = 3; point = first & 0x0f; minimum = 0x800; }
-  else if ((first & 0xf8) == 0xf0) { count = 4; point = first & 7; minimum = 0x10000; }
-  else return std::unexpected(UnicodeException("Invalid UTF-8 code unit sequence"));
-  if (remain != NPos && remain < count)
-    return std::unexpected(UnicodeException("UTF-8 string missing trailing code units"));
-  for (unsigned i = 1; i != count; ++i) {
-    auto next = static_cast<unsigned char>(bytes[i]);
-    if (remain == NPos && next == 0)
-      return std::unexpected(UnicodeException("UTF-8 string missing trailing code units"));
-    if ((next & 0xc0) != 0x80)
-      return std::unexpected(UnicodeException("Invalid UTF-8 code unit sequence"));
-    point = (point << 6) | (next & 0x3f);
-  }
-  if (point < minimum || point > 0x10ffff)
-    return std::unexpected(UnicodeException("Invalid UTF-8 code point"));
-  *output = static_cast<Utf32Type>(point);
-  return count;
+  auto decoded = unicode_detail::decode_char(bytes, output, remain);
+  if (!decoded) return std::unexpected(UnicodeException(unicode_detail::decode_message(decoded.error())));
+  return *decoded;
 }
 
 std::expected<std::size_t, StarException> utf8_length(Utf8Type const* bytes, std::size_t remain) {
   std::size_t length = 0;
   while (remain != 0) {
     Utf32Type point;
-    auto decoded = utf8_decode_char(bytes, &point, remain);
-    if (!decoded) return std::unexpected(std::move(decoded.error()));
+    auto decoded = unicode_detail::decode_char(bytes, &point, remain);
+    if (!decoded) return std::unexpected(UnicodeException(unicode_detail::decode_message(decoded.error())));
     if (*decoded == 0) break;
     bytes += *decoded;
     if (remain != NPos) remain -= *decoded;

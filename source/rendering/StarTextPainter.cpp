@@ -598,7 +598,7 @@ std::expected<RectF, StarException> TextPainter::doRenderText(StringView s, Text
       m_renderSettings = std::move(backup);
       auto restored = m_fontTextureGroup.switchFont(m_renderSettings.font);
       if (!restored)
-        return std::unexpected(restored.error().withContext(line.error().what()));
+        return std::unexpected(restored.error().with_context(line.error().what()));
       return std::unexpected(std::move(line.error()));
     }
     bounds.combine(*line);

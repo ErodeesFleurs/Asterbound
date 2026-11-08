@@ -946,7 +946,7 @@ TEST(LuaTest, SourceProvidersUseFullLiveStackAndDeduplicate) {
   EXPECT_NE(message.find(helperPath.utf8()), std::string::npos);
   EXPECT_EQ(entryLookups, 1);
   EXPECT_EQ(helperLookups, 1);
-  auto const& summary = failure.error().diagnosticSummary();
+  auto const& summary = failure.error().diagnostic_summary();
   ASSERT_TRUE(summary);
   EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
   EXPECT_NE(summary->reason.find("original-provider-marker"), std::string::npos);
@@ -996,13 +996,13 @@ TEST(LuaTest, SourceProvidersPreserveCompilationAndLimitCategories) {
   ASSERT_FALSE(compiled);
   EXPECT_TRUE(compiled.error().is<LuaIncompleteStatementException>());
   EXPECT_NE(std::string(compiled.error().what()).find("syntax-provider"), std::string::npos);
-  ASSERT_TRUE(compiled.error().diagnosticSummary());
-  EXPECT_EQ(compiled.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptSyntax);
-  EXPECT_NE(compiled.error().diagnosticSummary()->reason.find("<eof>"), std::string::npos);
-  ASSERT_FALSE(compiled.error().diagnosticSummary()->locations.empty());
-  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().source, "/syntax.lua");
-  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().line, -1);
-  EXPECT_EQ(compiled.error().diagnosticSummary()->locations.front().provider, "syntax-provider /mods/syntax");
+  ASSERT_TRUE(compiled.error().diagnostic_summary());
+  EXPECT_EQ(compiled.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptSyntax);
+  EXPECT_NE(compiled.error().diagnostic_summary()->reason.find("<eof>"), std::string::npos);
+  ASSERT_FALSE(compiled.error().diagnostic_summary()->locations.empty());
+  EXPECT_EQ(compiled.error().diagnostic_summary()->locations.front().source, "/syntax.lua");
+  EXPECT_EQ(compiled.error().diagnostic_summary()->locations.front().line, -1);
+  EXPECT_EQ(compiled.error().diagnostic_summary()->locations.front().provider, "syntax-provider /mods/syntax");
   auto contextResult = engine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
@@ -1010,17 +1010,17 @@ TEST(LuaTest, SourceProvidersPreserveCompilationAndLimitCategories) {
   ASSERT_FALSE(loaded);
   EXPECT_TRUE(loaded.error().is<LuaException>());
   EXPECT_NE(std::string(loaded.error().what()).find("syntax-provider"), std::string::npos);
-  ASSERT_TRUE(loaded.error().diagnosticSummary());
-  EXPECT_EQ(loaded.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptSyntax);
+  ASSERT_TRUE(loaded.error().diagnostic_summary());
+  EXPECT_EQ(loaded.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptSyntax);
   engine->setInstructionMeasureInterval(1);
   engine->setInstructionLimit(20);
   auto limited = context.load("while true do end", "/syntax.lua");
   ASSERT_FALSE(limited);
   EXPECT_TRUE(limited.error().is<LuaInstructionLimitReached>());
-  ASSERT_TRUE(limited.error().diagnosticSummary());
-  EXPECT_EQ(limited.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_EQ(limited.error().diagnosticSummary()->category, "LuaInstructionLimitReached");
-  EXPECT_EQ(limited.error().diagnosticSummary()->reason, "Lua instruction limit reached");
+  ASSERT_TRUE(limited.error().diagnostic_summary());
+  EXPECT_EQ(limited.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(limited.error().diagnostic_summary()->category, "LuaInstructionLimitReached");
+  EXPECT_EQ(limited.error().diagnostic_summary()->reason, "Lua instruction limit reached");
 }
 
 TEST(LuaTest, SourceProviderFailureDoesNotReplaceSyntaxError) {
@@ -1062,13 +1062,13 @@ TEST(LuaTest, CoroutineSourceProvidersKeepFailedFrames) {
   EXPECT_NE(message.find("coroutine-original-marker"), std::string::npos);
   EXPECT_NE(message.find("coroutine-helper-provider"), std::string::npos);
   EXPECT_NE(message.find("coroutine-entry-provider"), std::string::npos);
-  ASSERT_TRUE(invoked.error().diagnosticSummary());
-  EXPECT_EQ(invoked.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_NE(invoked.error().diagnosticSummary()->reason.find("coroutine-original-marker"), std::string::npos);
-  EXPECT_EQ(invoked.error().diagnosticSummary()->reason.find('\n'), std::string::npos);
-  ASSERT_FALSE(invoked.error().diagnosticSummary()->locations.empty());
-  EXPECT_EQ(invoked.error().diagnosticSummary()->locations.front().source, "/helper.lua");
-  EXPECT_EQ(invoked.error().diagnosticSummary()->locations.front().line, 1);
+  ASSERT_TRUE(invoked.error().diagnostic_summary());
+  EXPECT_EQ(invoked.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(invoked.error().diagnostic_summary()->reason.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_EQ(invoked.error().diagnostic_summary()->reason.find('\n'), std::string::npos);
+  ASSERT_FALSE(invoked.error().diagnostic_summary()->locations.empty());
+  EXPECT_EQ(invoked.error().diagnostic_summary()->locations.front().source, "/helper.lua");
+  EXPECT_EQ(invoked.error().diagnostic_summary()->locations.front().line, 1);
   auto thread = context.get<LuaThread>("co");
   ASSERT_TRUE(thread);
   auto resumed = thread->resume<int>();
@@ -1077,13 +1077,13 @@ TEST(LuaTest, CoroutineSourceProvidersKeepFailedFrames) {
   EXPECT_NE(message.find("coroutine-original-marker"), std::string::npos);
   EXPECT_NE(message.find("coroutine-helper-provider"), std::string::npos);
   EXPECT_NE(message.find("coroutine-entry-provider"), std::string::npos);
-  ASSERT_TRUE(resumed.error().diagnosticSummary());
-  EXPECT_EQ(resumed.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_NE(resumed.error().diagnosticSummary()->reason.find("coroutine-original-marker"), std::string::npos);
-  EXPECT_EQ(resumed.error().diagnosticSummary()->reason.find('\n'), std::string::npos);
-  ASSERT_FALSE(resumed.error().diagnosticSummary()->locations.empty());
-  EXPECT_EQ(resumed.error().diagnosticSummary()->locations.front().source, "/helper.lua");
-  EXPECT_EQ(resumed.error().diagnosticSummary()->locations.front().line, 1);
+  ASSERT_TRUE(resumed.error().diagnostic_summary());
+  EXPECT_EQ(resumed.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(resumed.error().diagnostic_summary()->reason.find("coroutine-original-marker"), std::string::npos);
+  EXPECT_EQ(resumed.error().diagnostic_summary()->reason.find('\n'), std::string::npos);
+  ASSERT_FALSE(resumed.error().diagnostic_summary()->locations.empty());
+  EXPECT_EQ(resumed.error().diagnostic_summary()->locations.front().source, "/helper.lua");
+  EXPECT_EQ(resumed.error().diagnostic_summary()->locations.front().line, 1);
 }
 
 TEST(LuaTest, RuntimeSummaryUsesLiveFailureAndCallerLinesBeforeTraceback) {
@@ -1104,7 +1104,7 @@ TEST(LuaTest, RuntimeSummaryUsesLiveFailureAndCallerLinesBeforeTraceback) {
       "end", "/live-lines.lua"));
   auto failure = context.invokePath("entry");
   ASSERT_FALSE(failure);
-  auto const& summary = failure.error().diagnosticSummary();
+  auto const& summary = failure.error().diagnostic_summary();
   ASSERT_TRUE(summary);
   EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
   EXPECT_NE(summary->reason.find("unavailable"), std::string::npos);
@@ -1148,7 +1148,7 @@ TEST(LuaTest, SummaryPreservesTypedNativeCauseThroughNestedCaughtStringErrors) {
     auto failure = context.invokePath(entry);
     ASSERT_FALSE(failure);
     EXPECT_TRUE(failure.error().is<LuaException>());
-    auto const& summary = failure.error().diagnosticSummary();
+    auto const& summary = failure.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->kind, ExceptionSummaryKind::Native);
     EXPECT_EQ(summary->reason, "deepest-native-marker");
@@ -1184,7 +1184,7 @@ TEST(LuaTest, CaughtNativeSummariesDoNotLeakToOtherErrorsOrLaterCalls) {
   for (String const& entry : {String("unrelated"), String("caughtThenUnrelated"), String("unrelated")}) {
     auto failure = context.invokePath(entry);
     ASSERT_FALSE(failure);
-    auto const& summary = failure.error().diagnosticSummary();
+    auto const& summary = failure.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->kind, ExceptionSummaryKind::ScriptRuntime);
     EXPECT_NE(summary->reason.find("unrelated-lua-marker"), std::string::npos);
@@ -1194,9 +1194,9 @@ TEST(LuaTest, CaughtNativeSummariesDoNotLeakToOtherErrorsOrLaterCalls) {
   }
   auto transformed = context.invokePath("transformed");
   ASSERT_FALSE(transformed);
-  ASSERT_TRUE(transformed.error().diagnosticSummary());
-  EXPECT_EQ(transformed.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_TRUE(transformed.error().diagnosticSummary()->reason.starts_with("not-a-location-prefix:"));
+  ASSERT_TRUE(transformed.error().diagnostic_summary());
+  EXPECT_EQ(transformed.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_TRUE(transformed.error().diagnostic_summary()->reason.starts_with("not-a-location-prefix:"));
   EXPECT_EQ(context.invokePath<bool>("caughtSuccess"), true);
 }
 
@@ -1224,24 +1224,24 @@ TEST(LuaTest, CoroutineNativeSummariesRemainIdentityBoundAcrossResumeAndYield) {
       "/coroutine-native.lua"));
   auto luaFailure = context.invokePath("rethrow");
   ASSERT_FALSE(luaFailure);
-  ASSERT_TRUE(luaFailure.error().diagnosticSummary());
-  EXPECT_EQ(luaFailure.error().diagnosticSummary()->kind, ExceptionSummaryKind::Native);
-  EXPECT_EQ(luaFailure.error().diagnosticSummary()->reason, "coroutine-native-marker");
+  ASSERT_TRUE(luaFailure.error().diagnostic_summary());
+  EXPECT_EQ(luaFailure.error().diagnostic_summary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(luaFailure.error().diagnostic_summary()->reason, "coroutine-native-marker");
   auto thread = context.get<LuaThread>("co");
   ASSERT_TRUE(thread);
   auto hostFailure = thread->resume<LuaValue>();
   ASSERT_FALSE(hostFailure);
-  ASSERT_TRUE(hostFailure.error().diagnosticSummary());
-  EXPECT_EQ(hostFailure.error().diagnosticSummary()->kind, ExceptionSummaryKind::Native);
-  EXPECT_EQ(hostFailure.error().diagnosticSummary()->reason, "coroutine-native-marker");
-  ASSERT_FALSE(hostFailure.error().diagnosticSummary()->locations.empty());
-  EXPECT_EQ(hostFailure.error().diagnosticSummary()->locations.front().source, "/coroutine-native.lua");
-  EXPECT_EQ(hostFailure.error().diagnosticSummary()->locations.front().line, 1);
+  ASSERT_TRUE(hostFailure.error().diagnostic_summary());
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->reason, "coroutine-native-marker");
+  ASSERT_FALSE(hostFailure.error().diagnostic_summary()->locations.empty());
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->locations.front().source, "/coroutine-native.lua");
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->locations.front().line, 1);
   auto unrelated = context.invokePath("unrelated");
   ASSERT_FALSE(unrelated);
-  ASSERT_TRUE(unrelated.error().diagnosticSummary());
-  EXPECT_EQ(unrelated.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_NE(unrelated.error().diagnosticSummary()->reason.find("coroutine-unrelated-marker"), std::string::npos);
+  ASSERT_TRUE(unrelated.error().diagnostic_summary());
+  EXPECT_EQ(unrelated.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(unrelated.error().diagnostic_summary()->reason.find("coroutine-unrelated-marker"), std::string::npos);
   auto yielding = context.get<LuaThread>("yielding");
   ASSERT_TRUE(yielding);
   auto yielded = yielding->resume<String>();
@@ -1250,10 +1250,10 @@ TEST(LuaTest, CoroutineNativeSummariesRemainIdentityBoundAcrossResumeAndYield) {
   EXPECT_EQ(**yielded, "caught");
   auto afterYield = yielding->resume<LuaValue>();
   ASSERT_FALSE(afterYield);
-  ASSERT_TRUE(afterYield.error().diagnosticSummary());
-  EXPECT_EQ(afterYield.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_NE(afterYield.error().diagnosticSummary()->reason.find("after-yield-unrelated-marker"), std::string::npos);
-  EXPECT_EQ(afterYield.error().diagnosticSummary()->reason.find("coroutine-native-marker"), std::string::npos);
+  ASSERT_TRUE(afterYield.error().diagnostic_summary());
+  EXPECT_EQ(afterYield.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(afterYield.error().diagnostic_summary()->reason.find("after-yield-unrelated-marker"), std::string::npos);
+  EXPECT_EQ(afterYield.error().diagnostic_summary()->reason.find("coroutine-native-marker"), std::string::npos);
 }
 
 TEST(LuaTest, CoroutineNumericErrorsKeepTheirOriginalReason) {
@@ -1267,9 +1267,9 @@ TEST(LuaTest, CoroutineNumericErrorsKeepTheirOriginalReason) {
   auto result = coroutine->resume<LuaValue>();
   ASSERT_FALSE(result);
   EXPECT_TRUE(result.error().is<LuaException>());
-  ASSERT_TRUE(result.error().diagnosticSummary());
-  EXPECT_EQ(result.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-  EXPECT_EQ(result.error().diagnosticSummary()->reason, "42");
+  ASSERT_TRUE(result.error().diagnostic_summary());
+  EXPECT_EQ(result.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_EQ(result.error().diagnostic_summary()->reason, "42");
 }
 
 TEST(LuaTest, Eval) {
@@ -1475,10 +1475,10 @@ TEST(LuaTest, Limits) {
     auto failure = context.invokePath("call1");
     ASSERT_FALSE(failure);
     EXPECT_TRUE(failure.error().is<LuaRecursionLimitReached>());
-    ASSERT_TRUE(failure.error().diagnosticSummary());
-    EXPECT_EQ(failure.error().diagnosticSummary()->kind, ExceptionSummaryKind::ScriptRuntime);
-    EXPECT_EQ(failure.error().diagnosticSummary()->category, "LuaRecursionLimitReached");
-    EXPECT_EQ(failure.error().diagnosticSummary()->reason, "Lua recursion limit reached");
+    ASSERT_TRUE(failure.error().diagnostic_summary());
+    EXPECT_EQ(failure.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+    EXPECT_EQ(failure.error().diagnostic_summary()->category, "LuaRecursionLimitReached");
+    EXPECT_EQ(failure.error().diagnostic_summary()->reason, "Lua recursion limit reached");
   };
 
   // Make sure the context still functions properly after these previous

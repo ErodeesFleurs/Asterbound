@@ -1412,7 +1412,7 @@ std::expected<void, StarException> CraftingPane::countTextChanged() {
     if (countText.empty()) {
       m_count = appropriateDefaultCount;
     } else {
-      auto parsed = lexicalCast<int>(countText);
+      auto parsed = lexical_cast<int>(countText);
       if (!parsed) {
         if (!parsed.error().is<BadLexicalCast>())
           return std::unexpected(std::move(parsed.error()));

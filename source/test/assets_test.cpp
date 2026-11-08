@@ -1567,13 +1567,13 @@ const GameTestRegistration assetsFailureCacheReload(
     auto first = (*assets)->json("/failure.json");
     ASSERT_FALSE(first);
     EXPECT_TRUE(first.error().is<AssetException>());
-    EXPECT_EQ(first.error().diagnosticSummary()->asset, "/failure.json");
-    auto reason = first.error().diagnosticSummary()->reason;
+    EXPECT_EQ(first.error().diagnostic_summary()->asset, "/failure.json");
+    auto reason = first.error().diagnostic_summary()->reason;
     ASSERT_TRUE(File::write_file(String(R"({"recovered":42})"), path));
     (*assets)->clearCache();
     auto cached = (*assets)->json("/failure.json");
     ASSERT_FALSE(cached);
-    EXPECT_EQ(cached.error().diagnosticSummary()->reason, reason);
+    EXPECT_EQ(cached.error().diagnostic_summary()->reason, reason);
     (*assets)->hotReload();
     ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json"}));
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));

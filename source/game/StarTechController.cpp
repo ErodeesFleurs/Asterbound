@@ -219,7 +219,7 @@ std::expected<void, StarException> TechController::uninit() {
     auto unloaded = unloadModule(module);
     if (!unloaded) {
       if (error)
-        *error = error->withContext(unloaded.error().what());
+        *error = error->with_context(unloaded.error().what());
       else
         error = std::move(unloaded.error());
     }
@@ -581,7 +581,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
     auto unloaded = unloadModule(module);
     if (!unloaded) {
       if (unloadError)
-        *unloadError = unloadError->withContext(unloaded.error().what());
+        *unloadError = unloadError->with_context(unloaded.error().what());
       else
         unloadError = std::move(unloaded.error());
     }
@@ -639,7 +639,7 @@ std::expected<void, StarException> TechController::unloadModule(TechModule& modu
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(result.error().what());
+        *error = error->with_context(result.error().what());
       else
         error = std::move(result.error());
     }
@@ -694,7 +694,7 @@ std::expected<void, StarException> TechController::initializeModules() {
     for (auto& module : m_techModules) {
       auto unloaded = unloadModule(module);
       if (!unloaded)
-        error = error.withContext(unloaded.error().what());
+        error = error.with_context(unloaded.error().what());
     }
     return std::unexpected(std::move(error));
   }

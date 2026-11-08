@@ -426,7 +426,7 @@ std::expected<std::size_t, StarException> File::pread(void* file, char* data, st
   if (!read && error != ERROR_HANDLE_EOF) {
     if (!restored) {
       if (auto written = Star::print(stderr, "Error restoring file cursor after failed pread: {}\n", restored.error().what()); !written)
-        return std::unexpected(IOException::format("pread error {}", error).withContext(
+        return std::unexpected(IOException::format("pread error {}", error).with_context(
             Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
     }
     return std::unexpected(IOException::format("pread error {}", error));
@@ -452,7 +452,7 @@ std::expected<std::size_t, StarException> File::pwrite(void* file, char const* d
   if (!written) {
     if (!restored) {
       if (auto written = Star::print(stderr, "Error restoring file cursor after failed pwrite: {}\n", restored.error().what()); !written)
-        return std::unexpected(IOException::format("pwrite error {}", error).withContext(
+        return std::unexpected(IOException::format("pwrite error {}", error).with_context(
             Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
     }
     return std::unexpected(IOException::format("pwrite error {}", error));
@@ -477,7 +477,7 @@ std::expected<void, StarException> File::resize(void* file, StreamOffset size) {
   if (!resized) {
     if (!restored) {
       if (auto written = Star::print(stderr, "Error restoring file cursor after failed resize: {}\n", restored.error().what()); !written)
-        return std::unexpected(IOException::format("resize error {}", error).withContext(
+        return std::unexpected(IOException::format("resize error {}", error).with_context(
             Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
     }
     return std::unexpected(IOException::format("resize error {}", error));

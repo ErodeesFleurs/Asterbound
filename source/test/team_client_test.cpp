@@ -212,7 +212,7 @@ const GameTestRegistration teamStatusSynchronization(
     auto invalidInterval = team.update();
     ASSERT_FALSE(invalidInterval);
     EXPECT_TRUE(invalidInterval.error().is<AssetException>());
-    EXPECT_EQ(invalidInterval.error().diagnosticSummary()->asset, "/interface.config:invitationPollInterval");
+    EXPECT_EQ(invalidInterval.error().diagnostic_summary()->asset, "/interface.config:invitationPollInterval");
     ASSERT_TRUE(File::write_file(intervalPatch, intervalPath));
     ASSERT_TRUE((*root)->hotReload());
     ASSERT_TRUE(team.update());

@@ -293,7 +293,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
     if (!thread) {
       auto failure = std::move(thread.error());
       if (auto closed = close(); !closed)
-        failure = failure.withRelated(closed.error(), "Connection worker startup rollback failure");
+        failure = failure.with_related(closed.error(), "Connection worker startup rollback failure");
       return std::unexpected(std::move(failure));
     }
     m_processingThreads.push_back(std::move(*thread));
@@ -396,7 +396,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
     auto finished = thread.finish();
     if (!finished) {
       if (failure)
-        failure = failure->withRelated(finished.error(), "Additional connection worker shutdown failure");
+        failure = failure->with_related(finished.error(), "Additional connection worker shutdown failure");
       else
         failure = std::move(finished.error());
     }

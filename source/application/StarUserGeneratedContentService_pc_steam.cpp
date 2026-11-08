@@ -42,7 +42,7 @@ StringList SteamUserGeneratedContentService::subscribedContentIds() const {
 }
 
 std::expected<std::optional<String>, StarException> SteamUserGeneratedContentService::contentDownloadDirectory(String const& contentId) const {
-  auto parsed = lexicalCast<PublishedFileId_t>(contentId);
+  auto parsed = lexical_cast<PublishedFileId_t>(contentId);
   if (!parsed)
     return std::unexpected(std::move(parsed.error()));
   PublishedFileId_t id = *parsed;

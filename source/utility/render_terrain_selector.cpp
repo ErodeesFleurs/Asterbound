@@ -49,7 +49,7 @@ static std::expected<T, StarException> numericOption(OptionParser::Options const
   auto values = options.parameters.find_ref(name);
   if (!values || values->get().empty())
     return fallback;
-  return lexicalCast<T>(values->get()[0]);
+  return lexical_cast<T>(values->get()[0]);
 }
 
 [[nodiscard]]
@@ -102,10 +102,10 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto heightText = components->at(1);
   if (!heightText)
     return std::unexpected(std::move(heightText.error()));
-  auto width = lexicalCast<unsigned>(widthText->get());
+  auto width = lexical_cast<unsigned>(widthText->get());
   if (!width)
     return std::unexpected(std::move(width.error()));
-  auto height = lexicalCast<unsigned>(heightText->get());
+  auto height = lexical_cast<unsigned>(heightText->get());
   if (!height)
     return std::unexpected(std::move(height.error()));
   Vec2U size(*width, *height);

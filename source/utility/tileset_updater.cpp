@@ -267,7 +267,7 @@ std::expected<std::pair<StringMap<std::size_t>, std::size_t>, StarException> Til
   if (!properties)
     return std::unexpected(std::move(properties.error()));
   for (auto const& entry : *properties) {
-    auto id = lexicalCast<std::size_t>(entry.first);
+    auto id = lexical_cast<std::size_t>(entry.first);
     if (!id)
       return std::unexpected(std::move(id.error()));
     auto containsName = entry.second.contains("//name");

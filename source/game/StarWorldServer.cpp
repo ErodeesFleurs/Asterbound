@@ -308,7 +308,7 @@ std::expected<void, StarException> WorldServer::close() {
   std::optional<StarException> error;
   auto recordError = [&](StarException next) {
     if (error)
-      *error = error->withContext(Star::format("Additional error closing world: {}", next.what()));
+      *error = error->with_context(Star::format("Additional error closing world: {}", next.what()));
     else
       error = std::move(next);
   };
@@ -1119,7 +1119,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             if (published)
               world.m_entityMap->removeEntity(entity->entityId());
             if (auto result = entity->uninit(); !result)
-              error = error.withContext(Star::format("Error uninitializing rejected slave entity: {}", result.error().what()));
+              error = error.with_context(Star::format("Error uninitializing rejected slave entity: {}", result.error().what()));
             return std::unexpected(std::move(error));
           };
           if (auto result = entity->init(world, entityCreate->entityId, EntityMode::Slave); !result)
@@ -1912,12 +1912,12 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
     if (published) {
       if (auto tileEntity = as<TileEntity>(entity)) {
         if (auto result = world.updateTileEntityTiles(tileEntity, true, false); !result)
-          error = error.withContext(Star::format("Error clearing rejected entity tiles: {}", result.error().what()));
+          error = error.with_context(Star::format("Error clearing rejected entity tiles: {}", result.error().what()));
       }
       world.m_entityMap->removeEntity(entity->entityId());
     }
     if (auto result = entity->uninit(); !result)
-      error = error.withContext(Star::format("Error uninitializing rejected entity: {}", result.error().what()));
+      error = error.with_context(Star::format("Error uninitializing rejected entity: {}", result.error().what()));
     return std::unexpected(std::move(error));
   };
 

@@ -1012,7 +1012,7 @@ std::expected<void, StarException> MerchantPane::countTextChanged() {
       return std::unexpected(std::move(replaceResult700.error()));
     auto countString = std::move(*replaceResult700);
     if (!countString.empty()) {
-      auto parsed = lexicalCast<int>(countString);
+      auto parsed = lexical_cast<int>(countString);
       if (!parsed) {
         if (!parsed.error().is<BadLexicalCast>())
           return std::unexpected(std::move(parsed.error()));

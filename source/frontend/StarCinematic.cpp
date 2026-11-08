@@ -599,7 +599,7 @@ std::expected<void, StarException> Cinematic::render() {
     auto resetScissor = renderer.setScissorRect({});
     if (!resetScissor) {
       if (!panelsRendered)
-        return std::unexpected(panelsRendered.error().withContext(
+        return std::unexpected(panelsRendered.error().with_context(
             Star::format("Cinematic scissor restoration failed: {}",
                 Star::print_exception(ExceptionDiagnostic(resetScissor.error()), true))));
       return std::unexpected(std::move(resetScissor.error()));

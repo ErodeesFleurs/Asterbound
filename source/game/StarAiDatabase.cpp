@@ -89,7 +89,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!statuses)
       return std::unexpected(std::move(statuses.error()));
     for (auto const& pair : *statuses) {
-      auto level = lexicalCast<unsigned>(pair.first);
+      auto level = lexical_cast<unsigned>(pair.first);
       if (!level)
         return std::unexpected(std::move(level.error()));
       auto speech = parseSpeech(pair.second);

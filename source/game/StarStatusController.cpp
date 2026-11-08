@@ -1024,7 +1024,7 @@ std::expected<bool, StarException> StatusController::addUniqueEffect(UniqueStatu
       m_uniqueEffectMetadata.removeNetElement(instance.metadataId);
       if (instance.animatorId != EffectAnimatorGroup::NullElementId) m_effectAnimators.removeNetElement(instance.animatorId);
       m_uniqueEffects.remove(effect);
-      if (!cleanup) return std::unexpected(cleanup.error().withContext(result.error().what()));
+      if (!cleanup) return std::unexpected(cleanup.error().with_context(result.error().what()));
       return std::unexpected(std::move(result.error()));
     }
   }

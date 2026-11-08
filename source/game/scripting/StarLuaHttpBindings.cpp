@@ -125,7 +125,7 @@ struct LuaHttpSession::Impl {
       {.workerPromise = std::move(promise), .rpcKeeper = request.rpcKeeper, .scopedPromise = request.scopedPromise});
     if (!added) {
       if (auto failed = request.rpcKeeper.fail(Star::format("HTTP request failed: {}", added.error().what())); !failed)
-        return std::unexpected(failed.error().withRelated(added.error(), "Original HTTP submission failure"));
+        return std::unexpected(failed.error().with_related(added.error(), "Original HTTP submission failure"));
     }
     return {};
   }
@@ -161,7 +161,7 @@ struct LuaHttpSession::Impl {
     auto scoped = promise.withCancellation(lifetime, "Lua session stopped", progress);
     if (!scoped) {
       if (auto cancelled = progress.cancel(); !cancelled)
-        return std::unexpected(cancelled.error().withRelated(scoped.error(), "Original HTTP scope failure"));
+        return std::unexpected(cancelled.error().with_related(scoped.error(), "Original HTTP scope failure"));
       return std::unexpected(std::move(scoped.error()));
     }
     LuaBindings::HttpTrustRequestCallback callback;
@@ -226,7 +226,7 @@ struct LuaHttpSession::Impl {
         }
         if (retired) {
           if (auto failed = retired->rpcKeeper.fail(Star::format("HTTP request failed: {}", notified.error().what())); !failed)
-            return std::unexpected(failed.error().withRelated(notified.error(), "Original HTTP trust callback failure"));
+            return std::unexpected(failed.error().with_related(notified.error(), "Original HTTP trust callback failure"));
         }
         return std::unexpected(std::move(notified.error()));
       }

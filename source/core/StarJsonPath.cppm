@@ -165,7 +165,7 @@ namespace JsonPath {
       if (value.type() == Json::Type::Array) {
         if (buffer == "-")
           return std::unexpected(TraversalException::format("Tried to get key '{}' in non-object type in pathGet(\"{}\")", buffer, path));
-        auto i = maybeLexicalCast<std::size_t>(buffer);
+        auto i = maybe_lexical_cast<std::size_t>(buffer);
         if (!i)
           return std::unexpected(TraversalException::format("Cannot parse '{}' as index in pathGet(\"{}\")", buffer, path));
         auto size = value.size();
@@ -219,7 +219,7 @@ namespace JsonPath {
       if (value.type() == Json::Type::Array) {
         if (buffer == "-")
           return std::optional<Jsonlike>{};
-        auto i = maybeLexicalCast<std::size_t>(buffer);
+        auto i = maybe_lexical_cast<std::size_t>(buffer);
         if (!i)
           return std::optional<Jsonlike>{};
         auto size = value.size();
@@ -261,7 +261,7 @@ namespace JsonPath {
     if (value.type() == Json::Type::Array) {
       if (cursor.at_end())
         return op(value, buffer);
-      auto i = maybeLexicalCast<std::size_t>(buffer);
+      auto i = maybe_lexical_cast<std::size_t>(buffer);
       if (!i)
         return std::unexpected(TraversalException::format("Cannot parse '{}' as index in pathApply(\"{}\")", buffer, path));
       if constexpr (std::same_as<Jsonlike, Json>) {
@@ -347,7 +347,7 @@ namespace JsonPath {
           return std::unexpected(TraversalException("Cannot invoke an empty Json array operation"));
         if (*key == "-")
           return arrayOp(parent, {});
-        auto i = maybeLexicalCast<std::size_t>(*key);
+        auto i = maybe_lexical_cast<std::size_t>(*key);
         if (!i)
           return std::unexpected(TraversalException::format("Cannot parse '{}' as index in Json path \"{}\"", *key, path));
         auto size = parent.size();

@@ -237,12 +237,12 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
   ++m_activeCalls;
   auto result = std::forward<Function>(function)();
   if (!result) {
-    if (result.error().diagnosticSummary()->operation.empty()) {
-      auto summary = *result.error().diagnosticSummary();
+    if (result.error().diagnostic_summary()->operation.empty()) {
+      auto summary = *result.error().diagnostic_summary();
       summary.operation = name.empty() ? std::string(operation) : Star::format("{} '{}'", operation, name);
-      result.error() = std::move(result.error()).withSummary(std::move(summary));
+      result.error() = std::move(result.error()).with_summary(std::move(summary));
     }
-    result.error() = result.error().withContext(Star::format("{} '{}'", operation, name));
+    result.error() = result.error().with_context(Star::format("{} '{}'", operation, name));
     if (!m_boundaryError)
       m_boundaryError = result.error();
     if (policy == ErrorPolicy::DisableContext) {
@@ -254,7 +254,7 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
     if (auto finished = finishExecution(); !finished) {
       auto error = std::move(finished.error());
       if (!result) {
-        error = std::move(error).withSummary(*result.error().diagnosticSummary()).withRelated(
+        error = std::move(error).with_summary(*result.error().diagnostic_summary()).with_related(
             result.error(), "Original Lua failure");
       }
       return std::unexpected(std::move(error));
@@ -310,7 +310,7 @@ template <typename Ret, typename... V>
         if (!settled) {
           if (error)
             error =
-              error->withRelated(settled.error(), "Error settling Lua thread message");
+              error->with_related(settled.error(), "Error settling Lua thread message");
           else
             error = std::move(settled.error());
         }

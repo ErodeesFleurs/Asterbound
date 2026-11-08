@@ -94,7 +94,7 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
       if (l->level() <= level) {
         auto result = l->log(msg, level);
         if (!result)
-          return std::unexpected(std::move(result.error()).withContext(Star::format("While writing log message: {}", msg)));
+          return std::unexpected(std::move(result.error()).with_context(Star::format("While writing log message: {}", msg)));
       }
     }
   }

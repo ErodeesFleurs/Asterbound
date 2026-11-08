@@ -864,7 +864,7 @@ std::expected<void, StarException> Quest::initScript() {
   if (!result) {
     auto error = std::move(result.error());
     auto shutdown = uninitScript();
-    if (!shutdown) error = error.withRelated(shutdown.error(), "Error rolling back quest script");
+    if (!shutdown) error = error.with_related(shutdown.error(), "Error rolling back quest script");
     return std::unexpected(std::move(error));
   }
   return {};

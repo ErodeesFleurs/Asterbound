@@ -228,7 +228,7 @@ std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(R
   if (!initialized) {
     auto cleared = client->close();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back client creation: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().with_context(Star::format("Error rolling back client creation: {}", cleared.error().what())));
     return std::unexpected(std::move(initialized.error()));
   }
   return client;
@@ -417,7 +417,7 @@ std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(R
   if (!initialized) {
     auto cleared = client->close();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back client creation: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().with_context(Star::format("Error rolling back client creation: {}", cleared.error().what())));
     return std::unexpected(std::move(initialized.error()));
   }
   return client;
@@ -574,7 +574,7 @@ std::expected<void, StarException> WorldClient::reviveMainPlayer() {
     if (!added) {
       auto cleared = m_mainPlayer->uninit();
       if (!cleared)
-        return std::unexpected(added.error().withContext(Star::format("Error uninitializing revived player: {}", cleared.error().what())));
+        return std::unexpected(added.error().with_context(Star::format("Error uninitializing revived player: {}", cleared.error().what())));
     }
     return added;
   }
@@ -1629,7 +1629,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result103) {
         auto cleared = entity->uninit();
         if (!cleared)
-          return std::unexpected(result103.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
+          return std::unexpected(result103.error().with_context(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
         return std::unexpected(std::move(result103.error()));
       }
       
@@ -2675,7 +2675,7 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
     if (!added) {
       auto cleared = entity->uninit();
       if (!cleared)
-        return std::unexpected(added.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
+        return std::unexpected(added.error().with_context(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
       return std::unexpected(std::move(added.error()));
     }
     return notifyEntityCreate(entity);
@@ -3499,7 +3499,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
         if (!result275) {
           auto cleared = m_mainPlayer->uninit();
           if (!cleared)
-            return std::unexpected(result275.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
+            return std::unexpected(result275.error().with_context(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
           return std::unexpected(std::move(result275.error()));
         }
       }
@@ -3579,7 +3579,7 @@ std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const
   if (!initialized) {
     auto cleared = clearWorld();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back world initialization: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().with_context(Star::format("Error rolling back world initialization: {}", cleared.error().what())));
   }
   return initialized;
 }
@@ -3591,7 +3591,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(Star::format("Additional client world cleanup failure: {}", result.error().what()));
+        *error = error->with_context(Star::format("Additional client world cleanup failure: {}", result.error().what()));
       else
         error.emplace(std::move(result.error()));
     }

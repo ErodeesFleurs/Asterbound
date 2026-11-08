@@ -218,7 +218,7 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
     if (!closed) {
       if (auto written = Star::print(stderr, "Error closing file '{}' after failed metadata query: {}\n", path.utf8_data(),
                    closed.error().what()); !written)
-        return std::unexpected(std::move(size.error()).withContext(
+        return std::unexpected(std::move(size.error()).with_context(
             Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
     }
     return std::unexpected(std::move(size.error()));

@@ -115,11 +115,11 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
     for (auto const& removed : changed) {
       if (removed.callbacks) {
         if (auto restored = removed.component->addCallbacks(group, callbacks->get()); !restored)
-          error = restored.error().withRelated(error, "Original script callback removal failure");
+          error = restored.error().with_related(error, "Original script callback removal failure");
       }
       if (removed.threadCallbacks) {
         if (auto restored = removed.component->addThreadCallbacks(group, callbacks->get()); !restored)
-          error = restored.error().withRelated(error, "Original script callback removal failure");
+          error = restored.error().with_related(error, "Original script callback removal failure");
       }
     }
     return std::unexpected(std::move(error));
@@ -153,7 +153,7 @@ std::expected<bool, StarException> ScriptableThread::start() {
     requestStop();
     m_errorOccurred = true;
     if (auto stopped = stop(); !stopped)
-      started.error() = started.error().withRelated(stopped.error(), "Error settling failed worker startup");
+      started.error() = started.error().with_related(stopped.error(), "Error settling failed worker startup");
     m_shouldExpire.store(true, std::memory_order_release);
   }
   return started;
@@ -268,7 +268,7 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (result)
         result = std::unexpected(std::move(uninitialized.error()));
       else
-        result.error() = result.error().withRelated(uninitialized.error(), "Error uninitializing ScriptableThread");
+        result.error() = result.error().with_related(uninitialized.error(), "Error uninitializing ScriptableThread");
     }
   }
   m_scriptContexts.clear();
@@ -286,14 +286,14 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (result)
         result = std::unexpected(std::move(failed.error()));
       else
-        result.error() = result.error().withRelated(failed.error(), "Error settling ScriptableThread message");
+        result.error() = result.error().with_related(failed.error(), "Error settling ScriptableThread message");
     }
   }
   if (!result) {
     m_errorOccurred = true;
     if (auto logged = m_luaRoot->root().logger().errorException("ScriptableThread exception caught", ExceptionDiagnostic(result.error()));
         !logged)
-      result.error() = result.error().withRelated(logged.error(), "Could not log ScriptableThread failure");
+      result.error() = result.error().with_related(logged.error(), "Could not log ScriptableThread failure");
     else
       // This boundary handled the failure; Thread must not log it a second time.
       result = {};

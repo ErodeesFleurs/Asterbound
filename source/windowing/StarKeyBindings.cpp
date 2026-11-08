@@ -189,18 +189,18 @@ KeyBindings::KeyBindings() = default;
 
 std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json const& json) {
   if (!InterfaceActionNames)
-    return std::unexpected(InterfaceActionNames.error().withContext("Could not set keybindings from configuration"));
+    return std::unexpected(InterfaceActionNames.error().with_context("Could not set keybindings from configuration"));
   KeyBindings bindings;
   auto entries = json.iterateObject();
   if (!entries)
-    return std::unexpected(entries.error().withContext("Could not set keybindings from configuration"));
+    return std::unexpected(entries.error().with_context("Could not set keybindings from configuration"));
   for (auto const& entry : *entries) {
     auto action = InterfaceActionNames->get_left(entry.first);
     if (!action)
-      return std::unexpected(action.error().withContext("Could not set keybindings from configuration"));
+      return std::unexpected(action.error().with_context("Could not set keybindings from configuration"));
     auto inputs = entry.second.iterateArray();
     if (!inputs)
-      return std::unexpected(inputs.error().withContext("Could not set keybindings from configuration"));
+      return std::unexpected(inputs.error().with_context("Could not set keybindings from configuration"));
     for (auto const& input : *inputs) {
       auto chord = inputDescriptorFromJson(input);
       if (!chord) {

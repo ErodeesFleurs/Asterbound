@@ -337,7 +337,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   auto bytes = (*assets)->bytes(path);
   if (!bytes) {
     if (auto diagnostic = sourceDiagnostics.find_ref(path)) {
-      auto summary = *bytes.error().diagnosticSummary();
+      auto summary = *bytes.error().diagnostic_summary();
       bool found = false;
       for (auto& location : summary.locations) {
         if (location.source == path.utf8()) {
@@ -348,7 +348,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
       }
       if (!found)
         summary.locations.push_back({.source = path.utf8(), .line = -1, .provider = diagnostic->get().utf8()});
-      return std::unexpected(std::move(bytes.error()).withSummary(std::move(summary)).withContext(
+      return std::unexpected(std::move(bytes.error()).with_summary(std::move(summary)).with_context(
           Star::format("Lua source '{}': {}", path, diagnostic->get())));
     }
     return std::unexpected(std::move(bytes.error()));

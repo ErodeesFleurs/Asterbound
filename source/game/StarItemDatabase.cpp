@@ -136,7 +136,7 @@ std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseCompone
   auto cleaned = script.uninit();
   if (!cleaned) {
     if (!result)
-      return std::unexpected(cleaned.error().withContext(Star::print_exception(result.error(), true)));
+      return std::unexpected(cleaned.error().with_context(Star::print_exception(result.error(), true)));
     return std::unexpected(std::move(cleaned.error()));
   }
   return result;

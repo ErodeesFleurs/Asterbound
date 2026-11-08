@@ -60,19 +60,19 @@ std::expected<CelestialCoordinate, StarException> CelestialCoordinate::create(Js
         if (parts->size() < 3)
           return std::unexpected(CelestialException("CelestialCoordinate requires at least three location components"));
         for (std::size_t i = 0; i != 3; ++i) {
-          auto value = lexicalCast<int>((*parts)[i]);
+          auto value = lexical_cast<int>((*parts)[i]);
           if (!value)
             return std::unexpected(std::move(value.error()));
           coordinate.m_location[i] = *value;
         }
         if (parts->size() > 3) {
-          auto value = lexicalCast<int>((*parts)[3]);
+          auto value = lexical_cast<int>((*parts)[3]);
           if (!value)
             return std::unexpected(std::move(value.error()));
           coordinate.m_planetaryOrbitNumber = *value;
         }
         if (parts->size() > 4) {
-          auto value = lexicalCast<int>((*parts)[4]);
+          auto value = lexical_cast<int>((*parts)[4]);
           if (!value)
             return std::unexpected(std::move(value.error()));
           coordinate.m_satelliteOrbitNumber = *value;

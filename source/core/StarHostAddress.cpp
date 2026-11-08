@@ -254,7 +254,7 @@ std::expected<HostAddressWithPort, StarException> HostAddressWithPort::lookupWit
   if (hostBytes.size() >= 2 && hostBytes.front() == '[' && hostBytes.back() == ']')
     hostBytes = hostBytes.substr(1, hostBytes.size() - 2);
   String host(std::move(hostBytes));
-  auto portNum = maybeLexicalCast<std::uint16_t>(port);
+  auto portNum = maybe_lexical_cast<std::uint16_t>(port);
   if (!portNum)
     return std::unexpected(NetworkException::format("Could not parse port portion of HostAddressWithPort '{}'", port));
   return lookup(host, *portNum);

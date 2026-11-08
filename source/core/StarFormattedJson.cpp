@@ -735,14 +735,14 @@ std::expected<void, StarException> FormattedJsonBuilderStream::putStringUtf8(std
 }
 
 std::expected<void, StarException> FormattedJsonBuilderStream::putDouble(std::string_view s) {
-  auto number = lexicalCast<double>(s);
+  auto number = lexical_cast<double>(s);
   if (!number)
     return std::unexpected(JsonParserException("bad double", ExceptionDiagnostic(number.error())));
   return putValue(Json(*number), String(s));
 }
 
 std::expected<void, StarException> FormattedJsonBuilderStream::putInteger(std::string_view s) {
-  auto number = lexicalCast<long long>(s);
+  auto number = lexical_cast<long long>(s);
   if (!number)
     return std::unexpected(JsonParserException("bad integer", ExceptionDiagnostic(number.error())));
   return putValue(Json(*number), String(s));

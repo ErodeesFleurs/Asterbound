@@ -114,7 +114,7 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
     if (!mapping)
       return std::unexpected(std::move(mapping.error()));
     for (auto const& entry : *mapping) {
-      auto keyNumber = lexicalCast<int>(entry.first);
+      auto keyNumber = lexical_cast<int>(entry.first);
       if (!keyNumber)
         return std::unexpected(std::move(keyNumber.error()));
       NoteMapping nm;
@@ -324,10 +324,10 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
       return std::unexpected(std::move(parts.error()));
     if (parts->size() != 2)
       return std::unexpected(StarException("Invalid ABC fraction"));
-    auto numerator = lexicalCast<int>((*parts)[0]);
+    auto numerator = lexical_cast<int>((*parts)[0]);
     if (!numerator)
       return std::unexpected(std::move(numerator.error()));
-    auto denominator = lexicalCast<int>((*parts)[1]);
+    auto denominator = lexical_cast<int>((*parts)[1]);
     if (!denominator)
       return std::unexpected(std::move(denominator.error()));
     if (*denominator == 0)
@@ -368,7 +368,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
     auto last = parts->last();
     if (!last)
       return std::unexpected(std::move(last.error()));
-    auto tempo = lexicalCast<double>(last->get());
+    auto tempo = lexical_cast<double>(last->get());
     if (!tempo)
       return std::unexpected(std::move(tempo.error()));
     if (*tempo == 0 || !std::isfinite(*tempo))
@@ -383,7 +383,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
   };
   auto transpose = [&]() -> std::expected<int, StarException> {
     auto value = fields.value("Transpose", "0");
-    return lexicalCast<int>(value);
+    return lexical_cast<int>(value);
   };
   auto fetchKeySignatureMapping = [&]() -> std::expected<List<int>, StarException> {
     auto cleanupKey = [](String const& key) -> std::expected<String, StarException> {
@@ -568,7 +568,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           std::string digits;
           while (String::is_ascii_number(peek()))
             digits += static_cast<char>(readChar());
-          auto multiplier = lexicalCast<int>(std::string_view(digits));
+          auto multiplier = lexical_cast<int>(std::string_view(digits));
           if (!multiplier)
             return std::unexpected(std::move(multiplier.error()));
           duration *= *multiplier;
@@ -580,7 +580,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
             std::string digits;
             while (String::is_ascii_number(peek()))
               digits += static_cast<char>(readChar());
-            auto parsed = lexicalCast<int>(std::string_view(digits));
+            auto parsed = lexical_cast<int>(std::string_view(digits));
             if (!parsed)
               return std::unexpected(std::move(parsed.error()));
             divisor = *parsed;

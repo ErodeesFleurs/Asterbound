@@ -276,10 +276,10 @@ std::expected<void, StarException> TeamClient::update() {
       auto path = Star::format("/interface.config:{}", key);
       auto error = (*assets)->withAssetContext(
           AssetException(Star::format("Could not read JSON value {}", path), value.error()), "/interface.config", "");
-      auto summary = *error.diagnosticSummary();
+      auto summary = *error.diagnostic_summary();
       summary.kind = ExceptionSummaryKind::Resource;
       summary.asset = std::move(path);
-      return std::unexpected(std::move(error).withSummary(std::move(summary)));
+      return std::unexpected(std::move(error).with_summary(std::move(summary)));
     }
     return value->toFloat();
   };

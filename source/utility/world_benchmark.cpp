@@ -129,7 +129,7 @@ static std::expected<T, StarException> numericOption(OptionParser::Options const
   auto text = values->get().first();
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return lexicalCast<T>(text->get());
+  return lexical_cast<T>(text->get());
 }
 
 [[nodiscard]]

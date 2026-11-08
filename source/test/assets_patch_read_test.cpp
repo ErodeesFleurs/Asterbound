@@ -359,7 +359,7 @@ const GameTestRegistration assetsLuaPatchProvider(
         EXPECT_EQ(*indexedSource, *shadow);
         auto checkFailure = [&](auto const& loaded) {
           ASSERT_FALSE(loaded);
-          auto const& summary = loaded.error().diagnosticSummary();
+          auto const& summary = loaded.error().diagnostic_summary();
           ASSERT_TRUE(summary);
           EXPECT_EQ(summary->kind, syntax ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime);
           EXPECT_EQ(summary->asset, targetPath.utf8());
@@ -410,7 +410,7 @@ const GameTestRegistration assetsMissingResourceSummary(
     ASSERT_TRUE(assets) << assets.error().what();
     auto loaded = (*assets)->json("/missing-summary.json");
     ASSERT_FALSE(loaded);
-    auto const& summary = loaded.error().diagnosticSummary();
+    auto const& summary = loaded.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->kind, ExceptionSummaryKind::Resource);
     EXPECT_EQ(summary->asset, "/missing-summary.json");
@@ -569,7 +569,7 @@ const GameTestRegistration assetsReplacementPatchProvider(
     EXPECT_EQ((*assets)->assetSourcePath((*origin)->source), std::optional<String>(shadow));
     auto loaded = (*assets)->json("/target.json");
     ASSERT_FALSE(loaded);
-    auto const& summary = loaded.error().diagnosticSummary();
+    auto const& summary = loaded.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->kind, ExceptionSummaryKind::PatchRuntime);
     EXPECT_EQ(summary->asset, "/target.json");
@@ -616,7 +616,7 @@ const GameTestRegistration assetsSourceBytesReadFailure(
     ASSERT_TRUE(File::remove(File::relative_to(original, "raw.txt")));
     auto loaded = (*assets)->json("/caller.json");
     ASSERT_FALSE(loaded);
-    auto const& summary = loaded.error().diagnosticSummary();
+    auto const& summary = loaded.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->asset, "/caller.json");
     EXPECT_NE(summary->assetProvider.find(original.utf8()), std::string::npos);

@@ -1142,7 +1142,7 @@ void LuaEngine::pushCallbackError(lua_State* state, StarException const& error) 
     if (lua_pcall(state, 1, 1, 0) != LUA_OK)
       return;
   }
-  rememberDiagnostic(state, -1, error.diagnosticSummary());
+  rememberDiagnostic(state, -1, error.diagnostic_summary());
 }
 
 std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* state, int index) const {
@@ -1295,11 +1295,11 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
     void* error = lua_touserdata(state, -1);
     if (error == &s_luaInstructionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaInstructionLimitReached().withSummary(std::move(summary)));
+      return std::unexpected(LuaInstructionLimitReached().with_summary(std::move(summary)));
     }
     if (error == &s_luaRecursionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaRecursionLimitReached().withSummary(std::move(summary)));
+      return std::unexpected(LuaRecursionLimitReached().with_summary(std::move(summary)));
     }
   }
   if (lua_type(state, -1) == LUA_TNUMBER) {
@@ -1321,20 +1321,20 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
       : Star::format("Error code {}, <unknown error>", res);
   lua_pop(state, 1);
   if (error.utf8().ends_with("<eof>"))
-    return std::unexpected(LuaIncompleteStatementException(error.take_utf8()).withSummary(std::move(summary)));
-  return std::unexpected(LuaException(error.take_utf8()).withSummary(std::move(summary)));
+    return std::unexpected(LuaIncompleteStatementException(error.take_utf8()).with_summary(std::move(summary)));
+  return std::unexpected(LuaException(error.take_utf8()).with_summary(std::move(summary)));
 }
 
 std::expected<void, StarException> LuaEngine::handleSourceError(lua_State* state, int res, String const& source) {
   auto result = handleError(state, res);
   if (!result) {
-    auto summary = *result.error().diagnosticSummary();
+    auto summary = *result.error().diagnostic_summary();
     auto diagnostic = sourceDiagnostic(source);
     if (std::ranges::none_of(summary.locations, [&](auto const& location) { return location.source == source.utf8(); }))
       summary.locations.insert(summary.locations.begin(), {source.utf8(), -1, diagnostic.utf8()});
-    auto error = std::move(result.error()).withSummary(std::move(summary));
+    auto error = std::move(result.error()).with_summary(std::move(summary));
     if (!diagnostic.empty())
-      error = std::move(error).withContext(Star::format("Lua source '{}': {}", source, diagnostic));
+      error = std::move(error).with_context(Star::format("Lua source '{}': {}", source, diagnostic));
     return std::unexpected(std::move(error));
   }
   return result;

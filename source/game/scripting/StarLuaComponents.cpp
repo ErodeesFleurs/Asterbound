@@ -128,7 +128,7 @@ std::expected<void, StarException> LuaBaseComponent::addThreadCallbacks(String g
     if (auto result = p.second->addCallbacks(groupName, callbacks); !result) {
       for (auto const& thread : changed) {
         if (auto rollback = thread->removeCallbacks(groupName); !rollback)
-          result.error() = result.error().withRelated(rollback.error(), "Error rolling back thread callbacks");
+          result.error() = result.error().with_related(rollback.error(), "Error rolling back thread callbacks");
       }
       return std::unexpected(std::move(result.error()));
     }
@@ -147,7 +147,7 @@ std::expected<bool, StarException> LuaBaseComponent::removeThreadCallbacks(Strin
     if (auto removed = p.second->removeCallbacks(groupName); !removed) {
       for (auto const& thread : changed) {
         if (auto restored = thread->addCallbacks(groupName, callbacks->get()); !restored)
-          removed.error() = restored.error().withRelated(removed.error(), "Original thread callback removal failure");
+          removed.error() = restored.error().with_related(removed.error(), "Original thread callback removal failure");
       }
       return std::unexpected(std::move(removed.error()));
     }
@@ -201,7 +201,7 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
       m_callbackScope = std::stop_source{};
       auto context = m_luaRoot->createContext(m_scripts, m_callbackScope.get_token());
       if (!context)
-        return std::unexpected(context.error().withContext(Star::format("Creating Lua context for scripts '{}'", m_scripts)));
+        return std::unexpected(context.error().with_context(Star::format("Creating Lua context for scripts '{}'", m_scripts)));
       m_context = std::move(*context);
       LuaEnginePtr engine(&m_context->engine());
       auto previousLifetime = engine->setPromiseLifetime(m_callbackScope.get_token());
@@ -252,7 +252,7 @@ std::expected<void, StarException> LuaBaseComponent::shutdownContext(String cons
       if (!error)
         error = std::move(result.error());
       else
-        error = error->withRelated(result.error(), "Additional Lua shutdown failure");
+        error = error->with_related(result.error(), "Additional Lua shutdown failure");
     }
   };
   auto invokeHook = [&](String const& name) {
@@ -349,7 +349,7 @@ std::expected<void, StarException> LuaBaseComponent::retireContext() {
   if (!shutdown) {
     if (!stopped)
       shutdown.error() =
-        shutdown.error().withRelated(stopped.error(), "Error stopping Lua threads");
+        shutdown.error().with_related(stopped.error(), "Error stopping Lua threads");
     return shutdown;
   }
   return stopped;
@@ -375,7 +375,7 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
     auto detached = world.finishShutdown();
     if (!detached)
       cleanup = cleanup ? std::move(detached)
-                        : std::unexpected(detached.error().withRelated(cleanup.error(), "Earlier Lua shutdown failure"));
+                        : std::unexpected(detached.error().with_related(cleanup.error(), "Earlier Lua shutdown failure"));
   }
   for (auto const& group : m_pendingCallbackRemovals) {
     auto removed = removeCallbacks(group);
@@ -390,9 +390,9 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
   if (error) {
     if (auto logged = m_root.logger().errorException("Lua session failure", ExceptionDiagnostic(*error)); !logged) {
       auto failure =
-        logged.error().withRelated(*error, "Original Lua session failure");
+        logged.error().with_related(*error, "Original Lua session failure");
       if (!cleanup)
-        failure = failure.withRelated(cleanup.error(), "Lua session cleanup failure");
+        failure = failure.with_related(cleanup.error(), "Lua session cleanup failure");
       return std::unexpected(std::move(failure));
     }
   }
@@ -424,7 +424,7 @@ std::expected<void, StarException> LuaBaseComponent::cleanThreads() {
       if (!error)
         error = std::move(stopped.error());
       else
-        error = error->withRelated(stopped.error(), "Additional Lua thread reclamation failure");
+        error = error->with_related(stopped.error(), "Additional Lua thread reclamation failure");
     }
   }
   if (error)
@@ -439,7 +439,7 @@ std::expected<void, StarException> LuaBaseComponent::stopThreads() {
       if (!error)
         error = std::move(stopped.error());
       else
-        error = stopped.error().withRelated(*error, "Earlier Lua thread shutdown failure");
+        error = stopped.error().with_related(*error, "Earlier Lua thread shutdown failure");
     }
   }
   if (error)
@@ -553,7 +553,7 @@ std::expected<void, StarException> LuaScriptStorage::finishShutdown(std::expecte
     m_storage = std::move(*storage);
   else {
     if (!shutdown)
-      return std::unexpected(storage.error().withRelated(shutdown.error(), "Error shutting down Lua storage context"));
+      return std::unexpected(storage.error().with_related(shutdown.error(), "Error shutting down Lua storage context"));
     return std::unexpected(std::move(storage.error()));
   }
   return shutdown;
@@ -662,7 +662,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
       if (!error)
         error = std::move(result.error());
       else
-        error = result.error().withRelated(*error, "Earlier Lua shutdown failure");
+        error = result.error().with_related(*error, "Earlier Lua shutdown failure");
     }
   }
   m_threadMessageHandlers.clear();
@@ -674,7 +674,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
 std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected<void, StarException> stopped, std::expected<void, StarException> shutdown) {
   if (!stopped) {
     if (!shutdown)
-      return std::unexpected(stopped.error().withRelated(shutdown.error(), "Error shutting down Lua component"));
+      return std::unexpected(stopped.error().with_related(shutdown.error(), "Error shutting down Lua component"));
     return std::unexpected(std::move(stopped.error()));
   }
   return shutdown;
@@ -713,7 +713,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
   }();
   if (!result) {
     if (auto rollback = uninit(); !rollback)
-      return std::unexpected(result.error().withRelated(rollback.error(), "Error rolling back Lua world component"));
+      return std::unexpected(result.error().with_related(rollback.error(), "Error rolling back Lua world component"));
   }
   return result;
 }
@@ -730,7 +730,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
       if (!error)
         error = std::move(result.error());
       else
-        error = result.error().withRelated(*error, "Earlier Lua world shutdown failure");
+        error = result.error().with_related(*error, "Earlier Lua world shutdown failure");
     }
   };
   remember(m_host.removeCallbacks("world"));

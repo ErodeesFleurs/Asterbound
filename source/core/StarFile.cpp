@@ -117,7 +117,7 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
     if (!closed) {
       if (auto written = Star::print(stderr, "Error closing file '{}' after failed read: {}\n", filename.utf8_data(),
                    closed.error().what()); !written)
-        return std::unexpected(std::move(contents.error()).withContext(
+        return std::unexpected(std::move(contents.error()).with_context(
             Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
     }
     return std::unexpected(std::move(contents.error()));

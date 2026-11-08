@@ -1,4 +1,5 @@
 import star.lexical_cast;
+import star.format;
 
 import std;
 
@@ -6,12 +7,79 @@ import std;
 
 using namespace Star;
 
+namespace {
+template <typename Type>
+concept lexical_readable = requires(Type& value, std::string_view text, std::string const& owned,
+    char const (&literal)[2]) {
+  { try_lexical_cast(value, text) } -> std::same_as<bool>;
+  { try_lexical_cast(value, owned) } -> std::same_as<bool>;
+  { try_lexical_cast(value, literal) } -> std::same_as<bool>;
+  { lexical_cast<Type>(text) } -> std::same_as<std::expected<Type, StarException>>;
+  { maybe_lexical_cast<Type>(text) } -> std::same_as<std::optional<Type>>;
+};
+
+template <typename Type>
+concept lexical_writable = requires(Type& value, std::string_view text) {
+  { try_lexical_cast(value, text) } -> std::same_as<bool>;
+};
+
+struct immobile_numeric {
+  double value = 0;
+  immobile_numeric() = default;
+  immobile_numeric(immobile_numeric const&) = delete;
+  immobile_numeric(immobile_numeric&&) = delete;
+  operator double&() { return value; }
+};
+
+struct explicit_move_numeric {
+  double value = 0;
+  explicit_move_numeric() = default;
+  explicit explicit_move_numeric(explicit_move_numeric&& other) : value(other.value) {}
+  operator double&() { return value; }
+};
+
+struct explicit_copy_numeric {
+  double value = 0;
+  explicit_copy_numeric() = default;
+  explicit explicit_copy_numeric(explicit_copy_numeric const& other) : value(other.value) {}
+  explicit_copy_numeric(explicit_copy_numeric&&) = delete;
+  operator double&() { return value; }
+};
+
+struct non_default_numeric {
+  double value;
+  explicit non_default_numeric(double initial) : value(initial) {}
+  operator double&() { return value; }
+};
+
+static_assert(lexical_writable<immobile_numeric>);
+static_assert(!lexical_readable<immobile_numeric>);
+static_assert(lexical_readable<explicit_move_numeric>);
+static_assert(lexical_readable<explicit_copy_numeric>);
+static_assert(lexical_writable<non_default_numeric>);
+static_assert(!lexical_readable<non_default_numeric>);
+
+struct non_numeric {};
+static_assert(lexical_readable<bool>);
+static_assert(lexical_readable<char>);
+static_assert(lexical_readable<signed char>);
+static_assert(lexical_readable<unsigned char>);
+static_assert(lexical_readable<int>);
+static_assert(lexical_readable<std::uint64_t>);
+static_assert(lexical_readable<float>);
+static_assert(lexical_readable<double>);
+static_assert(!lexical_readable<non_numeric>);
+static_assert(!lexical_readable<std::string>);
+static_assert(!lexical_readable<int const>);
+static_assert(!lexical_readable<int volatile>);
+}
+
 TEST(LexicalCastTest, BoolRequiresTheExactLiteral) {
   auto cast = [](std::string_view text) {
-    return lexicalCast<bool>(text);
+    return lexical_cast<bool>(text);
   };
   auto tryCast = [](bool& value, std::string_view text) {
-    return tryLexicalCast(value, text);
+    return try_lexical_cast(value, text);
   };
 
   auto trueResult = cast("true");
@@ -40,12 +108,12 @@ namespace {
 
 template <typename Type>
 auto castNumber(std::string_view text) {
-  return lexicalCast<Type>(text);
+  return lexical_cast<Type>(text);
 }
 
 template <typename Type>
 bool tryNumber(Type& value, std::string_view text) {
-  return tryLexicalCast(value, text);
+  return try_lexical_cast(value, text);
 }
 
 template <typename Type>
@@ -144,7 +212,7 @@ TEST(LexicalCastTest, IntegerOverflowSucceedsWithoutChangingTheDestination) {
     auto result = castNumber<std::int64_t>(text);
     ASSERT_TRUE(result);
     EXPECT_EQ(*result, 0);
-    auto maybe = maybeLexicalCast<std::int64_t>(std::string_view(text));
+    auto maybe = maybe_lexical_cast<std::int64_t>(std::string_view(text));
     ASSERT_TRUE(maybe);
     EXPECT_EQ(*maybe, 0);
   }
@@ -246,4 +314,44 @@ TEST(LexicalCastTest, FloatingSpecialValuesKeepSignsAndDiscardNanPayloads) {
   }
   for (std::string_view text : {"+inf", "nan(a-b)", "nan(foo", "infinityx"})
     EXPECT_FALSE(castNumber<double>(text));
+}
+
+TEST(LexicalCastTest, CompactParserRejectsPartialTokensAndPreservesBoolFailureOutput) {
+  for (std::string_view text : {"x", "12x", "999999999999999999999999x"}) {
+    auto parsed = lexical_cast<int>(text);
+    ASSERT_FALSE(parsed);
+    EXPECT_TRUE(parsed.error().is<BadLexicalCast>());
+  }
+  for (std::string_view text : {"", "TRUE", "False", "0", "1", "true ", "falsex"}) {
+    for (bool initial : {false, true}) {
+      bool value = initial;
+      EXPECT_FALSE(try_lexical_cast(value, text));
+      EXPECT_EQ(value, initial);
+    }
+    auto parsed = lexical_cast<bool>(text);
+    ASSERT_FALSE(parsed);
+    EXPECT_TRUE(parsed.error().is<BadLexicalCast>());
+  }
+}
+
+TEST(LexicalCastTest, ActualParserCapabilityAndOwningConstructionAreIndependent) {
+  immobile_numeric immobile;
+  ASSERT_TRUE(try_lexical_cast(immobile, "1.25"));
+  EXPECT_EQ(immobile.value, 1.25);
+  non_default_numeric non_default(37);
+  ASSERT_TRUE(try_lexical_cast(non_default, "2.5"));
+  EXPECT_EQ(non_default.value, 2.5);
+
+  auto moved = lexical_cast<explicit_move_numeric>("3.75");
+  ASSERT_TRUE(moved);
+  EXPECT_EQ(moved->value, 3.75);
+  auto maybe_moved = maybe_lexical_cast<explicit_move_numeric>("4.5");
+  ASSERT_TRUE(maybe_moved);
+  EXPECT_EQ(maybe_moved->value, 4.5);
+  auto copied = lexical_cast<explicit_copy_numeric>("5.25");
+  ASSERT_TRUE(copied);
+  EXPECT_EQ(copied->value, 5.25);
+  auto maybe_copied = maybe_lexical_cast<explicit_copy_numeric>("6.5");
+  ASSERT_TRUE(maybe_copied);
+  EXPECT_EQ(maybe_copied->value, 6.5);
 }

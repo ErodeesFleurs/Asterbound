@@ -202,7 +202,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (loaded) return {};
     auto rollback = player.diskLoad(*saved);
     if (!rollback)
-      return std::unexpected(loaded.error().withContext(Star::format("Player load failed; restoring saved player state also failed: {}", Star::print_exception(ExceptionDiagnostic(rollback.error()), true))));
+      return std::unexpected(loaded.error().with_context(Star::format("Player load failed; restoring saved player state also failed: {}", Star::print_exception(ExceptionDiagnostic(rollback.error()), true))));
     return std::unexpected(std::move(loaded.error()));
   }); !registered)
     return std::unexpected(std::move(registered.error()));

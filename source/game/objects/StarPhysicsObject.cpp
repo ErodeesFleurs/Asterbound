@@ -209,7 +209,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
   if (!initialized) {
     auto removed = m_scriptComponent.removeCallbacks("physics");
     if (!removed)
-      return std::unexpected(initialized.error().withContext(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
+      return std::unexpected(initialized.error().with_context(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   m_metaBoundBox = Object::metaBoundBox();

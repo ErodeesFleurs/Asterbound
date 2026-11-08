@@ -186,7 +186,7 @@ std::expected<void, StarException> WorldServerThread::recordError(StarException 
   m_errorOccurred = true;
   auto logged = m_worldServer->root().logger().errorException("WorldServerThread error", ExceptionDiagnostic(error));
   if (!logged)
-    return std::unexpected(error.withRelated(logged.error(), "World error logging also failed"));
+    return std::unexpected(error.with_related(logged.error(), "World error logging also failed"));
   return {};
 }
 
@@ -221,7 +221,7 @@ std::expected<void, StarException> WorldServerThread::close() {
         : std::move(stopped.error());
     auto drained = drainMessages();
     if (!drained)
-      return std::unexpected(error.withRelated(drained.error(), "World message drain also failed"));
+      return std::unexpected(error.with_related(drained.error(), "World message drain also failed"));
     return std::unexpected(std::move(error));
   }
   std::unique_lock locker(m_mutex, std::defer_lock);
@@ -243,7 +243,7 @@ std::expected<void, StarException> WorldServerThread::close() {
     if (!error)
       error = logged ? std::move(closed.error()) : std::move(logged.error());
     else if (!logged)
-      *error = error->withRelated(logged.error(), "World close logging also failed");
+      *error = error->with_related(logged.error(), "World close logging also failed");
   }
   if (error)
     return std::unexpected(std::move(*error));
@@ -317,7 +317,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
       if (!error)
         error = logged ? std::move(removed.error()) : std::move(logged.error());
       else if (!logged)
-        *error = error->withRelated(logged.error(), "World client removal logging also failed");
+        *error = error->with_related(logged.error(), "World client removal logging also failed");
     } else {
       outgoingPackets.append_range(std::move(*removed));
     }
@@ -478,7 +478,7 @@ std::expected<void, StarException> WorldServerThread::run() {
       return std::unexpected(std::move(drained.error()));
     }
     if (!logged)
-      result = std::unexpected(result.error().withRelated(logged.error(), "World error logging also failed"));
+      result = std::unexpected(result.error().with_related(logged.error(), "World error logging also failed"));
   }
   return result;
 }

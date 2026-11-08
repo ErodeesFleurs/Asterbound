@@ -142,7 +142,7 @@ std::expected<void, StarException> Stagehand::init(World& world, EntityId entity
   if (!initialize) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(initialize.error().withContext(std::string("Stagehand initialization rollback also failed: ") + cleanup.error().what()));
+      return std::unexpected(initialize.error().with_context(std::string("Stagehand initialization rollback also failed: ") + cleanup.error().what()));
   }
   return initialize;
 }

@@ -1293,7 +1293,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
   auto remember = [&](auto result) {
     if (!result) {
       if (cleanupError)
-        cleanupError = cleanupError->withContext(Star::format("Additional client cleanup failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
+        cleanupError = cleanupError->with_context(Star::format("Additional client cleanup failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
       else
         cleanupError = std::move(result.error());
     }
@@ -1695,7 +1695,7 @@ std::expected<void, StarException> ClientApplication::recoverToTitle(std::expect
     auto& result = reference.get();
     if (!result) {
       if (failure)
-        failure = failure->withContext(Star::format("Additional client recovery failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
+        failure = failure->with_context(Star::format("Additional client recovery failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
       else
         failure = std::move(result.error());
     }
@@ -1710,7 +1710,7 @@ std::expected<void, StarException> ClientApplication::setError(String const& err
   auto displayed = m_errorScreen->setMessage(error);
   auto recovered = recoverToTitle(std::move(logged), std::move(displayed));
   if (!recovered)
-    return std::unexpected(recovered.error().withContext(error.utf8()));
+    return std::unexpected(recovered.error().with_context(error.utf8()));
   return recovered;
 }
 
@@ -1719,7 +1719,7 @@ std::expected<void, StarException> ClientApplication::setError(String const& err
   auto displayed = m_errorScreen->setMessage(Star::format("{}\n{}", error, Star::output_exception(diagnostic, false)));
   auto recovered = recoverToTitle(std::move(logged), std::move(displayed));
   if (!recovered)
-    return std::unexpected(recovered.error().withContext(Star::format("{}\n{}", error, Star::output_exception(diagnostic, true))));
+    return std::unexpected(recovered.error().with_context(Star::format("{}\n{}", error, Star::output_exception(diagnostic, true))));
   return recovered;
 }
 
@@ -1945,7 +1945,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
           return std::unexpected(std::move(defaultPort.error()));
         *portString = Star::to_string(*defaultPort);
       }
-      auto port = maybeLexicalCast<std::uint16_t>(*portString);
+      auto port = maybe_lexical_cast<std::uint16_t>(*portString);
       if (!port)
         return setError(Star::format("invalid port: {}", *portString));
       auto address = HostAddressWithPort::lookup(*addressString, *port);

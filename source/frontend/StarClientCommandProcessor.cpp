@@ -482,7 +482,7 @@ std::expected<String, StarException> ClientCommandProcessor::setGravity(String c
   if (!*allowed) return "You must be an admin to use this command.";
   auto argument = arguments->at(0);
   if (!argument) return std::unexpected(std::move(argument.error()));
-  auto value = lexicalCast<float>(argument->get());
+  auto value = lexical_cast<float>(argument->get());
   if (!value) return std::unexpected(std::move(value.error()));
   m_universeClient->worldClient()->overrideGravity(*value);
   return Star::format("Gravity set to {} (This is client-side!)", argument->get());
@@ -649,7 +649,7 @@ std::expected<String, StarException> ClientCommandProcessor::cinema(String const
   if (!config) return std::unexpected(std::move(config.error()));
   if (auto loaded = m_cinematicOverlay->load(*config); !loaded) return std::unexpected(std::move(loaded.error()));
   if (arguments->size() > 1) {
-    auto time = lexicalCast<float>((*arguments)[1]);
+    auto time = lexical_cast<float>((*arguments)[1]);
     if (!time) return std::unexpected(std::move(time.error()));
     m_cinematicOverlay->setTime(*time);
   }
@@ -979,7 +979,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   auto closed = (*file)->close();
   if (!written) {
     if (!closed)
-      return std::unexpected(written.error().withContext(Star::format("Closing output file also failed: {}", closed.error().what())));
+      return std::unexpected(written.error().with_context(Star::format("Closing output file also failed: {}", closed.error().what())));
     return std::unexpected(std::move(written.error()));
   }
   if (!closed) return std::unexpected(std::move(closed.error()));

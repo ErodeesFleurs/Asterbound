@@ -605,6 +605,86 @@ TEST(StringTest, RegexSearch) {
   EXPECT_EQ(String("0123456").regex_match("\\d{0,9}", true, true), true);
 }
 
+TEST(StringTest, CompactUtf8FailuresPreserveOutputsAndCursorState) {
+  for (std::string_view bytes : {"\xff", "\xc2", "\xe0" "A", "\xe0" "A\x80",
+           "\xc0\x80", "\xf4\x90\x80\x80", "\xf8"}) {
+    auto expect_error = [&](auto const& result) {
+      ASSERT_FALSE(result);
+      EXPECT_TRUE(result.error().template is<UnicodeException>());
+    };
+    Utf32Type point = U'Z';
+    expect_error(utf8_decode_char(bytes.data(), &point, bytes.size()));
+    EXPECT_EQ(point, U'Z');
+    expect_error(utf8_length(bytes.data(), bytes.size()));
+    Utf8Cursor cursor(bytes);
+    expect_error(cursor.read());
+    expect_error(cursor.advance());
+    EXPECT_EQ(cursor.offset(), 0u);
+    expect_error(cursor.read());
+  }
+
+  Utf32Type point = U'Z';
+  EXPECT_EQ(utf8_decode_char(nullptr, &point, 0), 0u);
+  EXPECT_EQ(point, U'Z');
+  EXPECT_EQ(utf8_decode_char("", &point), 0u);
+  EXPECT_EQ(point, U'Z');
+  EXPECT_EQ(utf8_decode_char("", &point, 1), 1u);
+  EXPECT_EQ(point, U'\0');
+  EXPECT_EQ(utf8_length(nullptr, 0), 0u);
+  EXPECT_EQ(utf8_length("a\0b"), 1u);
+  EXPECT_EQ(utf8_length("a\0b", 3), 3u);
+
+  point = U'Z';
+  auto terminated = utf8_decode_char("\xe0\0\x80", &point);
+  ASSERT_FALSE(terminated);
+  auto explicit_nul = utf8_decode_char("\xe0\0\x80", &point, 3);
+  ASSERT_FALSE(explicit_nul);
+  EXPECT_EQ(point, U'Z');
+}
+
+TEST(StringTest, CompactUtf8DecodeKeepsSurrogatePermissivenessAndCursorState) {
+  std::string_view bytes("a\0\xed\xa0\x80\xf4\x8f\xbf\xbf", 9);
+  EXPECT_EQ(utf8_length(bytes.data(), bytes.size()), 4u);
+  Utf8Cursor cursor(bytes);
+  for (Utf32Type expected : {U'a', U'\0', Utf32Type(0xd800), Utf32Type(0x10ffff)}) {
+    EXPECT_EQ(cursor.read(), expected);
+    EXPECT_EQ(cursor.read(), expected);
+    ASSERT_TRUE(cursor.advance());
+  }
+  EXPECT_TRUE(cursor.at_end());
+  auto past_end = cursor.read();
+  ASSERT_FALSE(past_end);
+  EXPECT_TRUE(past_end.error().is<UnicodeException>());
+  EXPECT_FALSE(cursor.advance());
+  EXPECT_EQ(cursor.offset(), bytes.size());
+  for (Utf32Type expected : {Utf32Type(0x10ffff), Utf32Type(0xd800), U'\0', U'a'}) {
+    ASSERT_TRUE(cursor.retreat());
+    EXPECT_EQ(cursor.read(), expected);
+  }
+  auto before_begin = cursor.retreat();
+  ASSERT_FALSE(before_begin);
+  EXPECT_TRUE(before_begin.error().is<UnicodeException>());
+  EXPECT_EQ(cursor.offset(), 0u);
+
+  char encoded[4] = {};
+  EXPECT_EQ(utf8_encode_char(encoded, Utf32Type(0xd800), sizeof(encoded)), 3u);
+  EXPECT_EQ(std::string_view(encoded, 3), "\xed\xa0\x80");
+}
+
+TEST(StringTest, CompactUtf8RetreatFailuresLeaveTheCursorUnchanged) {
+  auto malformed = Utf8Cursor::end(std::string_view("a\xff", 2));
+  auto decode_error = malformed.retreat();
+  ASSERT_FALSE(decode_error);
+  EXPECT_TRUE(decode_error.error().is<UnicodeException>());
+  EXPECT_EQ(malformed.offset(), 2u);
+
+  auto bad_boundary = Utf8Cursor::end(std::string_view("a\xe0" "A\x80", 4));
+  auto boundary_error = bad_boundary.retreat();
+  ASSERT_FALSE(boundary_error);
+  EXPECT_TRUE(boundary_error.error().is<UnicodeException>());
+  EXPECT_EQ(bad_boundary.offset(), 4u);
+}
+
 TEST(StringTest, InvalidUnicodeIsRecoverableAndDoesNotModifyTheSource) {
   String malformed(std::string_view("\xff", 1));
   auto length = malformed.size();

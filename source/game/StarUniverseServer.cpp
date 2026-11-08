@@ -336,7 +336,7 @@ std::expected<void, StarException> UniverseServer::close() {
     m_closed = true;
   if (!joined) {
     if (!stopped)
-      return std::unexpected(joined.error().withRelated(stopped.error(), "Additional universe shutdown failure"));
+      return std::unexpected(joined.error().with_related(stopped.error(), "Additional universe shutdown failure"));
     return std::unexpected(std::move(joined.error()));
   }
   return stopped;
@@ -908,7 +908,7 @@ std::expected<void, StarException> UniverseServer::run() {
   auto stopped = shutdown();
   if (!result) {
     if (!stopped)
-      return std::unexpected(result.error().withRelated(stopped.error(), "Additional shutdown failure"));
+      return std::unexpected(result.error().with_related(stopped.error(), "Additional shutdown failure"));
     return std::unexpected(std::move(result.error()));
   }
   return stopped;
@@ -987,8 +987,8 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         if (m_tcpServer) {
           if (auto stopped = m_tcpServer->stop(); !stopped) {
             if (!m_tcpServer->isClosed())
-              return std::unexpected(setup.error().withRelated(stopped.error(), "TCP setup rollback failed"));
-            setup = std::unexpected(setup.error().withRelated(stopped.error(), "TCP setup rollback failed"));
+              return std::unexpected(setup.error().with_related(stopped.error(), "TCP setup rollback failed"));
+            setup = std::unexpected(setup.error().with_related(stopped.error(), "TCP setup rollback failed"));
           }
           m_tcpServer.reset();
         }
@@ -1102,7 +1102,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   auto record = [&](auto&& result) {
     if (!result) {
       if (error)
-        *error = error->withRelated(result.error(), "Additional universe shutdown failure");
+        *error = error->with_related(result.error(), "Additional universe shutdown failure");
       else
         error = std::move(result.error());
     }
@@ -1744,7 +1744,7 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
               auto finalPackets = currentWorld->pullOutgoingPackets(clientId);
               if (!finalPackets.empty()) {
                 if (auto sent = m_connectionServer->sendPackets(clientId, std::move(finalPackets)); !sent)
-                  return std::unexpected(packets.error().withRelated(sent.error(), "Sending final world packets failed"));
+                  return std::unexpected(packets.error().with_related(sent.error(), "Sending final world packets failed"));
               }
               if (!currentWorld->hasClient(clientId))
                 clientContext->clearPlayerWorld();
@@ -2299,7 +2299,7 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
     }();
     if (!processed) {
       if (error)
-        *error = error->withRelated(processed.error(), "Additional universe message failure");
+        *error = error->with_related(processed.error(), "Additional universe message failure");
       else
         error = std::move(processed.error());
     }
@@ -2393,12 +2393,12 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
                 auto finalPackets = world->pullOutgoingPackets(clientId);
                 if (!finalPackets.empty()) {
                   if (auto sent = m_connectionServer->sendPackets(cid, std::move(finalPackets)); !sent)
-                    return std::unexpected(packets.error().withRelated(sent.error(), "Sending final subworld packets failed"));
+                    return std::unexpected(packets.error().with_related(sent.error(), "Sending final subworld packets failed"));
                 }
                 if (!world->hasClient(clientId)) {
                   auto client = m_clients.get(cid);
                   if (!client)
-                    return std::unexpected(packets.error().withRelated(client.error(), "Finding departing subworld client failed"));
+                    return std::unexpected(packets.error().with_related(client.error(), "Finding departing subworld client failed"));
                   client->get()->clearSubWorld(swid);
                 }
                 return std::unexpected(std::move(packets.error()));
@@ -3658,7 +3658,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         if (auto requested = addCelestialRequests(clientId, {makeLeft(location.vec2()), makeRight(location)}); !requested) {
           auto removed = (*system)->removeClient(clientId);
           if (!removed)
-            return std::unexpected(requested.error().withRelated(removed.error(), "Removing failed system client failed"));
+            return std::unexpected(requested.error().with_related(removed.error(), "Removing failed system client failed"));
           return std::unexpected(std::move(requested.error()));
         }
         client->setSystemWorld(*system);
@@ -3762,11 +3762,11 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
   if (!accepted && registered) {
     if (isConnectedClient(*registered)) {
       if (auto disconnected = doDisconnection(*registered, "Connection initialization failed"); !disconnected)
-        return std::unexpected(accepted.error().withRelated(disconnected.error(), "Connection initialization rollback failed"));
+        return std::unexpected(accepted.error().with_related(disconnected.error(), "Connection initialization rollback failed"));
     } else {
       auto removed = m_connectionServer->removeConnection(*registered);
       if (!removed)
-        return std::unexpected(accepted.error().withRelated(removed.error(), "Removing failed connection failed"));
+        return std::unexpected(accepted.error().with_related(removed.error(), "Removing failed connection failed"));
       std::unique_lock locker(m_mainLock, std::defer_lock);
       lockWithDiagnostics(locker);
       m_deadConnections.push_back({std::move(*removed),
@@ -3893,7 +3893,7 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
     if (result)
       return true;
     if (error)
-      *error = error->withRelated(result.error(), "Additional client disconnection failure");
+      *error = error->with_related(result.error(), "Additional client disconnection failure");
     else
       error = std::move(result.error());
     return false;
@@ -4145,9 +4145,9 @@ std::expected<void, StarException> UniverseServer::retireFailedWorldCreation(
     WorldId const& worldId, std::optional<WorldServerPromise>& promise, StarException const& error) {
   promise.reset();
   if (auto logged = m_root.logger().errorException("UniverseServer: error during world create", ExceptionDiagnostic(error)); !logged)
-    return std::unexpected(logged.error().withRelated(error, "Original world creation failure"));
+    return std::unexpected(logged.error().with_related(error, "Original world creation failure"));
   if (auto died = worldDiedWithError(worldId); !died)
-    return std::unexpected(died.error().withRelated(error, "Original world creation failure"));
+    return std::unexpected(died.error().with_related(error, "Original world creation failure"));
   return {};
 }
 
@@ -4711,7 +4711,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
   if (auto sent = m_connectionServer->sendPackets(*clientId, {std::make_shared<ClientCustomWorldRequest>(id.name)}); !sent) {
     auto failed = pair.second.fail(String(std::string_view(sent.error().what())));
     if (!failed)
-      return std::unexpected(sent.error().withRelated(failed.error(), "Settling failed world request failed"));
+      return std::unexpected(sent.error().with_related(failed.error(), "Settling failed world request failed"));
     return std::unexpected(std::move(sent.error()));
   }
   return WorldServerPromise(std::move(producer), pair.first);
@@ -4924,7 +4924,7 @@ std::expected<void, StarException> UniverseServer::stopLua() {
   for (auto&& context : m_scriptContexts) {
     if (auto stopped = context.second->uninit(); !stopped) {
       if (error)
-        *error = error->withRelated(stopped.error(), "Additional universe Lua shutdown failure");
+        *error = error->with_related(stopped.error(), "Additional universe Lua shutdown failure");
       else
         error = std::move(stopped.error());
     }

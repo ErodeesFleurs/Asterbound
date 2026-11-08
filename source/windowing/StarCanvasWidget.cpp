@@ -304,7 +304,7 @@ std::expected<void, StarException> CanvasWidget::renderImpl() {
     auto restored = target.setScissorRect(priorClip);
     if (!restored) {
       if (!rendered)
-        return std::unexpected(rendered.error().withContext(Star::format("Restoring Canvas clipping also failed: {}", Star::output_exception(restored.error(), true))));
+        return std::unexpected(rendered.error().with_context(Star::format("Restoring Canvas clipping also failed: {}", Star::output_exception(restored.error(), true))));
       return std::unexpected(std::move(restored.error()));
     }
   }

@@ -306,7 +306,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
   };
   auto settings = loadSettings();
   if (!settings)
-    return std::unexpected(settings.error().withContext("Could not perform initial Root load"));
+    return std::unexpected(settings.error().with_context("Could not perform initial Root load"));
   return settings;
 }
 

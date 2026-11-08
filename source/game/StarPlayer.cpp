@@ -1138,7 +1138,7 @@ std::expected<void, StarException> Player::uninit() {
       if (!error)
         error = std::move(result.error());
       else
-        error = error->withRelated(result.error(), "Additional error while uninitializing player");
+        error = error->with_related(result.error(), "Additional error while uninitializing player");
     }
   };
   remember(m_techController->uninit());
