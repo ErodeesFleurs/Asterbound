@@ -694,7 +694,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto items = std::move(*itemsResult);
     JsonArray result;
     for (auto const& item : items)
-      result.append(itemSafeDescriptor(item).toJson());
+      result.push_back(itemSafeDescriptor(item).toJson());
     return ChainableJsonMessageResponse(std::move(result));
   }
   return Object::receiveMessage(sendingConnection, message, args);
@@ -1007,7 +1007,7 @@ std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerO
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
-    items.append(std::move(item));
+    items.push_back(std::move(item));
   }
   return items;
 });
@@ -1036,7 +1036,7 @@ std::expected<void, StarException> ContainerObject::startCrafting() {
     if (m_crafting.get())
       return {};
     auto inputItems = m_items->items();
-    auto operation2 = inputItems.removeLast();
+    auto operation2 = inputItems.pop_back_checked();
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
     auto recipeResult = recipeForMaterials(inputItems);
@@ -1226,7 +1226,7 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   if (!overflowResult)
     return std::unexpected(std::move(overflowResult.error()));
   auto overflow = std::move(*overflowResult);
-  m_lostItems.appendAll(std::move(overflow));
+  m_lostItems.append_range(std::move(overflow));
   return {};
 }
 
@@ -1277,7 +1277,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
   if (!m_crafting.get())
     return {};
   auto inputItems = m_items->items();
-  auto operation1 = inputItems.removeLast();
+  auto operation1 = inputItems.pop_back_checked();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto recipeResult = recipeForMaterials(inputItems);

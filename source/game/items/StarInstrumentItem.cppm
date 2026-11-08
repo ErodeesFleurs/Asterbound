@@ -156,7 +156,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
     Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, *position);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
-  item->m_drawables.append(std::move(*drawable));
+  item->m_drawables.push_back(std::move(*drawable));
   auto activeImage = item->instanceValue("activeImage").and_then([](Json const& value) { return value.toString(); });
   if (!activeImage)
     return std::unexpected(std::move(activeImage.error()));
@@ -167,7 +167,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
                                             1.0f / TilePixels, true, *activePosition);
   if (!activeDrawable)
     return std::unexpected(std::move(activeDrawable.error()));
-  item->m_activeDrawables.append(std::move(*activeDrawable));
+  item->m_activeDrawables.push_back(std::move(*activeDrawable));
   auto angle = item->instanceValue("activeAngle").and_then([](Json const& value) { return value.toFloat(); });
   if (!angle)
     return std::unexpected(std::move(angle.error()));
@@ -180,7 +180,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      target.get().append(std::move(*effect));
+      target.get().push_back(std::move(*effect));
     }
   }
   auto activeSources = item->instanceValue("activeEffectSources", JsonArray()).and_then(jsonToStringSet);

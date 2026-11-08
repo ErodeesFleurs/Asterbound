@@ -88,6 +88,7 @@ using LuaValue =
 // used as an argument to a lua callback function, it must be the final
 // argument of the function!
 template <typename T>
+// A project sequence tag: Lua codecs expand these values into distinct stack slots.
 class LuaVariadic : public List<T> {
 public:
   using List<T>::List;
@@ -1280,7 +1281,7 @@ namespace LuaDetail {
         auto value = stack.read<T>(first + i);
         if (!value)
           return std::unexpected(std::move(value.error()));
-        result.append(std::move(*value));
+        result.push_back(std::move(*value));
       }
       return result;
     }
@@ -1579,13 +1580,7 @@ namespace LuaDetail {
 
 template <typename Container> LuaVariadic<typename std::decay_t<Container>::value_type> luaUnpack(Container&& c) {
   LuaVariadic<typename std::decay_t<Container>::value_type> ret;
-  if (std::is_rvalue_reference_v<Container&&>) {
-    for (auto& e : c)
-      ret.append(std::move(e));
-  } else {
-    for (auto const& e : c)
-      ret.append(e);
-  }
+  ret.append_range(std::forward<Container>(c));
   return ret;
 }
 
@@ -2575,7 +2570,7 @@ template <typename T>
 
 inline void LuaEngine::destroyHandle(int handleIndex) {
   // Registry references are released later by the engine's handle cleanup.
-  m_handleFree.append(handleIndex);
+  m_handleFree.push_back(handleIndex);
 }
 
 template <typename T>

@@ -199,7 +199,7 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
   // Removing entities during callbacks remains unsupported.
   m_entrySortBuffer.clear();
   for (auto const& entry : m_spatialMap.entries())
-    m_entrySortBuffer.append(std::cref(entry.second));
+    m_entrySortBuffer.push_back(std::cref(entry.second));
 
   if (sortOrder) {
     m_entrySortBuffer.sort([&sortOrder](auto a, auto b) {
@@ -242,7 +242,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityQue
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));
@@ -266,7 +266,7 @@ std::expected<List<std::shared_ptr<TileEntity>>, StarException> EntityMap::entit
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));
@@ -318,7 +318,7 @@ std::expected<void, StarException> EntityMap::forAllEntities(EntityCallback cons
   List<std::reference_wrapper<std::shared_ptr<Entity> const>> allEntities;
   allEntities.reserve(m_spatialMap.size());
   for (auto const& entry : m_spatialMap.entries())
-    allEntities.append(std::cref(entry.second.value));
+    allEntities.push_back(std::cref(entry.second.value));
 
   if (sortOrder) {
     allEntities.sort([&sortOrder](auto a, auto b) {
@@ -396,7 +396,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityLin
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));

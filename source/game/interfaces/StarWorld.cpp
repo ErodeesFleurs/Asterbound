@@ -55,7 +55,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> World::entityQuery(R
       if (!*accepted)
         return {};
     }
-    list.append(entity);
+    list.push_back(entity);
     return {};
   });
   if (!scanned)
@@ -73,7 +73,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> World::entityLineQue
       if (!*accepted)
         return {};
     }
-    list.append(entity);
+    list.push_back(entity);
     return {};
   });
   if (!scanned)
@@ -91,7 +91,7 @@ std::expected<List<std::shared_ptr<TileEntity>>, StarException> World::entitiesA
       if (!*accepted)
         return {};
     }
-    list.append(entity);
+    list.push_back(entity);
     return {};
   });
   if (!scanned)
@@ -105,7 +105,7 @@ std::expected<List<Vec2I>, StarException> World::findEmptyTiles(Vec2I pos, unsig
   if (!occupied)
     return std::unexpected(std::move(occupied.error()));
   if (!*occupied)
-    res.append(pos);
+    res.push_back(pos);
 
   if (res.size() >= maxAmount)
     return res;
@@ -122,7 +122,7 @@ std::expected<List<Vec2I>, StarException> World::findEmptyTiles(Vec2I pos, unsig
       if (!nextOccupied)
         return std::unexpected(std::move(nextOccupied.error()));
       if (!*nextOccupied) {
-        res.append(pos + Vec2I(xDiff, yDiff));
+        res.push_back(pos + Vec2I(xDiff, yDiff));
         if (res.size() >= maxAmount) {
           return res;
         }

@@ -769,7 +769,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       std::unique_lock locker(m_messageMutex, std::defer_lock);
       lockWithDiagnostics(locker);
       messages.erase(messages.begin(), messages.begin() + i + 1);
-      messages.appendAll(std::move(m_universeMessages));
+      messages.append_range(std::move(m_universeMessages));
       m_universeMessages = std::move(messages);
       return std::unexpected(std::move(error));
     }
@@ -799,7 +799,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       }
       printout = "Invited " + printout;
     }
-    m_pendingMessages.emplaceAppend(MessageContext::CommandResult, 0, "", printout);
+    m_pendingMessages.emplace_back(MessageContext::CommandResult, 0, "", printout);
   }
   auto contextUpdateResult = m_clientContext->writeUpdate(m_clientContext->netCompatibilityRules());
   if (!contextUpdateResult)
@@ -1744,7 +1744,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         m_mainPlayer->setAdmin(m_clientContext->isAdmin());
         m_mainPlayer->setTeam(m_clientContext->team());
       } else if (auto chat = as<ChatReceivePacket>(packet)) {
-        m_pendingMessages.append(chat->receivedMessage);
+        m_pendingMessages.push_back(chat->receivedMessage);
       } else if (auto time = as<UniverseTimeUpdatePacket>(packet)) {
         m_universeClock->setTime(time->universeTime);
       } else if (auto disconnect = as<ServerDisconnectPacket>(packet)) {
@@ -2045,7 +2045,7 @@ std::expected<void, StarException> UniverseClient::passMessage(Universe::Message
     return std::unexpected(StarException("Universe client message requires a local response keeper"));
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_universeMessages.append(std::move(message));
+  m_universeMessages.push_back(std::move(message));
   return {};
 }
 

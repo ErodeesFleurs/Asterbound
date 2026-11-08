@@ -381,7 +381,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *items) {
     auto item = ItemDescriptor::create(value);
     if (!item) return std::unexpected(std::move(item.error()));
-    m_defaultItems.append(std::move(*item));
+    m_defaultItems.push_back(std::move(*item));
   }
   auto blueprints = config.get("defaultBlueprints", JsonObject{});
   if (!blueprints) return std::unexpected(std::move(blueprints.error()));
@@ -390,7 +390,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *tier) {
     auto item = ItemDescriptor::create(value);
     if (!item) return std::unexpected(std::move(item.error()));
-    m_defaultBlueprints.append(std::move(*item));
+    m_defaultBlueprints.push_back(std::move(*item));
   }
   auto personalitiesLoaded = [&]() -> std::expected<void, StarException> {
   auto humanoid = humanoidConfig();
@@ -414,7 +414,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *effects) {
     auto effect = jsonToPersistentStatusEffect(value);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    m_statusEffects.append(std::move(*effect));
+    m_statusEffects.push_back(std::move(*effect));
   }
   auto directives = config.getString("effectDirectives", "");
   if (!directives) return std::unexpected(std::move(directives.error()));
@@ -506,7 +506,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
     if (!facialMaskRead) return std::unexpected(std::move(facialMaskRead.error()));
     auto facialMask = readOptions("facialMask", gender.facialMaskOptions);
     if (!facialMask) return std::unexpected(std::move(facialMask.error()));
-    species.genderOptions.append(std::move(gender));
+    species.genderOptions.push_back(std::move(gender));
   }
   m_options = std::move(species);
   return {};

@@ -68,7 +68,7 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
     List<std::reference_wrapper<Texture const>> liveTextures;
     filter(m_textureMap, [&](auto const& pair) {
         if (time - pair.second.second < timeout) {
-          liveTextures.append(std::cref(*pair.second.first));
+          liveTextures.push_back(std::cref(*pair.second.first));
           return true;
         }
         return false;

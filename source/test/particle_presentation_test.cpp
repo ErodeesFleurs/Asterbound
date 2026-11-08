@@ -253,7 +253,7 @@ const GameTestRegistration particleTrailSampling(
     particle.trail = true;
     List<Particle> batch;
     batch.reserve(8);
-    batch.append(particle);
+    batch.push_back(particle);
     auto capacity = batch.capacity();
     auto* allocation = batch.data();
     manager.addParticles(std::move(batch));

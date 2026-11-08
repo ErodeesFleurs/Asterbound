@@ -124,7 +124,7 @@ std::expected<WorldRegion, StarException> WorldRegion::create(Json const& store)
   for (auto const& entry : subBlockSelectorIndexes) {
     auto index = entry.toUInt();
     if (!index) return std::unexpected(std::move(index.error()));
-    result.subBlockSelectorIndexes.append(*index);
+    result.subBlockSelectorIndexes.push_back(*index);
   }
   auto autoforegroundOreSelectorIndexesResult1 = store.getArray("foregroundOreSelectorIndexes");
   if (!autoforegroundOreSelectorIndexesResult1) return std::unexpected(std::move(autoforegroundOreSelectorIndexesResult1.error()));
@@ -132,7 +132,7 @@ std::expected<WorldRegion, StarException> WorldRegion::create(Json const& store)
   for (auto const& entry : foregroundOreSelectorIndexes) {
     auto index = entry.toUInt();
     if (!index) return std::unexpected(std::move(index.error()));
-    result.foregroundOreSelectorIndexes.append(*index);
+    result.foregroundOreSelectorIndexes.push_back(*index);
   }
   auto autobackgroundOreSelectorIndexesResult1 = store.getArray("backgroundOreSelectorIndexes");
   if (!autobackgroundOreSelectorIndexesResult1) return std::unexpected(std::move(autobackgroundOreSelectorIndexesResult1.error()));
@@ -140,7 +140,7 @@ std::expected<WorldRegion, StarException> WorldRegion::create(Json const& store)
   for (auto const& entry : backgroundOreSelectorIndexes) {
     auto index = entry.toUInt();
     if (!index) return std::unexpected(std::move(index.error()));
-    result.backgroundOreSelectorIndexes.append(*index);
+    result.backgroundOreSelectorIndexes.push_back(*index);
   }
   return result;
 }
@@ -332,7 +332,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildTerrestrialLayout(Ro
                           .encloseLiquids = secondaryRegion.encloseLiquids,
                           .fillMicrodungeons = secondaryRegion.fillMicrodungeons}};
 
-      secondaryRegions.append(secondaryRegionParams);
+      secondaryRegions.push_back(secondaryRegionParams);
     }
 
     List<RegionParams> secondarySubRegions;
@@ -354,7 +354,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildTerrestrialLayout(Ro
                           .encloseLiquids = secondarySubRegion.encloseLiquids,
                           .fillMicrodungeons = secondarySubRegion.fillMicrodungeons}};
 
-      secondarySubRegions.append(secondarySubRegionParams);
+      secondarySubRegions.push_back(secondarySubRegionParams);
     }
 
     return layout.addLayer(seed,
@@ -536,7 +536,8 @@ std::expected<WorldLayout, StarException> WorldLayout::buildAsteroidsLayout(Root
     layout.m_blockNoise = std::move((*layoutm_blockNoiseResult1));
   }
 
-  layout.m_playerStartSearchRegions.append(RectI(0, asteroidParameters.asteroidBottomLevel, asteroidParameters.worldSize[0], asteroidParameters.asteroidTopLevel));
+  layout.m_playerStartSearchRegions.push_back(RectI(
+    0, asteroidParameters.asteroidBottomLevel, asteroidParameters.worldSize[0], asteroidParameters.asteroidTopLevel));
 
   auto finalized = layout.finalize(Color::Black);
   if (!finalized) return std::unexpected(std::move(finalized.error()));
@@ -606,7 +607,7 @@ std::expected<std::shared_ptr<WorldLayout>, StarException> WorldLayout::create(R
   for (auto const& value : biomes) {
     auto parsed = Biome::create(root, value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result->m_biomes.append(std::make_shared<Biome>(std::move(*parsed)));
+    result->m_biomes.push_back(std::make_shared<Biome>(std::move(*parsed)));
   }
   auto autoterrainSelectorsResult1 = store.getArray("terrainSelectors");
   if (!autoterrainSelectorsResult1) return std::unexpected(std::move(autoterrainSelectorsResult1.error()));
@@ -614,7 +615,7 @@ std::expected<std::shared_ptr<WorldLayout>, StarException> WorldLayout::create(R
   for (auto const& value : terrainSelectors) {
     auto parsed = terrainDatabase->loadSelector(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result->m_terrainSelectors.append(std::move(*parsed));
+    result->m_terrainSelectors.push_back(std::move(*parsed));
   }
   auto autolayersResult1 = store.getArray("layers");
   if (!autolayersResult1) return std::unexpected(std::move(autolayersResult1.error()));
@@ -631,7 +632,7 @@ std::expected<std::shared_ptr<WorldLayout>, StarException> WorldLayout::create(R
       auto autopositionResult1 = boundary.toInt();
       if (!autopositionResult1) return std::unexpected(std::move(autopositionResult1.error()));
       auto position = std::move((*autopositionResult1));
-      layer.boundaries.append(position);
+      layer.boundaries.push_back(position);
     }
     auto autocellsResult1 = value.getArray("cells");
     if (!autocellsResult1) return std::unexpected(std::move(autocellsResult1.error()));
@@ -639,9 +640,9 @@ std::expected<std::shared_ptr<WorldLayout>, StarException> WorldLayout::create(R
     for (auto const& cell : cells) {
       auto region = WorldRegion::create(cell);
       if (!region) return std::unexpected(std::move(region.error()));
-      layer.cells.append(std::make_shared<WorldRegion>(std::move(*region)));
+      layer.cells.push_back(std::make_shared<WorldRegion>(std::move(*region)));
     }
-    result->m_layers.append(std::move(layer));
+    result->m_layers.push_back(std::move(layer));
   }
   auto resultm_regionBlendingResult1 = store.getFloat("regionBlending");
   if (!resultm_regionBlendingResult1) return std::unexpected(std::move(resultm_regionBlendingResult1.error()));
@@ -667,7 +668,7 @@ std::expected<std::shared_ptr<WorldLayout>, StarException> WorldLayout::create(R
     auto autorectResult1 = jsonToRectI(region);
     if (!autorectResult1) return std::unexpected(std::move(autorectResult1.error()));
     auto rect = std::move((*autorectResult1));
-    result->m_playerStartSearchRegions.append(rect);
+    result->m_playerStartSearchRegions.push_back(rect);
   }
   return result;
 }
@@ -681,7 +682,7 @@ std::expected<Json, StarException> WorldLayout::toJson() const {
   for (auto const& biome : m_biomes) {
     auto stored = biome->toJson();
     if (!stored) return std::unexpected(std::move(stored.error()));
-    biomes.append(std::move(*stored));
+    biomes.push_back(std::move(*stored));
   }
   Json blockNoise;
   if (m_blockNoise) {
@@ -780,19 +781,19 @@ std::expected<List<WorldLayout::RegionWeighting>, StarException> WorldLayout::ge
     rightCellWeight *= weightFactor / totalWeight;
 
     if (innerCellWeight > 0.0f)
-      weighting.append(RegionWeighting{.weight = innerCellWeight,
-                                       .xValue = innerCellXValue,
-                                       .region = std::cref(*layer.cells[innerCellIndex])});
+      weighting.push_back(RegionWeighting{.weight = innerCellWeight,
+                                          .xValue = innerCellXValue,
+                                          .region = std::cref(*layer.cells[innerCellIndex])});
 
     if (leftCellWeight > 0.0f)
-      weighting.append(RegionWeighting{.weight = leftCellWeight,
-                                       .xValue = leftCellXValue,
-                                       .region = std::cref(*layer.cells[leftCellIndex])});
+      weighting.push_back(RegionWeighting{.weight = leftCellWeight,
+                                          .xValue = leftCellXValue,
+                                          .region = std::cref(*layer.cells[leftCellIndex])});
 
     if (rightCellWeight > 0.0f)
-      weighting.append(RegionWeighting{.weight = rightCellWeight,
-                                       .xValue = rightCellXValue,
-                                       .region = std::cref(*layer.cells[rightCellIndex])});
+      weighting.push_back(RegionWeighting{.weight = rightCellWeight,
+                                          .xValue = rightCellXValue,
+                                          .region = std::cref(*layer.cells[rightCellIndex])});
   };
 
   auto yi = std::lower_bound(m_layers.begin(), m_layers.end(), y, [](WorldLayer const& layer, int y) {
@@ -849,11 +850,11 @@ std::expected<List<RectI>, StarException> WorldLayout::previewAddBiomeRegion(Vec
   // need a dummy region to expand
   std::shared_ptr<WorldRegion> dummyRegion;
 
-  targetLayer.boundaries.insertAt(layerAndCell.second, insertX);
-  targetLayer.cells.insertAt(layerAndCell.second, dummyRegion);
+  targetLayer.boundaries.insert_at(layerAndCell.second, insertX);
+  targetLayer.cells.insert_at(layerAndCell.second, dummyRegion);
 
-  targetLayer.boundaries.insertAt(layerAndCell.second, insertX - 1);
-  targetLayer.cells.insertAt(layerAndCell.second, targetRegion);
+  targetLayer.boundaries.insert_at(layerAndCell.second, insertX - 1);
+  targetLayer.cells.insert_at(layerAndCell.second, targetRegion);
 
   auto expandResult = expandRegionInLayer(targetLayer, layerAndCell.second + 1, width);
 
@@ -957,7 +958,7 @@ std::expected<void, StarException> WorldLayout::addBiomeRegion(
     if (!selector_configuration)
       return std::unexpected(std::move(selector_configuration.error()));
     auto selector = std::move((*selector_configuration));
-    newRegion.subBlockSelectorIndexes.append(registerTerrainSelector(selector));
+    newRegion.subBlockSelectorIndexes.push_back(registerTerrainSelector(selector));
   }
 
   newRegion.environmentBiomeIndex = targetRegion->environmentBiomeIndex;
@@ -971,12 +972,12 @@ std::expected<void, StarException> WorldLayout::addBiomeRegion(
   int insertX = position[0] > 0 ? position[0] : 1;
 
   // insert the new region boundary
-  targetLayer.boundaries.insertAt(layerAndCell.second, insertX);
-  targetLayer.cells.insertAt(layerAndCell.second, newRegionPtr);
+  targetLayer.boundaries.insert_at(layerAndCell.second, insertX);
+  targetLayer.cells.insert_at(layerAndCell.second, newRegionPtr);
 
   // insert the left side of the (now split) target region
-  targetLayer.boundaries.insertAt(layerAndCell.second, insertX - 1);
-  targetLayer.cells.insertAt(layerAndCell.second, targetRegion);
+  targetLayer.boundaries.insert_at(layerAndCell.second, insertX - 1);
+  targetLayer.cells.insert_at(layerAndCell.second, targetRegion);
 
   // this->root().logger().info("boundaries after region insertion are {}", targetLayer.boundaries);
 
@@ -1061,7 +1062,7 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     targetLayer.cells = {targetLayer.cells[cellIndex]};
     targetLayer.boundaries = {};
 
-    regionRects.append(RectI{0, targetLayer.yStart, static_cast<int>(m_worldSize[0]), layerTop});
+    regionRects.push_back(RectI{0, targetLayer.yStart, static_cast<int>(m_worldSize[0]), layerTop});
   } else {
     auto targetRegion = targetLayer.cells[cellIndex];
 
@@ -1077,9 +1078,11 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
           (i == 0 && cellIndex == lastCellIndex && targetLayer.cells[i] == targetRegion) ||
           (cellIndex == 0 && i == lastCellIndex && targetLayer.cells[i] == targetRegion))
 
-        targetCells.append(RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
+        targetCells.push_back(
+          RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
       else
-        otherCells.append(RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
+        otherCells.push_back(
+          RegionCell{.lBound = lastBoundary, .rBound = nextBoundary, .region = targetLayer.cells[i]});
       lastBoundary = nextBoundary;
     }
 
@@ -1109,8 +1112,10 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 
     // build the rects for the areas NEWLY covered by the region; these don't need to be wrapped because
     // they'll be split when they're consumed
-    regionRects.append(RectI{targetCells[0].rBound, targetLayer.yStart, targetCells[0].rBound + expandRight, layerTop});
-    regionRects.append(RectI{targetCells[targetCells.size() - 1].lBound - expandLeft, targetLayer.yStart, targetCells[targetCells.size() - 1].lBound, layerTop});
+    regionRects.push_back(
+      RectI{targetCells[0].rBound, targetLayer.yStart, targetCells[0].rBound + expandRight, layerTop});
+    regionRects.push_back(RectI{targetCells[targetCells.size() - 1].lBound - expandLeft, targetLayer.yStart,
+                                targetCells[targetCells.size() - 1].lBound, layerTop});
 
     targetCells[0].rBound += expandRight;
     targetCells[targetCells.size() - 1].lBound -= expandLeft;
@@ -1121,17 +1126,17 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     List<RegionCell> wrappedTargetCells;
     for (auto const& cell : targetCells) {
       if (cell.lBound < 0) {
-        wrappedTargetCells.append(RegionCell{.lBound = 0, .rBound = cell.rBound, .region = cell.region});
-        wrappedTargetCells.append(RegionCell{.lBound = static_cast<int>(m_worldSize[0]) + cell.lBound,
-                                             .rBound = static_cast<int>(m_worldSize[0]),
-                                             .region = cell.region});
+        wrappedTargetCells.push_back(RegionCell{.lBound = 0, .rBound = cell.rBound, .region = cell.region});
+        wrappedTargetCells.push_back(RegionCell{.lBound = static_cast<int>(m_worldSize[0]) + cell.lBound,
+                                                .rBound = static_cast<int>(m_worldSize[0]),
+                                                .region = cell.region});
       } else if (cell.rBound > static_cast<int>(m_worldSize[0])) {
-        wrappedTargetCells.append(
+        wrappedTargetCells.push_back(
           RegionCell{.lBound = cell.lBound, .rBound = static_cast<int>(m_worldSize[0]), .region = cell.region});
-        wrappedTargetCells.append(
+        wrappedTargetCells.push_back(
           RegionCell{.lBound = 0, .rBound = cell.rBound - static_cast<int>(m_worldSize[0]), .region = cell.region});
       } else {
-        wrappedTargetCells.append(cell);
+        wrappedTargetCells.push_back(cell);
       }
     }
 
@@ -1146,13 +1151,13 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
         if (rInside && lInside)
           continue;
         else if (rInside)
-          newOtherCells.append(
+          newOtherCells.push_back(
             RegionCell{.lBound = otherCell.lBound, .rBound = targetCell.lBound, .region = otherCell.region});
         else if (lInside)
-          newOtherCells.append(
+          newOtherCells.push_back(
             RegionCell{.lBound = targetCell.rBound, .rBound = otherCell.rBound, .region = otherCell.region});
         else
-          newOtherCells.append(otherCell);
+          newOtherCells.push_back(otherCell);
       }
       otherCells = newOtherCells;
     }
@@ -1160,16 +1165,16 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     // this->root().logger().info("after de-overlapping:\ntarget cells are: {}\nother cells are:  {}", printRegionCells(targetCells), printRegionCells(otherCells));
 
     // combine lists and sort
-    otherCells.appendAll(targetCells);
+    otherCells.append_range(targetCells);
     otherCells.sort([](RegionCell const& a, RegionCell const& b) { return a.rBound < b.rBound; });
 
     // convert back into cells and boundaries
     targetLayer.cells.clear();
     targetLayer.boundaries.clear();
     for (std::size_t i = 0; i < otherCells.size(); ++i) {
-      targetLayer.cells.append(otherCells[i].region);
+      targetLayer.cells.push_back(otherCells[i].region);
       if (i < otherCells.size() - 1)
-        targetLayer.boundaries.append(otherCells[i].rBound);
+        targetLayer.boundaries.push_back(otherCells[i].rBound);
     }
   }
 
@@ -1179,20 +1184,20 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 }
 
 BiomeIndex WorldLayout::registerBiome(std::shared_ptr<Biome const> biome) {
-  std::size_t foundIndex = m_biomes.indexOf(biome);
+  std::size_t foundIndex = m_biomes.index_of(biome);
   if (foundIndex != NPos)
     return foundIndex + 1;
 
-  m_biomes.append(std::move(biome));
+  m_biomes.push_back(std::move(biome));
   return m_biomes.size();
 }
 
 TerrainSelectorIndex WorldLayout::registerTerrainSelector(std::shared_ptr<TerrainSelector const> terrainSelector) {
-  std::size_t foundIndex = m_terrainSelectors.indexOf(terrainSelector);
+  std::size_t foundIndex = m_terrainSelectors.index_of(terrainSelector);
   if (foundIndex != NPos)
     return foundIndex + 1;
 
-  m_terrainSelectors.append(std::move(terrainSelector));
+  m_terrainSelectors.push_back(std::move(terrainSelector));
   return m_terrainSelectors.size();
 }
 
@@ -1247,7 +1252,7 @@ std::expected<WorldRegion, StarException> WorldLayout::buildRegion(std::uint64_t
         if (!selector_configuration)
           return std::unexpected(std::move(selector_configuration.error()));
         auto selector = std::move((*selector_configuration));
-        region.subBlockSelectorIndexes.append(registerTerrainSelector(selector));
+        region.subBlockSelectorIndexes.push_back(registerTerrainSelector(selector));
       }
     }
 
@@ -1262,7 +1267,7 @@ std::expected<WorldRegion, StarException> WorldLayout::buildRegion(std::uint64_t
         if (!foreground_selector)
           return std::unexpected(std::move(foreground_selector.error()));
         auto fgSelector = std::move((*foreground_selector));
-        region.foregroundOreSelectorIndexes.append(registerTerrainSelector(fgSelector));
+        region.foregroundOreSelectorIndexes.push_back(registerTerrainSelector(fgSelector));
       }
 
       if (regionParams.bgOreSelector) {
@@ -1273,7 +1278,7 @@ std::expected<WorldRegion, StarException> WorldLayout::buildRegion(std::uint64_t
         if (!background_selector)
           return std::unexpected(std::move(background_selector.error()));
         auto bgSelector = std::move((*background_selector));
-        region.backgroundOreSelectorIndexes.append(registerTerrainSelector(bgSelector));
+        region.backgroundOreSelectorIndexes.push_back(registerTerrainSelector(bgSelector));
       }
     }
 
@@ -1292,9 +1297,9 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   auto stdshared_ptrWorldRegionregionResult1 = buildRegion(seed, regionParams);
   if (!stdshared_ptrWorldRegionregionResult1) return std::unexpected(std::move(stdshared_ptrWorldRegionregionResult1.error()));
   std::shared_ptr<WorldRegion> region = std::make_shared<WorldRegion>(std::move(*stdshared_ptrWorldRegionregionResult1));
-  layer.cells.append(region);
+  layer.cells.push_back(region);
 
-  m_layers.append(std::move(layer));
+  m_layers.push_back(std::move(layer));
   return {};
 }
 
@@ -1337,9 +1342,9 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
     if (subRegionParams.biomeName == primaryBiome)
       spawnBiomeIndexes.add(subRegion->blockBiomeIndex);
 
-    layer.cells.append(region);
-    layer.cells.append(subRegion);
-    layer.cells.append(region);
+    layer.cells.push_back(region);
+    layer.cells.push_back(subRegion);
+    layer.cells.push_back(region);
     auto region_relative_size = static_random_float_range(regionSizeRange[0], regionSizeRange[1], seed, ++mix, yStart);
     float regionRelativeSize = std::move(region_relative_size);
     auto subregion_relative_size = static_random_float_range(subRegionSize[0], subRegionSize[1], seed, ++mix, yStart);
@@ -1352,9 +1357,9 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
     subRegionRelativeSize *= regionRelativeSize;
     regionRelativeSize -= subRegionRelativeSize;
 
-    relativeRegionSizes.append(regionRelativeSize / 2);
-    relativeRegionSizes.append(subRegionRelativeSize);
-    relativeRegionSizes.append(regionRelativeSize / 2);
+    relativeRegionSizes.push_back(regionRelativeSize / 2);
+    relativeRegionSizes.push_back(subRegionRelativeSize);
+    relativeRegionSizes.push_back(regionRelativeSize / 2);
     return {};
   };
 
@@ -1372,11 +1377,11 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   // construct boundaries based on normalized sizes
     auto next_boundary = static_random_i32_range(0, m_worldSize[0] - 1, seed, yStart, "LayerOffset");
     int nextBoundary = std::move(next_boundary);
-    layer.boundaries.append(nextBoundary);
+    layer.boundaries.push_back(nextBoundary);
     for (std::size_t i = 0; i + 1 < relativeRegionSizes.size(); ++i) {
       int regionSize = static_cast<int>(m_worldSize[0]) * (relativeRegionSizes[i] / totalRelativeSize);
       nextBoundary += regionSize;
-      layer.boundaries.append(nextBoundary);
+      layer.boundaries.push_back(nextBoundary);
     }
 
   // wrap cells + boundaries
@@ -1385,16 +1390,16 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
     if (!last) return std::unexpected(std::move(last.error()));
     if (last->get() <= static_cast<int>(m_worldSize[0]))
       break;
-    auto cell = layer.cells.takeLast();
+    auto cell = layer.cells.take_back();
     if (!cell) return std::unexpected(std::move(cell.error()));
-    layer.cells.prepend(std::move(*cell));
-    auto boundary = layer.boundaries.takeLast();
+    layer.cells.push_front(std::move(*cell));
+    auto boundary = layer.boundaries.take_back();
     if (!boundary) return std::unexpected(std::move(boundary.error()));
-    layer.boundaries.prepend(*boundary - m_worldSize[0]);
+    layer.boundaries.push_front(*boundary - m_worldSize[0]);
   }
   auto lastCell = layer.cells.last();
   if (!lastCell) return std::unexpected(std::move(lastCell.error()));
-  layer.cells.prepend(lastCell->get());
+  layer.cells.push_front(lastCell->get());
   auto intyRangeResult1 = this->root().assets();
   if (!intyRangeResult1) return std::unexpected(std::move(intyRangeResult1.error()));
   auto intyRangeResult2 = (*intyRangeResult1)->json("/world_template.config:playerStartSearchYRange");
@@ -1407,13 +1412,13 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
   for (auto const& region : layer.cells) {
     int nextBoundary = std::move(i < static_cast<int>(layer.boundaries.size()) ? layer.boundaries[i] : m_worldSize[0]);
     if (spawnBiomeIndexes.contains(region->blockBiomeIndex))
-      m_playerStartSearchRegions.append(RectI(lastBoundary, std::max(0, yBase - yRange), nextBoundary,
-                                              std::min(static_cast<int>(m_worldSize[1]), yBase + yRange)));
+      m_playerStartSearchRegions.push_back(RectI(lastBoundary, std::max(0, yBase - yRange), nextBoundary,
+                                                 std::min(static_cast<int>(m_worldSize[1]), yBase + yRange)));
     lastBoundary = nextBoundary;
     i++;
   }
 
-  m_layers.append(std::move(layer));
+  m_layers.push_back(std::move(layer));
   return {};
 }
 

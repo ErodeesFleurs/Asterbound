@@ -33,7 +33,7 @@ std::expected<void, StarException> JsonBuilderStream::endArray() {
   while (!isSentry()) {
     auto value = pop();
     if (!value) return std::unexpected(std::move(value.error()));
-    array.append(std::move(*value));
+    array.push_back(std::move(*value));
   }
   array.reverse();
   return set(Json(std::move(array)));
@@ -74,7 +74,7 @@ std::expected<Json, StarException> JsonBuilderStream::takeTop() {
     return std::unexpected(JsonParsingException("Incomplete JSON builder stream"));
   return pop();
 }
-void JsonBuilderStream::push(Json value) { m_stack.append(std::move(value)); }
+void JsonBuilderStream::push(Json value) { m_stack.push_back(std::move(value)); }
 std::expected<Json, StarException> JsonBuilderStream::pop() {
   if (m_stack.empty() || !m_stack.back())
     return std::unexpected(JsonParsingException("Incomplete JSON builder stream"));
@@ -87,7 +87,7 @@ std::expected<void, StarException> JsonBuilderStream::set(Json value) {
   m_stack.back() = std::move(value);
   return {};
 }
-void JsonBuilderStream::pushSentry() { m_stack.append({}); }
+void JsonBuilderStream::pushSentry() { m_stack.push_back({}); }
 bool JsonBuilderStream::isSentry() { return !m_stack.empty() && !m_stack.back(); }
 
 std::expected<void, StarException> JsonStreamer<Json>::toJsonStream(Json const& val, JsonStream& stream, bool sort) {
@@ -163,7 +163,8 @@ std::expected<void, StarException> JsonStreamer<Json>::toJsonStream(Json const& 
       if (sort) {
         List<JsonObject::const_iterator> iterators;
         iterators.reserve((*object)->size());
-        for (auto i = (*object)->begin(); i != (*object)->end(); ++i) iterators.append(i);
+        for (auto i = (*object)->begin(); i != (*object)->end(); ++i)
+          iterators.push_back(i);
         iterators.sort([](auto a, auto b) { return a->first < b->first; });
         for (auto i : iterators) {
           auto written = entry(*i, first);

@@ -1036,7 +1036,7 @@ auto Box<T, N>::subtract(Box const& rect) const -> Enable2D<P, List<Box>> {
   if (overlap.isEmpty()) {
     // If this rect doesn't overlap at all with the subtracted one, obviously
     // the entire rect is new territory.
-    regions.append(*this);
+    regions.push_back(*this);
   } else {
     // If there is overlap with this rect, we need to add the left, bottom,
     // right, and top sections.  These can overlap at the corners, so the left
@@ -1045,16 +1045,16 @@ auto Box<T, N>::subtract(Box const& rect) const -> Enable2D<P, List<Box>> {
     // the overlap section.
 
     if (xMin() < overlap.xMin())
-      regions.append(Box(xMin(), yMin(), overlap.xMin(), yMax()));
+      regions.push_back(Box(xMin(), yMin(), overlap.xMin(), yMax()));
 
     if (overlap.xMax() < xMax())
-      regions.append(Box(overlap.xMax(), yMin(), xMax(), yMax()));
+      regions.push_back(Box(overlap.xMax(), yMin(), xMax(), yMax()));
 
     if (yMin() < overlap.yMin())
-      regions.append(Box(rect.xMin(), yMin(), rect.xMax(), overlap.yMin()));
+      regions.push_back(Box(rect.xMin(), yMin(), rect.xMax(), overlap.yMin()));
 
     if (overlap.yMax() < yMax())
-      regions.append(Box(rect.xMin(), overlap.yMax(), rect.xMax(), yMax()));
+      regions.push_back(Box(rect.xMin(), overlap.yMax(), rect.xMax(), yMax()));
   }
 
   return regions;

@@ -69,7 +69,7 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
       auto const& key = std::get<String>(p.second.second);
       auto input = m_input.get(p.second.first);
       if (!input) return std::unexpected(std::move(input.error()));
-      input->get()[key].append({nodeId, p.first});
+      input->get()[key].push_back({nodeId, p.first});
       auto value = get(p.second.first, key);
       if (!value) return std::unexpected(std::move(value.error()));
       auto set = table.set(p.first, *value);
@@ -89,7 +89,7 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
           if ((*vector)[i].isType(Json::Type::String)) {
             auto key = (*vector)[i].toString();
             if (!key) return std::unexpected(std::move(key.error()));
-            m_vectorNumberInput[*key].append({i + 1, luaVector});
+            m_vectorNumberInput[*key].push_back({i + 1, luaVector});
             auto number = get(NodeParameterType::Number, *key);
             if (!number) return std::unexpected(std::move(number.error()));
             auto set = luaVector.set(i + 1, *number);
@@ -137,7 +137,8 @@ std::expected<void, StarException> Blackboard::clearEphemerals(Set<std::pair<Nod
 }
 DecoratorState::DecoratorState(LuaThread thread) : thread(std::move(thread)), child(std::make_shared<NodeState>()) {}
 CompositeState::CompositeState(std::size_t count) : index() {
-  for (std::size_t i = 0; i < count; ++i) children.append(std::make_shared<NodeState>());
+  for (std::size_t i = 0; i < count; ++i)
+    children.push_back(std::make_shared<NodeState>());
 }
 CompositeState::CompositeState(std::size_t count, std::size_t begin) : CompositeState(count) { index = begin; }
 
@@ -186,7 +187,7 @@ std::expected<std::shared_ptr<Blackboard>, StarException> BehaviorState::board()
   return value;
 }
 std::expected<LuaThread, StarException> BehaviorState::nodeLuaThread(String const& name) {
-  auto thread = m_threads.maybeTakeLast();
+  auto thread = m_threads.try_take_back();
   if (!thread) {
     auto created = m_luaContext.engine().createThread();
     if (!created) return std::unexpected(std::move(created.error()));
@@ -236,7 +237,8 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
     }
     result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
     auto status = std::get<0>(result);
-    if (status == NodeStatus::Success || status == NodeStatus::Failure) m_threads.append(thread);
+    if (status == NodeStatus::Success || status == NodeStatus::Failure)
+      m_threads.push_back(thread);
   }
   if (std::holds_alternative<LuaTable>(std::get<1>(result))) {
     auto output = (*blackboard)->setOutput(node, std::get<LuaTable>(std::get<1>(result)));
@@ -276,7 +278,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNo
       status = resumed->value_or(NodeStatus::Invalid);
     } else return NodeStatus::Running;
   }
-  m_threads.append(decorator.thread);
+  m_threads.push_back(decorator.thread);
   return status;
 }
 std::expected<NodeStatus, StarException> BehaviorState::runComposite(CompositeNode const& node, NodeState& state) {

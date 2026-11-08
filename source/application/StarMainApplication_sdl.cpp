@@ -520,7 +520,7 @@ public:
       if (!platformArgument)
         return std::unexpected(std::move(platformArgument.error()));
       if (*platformArgument) {
-        platformArguments.append(std::move(*it));
+        platformArguments.push_back(std::move(*it));
         it = cmdLineArgs.erase(it);
       } else {
         ++it;

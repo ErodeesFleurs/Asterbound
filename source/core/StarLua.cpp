@@ -769,7 +769,7 @@ bool LuaEngine::profilingEnabled() const {
 List<LuaProfileEntry> LuaEngine::getProfile() {
   List<LuaProfileEntry> profileEntries;
   for (auto const& p : m_profileEntries) {
-    profileEntries.append(*p.second);
+    profileEntries.push_back(*p.second);
   }
 
   return profileEntries;

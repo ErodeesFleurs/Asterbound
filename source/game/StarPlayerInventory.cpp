@@ -194,7 +194,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
   for (auto const& bag : *bags) {
     auto priority = bag.second.getInt("priority", 0);
     if (!priority) return std::unexpected(std::move(priority.error()));
-    bagOrder.append({bag.first, *priority});
+    bagOrder.push_back({bag.first, *priority});
   }
   bagOrder.sort([](auto const& a, auto const& b) { return a.second < b.second; });
   for (auto const& entry : bagOrder) {
@@ -1092,10 +1092,10 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
     if (auto bag = m_bags.find_ref(entry.first)) {
       auto overflow = loaded->resize(bag->get()->size());
       if (!overflow) return std::unexpected(std::move(overflow.error()));
-      m_inventoryLoadOverflow.appendAll(*overflow);
+      m_inventoryLoadOverflow.append_range(*overflow);
       *bag->get() = std::move(*loaded);
     } else
-      m_inventoryLoadOverflow.appendAll(loaded->items());
+      m_inventoryLoadOverflow.append_range(loaded->items());
   }
   auto swap = loadItem("swapSlot", m_swapSlot);
   if (!swap) return std::unexpected(std::move(swap.error()));
@@ -1167,11 +1167,11 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
           if (!encoded) return std::unexpected(std::move(encoded.error()));
           json = std::move(*encoded);
         }
-        hands.append(std::move(json));
+        hands.push_back(std::move(json));
       }
-      row.append(std::move(hands));
+      row.push_back(std::move(hands));
     }
-    bar.append(std::move(row));
+    bar.push_back(std::move(row));
   }
   JsonObject bags;
   for (auto const& bag : m_bags) {
@@ -1265,10 +1265,11 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
 
 [[nodiscard]] std::expected<List<std::shared_ptr<Item>>, StarException> PlayerInventory::allItems() const {
   List<std::shared_ptr<Item>> items;
-  auto result = forEveryItem([&](InventorySlot const&, std::shared_ptr<Item> const& item) -> std::expected<void, StarException> {
-    items.append(item);
-    return {};
-  });
+  auto result =
+    forEveryItem([&](InventorySlot const&, std::shared_ptr<Item> const& item) -> std::expected<void, StarException> {
+      items.push_back(item);
+      return {};
+    });
   if (!result) return std::unexpected(std::move(result.error()));
   return items;
 }

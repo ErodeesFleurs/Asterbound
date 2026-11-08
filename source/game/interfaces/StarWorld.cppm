@@ -273,7 +273,7 @@ template <typename EntityT>
         if (!*accepted)
           return {};
       }
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     }
     return {};
   });
@@ -312,7 +312,7 @@ template <typename EntityT>
         if (!*accepted)
           return {};
       }
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     }
     return {};
   });
@@ -326,7 +326,7 @@ template <typename EntityT>
   List<std::shared_ptr<EntityT>> list;
   auto scanned = forEachEntityAtTile(pos, [&](std::shared_ptr<TileEntity> const& entity) -> std::expected<void, StarException> {
     if (auto e = as<EntityT>(entity))
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     return {};
   });
   if (!scanned)

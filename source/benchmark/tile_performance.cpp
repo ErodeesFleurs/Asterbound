@@ -543,7 +543,7 @@ int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
   Star::StringList arguments;
   for (int i = 0; i < argc; ++i)
-    arguments.append(Star::String(std::string_view(argv[i])));
+    arguments.push_back(Star::String(std::string_view(argv[i])));
   int result = 1;
   auto status =
     Star::runMainApplication(std::make_unique<Star::TileBenchmarkApplication>(result), std::move(arguments));

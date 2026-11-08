@@ -70,7 +70,7 @@ std::expected<WeatherType, StarException> WeatherType::create(Root& root, Json c
     auto autoRotate = v.getBool("autoRotate", false);
     if (!autoRotate) return std::unexpected(std::move(autoRotate.error()));
     pc.autoRotate = *autoRotate;
-    result.particles.append(std::move(pc));
+    result.particles.push_back(std::move(pc));
   }
   auto projectiles = config.getArray("projectiles", JsonArray());
   if (!projectiles) return std::unexpected(std::move(projectiles.error()));
@@ -99,7 +99,7 @@ std::expected<WeatherType, StarException> WeatherType::create(Root& root, Json c
     auto wind = v.getFloat("windAffectAmount", 0.0f);
     if (!wind) return std::unexpected(std::move(wind.error()));
     pc.windAffectAmount = *wind;
-    result.projectiles.append(std::move(pc));
+    result.projectiles.push_back(std::move(pc));
   }
   auto maximumWind = config.getFloat("maximumWind", 0.0f);
   if (!maximumWind) return std::unexpected(std::move(maximumWind.error()));
@@ -134,14 +134,18 @@ std::expected<Json, StarException> WeatherType::toJson() const {
   for (auto const& pc : particles) {
     auto particle = pc.particle.toJson();
     if (!particle) return std::unexpected(std::move(particle.error()));
-    particleConfigs.append(JsonObject{{"particle", std::move(*particle)}, {"density", pc.density}, {"autoRotate", pc.autoRotate}});
+    particleConfigs.push_back(
+      JsonObject{{"particle", std::move(*particle)}, {"density", pc.density}, {"autoRotate", pc.autoRotate}});
   }
   JsonArray projectileConfigs;
   for (auto const& pc : projectiles)
-    projectileConfigs.append(JsonObject{{"projectile", pc.projectile}, {"parameters", pc.parameters},
-        {"velocity", jsonFromVec2F(pc.velocity)}, {"ratePerX", pc.ratePerX},
-        {"spawnAboveRegion", pc.spawnAboveRegion}, {"spawnHorizontalPad", pc.spawnHorizontalPad},
-        {"windAffectAmount", pc.windAffectAmount}});
+    projectileConfigs.push_back(JsonObject{{"projectile", pc.projectile},
+                                           {"parameters", pc.parameters},
+                                           {"velocity", jsonFromVec2F(pc.velocity)},
+                                           {"ratePerX", pc.ratePerX},
+                                           {"spawnAboveRegion", pc.spawnAboveRegion},
+                                           {"spawnHorizontalPad", pc.spawnHorizontalPad},
+                                           {"windAffectAmount", pc.windAffectAmount}});
   return JsonObject{{"name", name}, {"particles", std::move(particleConfigs)}, {"projectiles", std::move(projectileConfigs)},
       {"maximumWind", maximumWind}, {"duration", jsonFromVec2F(duration)}, {"weatherNoises", jsonFromStringList(weatherNoises)},
       {"statusEffects", jsonFromStringList(statusEffects)}, {"parallax", parallax ? Json(*parallax) : Json()}};

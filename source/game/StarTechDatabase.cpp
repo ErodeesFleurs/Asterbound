@@ -98,7 +98,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
       auto scriptName = script.toString();
       if (!scriptName)
         return std::unexpected(std::move(scriptName.error()));
-      tech.scripts.append(AssetPath::relative_to(path, *scriptName));
+      tech.scripts.push_back(AssetPath::relative_to(path, *scriptName));
     }
     auto animator = config.optString("animator");
     if (!animator)

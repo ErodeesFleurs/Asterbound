@@ -265,9 +265,9 @@ std::expected<int, StarException> Star::edit(Logger& logger, int argc, char* arg
       auto found = findFiles(logger, std::get<FindInput>(input));
       if (!found)
         return std::unexpected(std::move(found.error()));
-      files.appendAll(std::move(*found));
+      files.append_range(std::move(*found));
     } else {
-      files.append(std::get<FileInput>(input).filename);
+      files.push_back(std::get<FileInput>(input).filename);
     }
   }
   if (files.empty())

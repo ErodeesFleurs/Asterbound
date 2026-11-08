@@ -904,7 +904,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     for (auto const& recipe : recipes) {
       auto json = recipe.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
     }
     return result;
   }); !registered)
@@ -1099,7 +1099,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       auto tags = item->itemTags();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& itemTag : *tags) {
-        if (itemTag == tag) items.append(item->descriptor().toJson());
+      if (itemTag == tag)
+        items.push_back(item->descriptor().toJson());
       }
     }
     return items;
@@ -1487,7 +1488,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
         auto id = printWorldId(*worldId);
     if (!id) return std::unexpected(std::move(id.error()));
     bool selected = current && (*current)->questId() == quest->questId();
-        result.append({std::move(*id), selected});
+    result.push_back({std::move(*id), selected});
       }
     }
     return result;
@@ -1511,7 +1512,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       if (auto location = quest->location()) {
         Json locationJson = JsonObject{{"system", jsonFromVec3I(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
         bool selected = current && (*current)->questId() == quest->questId();
-        result.append({std::move(locationJson), selected});
+        result.push_back({std::move(locationJson), selected});
       }
     }
     return result;
@@ -1663,7 +1664,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     for (auto const& bookmark : *bookmarks) {
       auto json = bookmark.second.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append({bookmark.first, std::move(*json)});
+    result.push_back({bookmark.first, std::move(*json)});
     }
     return result;
   }); !registered)
@@ -1678,7 +1679,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     for (auto const& bookmark : *bookmarks) {
       auto json = bookmark.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
     }
     return result;
   }); !registered)
@@ -1709,7 +1710,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     for (auto const& bookmark : *bookmarks) {
       auto json = bookmark.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
     }
     return result;
   }); !registered)
@@ -1819,7 +1820,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto count = codex->pageCount();
     pages.reserve(count);
     for (std::size_t index = 0; index < count; ++index)
-      pages.append(codex->page(index));
+      pages.push_back(codex->page(index));
     return JsonObject{{"id", codex->id()}, {"species", codex->species()},
         {"title", codex->title()}, {"description", codex->description()},
         {"icon", codex->icon()}, {"contentPages", std::move(pages)}};
@@ -1831,7 +1832,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto entries = player.codexes()->codexes();
     result.reserve(entries.size());
     for (auto const& entry : entries)
-      result.append(JsonObject{{"id", entry.first->id()}, {"read", entry.second}});
+      result.push_back(JsonObject{{"id", entry.first->id()}, {"read", entry.second}});
     return result;
   }); !registered)
     return std::unexpected(std::move(registered.error()));

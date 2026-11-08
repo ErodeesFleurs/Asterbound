@@ -545,14 +545,14 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         return std::unexpected(std::move(pathKey.error()));
       if (auto file = m_files.find_ref(*pathKey)) {
         if (newFiles->contains(patchPath)) {
-          file->get().patchSources.append(std::make_pair(patchPath, newFiles));
+          file->get().patchSources.push_back(std::make_pair(patchPath, newFiles));
           return true;
         }
         auto patchKey = CaseInsensitiveStringView::create(patchPath);
         if (!patchKey)
           return std::unexpected(std::move(patchKey.error()));
         if (auto asset = m_files.find_ref(*patchKey)) {
-          file->get().patchSources.append(std::make_pair(patchPath, asset->get().source));
+          file->get().patchSources.push_back(std::make_pair(patchPath, asset->get().source));
           return true;
         }
       }
@@ -608,7 +608,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         } else {
           for (auto const& patch : file->get().patchSources) {
             if (matches(patch))
-              destination->patchSources.append(replacement);
+              destination->patchSources.push_back(replacement);
           }
           file->get().patchSources.filter([&](auto const& patch) { return !matches(patch); });
         }
@@ -669,7 +669,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           return true;
         }
       }
-      loadScriptState->replacements.append({.original = std::move(original), .replacement = std::move(replacement)});
+      loadScriptState->replacements.push_back({.original = std::move(original), .replacement = std::move(replacement)});
       return true;
     });
     if (!registered)
@@ -720,7 +720,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         if (!targetKey)
           return std::unexpected(std::move(targetKey.error()));
         if (auto p = m_files.find_ref(*targetKey))
-          p->get().patchSources.append({filename, source});
+          p->get().patchSources.push_back({filename, source});
         return {};
       };
       auto containsPatch = filename.contains(AssetsPatchSuffix, String::CaseInsensitive);
@@ -778,9 +778,9 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
                         auto patchPath = patch.toString();
                         if (!patchPath)
                           return std::unexpected(std::move(patchPath.error()));
-                        p->get().patchSources.append({std::move(*patchPath), source});
+                        p->get().patchSources.push_back({std::move(*patchPath), source});
                       } else {
-                        p->get().patchSources.append({strf("{}:[{}].patches[{}]", filename, patchIndex, i), source});
+                        p->get().patchSources.push_back({strf("{}:[{}].patches[{}]", filename, patchIndex, i), source});
                       }
                     }
                   }
@@ -850,7 +850,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             if (!path)
               return std::unexpected(std::move(path.error()));
             LoadScriptReference selected{.source = source, .path = *path};
-            loadScriptState->unavailable.append(selected);
+            loadScriptState->unavailable.push_back(selected);
             for (auto const& entry : loadScriptState->replacements) {
               if (entry.original == selected) {
                 selected = entry.replacement;
@@ -876,7 +876,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             return std::unexpected(std::move(path.error()));
           LoadScriptReference closed{.source = source, .path = std::move(*path)};
           if (!loadScriptState->unavailable.contains(closed))
-            loadScriptState->unavailable.append(std::move(closed));
+            loadScriptState->unavailable.push_back(std::move(closed));
         }
         if (!ran) {
           if (!ran.error().is<LuaException>())
@@ -932,7 +932,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto added = addSource(sourcePath, source);
     if (!added)
       return std::unexpected(std::move(added.error()));
-    sources.append(std::make_pair(sourcePath, source));
+    sources.push_back(std::make_pair(sourcePath, source));
     auto loaded = runLoadScripts("onLoad", sourcePath, source);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
@@ -952,7 +952,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto lower = entry.first.string().toLower();
     if (!lower)
       return std::unexpected(std::move(lower.error()));
-    digestPaths.append(std::move(*lower));
+    digestPaths.push_back(std::move(*lower));
   }
   digestPaths.sort();
   struct SizeGroup {
@@ -1039,7 +1039,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto worker = Thread::invoke("Assets::workerMain", std::mem_fn(&Assets::workerMain), std::ref(*this), m_workerStopSource.get_token());
     if (!worker)
       return std::unexpected(std::move(worker.error()));
-    m_workerThreads.append(std::move(*worker));
+    m_workerThreads.push_back(std::move(*worker));
   }
 
   // preload.config contains files which will be loaded and then told to persist.
@@ -1188,21 +1188,21 @@ std::expected<StringList, StarException> Assets::scan(String const& suffix) cons
     StringList result;
     result.reserve(extension->get().size());
     for (auto const& key : extension->get())
-      result.append(key.string());
+      result.push_back(key.string());
     return result;
   }
   StringList result;
   for (auto const& fileEntry : m_files) {
     auto const& path = fileEntry.first.string();
     if (suffix.empty()) {
-      result.append(path);
+      result.push_back(path);
       continue;
     }
     auto match = path.endsWith(suffix, String::CaseInsensitive);
     if (!match)
       return std::unexpected(std::move(match.error()));
     if (*match)
-      result.append(path);
+      result.push_back(path);
   }
   return result;
 }
@@ -1217,7 +1217,7 @@ std::expected<StringList, StarException> Assets::scan(String const& prefix, Stri
     if (!match)
       return std::unexpected(std::move(match.error()));
     if (*match)
-      result.append(file);
+      result.push_back(file);
   }
   return result;
 }
@@ -1259,7 +1259,7 @@ std::expected<void, StarException> Assets::queueJsons(StringList const& paths) c
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, true, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({.type = AssetType::Json, .path = {std::move(components.basePath), {}, {}}});
+    ids.push_back({.type = AssetType::Json, .path = {std::move(components.basePath), {}, {}}});
   }
   queueAssets(ids);
   return {};
@@ -1290,7 +1290,7 @@ std::expected<void, StarException> Assets::queueImages(StringList const& paths) 
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, true, true); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({.type = AssetType::Image, .path = std::move(components)});
+    ids.push_back({.type = AssetType::Image, .path = std::move(components)});
   }
   queueAssets(ids);
   return {};
@@ -1341,7 +1341,7 @@ std::expected<void, StarException> Assets::queueAudios(StringList const& paths) 
     auto components = AssetPath::split(path);
     if (auto valid = validatePath(components, false, false); !valid)
       return std::unexpected(std::move(valid.error()));
-    ids.append({.type = AssetType::Audio, .path = std::move(components)});
+    ids.push_back({.type = AssetType::Audio, .path = std::move(components)});
   }
   queueAssets(ids);
   return {};

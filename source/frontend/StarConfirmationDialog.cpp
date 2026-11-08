@@ -201,7 +201,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
           auto drawable = Drawable::create(**metadata, entry);
           if (!drawable)
             return std::unexpected(std::move(drawable.error()));
-          drawables.append(std::move(*drawable));
+          drawables.push_back(std::move(*drawable));
         }
         auto set = (*widget)->setDrawables(std::move(drawables));
         if (!set)

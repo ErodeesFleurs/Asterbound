@@ -213,7 +213,7 @@ std::expected<Json, StarException> StatusController::diskStore() const {
     for (auto const& effect : persistentEffects) {
       auto json = jsonFromPersistentStatusEffect(effect);
       if (!json) return std::unexpected(std::move(json.error()));
-      effects.append(std::move(*json));
+      effects.push_back(std::move(*json));
     }
     persistentEffectCategories[pair.first] = std::move(effects);
   }
@@ -226,7 +226,8 @@ std::expected<Json, StarException> StatusController::diskStore() const {
     auto metadata = m_uniqueEffectMetadata.getNetElement(pair.second.metadataId);
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     if ((*metadata)->duration) {
-      ephemeralEffects.append(jsonFromEphemeralStatusEffect(EphemeralStatusEffect{pair.first, *(*metadata)->duration}));
+      ephemeralEffects.push_back(
+        jsonFromEphemeralStatusEffect(EphemeralStatusEffect{pair.first, *(*metadata)->duration}));
     }
   }
 
@@ -254,7 +255,7 @@ std::expected<void, StarException> StatusController::diskLoad(Json const& store)
     for (auto const& value : *values) {
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect) return std::unexpected(std::move(effect.error()));
-      effects.append(std::move(*effect));
+      effects.push_back(std::move(*effect));
     }
     if (auto result = addPersistentEffects(category.first, effects); !result) return std::unexpected(std::move(result.error()));
   }
@@ -264,7 +265,7 @@ std::expected<void, StarException> StatusController::diskLoad(Json const& store)
   for (auto const& value : *ephemeral) {
     auto effect = jsonToEphemeralStatusEffect(value);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   if (auto result = addEphemeralEffects(effects); !result) return std::unexpected(std::move(result.error()));
   auto values = store.getObject("resourceValues", {});
@@ -417,7 +418,7 @@ std::expected<void, StarException> StatusController::addPersistentEffects(
 
   for (auto const& effect : effectList) {
     if (std::holds_alternative<StatModifier>(effect))
-      persistentEffectCategory.statModifiers.append(std::get<StatModifier>(effect));
+      persistentEffectCategory.statModifiers.push_back(std::get<StatModifier>(effect));
     else if (std::holds_alternative<UniqueStatusEffect>(effect))
       persistentEffectCategory.uniqueEffects.add(std::get<UniqueStatusEffect>(effect));
   }
@@ -513,9 +514,9 @@ ActiveUniqueStatusEffectSummary StatusController::activeUniqueStatusEffectSummar
   ActiveUniqueStatusEffectSummary summary;
   for (auto const& metadata : m_uniqueEffectMetadata.netElements()) {
     if (metadata->duration)
-      summary.append({metadata->effect, *metadata->duration / metadata->maxDuration.get()});
+      summary.push_back({metadata->effect, *metadata->duration / metadata->maxDuration.get()});
     else
-      summary.append({metadata->effect, 1.0f});
+      summary.push_back({metadata->effect, 1.0f});
   }
   return summary;
 }
@@ -566,7 +567,7 @@ std::expected<void, StarException> StatusController::applySelfDamageRequest(Dama
   auto notifications = applyDamageRequest(std::move(dr));
   if (!notifications) return std::unexpected(std::move(notifications.error()));
   for (auto const& notification : *notifications) m_recentDamageTaken.add(notification);
-  m_pendingSelfDamageNotifications.appendAll(std::move(*notifications));
+  m_pendingSelfDamageNotifications.append_range(std::move(*notifications));
   return {};
 }
 
@@ -691,7 +692,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
             if (*intersects) {
               auto effects = effectEntity->statusEffects();
               if (!effects) return std::unexpected(std::move(effects.error()));
-              entityEffects.appendAll(std::move(*effects));
+              entityEffects.append_range(std::move(*effects));
             }
           }
           return {};
@@ -706,7 +707,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
       for (auto const& value : *values) {
         auto effect = jsonToPersistentStatusEffect(value);
         if (!effect) return std::unexpected(std::move(effect.error()));
-        effects.append(std::move(*effect));
+        effects.push_back(std::move(*effect));
       }
       if (auto result = setPersistentEffects("environment", effects); !result) return std::unexpected(std::move(result.error()));
     }
@@ -717,7 +718,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
       for (auto const& value : *values) {
         auto effect = jsonToEphemeralStatusEffect(value);
         if (!effect) return std::unexpected(std::move(effect.error()));
-        effects.append(std::move(*effect));
+        effects.push_back(std::move(*effect));
       }
       if (auto result = addEphemeralEffects(effects, {}); !result) return std::unexpected(std::move(result.error()));
     }
@@ -765,7 +766,7 @@ std::expected<List<Drawable>, StarException> StatusController::drawables(float i
     auto sample = animator->animator->sample(interpolation);
     auto values = sample.drawables(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
-    output.appendAll(std::move(*values));
+    output.append_range(std::move(*values));
   }
   return output;
 }
@@ -776,7 +777,7 @@ std::expected<List<LightSource>, StarException> StatusController::lightSources(f
     auto sample = animator->animator->sample(interpolation);
     auto values = sample.lightSources(m_movementController->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
-    output.appendAll(std::move(*values));
+    output.append_range(std::move(*values));
   }
   return output;
 }
@@ -792,7 +793,7 @@ std::expected<List<OverheadBar>, StarException> StatusController::overheadBars()
     for (auto const& value : **json) {
       auto bar = OverheadBar::create(value);
       if (!bar) return std::unexpected(std::move(bar.error()));
-      bars.append(std::move(*bar));
+      bars.push_back(std::move(*bar));
     }
   }
   return bars;
@@ -805,14 +806,14 @@ bool StatusController::toolUsageSuppressed() const {
 List<std::shared_ptr<AudioInstance>> StatusController::pullNewAudios() {
   List<std::shared_ptr<AudioInstance>> newAudios;
   for (auto const& animator : m_effectAnimators.netElements())
-    newAudios.appendAll(animator->dynamicTarget.pullNewAudios());
+    newAudios.append_range(animator->dynamicTarget.pullNewAudios());
   return newAudios;
 }
 
 List<Particle> StatusController::pullNewParticles() {
   List<Particle> newParticles;
   for (auto const& animator : m_effectAnimators.netElements())
-    newParticles.appendAll(animator->dynamicTarget.pullNewParticles());
+    newParticles.append_range(animator->dynamicTarget.pullNewParticles());
   return newParticles;
 }
 

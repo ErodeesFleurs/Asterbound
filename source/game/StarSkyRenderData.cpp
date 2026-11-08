@@ -51,10 +51,10 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::backOrbiters(Vec2F
   // objects to draw in the sky, we should draw the parent planet if we are a
   // satellite, as well as all the other satellites.
   if (skyParameters.nearbyPlanet)
-    orbitingCelestialObjects.append(tuple_cat(*skyParameters.nearbyPlanet, std::tie(planetScale)));
+    orbitingCelestialObjects.push_back(tuple_cat(*skyParameters.nearbyPlanet, std::tie(planetScale)));
 
   for (auto moon : skyParameters.nearbyMoons)
-    orbitingCelestialObjects.append(tuple_cat(moon, std::tie(moonScale)));
+    orbitingCelestialObjects.push_back(tuple_cat(moon, std::tie(moonScale)));
 
   auto area = settings.query("satellite.area");
   if (!area) return std::unexpected(std::move(area.error()));
@@ -73,7 +73,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::backOrbiters(Vec2F
     pos -= worldOffset;
     pos = rotMatrix.transformVec2(pos);
     for (auto const& l : layers)
-      orbiters.append(SkyOrbiter{SkyOrbiterType::Moon, std::get<2>(object) * l.second, 0.0f, l.first, pos});
+      orbiters.push_back(SkyOrbiter{SkyOrbiterType::Moon, std::get<2>(object) * l.second, 0.0f, l.first, pos});
   }
 
   return orbiters;
@@ -138,7 +138,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
       auto angle = static_random_float_range(0, 2 * std::numbers::pi, i, "CloudStartAngle");
       auto speed = static_random_float_range(cloudSpeedRange[0], cloudSpeedRange[1], i, "CloudSpeed");
       auto radius = static_random_float_range(cloudRadiusRange[0], cloudRadiusRange[1], i, "CloudRadius");
-      horizonClouds.append({angle, image->get(), speed, radius});
+      horizonClouds.push_back({angle, image->get(), speed, radius});
     }
   }
 
@@ -160,8 +160,8 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
     if (!scale) return std::unexpected(std::move(scale.error()));
     auto radius = settings.queryFloat("sun.radius");
     if (!radius) return std::unexpected(std::move(radius.error()));
-    orbiters.append({SkyOrbiterType::Sun, *scale, 0.0f, image,
-        Vec2F::withAngle(orbitAngle, *radius) + viewSize / 2});
+    orbiters.push_back(
+      {SkyOrbiterType::Sun, *scale, 0.0f, image, Vec2F::withAngle(orbitAngle, *radius) + viewSize / 2});
   } else if (type == SkyType::Orbital) {
     auto yCenter = settings.queryFloat("planetHorizon.yCenter");
     if (!yCenter) return std::unexpected(std::move(yCenter.error()));
@@ -177,7 +177,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
       for (auto const& horizonCloud : horizonClouds) {
         Vec2F position = Vec2F::withAngle(horizonCloud.startAngle + orbitAngle * horizonCloud.speed, horizonCloud.radius) + planetCenter;
         position = rotMatrix.transformVec2(position);
-        orbiters.append({SkyOrbiterType::HorizonCloud, scale, worldRotation, horizonCloud.image, position});
+        orbiters.push_back({SkyOrbiterType::HorizonCloud, scale, worldRotation, horizonCloud.image, position});
       }
     }
   }

@@ -320,7 +320,7 @@ std::expected<StringList, StarException> BiomeDatabase::biomeOres(String const& 
       if (*density > 0) {
         auto name = entry.getString(0);
         if (!name) return std::unexpected(std::move(name.error()));
-        result.append(std::move(*name));
+        result.push_back(std::move(*name));
       }
     }
   }
@@ -375,7 +375,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
       if (!name) return std::unexpected(std::move(name.error()));
       auto id = (*materials)->materialId(*name);
       if (!id) return std::unexpected(std::move(id.error()));
-      biome->subBlocks.append(*id);
+      biome->subBlocks.push_back(*id);
     }
     auto oreConfig = parameters.get("ores", {});
     if (!oreConfig) return std::unexpected(std::move(oreConfig.error()));
@@ -509,7 +509,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
   for (auto const& item : *items) {
     auto distribution = BiomeItemDistribution::create(m_root, item, rand.randu64(), biomeHueShift);
     if (!distribution) return std::unexpected(std::move(distribution.error()));
-    result.itemDistributions.append(std::move(*distribution));
+    result.itemDistributions.push_back(std::move(*distribution));
   }
   return result;
 }
@@ -535,7 +535,7 @@ std::expected<List<std::pair<ModId, float>>, StarException> BiomeDatabase::readO
         if (!name) return std::unexpected(std::move(name.error()));
         auto id = (*materials)->modId(*name);
         if (!id) return std::unexpected(std::move(id.error()));
-        result.append({*id, *density});
+        result.push_back({*id, *density});
       }
     }
   }

@@ -39,9 +39,9 @@ std::expected<void, StarException> OptionParser::addParameter(String const& flag
 }
 
 void OptionParser::addArgument(String argument, RequirementMode requirementMode, String description) {
-  m_arguments.append(Argument{.argumentName = std::move(argument),
-                              .requirementMode = requirementMode,
-                              .description = std::move(description)});
+  m_arguments.push_back(Argument{.argumentName = std::move(argument),
+                                 .requirementMode = requirementMode,
+                                 .description = std::move(description)});
 }
 
 std::expected<std::pair<OptionParser::Options, StringList>, StarException> OptionParser::parseOptions(StringList const& arguments) const {
@@ -64,7 +64,7 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       String flag = std::move(*parsedFlag);
       auto option = m_options.maybe(flag);
       if (!option) {
-        errors.append(strf("No such option '-{}'", flag));
+        errors.push_back(strf("No such option '-{}'", flag));
         continue;
       }
 
@@ -73,19 +73,19 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       } else {
         auto const& parameter = std::get<Parameter>(*option);
         if (it == arguments.end()) {
-          errors.append(strf("Option '-{}' must be followed by an argument", flag));
+          errors.push_back(strf("Option '-{}' must be followed by an argument", flag));
           continue;
         }
         String val = *it++;
         if (parameter.requirementMode != Multiple && result.parameters.contains(flag)) {
-          errors.append(strf("Option with argument '-{}' specified multiple times", flag));
+          errors.push_back(strf("Option with argument '-{}' specified multiple times", flag));
           continue;
         }
-        result.parameters[std::move(flag)].append(std::move(val));
+        result.parameters[std::move(flag)].push_back(std::move(val));
       }
 
     } else {
-      result.arguments.append(arg);
+      result.arguments.push_back(arg);
     }
   }
 
@@ -93,7 +93,7 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
     if (std::holds_alternative<Parameter>(pair.second)) {
       auto const& na = std::get<Parameter>(pair.second);
       if (na.requirementMode == Required && !result.parameters.contains(pair.first))
-        errors.append(strf("Missing required flag with argument '-{}'", pair.first));
+        errors.push_back(strf("Missing required flag with argument '-{}'", pair.first));
     }
   }
 
@@ -108,11 +108,11 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       maximumArguments = NPos;
   }
   if (result.arguments.size() < minimumArguments)
-    errors.append(strf(
-        "Too few positional arguments given, expected at least {} got {}", minimumArguments, result.arguments.size()));
+    errors.push_back(strf("Too few positional arguments given, expected at least {} got {}", minimumArguments,
+                          result.arguments.size()));
   if (result.arguments.size() > maximumArguments)
-    errors.append(strf(
-        "Too many positional arguments given, expected at most {} got {}", maximumArguments, result.arguments.size()));
+    errors.push_back(strf("Too many positional arguments given, expected at most {} got {}", maximumArguments,
+                          result.arguments.size()));
 
   return std::pair{std::move(result), std::move(errors)};
 }

@@ -78,7 +78,7 @@ std::expected<void, StarException> FallingBlocksAgent::update() {
   while (!processing.empty()) {
     List<Vec2I> positions;
     for (auto const& pos : std::exchange(processing, {}))
-      positions.append(pos);
+      positions.push_back(pos);
 
     m_random.shuffle(positions);
 

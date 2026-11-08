@@ -355,14 +355,14 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
     for (auto const& entry : *secondaryRegions) {
       auto region = loadTerrestrialRegion(entry);
       if (!region) return std::unexpected(std::move(region.error()));
-      layer.secondaryRegions.append(std::move(*region));
+      layer.secondaryRegions.push_back(std::move(*region));
     }
     auto secondarySubRegions = config.getArray("secondarySubRegions");
     if (!secondarySubRegions) return std::unexpected(std::move(secondarySubRegions.error()));
     for (auto const& entry : *secondarySubRegions) {
       auto region = loadTerrestrialRegion(entry);
       if (!region) return std::unexpected(std::move(region.error()));
-      layer.secondarySubRegions.append(std::move(*region));
+      layer.secondarySubRegions.push_back(std::move(*region));
     }
     auto secondaryRegionSizeRangeValue1 = config.get("secondaryRegionSizeRange");
     if (!secondaryRegionSizeRangeValue1) return std::unexpected(std::move(secondaryRegionSizeRangeValue1.error()));
@@ -431,7 +431,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
   for (auto const& entry : *layers) {
     auto layer = loadTerrestrialLayer(entry);
     if (!layer) return std::unexpected(std::move(layer.error()));
-    result->undergroundLayers.append(std::move(*layer));
+    result->undergroundLayers.push_back(std::move(*layer));
   }
   auto coreLayerValue1 = store.get("coreLayer");
   if (!coreLayerValue1) return std::unexpected(std::move(coreLayerValue1.error()));
@@ -1470,7 +1470,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         auto autoregionResult1 = readRegion(secondaryRegionConfig, layerName, layer.layerBaseHeight);
         if (!autoregionResult1) return std::unexpected(std::move(autoregionResult1.error()));
         auto region = std::move((*autoregionResult1));
-        layer.secondaryRegions.append(std::move(region));
+        layer.secondaryRegions.push_back(std::move(region));
         auto autosubRegionListResult1 = secondaryRegionConfig.getArray("subRegion");
         if (!autosubRegionListResult1) return std::unexpected(std::move(autosubRegionListResult1.error()));
         auto subRegionList = std::move((*autosubRegionListResult1));
@@ -1495,7 +1495,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         auto autosubRegionResult1 = readRegion(subRegionConfig, layerName, layer.layerBaseHeight);
         if (!autosubRegionResult1) return std::unexpected(std::move(autosubRegionResult1.error()));
         auto subRegion = std::move((*autosubRegionResult1));
-        layer.secondarySubRegions.append(std::move(subRegion));
+        layer.secondarySubRegions.push_back(std::move(subRegion));
         --secondaryRegionCount;
       }
     }
@@ -1525,7 +1525,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto dungeon_count =
       static_random_u32_range(dungeonCountRange[0], dungeonCountRange[1], seed, layerName, "DungeonCount");
     unsigned dungeonCount = std::move(dungeon_count);
-    layer.dungeons.appendAll(
+    layer.dungeons.append_range(
       dungeonPool.selectUniques(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
     auto layerdungeonXVarianceResult1 = layerConfig.getInt("dungeonXVariance", 0);
     if (!layerdungeonXVarianceResult1) return std::unexpected(std::move(layerdungeonXVarianceResult1.error()));
@@ -1633,7 +1633,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto underground = readLayer(strf("underground{}", parameters->undergroundLayers.size() + 1));
     if (!underground) return std::unexpected(std::move(underground.error()));
     if (!*underground) break;
-    parameters->undergroundLayers.append(std::move(**underground));
+    parameters->undergroundLayers.push_back(std::move(**underground));
   }
   auto autocoreLayerOptionalResult1 = readLayer("core");
   if (!autocoreLayerOptionalResult1) return std::unexpected(std::move(autocoreLayerOptionalResult1.error()));

@@ -190,7 +190,7 @@ if (!result362) return std::unexpected(std::move(result362.error()));
     pdp.segmentIdx = piece.segmentIdx;
     pdp.kind = piece.kind;
     pdp.flip = piece.flip;
-    m_pieces.append(pdp);
+    m_pieces.push_back(pdp);
   }
 
   if (fullBounds.isNull())

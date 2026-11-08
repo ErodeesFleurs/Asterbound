@@ -123,7 +123,7 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::doSplash(Vec2F 
         newSplashParticle.velocity[1] = std::fabs(velocity[1]) * splashYVelocityFactor;
         newSplashParticle.color = particleColor;
         newSplashParticle.applyVariance(world.root(), splashParticleVariance);
-        particles.append(newSplashParticle);
+        particles.push_back(newSplashParticle);
       }
     }
   }

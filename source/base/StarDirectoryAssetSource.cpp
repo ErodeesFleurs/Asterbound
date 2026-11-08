@@ -53,8 +53,8 @@ std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> DirectoryAss
       break;
     }
   }
-  source->m_ignorePatterns.append("^/_metadata$");
-  source->m_ignorePatterns.append("^/\\.metadata$");
+  source->m_ignorePatterns.push_back("^/_metadata$");
+  source->m_ignorePatterns.push_back("^/\\.metadata$");
   auto root = source->toFilesystem("/");
   if (!root)
     return std::unexpected(std::move(root.error()));
@@ -168,7 +168,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
         continue;
       }
       auto childAncestors = ancestorDirectories;
-      childAncestors.append(std::move(*childDirectory));
+      childAncestors.push_back(std::move(*childDirectory));
       auto scanned = scanAll(assetPath + "/", output, childAncestors);
       if (!scanned)
         return std::unexpected(std::move(scanned.error()));
@@ -177,7 +177,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
       if (!ignored)
         return std::unexpected(std::move(ignored.error()));
       if (!*ignored)
-        output.append(std::move(assetPath));
+        output.push_back(std::move(assetPath));
     }
   }
   return {};

@@ -555,7 +555,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
         auto currencyItem = as<CurrencyItem>(*shared);
         res.currencyInputs[currencyItem->currencyType()] += currencyItem->totalValue();
       } else {
-        res.inputs.append(std::move(*id));
+        res.inputs.push_back(std::move(*id));
       }
     }
     auto outputConfig = config.get("output");
@@ -908,7 +908,7 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       data.directory = AssetPath::directory(file);
       data.filename = AssetPath::filename(file);
       for (auto const& script : *scripts)
-        data.agingScripts.append(AssetPath::relative_to(data.directory, script));
+        data.agingScripts.push_back(AssetPath::relative_to(data.directory, script));
       return data;
     }();
     if (!loaded)

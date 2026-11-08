@@ -319,7 +319,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServerThread::r
       else if (!logged)
         *error = error->withRelated(logged.error(), "World client removal logging also failed");
     } else {
-      outgoingPackets.appendAll(std::move(*removed));
+      outgoingPackets.append_range(std::move(*removed));
     }
   }
   if (!m_worldServer->hasClient(clientId)) {
@@ -369,7 +369,7 @@ List<ConnectionId> WorldServerThread::erroredClients() const {
 void WorldServerThread::pushIncomingPackets(ConnectionId clientId, List<std::shared_ptr<Packet>> packets) {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
-  m_incomingPacketQueue[clientId].appendAll(std::move(packets));
+  m_incomingPacketQueue[clientId].append_range(std::move(packets));
 }
 
 List<std::shared_ptr<Packet>> WorldServerThread::pullOutgoingPackets(ConnectionId clientId) {
@@ -417,7 +417,7 @@ void WorldServerThread::setUpdateAction(WorldServerAction updateAction) {
 void WorldServerThread::passMessages(List<Message>&& messages) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_messages.appendAll(std::move(messages));
+  m_messages.append_range(std::move(messages));
 }
 
 std::expected<void, StarException> WorldServerThread::unloadAll(bool force) {
@@ -584,7 +584,7 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
         return std::unexpected(std::move(removed.error()));
       std::unique_lock outgoingLocker(m_queueMutex, std::defer_lock);
       lockWithDiagnostics(outgoingLocker);
-      m_outgoingPacketQueue[clientId].appendAll(std::move(*removed));
+      m_outgoingPacketQueue[clientId].append_range(std::move(*removed));
       unerroredClientIds.remove(clientId);
       if (!logged)
         return std::unexpected(std::move(logged.error()));
@@ -617,7 +617,7 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
       return std::unexpected(std::move(outgoingPackets.error()));
     std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
     lockWithDiagnostics(queueLocker);
-    m_outgoingPacketQueue[clientId].appendAll(std::move(*outgoingPackets));
+    m_outgoingPacketQueue[clientId].append_range(std::move(*outgoingPackets));
   }
   m_shouldExpire = m_worldServer->shouldExpire();
   if (m_updateAction)

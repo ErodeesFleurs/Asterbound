@@ -315,7 +315,7 @@ namespace WorldImpl {
         if (res.size() >= maxSize)
           return false;
         if (tileSectorArray->tile({x, y}).isColliding(collisionSet))
-          res.append({x, y});
+          res.push_back({x, y});
         return true;
       });
     if (!traversed)
@@ -591,17 +591,17 @@ namespace WorldImpl {
       }
 
       if (good)
-        success.append(pair);
+        success.push_back(pair);
       else if (perhaps)
-        unknown.append(pair);
+        unknown.push_back(pair);
       else
-        failures.append(pair);
+        failures.push_back(pair);
     }
 
     if (!success.empty())
-      success.appendAll(unknown);
+      success.append_range(unknown);
     else
-      failures.appendAll(unknown);
+      failures.append_range(unknown);
 
     return std::pair<TileModificationList, TileModificationList>(std::move(success), std::move(failures));
   }

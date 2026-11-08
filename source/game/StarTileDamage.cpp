@@ -44,7 +44,7 @@ List<Vec2I> tileAreaBrush(float range, Vec2F const& centerOffset, bool squareMod
       Vec2F fromCenter = Vec2F(x, y) + Vec2F(0.5, 0.5) + offset; // distance to the center of the tile
       Vec2I intPos = Vec2I(x, y);
       if (squareMode || fromCenter.magnitude() <= range) {
-        result.append(intPos + intOffset);
+        result.push_back(intPos + intOffset);
       }
     }
   }

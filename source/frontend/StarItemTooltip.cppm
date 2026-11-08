@@ -505,13 +505,13 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
                   return std::unexpected(std::move(toArrayResult835.error()));
                 for (auto const& drawable : std::move(*toArrayResult835))
                   {
-                    auto imageMetadataDatabaseResult836 = context.root().imageMetadataDatabase();
-                    if (!imageMetadataDatabaseResult836)
-                      return std::unexpected(std::move(imageMetadataDatabaseResult836.error()));
-                    auto createResult837 = Drawable::create(*std::move(*imageMetadataDatabaseResult836), drawable);
-                    if (!createResult837)
-                      return std::unexpected(std::move(createResult837.error()));
-                    drawables.append(std::move(*createResult837));
+                  auto image_metadata = context.root().imageMetadataDatabase();
+                  if (!image_metadata)
+                    return std::unexpected(std::move(image_metadata.error()));
+                  auto decoded_drawable = Drawable::create(*std::move(*image_metadata), drawable);
+                  if (!decoded_drawable)
+                    return std::unexpected(std::move(decoded_drawable.error()));
+                  drawables.push_back(std::move(*decoded_drawable));
                   }
               }
               auto fetchChildResult838 = container->fetchChild<ImageWidget>(pair.first);

@@ -26,7 +26,7 @@ std::expected<StringList, StarException> colorDirectivesFromConfig(JsonArray con
     auto text = entry.type() == Json::Type::Object ? paletteSwapDirectivesFromConfig(entry) : entry.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    result.append(std::move(*text));
+    result.push_back(std::move(*text));
   }
   return result;
 }
@@ -328,7 +328,7 @@ List<ImageOperation> parseImageOperations(StringView params) {
     if (end == std::string_view::npos)
       end = text.size();
     if (end != begin)
-      operations.append(imageOperationFromString(text.substr(begin, end - begin)));
+      operations.push_back(imageOperationFromString(text.substr(begin, end - begin)));
     begin = end + 1;
   }
   return operations;
@@ -340,9 +340,9 @@ String printImageOperations(List<ImageOperation> const& list) {
 
 void addImageOperationReferences(ImageOperation const& operation, StringList& out) {
   if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt))
-    out.appendAll(op->get().maskImages);
+    out.append_range(op->get().maskImages);
   else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt))
-    out.appendAll(op->get().blendImages);
+    out.append_range(op->get().blendImages);
 }
 
 StringList imageOperationReferences(List<ImageOperation> const& operations) {
@@ -491,7 +491,7 @@ static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation co
       return std::unexpected(std::move(blend.error()));
     if (!*blend)
       return std::unexpected(ImageOperationException::format("Missing blend image '{}'", reference));
-    blendImages.append(**blend);
+    blendImages.push_back(**blend);
   }
 
   std::int64_t offsetX = op.offset[0], offsetY = op.offset[1];
@@ -615,7 +615,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
         return std::unexpected(std::move(mask.error()));
       if (!*mask)
         return std::unexpected(ImageOperationException::format("Missing mask image '{}'", reference));
-      maskImages.append(**mask);
+      maskImages.push_back(**mask);
     }
 
     image.forEachPixel([&op, &maskImages](unsigned x, unsigned y, Vec4B& pixel) {

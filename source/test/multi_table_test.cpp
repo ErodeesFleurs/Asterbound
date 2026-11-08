@@ -108,7 +108,7 @@ void testViewInterpolation() {
   double factor = 1;
   for (std::size_t dim = 0; dim < Rank; ++dim) {
     for (std::size_t i = 0; i < dim + 4; ++i)
-      ranges[dim].append(static_cast<double>(i));
+      ranges[dim].push_back(static_cast<double>(i));
     coordinate[dim] = static_cast<double>(dim) + 0.25;
     interpolatedExpected += coordinate[dim] * factor;
     steppedExpected += static_cast<double>(dim) * factor;

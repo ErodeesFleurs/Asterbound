@@ -53,7 +53,7 @@ std::expected<RpcPromise<Json>, StarException> JsonRpc::invokeRemote(String cons
   if (!added)
     return std::unexpected(std::move(added.error()));
   ++m_requestId;
-  m_pending.append(JsonObject{{"command", "request"}, {"id", id}, {"handler", handler}, {"arguments", arguments}});
+  m_pending.push_back(JsonObject{{"command", "request"}, {"id", id}, {"handler", handler}, {"arguments", arguments}});
   return pair.first;
 }
 
@@ -104,11 +104,11 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
       auto result = invoke();
       if (!result) {
         auto logged = m_logger.error("Error while handling variant rpc request handler call. {}", outputException(ExceptionDiagnostic(result.error()), false));
-        m_pending.append(JsonObject{{"command", "fail"}, {"id", *id}});
+        m_pending.push_back(JsonObject{{"command", "fail"}, {"id", *id}});
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       } else {
-        m_pending.append(JsonObject{{"command", "response"}, {"id", *id}, {"result", std::move(*result)}});
+        m_pending.push_back(JsonObject{{"command", "response"}, {"id", *id}, {"result", std::move(*result)}});
       }
     } else if (*command == "response" || *command == "fail") {
       auto complete = [&]() -> std::expected<void, StarException> {

@@ -376,7 +376,7 @@ List<std::shared_ptr<Voice::Speaker>> Voice::sortedSpeakers(bool onlyPlaying) {
 
   for (auto&& p : m_speakers) {
     if (!onlyPlaying || p.second->playing)
-      result.insertSorted(p.second, sorter);
+      result.insert_sorted(p.second, sorter);
   }
 
   return result;

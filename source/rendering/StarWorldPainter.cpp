@@ -302,7 +302,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
   for (auto const& ed : renderData.entityDrawables) {
     for (auto const& p : ed.layers)
       if (!p.second.empty())
-        m_entityDrawableLayers[p.first].append({ed.highlightEffect, std::cref(p.second)});
+        m_entityDrawableLayers[p.first].push_back({ed.highlightEffect, std::cref(p.second)});
   }
 
   auto entityDrawableIterator = m_entityDrawableLayers.begin();

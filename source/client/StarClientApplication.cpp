@@ -733,8 +733,8 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
   restorePresentedCamera();
   if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
-    m_heldKeyEvents.append(keyDown);
-    m_edgeKeyEvents.append(keyDown);
+    m_heldKeyEvents.push_back(keyDown);
+    m_edgeKeyEvents.push_back(keyDown);
   } else if (std::holds_alternative<KeyUpEvent>(event)) {
     auto const& keyUp = std::get<KeyUpEvent>(event);
     eraseWhere(m_heldKeyEvents, [&](auto& keyEvent) {
@@ -1195,14 +1195,14 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!label)
       return std::unexpected(std::move(label.error()));
     if (*label) {
-      auto added = m_labelledPostProcessLayers.add(**label, m_postProcessLayers.count());
+      auto added = m_labelledPostProcessLayers.add(**label, m_postProcessLayers.size());
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
     auto passes = layer.getUInt("passes", 1);
     if (!passes)
       return std::unexpected(std::move(passes.error()));
-    m_postProcessLayers.append(
+    m_postProcessLayers.push_back(
       PostProcessLayer{.effects = std::move(*effects), .passes = static_cast<unsigned>(*passes), .group = group});
   }
   return loadEffectConfig("interface");
@@ -1744,7 +1744,7 @@ std::expected<void, StarException> ClientApplication::loadMods() {
     if (*directory) {
       if (auto logged = m_root->logger().info("Loading mods from user generated content with id '{}' from directory '{}'", id, **directory); !logged)
         return std::unexpected(std::move(logged.error()));
-      directories.append(**directory);
+      directories.push_back(**directory);
     } else {
       if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available", id); !logged)
         return std::unexpected(std::move(logged.error()));
@@ -1808,7 +1808,7 @@ std::expected<void, StarException> ClientApplication::updateMods(float dt) {
     if (*directory) {
       if (auto logged = m_root->logger().info("Loading mods from user generated content with id '{}' from directory '{}'", id, **directory); !logged)
         return std::unexpected(std::move(logged.error()));
-      directories.append(**directory);
+      directories.push_back(**directory);
     } else {
       if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available", id); !logged)
         return std::unexpected(std::move(logged.error()));
@@ -2062,7 +2062,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           auto text = getActivityDetail(*tag);
           if (!text)
             return std::unexpected(std::move(text.error()));
-          detailsList.append(std::move(*text));
+          detailsList.push_back(std::move(*text));
         }
         finalDetails = detailsList.join("\n");
       } else if (activityDetails->isType(Json::Type::String)) {
@@ -2537,7 +2537,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
       reportStartupFailure(Star::strf("Invalid Windows command line: {}", Star::outputException(Star::ExceptionDiagnostic(arg.error()), true)));
       return 1;
     }
-    args.append(std::move(*arg));
+    args.push_back(std::move(*arg));
   }
   if (IsDebuggerPresent() && AllocConsole()) {
     std::freopen("CONOUT$", "w", stdout);
@@ -2557,7 +2557,7 @@ int main(int argc, char** argv) {
   Star::StringList args;
   args.reserve(argc);
   for (int i = 0; i < argc; ++i)
-    args.append(Star::String(std::string_view(argv[i])));
+    args.push_back(Star::String(std::string_view(argv[i])));
   return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), args);
 }
 #endif

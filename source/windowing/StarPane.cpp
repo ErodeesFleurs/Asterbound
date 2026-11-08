@@ -257,7 +257,7 @@ std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
       // m_members while processing the event and fuck everything up
       for (auto const& widget : std::views::reverse(m_members)) {
         if (widget->inMember(mousePos) && widget->active() && widget->interactive())
-          validWidgets.append(widget);
+          validWidgets.push_back(widget);
       }
 
       // Then, go through widgets in highest to lowest z-order and handle mouse
@@ -601,7 +601,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
       auto played = pane.context().playAudio(*instance);
       if (!played)
         return std::unexpected(std::move(played.error()));
-      pane.m_playingSounds.append({audio, std::move(*instance)});
+      pane.m_playingSounds.push_back({audio, std::move(*instance)});
       return {};
     });
   if (!playSound)

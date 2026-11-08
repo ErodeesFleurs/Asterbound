@@ -213,7 +213,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
   auto loadSettings = [&]() -> std::expected<Root::Settings, StarException> {
     if (!BaseAssetsSettings) return std::unexpected(BaseAssetsSettings.error());
     if (!BaseDefaultConfiguration) return std::unexpected(BaseDefaultConfiguration.error());
-    String bootConfigFile = options.parameters.value("bootconfig").maybeFirst().value_or("sbinit.config");
+    String bootConfigFile = options.parameters.value("bootconfig").front_value().value_or("sbinit.config");
     auto contents = File::read_file_string(bootConfigFile);
     if (!contents) return std::unexpected(std::move(contents.error()));
     auto boot = Json::parseJson(*contents);
@@ -275,7 +275,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     auto logDirectory = boot->optString("logDirectory");
     if (!logDirectory) return std::unexpected(std::move(logDirectory.error()));
     rootSettings.logDirectory = std::move(*logDirectory);
-    rootSettings.logFile = options.parameters.value("logfile").maybeFirst();
+    rootSettings.logFile = options.parameters.value("logfile").front_value();
     if (!rootSettings.logFile)
       rootSettings.logFile = m_defaults.logFile;
     auto backups = boot->getUInt("logFileBackups", 10);
@@ -285,7 +285,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     if (!ugc) return std::unexpected(std::move(ugc.error()));
     rootSettings.includeUGC = *ugc;
 
-    if (auto level = options.parameters.value("loglevel").maybeFirst()) {
+    if (auto level = options.parameters.value("loglevel").front_value()) {
       auto parsed = enumValue<LogLevelNames>(*level);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       rootSettings.logLevel = *parsed;
@@ -298,7 +298,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
       rootSettings.quiet = false;
     else
       rootSettings.quiet = m_defaults.quiet;
-    if (auto runtime = options.parameters.value("runtimeconfig").maybeFirst())
+    if (auto runtime = options.parameters.value("runtimeconfig").front_value())
       rootSettings.runtimeConfigFile = *runtime;
     else
       rootSettings.runtimeConfigFile = m_defaults.runtimeConfigFile;

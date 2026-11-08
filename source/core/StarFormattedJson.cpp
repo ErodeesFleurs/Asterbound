@@ -44,7 +44,7 @@ public:
     auto indexed = index(elem, m_formatted.m_elements.size());
     if (!indexed)
       return indexed;
-    m_formatted.m_elements.append(std::move(elem));
+    m_formatted.m_elements.push_back(std::move(elem));
     return {};
   }
 
@@ -94,8 +94,8 @@ private:
         if (m_object)
           return std::unexpected(JsonException("Invalid FormattedJson array entry"));
         if (m_values)
-          std::get<JsonArray>(*m_values).append(value.value->toJson());
-        m_formatted.m_arrayElementLocations.append(loc);
+          std::get<JsonArray>(*m_values).push_back(value.value->toJson());
+        m_formatted.m_arrayElementLocations.push_back(loc);
       }
     }
     return {};
@@ -428,7 +428,7 @@ std::expected<WhitespaceStyle, StarException> detectWhitespace(FormattedJson::El
 void insertWhitespace(FormattedJson::ElementList& destination, FormattedJson::ElementLocation& at, String const& whitespace) {
   if (whitespace == "")
     return;
-  destination.insertAt(at++, WhitespaceElement{whitespace});
+  destination.insert_at(at++, WhitespaceElement{whitespace});
 }
 
 void insertWithWhitespace(FormattedJson::ElementList& destination, WhitespaceStyle const& style,
@@ -441,7 +441,7 @@ void insertWithWhitespace(FormattedJson::ElementList& destination, WhitespaceSty
     insertWhitespace(destination, at, style.beforeColon);
   if (std::holds_alternative<CommaElement>(element))
     insertWhitespace(destination, at, style.beforeComma);
-  destination.insertAt(at++, element);
+  destination.insert_at(at++, element);
 }
 
 std::expected<void, StarException> insertWithCommaAndFormatting(FormattedJson::ElementList& destination, FormattedJson::ElementLocation at,
@@ -504,16 +504,16 @@ void removeValueFromArray(List<JsonElement>& elements, std::size_t loc) {
   // next value.
   // If it's the last value, it removes the value, and the preceding whitespace
   // and comma.
-  std::size_t commaLoc = elements.indexOf(CommaElement{}, loc);
+  std::size_t commaLoc = elements.index_of(CommaElement{}, loc);
   if (commaLoc != NPos) {
-    elements.eraseAt(loc, commaLoc + 1);
+    elements.erase_at(loc, commaLoc + 1);
     while (loc < elements.size() && std::holds_alternative<WhitespaceElement>(elements[loc]))
-      elements.eraseAt(loc);
+      elements.erase_at(loc);
   } else {
-    commaLoc = elements.lastIndexOf(CommaElement{}, loc);
+    commaLoc = elements.last_index_of(CommaElement{}, loc);
     if (commaLoc == NPos)
       commaLoc = 0;
-    elements.eraseAt(commaLoc, loc + 1);
+    elements.erase_at(commaLoc, loc + 1);
   }
 }
 
@@ -527,7 +527,7 @@ std::expected<FormattedJson, StarException> FormattedJson::eraseKey(String const
 
   ElementLocation loc = maybeEntry->first;
   ElementList elements = m_elements;
-  elements.eraseAt(loc, maybeEntry->second); // Remove key, colon and whitespace up to the value
+  elements.erase_at(loc, maybeEntry->second);// Remove key, colon and whitespace up to the value
   removeValueFromArray(elements, loc);
   return object(std::move(elements));
 }

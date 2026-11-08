@@ -15,8 +15,8 @@ using namespace Star;
 
 void removeCommonPrefix(StringList& a, StringList& b) {
   while (!a.empty() && !b.empty() && a[0] == b[0]) {
-    a.eraseAt(0);
-    b.eraseAt(0);
+    a.erase_at(0);
+    b.erase_at(0);
   }
 }
 
@@ -42,8 +42,8 @@ std::expected<String, StarException> createRelativePath(String fromFile, String 
   removeCommonPrefix(*fromParts, *toParts);
   StringList relativeParts;
   for (std::size_t i = 0; i < fromParts->size(); ++i)
-    relativeParts.append("..");
-  relativeParts.appendAll(*toParts);
+    relativeParts.push_back("..");
+  relativeParts.append_range(*toParts);
   return relativeParts.join("/");
 }
 

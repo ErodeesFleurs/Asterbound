@@ -492,7 +492,7 @@ void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
     Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
-  m_changeData.append({currentVersion, std::move(change)});
+  m_changeData.push_back({currentVersion, std::move(change)});
 
   m_changeDataLastVersion =
     std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
@@ -506,7 +506,7 @@ void NetElementMapWrapper<BaseMap>::addPendingChangeData(ElementChange change, f
     for (auto& change : std::exchange(m_pendingChangeData, {}))
       applyChange(std::move(change.second));
   }
-  m_pendingChangeData.append({interpolationTime, std::move(change)});
+  m_pendingChangeData.push_back({interpolationTime, std::move(change)});
 }
 
 template <typename BaseMap>

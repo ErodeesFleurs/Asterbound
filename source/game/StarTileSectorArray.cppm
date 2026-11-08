@@ -200,7 +200,7 @@ template <typename Tile, unsigned SectorSize>
     sectors.reserve(sectors.size() + (sectorRange.max[0] - sectorRange.min[0]) * (sectorRange.max[1] - sectorRange.min[1]));
     for (std::size_t x = sectorRange.min[0]; x < sectorRange.max[0]; ++x) {
       for (std::size_t y = sectorRange.min[1]; y < sectorRange.max[1]; ++y)
-        sectors.append({x, y});
+        sectors.push_back({x, y});
     }
   }
   return sectors;

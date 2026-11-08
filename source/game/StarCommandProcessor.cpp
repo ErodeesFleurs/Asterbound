@@ -553,29 +553,35 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
     return "Not enough arguments to /settileprotection. Use /settileprotection <dungeonId> <protected>";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto last = arguments.takeLast();
-    if (!last) return std::unexpected(std::move(last.error()));
+    auto last = arguments.take_back();
+    if (!last)
+      return std::unexpected(std::move(last.error()));
     auto protectedJson = Json::parse(*last);
-    if (!protectedJson) return std::unexpected(std::move(protectedJson.error()));
+    if (!protectedJson)
+      return std::unexpected(std::move(protectedJson.error()));
     auto protectedValue = protectedJson->toBool();
-    if (!protectedValue) return std::unexpected(std::move(protectedValue.error()));
+    if (!protectedValue)
+      return std::unexpected(std::move(protectedValue.error()));
     bool isProtected = *protectedValue;
     List<DungeonId> dungeonIds;
     for (auto& banana : arguments) {
       auto sliced = banana.split("..");
-      if (!sliced) return std::unexpected(std::move(sliced.error()));
+      if (!sliced)
+        return std::unexpected(std::move(sliced.error()));
       auto slices = std::move(*sliced);
       auto it = slices.begin();
       DungeonId previous = 0;
       while (it != slices.end()) {
         auto currentResult = lexicalCast<DungeonId>(*it);
-        if (!currentResult) return std::unexpected(std::move(currentResult.error()));
+        if (!currentResult)
+          return std::unexpected(std::move(currentResult.error()));
         DungeonId current = *currentResult;
-        dungeonIds.append(current);
+        dungeonIds.push_back(current);
         if (it++ != slices.begin() && previous != current) {
-          if (current < previous) std::swap(previous, current);
+          if (current < previous)
+            std::swap(previous, current);
           for (DungeonId id = previous + 1; id != current; ++id)
-            dungeonIds.append(id);
+            dungeonIds.push_back(id);
         }
         previous = current;
       }
@@ -587,13 +593,13 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
        changed = *count;
        return {};
       });
-    if (!executed) return std::unexpected(std::move(executed.error()));
+    if (!executed)
+      return std::unexpected(std::move(executed.error()));
     if (!*executed) {
       return "Invalid client state";
     }
     String output = strf("{} {} dungeon IDs", isProtected ? std::string_view("Protected") : std::string_view("Unprotected"), changed);
     return changed < dungeonIds.size() ? strf("{} ({} unchanged)", output, dungeonIds.size() - changed) : output;
-  
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
@@ -1142,7 +1148,7 @@ std::expected<String, StarException> CommandProcessor::kick(ConnectionId connect
   if (arguments.size() == 1) {
     auto nick = m_universe.clientNick(*toKick);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    arguments.append(*nick);
+    arguments.push_back(*nick);
   }
 
   auto disconnected = m_universe.disconnectClient(*toKick, arguments[1]);
@@ -1267,7 +1273,7 @@ std::expected<String, StarException> CommandProcessor::list(ConnectionId connect
   for (auto cid : m_universe.clientIds()) {
     auto nick = m_universe.clientNick(cid);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    res.append(strf("${} : {} : ${}", cid, *nick, m_universe.uuidForClient(cid)->hex()));
+    res.push_back(strf("${} : {} : ${}", cid, *nick, m_universe.uuidForClient(cid)->hex()));
   }
 
   return res.join("\n");

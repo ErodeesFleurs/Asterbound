@@ -254,7 +254,7 @@ TEST(FixedScheduler, InFlightFrameWaitUsesOnlyLogicDeadline) {
 
 auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, String const& overlay,
                               String runtimeConfig) {
-  settings.assetSources.append(overlay);
+  settings.assetSources.push_back(overlay);
   settings.storageDirectory = File::relative_to(directory, "storage");
   settings.runtimeConfigFile = std::move(runtimeConfig);
   settings.logDirectory = {};
@@ -778,7 +778,8 @@ const GameTestRegistration
     ASSERT_TRUE(pane->addChild("surface", *surface));
     List<LuaFunction> retained;
     LuaCallbacks probe;
-    ASSERT_TRUE(probe.registerCallback("capture", [&](LuaFunction function) { retained.append(std::move(function)); }));
+    ASSERT_TRUE(
+      probe.registerCallback("capture", [&](LuaFunction function) { retained.push_back(std::move(function)); }));
     ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
     ASSERT_TRUE(pane->displayed());
     String capture = R"LUA(
@@ -1599,7 +1600,8 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
     JsonArray ids;
     for (auto const& pane : *targets)
       for (auto const& entry : instances)
-        if (entry.second == pane) ids.append(entry.first);
+        if (entry.second == pane)
+          ids.push_back(entry.first);
     return ids;
   }));
   ASSERT_TRUE(controller.addCallbacks("interface", callbacks));
@@ -1880,7 +1882,7 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
     for (auto const& bookmark : *bookmarks) {
       auto json = bookmark.toJson();
       if (!json) return std::unexpected(std::move(json.error()));
-      result.append(std::move(*json));
+      result.push_back(std::move(*json));
     }
     return result;
   }));
@@ -2021,9 +2023,9 @@ public:
     auto callbacks = BaseScriptPane::makePaneCallbacks();
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     callbacks->removeCallback("playSound");
-    if (auto added = callbacks->registerCallback("playSound", [this](String const& sound) {
-          m_sounds.append(sound);
-        }); !added)
+    if (auto added =
+          callbacks->registerCallback("playSound", [this](String const& sound) { m_sounds.push_back(sound); });
+        !added)
       return std::unexpected(std::move(added.error()));
     return callbacks;
   }
@@ -2216,7 +2218,7 @@ const GameTestRegistration
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
       auto path = (*list)->itemAt(index)->data().toString();
       ASSERT_TRUE(path) << path.error().what();
-      visibleResources.append(std::move(*path));
+      visibleResources.push_back(std::move(*path));
     }
     ASSERT_EQ(visibleResources, (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookZ.abc"}));
     ASSERT_TRUE((*search)->setText("CAFÉ"));
@@ -2266,7 +2268,7 @@ const GameTestRegistration
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
       auto path = (*list)->itemAt(index)->data().toString();
       ASSERT_TRUE(path) << path.error().what();
-      visibleResources.append(std::move(*path));
+      visibleResources.push_back(std::move(*path));
     }
     EXPECT_EQ(
       visibleResources,
@@ -2283,7 +2285,7 @@ const GameTestRegistration
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
       auto path = (*list)->itemAt(index)->data().toString();
       ASSERT_TRUE(path);
-      visibleResources.append(std::move(*path));
+      visibleResources.push_back(std::move(*path));
     }
     EXPECT_EQ(visibleResources,
               (StringList{"/songs/Nested/zzsongbookB.abc", resource, "/songs/zzsongbookClosed.abc",
@@ -4569,7 +4571,7 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
   ASSERT_TRUE(overflow && *overflow);
   JsonArray remaining;
   for (unsigned i = 4; i <= *capacity + 3; ++i)
-    remaining.append(strf("{}", i));
+    remaining.push_back(strf("{}", i));
   EXPECT_EQ(**overflow, (JsonArray{*capacity + 1, 3, remaining}));
   ASSERT_TRUE(fixture.root().reload());
   ASSERT_TRUE(pane->tick(0));

@@ -60,7 +60,7 @@ std::expected<ItemBag, StarException> ItemBag::fromJson(Root& root, Json const& 
     auto item = (*itemDatabase)->fromJson(entry);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    res.m_items.append(std::move(*item));
+    res.m_items.push_back(std::move(*item));
   }
   return res;
 }
@@ -77,7 +77,7 @@ std::expected<ItemBag, StarException> ItemBag::loadStore(Root& root, Json const&
     auto item = (*itemDatabase)->diskLoad(entry);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    res.m_items.append(std::move(*item));
+    res.m_items.push_back(std::move(*item));
   }
   return res;
 }
@@ -85,7 +85,7 @@ std::expected<ItemBag, StarException> ItemBag::loadStore(Root& root, Json const&
 std::expected<Json, StarException> ItemBag::toJson() const {
   JsonArray entries;
   for (auto const& item : m_items)
-    entries.append(item ? item->descriptor().toJson() : Json());
+    entries.push_back(item ? item->descriptor().toJson() : Json());
   return Json(std::move(entries));
 }
 
@@ -96,13 +96,13 @@ std::expected<Json, StarException> ItemBag::diskStore() const {
   JsonArray entries;
   for (auto const& item : m_items) {
     if (!item) {
-      entries.append(Json());
+      entries.push_back(Json());
       continue;
     }
     auto stored = item->descriptor().diskStore(**versioningDatabase);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    entries.append(std::move(*stored));
+    entries.push_back(std::move(*stored));
   }
   return Json(std::move(entries));
 }
@@ -120,7 +120,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> ItemBag::resize(std::s
     if (!remaining)
       return std::unexpected(std::move(remaining.error()));
     if (*remaining && !(*remaining)->empty())
-      lost.append(std::move(*remaining));
+      lost.push_back(std::move(*remaining));
   }
   m_items.resize(size);
   return lost;
@@ -178,7 +178,7 @@ List<std::shared_ptr<Item>> ItemBag::takeAll() {
   List<std::shared_ptr<Item>> taken;
   for (auto& item : m_items) {
     if (item)
-      taken.append(std::move(item));
+      taken.push_back(std::move(item));
   }
   return taken;
 }
@@ -272,7 +272,7 @@ bool ItemBag::consumeItems(ItemDescriptor const& descriptor, bool exactMatch) {
     if (storedItem && storedItem->matches(descriptor, exactMatch)) {
       std::uint64_t count = storedItem->count();
       std::uint64_t take = std::min(count, countLeft);
-      consumeLocations.append({i, take});
+      consumeLocations.push_back({i, take});
       countLeft -= take;
       if (countLeft == 0)
         break;
@@ -335,7 +335,7 @@ auto ItemBag::itemsFitWhere(std::optional<std::reference_wrapper<Item const>> it
     if (slot == NPos)
       break;
     else {
-      slots.append(slot);
+      slots.push_back(slot);
       taken.insert(slot);
     }
 

@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
       auto items = jsonToList<ItemDescriptor>(option, [](Json const& entry) { return ItemDescriptor::create(entry); });
       if (!items)
         return std::unexpected(std::move(items.error()));
-      result->rewards.append(std::move(*items));
+      result->rewards.push_back(std::move(*items));
     }
   }
   auto rewardParameters = config.get("rewardParameters", JsonArray{});

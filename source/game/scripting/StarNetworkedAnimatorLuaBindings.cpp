@@ -58,7 +58,7 @@ std::expected<void, StarException> applyAnimatorJsonDrawables(NetworkedAnimator&
   for (auto const& config : drawablesConfig) {
     auto drawable = Drawable::create(**metadata, config);
     if (!drawable) return std::unexpected(std::move(drawable.error()));
-    drawables.append(std::move(*drawable));
+    drawables.push_back(std::move(*drawable));
   }
   (networkedAnimator.*apply)(part, std::move(drawables));
   return {};

@@ -80,9 +80,9 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
               auto data = callback(sectorRandomness);
               if (!data)
                 return std::unexpected(std::move(data.error()));
-              sectorResult.append(std::pair<Point, PointData>(pointPos, std::move(*data)));
+              sectorResult.push_back(std::pair<Point, PointData>(pointPos, std::move(*data)));
             } else {
-              sectorResult.append(std::pair<Point, PointData>(pointPos, callback(sectorRandomness)));
+              sectorResult.push_back(std::pair<Point, PointData>(pointPos, callback(sectorRandomness)));
             }
           }
 
@@ -90,7 +90,7 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
         });
       if (!points)
         return std::unexpected(std::move(points.error()));
-      finalResult.appendAll(points->get());
+      finalResult.append_range(points->get());
     }
   }
 

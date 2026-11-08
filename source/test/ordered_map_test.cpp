@@ -28,7 +28,7 @@ TEST(OrderedMap, Insert) {
     List<int> comp = {3, 2, 1};
     List<int> keys;
     for (auto i = map.begin(); i != map.end(); ++i)
-      keys.append(i->first);
+      keys.push_back(i->first);
     EXPECT_EQ(comp, keys);
   }
 
@@ -36,7 +36,7 @@ TEST(OrderedMap, Insert) {
     List<int> comp = {1, 2, 3};
     List<int> keys;
     for (auto i = map.rbegin(); i != map.rend(); ++i)
-      keys.append(i->first);
+      keys.push_back(i->first);
     EXPECT_EQ(comp, keys);
   }
 }

@@ -88,7 +88,7 @@ end
         return;
       }
     }
-    paths.append("/" + name);
+    paths.push_back("/" + name);
   }
   Assets::Settings settings{};
   settings.workerPoolSize = static_cast<unsigned>(state.range(1));

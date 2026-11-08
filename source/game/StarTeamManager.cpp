@@ -236,7 +236,7 @@ bool TeamManager::addToTeam(Uuid const& playerUuid, Uuid const& teamUuid) {
   for (auto otherTeam : m_teams) {
     List<Uuid> alreadyMemberOf;
     if (otherTeam.second.members.contains(playerUuid))
-      alreadyMemberOf.append(otherTeam.first);
+      alreadyMemberOf.push_back(otherTeam.first);
     for (auto leaveTeamUuid : alreadyMemberOf)
       removeFromTeam(playerUuid, leaveTeamUuid);
   }
@@ -469,7 +469,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
       invitation.inviterName = *inviterName;
       m_invitations.try_emplace(inviteeUuid, m_root.random()).first->second = invitation;
       m_polledInvitations.remove(inviteeUuid);
-      invited.append(JsonArray{entry.first, inviteeUuid.hex()});
+      invited.push_back(JsonArray{entry.first, inviteeUuid.hex()});
     }
   }
 

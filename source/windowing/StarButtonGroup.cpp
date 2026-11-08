@@ -75,7 +75,7 @@ List<std::reference_wrapper<ButtonWidget>> ButtonGroup::buttons() const {
   for (auto const& entry : m_buttons) {
     if (auto owner = entry.second.lock()) {
       if (auto button = asRef<ButtonWidget>(*owner))
-        result.append(*button);
+        result.push_back(*button);
     }
   }
   return result;

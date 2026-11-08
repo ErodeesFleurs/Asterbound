@@ -169,7 +169,7 @@ RectI ImageWidget::screenBoundRect() const {
 std::expected<void, StarException> ImageWidget::transformDrawables() {
   m_drawables.clear();
   for (auto const& drawable : m_baseDrawables)
-    m_drawables.append(Drawable(drawable));
+    m_drawables.push_back(Drawable(drawable));
 
   if (m_rotation != 0)
     Drawable::rotateAll(m_drawables, m_rotation);

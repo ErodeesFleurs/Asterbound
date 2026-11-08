@@ -951,7 +951,7 @@ for (auto const& v : std::move(*checked146))
     {
 auto checked147 = v.toDouble();
 if (!checked147) return std::unexpected(std::move(checked147.error()));
-m_walkBob.append(std::move(*checked147) / TilePixels);
+m_walkBob.push_back(std::move(*checked147) / TilePixels);
 }
 }
   m_runBob.clear();
@@ -964,7 +964,7 @@ for (auto const& v : std::move(*checked149))
     {
 auto checked150 = v.toDouble();
 if (!checked150) return std::unexpected(std::move(checked150.error()));
-m_runBob.append(std::move(*checked150) / TilePixels);
+m_runBob.push_back(std::move(*checked150) / TilePixels);
 }
 }
   m_swimBob.clear();
@@ -977,7 +977,7 @@ for (auto const& v : std::move(*checked152))
     {
 auto checked153 = v.toDouble();
 if (!checked153) return std::unexpected(std::move(checked153.error()));
-m_swimBob.append(std::move(*checked153) / TilePixels);
+m_swimBob.push_back(std::move(*checked153) / TilePixels);
 }
 }
 
@@ -2175,18 +2175,18 @@ auto animatorDrawables = std::move(*checked341);
 
     if (withItems) {
       if (!m_altHand.nonRotatedDrawables.empty())
-        drawables.appendAll(m_altHand.nonRotatedDrawables);
+        drawables.append_range(m_altHand.nonRotatedDrawables);
       if (!m_primaryHand.nonRotatedDrawables.empty())
-        drawables.appendAll(m_primaryHand.nonRotatedDrawables);
+        drawables.append_range(m_primaryHand.nonRotatedDrawables);
     }
-    drawables.appendAll(std::move(animatorDrawables));
+    drawables.append_range(std::move(animatorDrawables));
     Drawable::rebaseAll(drawables);
   } else {
     auto addDrawable = [&](Drawable drawable, bool forceFullbright = false) -> Drawable& {
       if (m_facingDirection == Direction::Left)
         drawable.scale(Vec2F(-1, 1));
       drawable.fullbright |= forceFullbright;
-      drawables.append(std::move(drawable));
+      drawables.push_back(std::move(drawable));
       return drawables[drawables.size() - 1];
     };
 
@@ -2378,7 +2378,7 @@ if (!checked366) return std::unexpected(std::move(checked366.error()));
         drawable.scale(Vec2F(-1, 1));
       drawable.fullbright |= forceFullbright;
       applyHeadRotation(drawable);
-      drawables.append(std::move(drawable));
+      drawables.push_back(std::move(drawable));
     };
 
     if (!m_headFrameset.empty() && !m_bodyHidden) {
@@ -2735,9 +2735,9 @@ addDrawable(std::move(*checked441));
 
     if (withItems) {
       if (!m_primaryHand.nonRotatedDrawables.empty())
-        drawables.insertAllAt(0, m_primaryHand.nonRotatedDrawables);
+        drawables.insert_range_at(0, m_primaryHand.nonRotatedDrawables);
       if (!m_altHand.nonRotatedDrawables.empty())
-        drawables.insertAllAt(0, m_altHand.nonRotatedDrawables);
+        drawables.insert_range_at(0, m_altHand.nonRotatedDrawables);
     }
 
     for (auto& drawable : drawables) {
@@ -2853,7 +2853,7 @@ if (!checked459) return std::unexpected(std::move(checked459.error()));
 auto checked460 = drawable.imagePart().addDirectives(*std::move(*checked459), String("addmask=/humanoid/portraitMask.png;0;0"), false);
 if (!checked460) return std::unexpected(std::move(checked460.error()));
       }
-      drawables.append(std::move(drawable));
+      drawables.push_back(std::move(drawable));
       return {};
     };
 
@@ -3328,7 +3328,7 @@ transformationGroups = std::move(*checked585);
     // now I DOUBT people will be doing crazy things using the animation transformation properties on the arm rotation parts themselves
     // but rather parts that the arms are parented to with anchors, so I'm not accounting for that here
     auto mat = Mat3F::identity();
-    auto i = transformationGroups.indexOf(rotationTransformGroup);
+    auto i = transformationGroups.index_of(rotationTransformGroup);
     if (i != NPos) {
       if (i > 0)
         {
@@ -3441,7 +3441,7 @@ transformationGroups = std::move(*checked606);
     // now I DOUBT people will be doing crazy things using the animation transformation properties on the arm rotation parts themselves
     // but rather parts that the arms are parented to with anchors, so I'm not accounting for that here
     auto mat = Mat3F::identity();
-    auto i = transformationGroups.indexOf(rotationTransformGroup);
+    auto i = transformationGroups.index_of(rotationTransformGroup);
     if (i != NPos) {
       if (i > 0)
         {

@@ -25,7 +25,7 @@ auto ShellParser::tokenize(String const& command) -> std::expected<List<Token>, 
     auto token = word();
     if (!token)
       return std::unexpected(std::move(token.error()));
-    res.append(Token{.type = TokenType::Word, .token = std::move(*token)});
+    res.push_back(Token{.type = TokenType::Word, .token = std::move(*token)});
   }
 
   return res;
@@ -38,7 +38,7 @@ std::expected<StringList, StarException> ShellParser::tokenizeToStringList(Strin
     return std::unexpected(std::move(tokens.error()));
   for (auto& token : *tokens) {
     if (token.type == TokenType::Word) {
-      res.append(std::move(token.token));
+      res.push_back(std::move(token.token));
     }
   }
 

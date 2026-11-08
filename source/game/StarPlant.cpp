@@ -221,7 +221,7 @@ float baseImageHeight = std::move(*result443)->height();
       piece.zLevel = 0.0f;
       piece.rotationType = DontRotate;
       piece.rotationOffset = this->root().random().randf() + roffset;
-      m_pieces.append(piece);
+      m_pieces.push_back(piece);
     }
 
     // base leaves
@@ -273,7 +273,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = this->root().random().randf() + roffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
       }
 
       bool condition459 = static_cast<bool>(baseLeavesSettings.contains("backimage"));
@@ -299,7 +299,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = this->root().random().randf() + roffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
       }
     }
 
@@ -387,7 +387,7 @@ String middleFile = AssetPath::relative_to(config.stemDirectory, std::move(*resu
   piece.zLevel = 1.0f;
   piece.rotationType = DontRotate;
   piece.rotationOffset = this->root().random().randf() + roffset;
-  m_pieces.append(piece);
+  m_pieces.push_back(piece);
 }
 
       // trunk leaves
@@ -438,7 +438,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = this->root().random().randf() + roffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
         }
 
         bool condition499 = static_cast<bool>(trunkLeavesSettings.contains("backimage"));
@@ -464,7 +464,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = this->root().random().randf() + roffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
         }
       }
 
@@ -533,7 +533,7 @@ String branchFile = AssetPath::relative_to(config.stemDirectory, std::move(*resu
   piece.zLevel = 0.0f;
   piece.rotationType = m_ceiling ? DontRotate : RotateBranch;
   piece.rotationOffset = boffset;
-  m_pieces.append(piece);
+  m_pieces.push_back(piece);
 }
           branchYOffset += h;
 
@@ -585,7 +585,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = boffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
             }
 
             bool condition535 = static_cast<bool>(branchLeavesSettings.contains("backimage"));
@@ -611,7 +611,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
 piece.rotationOffset = boffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
             }
           }
 
@@ -673,7 +673,7 @@ String crownFile = AssetPath::relative_to(config.stemDirectory, std::move(*resul
   piece.zLevel = 0.0f;
   piece.rotationType = m_ceiling ? DontRotate : RotateCrownBranch;
   piece.rotationOffset = coffset;
-  m_pieces.append(piece);
+  m_pieces.push_back(piece);
 }
       // crown leaves
       auto result551 = config.foliageSettings.getObject("crownLeaves", {});
@@ -725,7 +725,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
 piece.rotationOffset = coffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
         }
 
         bool condition566 = static_cast<bool>(crownLeavesSettings.contains("backimage"));
@@ -752,7 +752,7 @@ piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
 piece.rotationOffset = coffset;
-m_pieces.append(piece);
+m_pieces.push_back(piece);
         }
       }
     }
@@ -924,7 +924,7 @@ float shapeImageHeight = std::move(*result422)->height();
     piece.segmentIdx = 0;
     piece.structuralSegment = true;
     piece.kind = PlantPieceKind::None;
-    m_pieces.append(piece);
+    m_pieces.push_back(piece);
   }
 
   auto mod = rand.randValueFrom(shape.mods);
@@ -935,7 +935,7 @@ float shapeImageHeight = std::move(*result422)->height();
     piece.segmentIdx = 0;
     piece.structuralSegment = false;
     piece.kind = PlantPieceKind::None;
-    m_pieces.append(piece);
+    m_pieces.push_back(piece);
   }
 
   m_ceiling = config.ceiling;
@@ -1659,17 +1659,19 @@ auto geometry = result575->get().geometry();
     idx = 0;
     while (idx < m_pieces.size()) {
       if (m_pieces[idx].segmentIdx >= segmentIdx) {
-        auto result576 = m_pieces.takeAt(idx);
-if (!result576) return std::unexpected(std::move(result576.error()));
-droppedPieces.append(std::move(*result576));
+        auto result576 = m_pieces.take_at(idx);
+        if (!result576)
+          return std::unexpected(std::move(result576.error()));
+        droppedPieces.push_back(std::move(*result576));
         continue;
       }
       idx++;
     }
   } else {
-    auto result577 = m_pieces.takeAt(idx);
-if (!result577) return std::unexpected(std::move(result577.error()));
-droppedPieces.append(std::move(*result577));
+    auto result577 = m_pieces.take_at(idx);
+    if (!result577)
+      return std::unexpected(std::move(result577.error()));
+    droppedPieces.push_back(std::move(*result577));
   }
   m_piecesUpdated = true;
 
@@ -1691,8 +1693,8 @@ droppedPieces.append(std::move(*result577));
   Map<int, List<PlantPiece>> segments;
   for (auto& piece : droppedPieces) {
     if (!segments.contains(piece.segmentIdx))
-      segmentOrder.append(piece.segmentIdx);
-    segments[piece.segmentIdx].append(piece);
+      segmentOrder.push_back(piece.segmentIdx);
+    segments[piece.segmentIdx].push_back(piece);
   }
   std::reverse(segmentOrder.begin(), segmentOrder.end());
   auto result578 = this->root().random().randf(-0.3f, 0.3f);

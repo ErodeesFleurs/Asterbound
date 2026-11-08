@@ -2102,7 +2102,7 @@ std::expected<void, StarException> ClientSubWorldPackets::read(DataStream& ds) {
     auto read = packet->read(ds);
     if (!read)
       return std::unexpected(std::move(read.error()));
-    packets.append(std::move(packet));
+    packets.push_back(std::move(packet));
   }
   return {};
 }
@@ -2114,7 +2114,7 @@ std::expected<void, StarException> ClientSubWorldPackets::write(DataStream& ds) 
       return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.write<std::uint32_t>(packets.count());
+    auto result = ds.write<std::uint32_t>(packets.size());
     if (!result)
       return std::unexpected(std::move(result.error()));
   }

@@ -193,7 +193,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto configuration = root->configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
-  auto fidelity = options.parameters.maybe("fidelity").and_then([](StringList const& p) { return p.maybeFirst(); });
+  auto fidelity = options.parameters.maybe("fidelity").and_then([](StringList const& p) { return p.front_value(); });
   auto configuredFidelity = (*configuration)->set("serverFidelity", fidelity.value_or("high"));
   if (!configuredFidelity)
     return std::unexpected(std::move(configuredFidelity.error()));

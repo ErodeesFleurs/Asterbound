@@ -160,9 +160,9 @@ TEST(ListPredicates, NoncopyableExplicitBoolShortCircuit) {
 
   int visits = 0;
   LinkedList<Truth> values;
-  EXPECT_FALSE(values.emplaceAppend(false, visits).value);
-  EXPECT_TRUE(values.emplaceAppend(true, visits).value);
-  EXPECT_FALSE(values.emplaceAppend(false, visits).value);
+  EXPECT_FALSE(values.emplace_back(false, visits).value);
+  EXPECT_TRUE(values.emplace_back(true, visits).value);
+  EXPECT_FALSE(values.emplace_back(false, visits).value);
   EXPECT_TRUE(values.any());
   EXPECT_EQ(visits, 2);
   visits = 0;
@@ -222,7 +222,7 @@ TEST(TupleSerialization, OrderedWireAndEnumWidths) {
 TEST(ListFiltering, MoveOnlyValuesKeepStableOrder) {
   List<std::unique_ptr<int>> values;
   for (int value = 0; value < 8; ++value)
-    values.append(std::make_unique<int>(value));
+    values.push_back(std::make_unique<int>(value));
   values.filter([](std::unique_ptr<int>& value) { return *value % 2 != 0; });
   ASSERT_EQ(values.size(), 4u);
   for (std::size_t i = 0; i < values.size(); ++i)
@@ -266,7 +266,7 @@ TEST(ComputedSort, MoveOnlyNonDefaultKeysAndStableTies) {
   List<int> values{21, 10, 22, 11, 20};
   List<int> visited;
   stableSortByComputedValue(values, [&](int value) {
-    visited.append(value);
+    visited.push_back(value);
     return Key(value / 10);
   });
   EXPECT_EQ(visited, (List<int>{21, 10, 22, 11, 20}));
@@ -283,7 +283,7 @@ TEST(ComputedSort, FirstKeyFailureLeavesInputUnreordered) {
     auto values = original;
     List<int> visited;
     auto result = stableSortByComputedValue(values, [&](int value) -> std::expected<int, StarException> {
-      visited.append(value);
+      visited.push_back(value);
       if (visited.size() == failure + 1)
         return std::unexpected(OutOfRangeException("sort key boundary", false));
       return value;
@@ -367,7 +367,7 @@ TEST(ContainerTransform, BoundedOutputStopsAtInsertionFailure) {
   EXPECT_EQ(calls, 3);
 
   StaticList<int, 2> output;
-  ASSERT_TRUE(output.append(99));
+  ASSERT_TRUE(output.push_back(99));
   calls = 0;
   auto appended = transformInto(output, values, [&](int value) {
     ++calls;

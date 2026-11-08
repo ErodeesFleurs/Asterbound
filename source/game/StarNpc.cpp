@@ -1902,7 +1902,7 @@ if (!result403) return std::unexpected(std::move(result403.error()));
       for (auto const& quest : offeredQuests.value_or(JsonArray{})) {
         auto arc = QuestArcDescriptor::fromJson(root(), quest);
         if (!arc) return std::unexpected(std::move(arc.error()));
-        parsed.append(std::move(*arc));
+        parsed.push_back(std::move(*arc));
       }
       m_offeredQuests.set(std::move(parsed));
       return {};
@@ -2208,14 +2208,15 @@ if (!result477) return std::unexpected(std::move(result477.error()));
       {
   auto result478 = mouthPosition();
   if (!result478) return std::unexpected(std::move(result478.error()));
-  m_pendingChatActions.append(SayChatAction{entityId(), m_chatMessage.get(), std::move(*result478), m_chatConfig.get()});
+  m_pendingChatActions.push_back(
+    SayChatAction{entityId(), m_chatMessage.get(), std::move(*result478), m_chatConfig.get()});
 }
     else
       {
   auto result479 = mouthPosition();
   if (!result479) return std::unexpected(std::move(result479.error()));
-  m_pendingChatActions.append(PortraitChatAction{
-            entityId(), m_chatPortrait.get(), m_chatMessage.get(), std::move(*result479), m_chatConfig.get()});
+  m_pendingChatActions.push_back(PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(),
+                                                    std::move(*result479), m_chatConfig.get()});
 }
   }
   return {};
@@ -2248,13 +2249,13 @@ std::expected<void, StarException> Npc::addChatMessage(String const& message, Js
     {
   auto result482 = mouthPosition();
   if (!result482) return std::unexpected(std::move(result482.error()));
-  m_pendingChatActions.append(SayChatAction{entityId(), message, std::move(*result482), config});
+  m_pendingChatActions.push_back(SayChatAction{entityId(), message, std::move(*result482), config});
 }
   else
     {
   auto result483 = mouthPosition();
   if (!result483) return std::unexpected(std::move(result483.error()));
-  m_pendingChatActions.append(PortraitChatAction{entityId(), portrait, message, std::move(*result483), config});
+  m_pendingChatActions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result483), config});
 }
   return {};
 }
@@ -2397,11 +2398,11 @@ std::expected<List<LightSource>, StarException> Npc::presentationLightSources(fl
   List<LightSource> lights;
   auto result498 = m_tools->lightSources(interpolation);
 if (!result498) return std::unexpected(std::move(result498.error()));
-lights.appendAll(std::move(*result498));
-  auto result499 = m_statusController->lightSources(interpolation);
+lights.append_range(std::move(*result498));
+auto result499 = m_statusController->lightSources(interpolation);
 if (!result499) return std::unexpected(std::move(result499.error()));
-lights.appendAll(std::move(*result499));
-  auto result500 = humanoid();
+lights.append_range(std::move(*result499));
+auto result500 = humanoid();
 if (!result500) return std::unexpected(std::move(result500.error()));
 auto animator = (*result500)->networkedAnimator();
 auto humanoidSample = animator->get().sample(interpolation);
@@ -2409,8 +2410,8 @@ auto prepared = (*result500)->prepareAnimatorPose(humanoidSample);
 if (!prepared) return std::unexpected(std::move(prepared.error()));
 auto result501 = humanoidSample.lightSources();
 if (!result501) return std::unexpected(std::move(result501.error()));
-lights.appendAll(std::move(*result501));
-  return lights;
+lights.append_range(std::move(*result501));
+return lights;
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
@@ -2633,7 +2634,7 @@ auto damageSource = std::move(*result520);
     if (std::holds_alternative<PolyF>(damageSource.damageArea))
       std::get<PolyF>(damageSource.damageArea).rotate(m_movementController->rotation());
     damageSource.damage *= m_statusController->stat("powerMultiplier");
-    damageSources.append(damageSource);
+    damageSources.push_back(damageSource);
   }
 
   for (auto& damageSource : damageSources) {

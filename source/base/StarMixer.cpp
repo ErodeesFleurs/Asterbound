@@ -480,9 +480,9 @@ Mixer::EffectFunction Mixer::lowpass(std::size_t avgSize) const {
       for (std::size_t f = 0; f < frames; ++f) {
         for (std::size_t c = 0; c < channels; ++c) {
           auto& filterChannel = filter[c];
-          filterChannel.append(buffer[f * channels + c] / 32767.0f);
+          filterChannel.push_back(buffer[f * channels + c] / 32767.0f);
           while (filterChannel.size() > avgSize) {
-            auto removed = filterChannel.takeFirst();
+            auto removed = filterChannel.take_front();
             if (!removed)
               return std::unexpected(std::move(removed.error()));
           }
@@ -519,9 +519,9 @@ Mixer::EffectFunction Mixer::echo(float time, float dry, float wet) const {
         for (std::size_t c = 0; c < channels; ++c) {
           auto& filterChannel = filter[c];
           buffer[f * channels + c] = buffer[f * channels + c] * dry + filter[c][0] * wet;
-          filterChannel.append(buffer[f * channels + c]);
+          filterChannel.push_back(buffer[f * channels + c]);
           while (filterChannel.size() > echoLength) {
-            auto removed = filterChannel.takeFirst();
+            auto removed = filterChannel.take_front();
             if (!removed)
               return std::unexpected(std::move(removed.error()));
           }

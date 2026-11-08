@@ -590,7 +590,7 @@ TEST(FlatHashSet, Random) {
   auto& random = **randomResult;
   List<Vec2I> keys;
   for (unsigned i = 0; i < RandomSampleCount; ++i)
-    keys.append(Vec2I(i * 743202097, i * 205495087));
+    keys.push_back(Vec2I(i * 743202097, i * 205495087));
   random.shuffle(keys);
 
   FlatHashSet<Vec2I> testSet;
@@ -625,7 +625,7 @@ TEST(FlatHashSet, Random) {
 
   List<Vec2I> cmp;
   for (auto const& k : testSet)
-    cmp.append(k);
+    cmp.push_back(k);
   cmp.sort();
   keys.sort();
   ASSERT_TRUE(cmp == keys);
@@ -693,7 +693,7 @@ TEST(FlatHashMap, Random) {
   auto& random = **randomResult;
   List<std::pair<Vec2I, int>> values;
   for (unsigned i = 0; i < RandomSampleCount; ++i)
-    values.append({Vec2I(i * 743202097, i * 205495087), i});
+    values.push_back({Vec2I(i * 743202097, i * 205495087), i});
   random.shuffle(values);
 
   FlatHashMap<Vec2I, int> testMap;
@@ -740,7 +740,7 @@ TEST(FlatHashMap, Random) {
 TEST(FlatHashMap, EraseWhileIterating) {
   List<std::pair<Vec2I, int>> values;
   for (unsigned i = 0; i < RandomSampleCount; ++i)
-    values.append({Vec2I(i * 743202097, i * 205495087), i});
+    values.push_back({Vec2I(i * 743202097, i * 205495087), i});
 
   FlatHashMap<Vec2I, int> testMap;
   for (auto v : values)

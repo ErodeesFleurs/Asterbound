@@ -552,7 +552,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     auto result27 = m_centralStructure.store();
     if (!result27)
       return std::unexpected(std::move(result27.error()));
-    pair.second->outgoingPackets.append(std::make_shared<CentralStructureUpdatePacket>(std::move(*result27)));
+    pair.second->outgoingPackets.push_back(std::make_shared<CentralStructureUpdatePacket>(std::move(*result27)));
   }
 
   return m_centralStructure;
@@ -769,12 +769,12 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   worldStartPacket->protectedDungeonIds = m_protectedDungeonIds;
   worldStartPacket->clientId = clientId;
   worldStartPacket->localInterpolationMode = isLocal;
-  clientInfo->outgoingPackets.append(worldStartPacket);
+  clientInfo->outgoingPackets.push_back(worldStartPacket);
 
   auto result61 = m_centralStructure.store();
   if (!result61)
     return std::unexpected(std::move(result61.error()));
-  clientInfo->outgoingPackets.append(std::make_shared<CentralStructureUpdatePacket>(std::move(*result61)));
+  clientInfo->outgoingPackets.push_back(std::make_shared<CentralStructureUpdatePacket>(std::move(*result61)));
 
   for (auto&& p : m_scriptContexts) {
     auto result62 = p.second->invoke("addClient", clientId, isLocal);
@@ -811,7 +811,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
       auto response = entry.second;
       if (std::holds_alternative<ConnectionId>(response)) {
         if (auto clientInfo = m_clientInfo.value(std::get<ConnectionId>(response)))
-          clientInfo->outgoingPackets.append(
+          clientInfo->outgoingPackets.push_back(
             std::make_shared<EntityMessageResponsePacket>(std::unexpected(String("Client disconnected")), uuid));
       } else {
         if (auto failed = std::get<RpcPromiseKeeper<Json>>(response).fail("Client disconnected"); !failed)
@@ -827,7 +827,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
   auto subWorldId = info->subWorldId;
   m_clientInfo.remove(clientId);
 
-  packets.append(std::make_shared<WorldStopPacket>("Removed"));
+  packets.push_back(std::make_shared<WorldStopPacket>("Removed"));
   if (subWorldId == MainClientWorldId) {
     return packets;
   } else {
@@ -870,7 +870,7 @@ ClientSubWorldId WorldServer::clientSubWorld(ConnectionId clientId) const {
 List<EntityId> WorldServer::players() const {
   List<EntityId> playerIds;
   for (auto const& pair : m_clientInfo)
-    playerIds.append(pair.second->clientState->playerId());
+    playerIds.push_back(pair.second->clientState->playerId());
   return playerIds;
 }
 
@@ -937,8 +937,9 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           ok = materialDb->isValidMaterialId(std::get<PlaceMaterial>(pair.second).material); else if (std::holds_alternative<PlaceMod>(pair.second))
           ok = materialDb->isValidModId(std::get<PlaceMod>(pair.second).mod);
         if (ok)
-          sanitized.append(pair); else {
-          rejected.append(pair);
+          sanitized.push_back(pair);
+        else {
+          rejected.push_back(pair);
           auto result74 = this->root().logger().warn("WorldServer: dropped tile mod with invalid id from client {}", clientId);
           if (!result74)
             return std::unexpected(std::move(result74.error()));
@@ -948,9 +949,9 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!result75)
         return std::unexpected(std::move(result75.error()));
       auto unappliedModifications = std::move(*result75);
-      unappliedModifications.appendAll(rejected);
+      unappliedModifications.append_range(rejected);
       if (!unappliedModifications.empty())
-        clientInfo->outgoingPackets.append(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
+        clientInfo->outgoingPackets.push_back(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
     } else if (auto rtpacket = as<ReplaceTileListPacket>(packet)) {
       auto result76 = this->root().materialDatabase();
       if (!result76)
@@ -963,17 +964,18 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (std::holds_alternative<PlaceMaterial>(pair.second))
           ok = materialDb->isValidMaterialId(std::get<PlaceMaterial>(pair.second).material);
         if (ok)
-          sanitized.append(pair); else {
-          rejected.append(pair);
+          sanitized.push_back(pair);
+        else {
+          rejected.push_back(pair);
         }
       }
       auto result77 = replaceTiles(sanitized, rtpacket->tileDamage, rtpacket->applyDamage);
       if (!result77)
         return std::unexpected(std::move(result77.error()));
       auto unappliedModifications = std::move(*result77);
-      unappliedModifications.appendAll(rejected);
+      unappliedModifications.append_range(rejected);
       if (!unappliedModifications.empty())
-        clientInfo->outgoingPackets.append(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
+        clientInfo->outgoingPackets.push_back(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
     } else if (auto dtgpacket = as<DamageTileGroupPacket>(packet)) {
       auto result78 = damageTiles(dtgpacket->tilePositions, dtgpacket->layer, dtgpacket->sourcePosition, dtgpacket->tileDamage, dtgpacket->sourceEntity);
       if (!result78)
@@ -992,7 +994,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!result81)
         return std::unexpected(std::move(result81.error()));
       if (auto item = std::move(*result81))
-        clientInfo->outgoingPackets.append(std::make_shared<GiveItemPacket>(item));
+        clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>(item));
     } else if (auto sepacket = as<SpawnEntityPacket>(packet)) {
       auto acceptEntity = [&, &world = *this]() -> std::expected<void, StarException> {
       auto netRules = clientInfo->clientState->netCompatibilityRules();
@@ -1025,7 +1027,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (!result85)
           return std::unexpected(std::move(result85.error()));
         if (auto taken = std::move(*result85))
-          clientInfo->outgoingPackets.append(std::make_shared<GiveItemPacket>(taken->descriptor()));
+          clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>(taken->descriptor()));
       }
     } else if (auto hit = as<HitRequestPacket>(packet)) {
       if (hit->remoteHitRequest.destinationConnection() == ServerConnectionId) {
@@ -1036,7 +1038,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto destination = m_clientInfo.get(hit->remoteHitRequest.destinationConnection());
         if (!destination)
           return std::unexpected(std::move(destination.error()));
-        destination->get()->outgoingPackets.append(std::make_shared<HitRequestPacket>(hit->remoteHitRequest));
+        destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(hit->remoteHitRequest));
       }
     } else if (auto damage = as<DamageRequestPacket>(packet)) {
       if (damage->remoteDamageRequest.destinationConnection() == ServerConnectionId) {
@@ -1047,7 +1049,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto destination = m_clientInfo.get(damage->remoteDamageRequest.destinationConnection());
         if (!destination)
           return std::unexpected(std::move(destination.error()));
-        destination->get()->outgoingPackets.append(std::make_shared<DamageRequestPacket>(damage->remoteDamageRequest));
+        destination->get()->outgoingPackets.push_back(
+          std::make_shared<DamageRequestPacket>(damage->remoteDamageRequest));
       }
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
       auto result88 = m_damageManager->pushRemoteDamageNotification(damage->remoteDamageNotification);
@@ -1055,7 +1058,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         return std::unexpected(std::move(result88.error()));
       for (auto const& pair : m_clientInfo) {
         if (pair.first != clientId && pair.second->needsDamageNotification(damage->remoteDamageNotification))
-          pair.second->outgoingPackets.append(std::make_shared<DamageNotificationPacket>(damage->remoteDamageNotification));
+          pair.second->outgoingPackets.push_back(
+            std::make_shared<DamageNotificationPacket>(damage->remoteDamageNotification));
       }
     } else if (auto entityInteract = as<EntityInteractPacket>(packet)) {
       auto targetEntityConnection = connectionForEntity(entityInteract->interactRequest.targetId);
@@ -1070,20 +1074,21 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto result91 = takeOptional(interactResult);
         if (!result91)
           return std::unexpected(std::move(result91.error()));
-        clientInfo->outgoingPackets.append(std::make_shared<EntityInteractResultPacket>(std::move(*result91), entityInteract->requestId, entityInteract->interactRequest.sourceId));
+        clientInfo->outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
+          std::move(*result91), entityInteract->requestId, entityInteract->interactRequest.sourceId));
       } else {
         auto result92 = m_clientInfo.get(targetEntityConnection);
         if (!result92)
           return std::unexpected(std::move(result92.error()));
         auto const& forwardClientInfo = result92->get();
-        forwardClientInfo->outgoingPackets.append(entityInteract);
+        forwardClientInfo->outgoingPackets.push_back(entityInteract);
       }
     } else if (auto interactResult = as<EntityInteractResultPacket>(packet)) {
       auto result93 = m_clientInfo.get(connectionForEntity(interactResult->sourceEntityId));
       if (!result93)
         return std::unexpected(std::move(result93.error()));
       auto const& forwardClientInfo = result93->get();
-      forwardClientInfo->outgoingPackets.append(interactResult);
+      forwardClientInfo->outgoingPackets.push_back(interactResult);
     } else if (auto entityCreate = as<EntityCreatePacket>(packet)) {
       auto legalEntityId = entityIdInSpace(entityCreate->entityId, clientInfo->clientId);
       if (!legalEntityId)
@@ -1213,15 +1218,15 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto result115 = m_worldStorage->findUniqueEntity(findUniqueEntity->uniqueEntityId);
       if (!result115)
         return std::unexpected(std::move(result115.error()));
-      clientInfo->outgoingPackets.append(std::make_shared<FindUniqueEntityResponsePacket>(findUniqueEntity->uniqueEntityId,
-          std::move(*result115)));
+      clientInfo->outgoingPackets.push_back(
+        std::make_shared<FindUniqueEntityResponsePacket>(findUniqueEntity->uniqueEntityId, std::move(*result115)));
     } else if (auto entityMessagePacket = as<EntityMessagePacket>(packet)) {
       auto rejectMessage = [&, &world = *this](String const& reason) -> std::expected<void, StarException> {
       auto result116 = world.root().logger().warn("WorldServer: rejecting EntityMessage '{}' from client {}: {}",
                        entityMessagePacket->message, clientId, reason);
       if (!result116)
       return std::unexpected(std::move(result116.error()));
-      clientInfo->outgoingPackets.append(
+      clientInfo->outgoingPackets.push_back(
         std::make_shared<EntityMessageResponsePacket>(std::unexpected(reason), entityMessagePacket->uuid));
       return {};
       };
@@ -1392,7 +1397,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       }
 
       if (!entity) {
-        clientInfo->outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
+        clientInfo->outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
           std::unexpected(String("Unknown entity")), entityMessagePacket->uuid));
       } else {
         if (entity->isMaster()) {
@@ -1401,20 +1406,20 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(result138.error()));
           if (auto response = std::move(*result138)) {
             if (std::holds_alternative<Json>(*response))
-              clientInfo->outgoingPackets.append(
+              clientInfo->outgoingPackets.push_back(
                 std::make_shared<EntityMessageResponsePacket>(std::get<Json>(*response), entityMessagePacket->uuid));
             else {
               // delay the response until this promise is done
               m_entityMessagePromises[entityMessagePacket->uuid] = std::make_pair(clientId, std::get<RpcPromise<Json>>(*response));
             }
           } else {
-            clientInfo->outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
+            clientInfo->outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
               std::unexpected(String("Message not handled by entity")), entityMessagePacket->uuid));
           }
         } else if (auto const& clientInfo = m_clientInfo.value(connectionForEntity(entity->entityId()))) {
           m_entityMessageResponses[entityMessagePacket->uuid] = {clientInfo->clientId, clientId};
           entityMessagePacket->fromConnection = clientId;
-          clientInfo->outgoingPackets.append(std::move(entityMessagePacket));
+          clientInfo->outgoingPackets.push_back(std::move(entityMessagePacket));
         }
       }
     } else if (auto entityMessageResponsePacket = as<EntityMessageResponsePacket>(packet)) {
@@ -1429,7 +1434,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto response = std::move(*result140).second;
         if (std::holds_alternative<ConnectionId>(response)) {
           if (auto clientInfo = m_clientInfo.value(std::get<ConnectionId>(response)))
-            clientInfo->outgoingPackets.append(std::move(entityMessageResponsePacket));
+            clientInfo->outgoingPackets.push_back(std::move(entityMessageResponsePacket));
         } else {
           if (entityMessageResponsePacket->response.has_value()) {
             if (auto fulfilled =
@@ -1445,7 +1450,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         }
       }
     } else if (auto pingPacket = as<PingPacket>(packet)) {
-      clientInfo->outgoingPackets.append(std::make_shared<PongPacket>(pingPacket->time));
+      clientInfo->outgoingPackets.push_back(std::make_shared<PongPacket>(pingPacket->time));
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
       for (auto&& pair : updateWorldProperties->updatedProperties) {
@@ -1455,7 +1460,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         }
       }
       for (auto const& pair : m_clientInfo)
-        pair.second->outgoingPackets.append(std::make_shared<UpdateWorldPropertiesPacket>(updateWorldProperties->updatedProperties));
+        pair.second->outgoingPackets.push_back(
+          std::make_shared<UpdateWorldPropertiesPacket>(updateWorldProperties->updatedProperties));
     } else if (auto updateWorldTemplate = as<UpdateWorldTemplatePacket>(packet)) {
       if (!clientInfo->admin)
         continue;
@@ -1502,7 +1508,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::getOutg
 
 bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> const& packet) {
   if (auto clientInfo = m_clientInfo.find_ref(clientId)) {
-    clientInfo->get()->outgoingPackets.append(packet);
+    clientInfo->get()->outgoingPackets.push_back(packet);
     return true;
   }
   return false;
@@ -1588,7 +1594,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   List<WorldAction> triggeredActions;
   m_timers.filter([&triggeredActions, dt](std::pair<float, WorldAction>& timer) {
     if ((timer.first -= dt) <= 0) {
-      triggeredActions.append(timer.second);
+      triggeredActions.push_back(timer.second);
       return false;
     }
     return true;
@@ -1640,7 +1646,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     if (!result161)
       return std::unexpected(std::move(result161.error()));
     if (std::move(*result161) && entity->entityMode() == EntityMode::Master)
-      toRemove.append(entity->entityId());
+      toRemove.push_back(entity->entityId());
     return {};
   }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
         return a->entityType() < b->entityType();
@@ -1683,7 +1689,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
           auto clippedWindow = RectI(window.xMin(), std::max(window.yMin(), layer->get().minHeight),
               window.xMax(), std::min(window.yMax(), layer->get().maxHeight));
           if (!clippedWindow.isEmpty())
-            weatherClientWindows[*layer->get().domain].append(clippedWindow);
+            weatherClientWindows[*layer->get().domain].push_back(clippedWindow);
         }
       }
     }
@@ -1694,7 +1700,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       auto result170 = m_geometry.splitRect(region);
       if (!result170)
         return std::unexpected(std::move(result170.error()));
-      clientMonitoringRegions.appendAll(std::move(*result170));
+      clientMonitoringRegions.append_range(std::move(*result170));
     }
   }
 
@@ -1794,13 +1800,13 @@ std::expected<void, StarException> WorldServer::update(float dt) {
           auto result188 = m_entityMessagePromises[uuid].second.result();
           if (!result188)
             return std::unexpected(std::move(result188.error()));
-          clientInfo->outgoingPackets.append(
+          clientInfo->outgoingPackets.push_back(
             std::make_shared<EntityMessageResponsePacket>(*std::move(*result188), uuid));
         } else {
           auto result189 = m_entityMessagePromises[uuid].second.error();
           if (!result189)
             return std::unexpected(std::move(result189.error()));
-          clientInfo->outgoingPackets.append(
+          clientInfo->outgoingPackets.push_back(
             std::make_shared<EntityMessageResponsePacket>(std::unexpected(*std::move(*result189)), uuid));
         }
         m_entityMessagePromises.remove(uuid);
@@ -2178,7 +2184,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
         layer = placeMaterial.layer;
 
         if (placeMaterial.material == material(pair.first, layer)) {
-          failures.append(pair);
+          failures.push_back(pair);
           continue;
         }
 
@@ -2190,18 +2196,19 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
           if (!result230)
             return std::unexpected(std::move(result230.error()));
           if (std::move(*result230))
-            success.append(pair); else {
-            failures.append(pair);
+            success.push_back(pair);
+          else {
+            failures.push_back(pair);
           }
           continue;
         }
 
-        toDamage.append(pair.first);
-        success.append(pair);
+        toDamage.push_back(pair.first);
+        success.push_back(pair);
         continue;
       }
 
-      failures.append(pair);
+      failures.push_back(pair);
     }
 
     if (!toDamage.empty()) {
@@ -2215,8 +2222,9 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
       if (!result232)
         return std::unexpected(std::move(result232.error()));
       if (std::move(*result232))
-        success.append(pair); else {
-        failures.append(pair);
+        success.push_back(pair);
+      else {
+        failures.push_back(pair);
       }
     }
   }
@@ -2224,7 +2232,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
   auto result233 = doApplyTileModifications(success, true, false, false);
   if (!result233)
     return std::unexpected(std::move(result233.error()));
-  failures.appendAll(std::move(*result233));
+  failures.append_range(std::move(*result233));
 
   for (auto pair : success) {
     auto result234 = checkEntityBreaks(RectF::withSize(Vec2F(pair.first), Vec2F(1, 1)));
@@ -2446,7 +2454,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
 
       if (tile->get().liquid.level > 0) {
         nextUnit -= tile->get().liquid.level;
-        maybeDrainTiles.append(*tile);
+        maybeDrainTiles.push_back(*tile);
       }
 
       for (auto const& pair : m_clientInfo) {
@@ -2622,7 +2630,7 @@ std::expected<void, StarException> WorldServer::setLayerEnvironmentBiome(Vec2I c
     return std::unexpected(std::move(result282.error()));
   auto layoutJson = std::move(*result282);
   for (auto const& pair : m_clientInfo)
-    pair.second->outgoingPackets.append(std::make_shared<WorldLayoutUpdatePacket>(layoutJson));
+    pair.second->outgoingPackets.push_back(std::make_shared<WorldLayoutUpdatePacket>(layoutJson));
   return {};
 }
 
@@ -2666,7 +2674,7 @@ std::expected<void, StarException> WorldServer::setPlanetType(String const& plan
         auto result288 = netStoreVisitableWorldParameters(newTerrestrialParameters);
         if (!result288)
           return std::unexpected(std::move(result288.error()));
-        pair.second->outgoingPackets.append(std::make_shared<WorldParametersUpdatePacket>(std::move(*result288)));
+        pair.second->outgoingPackets.push_back(std::make_shared<WorldParametersUpdatePacket>(std::move(*result288)));
       }
 
       auto newSkyParameters = SkyParameters(m_worldTemplate->skyParameters(), newTerrestrialParameters);
@@ -2751,7 +2759,7 @@ std::expected<void, StarException> WorldServer::setTileProtection(DungeonId dung
 
   if (updated) {
     for (auto const& pair : m_clientInfo)
-      pair.second->outgoingPackets.append(std::make_shared<UpdateTileProtectionPacket>(dungeonId, isProtected));
+      pair.second->outgoingPackets.push_back(std::make_shared<UpdateTileProtectionPacket>(dungeonId, isProtected));
 
     auto result297 = this->root().logger().info("Protected dungeonIds for world set to {}", m_protectedDungeonIds);
     if (!result297)
@@ -2765,13 +2773,13 @@ std::expected<std::size_t, StarException> WorldServer::setTileProtection(List<Du
   updates.reserve(dungeonIds.size());
   for (auto const& dungeonId : dungeonIds)
     if (isProtected ? m_protectedDungeonIds.add(dungeonId) : m_protectedDungeonIds.remove(dungeonId))
-      updates.append(std::make_shared<UpdateTileProtectionPacket>(dungeonId, isProtected));
+      updates.push_back(std::make_shared<UpdateTileProtectionPacket>(dungeonId, isProtected));
 
   if (updates.empty())
     return 0;
 
   for (auto const& pair : m_clientInfo)
-    pair.second->outgoingPackets.appendAll(updates);
+    pair.second->outgoingPackets.append_range(updates);
 
   auto newDungeonIds = m_protectedDungeonIds.values();
   std::sort(newDungeonIds.begin(), newDungeonIds.end(), std::less<DungeonId>());
@@ -2809,7 +2817,7 @@ std::expected<void, StarException> WorldServer::setDungeonGravity(DungeonId dung
     }
 
     for (auto const& p : m_clientInfo)
-      p.second->outgoingPackets.append(std::make_shared<SetDungeonGravityPacket>(dungeonId, gravity));
+      p.second->outgoingPackets.push_back(std::make_shared<SetDungeonGravityPacket>(dungeonId, gravity));
   }
   return {};
 }
@@ -3349,7 +3357,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
         }
         if (isRealMaterial(materialSpace.material))
           tile->get().rootSource = entity->tilePosition();
-        passedSpaces.emplaceAppend(materialSpace);
+        passedSpaces.emplace_back(materialSpace);
         auto result358 = materialDatabase->materialCollisionKind(materialSpace.material);
         if (!result358)
           return std::unexpected(std::move(result358.error()));
@@ -3568,7 +3576,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (!result381)
           return std::unexpected(std::move(result381.error()));
         if (auto drop = std::move(*result381))
-          drops.append(drop);
+          drops.push_back(drop);
       }
       tile->get().backgroundMod = NoModId;
     } else {
@@ -3577,12 +3585,12 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (!result382)
           return std::unexpected(std::move(result382.error()));
         if (auto drop = std::move(*result382))
-          drops.append(drop);
+          drops.push_back(drop);
         auto result383 = materialDatabase->modItemDrop(tile->get().backgroundMod);
         if (!result383)
           return std::unexpected(std::move(result383.error()));
         if (auto drop = std::move(*result383))
-          drops.append(drop);
+          drops.push_back(drop);
       }
       tile->get().background = EmptyMaterialId;
       tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
@@ -3605,7 +3613,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (!result386)
           return std::unexpected(std::move(result386.error()));
         if (auto drop = std::move(*result386))
-          drops.append(drop);
+          drops.push_back(drop);
       }
       tile->get().foregroundMod = NoModId;
     } else {
@@ -3614,12 +3622,12 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (!result387)
           return std::unexpected(std::move(result387.error()));
         if (auto drop = std::move(*result387))
-          drops.append(drop);
+          drops.push_back(drop);
         auto result388 = materialDatabase->modItemDrop(tile->get().foregroundMod);
         if (!result388)
           return std::unexpected(std::move(result388.error()));
         if (auto drop = std::move(*result388))
-          drops.append(drop);
+          drops.push_back(drop);
       }
       tile->get().foreground = EmptyMaterialId;
       tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
@@ -3668,7 +3676,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
   if (!result394)
     return std::unexpected(std::move(result394.error()));
   auto const& clientInfo = result394->get();
-  clientInfo->outgoingPackets.append(std::make_shared<StepUpdatePacket>(m_currentTime));
+  clientInfo->outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_currentTime));
 
   std::optional<String> weatherDomain;
   auto clientWindow = clientInfo->clientState->window();
@@ -3705,7 +3713,8 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     std::tie(weatherDelta, clientInfo->weatherNetVersion) = std::move(*result399);
 
     if (!skyDelta.empty() || !weatherDelta.empty())
-      clientInfo->outgoingPackets.append(std::make_shared<EnvironmentUpdatePacket>(std::move(skyDelta), std::move(weatherDelta)));
+      clientInfo->outgoingPackets.push_back(
+        std::make_shared<EnvironmentUpdatePacket>(std::move(skyDelta), std::move(weatherDelta)));
   }
 
   for (auto sector : clientInfo->pendingSectors.values()) {
@@ -3728,7 +3737,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
       snapshot = sectorSnapshots.insert(sector, std::move(tileArrayUpdate)).first;
     }
 
-    clientInfo->outgoingPackets.append(snapshot->second);
+    clientInfo->outgoingPackets.push_back(snapshot->second);
     clientInfo->pendingSectors.remove(sector);
   }
 
@@ -3739,24 +3748,25 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     if (!result401)
       return std::unexpected(std::move(result401.error()));
 
-    clientInfo->outgoingPackets.append(tileUpdate);
+    clientInfo->outgoingPackets.push_back(tileUpdate);
   }
   clientInfo->pendingTileUpdates.clear();
 
   for (auto pair : clientInfo->pendingTileDamageUpdates) {
     auto tile = m_tileArray->tile(pair.first);
     if (pair.second == TileLayer::Foreground)
-      clientInfo->outgoingPackets.append(
-          std::make_shared<TileDamageUpdatePacket>(pair.first, TileLayer::Foreground, tile.foregroundDamage)); else {
-      clientInfo->outgoingPackets.append(
-          std::make_shared<TileDamageUpdatePacket>(pair.first, TileLayer::Background, tile.backgroundDamage));
+      clientInfo->outgoingPackets.push_back(
+        std::make_shared<TileDamageUpdatePacket>(pair.first, TileLayer::Foreground, tile.foregroundDamage));
+    else {
+      clientInfo->outgoingPackets.push_back(
+        std::make_shared<TileDamageUpdatePacket>(pair.first, TileLayer::Background, tile.backgroundDamage));
     }
   }
   clientInfo->pendingTileDamageUpdates.clear();
 
   for (auto pos : clientInfo->pendingLiquidUpdates) {
     auto tile = m_tileArray->tile(pos);
-    clientInfo->outgoingPackets.append(std::make_shared<TileLiquidUpdatePacket>(pos, tile.liquid.netUpdate()));
+    clientInfo->outgoingPackets.push_back(std::make_shared<TileLiquidUpdatePacket>(pos, tile.liquid.netUpdate()));
   }
   clientInfo->pendingLiquidUpdates.clear();
 
@@ -3779,7 +3789,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
   for (auto const& monitoredEntity : monitoredEntities)
     outOfMonitoredRegionsEntities.remove(monitoredEntity->entityId());
   for (auto entityId : outOfMonitoredRegionsEntities) {
-    clientInfo->outgoingPackets.append(std::make_shared<EntityDestroyPacket>(entityId, ByteArray(), false));
+    clientInfo->outgoingPackets.push_back(std::make_shared<EntityDestroyPacket>(entityId, ByteArray(), false));
     clientInfo->clientSlavesNetVersion.remove(entityId);
   }
 
@@ -3830,14 +3840,14 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
         auto result410 = entityFactory->netStoreEntity(monitoredEntity, netRules);
         if (!result410)
           return std::unexpected(std::move(result410.error()));
-        clientInfo->outgoingPackets.append(std::make_shared<EntityCreatePacket>(monitoredEntity->entityType(),
-              std::move(*result410), std::move(firstUpdate.first), entityId));
+        clientInfo->outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(
+          monitoredEntity->entityType(), std::move(*result410), std::move(firstUpdate.first), entityId));
       }
     }
   }
 
   for (auto&& p : updateSetPackets)
-    clientInfo->outgoingPackets.append(std::move(p.second));
+    clientInfo->outgoingPackets.push_back(std::move(p.second));
   return {};
 }
 
@@ -3853,20 +3863,20 @@ std::expected<void, StarException> WorldServer::updateDamage(float dt) {
     auto destination = m_clientInfo.get(remoteHitRequest.destinationConnection());
     if (!destination)
       return std::unexpected(std::move(destination.error()));
-    destination->get()->outgoingPackets.append(std::make_shared<HitRequestPacket>(remoteHitRequest));
+    destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(remoteHitRequest));
   }
 
   for (auto const& remoteDamageRequest : m_damageManager->pullRemoteDamageRequests()) {
     auto destination = m_clientInfo.get(remoteDamageRequest.destinationConnection());
     if (!destination)
       return std::unexpected(std::move(destination.error()));
-    destination->get()->outgoingPackets.append(std::make_shared<DamageRequestPacket>(remoteDamageRequest));
+    destination->get()->outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(remoteDamageRequest));
   }
 
   for (auto const& remoteDamageNotification : m_damageManager->pullRemoteDamageNotifications()) {
     for (auto const& pair : m_clientInfo) {
       if (pair.second->needsDamageNotification(remoteDamageNotification))
-        pair.second->outgoingPackets.append(std::make_shared<DamageNotificationPacket>(remoteDamageNotification));
+        pair.second->outgoingPackets.push_back(std::make_shared<DamageNotificationPacket>(remoteDamageNotification));
     }
   }
   return {};
@@ -4111,7 +4121,7 @@ std::expected<void, StarException> WorldServer::freshenCollision(RectI const& re
       return std::unexpected(std::move(result439.error()));
     for (auto collisionBlock : std::move(*result439)) {
       if (auto tile = m_tileArray->modifyTile(collisionBlock.space)) {
-        if (auto appended = tile->get().collisionCache.append(std::move(collisionBlock)); !appended)
+        if (auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock)); !appended)
           return std::unexpected(std::move(appended.error()));
       }
     }
@@ -4145,7 +4155,8 @@ std::expected<void, StarException> WorldServer::removeEntity(EntityId entityId, 
       if (!result442)
         return std::unexpected(std::move(result442.error()));
       ByteArray finalDelta = std::move(*result442).first;
-      clientInfo->outgoingPackets.append(std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(finalDelta), andDie));
+      clientInfo->outgoingPackets.push_back(
+        std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(finalDelta), andDie));
     }
   }
 
@@ -4179,7 +4190,7 @@ std::expected<void, StarException> WorldServer::setDungeonBreathable(DungeonId d
     }
 
     for (auto const& p : m_clientInfo)
-      p.second->outgoingPackets.append(std::make_shared<SetDungeonBreathablePacket>(dungeonId, breathable));
+      p.second->outgoingPackets.push_back(std::make_shared<SetDungeonBreathablePacket>(dungeonId, breathable));
   }
   return {};
 }
@@ -4297,7 +4308,8 @@ std::expected<void, StarException> WorldServer::setProperty(String const& proper
       entry->second = property;
     }
     for (auto const& pair : m_clientInfo)
-      pair.second->outgoingPackets.append(std::make_shared<UpdateWorldPropertiesPacket>(JsonObject{ {propertyName, property} }));
+      pair.second->outgoingPackets.push_back(
+        std::make_shared<UpdateWorldPropertiesPacket>(JsonObject{{propertyName, property}}));
   }
   auto listener = m_worldPropertyListeners.find(propertyName);
   if (listener != m_worldPropertyListeners.end()) {
@@ -4310,9 +4322,7 @@ std::expected<void, StarException> WorldServer::setProperty(String const& proper
   return {};
 }
 
-void WorldServer::timer(float delay, WorldAction worldAction) {
-  m_timers.append({delay, worldAction});
-}
+void WorldServer::timer(float delay, WorldAction worldAction) { m_timers.push_back({delay, worldAction}); }
 
 std::expected<void, StarException> WorldServer::startFlyingSky(bool enterHyperspace, bool startInWarp, Json settings) {
   auto result459 = m_sky->startFlying(enterHyperspace, startInWarp, std::move(settings));
@@ -4403,7 +4413,8 @@ std::expected<RpcPromise<Json>, StarException> WorldServer::sendEntityMessage(st
     auto const& clientInfo = destination->get();
     Uuid uuid(this->root().random());
     m_entityMessageResponses[uuid] = {clientInfo->clientId, pair.second};
-    clientInfo->outgoingPackets.append(std::make_shared<EntityMessagePacket>(entity->entityId(), message, args, uuid));
+    clientInfo->outgoingPackets.push_back(
+      std::make_shared<EntityMessagePacket>(entity->entityId(), message, args, uuid));
     return pair.first;
   }
 }
@@ -4413,7 +4424,7 @@ void WorldServer::setPlayerStart(Vec2F const& startPosition, bool respawnInWorld
   m_respawnInWorld = respawnInWorld;
   m_adjustPlayerStart = false;
   for (auto const& pair : m_clientInfo)
-    pair.second->outgoingPackets.append(std::make_shared<SetPlayerStartPacket>(m_playerStart, m_respawnInWorld));
+    pair.second->outgoingPackets.push_back(std::make_shared<SetPlayerStartPacket>(m_playerStart, m_respawnInWorld));
 }
 
 std::expected<Vec2F, StarException> WorldServer::findPlayerStart(std::optional<Vec2F> firstTry) {
@@ -4661,14 +4672,14 @@ std::expected<void, StarException> WorldServer::writeMetadata() {
         JsonArray gravity;
         gravity.reserve(gravityByDungeon.size());
         for (auto const& p : gravityByDungeon)
-          gravity.append(JsonArray{p.first, p.second});
+          gravity.push_back(JsonArray{p.first, p.second});
         return gravity;
       }()},
     {"dungeonIdBreathable", [&breathableByDungeon = m_dungeonIdBreathable]() {
         JsonArray breathable;
         breathable.reserve(breathableByDungeon.size());
         for (auto const& p : breathableByDungeon)
-          breathable.append(JsonArray{p.first, p.second});
+          breathable.push_back(JsonArray{p.first, p.second});
         return breathable;
       }()}
   };
@@ -4797,7 +4808,7 @@ std::expected<void, StarException> WorldServer::setupForceRegions() {
     topForceRegion.baseTargetVelocity = regionVelocity;
     topForceRegion.baseControlForce = regionForce;
     topForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.append(topForceRegion);
+    m_forceRegions.push_back(topForceRegion);
   }
 
   if (addBottomRegion) {
@@ -4811,7 +4822,7 @@ std::expected<void, StarException> WorldServer::setupForceRegions() {
     bottomForceRegion.baseTargetVelocity = regionVelocity;
     bottomForceRegion.baseControlForce = regionForce;
     bottomForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.append(bottomForceRegion);
+    m_forceRegions.push_back(bottomForceRegion);
   }
   return {};
 }

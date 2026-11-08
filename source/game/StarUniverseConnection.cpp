@@ -135,13 +135,13 @@ void UniverseConnection::close() {
 
 std::expected<void, StarException> UniverseConnection::push(List<std::shared_ptr<Packet>> packets) {
   std::lock_guard locker(m_mutex);
-  m_sendQueue.appendAll(std::move(packets));
+  m_sendQueue.append_range(std::move(packets));
   return {};
 }
 
 std::expected<void, StarException> UniverseConnection::pushSingle(std::shared_ptr<Packet> packet) {
   std::lock_guard locker(m_mutex);
-  m_sendQueue.append(std::move(packet));
+  m_sendQueue.push_back(std::move(packet));
   return {};
 }
 
@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<Packet>, StarException> UniverseConnection::pullSi
   std::lock_guard locker(m_mutex);
   if (m_receiveQueue.empty())
     return std::shared_ptr<Packet>{};
-  return m_receiveQueue.takeFirst();
+  return m_receiveQueue.take_front();
 }
 
 std::expected<bool, StarException> UniverseConnection::send() {
@@ -203,7 +203,7 @@ std::expected<bool, StarException> UniverseConnection::receive() {
   auto packets = m_packetSocket->receivePackets();
   if (!packets)
     return std::unexpected(std::move(packets.error()));
-  m_receiveQueue.appendAll(std::move(*packets));
+  m_receiveQueue.append_range(std::move(*packets));
   return *received;
 }
 
@@ -221,7 +221,7 @@ std::expected<bool, StarException> UniverseConnection::receiveAny(unsigned timeo
     auto packets = m_packetSocket->receivePackets();
     if (!packets)
       return std::unexpected(std::move(packets.error()));
-    m_receiveQueue.appendAll(std::move(*packets));
+    m_receiveQueue.append_range(std::move(*packets));
     if (!m_receiveQueue.empty())
       return true;
     if (std::chrono::steady_clock::now() >= deadline || !m_packetSocket->isOpen())
@@ -296,7 +296,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
         failure = failure.withRelated(closed.error(), "Connection worker startup rollback failure");
       return std::unexpected(std::move(failure));
     }
-    m_processingThreads.append(std::move(*thread));
+    m_processingThreads.push_back(std::move(*thread));
   }
   return {};
 }
@@ -332,7 +332,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
         if (!packets->empty()) {
           p.second->lastActivityTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
           m_workerStats[i].packetsProcessed += packets->size();
-          p.second->receiveQueue.appendAll(std::move(*packets));
+          p.second->receiveQueue.append_range(std::move(*packets));
         }
         return {};
       };
@@ -438,7 +438,7 @@ List<ConnectionId> UniverseConnectionServer::allConnections() const {
   lockWithDiagnostics(connectionsLocker);
   List<ConnectionId> connections;
   for (auto const& shard : m_connections)
-    connections.appendAll(shard.keys());
+    connections.append_range(shard.keys());
   return connections;
 }
 
@@ -518,7 +518,7 @@ List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
       uc.m_packetSocket = std::exchange(p.second->packetSocket, {});
       uc.m_sendQueue = std::move(p.second->sendQueue);
       uc.m_receiveQueue = std::move(p.second->receiveQueue);
-      removedConnections.append(std::move(uc));
+      removedConnections.push_back(std::move(uc));
     }
     shard.clear();
   }
@@ -531,7 +531,7 @@ std::expected<void, StarException> UniverseConnectionServer::sendPackets(Connect
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
     std::lock_guard connectionLocker(conn->mutex);
     connectionsLocker.unlock();
-    conn->sendQueue.appendAll(std::move(packets));
+    conn->sendQueue.append_range(std::move(packets));
 
     if (conn->packetSocket && conn->packetSocket->isOpen()) {
       auto queued = conn->packetSocket->sendPackets(std::exchange(conn->sendQueue, {}));

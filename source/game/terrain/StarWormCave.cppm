@@ -155,7 +155,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
         if (!length)
           return std::unexpected(std::move(length.error()));
         worm.goalLength = *length * commonality;
-        worms.append(worm);
+        worms.push_back(worm);
       }
     }
 

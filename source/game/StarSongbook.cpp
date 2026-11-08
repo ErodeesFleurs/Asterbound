@@ -125,7 +125,7 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
         auto speciesFile = instrumentFile->replace("$species$", species);
         if (!speciesFile)
           return std::unexpected(std::move(speciesFile.error()));
-        nm.files.append(std::move(*speciesFile));
+        nm.files.push_back(std::move(*speciesFile));
         return {};
       };
       auto hasFile = entry.second.contains("file");
@@ -221,7 +221,7 @@ std::expected<void, StarException> Songbook::update(EntityMode mode, World& worl
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       } else {
-        m_track.appendAll(std::move(*parsed));
+        m_track.append_range(std::move(*parsed));
       }
     }
   }
@@ -246,7 +246,7 @@ std::expected<void, StarException> Songbook::playback() {
   }
 
   while (!m_track.empty() && (m_track.begin()->timecode <= (now + 0.5))) {
-    auto taken = m_track.takeFirst();
+    auto taken = m_track.take_front();
     if (!taken)
       return std::unexpected(std::move(taken.error()));
     auto note = std::move(*taken);
@@ -287,8 +287,8 @@ std::expected<void, StarException> Songbook::playback() {
 
     audioInstance->setPosition(m_position);
 
-    m_pendingAudio.append(audioInstance);
-    m_heldNotes.append(HeldNote{audioInstance, note.timecode, note.duration + note.timecode});
+    m_pendingAudio.push_back(audioInstance);
+    m_heldNotes.push_back(HeldNote{audioInstance, note.timecode, note.duration + note.timecode});
   }
   return {};
 }
@@ -437,7 +437,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
         auto value = entry.toInt();
         if (!value)
           return std::unexpected(std::move(value.error()));
-        mapping.append(*value);
+        mapping.push_back(*value);
       }
       if (mapping.size() < 7)
         return std::unexpected(StarException("ABC key signature needs seven notes"));
@@ -541,16 +541,16 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           tdt = 3;
 
         tupleMapping.clear();
-        tupleMapping.append(0);
-        tupleMapping.append(0);
-        tupleMapping.append(3);
-        tupleMapping.append(2);
-        tupleMapping.append(3);
-        tupleMapping.append(tdt);
-        tupleMapping.append(2);
-        tupleMapping.append(tdt);
-        tupleMapping.append(3);
-        tupleMapping.append(tdt);
+        tupleMapping.push_back(0);
+        tupleMapping.push_back(0);
+        tupleMapping.push_back(3);
+        tupleMapping.push_back(2);
+        tupleMapping.push_back(3);
+        tupleMapping.push_back(tdt);
+        tupleMapping.push_back(2);
+        tupleMapping.push_back(tdt);
+        tupleMapping.push_back(3);
+        tupleMapping.push_back(tdt);
       }
 
       std::size_t cursor = 0;
@@ -859,8 +859,8 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               auto file = m_root.random().randFrom(mapping->get().files);
               if (!file)
                 return std::unexpected(std::move(file.error()));
-              result.append(Note{m_instrument, file->get(), now, noteDuration,
-                  mapping->get().fadeout, mapping->get().velocity});
+              result.push_back(
+                Note{m_instrument, file->get(), now, noteDuration, mapping->get().fadeout, mapping->get().velocity});
               if (tied)
                 pendingTies[note] = result.size() - 1;
             }

@@ -567,7 +567,7 @@ std::expected<StringList, StarException> LuaBindings::UniverseServerCallbacks::a
     auto id = printWorldId(world);
     if (!id)
       return std::unexpected(std::move(id.error()));
-    result.append(std::move(*id));
+    result.push_back(std::move(*id));
   }
   return result;
 }

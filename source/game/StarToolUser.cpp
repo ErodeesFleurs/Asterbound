@@ -264,17 +264,17 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     if (auto active = as<ActiveItem>(item)) {
       auto sources = active->lights(interpolation);
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
     if (auto flashlight = as<Flashlight>(item)) {
       auto sources = flashlight->lightSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
     if (auto inspection = as<InspectionTool>(item)) {
       auto sources = inspection->lightSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
   }
 
@@ -303,7 +303,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
       if (auto source = as<StatusEffectItem>(item)) {
         auto status = source->statusEffects();
         if (!status) return std::unexpected(std::move(status.error()));
-        effects.appendAll(*status);
+        effects.append_range(*status);
       }
     }
   }
@@ -766,7 +766,7 @@ bool ToolUser::firingAlt() const {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto sources = toolItem->damageSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      ds.appendAll(*sources);
+      ds.append_range(*sources);
     }
   }
   return ds;
@@ -781,7 +781,7 @@ bool ToolUser::firingAlt() const {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto regions = toolItem->forceRegions();
       if (!regions) return std::unexpected(std::move(regions.error()));
-      ds.appendAll(*regions);
+      ds.append_range(*regions);
     }
   }
   return ds;

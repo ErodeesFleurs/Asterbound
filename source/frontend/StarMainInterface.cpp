@@ -821,7 +821,7 @@ std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const 
   for (auto const& pane : *targets) {
     for (auto const& entry : m_paneInstances) {
       if (entry.second.first == pane) {
-        ids.append(entry.first);
+        ids.push_back(entry.first);
         break;
       }
     }
@@ -944,7 +944,7 @@ std::expected<void, StarException> MainInterface::addChatMessages(List<ChatRecei
     if (!logged) return std::unexpected(std::move(logged.error()));
     auto json = message.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    payload.append(std::move(*json));
+    payload.push_back(std::move(*json));
   }
   return sendPaneEvent("chat", "messages", JsonObject{{"messages", std::move(payload)}, {"showPane", showPane}});
 }
@@ -1203,7 +1203,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     for (auto action : context().actions(event)) {
       auto name = InterfaceActionNames->get_right(action);
       if (!name) return std::unexpected(std::move(name.error()));
-      actions.append(name->get());
+      actions.push_back(name->get());
     }
     auto captured = m_paneManager.keyboardCapturedPane();
     if (!captured) return std::unexpected(std::move(captured.error()));
@@ -1696,7 +1696,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   }
 
   if (!m_joinRequestDialog->isDisplayed()) {
-    if (auto req = m_queuedJoinRequests.maybeTakeLast()) {
+    if (auto req = m_queuedJoinRequests.try_take_back()) {
       auto displayed = m_paneManager.displayRegisteredPane(MainInterfacePanes::JoinRequest);
       if (!displayed)
         return std::unexpected(std::move(displayed.error()));
@@ -2019,7 +2019,7 @@ std::expected<void, StarException> MainInterface::takeScriptPanes(List<ScriptPan
         return false;
       auto sourceEntityId = scriptPane->sourceEntityId();
       m_interactionScriptPanes.remove(sourceEntityId);
-      auto& info = out.emplaceAppend();
+      auto& info = out.emplace_back();
       info.scriptPane = scriptPane;
       info.config = scriptPane->rawConfig();
       info.sourceEntityId = sourceEntityId;

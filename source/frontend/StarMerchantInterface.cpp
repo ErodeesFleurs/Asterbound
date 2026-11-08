@@ -703,7 +703,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
     if (!available)
       return std::unexpected(std::move(available.error()));
     if (*available)
-      availableItems.append(itemConfig);
+      availableItems.push_back(itemConfig);
   }
   m_itemList = std::move(availableItems);
 

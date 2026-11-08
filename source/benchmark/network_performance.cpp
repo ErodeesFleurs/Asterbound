@@ -223,7 +223,7 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
     auto packets = client.receiver->pull();
     if (!packets)
       return std::unexpected(std::move(packets.error()));
-    delivered.appendAll(std::move(*packets));
+    delivered.append_range(std::move(*packets));
     if ((std::chrono::steady_clock::now() - start).count()
         > std::chrono::steady_clock::duration(std::chrono::seconds(2)).count())
       return std::unexpected(StarException("Snapshot benchmark TCP delivery timed out"));

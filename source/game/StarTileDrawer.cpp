@@ -450,7 +450,7 @@ std::expected<bool, StarException> TileDrawer::determineMatchingPieces(MaterialP
       subMatchResult = true;
 
       for (auto const& piecePair : match->resultingPieces)
-        resultList.append({piecePair.first, piecePair.second});
+        resultList.push_back({piecePair.first, piecePair.second});
 
       auto matched = determineMatchingPieces(resultList, occlude, materialDb, match->subMatches, renderData, basePos, layer, isMod);
       if (!matched)

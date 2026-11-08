@@ -267,9 +267,10 @@ namespace Tiled {
       auto converted = getter(**value, properties);
       if (!converted) return std::unexpected(std::move(converted.error()));
       if constexpr (std::is_same_v<typename decltype(converted)::value_type, std::optional<T>>) {
-        if (*converted) list.append(std::move(**converted));
+        if (*converted)
+          list.push_back(std::move(**converted));
       } else {
-        list.append(std::move(*converted));
+        list.push_back(std::move(*converted));
       }
       return {};
     }

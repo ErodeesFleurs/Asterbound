@@ -135,7 +135,7 @@ std::expected<List<Collectable>, StarException> CollectionDatabase::collectables
     auto value = collectable(collectionName, entry.first, itemCatalog);
     if (!value)
       return std::unexpected(std::move(value.error()));
-    result.append(std::move(*value));
+    result.push_back(std::move(*value));
   }
   return result;
 }

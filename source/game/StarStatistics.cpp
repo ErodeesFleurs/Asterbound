@@ -86,7 +86,7 @@ bool Statistics::achievementUnlocked(String const& name) const {
 }
 
 void Statistics::recordEvent(String const& name, Json const& fields) {
-  m_pendingEvents.append(std::make_pair(name, fields));
+  m_pendingEvents.push_back(std::make_pair(name, fields));
 }
 
 bool Statistics::reset() {

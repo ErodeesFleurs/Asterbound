@@ -575,7 +575,7 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
     if (!button) return std::unexpected(std::move(button.error()));
     (*button)->setPosition(*offset);
     if (*rightAnchored)
-      m_rightAnchoredButtons.append({*button, *offset});
+      m_rightAnchoredButtons.push_back({*button, *offset});
     if (auto r = (*key == "back" ? *backMenu : m_mainMenu)->addChild(*key, *button); !r)
       return std::unexpected(std::move(r.error()));
   }

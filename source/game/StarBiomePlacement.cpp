@@ -213,7 +213,8 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
           if (!foliageShape) return std::unexpected(std::move(foliageShape.error()));
           matches = *stemShape == *foliageShape;
         }
-        if (matches) matchingPairs.append({stem, foliage});
+        if (matches)
+          matchingPairs.push_back({stem, foliage});
       }
     }
     if (matchingPairs.empty() && !stems->empty() && !foliages->empty()) {
@@ -360,7 +361,8 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
-      if (*item) result.m_randomItems.append(std::move(**item));
+      if (*item)
+        result.m_randomItems.push_back(std::move(**item));
     }
   } else if (result.m_distribution == DistributionType::Periodic) {
     auto octaves = settings->getInt("octaves", 1);
@@ -396,7 +398,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
       if (!item) return std::unexpected(std::move(item.error()));
       if (*item) {
         PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
-        result.m_weightedItems.append({std::move(**item), weight});
+        result.m_weightedItems.push_back({std::move(**item), weight});
       }
     }
   }
@@ -435,7 +437,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   for (auto const& entry : *randomItems) {
     auto item = variantToBiomeItem(assets, entry);
     if (!item) return std::unexpected(std::move(item.error()));
-    result.m_randomItems.append(std::move(*item));
+    result.m_randomItems.push_back(std::move(*item));
   }
   auto densityFunctionConfig = store.get("densityFunction");
   if (!densityFunctionConfig) return std::unexpected(std::move(densityFunctionConfig.error()));
@@ -472,7 +474,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     if (!weightConfig) return std::unexpected(std::move(weightConfig.error()));
     auto weight = PerlinF::create(*weightConfig);
     if (!weight) return std::unexpected(std::move(weight.error()));
-    result.m_weightedItems.append({std::move(*item), std::move(*weight)});
+    result.m_weightedItems.push_back({std::move(*item), std::move(*weight)});
   }
   return result;
 }
@@ -486,7 +488,7 @@ std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
   for (auto const& item : m_randomItems) {
     auto json = variantFromBiomeItem(item);
     if (!json) return std::unexpected(std::move(json.error()));
-    randomItems.append(std::move(*json));
+    randomItems.push_back(std::move(*json));
   }
   auto density = m_densityFunction.toJson();
   if (!density) return std::unexpected(std::move(density.error()));
@@ -498,7 +500,7 @@ std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
     if (!item) return std::unexpected(std::move(item.error()));
     auto weight = pair.second.toJson();
     if (!weight) return std::unexpected(std::move(weight.error()));
-    weightedItems.append(JsonArray{std::move(*item), std::move(*weight)});
+    weightedItems.push_back(JsonArray{std::move(*item), std::move(*weight)});
   }
   return JsonObject{{"mode", String(*mode)}, {"distribution", String(*distribution)}, {"priority", m_priority},
       {"blockProbability", m_blockProbability}, {"blockSeed", m_blockSeed}, {"randomItems", std::move(randomItems)},
@@ -516,7 +518,7 @@ List<BiomeItem> BiomeItemDistribution::allItems() const {
   } else if (m_distribution == DistributionType::Periodic) {
     List<BiomeItem> items;
     for (auto const& pair : m_weightedItems)
-      items.append(pair.first);
+      items.push_back(pair.first);
     return items;
   } else {
     return {};

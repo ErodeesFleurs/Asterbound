@@ -568,7 +568,7 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
     m_mousePosition = mouseDown.mousePosition;
     if (!gameProcessed) {
       auto& state = m_mouseStates[mouseDown.mouseButton];
-      state.pressPositions.append(mouseDown.mousePosition);
+      state.pressPositions.push_back(mouseDown.mousePosition);
       state.press();
 
       if (auto binds = m_bindMappings.find_ref(mouseDown.mouseButton)) {
@@ -581,7 +581,7 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
     auto const& mouseUp = std::get<MouseButtonUpEvent>(input);
     m_mousePosition = mouseUp.mousePosition;
     if (auto state = m_mouseStates.find_ref(mouseUp.mouseButton)) {
-      state->get().releasePositions.append(mouseUp.mousePosition);
+      state->get().releasePositions.push_back(mouseUp.mousePosition);
       state->get().release();
     }
 

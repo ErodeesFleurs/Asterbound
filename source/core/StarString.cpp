@@ -223,7 +223,7 @@ std::expected<StringList, StarException> String::split(String const& pattern, st
   std::size_t start = 0;
   for (;;) {
     auto stop = result.size() == maxSplit ? NPos : m_string.find(pattern.m_string, start);
-    result.append(String(std::string_view(m_string).substr(start, stop == NPos ? NPos : stop - start)));
+    result.push_back(String(std::string_view(m_string).substr(start, stop == NPos ? NPos : stop - start)));
     if (stop == NPos) return result;
     start = stop + pattern.m_string.size();
   }
@@ -263,7 +263,7 @@ std::expected<StringList, StarException> String::splitAny(String const& chars, s
     }
     if (delimiter) {
       if (!next.empty())
-        result.append(std::exchange(next, {}));
+        result.push_back(std::exchange(next, {}));
     } else {
       if (result.size() == maxSplit) done = true;
       auto appended = next.append(*point);
@@ -271,7 +271,8 @@ std::expected<StringList, StarException> String::splitAny(String const& chars, s
     }
     auto moved = cursor.advance(); if (!moved) return std::unexpected(std::move(moved.error()));
   }
-  if (!next.empty()) result.append(std::move(next));
+  if (!next.empty())
+    result.push_back(std::move(next));
   return result;
 }
 std::expected<StringList, StarException> String::rsplitAny(String const& chars, std::size_t maxSplit) const {
@@ -510,10 +511,18 @@ StringList::StringList(StringList const& list) = default;
 StringList::StringList(StringList&& list) : Base(std::move(list)) {}
 std::expected<StringList, StarException> StringList::create(std::span<std::u32string_view const> strings) {
   StringList result;
-  for (auto source : strings) { auto text = String::create(source); if (!text) return std::unexpected(std::move(text.error())); result.append(std::move(*text)); }
+  for (auto source : strings) {
+    auto text = String::create(source);
+    if (!text)
+      return std::unexpected(std::move(text.error()));
+    result.push_back(std::move(*text));
+  }
   return result;
 }
-StringList::StringList(std::span<std::string_view const> strings) { for (auto source : strings) append(String(source)); }
+StringList::StringList(std::span<std::string_view const> strings) {
+  for (auto source : strings)
+    push_back(String(source));
+}
 StringList::StringList(std::size_t count, String const& text) : Base(count, text) {}
 StringList::StringList(std::initializer_list<String> list) : Base(list) {}
 StringList& StringList::operator=(Base const& list) { Base::operator=(list); return *this; }
@@ -527,7 +536,12 @@ std::expected<bool, StarException> StringList::contains(String const& text, Stri
 }
 std::expected<StringList, StarException> StringList::trimAll(String const& pattern) const {
   StringList result;
-  for (auto const& item : *this) { auto text = item.trim(pattern); if (!text) return std::unexpected(std::move(text.error())); result.append(std::move(*text)); }
+  for (auto const& item : *this) {
+    auto text = item.trim(pattern);
+    if (!text)
+      return std::unexpected(std::move(text.error()));
+    result.push_back(std::move(*text));
+  }
   return result;
 }
 String StringList::join(String const& separator) const {

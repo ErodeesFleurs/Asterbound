@@ -1088,7 +1088,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::connectWireGroup(List<
             !inputNodeMatches)
           return std::unexpected(std::move(inputNodeMatches.error()));
         else if (*inputNodeMatches) {
-          inbounds.append(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
+          inbounds.push_back(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
           found = true;
         }
       }
@@ -1103,7 +1103,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::connectWireGroup(List<
             !outputNodeMatches)
           return std::unexpected(std::move(outputNodeMatches.error()));
         else if (*outputNodeMatches) {
-          outbounds.append(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
+          outbounds.push_back(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
           found = true;
         }
       }
@@ -1270,7 +1270,7 @@ WorldGeometry SpawnerWorld::geometry() const {
 List<RectF> SpawnerWorld::clientWindows() const {
   List<RectF> windows;
   for (auto clientId : m_worldServer.clientIds())
-    windows.append(m_worldServer.clientWindow(clientId));
+    windows.push_back(m_worldServer.clientWindow(clientId));
   return windows;
 }
 
@@ -1488,7 +1488,7 @@ std::expected<bool, StarException> WorldGenerator::entityPersistent(WorldStorage
 
 std::expected<RpcPromise<Vec2I>, StarException> WorldGenerator::enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
   auto promise = RpcPromise<Vec2I>::createPair();
-  m_queuedPlacements.append(QueuedPlacement{
+  m_queuedPlacements.push_back(QueuedPlacement{
     .distributions = std::move(distributions),
     .dungeonId = id,
     .promise = promise.second,
@@ -1674,7 +1674,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
       if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
       auto rangeValues = std::move((*rangeValuesResult1));
       for (auto const& placement : rangeValues)
-        placementQueue.append({.placement = placement, .queued = {}, .queueOrder = 0});
+        placementQueue.push_back({.placement = placement, .queued = {}, .queueOrder = 0});
 
       for (std::size_t queueIndex = 0; queueIndex < m_queuedPlacements.size(); ++queueIndex) {
         auto& p = m_queuedPlacements[queueIndex];
@@ -1691,7 +1691,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
         if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
         auto rangeValues = std::move((*rangeValuesResult1));
         for (auto placement : rangeValues)
-          placementQueue.append(
+          placementQueue.push_back(
             {.placement = std::move(placement), .queued = std::ref(p), .queueOrder = queueIndex + 1});
       }
     }
@@ -1987,7 +1987,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
         if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
         auto rangeValues = std::move((*rangeValuesResult1));
         for (auto const& placement : rangeValues)
-          placementQueue.append(placement);
+          placementQueue.push_back(placement);
       }
     }
   }
@@ -2176,10 +2176,10 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
   List<std::shared_ptr<TileEntity>> biomeTileEntities;
   for (auto const& entity : entities) {
     if (auto plant = as<Plant>(entity)) {
-      biomeTileEntities.append(as<TileEntity>(entity));
+      biomeTileEntities.push_back(as<TileEntity>(entity));
     } else if (auto object = as<Object>(entity)) {
       if (object->biomePlaced())
-        biomeTileEntities.append(as<TileEntity>(entity));
+        biomeTileEntities.push_back(as<TileEntity>(entity));
     }
   }
 
@@ -2338,7 +2338,7 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
       if (tile->get().biomeTransition && !blockInfo.biomeTransition) {
         tile->get().biomeTransition = false;
         if (!isSolidColliding(tile->get().collision))
-          biomeItemTiles.append(position);
+          biomeItemTiles.push_back(position);
       }
     }
   }

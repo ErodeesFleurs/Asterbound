@@ -1344,7 +1344,7 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
   if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
   World& worldRef = activeWorld->get();
   while (!m_workingCollisions.empty()) {
-    m_collisionBuffers.append(std::move(m_workingCollisions.back().poly));
+    m_collisionBuffers.push_back(std::move(m_workingCollisions.back().poly));
     m_workingCollisions.pop_back();
   }
 
@@ -1352,10 +1352,10 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
     if (!collisionBuffers.empty()) {
       auto poly = std::move(collisionBuffers.back());
       collisionBuffers.pop_back();
-      return workingCollisions.emplaceAppend(CollisionPoly{std::move(poly), {}, {}, {}, {}, {}});
+      return workingCollisions.emplace_back(CollisionPoly{std::move(poly), {}, {}, {}, {}, {}});
     }
     else
-      return workingCollisions.emplaceAppend(CollisionPoly{});
+      return workingCollisions.emplace_back(CollisionPoly{});
   };
 
   auto geometry = worldRef.geometry();

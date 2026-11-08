@@ -295,12 +295,12 @@ std::expected<MarkovSource, StarException> PatternedNameGenerator::makeMarkovSou
       if (!prefix)
         return std::unexpected(std::move(prefix.error()));
       if (i == 0)
-        source.starts.append(*prefix);
+        source.starts.push_back(*prefix);
       if (i + prefixSize < *lowerLength) {
         auto next = name->slice(i + prefixSize, i + prefixSize + 1);
         if (!next)
           return std::unexpected(std::move(next.error()));
-        source.chains[*prefix].append(std::move(*next));
+        source.chains[*prefix].push_back(std::move(*next));
       }
     }
   }

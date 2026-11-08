@@ -232,7 +232,8 @@ std::shared_ptr<SystemClientShip> SystemWorldClient::getShip(Uuid const & uuid) 
 
 Uuid SystemWorldClient::spawnObject(String typeName, std::optional<Vec2F> position, std::optional<Uuid> const& uuid, JsonObject overrides) {
   Uuid objectUuid = uuid.value_or(Uuid(this->root().random()));
-  m_outgoingPackets.append(std::make_shared<SystemObjectSpawnPacket>(std::move(typeName), objectUuid, std::move(position), std::move(overrides)));
+  m_outgoingPackets.push_back(std::make_shared<SystemObjectSpawnPacket>(std::move(typeName), objectUuid,
+                                                                        std::move(position), std::move(overrides)));
   return objectUuid;
 }
 

@@ -229,7 +229,7 @@ std::expected<CompositeNode, StarException> BehaviorDatabase::compositeNode(Json
   for (auto const& child : *array) {
     auto node = behaviorNode(child, treeParameters, tree);
     if (!node) return std::unexpected(std::move(node.error()));
-    children.append(*node);
+    children.push_back(*node);
   }
   auto name = config.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));

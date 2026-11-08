@@ -298,7 +298,7 @@ std::expected<List<Vec2I>, StarException> Spawner::cellIndexesForRange(RectF con
     auto indexes = RectI::integral(RectF(srange).scaled(1.0f / m_spawnCellSize));
     for (int x = indexes.xMin(); x < indexes.xMax(); ++x) {
       for (int y = indexes.yMin(); y < indexes.yMax(); ++y)
-        cellIndexes.append({x, y});
+        cellIndexes.push_back({x, y});
     }
   }
 
@@ -440,7 +440,7 @@ std::expected<std::optional<Vec2F>, StarException> Spawner::adjustSpawnRegion(Re
   List<Vec2F> tryPositions;
   for (float x = spawnRegion.xMin(); x <= spawnRegion.xMax(); x += m_spawnCheckResolution) {
     for (float y = spawnRegion.yMin(); y <= spawnRegion.yMax(); y += m_spawnCheckResolution)
-      tryPositions.append({x, y});
+      tryPositions.push_back({x, y});
   }
 
   this->root().random().shuffle(tryPositions);
@@ -538,7 +538,7 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
         if (!name) return std::unexpected(std::move(name.error()));
         auto shortName = name->get().slice(0, 3);
         if (!shortName) return std::unexpected(std::move(shortName.error()));
-        areas.append(std::move(*shortName));
+        areas.push_back(std::move(*shortName));
       }
       root().spatialLogger().logText("world", strf("Areas: {}", areas.join(", ")), region.min() + Vec2F(0.5, 2.5), {255, 255, 255, 255});
       if (!SpawnParameters::RegionNames) return std::unexpected(SpawnParameters::RegionNames.error());

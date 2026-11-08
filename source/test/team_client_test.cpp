@@ -50,7 +50,7 @@ const GameTestRegistration teamStatusSynchronization(
     auto intervalPath = File::relative_to(overlay, "interface.config.patch");
     ASSERT_TRUE(File::write_file(intervalPatch, intervalPath));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};

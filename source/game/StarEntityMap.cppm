@@ -173,7 +173,7 @@ template <typename EntityT>
         if (!accepted) return std::unexpected(std::move(accepted.error()));
         if (!*accepted) return {};
       }
-      entities.append(std::move(e));
+      entities.push_back(std::move(e));
     }
     return {};
   });
@@ -191,7 +191,7 @@ template <typename EntityT>
         if (!accepted) return std::unexpected(std::move(accepted.error()));
         if (!*accepted) return {};
       }
-      entities.append(e);
+      entities.push_back(e);
     }
     return {};
   });
@@ -205,7 +205,7 @@ template <typename EntityT>
   if (!result) return std::unexpected(std::move(result.error()));
   List<std::shared_ptr<EntityT>> entities;
   for (auto const& entity : *result)
-    entities.append(as<EntityT>(entity));
+    entities.push_back(as<EntityT>(entity));
   return entities;
 }
 
@@ -221,7 +221,7 @@ template <typename EntityT>
   List<std::shared_ptr<EntityT>> list;
   auto result = forEachEntityAtTile(pos, [&](std::shared_ptr<TileEntity> const& entity) -> std::expected<void, StarException> {
     if (auto e = as<EntityT>(entity))
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));

@@ -352,7 +352,7 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
       auto value = (**pair)[1].toDouble();
       if (!value)
         return std::unexpected(std::move(value.error()));
-      points.append({*index, *value});
+      points.push_back({*index, *value});
     }
     auto interpolation = storedInterpolationMode(*interpolationName);
     if (!interpolation)
@@ -382,7 +382,7 @@ std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::param
       auto index = (**pair)[0].toInt();
       if (!index)
         return std::unexpected(std::move(index.error()));
-      points.append({*index, (**pair)[1]});
+      points.push_back({*index, (**pair)[1]});
     }
     return ParametricTable<int, Json>::create(std::move(points));
   }();
@@ -418,7 +418,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
           auto value = (**row)[x].toFloat();
           if (!value)
             return std::unexpected(std::move(value.error()));
-          xaxis.append(*value);
+          xaxis.push_back(*value);
         }
         points.resize({(*row)->size() - 1, (*grid)->size() - 1});
       } else {
@@ -427,7 +427,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
         auto axis = (**row)[0].toFloat();
         if (!axis)
           return std::unexpected(std::move(axis.error()));
-        yaxis.append(*axis);
+        yaxis.push_back(*axis);
         auto cells = (**row)[1].arrayPtr();
         if (!cells)
           return std::unexpected(std::move(cells.error()));

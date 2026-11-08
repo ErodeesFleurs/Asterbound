@@ -447,7 +447,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
         return std::unexpected(std::move(position.error()));
       line.translate(*position);
     }
-    damageSources.append(std::move(ds));
+    damageSources.push_back(std::move(ds));
   }
   return damageSources;
 }
@@ -465,7 +465,7 @@ std::expected<List<PolyF>, StarException> ActiveItem::shieldPolys() const {
     if (!position)
       return std::unexpected(std::move(position.error()));
     sp.translate(*position);
-    shieldPolys.append(std::move(sp));
+    shieldPolys.push_back(std::move(sp));
   }
   return shieldPolys;
 }
@@ -498,7 +498,7 @@ std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::forceRegions(
         return std::unexpected(std::move(position.error()));
       rfr.center += itemOwner->get().position() + *position;
     }
-    forceRegions.append(std::move(fr));
+    forceRegions.push_back(std::move(fr));
   }
   return forceRegions;
 }
@@ -574,9 +574,9 @@ std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpo
       else
         light.beamAngle = -std::numbers::pi / 2 - constrainAngle(light.beamAngle + std::numbers::pi / 2);
     }
-    result.append(std::move(light));
+    result.push_back(std::move(light));
   }
-  result.appendAll(m_scriptedAnimator.lightSources());
+  result.append_range(m_scriptedAnimator.lightSources());
   return result;
 }
 
@@ -598,9 +598,9 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
     if (!position)
       return std::unexpected(std::move(position.error()));
     audio->setPosition(itemOwner->get().position() + *position);
-    result.append(std::move(audio));
+    result.push_back(std::move(audio));
   }
-  result.appendAll(m_scriptedAnimator.pullNewAudios());
+  result.append_range(m_scriptedAnimator.pullNewAudios());
   return result;
 }
 
@@ -620,9 +620,9 @@ std::expected<List<Particle>, StarException> ActiveItem::pullNewParticles() {
       particle.velocity[0] *= -1;
       particle.flip = !particle.flip;
     }
-    result.append(std::move(particle));
+    result.push_back(std::move(particle));
   }
-  result.appendAll(m_scriptedAnimator.pullNewParticles());
+  result.append_range(m_scriptedAnimator.pullNewParticles());
   return result;
 }
 
@@ -784,7 +784,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto source = DamageSource::create(value);
           if (!source)
             return std::unexpected(std::move(source.error()));
-          sources.append(std::move(*source));
+          sources.push_back(std::move(*source));
         }
       }
       m_damageSources.set(std::move(sources));
@@ -798,7 +798,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto source = DamageSource::create(value);
           if (!source)
             return std::unexpected(std::move(source.error()));
-          sources.append(std::move(*source));
+          sources.push_back(std::move(*source));
         }
       }
       m_itemDamageSources.set(std::move(sources));
@@ -816,7 +816,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto region = jsonToPhysicsForceRegion(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
-          regions.append(std::move(*region));
+          regions.push_back(std::move(*region));
         }
       }
       m_forceRegions.set(std::move(regions));
@@ -830,7 +830,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto region = jsonToPhysicsForceRegion(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
-          regions.append(std::move(*region));
+          regions.push_back(std::move(*region));
         }
       }
       m_itemForceRegions.set(std::move(regions));
@@ -864,7 +864,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         auto drawable = Drawable::create(**metadata, config);
         if (!drawable)
           return std::unexpected(std::move(drawable.error()));
-        drawables.append(std::move(*drawable));
+        drawables.push_back(std::move(*drawable));
       }
     } else {
       auto image = icon.toString();
@@ -876,7 +876,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
-      drawables.append(std::move(*drawable));
+      drawables.push_back(std::move(*drawable));
     }
     return drawables;
   };

@@ -323,7 +323,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
   if (auto builtin = s_builtinCommands->maybe(*key)) {
     auto output = (*builtin)(*this, *arguments);
     if (!output) return std::unexpected(std::move(output.error()));
-    result.append(std::move(*output));
+    result.push_back(std::move(*output));
   } else if (auto macro = m_macroCommands.maybe(*command)) {
     for (auto const& entry : *macro) {
       auto isCommand = entry.beginsWith("/");
@@ -331,9 +331,9 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
       if (*isCommand) {
         auto output = handleCommand(entry);
         if (!output) return std::unexpected(std::move(output.error()));
-        result.appendAll(std::move(*output));
+        result.append_range(std::move(*output));
       } else {
-        result.append(entry);
+        result.push_back(entry);
       }
     }
   } else {
@@ -346,11 +346,11 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
         if (value.isType(Json::Type::String)) {
           auto text = value.stringPtr();
           if (!text) return std::unexpected(std::move(text.error()));
-          result.append(**text);
+          result.push_back(**text);
         } else if (!value.isNull()) {
           auto printed = value.repr(1, true);
           if (!printed) return std::unexpected(std::move(printed.error()));
-          result.append(std::move(*printed));
+          result.push_back(std::move(*printed));
         }
       } else {
         Uuid uuid(m_context.root().random());
@@ -381,18 +381,18 @@ std::expected<StringList, StarException> ClientCommandProcessor::updatePromises(
       if (value.isType(Json::Type::String)) {
         auto text = value.stringPtr();
         if (!text) return std::unexpected(std::move(text.error()));
-        result.append(**text);
+        result.push_back(**text);
       } else if (!value.isNull()) {
         auto printed = value.repr(1, true);
         if (!printed) return std::unexpected(std::move(printed.error()));
-        result.append(std::move(*printed));
+        result.push_back(std::move(*printed));
       }
     } else {
       auto error = promise.error();
       if (!error) return std::unexpected(std::move(error.error()));
       if (!*error)
         return std::unexpected(StarException("Failed client command promise has no error"));
-      result.append(strf("Error: {}", **error));
+      result.push_back(strf("Error: {}", **error));
     }
     m_commandPromises.remove(uuid);
   }
@@ -692,7 +692,7 @@ std::expected<String, StarException> ClientCommandProcessor::statistic(String co
     auto value = m_universeClient->statistics()->stat(name);
     auto printed = value.repr();
     if (!printed) return std::unexpected(std::move(printed.error()));
-    values.append(strf("{} = {}", name, *printed));
+    values.push_back(strf("{} = {}", name, *printed));
   }
   return values.join("\n");
 }
@@ -803,7 +803,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     auto parsedArgs = m_parser.tokenizeToStringList(path);
     if (!parsedArgs) return std::unexpected(std::move(parsedArgs.error()));
     auto& args = *parsedArgs;
-    auto lowered = args.maybeFirst().value_or(String{}).toLower();
+    auto lowered = args.front_value().value_or(String{}).toLower();
     if (!lowered) return std::unexpected(std::move(lowered.error()));
     auto const& first = *lowered;
     auto humanoid = player->humanoid();

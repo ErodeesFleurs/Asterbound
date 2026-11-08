@@ -524,7 +524,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
               }
             }
             if (metadata.loadLevel < SectorLoadLevel::Entities)
-              zombieEntities.append(entity);
+              zombieEntities.push_back(entity);
           }
           return {};
         });
@@ -548,9 +548,9 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
           if (!autopersistentResult1) return std::unexpected(std::move(autopersistentResult1.error()));
           auto persistent = std::move((*autopersistentResult1));
           if (persistent)
-            zombiesToStore.append(entity);
+            zombiesToStore.push_back(entity);
           else
-            zombiesToRemove.append(entity);
+            zombiesToRemove.push_back(entity);
         }
 
         for (auto const& entity : zombiesToRemove) {
@@ -588,7 +588,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
             auto autostoredResult1 = entityFactory->storeVersionedEntity(entity);
             if (!autostoredResult1) return std::unexpected(std::move(autostoredResult1.error()));
             auto stored = std::move((*autostoredResult1));
-            sectorStore.append(std::move(stored));
+            sectorStore.push_back(std::move(stored));
           }
           {
             auto operationResult1 = entitySectorKey(sector);
@@ -1209,7 +1209,7 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
         for (auto const& entityStore : sectorStore) {
           auto entity = entityFactory->loadVersionedEntity(entityStore);
           if (entity) {
-            addedEntities.append(std::move(*entity));
+            addedEntities.push_back(std::move(*entity));
           } else {
             auto logged = this->root().logger().warnException(strf("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
             if (!logged) return std::unexpected(std::move(logged.error()));
@@ -1292,9 +1292,9 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
       auto persistent = std::move((*autopersistentResult1));
 
       if (persistent)
-        entitiesToStore.append(std::move(entity));
+        entitiesToStore.push_back(std::move(entity));
       else
-        entitiesToRemove.append(std::move(entity));
+        entitiesToRemove.push_back(std::move(entity));
     }
 
     for (auto const& entity : entitiesToRemove) {
@@ -1338,7 +1338,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
         auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
-        sectorStore.append(std::move(storedEntity));
+        sectorStore.push_back(std::move(storedEntity));
       }
       {
         auto operationResult1 = entitySectorKey(sector);
@@ -1428,7 +1428,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
         auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
-        sectorStore.append(std::move(storedEntity));
+        sectorStore.push_back(std::move(storedEntity));
       }
     }
     {

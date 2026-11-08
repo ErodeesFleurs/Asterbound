@@ -243,9 +243,9 @@ Json numericArray(std::size_t count) {
   for (std::size_t i = 0; i < count; ++i) {
     auto value = static_cast<std::int64_t>((i * 7919) % 2000001) - 1000000;
     if (i % 2)
-      values.append(Json(static_cast<double>(value) / 8.0));
+      values.push_back(Json(static_cast<double>(value) / 8.0));
     else
-      values.append(Json(value));
+      values.push_back(Json(value));
   }
   return Json(std::move(values));
 }
@@ -254,12 +254,12 @@ Json unicodeDocument(std::size_t count) {
   JsonArray rows;
   rows.reserve(count);
   for (std::size_t i = 0; i < count; ++i) {
-    rows.append(Json(JsonObject{
-        {"index", Json(i)},
-        {"日本語", Json("星の世界 — café é 😀")},
-        {"escapes", Json("quote: \"; slash: \\; newline:\n tab:\t control:\x01")},
-        {"active", Json(i % 2 == 0)},
-        {"nested", Json(JsonObject{{"nothing", Json()}, {"numbers", numericArray(8)}})},
+    rows.push_back(Json(JsonObject{
+      {"index", Json(i)},
+      {"日本語", Json("星の世界 — café é 😀")},
+      {"escapes", Json("quote: \"; slash: \\; newline:\n tab:\t control:\x01")},
+      {"active", Json(i % 2 == 0)},
+      {"nested", Json(JsonObject{{"nothing", Json()}, {"numbers", numericArray(8)}})},
     }));
   }
   return Json(JsonObject{{"title", Json("Unicode mixed document / Ελληνικά")}, {"rows", Json(std::move(rows))}});

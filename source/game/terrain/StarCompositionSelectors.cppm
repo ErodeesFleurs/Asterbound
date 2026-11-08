@@ -85,7 +85,7 @@ std::expected<std::shared_ptr<MaxSelector>, StarException> MaxSelector::create(
     auto source = database.createSelectorType(*sourceType, sourceConfig, sourceParameters);
     if (!source)
       return std::unexpected(std::move(source.error()));
-    result->m_sources.append(std::move(*source));
+    result->m_sources.push_back(std::move(*source));
   }
   return result;
 }
@@ -123,7 +123,7 @@ std::expected<std::shared_ptr<MinMaxSelector>, StarException> MinMaxSelector::cr
     auto source = database.createSelectorType(*sourceType, sourceConfig, sourceParameters);
     if (!source)
       return std::unexpected(std::move(source.error()));
-    result->m_sources.append(std::move(*source));
+    result->m_sources.push_back(std::move(*source));
   }
   return result;
 }

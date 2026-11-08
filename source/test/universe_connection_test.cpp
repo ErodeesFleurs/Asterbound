@@ -343,7 +343,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
     ASSERT_TRUE((*server)->addConnection(++clientId, UniverseConnection(std::move(pair.first))));
     auto client = ASyncClientThread::create(UniverseConnection(std::move(pair.second)));
     ASSERT_TRUE(client) << client.error().what();
-    localASyncClients.append(std::move(*client));
+    localASyncClients.push_back(std::move(*client));
   }
 
   List<std::unique_ptr<SyncClientThread>> localSyncClients;
@@ -352,7 +352,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
     ASSERT_TRUE((*server)->addConnection(++clientId, UniverseConnection(std::move(pair.first))));
     auto client = SyncClientThread::create(UniverseConnection(std::move(pair.second)));
     ASSERT_TRUE(client) << client.error().what();
-    localSyncClients.append(std::move(*client));
+    localSyncClients.push_back(std::move(*client));
   }
 
   List<std::unique_ptr<ASyncClientThread>> remoteASyncClients;
@@ -364,7 +364,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
     ASSERT_TRUE(packetSocket) << packetSocket.error().what();
     auto client = ASyncClientThread::create(UniverseConnection(std::move(*packetSocket)));
     ASSERT_TRUE(client) << client.error().what();
-    remoteASyncClients.append(std::move(*client));
+    remoteASyncClients.push_back(std::move(*client));
   }
 
   List<std::unique_ptr<SyncClientThread>> remoteSyncClients;
@@ -376,7 +376,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
     ASSERT_TRUE(packetSocket) << packetSocket.error().what();
     auto client = SyncClientThread::create(UniverseConnection(std::move(*packetSocket)));
     ASSERT_TRUE(client) << client.error().what();
-    remoteSyncClients.append(std::move(*client));
+    remoteSyncClients.push_back(std::move(*client));
   }
 
   for (auto& c : localASyncClients)

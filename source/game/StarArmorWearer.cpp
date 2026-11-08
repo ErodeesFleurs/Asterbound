@@ -332,10 +332,10 @@ std::expected<List<PersistentStatusEffect>, StarException> ArmorWearer::statusEf
       auto effects = m_armors[i].item->statusEffects();
       if (!effects)
         return std::unexpected(std::move(effects.error()));
-      statusEffects.appendAll(std::move(*effects));
+      statusEffects.append_range(std::move(*effects));
     }
     if (m_armors[i].isCurrentlyVisible)
-      statusEffects.appendAll(m_armors[i].item->cosmeticStatusEffects());
+      statusEffects.append_range(m_armors[i].item->cosmeticStatusEffects());
   }
 
   return statusEffects;

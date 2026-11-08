@@ -20,7 +20,7 @@ std::expected<int, StarException> countWords(String const& text) {
   auto words = text.split(" ");
   if (!words)
     return std::unexpected(std::move(words.error()));
-  return static_cast<int>(words->count());
+  return static_cast<int>(words->size());
 }
 
 [[nodiscard]]
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
           if (!*include)
             continue;
         }
-        files.append(path);
+        files.push_back(path);
       }
       auto queued = (*assets)->queueJsons(files);
       if (!queued)

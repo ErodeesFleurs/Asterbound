@@ -298,9 +298,9 @@ json_fixture make_json(std::size_t count, bool nested, bool reverse) {
     Json value(static_cast<std::int64_t>(i * 13 + runtime_salt % 101));
     if (nested) {
       JsonArray array;
-      array.append(std::move(value));
-      array.append(Json(make_bytes(byte_input::embedded_nul, i)));
-      array.append(Json(i % 2 != 0));
+      array.push_back(std::move(value));
+      array.push_back(Json(make_bytes(byte_input::embedded_nul, i)));
+      array.push_back(Json(i % 2 != 0));
       JsonObject inner;
       inner.insert({String("a"), Json(std::move(array))});
       value = Json(std::move(inner));

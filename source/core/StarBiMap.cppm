@@ -277,13 +277,13 @@ public:
   List<Right> right_values() const {
     List<Right> result;
     for (auto const& pair : *this)
-      result.append(pair.second);
+      result.push_back(pair.second);
     return result;
   }
   List<value_type> pairs() const {
     List<value_type> result;
     for (auto const& pair : *this)
-      result.append(value_type(pair.first, pair.second));
+      result.push_back(value_type(pair.first, pair.second));
     return result;
   }
 
@@ -510,7 +510,7 @@ template <typename LeftT, typename RightT, typename LeftMapT, typename RightMapT
 auto BiMap<LeftT, RightT, LeftMapT, RightMapT>::pairs() const -> List<value_type> {
   List<value_type> values;
   for (auto const& p : *this)
-    values.append(p);
+    values.push_back(p);
   return values;
 }
 

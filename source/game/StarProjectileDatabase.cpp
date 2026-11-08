@@ -232,7 +232,7 @@ auto result96 = c.getFloat("time");
 if (!result96) return std::unexpected(std::move(result96.error()));
 auto result97 = c.getBool("repeat", true);
 if (!result97) return std::unexpected(std::move(result97.error()));
-projectileConfig->periodicActions.append(std::make_tuple(std::move(*result96), std::move(*result97), c));
+projectileConfig->periodicActions.push_back(std::make_tuple(std::move(*result96), std::move(*result97), c));
 }
 
   auto result98 = config.getString("image");
@@ -349,7 +349,7 @@ if (!result127) return std::unexpected(std::move(result127.error()));
 for (auto const& effect : std::move(*result127)) {
 auto result128 = jsonToEphemeralStatusEffect(effect);
 if (!result128) return std::unexpected(std::move(result128.error()));
-projectileConfig->statusEffects.append(std::move(*result128));
+projectileConfig->statusEffects.push_back(std::move(*result128));
 }
 
   auto result129 = config.getArray("emitters", JsonArray());
@@ -405,7 +405,7 @@ if (!result143) return std::unexpected(std::move(result143.error()));
 for (auto const& effect : std::move(*result143)) {
 auto result144 = jsonToPersistentStatusEffect(effect);
 if (!result144) return std::unexpected(std::move(result144.error()));
-projectileConfig->persistentStatusEffects.append(std::move(*result144));
+projectileConfig->persistentStatusEffects.push_back(std::move(*result144));
 }
   auto result145 = config.get("statusEffectArea", JsonArray());
 if (!result145) return std::unexpected(std::move(result145.error()));

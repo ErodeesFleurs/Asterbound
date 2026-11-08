@@ -312,7 +312,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
         }
       }
     }
-    m_destinations.append({std::move(*warpAction), *deploy});
+    m_destinations.push_back({std::move(*warpAction), *deploy});
   }
   auto beamLabelConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:beamPartyMemberLabel");
   if (!beamLabelConfig) return std::unexpected(std::move(beamLabelConfig.error()));
@@ -340,7 +340,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
       bool deploy = member.warpMode == WarpMode::DeployOnly;
       auto setup = setupTeleportEntry(**entry, member.name, deploy ? *deployPartyMember : *beamPartyMember, deploy ? *deployPartyMemberIcon : *beamPartyMemberIcon);
       if (!setup) return std::unexpected(std::move(setup.error()));
-      m_destinations.append({WarpToPlayer(member.uuid), deploy});
+      m_destinations.push_back({WarpToPlayer(member.uuid), deploy});
     }
   }
   auto includeBookmarks = config.getBool("includePlayerBookmarks", false);
@@ -362,7 +362,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
         if (!editButton) return std::unexpected(std::move(editButton.error()));
         (*editButton)->setEnabled(false);
       }
-      m_destinations.append({WarpToWorld(bookmark.target.first, bookmark.target.second), false});
+      m_destinations.push_back({WarpToWorld(bookmark.target.first, bookmark.target.second), false});
     }
   }
   return selectDestination();

@@ -356,12 +356,12 @@ if (!result55) return std::unexpected(std::move(result55.error()));
 auto result56 = jsonToList<PersistentStatusEffect>(std::move(*result55), jsonToPersistentStatusEffect);
 if (!result56) return std::unexpected(std::move(result56.error()));
 variant.innateStatusEffects = std::move(*result56);
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result57 = config.get("touchDamage", {});
+auto result57 = config.get("touchDamage", {});
 if (!result57) return std::unexpected(std::move(result57.error()));
 variant.touchDamageConfig = std::move(*result57);
 
@@ -688,12 +688,12 @@ auto result138 = jsonToList<PersistentStatusEffect>(std::move(*result137), jsonT
 if (!result138) return std::unexpected(std::move(result138.error()));
 variant.innateStatusEffects = std::move(*result138);
 
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result139 = config.get("touchDamage", {});
+auto result139 = config.get("touchDamage", {});
 if (!result139) return std::unexpected(std::move(result139.error()));
 variant.touchDamageConfig = std::move(*result139);
 
@@ -882,12 +882,12 @@ auto result189 = jsonToList<PersistentStatusEffect>(std::move(*result188), jsonT
 if (!result189) return std::unexpected(std::move(result189.error()));
 variant.innateStatusEffects = std::move(*result189);
 
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result190 = config.get("touchDamage", {});
+auto result190 = config.get("touchDamage", {});
 if (!result190) return std::unexpected(std::move(result190.error()));
 variant.touchDamageConfig = std::move(*result190);
 

@@ -168,8 +168,10 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
     auto movement = liquid->config.getFloat("textureMovementFactor");
     if (!movement)
       return std::unexpected(std::move(movement.error()));
-    painter->m_liquids.set(liquid->id, LiquidInfo{
-        std::move(*texture), color->toRgba(), bottomLight->toRgbF(), *movement});
+    auto stored = painter->m_liquids.set(
+      liquid->id, LiquidInfo{std::move(*texture), color->toRgba(), bottomLight->toRgbF(), *movement});
+    if (!stored)
+      return std::unexpected(std::move(stored.error()));
   }
   return painter;
 }
@@ -317,7 +319,7 @@ std::expected<void, StarException> TilePainter::renderTerrainChunks(WorldCamera 
   for (auto const& chunk : m_pendingTerrainChunks) {
     if (auto layer = chunk->find_ref(terrainLayer)) {
       for (auto const& pair : layer->get())
-        zOrderBuffers[pair.first].append(pair.second);
+        zOrderBuffers[pair.first].push_back(pair.second);
     }
   }
 

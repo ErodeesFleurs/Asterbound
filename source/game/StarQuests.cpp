@@ -250,7 +250,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
   for (auto const& descriptor : root.random().randValueFrom(qt.rewards, {})) {
     auto item = (*items)->item(descriptor);
     if (!item) return std::unexpected(std::move(item.error()));
-    quest->m_rewards.append(*item);
+    quest->m_rewards.push_back(*item);
   }
   for (auto const& name : qt.rewardParameters) {
     auto parameter = quest->m_parameters.find_ref(name);
@@ -352,7 +352,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   for (auto const& entry : *rewards) {
     auto item = (*items)->diskLoad(entry);
     if (!item) return std::unexpected(std::move(item.error()));
-    quest->m_rewards.append(*item);
+    quest->m_rewards.push_back(*item);
   }
   auto updated = store->getInt("lastUpdatedOn");
   if (!updated) return std::unexpected(std::move(updated.error()));
@@ -400,7 +400,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
     for (auto const& value : *array) {
       auto drawable = Drawable::create(**metadata, value);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      result.append(std::move(*drawable));
+      result.push_back(std::move(*drawable));
     }
     return result;
   });
@@ -1045,7 +1045,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     for (auto const& json : *portrait) {
       auto drawable = Drawable::create(**metadata, json);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      result.append(std::move(*drawable));
+      result.push_back(std::move(*drawable));
     }
     if (auto previous = quest.m_portraits.find_ref(name); previous && previous->get() == result)
       return {};
@@ -1106,7 +1106,7 @@ std::expected<void, StarException> Quest::addReward(ItemDescriptor const& reward
   if (!database) return std::unexpected(std::move(database.error()));
   auto item = (*database)->item(reward);
   if (!item) return std::unexpected(std::move(item.error()));
-  m_rewards.append(*item);
+  m_rewards.push_back(*item);
   m_rewardsRevision = nextQuestPresentationRevision();
   return {};
 }

@@ -235,11 +235,11 @@ auto result952 = c.getFloat("time");
 if (!result952) return std::unexpected(std::move(result952.error()));
 auto result953 = c.getBool("repeat", true);
 if (!result953) return std::unexpected(std::move(result953.error()));
-m_periodicActions.append(std::make_tuple(GameTimer(std::move(*result952)), std::move(*result953), c));
+m_periodicActions.push_back(std::make_tuple(GameTimer(std::move(*result952)), std::move(*result953), c));
 }
   } else {
     for (auto const& [time, repeat, action] : m_config->periodicActions)
-      m_periodicActions.append(std::make_tuple(GameTimer(time), repeat, action));
+      m_periodicActions.push_back(std::make_tuple(GameTimer(time), repeat, action));
   }
 
   if (isMaster()) {
@@ -300,7 +300,7 @@ if (!result1276) return std::unexpected(std::move(result1276.error()));
 m_persistentAudio = std::move(*result1276);
     m_persistentAudio->setLoops(-1);
     m_persistentAudio->setPosition(position());
-    m_pendingRenderables.append(m_persistentAudio);
+    m_pendingRenderables.push_back(m_persistentAudio);
   }
   return {};
 }
@@ -444,7 +444,7 @@ if (!result921) return std::unexpected(std::move(result921.error()));
 for (auto const& effect : std::move(*result921)) {
 auto result922 = jsonToEphemeralStatusEffect(effect);
 if (!result922) return std::unexpected(std::move(result922.error()));
-statusEffects.append(std::move(*result922));
+statusEffects.push_back(std::move(*result922));
 }
 
   auto result923 = m_parameters.getFloat("knockback", m_config->knockback);
@@ -461,9 +461,9 @@ if (std::move(*result924))
 
   List<DamageSource> res;
   auto addDamageSource = [&, &self = *this](DamageSource::DamageArea damageArea) {
-    res.append(DamageSource(self.m_damageType, std::move(damageArea), self.m_power * self.m_powerMultiplier, true,
-                            self.m_sourceEntity, sourceTeam, self.m_damageRepeatGroup, self.m_damageRepeatTimeout,
-                            self.m_damageKind, statusEffects, knockback, self.m_rayCheckToSource));
+    res.push_back(DamageSource(self.m_damageType, std::move(damageArea), self.m_power * self.m_powerMultiplier, true,
+                               self.m_sourceEntity, sourceTeam, self.m_damageRepeatGroup, self.m_damageRepeatTimeout,
+                               self.m_damageKind, statusEffects, knockback, self.m_rayCheckToSource));
   };
 
   auto result925 = world();
@@ -795,7 +795,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Projectile::forceRegions(
     if (p.second.enabled.get()) {
       PhysicsForceRegion forceRegion = p.second.forceRegion;
       std::visit([pos = position()](auto& fr) { fr.translate(pos); }, forceRegion);
-      forces.append(std::move(forceRegion));
+      forces.push_back(std::move(forceRegion));
     }
   }
   return forces;
@@ -860,7 +860,7 @@ particle.color = std::move(*result892);
       particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(rootContext.random().randf() - 0.5f, -20.0f + rootContext.random().randf()));
       particle.trail = true;
 
-      result.append(std::move(particle));
+      result.push_back(std::move(particle));
     }
   }
   return result;
@@ -1307,7 +1307,7 @@ for (auto& particle : std::move(*result824)) {
       particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(this->root().random().randf() - 0.5f, -20.0f + this->root().random().randf()));
       particle.trail = true;
 
-      m_pendingRenderables.append(std::move(particle));
+      m_pendingRenderables.push_back(std::move(particle));
     }
 
   } else if (command == "particle") {
@@ -1332,7 +1332,7 @@ if (std::move(*result829)) {
     }
     particle.translate(position());
     particle.velocity += m_referenceVelocity.value_or(Vec2F{});
-    m_pendingRenderables.append(std::move(particle));
+    m_pendingRenderables.push_back(std::move(particle));
 
   } else if (command == "explosion") {
     if (isSlave())
@@ -1438,7 +1438,7 @@ if (!result854) return std::unexpected(std::move(result854.error()));
 auto particle = std::move(*result854);
       particle.translate(position());
       particle.velocity += m_referenceVelocity.value_or(Vec2F{});
-      m_pendingRenderables.append(std::move(particle));
+      m_pendingRenderables.push_back(std::move(particle));
     }
 
   } else if (command == "item") {
@@ -1489,7 +1489,7 @@ sound->setVolume(std::move(*result867));
     auto result868 = parameters.getFloat("pitch", 1.0f);
 if (!result868) return std::unexpected(std::move(result868.error()));
 sound->setPitchMultiplier(std::move(*result868));
-    m_pendingRenderables.append(std::move(sound));
+m_pendingRenderables.push_back(std::move(sound));
 
   } else if (command == "light") {
     auto result869 = world();
@@ -1503,8 +1503,8 @@ auto result871 = jsonToColor(std::move(*result870));
 if (!result871) return std::unexpected(std::move(result871.error()));
 auto result872 = parameters.getBool("pointLight", true);
 if (!result872) return std::unexpected(std::move(result872.error()));
-m_pendingRenderables.append(LightSource{position(), std::move(*result871).toRgbF(),
-                                        static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
+m_pendingRenderables.push_back(LightSource{position(), std::move(*result871).toRgbF(),
+                                           static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
 
   } else if (command == "option") {
     auto result873 = parameters.getArray("options");
@@ -1823,7 +1823,7 @@ auto result669 = renderCallback.addParticle(std::get<Particle>(renderable));
 if (!result669) return std::unexpected(std::move(result669.error()));
 }
     else if (auto light = std::get_if<LightSource>(&renderable))
-      m_renderLights.append(*light);
+  m_renderLights.push_back(*light);
   }
   m_pendingRenderables.clear();
   return {};

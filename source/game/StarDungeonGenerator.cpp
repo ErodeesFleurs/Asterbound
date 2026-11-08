@@ -89,10 +89,11 @@ namespace Dungeon {
     float pick = rnd.randf() * distribution;
     for (std::size_t i = 0; i < options.size(); i++) {
       pick -= options[i]->part().chance();
-      if (pick <= 0) return options.takeAt(i);
+      if (pick <= 0)
+        return options.take_at(i);
     }
     // Preserve the final-option float rounding fallback.
-    return options.takeAt(options.size() - 1);
+    return options.take_at(options.size() - 1);
   }
 
   std::expected<std::shared_ptr<MaxSpawnCountRule>, StarException> MaxSpawnCountRule::create(Json const& rule) {
@@ -413,7 +414,7 @@ namespace Dungeon {
     for (auto const& option : *options) {
       auto parsed = Brush::parse(root, option);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      result->m_brushes.append(std::move(*parsed));
+      result->m_brushes.push_back(std::move(*parsed));
     }
     result->m_seed = root.random().randi64();
     return result;
@@ -1029,7 +1030,8 @@ namespace Dungeon {
         auto logged = this->root().logger().debug("Found connector on {} at {} group {} direction {}", m_name, position,
                                                   tile.connector->value, static_cast<int>(direction));
         if (!logged) return std::unexpected(std::move(logged.error()));
-        m_connections.append(std::make_shared<Connector>(*this, tile.connector->value, tile.connector->forwardOnly, direction, position));
+        m_connections.push_back(
+          std::make_shared<Connector>(*this, tile.connector->value, tile.connector->forwardOnly, direction, position));
       }
       return false;
     });
@@ -1311,7 +1313,7 @@ namespace Dungeon {
 
   void DungeonGeneratorWriter::finishPart() {
     for (auto&& entries : m_openLocalWires)
-      m_localWires.append(entries.second);
+      m_localWires.push_back(entries.second);
     m_openLocalWires.clear();
 
     if (m_currentBounds.xMin() > m_currentBounds.xMax())
@@ -1350,7 +1352,7 @@ namespace Dungeon {
               Vec2I pos = p + dir;
               if (unpressurized.remove(pos)) {
                 contiguousRegion.add(pos);
-                openSet.append(pos);
+                openSet.push_back(pos);
               }
             }
           }
@@ -1390,19 +1392,19 @@ namespace Dungeon {
         if (bb.yMin() < *m_terrainMarkingSurfaceLevel) {
           RectI lower = bb;
           lower.setYMax(std::min(lower.yMax(), *m_terrainMarkingSurfaceLevel));
-          terrainBlendingVertexes.append(Vec2F(lower.xMin(), lower.yMin()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMax(), lower.yMin()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMin(), lower.yMax()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMax(), lower.yMax()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMin()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMin()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMax()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMax()));
         }
 
         if (bb.yMax() > *m_terrainMarkingSurfaceLevel) {
           RectI upper = bb;
           upper.setYMin(std::max(upper.yMin(), *m_terrainMarkingSurfaceLevel));
-          spaceBlendingVertexes.append(Vec2F(upper.xMin(), upper.yMin()));
-          spaceBlendingVertexes.append(Vec2F(upper.xMax(), upper.yMin()));
-          spaceBlendingVertexes.append(Vec2F(upper.xMin(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
-          spaceBlendingVertexes.append(Vec2F(upper.xMax(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMin()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMin()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
         }
       }
     }
@@ -1458,13 +1460,13 @@ namespace Dungeon {
     for (auto&& wires : m_globalWires) {
       List<Vec2I> wireGroup;
       for (auto& pos : wires.second)
-        wireGroup.append(displace(pos));
+        wireGroup.push_back(displace(pos));
       if (auto applied = m_facade->connectWireGroup(wireGroup); !applied) return std::unexpected(std::move(applied.error()));
     }
     for (auto& wires : m_localWires) {
       List<Vec2I> wireGroup;
       for (auto& pos : wires)
-        wireGroup.append(displace(pos));
+        wireGroup.push_back(displace(pos));
       if (auto applied = m_facade->connectWireGroup(wireGroup); !applied) return std::unexpected(std::move(applied.error()));
     }
 
@@ -1770,7 +1772,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
         });
 
       if (!marked) return std::unexpected(std::move(marked.error()));
-      openSet.append({std::cref(part), placePos});
+      openSet.push_back({std::cref(part), placePos});
 
       placementCounter[part.name()]++;
       piecesPlaced++;
@@ -1786,7 +1788,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
 
   Set<Vec2I> closedConnectors;
   while (!openSet.empty()) {
-    auto next = openSet.takeFirst();
+    auto next = openSet.take_front();
     if (!next) return std::unexpected(std::move(next.error()));
     Dungeon::Part const& parentPart = next->first.get();
     Vec2I parentPos = next->second;
@@ -1871,7 +1873,7 @@ std::expected<std::shared_ptr<Dungeon::Part const>, StarException> DungeonGenera
     auto const& anchor = part->get();
     if ((!anchor->minimumThreatLevel() || m_threatLevel >= *anchor->minimumThreatLevel())
         && (!anchor->maximumThreatLevel() || m_threatLevel <= *anchor->maximumThreatLevel()))
-      validAnchors.append(name);
+      validAnchors.push_back(name);
   }
   if (validAnchors.empty()) return std::shared_ptr<Dungeon::Part const>();
   auto name = m_rand.randFrom(validAnchors);
@@ -1888,7 +1890,8 @@ std::expected<List<std::shared_ptr<Dungeon::Connector const>>, StarException> Du
     for (auto const& connection : partPair.second->connections()) {
       auto connects = connection->connectsTo(connector);
       if (!connects) return std::unexpected(std::move(connects.error()));
-      if (*connects) result.append(connection);
+      if (*connects)
+        result.push_back(connection);
     }
   }
   return result;

@@ -68,16 +68,16 @@ template <ParseKind Kind> Fixture parseFixture(std::size_t count) {
       std::array<Json, 6> values{Json(0),     Json(-17),  Json(1.25),
                                  Json(625.0), Json(-0.0), Json(static_cast<std::int64_t>(9223372036854775807ll))};
       text += spelling[i % spelling.size()];
-      expected.append(values[i % values.size()]);
+      expected.push_back(values[i % values.size()]);
     } else if constexpr (Kind == ParseKind::Unicode) {
       constexpr std::array<std::string_view, 3> spelling{"\"日本語🌟\"", "\"caf\\u00e9\\n\\t\\\"\\\\\"",
                                                          "\"\\ud83d\\ude80\""};
       std::array<Json, 3> values{Json(String("日本語🌟")), Json(String("café\n\t\"\\")), Json(String("🚀"))};
       text += spelling[i % spelling.size()];
-      expected.append(values[i % values.size()]);
+      expected.push_back(values[i % values.size()]);
     } else {
       text += " /* config 注釈 */ " + std::to_string(i) + " // setting\n";
-      expected.append(Json(i));
+      expected.push_back(Json(i));
     }
   }
   text += ']';
@@ -142,7 +142,7 @@ Fixture flatFixture(bool object, std::size_t count, bool preserve) {
     if (object)
       entries[String(key)] = std::move(value);
     else
-      array.append(std::move(value));
+      array.push_back(std::move(value));
   }
   text += object ? '}' : ']';
   return {String(std::move(text)), object ? Json(std::move(entries)) : Json(std::move(array))};
@@ -265,8 +265,8 @@ Json searchDocument(std::size_t count, bool changed) {
   rows.reserve(count);
   for (std::size_t i = 0; i < count; ++i) {
     bool target = changed && i + 1 == count;
-    rows.append(JsonObject{{"id", Json(i)},
-                           {"config", JsonObject{{"enabled", target}, {"keep", 23}, {"level", target ? 9 : 1}}}});
+    rows.push_back(JsonObject{{"id", Json(i)},
+                              {"config", JsonObject{{"enabled", target}, {"keep", 23}, {"level", target ? 9 : 1}}}});
   }
   return JsonObject{{"rows", std::move(rows)}, {"untouched", "snapshot"}};
 }

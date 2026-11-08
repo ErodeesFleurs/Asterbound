@@ -898,12 +898,12 @@ void ActorMovementController::controlForce(Vec2F const& force) {
 }
 
 void ActorMovementController::controlApproachVelocity(Vec2F const& targetVelocity, float maxControlForce) {
-  m_controlApproachVelocities.append({targetVelocity, maxControlForce});
+  m_controlApproachVelocities.push_back({targetVelocity, maxControlForce});
 }
 
 void ActorMovementController::controlApproachVelocityAlongAngle(
     float angle, float targetVelocity, float maxControlForce, bool positiveOnly) {
-  m_controlApproachVelocityAlongAngles.append({angle, targetVelocity, maxControlForce, positiveOnly});
+  m_controlApproachVelocityAlongAngles.push_back({angle, targetVelocity, maxControlForce, positiveOnly});
 }
 
 void ActorMovementController::controlApproachXVelocity(float targetXVelocity, float maxControlForce) {
@@ -1578,7 +1578,7 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
               if (edge.target.position == newPathStart.source.position) {
                 // splice the new path onto our current path up to this index
                 auto newPath = m_path->slice(0, i + 1);
-                newPath.appendAll(path);
+                newPath.append_range(path);
                 path = std::move(newPath);
 
                 newEdgeTimer = m_edgeTimer;
@@ -1605,7 +1605,7 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
             // concatenate the bridge path with the new path
             if (!bridgePathFinder->result()) return std::unexpected(ActorMovementControllerException("Successful bridge search has no path"));
             auto newPath = *bridgePathFinder->result();
-            newPath.appendAll(path);
+            newPath.append_range(path);
             path = newPath;
           } else {
             // if the gap isn't bridged in a single tick, reset and start over
@@ -1725,7 +1725,7 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
     return {};
   }
 
-  if (auto lastEdge = m_path->maybeLast()) {
+  if (auto lastEdge = m_path->back_value()) {
     movementController.setPosition(lastEdge->target.position);
     movementController.setVelocity(Vec2F());
   }

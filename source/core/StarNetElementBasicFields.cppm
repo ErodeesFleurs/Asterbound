@@ -265,7 +265,7 @@ template <typename T>
     // case, this is an error or the step tracking is wildly off, so just clear
     // any other incoming values.
     if (interpolationTime > 0.0f && (m_pendingInterpolatedValues->empty() || interpolationTime >= m_pendingInterpolatedValues->back().first)) {
-      m_pendingInterpolatedValues->append({interpolationTime, std::move(t)});
+      m_pendingInterpolatedValues->push_back({interpolationTime, std::move(t)});
     } else {
       m_value = std::move(t);
       m_pendingInterpolatedValues->clear();

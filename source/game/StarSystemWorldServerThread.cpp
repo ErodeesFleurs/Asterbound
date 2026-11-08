@@ -230,7 +230,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
     return std::unexpected(std::move(active.error()));
   m_activeInstanceWorlds = std::move(*active);
   for (auto clientId : m_clients) {
-    m_outgoingPacketQueue[clientId].appendAll(m_systemWorld->pullOutgoingPackets(clientId));
+    m_outgoingPacketQueue[clientId].append_range(m_systemWorld->pullOutgoingPackets(clientId));
     auto location = m_systemWorld->clientShipLocation(clientId);
     if (!location)
       return std::unexpected(std::move(location.error()));
@@ -265,7 +265,7 @@ std::expected<void, StarException> SystemWorldServerThread::executeClientShipAct
   if (!action)
     return std::unexpected(StarException("System client ship action cannot be empty"));
   std::unique_lock locker(m_queueMutex);
-  m_clientShipActions.append({clientId, std::move(action)});
+  m_clientShipActions.push_back({clientId, std::move(action)});
   return {};
 }
 
@@ -304,7 +304,7 @@ void SystemWorldServerThread::setUpdateAction(std::function<std::expected<void, 
 
 void SystemWorldServerThread::pushIncomingPacket(ConnectionId clientId, std::shared_ptr<Packet> packet) {
   std::unique_lock locker(m_queueMutex);
-  m_incomingPacketQueue.append({std::move(clientId), std::move(packet)});
+  m_incomingPacketQueue.push_back({std::move(clientId), std::move(packet)});
 }
 
 List<std::shared_ptr<Packet>> SystemWorldServerThread::pullOutgoingPackets(ConnectionId clientId) {

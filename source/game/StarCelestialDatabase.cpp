@@ -97,7 +97,7 @@ List<Vec2I> CelestialDatabase::chunkIndexesFor(RectI const& region) const {
   RectI chunkRegion(chunkIndexFor(region.min()), chunkIndexFor(region.max() - Vec2I(1, 1)));
   for (int x = chunkRegion.xMin(); x <= chunkRegion.xMax(); ++x) {
     for (int y = chunkRegion.yMin(); y <= chunkRegion.yMax(); ++y)
-      chunkLocations.append({x, y});
+      chunkLocations.push_back({x, y});
   }
   return chunkLocations;
 }
@@ -272,7 +272,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
             return std::unexpected(std::move(value.error()));
           region.satelliteTypes = std::move(*value);
         }
-        type.orbitRegions.append(std::move(region));
+        type.orbitRegions.push_back(std::move(region));
       }
       auto added = m_generationInformation.systemTypes.add(pair.first, std::move(type));
       if (!added)
@@ -690,7 +690,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialMasterDatabase:
     auto child = coordinate.child(orbit);
     if (!child)
       return std::unexpected(std::move(child.error()));
-    children.append(std::move(*child));
+    children.push_back(std::move(*child));
   }
   return children;
 }
@@ -746,7 +746,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialMasterDatabase:
           if (!includedTypes->contains(*type))
             continue;
         }
-        systems.append(CelestialCoordinate(pair.first));
+        systems.push_back(CelestialCoordinate(pair.first));
       }
     }
   }
@@ -764,7 +764,7 @@ std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialMasterDatab
     for (auto const& constellation : chunk->get().constellations)
       for (auto const& line : constellation)
         if (region.intersects(Line2I(line.first, line.second)))
-          lines.append(line);
+          lines.push_back(line);
   }
   return lines;
 }
@@ -960,7 +960,7 @@ std::expected<CelestialChunk, StarException> CelestialMasterDatabase::produceChu
       if (random.randf() < m_generationInformation.systemProbability) {
         auto z = random.randi32() % (m_baseInformation.zCoordRange[1] - m_baseInformation.zCoordRange[0])
             + m_baseInformation.zCoordRange[0];
-        locations.append(Vec3I(x, y, z));
+        locations.push_back(Vec3I(x, y, z));
       }
     }
   }
@@ -977,7 +977,7 @@ std::expected<CelestialChunk, StarException> CelestialMasterDatabase::produceChu
       chunk.systemParameters[location] = std::move(system.first);
       chunk.systemObjects[location] = std::move(system.second);
       if (*magnitude >= m_generationInformation.minimumConstellationMagnitude)
-        candidates.append(location.vec2());
+        candidates.push_back(location.vec2());
     }
   }
   auto constellations = produceConstellations(random, candidates);
@@ -1032,7 +1032,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
   for (int i = 1; i <= m_baseInformation.planetOrbitalLevels; ++i)
     if (auto region = orbitRegion(type.orbitRegions, i))
       if (random.randf() <= region->bodyProbability)
-        planetaryOrbits.append(i);
+        planetaryOrbits.push_back(i);
   HashMap<int, CelestialPlanet> objects;
   for (auto [planetIndex, planetOrbit] : std::views::enumerate(planetaryOrbits)) {
     auto region = orbitRegion(type.orbitRegions, planetOrbit);
@@ -1053,7 +1053,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
       List<int> satelliteOrbits;
       for (int i = 1; i <= m_baseInformation.satelliteOrbitalLevels; ++i)
         if (satelliteOrbits.size() < planetType->get().maxSatelliteCount && random.randf() < planetType->get().satelliteProbability)
-          satelliteOrbits.append(i);
+          satelliteOrbits.push_back(i);
       for (auto [satelliteIndex, satelliteOrbit] : std::views::enumerate(satelliteOrbits)) {
         auto satelliteTypeName = region->satelliteTypes.select(random);
         if (auto satelliteType = m_generationInformation.satelliteTypes.find_ref(satelliteTypeName)) {
@@ -1156,8 +1156,8 @@ std::expected<List<CelestialConstellation>, StarException> CelestialMasterDataba
     if (constellationLines.size() > 1) {
       CelestialConstellation constellation;
       for (auto const& line : constellationLines)
-        constellation.append({line.min(), line.max()});
-      constellations.append(constellation);
+        constellation.push_back({line.min(), line.max()});
+      constellations.push_back(constellation);
     }
   }
 
@@ -1216,7 +1216,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   for (auto chunkIt = m_pendingChunkRequests.begin(); chunkIt != m_pendingChunkRequests.end();) {
     auto&& pair = *chunkIt;
     if (!pair.second.running()) {
-      requests.append(makeLeft(pair.first));
+      requests.push_back(makeLeft(pair.first));
       pair.second.restart(m_requestTimeout);
       ++chunkIt;
     } else if (pair.second.timeUp()) {
@@ -1229,7 +1229,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   for (auto systemIt = m_pendingSystemRequests.begin(); systemIt != m_pendingSystemRequests.end();) {
     auto&& pair = *systemIt;
     if (!pair.second.running()) {
-      requests.append(makeRight(pair.first));
+      requests.push_back(makeRight(pair.first));
       pair.second.restart(m_requestTimeout);
       ++systemIt;
     } else if (pair.second.timeUp()) {
@@ -1355,7 +1355,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialSlaveDatabase::
     auto child = coordinate.child(orbit);
     if (!child)
       return std::unexpected(std::move(child.error()));
-    children.append(std::move(*child));
+    children.push_back(std::move(*child));
   }
   return children;
 }
@@ -1413,7 +1413,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialSlaveDatabase::
             if (!includedTypes->contains(*type))
               continue;
           }
-          systems.append(CelestialCoordinate(pair.first));
+          systems.push_back(CelestialCoordinate(pair.first));
         }
       }
     }
@@ -1436,7 +1436,7 @@ std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialSlaveDataba
       for (auto const& constellation : (*chunk)->get().constellations)
         for (auto const& line : constellation)
           if (region.intersects(Line2I(line.first, line.second)))
-            lines.append(line);
+            lines.push_back(line);
   }
   return lines;
 }

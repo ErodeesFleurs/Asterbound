@@ -240,7 +240,7 @@ namespace {
     List<std::uint32_t> keys;
     for (std::uint32_t k : keySet) {
       for (std::uint32_t j = 0; j < writeRepeat; ++j)
-        keys.append(k);
+        keys.push_back(k);
     }
 
     db.setIndexCacheSize(0);
@@ -350,9 +350,9 @@ TEST(BTreeDatabaseTest, Threading) {
 
   while (writeKeySet.size() < 5000) {
     std::uint32_t key = random.randu32();
-    writeKeySet.append(key);
+    writeKeySet.push_back(key);
     if (random.randf() > 0.3)
-      deleteKeySet.append(key);
+      deleteKeySet.push_back(key);
   }
   random.shuffle(writeKeySet);
 
@@ -418,7 +418,7 @@ TEST(BTreeDatabaseTest, Threading) {
             return {};
           });
       ASSERT_TRUE(reader) << reader.error().what();
-      readers.append(std::move(*reader));
+      readers.push_back(std::move(*reader));
     }
     for (auto& reader : readers) {
       auto finished = reader.finish();

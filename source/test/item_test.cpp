@@ -577,7 +577,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   List<long> owners;
   for (auto const& entry : items) {
     ASSERT_TRUE(entry.second->consume(1));
-    owners.append(entry.second.use_count());
+    owners.push_back(entry.second.use_count());
     EXPECT_EQ(view.itemsAt(entry.first), nullptr);
   }
 
@@ -935,13 +935,13 @@ const GameTestRegistration
     auto creationScripts = humanConfig.getArray("createScripts", {});
     ASSERT_TRUE(creationScripts);
     if (creationScripts->empty())
-      creationScripts->append("/humanoid/opensb/create.lua");
-    creationScripts->append("/readycatalog/create.lua");
+      creationScripts->push_back("/humanoid/opensb/create.lua");
+    creationScripts->push_back("/readycatalog/create.lua");
     auto buildScripts = humanConfig.getArray("buildScripts", {});
     ASSERT_TRUE(buildScripts);
     if (buildScripts->empty())
-      buildScripts->append("/humanoid/opensb/build.lua");
-    buildScripts->append("/readycatalog/humanoid.lua");
+      buildScripts->push_back("/humanoid/opensb/build.lua");
+    buildScripts->push_back("/readycatalog/humanoid.lua");
     auto humanWithCreation = humanConfig.set("createScripts", *creationScripts);
     ASSERT_TRUE(humanWithCreation);
     auto humanWithBuild = humanWithCreation->set("buildScripts", *buildScripts);
@@ -1079,7 +1079,7 @@ end
   })"));
 
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
@@ -1285,7 +1285,7 @@ const GameTestRegistration blueprintLearning(
   ])"),
                                  patchPath));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
@@ -1432,7 +1432,7 @@ end
     )"),
                                  File::relative_to(overlay, "lifecycle.lua")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
@@ -1612,7 +1612,7 @@ const GameTestRegistration
       ASSERT_TRUE(File::write_file(*contents, File::relative_to(objectDirectory, String(test.name) + ".object")));
     }
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};

@@ -358,14 +358,14 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     if (!mining)
       return std::unexpected(std::move(mining.error()));
     if (!mining->empty())
-      item->m_placeSounds.append(std::move(*mining));
+      item->m_placeSounds.push_back(std::move(*mining));
     auto step = (*database)->footstepSound(item->m_material);
     if (!step)
       return std::unexpected(std::move(step.error()));
     if (!step->empty())
-      item->m_placeSounds.append(std::move(*step));
+      item->m_placeSounds.push_back(std::move(*step));
     else if (item->m_placeSounds.empty())
-      item->m_placeSounds.append((*database)->defaultFootstepSound());
+      item->m_placeSounds.push_back((*database)->defaultFootstepSound());
   }
   item->m_shifting = false;
   item->m_lastTileAreaRadiusCache = 0.0f;
@@ -633,11 +633,11 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
       auto hue = placementHueShift(pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
-      modifications.emplaceAppend(pos,
-                                  PlaceMaterial{.layer = layer,
-                                                .material = materialId(),
-                                                .materialHueShift = *hue,
-                                                .collisionOverride = m_collisionOverride});
+      modifications.emplace_back(pos,
+                                 PlaceMaterial{.layer = layer,
+                                               .material = materialId(),
+                                               .materialHueShift = *hue,
+                                               .collisionOverride = m_collisionOverride});
     }
 
     // Make sure not to make any more modifications than we have consumables.
@@ -707,7 +707,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
       continue;
     if (itemWorld->get().material(pos, layer) == materialId())
       continue;
-    swapPositions.append(pos);
+    swapPositions.push_back(pos);
   }
 
   if (swapPositions.empty())
@@ -738,16 +738,16 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     auto hue = placementHueShift(pos);
     if (!hue)
       return std::unexpected(std::move(hue.error()));
-    toSwap.emplaceAppend(pos,
-                         PlaceMaterial{.layer = layer,
-                                       .material = materialId(),
-                                       .materialHueShift = *hue,
-                                       .collisionOverride = m_collisionOverride});
+    toSwap.emplace_back(pos,
+                        PlaceMaterial{.layer = layer,
+                                      .material = materialId(),
+                                      .materialHueShift = *hue,
+                                      .collisionOverride = m_collisionOverride});
     auto destroys = itemWorld->get().damageWouldDestroy(pos, layer, damage);
     if (!destroys)
       return std::unexpected(std::move(destroys.error()));
     if (!*destroys)
-      willDamage.append(pos);
+      willDamage.push_back(pos);
   }
   
   std::size_t success;
@@ -762,8 +762,8 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     List<Vec2I> toDamage;
 
     for (auto pair : toSwap)
-      toDamage.append(pair.first);
-    
+      toDamage.push_back(pair.first);
+
     auto damaged = itemWorld->get().damageTiles(toDamage, layer, itemOwner->get().position(), damage, itemOwner->get().entityId());
     if (!damaged)
       return std::unexpected(std::move(damaged.error()));
@@ -876,7 +876,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
         auto taken = tileDrawables.extract_value(index);
         if (!taken)
           return std::unexpected(std::move(taken.error()));
-        drawables.appendAll(std::move(*taken));
+        drawables.append_range(std::move(*taken));
       }
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
@@ -1043,7 +1043,7 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::previewTiles(bool 
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
       if (*foreground) {
-        result.append({pos, true, material, *hue, true});
+        result.push_back({pos, true, material, *hue, true});
         c++;
       } else {
         bool backPlaceable = false;
@@ -1055,10 +1055,10 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::previewTiles(bool 
           backPlaceable = *background;
         }
         if (backPlaceable) {
-          result.append({pos, true, material, *hue, true, light, true, color});
+          result.push_back({pos, true, material, *hue, true, light, true, color});
           c++;
         } else {
-          result.append({pos, true, material, *hue, true});
+          result.push_back({pos, true, material, *hue, true});
         }
       }
     }

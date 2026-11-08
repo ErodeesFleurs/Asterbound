@@ -193,7 +193,7 @@ auto result177 = v.get(1);
 if (!result177) return std::unexpected(std::move(result177.error()));
 auto result178 = jsonToStringList(std::move(*result177));
 if (!result178) return std::unexpected(std::move(result178.error()));
-value.shapes.append(BushShape{std::move(*result176), std::move(*result178)});
+value.shapes.push_back(BushShape{std::move(*result176), std::move(*result178)});
 }
   auto result179 = variant.getFloat("baseHueShift");
 if (!result179) return std::unexpected(std::move(result179.error()));
@@ -286,7 +286,7 @@ std::expected<StringList, StarException> PlantDatabase::treeStemNames(bool ceili
     auto result255 = pair.second.settings.getBool("ceiling", false);
 if (!result255) return std::unexpected(std::move(result255.error()));
 if (std::move(*result255) == ceiling)
-      names.append(pair.first);
+  names.push_back(pair.first);
   }
   return names;
 }
@@ -458,7 +458,7 @@ std::expected<StringList, StarException> PlantDatabase::grassNames(bool ceiling)
     auto result224 = pair.second.settings.getBool("ceiling", false);
 if (!result224) return std::unexpected(std::move(result224.error()));
 if (std::move(*result224) == ceiling)
-      names.append(pair.first);
+  names.push_back(pair.first);
   }
   return names;
 }
@@ -522,7 +522,7 @@ std::expected<StringList, StarException> PlantDatabase::bushNames(bool ceiling) 
     auto result211 = pair.second.settings.getBool("ceiling");
 if (!result211) return std::unexpected(std::move(result211.error()));
 if (std::move(*result211) == ceiling)
-      names.append(pair.first);
+  names.push_back(pair.first);
   }
   return names;
 }

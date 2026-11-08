@@ -201,7 +201,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto skipTo = timeSkipDefinition.getFloat("skipTo");
     if (!skipTo)
       return std::unexpected(std::move(skipTo.error()));
-    m_timeSkips.append(TimeSkip{.availableTime = *available, .skipToTime = *skipTo});
+    m_timeSkips.push_back(TimeSkip{.availableTime = *available, .skipToTime = *skipTo});
   }
   std::sort(m_timeSkips.begin(), m_timeSkips.end(), [](TimeSkip const& a, TimeSkip const& b) {
     return a.availableTime < b.availableTime;
@@ -230,7 +230,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
         return std::unexpected(std::move(pan.error()));
       keyFrame.pan = *pan;
     }
-    m_cameraKeyFrames.append(keyFrame);
+    m_cameraKeyFrames.push_back(keyFrame);
   }
 
   auto panels = definition.getArray("panels");
@@ -336,11 +336,11 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
       decoded = assignIfPresent("textPercentage", keyframe.textPercentage, &Json::toFloat);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      panel->keyFrames.append(std::move(keyframe));
+      panel->keyFrames.push_back(std::move(keyframe));
       float endTimecode = panel->endTime > 0 ? std::min(panel->endTime, panel->startTime + *timecode) : panel->startTime + *timecode;
       m_completionTime = std::max(m_completionTime, endTimecode);
     }
-    m_panels.append(std::move(panel));
+    m_panels.push_back(std::move(panel));
   }
 
   auto audio = definition.getArray("audio");
@@ -364,7 +364,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     if (!resource)
       return std::unexpected(std::move(resource.error()));
     cue.resource = std::move(*resource);
-    m_audioCues.append(std::move(cue));
+    m_audioCues.push_back(std::move(cue));
     m_completionTime = std::max(m_completionTime, *timecode);
     m_completionTime = std::max(m_completionTime, *endTimecode);
   }

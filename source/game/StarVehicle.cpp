@@ -709,7 +709,7 @@ if (!result1207) return std::unexpected(std::move(result1207.error()));
           auto result1208 = LoungeControlNames->get_right(control);
           if (!result1208)
             return std::unexpected(std::move(result1208.error()));
-          allControlsHeld.append(result1208->get());
+          allControlsHeld.push_back(result1208->get());
         }
         auto result1209 = world();
 if (!result1209) return std::unexpected(std::move(result1209.error()));
@@ -1125,7 +1125,7 @@ Mat3F partTransformation = std::move(*result1127);
       }
 
       std::visit([translatePos](auto& fr) { fr.translate(translatePos); }, forceRegion);
-      forces.append(std::move(forceRegion));
+      forces.push_back(std::move(forceRegion));
     }
   }
   return forces;
@@ -1150,7 +1150,7 @@ Mat3F partTransformation = std::move(*result1126);
       damageSource.team = m_damageTeam.get();
       damageSource.sourceEntityId = entityId();
 
-      sources.append(std::move(damageSource));
+      sources.push_back(std::move(damageSource));
     }
   }
   return sources;

@@ -411,7 +411,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     StringList result;
     result.reserve(paths->get().size());
     for (auto const& path : paths->get())
-      result.append(path.string());
+      result.push_back(path.string());
     return result;
   }); !r) return std::unexpected(std::move(r.error()));
 
@@ -933,7 +933,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::recipesForIt
   for (auto& recipe : recipes) {
     auto json = recipe.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }
@@ -950,7 +950,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::allRecipes(I
   for (auto& recipe : recipes.get()) {
     auto json = recipe.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }
@@ -1050,7 +1050,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
   for (auto const& drawable : *drawables) {
     auto json = drawable.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }
@@ -1076,7 +1076,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::monsterPortr
   for (auto const& drawable : *drawables) {
     auto json = drawable.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }

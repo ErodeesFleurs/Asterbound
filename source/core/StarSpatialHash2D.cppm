@@ -129,7 +129,7 @@ template <typename KeyT, typename ScalarT, typename ValueT, typename IntT, std::
 List<typename SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::Value> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::values() const {
   List<Value> values;
   for (auto const& pair : m_entryMap)
-    values.append(pair.second.value);
+    values.push_back(pair.second.value);
 
   return values;
 }
@@ -188,9 +188,9 @@ template <typename RectCollection>
 std::expected<List<ValueT>, StarException> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::queryValues(RectCollection const& rects) const {
   List<Value> values;
   auto result = forEach(rects, [&values](Value const& value) -> std::expected<void, StarException> {
-      values.append(value);
-      return {};
-    });
+    values.push_back(value);
+    return {};
+  });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return values;
@@ -220,7 +220,7 @@ std::expected<void, StarException> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, Al
           for (auto e : i->second) {
             for (Rect const& r : e->rects) {
               if (r.intersects(rect)) {
-                foundEntries.append(e);
+                foundEntries.push_back(e);
                 break;
               }
             }
@@ -358,7 +358,7 @@ template <typename RectCollection>
 void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::updateSpatial(Entry& entry, RectCollection const& rects) {
   removeSpatial(entry);
   entry.rects.clear();
-  entry.rects.appendAll(rects);
+  entry.rects.append_range(rects);
   addSpatial(entry);
 }
 

@@ -621,18 +621,18 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     return std::unexpected(std::move(toFloatResult60.error()));
   m_trashBurn = GameTimer(std::move(*toFloatResult60));
 
-  auto fetchChildResult61 = fetchChild<ImageWidget>("techHeadDisabled");
-  if (!fetchChildResult61)
-    return std::unexpected(std::move(fetchChildResult61.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult61));
-  auto fetchChildResult62 = fetchChild<ImageWidget>("techBodyDisabled");
-  if (!fetchChildResult62)
-    return std::unexpected(std::move(fetchChildResult62.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult62));
-  auto fetchChildResult63 = fetchChild<ImageWidget>("techLegsDisabled");
-  if (!fetchChildResult63)
-    return std::unexpected(std::move(fetchChildResult63.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult63));
+  auto head_overlay = fetchChild<ImageWidget>("techHeadDisabled");
+  if (!head_overlay)
+    return std::unexpected(std::move(head_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*head_overlay));
+  auto body_overlay = fetchChild<ImageWidget>("techBodyDisabled");
+  if (!body_overlay)
+    return std::unexpected(std::move(body_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*body_overlay));
+  auto legs_overlay = fetchChild<ImageWidget>("techLegsDisabled");
+  if (!legs_overlay)
+    return std::unexpected(std::move(legs_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*legs_overlay));
 
   {
     auto const& enumResult64 = EquipmentSlotNames;

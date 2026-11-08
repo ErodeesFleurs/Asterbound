@@ -66,11 +66,11 @@ std::expected<List<std::pair<String, bool>>, StarException> File::directory_entr
   List<std::pair<String, bool>> files;
   // Standard directory iterators omit these entries unconditionally.
   if (!skipDots) {
-    files.append({".", true});
+    files.push_back({".", true});
     auto parent = is_directory(relative_to(dirName, ".."));
     if (!parent)
       return std::unexpected(std::move(parent.error()));
-    files.append({"..", *parent});
+    files.push_back({"..", *parent});
   }
   for (std::filesystem::directory_iterator end; entry != end; entry.increment(error)) {
     if (error)
@@ -78,7 +78,7 @@ std::expected<List<std::pair<String, bool>>, StarException> File::directory_entr
     auto directory = entry->is_directory(error);
     // Native stat failures for an entry have always classified it as non-directory.
     error.clear();
-    files.append({String(entry->path().filename().native()), directory});
+    files.push_back({String(entry->path().filename().native()), directory});
   }
   if (error)
     return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));

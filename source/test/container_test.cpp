@@ -110,10 +110,10 @@ void expectMoveOnlyFilterContract() {
   for (int value : {1, 2, 3, 4, 5}) {
     auto owned = std::make_unique<int>(value);
     original.push_back(owned.get());
-    if constexpr (std::is_void_v<typename Container::AppendResult>) {
-      input.append(std::move(owned));
+    if constexpr (std::is_void_v<decltype(input.push_back(std::move(owned)))>) {
+      input.push_back(std::move(owned));
     } else {
-      auto added = input.append(std::move(owned));
+      auto added = input.push_back(std::move(owned));
       ASSERT_TRUE(added);
     }
   }
@@ -167,7 +167,7 @@ TEST(ListTest, RemovalObservesAliasingAndImmediateDestruction) {
   List<RemovalProbe> input;
   input.reserve(4);
   for (int value : {1, 2, 1, 3})
-    input.emplaceAppend(value, std::ref(destructions), std::ref(comparisons));
+    input.emplace_back(value, std::ref(destructions), std::ref(comparisons));
   RemovalProbe key{1, std::ref(destructions), std::ref(comparisons)};
   EXPECT_EQ(input.remove(key), 2u);
   EXPECT_EQ(comparisons, (std::vector<int>{0, 1, 1, 2}));
@@ -181,7 +181,7 @@ TEST(ListTest, BoundedAppendConsumesInputOnceAndRetainsSuccessfulPrefix) {
   StaticList<int, 2> input;
   std::istringstream stream("1 2 3 4");
   auto values = std::ranges::istream_view<int>(stream);
-  auto appended = input.appendAll(values);
+  auto appended = input.append_range(values);
   ASSERT_FALSE(appended);
   EXPECT_TRUE(appended.error().is<StaticVectorSizeException>());
   EXPECT_EQ(std::vector<int>(input.begin(), input.end()), (std::vector<int>{1, 2}));
@@ -192,9 +192,9 @@ TEST(ListTest, BoundedAppendConsumesInputOnceAndRetainsSuccessfulPrefix) {
 
 TEST(ListTest, BoundedEmplacementRejectsBeforeMovingArguments) {
   StaticList<std::unique_ptr<int>, 1> input;
-  ASSERT_TRUE(input.append(std::make_unique<int>(1)));
+  ASSERT_TRUE(input.push_back(std::make_unique<int>(1)));
   auto pending = std::make_unique<int>(2);
-  auto rejected = input.emplaceAppend(std::move(pending));
+  auto rejected = input.emplace_back(std::move(pending));
   ASSERT_FALSE(rejected);
   ASSERT_TRUE(pending);
   EXPECT_EQ(*pending, 2);
@@ -252,10 +252,10 @@ TEST(ListTest, IndexedQueriesRetainDefaultArguments) {
     EXPECT_EQ(input.get(1), 2);
     EXPECT_EQ(input.get(99), 0);
     EXPECT_EQ(input.get(99, 7), 7);
-    EXPECT_EQ(input.indexOf(1), 0u);
-    EXPECT_EQ(input.lastIndexOf(1), 2u);
-    EXPECT_EQ(input.indexOf(1, 1), 2u);
-    EXPECT_EQ(input.lastIndexOf(1, 2), 0u);
+    EXPECT_EQ(input.index_of(1), 0u);
+    EXPECT_EQ(input.last_index_of(1), 2u);
+    EXPECT_EQ(input.index_of(1, 1), 2u);
+    EXPECT_EQ(input.last_index_of(1, 2), 0u);
   };
   expectDefaults(List<int>{1, 2, 1});
   expectDefaults(SmallList<int, 2>{1, 2, 1});
@@ -268,19 +268,19 @@ TEST(ListTest, IndexedQueriesRetainDefaultArguments) {
 TEST(ListTest, IndexOfPreservesTypedFirstMatchAndBounds) {
   auto expectSearch = []<typename Sequence>(Sequence const& input) {
     double needle = 1.5;
-    EXPECT_EQ(input.indexOf(needle), 0u);
-    EXPECT_EQ(input.indexOf(needle, 1), 2u);
-    EXPECT_EQ(input.indexOf(needle, 2), 2u);
-    EXPECT_EQ(input.indexOf(2, 2), NPos);
-    EXPECT_EQ(input.indexOf(9), NPos);
-    EXPECT_EQ(input.indexOf(1, input.size()), NPos);
-    EXPECT_EQ(input.indexOf(1, input.size() + 1), NPos);
-    EXPECT_EQ(input.indexOf(1, NPos), NPos);
+    EXPECT_EQ(input.index_of(needle), 0u);
+    EXPECT_EQ(input.index_of(needle, 1), 2u);
+    EXPECT_EQ(input.index_of(needle, 2), 2u);
+    EXPECT_EQ(input.index_of(2, 2), NPos);
+    EXPECT_EQ(input.index_of(9), NPos);
+    EXPECT_EQ(input.index_of(1, input.size()), NPos);
+    EXPECT_EQ(input.index_of(1, input.size() + 1), NPos);
+    EXPECT_EQ(input.index_of(1, NPos), NPos);
 
     Sequence const empty;
-    EXPECT_EQ(empty.indexOf(1), NPos);
-    EXPECT_EQ(empty.indexOf(1, 1), NPos);
-    EXPECT_EQ(empty.indexOf(1, NPos), NPos);
+    EXPECT_EQ(empty.index_of(1), NPos);
+    EXPECT_EQ(empty.index_of(1, 1), NPos);
+    EXPECT_EQ(empty.index_of(1, NPos), NPos);
   };
   expectSearch(List<int>{1, 2, 1});
   expectSearch(SmallList<int, 2>{1, 2, 1});

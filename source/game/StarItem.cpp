@@ -103,7 +103,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
         auto drawable = Drawable::create(**metadata, imageConfig);
         if (!drawable)
           return std::unexpected(std::move(drawable.error()));
-        drawables.append(std::move(*drawable));
+        drawables.push_back(std::move(*drawable));
       }
     } else {
       auto image = icon.toString();
@@ -112,7 +112,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
       auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(m_directory, *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
-      drawables.append(std::move(*drawable));
+      drawables.push_back(std::move(*drawable));
     }
     return drawables;
   };
@@ -194,7 +194,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
     auto descriptor = ItemDescriptor::create(Json(blueprint));
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
-    m_learnBlueprintsOnPickup.append(std::move(*descriptor));
+    m_learnBlueprintsOnPickup.push_back(std::move(*descriptor));
   }
   auto collectables = instanceValue("collectablesOnPickup", JsonObject{}).and_then([](Json const& value) { return value.iterateObject(); });
   if (!collectables)
@@ -445,7 +445,7 @@ std::expected<List<QuestArcDescriptor>, StarException> Item::pickupQuestTemplate
     auto descriptor = QuestArcDescriptor::fromJson(root(), quest);
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
-    result.append(std::move(*descriptor));
+    result.push_back(std::move(*descriptor));
   }
   return result;
 }

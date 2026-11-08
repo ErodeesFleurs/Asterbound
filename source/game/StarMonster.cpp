@@ -641,7 +641,7 @@ auto damageSource = std::move(*result99);
     damageSource.damage *= m_monsterVariant.touchDamageMultiplier * levelPowerMultiplier * m_statusController->stat("powerMultiplier");
     damageSource.sourceEntityId = entityId();
     damageSource.team = getTeam();
-    damageSources.append(damageSource);
+    damageSources.push_back(damageSource);
   }
 
   auto animationDamageParts = m_monsterVariant.animationDamageParts;
@@ -704,7 +704,7 @@ knockback = std::move(*result106).transformVec2(knockback);
               length = length - worldLine.length();
 
               if (--bounces >= 0 && length > 0.0f) {
-                partSources.append(ds);
+                partSources.push_back(ds);
                 ds = DamageSource(ds);
                 Vec2F dir = worldLine.direction();
                 Vec2F normal = Vec2F((*collision).second);
@@ -719,13 +719,13 @@ knockback = std::move(*result106).transformVec2(knockback);
                 break;
               }
   }
-          partSources.append(ds);
+  partSources.push_back(ds);
         }
 }
     } else {
-      partSources.append(ds);
+      partSources.push_back(ds);
     }
-    damageSources.appendAll(partSources);
+    damageSources.append_range(partSources);
   }
 
   return damageSources;
@@ -886,8 +886,8 @@ if (!result138) return std::unexpected(std::move(result138.error()));
 auto lightSources = std::move(*result138);
   auto result139 = m_statusController->lightSources();
 if (!result139) return std::unexpected(std::move(result139.error()));
-lightSources.appendAll(std::move(*result139));
-  return lightSources;
+lightSources.append_range(std::move(*result139));
+return lightSources;
 }
 
 std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
@@ -1145,7 +1145,7 @@ if (!result184) return std::unexpected(std::move(result184.error()));
       for (auto const& source : damageSources.value_or(JsonArray{})) {
         auto damage = DamageSource::create(source);
         if (!damage) return std::unexpected(std::move(damage.error()));
-        parsed.append(std::move(*damage));
+        parsed.push_back(std::move(*damage));
       }
       m_damageSources.set(std::move(parsed));
       return {};
@@ -1208,7 +1208,7 @@ if (!result195) return std::unexpected(std::move(result195.error()));
       for (auto const& force : forces) {
         auto region = jsonToPhysicsForceRegion(force);
         if (!region) return std::unexpected(std::move(region.error()));
-        parsed.append(std::move(*region));
+        parsed.push_back(std::move(*region));
       }
       m_physicsForces.set(std::move(parsed));
       return {};
@@ -1297,13 +1297,13 @@ std::expected<void, StarException> Monster::addChatMessage(String const& message
     {
   auto result210 = mouthPosition();
   if (!result210) return std::unexpected(std::move(result210.error()));
-  m_pendingChatActions.append(SayChatAction{entityId(), message, std::move(*result210)});
+  m_pendingChatActions.push_back(SayChatAction{entityId(), message, std::move(*result210)});
 }
   else
     {
   auto result211 = mouthPosition();
   if (!result211) return std::unexpected(std::move(result211.error()));
-  m_pendingChatActions.append(PortraitChatAction{entityId(), portrait, message, std::move(*result211)});
+  m_pendingChatActions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result211)});
 }
   return {};
 }
@@ -1430,14 +1430,14 @@ std::expected<void, StarException> Monster::getNetStates(bool initial) {
       {
   auto result237 = mouthPosition();
   if (!result237) return std::unexpected(std::move(result237.error()));
-  m_pendingChatActions.append(SayChatAction{entityId(), m_chatMessage.get(), std::move(*result237)});
+  m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage.get(), std::move(*result237)});
 }
     else
       {
   auto result238 = mouthPosition();
   if (!result238) return std::unexpected(std::move(result238.error()));
-  m_pendingChatActions.append(
-            PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(), std::move(*result238)});
+  m_pendingChatActions.push_back(
+    PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(), std::move(*result238)});
 }
   }
   return {};

@@ -82,7 +82,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
       for (auto const& trigger : *triggers) {
         auto stat = trigger.toString();
         if (!stat) return std::unexpected(std::move(stat.error()));
-        m_statAchievements[*stat].append(*name);
+        m_statAchievements[*stat].push_back(*name);
       }
       return {};
     }();

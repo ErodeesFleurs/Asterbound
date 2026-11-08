@@ -228,10 +228,8 @@ template <typename AtlasTextureHandle>
   auto atlasTexture = createAtlasTexture(atlasTextureSize(), PixelFormat::RGBA32);
   if (!atlasTexture)
     return std::unexpected(std::move(atlasTexture.error()));
-  m_atlases.append(std::make_unique<TextureAtlas>(TextureAtlas{
-      std::move(*atlasTexture),
-      std::unique_ptr<bool[]>(new bool[m_atlasNumCells * m_atlasNumCells]()), 0
-    }));
+  m_atlases.push_back(std::make_unique<TextureAtlas>(
+    TextureAtlas{std::move(*atlasTexture), std::unique_ptr<bool[]>(new bool[m_atlasNumCells * m_atlasNumCells]()), 0}));
 
   auto texture = tryAtlas(*m_atlases[m_atlases.size() - 1]);
   if (texture && *texture)

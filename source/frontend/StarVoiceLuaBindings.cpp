@@ -72,7 +72,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeVoiceCallbacks(Voice
   if (auto r = callbacks.registerCallback("speakers", [&voice](std::optional<bool> onlyPlaying) -> List<Json> {
     List<Json> list;
     for (auto& speaker : voice.sortedSpeakers(onlyPlaying.value_or(true)))
-      list.append(speaker->toJson());
+      list.push_back(speaker->toJson());
     return list;
   }); !r) return std::unexpected(std::move(r.error()));
   return callbacks;

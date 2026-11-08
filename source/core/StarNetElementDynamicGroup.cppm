@@ -418,7 +418,7 @@ void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
     Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
-  m_changeData.append({currentVersion, std::move(change)});
+  m_changeData.push_back({currentVersion, std::move(change)});
 
   m_changeDataLastVersion =
     std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);

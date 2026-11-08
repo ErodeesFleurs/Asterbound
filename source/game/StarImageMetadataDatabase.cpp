@@ -136,7 +136,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
       }
 
       if (fillRatio >= fillLimit)
-        spaces.append(Vec2I(xspace, yspace));
+        spaces.push_back(Vec2I(xspace, yspace));
     }
   }
 

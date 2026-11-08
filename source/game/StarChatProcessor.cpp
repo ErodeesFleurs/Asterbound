@@ -31,12 +31,8 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
   nick = makeNickUnique(nick);
 
   for (auto&& pair : m_clients) {
-    pair.second.pendingMessages.append({
-        {MessageContext::Broadcast},
-        ServerConnectionId,
-        ServerNick,
-        strf("Player '{}' connected", nick)
-      });
+    pair.second.pendingMessages.push_back(
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, strf("Player '{}' connected", nick)});
   }
 
   auto added = m_clients.add(clientId, ClientInfo(clientId, nick));
@@ -59,12 +55,8 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
   m_nicks.remove(clientInfo.nick);
 
   for (auto&& pair : m_clients) {
-    pair.second.pendingMessages.append({
-        {MessageContext::Broadcast},
-        ServerConnectionId,
-        ServerNick,
-        strf("Player '{}' disconnected", clientInfo.nick)
-      });
+    pair.second.pendingMessages.push_back(
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, strf("Player '{}' disconnected", clientInfo.nick)});
   }
 
   return clientInfo.pendingMessages;
@@ -138,7 +130,7 @@ StringList ChatProcessor::clientChannels(ConnectionId clientId) const {
   StringList channels;
   for (auto const& pair : m_channels) {
     if (pair.second.contains(clientId))
-      channels.append(pair.first);
+      channels.push_back(pair.first);
   }
   return channels;
 }
@@ -150,7 +142,7 @@ StringList ChatProcessor::activeChannels() const {
   StringList channels;
   for (auto const& pair : m_channels) {
     if (!pair.second.empty())
-      channels.append(pair.first);
+      channels.push_back(pair.first);
   }
   return channels;
 }
@@ -175,7 +167,7 @@ std::expected<void, StarException> ChatProcessor::broadcast(ConnectionId sourceC
   if (*handled) return {};
 
   for (auto&& pair : m_clients)
-    pair.second.pendingMessages.append(message);
+    pair.second.pendingMessages.push_back(message);
   return {};
 }
 
@@ -202,7 +194,7 @@ std::expected<void, StarException> ChatProcessor::message(ConnectionId sourceCon
     auto clientInfoResult = m_clients.get(clientId);
     if (!clientInfoResult) return std::unexpected(std::move(clientInfoResult.error()));
     auto& clientInfo = clientInfoResult->get();
-    clientInfo.pendingMessages.append(message);
+    clientInfo.pendingMessages.push_back(message);
   }
   return {};
 }
@@ -229,11 +221,11 @@ std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceCon
   if (sourceConnectionId != ServerConnectionId) {
     auto source = m_clients.get(sourceConnectionId);
     if (!source) return std::unexpected(std::move(source.error()));
-    source->get().pendingMessages.append(message);
+    source->get().pendingMessages.push_back(message);
   }
   auto target = m_clients.get(targetClientId);
   if (!target) return std::unexpected(std::move(target.error()));
-  target->get().pendingMessages.append(message);
+  target->get().pendingMessages.push_back(message);
   return {};
 }
 
@@ -332,7 +324,8 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
   if (!response.empty()) {
     auto client = m_clients.get(message.fromConnection);
     if (!client) return std::unexpected(std::move(client.error()));
-    client->get().pendingMessages.append({MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+    client->get().pendingMessages.push_back(
+      {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
   }
   return true;
 }
@@ -362,7 +355,8 @@ std::expected<void, StarException> ChatProcessor::updatePromises() {
       if (!response.empty()) {
         auto client = m_clients.get(entry.first);
         if (!client) return std::unexpected(std::move(client.error()));
-        client->get().pendingMessages.append({MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+        client->get().pendingMessages.push_back(
+          {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
       }
       m_commandPromises.remove(uuid);
     }

@@ -232,7 +232,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
         auto blueprint = ItemDescriptor::create(value);
         if (!blueprint)
           return std::unexpected(std::move(blueprint.error()));
-        blueprints.append(std::move(*blueprint));
+        blueprints.push_back(std::move(*blueprint));
       }
       auto speciesConfig = (*assets)->json(strf("/species/{}.species", player->get().species()));
       if (!speciesConfig)
@@ -244,7 +244,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
         auto blueprint = ItemDescriptor::create(value);
         if (!blueprint)
           return std::unexpected(std::move(blueprint.error()));
-        blueprints.append(std::move(*blueprint));
+        blueprints.push_back(std::move(*blueprint));
       }
       for (auto const& blueprint : blueprints) {
         auto added = player->get().addBlueprint(blueprint);

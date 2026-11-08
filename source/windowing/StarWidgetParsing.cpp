@@ -231,7 +231,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
       auto children = parser.constructor(*included);
       if (!children)
         return std::unexpected(std::move(children.error()));
-      widgets.appendAll(std::move(*children));
+      widgets.append_range(std::move(*children));
     } else {
       auto handler = parser.m_constructors.find_ref(*type);
       if (!handler || !handler->get())
@@ -240,7 +240,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
       if (!result)
         return std::unexpected(std::move(result.error()));
       if (result->obj)
-        widgets.append(std::move(*result));
+        widgets.push_back(std::move(*result));
     }
     return {};
   };
@@ -486,7 +486,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
       auto drawable = Drawable::create(**metadata, drawableConfig);
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
-      drawables.append(std::move(*drawable));
+      drawables.push_back(std::move(*drawable));
     }
     auto result4 = image->setDrawables(std::move(drawables));
     if (!result4)

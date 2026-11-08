@@ -122,15 +122,15 @@ template <typename Key, typename Pointer>
 void SimpleBTreeIndex<Key, Pointer>::removeBefore(std::size_t i) {
   if (i == 0) {
     beginPointer = pointers[0].pointer;
-    pointers.eraseAt(0);
+    pointers.erase_at(0);
   } else {
-    pointers.eraseAt(i - 1);
+    pointers.erase_at(i - 1);
   }
 }
 
 template <typename Key, typename Pointer>
 void SimpleBTreeIndex<Key, Pointer>::insertAfter(std::size_t i, Key k, Pointer p) {
-  pointers.insertAt(i, Element{k, p});
+  pointers.insert_at(i, Element{k, p});
 }
 
 template <typename Key, typename Pointer>
@@ -150,7 +150,7 @@ void SimpleBTreeIndex<Key, Pointer>::shiftLeft(Key const& mid, SimpleBTreeIndex&
   if (count == 0)
     return;
 
-  pointers.append(Element{mid, *right.beginPointer});
+  pointers.push_back(Element{mid, *right.beginPointer});
 
   typename ElementList::iterator s = right.pointers.begin();
   std::advance(s, count - 1);
@@ -159,7 +159,7 @@ void SimpleBTreeIndex<Key, Pointer>::shiftLeft(Key const& mid, SimpleBTreeIndex&
   right.pointers.erase(right.pointers.begin(), s);
   if (right.pointers.size() != 0) {
     right.beginPointer = right.pointers[0].pointer;
-    right.pointers.eraseAt(0);
+    right.pointers.erase_at(0);
   } else {
     right.beginPointer.reset();
   }
@@ -182,7 +182,7 @@ void SimpleBTreeIndex<Key, Pointer>::shiftRight(Key const& mid, SimpleBTreeIndex
   left.pointers.erase(s, left.pointers.end());
   if (left.pointers.size() != 0) {
     beginPointer = left.pointers[left.pointers.size() - 1].pointer;
-    left.pointers.eraseAt(left.pointers.size() - 1);
+    left.pointers.erase_at(left.pointers.size() - 1);
   } else {
     beginPointer = std::exchange(left.beginPointer, std::nullopt);
   }
@@ -223,12 +223,12 @@ Data const& SimpleBTreeLeaf<Key, Data, Pointer>::data(std::size_t i) const {
 
 template <typename Key, typename Data, typename Pointer>
 void SimpleBTreeLeaf<Key, Data, Pointer>::insert(std::size_t i, Key k, Data d) {
-  elements.insertAt(i, Element{std::move(k), std::move(d)});
+  elements.insert_at(i, Element{std::move(k), std::move(d)});
 }
 
 template <typename Key, typename Data, typename Pointer>
 void SimpleBTreeLeaf<Key, Data, Pointer>::remove(std::size_t i) {
-  elements.eraseAt(i);
+  elements.erase_at(i);
 }
 
 template <typename Key, typename Data, typename Pointer>
@@ -387,7 +387,7 @@ struct SimpleBTreeStorage {
   }
 
   [[nodiscard]] std::expected<void, StarException> deleteLeaf(Leaf const& leaf) {
-    deletedLeaves.append(leaf.self);
+    deletedLeaves.push_back(leaf.self);
     return {};
   }
 
@@ -454,9 +454,7 @@ struct SimpleBTreeStorage {
     return index.self;
   }
 
-  void deleteIndex(Index const& index) {
-    deletedIndexes.append(index.self);
-  }
+  void deleteIndex(Index const& index) { deletedIndexes.push_back(index.self); }
 
   std::size_t indexPointerCount(Index const& index) {
     return index.pointerCount();
@@ -639,7 +637,7 @@ void testBTree(std::size_t maxIndexSize, std::size_t maxLeafSize) {
   List<int> keys;
   for (int k : keySet) {
     for (std::size_t j = 0; j < WriteRepeat; ++j)
-      keys.append(k);
+      keys.push_back(k);
   }
 
   // record writes/reads repeated WriteRepeat times randomly each cycle

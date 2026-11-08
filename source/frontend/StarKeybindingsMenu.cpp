@@ -242,7 +242,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
           auto descriptor = inputDescriptorFromJson(bindingEntry);
           if (!descriptor)
             return std::unexpected(std::move(descriptor.error()));
-          inputDesc.append(std::move(*descriptor));
+          inputDesc.push_back(std::move(*descriptor));
         }
         return {};
       };
@@ -267,7 +267,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
         auto description = printInputDescriptor(descriptor);
         if (!description)
           return std::unexpected(std::move(description.error()));
-        descriptions.append(std::move(*description));
+        descriptions.push_back(std::move(*description));
       }
       (*boundKeys)->setText(descriptions.join(", "));
       auto deleteButton = (*newListMember)->requireChild<ButtonWidget>("deleteBinding");

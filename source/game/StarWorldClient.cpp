@@ -604,7 +604,8 @@ std::expected<void, StarException> WorldClient::resendEntity(EntityId entityId) 
   auto state = entity->writeNetState(*fromVersion, netRules);
   if (!state)
     return std::unexpected(std::move(state.error()));
-  m_outgoingPackets.append(std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(state->first), false));
+  m_outgoingPackets.push_back(
+    std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(state->first), false));
   return notifyEntityCreate(entity);
 }
 
@@ -649,7 +650,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     }
 
     m_particles->addParticles(std::move(renderCallback.particles));
-    m_samples.appendAll(std::move(renderCallback.audios));
+    m_samples.append_range(std::move(renderCallback.audios));
   }
 
   if (auto version = m_masterEntitiesNetVersion.try_extract_value(entity->entityId())) {
@@ -658,7 +659,8 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     if (!state)
       return std::unexpected(std::move(state.error()));
     ByteArray finalNetState = std::move(state->first);
-    m_outgoingPackets.append(std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(finalNetState), andDie));
+    m_outgoingPackets.push_back(
+      std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(finalNetState), andDie));
   }
 
   m_entityMap->removeEntity(entityId);
@@ -683,7 +685,7 @@ void WorldClient::timer(float delay, WorldAction worldAction) {
   if (!inWorld())
     return;
 
-  m_timers.append({delay, worldAction});
+  m_timers.push_back({delay, worldAction});
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldClient::closestEntity(Vec2F const& center, float radius, EntityFilter selector) const {
@@ -870,12 +872,12 @@ std::expected<TileModificationList, StarException> WorldClient::applyTileModific
           if (!predicted) {
             return std::unexpected(std::move(predicted.error()));
           }
-          success.append(pair);
+          success.push_back(pair);
           yay = true;
           continue;
         }
       }
-      failures.append(pair);
+      failures.push_back(pair);
     }
     if (yay) {
       list = std::cref(temp = std::move(failures));
@@ -887,7 +889,7 @@ std::expected<TileModificationList, StarException> WorldClient::applyTileModific
   }
   
   if (!success.empty()) {
-    m_outgoingPackets.append(std::make_shared<ModifyTileListPacket>(std::move(success), true));
+    m_outgoingPackets.push_back(std::make_shared<ModifyTileListPacket>(std::move(success), true));
   }
   
   return failures;
@@ -912,12 +914,12 @@ std::expected<TileModificationList, StarException> WorldClient::replaceTiles(Til
       valid = *replacement;
     }
     if (valid)
-      success.append(pair);
+      success.push_back(pair);
     else
-      failures.append(pair);
+      failures.push_back(pair);
   }
 
-  m_outgoingPackets.append(std::make_shared<ReplaceTileListPacket>(std::move(success), tileDamage, applyDamage));
+  m_outgoingPackets.push_back(std::make_shared<ReplaceTileListPacket>(std::move(success), tileDamage, applyDamage));
 
   return failures;
 }
@@ -1090,7 +1092,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       m_pendingParticleLights.clear();
       for (auto const& particle : renderData.particles)
         if (particle.light != Color::Clear)
-          m_pendingParticleLights.append({particle.position, particle.light.toRgbF()});
+          m_pendingParticleLights.push_back({particle.position, particle.light.toRgbF()});
       m_pendingLightRange = window.padded(1);
       m_pendingLightReady = true;
     }
@@ -1167,7 +1169,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       }
       
       if (drawableIndex == renderData.entityDrawables.size())
-        renderData.entityDrawables.append({});
+        renderData.entityDrawables.push_back({});
       auto& ed = renderData.entityDrawables[drawableIndex++];
       ClientRenderCallback renderCallback(tileDrawer, self.presentationFor(*entity, presentation), self.m_presentationTimestep,
           self.m_geometry.diff(self.renderPosition(entity->entityId(), presentation), entity->position()));
@@ -1252,9 +1254,9 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           ed.highlightEffect.level *= self.m_inspectionFlickerMultiplier;
         }
       }
-      
-      self.m_previewTiles.appendAll(std::move(renderCallback.previewTiles));
-      renderData.overheadBars.appendAll(std::move(renderCallback.overheadBars));
+
+      self.m_previewTiles.append_range(std::move(renderCallback.previewTiles));
+      renderData.overheadBars.append_range(std::move(renderCallback.overheadBars));
       return {};
     }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
       return a->entityId() < b->entityId();
@@ -1360,11 +1362,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   
   if (m_currentParallax) {
     if (m_parallaxFadeTimer.ready()) {
-      renderData.parallaxLayers.appendAll(m_currentParallax->layers());
+      renderData.parallaxLayers.append_range(m_currentParallax->layers());
     } else {
       for (auto layer : m_currentParallax->layers()) {
         layer.alpha = std::min(1.0f, m_parallaxFadeTimer.percent() * 2);
-        renderData.parallaxLayers.append(layer);
+        renderData.parallaxLayers.push_back(layer);
       }
     }
   }
@@ -1372,7 +1374,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (m_nextParallax) {
     for (auto layer : m_nextParallax->layers()) {
       layer.alpha = std::min(1.0f, (1.0f - m_parallaxFadeTimer.percent()) * 2);
-      renderData.parallaxLayers.append(layer);
+      renderData.parallaxLayers.push_back(layer);
     }
   }
   
@@ -1425,7 +1427,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (m_weatherParallax) {
     for (auto layer : m_weatherParallax->layers()) {
       layer.alpha *= m_weather->weatherIntensity();
-      renderData.parallaxLayers.append(std::move(layer));
+      renderData.parallaxLayers.push_back(std::move(layer));
     }
   }
   
@@ -1485,14 +1487,14 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     if (!drawable) {
       return std::unexpected(std::move(drawable.error()));
     }
-    renderData.backgroundOverlays.append(std::move(*drawable));
+    renderData.backgroundOverlays.push_back(std::move(*drawable));
   }
   for (auto const& overlay : m_centralStructure.foregroundOverlays()) {
     auto drawable = overlayToDrawable(overlay);
     if (!drawable) {
       return std::unexpected(std::move(drawable.error()));
     }
-    renderData.foregroundOverlays.append(std::move(*drawable));
+    renderData.foregroundOverlays.push_back(std::move(*drawable));
   }
   
   renderData.isFullbright = m_fullBright;
@@ -1905,13 +1907,13 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
       
       if (!entity) {
-        m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
+        m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
           std::unexpected(String("Unknown entity")), entityMessagePacket->uuid));
       } else if (!entity->isMaster()) {
         auto result133 = this->root().logger().error("Server has sent a scripted entity response for a slave entity");
         if (!result133)
           return std::unexpected(std::move(result133.error()));
-        m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
+        m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
           std::unexpected(String("Entity delivery error")), entityMessagePacket->uuid));
       } else {
         ConnectionId fromConnection = entityMessagePacket->fromConnection;
@@ -1930,7 +1932,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
               Uuid const& uuid;
 
               void operator()(Json& result) const {
-                client.m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(result, uuid));
+                client.m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(result, uuid));
               }
 
               void operator()(RpcPromise<Json>& promise) const {
@@ -1940,7 +1942,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
             };
             std::visit(QueueEntityResponse{.client = *this, .uuid = entityMessagePacket->uuid}, *response);
           } else {
-            m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(
+            m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
               std::unexpected(String("Message not handled by entity")), entityMessagePacket->uuid));
           }
         }
@@ -1996,7 +1998,9 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result142)
         return std::unexpected(std::move(result142.error()));
       auto interactResult = (std::move(*result142));
-      m_outgoingPackets.append(std::make_shared<EntityInteractResultPacket>(interactResult.value_or(InteractAction{}), entityInteract->requestId, entityInteract->interactRequest.sourceId));
+      m_outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
+        interactResult.value_or(InteractAction{}), entityInteract->requestId,
+        entityInteract->interactRequest.sourceId));
     } else if (auto interactResult = as<EntityInteractResultPacket>(packet)) {
       if (auto response = m_entityInteractionResponses.try_extract_value(interactResult->requestId)) {
         if (interactResult->action) {
@@ -2155,7 +2159,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   List<WorldAction> triggeredActions;
   m_timers.filter([&triggeredActions, dt](std::pair<float, WorldAction>& timer) {
     if ((timer.first -= dt) <= 0) {
-      triggeredActions.append(timer.second);
+      triggeredActions.push_back(timer.second);
       return false;
     }
     return true;
@@ -2201,11 +2205,11 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         if (!result159)
           return std::unexpected(std::move(result159.error()));
         if ((std::move(*result159)) && entity->entityMode() == EntityMode::Master) {
-          toRemove.append(entity->entityId());
+          toRemove.push_back(entity->entityId());
         }
       }
       if (entity->isMaster() && entity->clientEntityMode() == ClientEntityMode::ClientPresenceMaster) {
-        clientPresenceEntities.append(entity->entityId());
+        clientPresenceEntities.push_back(entity->entityId());
       }
       return {};
     }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
@@ -2341,7 +2345,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
                   itemDrop->takeBy(m_mainPlayer->entityId(), static_cast<float>(m_latency.count()) / 1000);
                 if (!result175)
                   return std::unexpected(std::move(result175.error()));
-                m_outgoingPackets.append(std::make_shared<RequestDropPacket>(itemDrop->entityId()));
+                m_outgoingPackets.push_back(std::make_shared<RequestDropPacket>(itemDrop->entityId()));
               }
             }
           }
@@ -2399,7 +2403,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         if (pending->instance.lock() == entity)
           for (auto& audio : pending->loops)
             if (!audio->finished())
-              m_samples.append(std::move(audio));
+              m_samples.push_back(std::move(audio));
       }
       if (auto const& parameters = m_worldTemplate->worldParameters()) {
         if (auto const& directives = parameters->globalDirectives; directives && !directives->empty()) {
@@ -2409,7 +2413,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         }
       }
       m_particles->addParticles(std::move(m_eventRenderCallback.particles));
-      m_samples.appendAll(std::move(m_eventRenderCallback.audios));
+      m_samples.append_range(std::move(m_eventRenderCallback.audios));
       return {};
     });
     if (!events)
@@ -2423,7 +2427,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!result179)
         return std::unexpected(std::move(result179.error()));
       if (auto audioSample = (std::move(*result179))) {
-        m_samples.append(audioSample);
+        m_samples.push_back(audioSample);
       }
     }
     {
@@ -2434,7 +2438,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!result181)
         return std::unexpected(std::move(result181.error()));
       if (auto audioSample = (std::move(*result181))) {
-        m_samples.append(audioSample);
+        m_samples.push_back(audioSample);
       }
     }
     
@@ -2442,8 +2446,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       auto result182 = m_sky->pullSounds();
       if (!result182)
         return std::unexpected(std::move(result182.error()));
-      m_samples.appendAll((std::move(*result182)));
-      
+      m_samples.append_range((std::move(*result182)));
+
       if (m_spaceSound && m_spaceSound->finished()) {
         m_spaceSound = {};
         m_activeSpaceSound = "";
@@ -2466,7 +2470,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
             if (!result185)
               return std::unexpected(std::move(result185.error()));
             m_spaceSound = (std::move(*result185));
-            m_samples.append(m_spaceSound);
+            m_samples.push_back(m_spaceSound);
           }
         }
       }
@@ -2485,7 +2489,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!result186)
         return std::unexpected(std::move(result186.error()));
       if (auto audioSample = (std::move(*result186))) {
-        m_music.append(audioSample);
+        m_music.push_back(audioSample);
       }
     }
     
@@ -2497,7 +2501,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!result188)
         return std::unexpected(std::move(result188.error()));
       if (auto audioSample = (std::move(*result188))) {
-        m_music.append(audioSample);
+        m_music.push_back(audioSample);
       }
     }
   }
@@ -2521,12 +2525,12 @@ std::expected<void, StarException> WorldClient::update(float dt) {
             auto result192 = m_entityMessagePromises[uuid].result();
             if (!result192)
               return std::unexpected(std::move(result192.error()));
-            m_outgoingPackets.append(std::make_shared<EntityMessageResponsePacket>(*(std::move(*result192)), uuid));
+            m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(*(std::move(*result192)), uuid));
           } else {
             auto result193 = m_entityMessagePromises[uuid].error();
             if (!result193)
               return std::unexpected(std::move(result193.error()));
-            m_outgoingPackets.append(
+            m_outgoingPackets.push_back(
               std::make_shared<EntityMessageResponsePacket>(std::unexpected(*(std::move(*result193))), uuid));
           }
         }
@@ -2541,7 +2545,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   
   if ((!m_clientState->netCompatibilityRules().isLegacy() && m_currentStep % 3 == 0) || !m_pingTime.has_value()) {
     m_pingTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-    m_outgoingPackets.append(std::make_shared<PingPacket>(m_pingTime->time_since_epoch().count()));
+    m_outgoingPackets.push_back(std::make_shared<PingPacket>(m_pingTime->time_since_epoch().count()));
   }
   
   this->root().logMap().set(strf("client_{}_ping",m_subWorldId), m_latency.count());
@@ -2686,7 +2690,8 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
   auto state = entity->writeNetState(0, rules);
   if (!state)
     return std::unexpected(std::move(state.error()));
-  m_outgoingPackets.append(std::make_shared<SpawnEntityPacket>(entity->entityType(), std::move(*store), std::move(state->first)));
+  m_outgoingPackets.push_back(
+    std::make_shared<SpawnEntityPacket>(entity->entityType(), std::move(*store), std::move(state->first)));
   return {};
 }
 
@@ -2701,7 +2706,7 @@ std::expected<TileDamageResult, StarException> WorldClient::damageTiles(List<Vec
     if (!isOccupied)
       return std::unexpected(std::move(isOccupied.error()));
     if (*isOccupied)
-      occupied.append(position);
+      occupied.push_back(position);
   }
   List<Vec2I> toDing;
   List<Vec2I> toDamage;
@@ -2716,12 +2721,14 @@ std::expected<TileDamageResult, StarException> WorldClient::damageTiles(List<Vec
   if (toDing.size()) {
     auto dingDamage = tileDamage;
     dingDamage.type = TileDamageType::Protected;
-    m_outgoingPackets.append(std::make_shared<DamageTileGroupPacket>(std::move(toDing), layer, sourcePosition, dingDamage, std::optional<EntityId>()));
+    m_outgoingPackets.push_back(std::make_shared<DamageTileGroupPacket>(std::move(toDing), layer, sourcePosition,
+                                                                        dingDamage, std::optional<EntityId>()));
     res = TileDamageResult::Protected;
   }
 
   if (toDamage.size()) {
-    m_outgoingPackets.append(std::make_shared<DamageTileGroupPacket>(std::move(toDamage), layer, sourcePosition, tileDamage, sourceEntity));
+    m_outgoingPackets.push_back(
+      std::make_shared<DamageTileGroupPacket>(std::move(toDamage), layer, sourcePosition, tileDamage, sourceEntity));
     res = TileDamageResult::Normal;
   }
 
@@ -2776,12 +2783,12 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
       
       if (liquid.level > 0) {
         nextUnit -= liquid.level;
-        maybeDrainTiles.append(pos);
+        maybeDrainTiles.push_back(pos);
       }
     }
   }
-  
-  m_outgoingPackets.append(std::make_shared<CollectLiquidPacket>(tilePositions, liquidId));
+
+  m_outgoingPackets.push_back(std::make_shared<CollectLiquidPacket>(tilePositions, liquidId));
   return {};
 }
 
@@ -2838,9 +2845,9 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
   if (!result204)
     return std::unexpected(std::move(result204.error()));
   auto entityFactory = (std::move(*result204));
-  
-  m_outgoingPackets.append(std::make_shared<StepUpdatePacket>(m_currentTime));
-  
+
+  m_outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_currentTime));
+
   {
     auto result205 = m_clientConfig.getInt("worldClientStateUpdateDelta");
     if (!result205)
@@ -2849,7 +2856,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
       auto result206 = m_clientState->writeDelta();
       if (!result206)
         return std::unexpected(std::move(result206.error()));
-      m_outgoingPackets.append(std::make_shared<WorldClientStateUpdatePacket>((std::move(*result206))));
+      m_outgoingPackets.push_back(std::make_shared<WorldClientStateUpdatePacket>((std::move(*result206))));
     }
   }
   
@@ -2882,17 +2889,17 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
       });
     if (!result210)
       return std::unexpected(std::move(result210.error()));
-    m_outgoingPackets.append(std::move(entityUpdateSet));
+    m_outgoingPackets.push_back(std::move(entityUpdateSet));
   }
   
   for (auto& remoteHitRequest : m_damageManager->pullRemoteHitRequests()) {
-    m_outgoingPackets.append(std::make_shared<HitRequestPacket>(std::move(remoteHitRequest)));
+    m_outgoingPackets.push_back(std::make_shared<HitRequestPacket>(std::move(remoteHitRequest)));
   }
   for (auto& remoteDamageRequest : m_damageManager->pullRemoteDamageRequests()) {
-    m_outgoingPackets.append(std::make_shared<DamageRequestPacket>(std::move(remoteDamageRequest)));
+    m_outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(std::move(remoteDamageRequest)));
   }
   for (auto& remoteDamageNotification : m_damageManager->pullRemoteDamageNotifications()) {
-    m_outgoingPackets.append(std::make_shared<DamageNotificationPacket>(std::move(remoteDamageNotification)));
+    m_outgoingPackets.push_back(std::make_shared<DamageNotificationPacket>(std::move(remoteDamageNotification)));
   }
   return {};
 }
@@ -3008,7 +3015,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       auto result225 = soundsFromDefinition(this->root(), result224->get().sounds, damageNotification.position);
       if (!result225)
         return std::unexpected(std::move(result225.error()));
-      m_samples.appendAll((std::move(*result225)));
+      m_samples.append_range((std::move(*result225)));
       auto result226 = damageKind.effects.get(material);
       if (!result226)
         return std::unexpected(std::move(result226.error()));
@@ -3132,8 +3139,8 @@ std::expected<RpcPromise<InteractAction>, StarException> WorldClient::interact(I
   auto pair = RpcPromise<InteractAction>::createPair();
   Uuid requestId(this->root().random());
   m_entityInteractionResponses[requestId] = pair.second;
-  m_outgoingPackets.append(std::make_shared<EntityInteractPacket>(request, requestId));
-  
+  m_outgoingPackets.push_back(std::make_shared<EntityInteractPacket>(request, requestId));
+
   return pair.first;
 }
 
@@ -3353,8 +3360,8 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     auto result251 = clearWorld();
     if (!result251)
       return std::unexpected(std::move(result251.error()));
-    m_outgoingPackets.append(std::make_shared<WorldStartAcknowledgePacket>());
-    
+    m_outgoingPackets.push_back(std::make_shared<WorldStartAcknowledgePacket>());
+
     auto result252 = this->root().assets();
     if (!result252)
       return std::unexpected(std::move(result252.error()));
@@ -3710,8 +3717,8 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
     auto result295 = (std::move(*result294))->netStoreEntity(entity, netRules);
     if (!result295)
       return std::unexpected(std::move(result295.error()));
-    m_outgoingPackets.append(std::make_shared<EntityCreatePacket>(entity->entityType(),
-      (std::move(*result295)), std::move(firstNetState.first), entity->entityId()));
+    m_outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(
+      entity->entityType(), (std::move(*result295)), std::move(firstNetState.first), entity->entityId()));
   }
   return {};
 }
@@ -3950,7 +3957,7 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
     }
     for (auto& collisionBlock : *blocks) {
       if (auto tile = m_tileArray->modifyTile(collisionBlock.space)) {
-        auto appended = tile->get().collisionCache.append(std::move(collisionBlock));
+        auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock));
         if (!appended)
           return std::unexpected(std::move(appended.error()));
       }
@@ -4093,8 +4100,8 @@ std::expected<void, StarException> WorldClient::setProperty(String const& proper
   if (m_worldProperties[propertyName] == property) {
     return {};
   }
-  
-  m_outgoingPackets.append(std::make_shared<UpdateWorldPropertiesPacket>(JsonObject{{propertyName, property}}));
+
+  m_outgoingPackets.push_back(std::make_shared<UpdateWorldPropertiesPacket>(JsonObject{{propertyName, property}}));
   return {};
 }
 
@@ -4108,7 +4115,7 @@ std::expected<bool, StarException> WorldClient::playerCanReachEntity(EntityId en
 }
 
 void WorldClient::disconnectAllWires(Vec2I wireEntityPosition, WireNode const& node) {
-  m_outgoingPackets.append(std::make_shared<DisconnectAllWiresPacket>(wireEntityPosition, node));
+  m_outgoingPackets.push_back(std::make_shared<DisconnectAllWiresPacket>(wireEntityPosition, node));
 }
 
 void WorldClient::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec2I const& inputPosition, std::size_t inputIndex) {
@@ -4118,7 +4125,7 @@ void WorldClient::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec
 }
 
 void WorldClient::connectWire(WireConnection const& output, WireConnection const& input) {
-  m_outgoingPackets.append(std::make_shared<ConnectWirePacket>(output, input));
+  m_outgoingPackets.push_back(std::make_shared<ConnectWirePacket>(output, input));
 }
 
 bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compress) {
@@ -4166,34 +4173,34 @@ void WorldClient::ClientRenderCallback::clear() {
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addDrawable(Drawable drawable, EntityRenderLayer renderLayer) {
   drawable.translate(m_offset);
-  (drawableTarget ? *drawableTarget : drawables)[renderLayer].append(std::move(drawable));
+  (drawableTarget ? *drawableTarget : drawables)[renderLayer].push_back(std::move(drawable));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addLightSource(LightSource lightSource) {
   lightSource.translate(m_offset);
-  lightSources.append(std::move(lightSource));
+  lightSources.push_back(std::move(lightSource));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addParticle(Particle particle) {
-  particles.append(std::move(particle));
+  particles.push_back(std::move(particle));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addAudio(std::shared_ptr<AudioInstance> audio) {
-  audios.append(std::move(audio));
+  audios.push_back(std::move(audio));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addTilePreview(PreviewTile preview) {
-  previewTiles.append(std::move(preview));
+  previewTiles.push_back(std::move(preview));
   return {};
 }
 
 std::expected<void, StarException> WorldClient::ClientRenderCallback::addOverheadBar(OverheadBar bar) {
   bar.entityPosition += m_offset;
-  overheadBars.append(std::move(bar));
+  overheadBars.push_back(std::move(bar));
   return {};
 }
 
@@ -4252,10 +4259,10 @@ std::expected<RpcPromise<Vec2F>, StarException> WorldClient::findUniqueEntity(St
   auto pair = RpcPromise<Vec2F>::createPair();
   auto& rpcPromises = m_findUniqueEntityResponses[uniqueId];
   if (rpcPromises.empty()) {
-    m_outgoingPackets.append(std::make_shared<FindUniqueEntityPacket>(uniqueId));
+    m_outgoingPackets.push_back(std::make_shared<FindUniqueEntityPacket>(uniqueId));
   }
-  rpcPromises.append(pair.second);
-  
+  rpcPromises.push_back(pair.second);
+
   return pair.first;
 }
 
@@ -4295,7 +4302,7 @@ std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(st
     auto pair = RpcPromise<Json>::createPair();
     Uuid uuid(this->root().random());
     m_entityMessageResponses[uuid] = pair.second;
-    m_outgoingPackets.append(std::make_shared<EntityMessagePacket>(entityId, message, args, uuid));
+    m_outgoingPackets.push_back(std::make_shared<EntityMessagePacket>(entityId, message, args, uuid));
     return pair.first;
   }
 }
@@ -4308,7 +4315,7 @@ std::expected<List<ChatAction>, StarException> WorldClient::pullPendingChatActio
       if (!result310)
         return std::unexpected(std::move(result310.error()));
       for (auto const& entity : (std::move(*result310))) {
-        result.appendAll(entity->pullPendingChatActions());
+        result.append_range(entity->pullPendingChatActions());
       }
     }
   }
@@ -4493,7 +4500,7 @@ std::expected<void, StarException> WorldClient::setupForceRegions() {
     topForceRegion.baseTargetVelocity = regionVelocity;
     topForceRegion.baseControlForce = regionForce;
     topForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.append(topForceRegion);
+    m_forceRegions.push_back(topForceRegion);
   }
   
   if (addBottomRegion) {
@@ -4507,7 +4514,7 @@ std::expected<void, StarException> WorldClient::setupForceRegions() {
     bottomForceRegion.baseTargetVelocity = regionVelocity;
     bottomForceRegion.baseControlForce = regionForce;
     bottomForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.append(bottomForceRegion);
+    m_forceRegions.push_back(bottomForceRegion);
   }
   return {};
 }

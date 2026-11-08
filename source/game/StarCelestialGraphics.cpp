@@ -130,13 +130,13 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto image = liquidImages->replace("<liquid>", *liquidName);
       if (!image)
         return std::unexpected(std::move(image.error()));
-      layers.append({std::move(*image), *imageScale});
+      layers.push_back({std::move(*image), *imageScale});
     } else if (*baseCount > 0) {
       auto image = baseImages->replace("<biome>", terrestrialParameters->primaryBiome)
           .and_then([&](String const& value) { return value.replace("<num>", toString(*baseCount)); });
       if (!image)
         return std::unexpected(std::move(image.error()));
-      layers.append({strf("{}?hueshift={}", *image, terrestrialParameters->hueShift), *imageScale});
+      layers.push_back({strf("{}?hueshift={}", *image, terrestrialParameters->hueShift), *imageScale});
     }
     for (int i = 0; i < *baseCount; ++i) {
       auto baseImage = baseImages->replace("<num>", toString(*baseCount - i));
@@ -156,7 +156,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       }
       if (terrestrialParameters->hueShift != 0)
         hueShiftString = strf("?hueshift={}", terrestrialParameters->hueShift);
-      layers.append({*baseImage + hueShiftString + dynamicMaskString, *imageScale});
+      layers.push_back({*baseImage + hueShiftString + dynamicMaskString, *imageScale});
     }
     if (!shadowImages->empty()) {
       auto number = gfxConfig.getArray("shadowNumber")
@@ -167,7 +167,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto shadow = shadowImages->replace("<num>", toString(*number));
       if (!shadow)
         return std::unexpected(std::move(shadow.error()));
-      layers.append({std::move(*shadow), *imageScale});
+      layers.push_back({std::move(*shadow), *imageScale});
     }
   } else if (*type == "Asteroids") {
     auto maskImages = celestialParameters.getParameter("maskImages").and_then([](Json const& value) { return value.toString(); });
@@ -192,7 +192,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto mask = dynamicsImages->replace("<num>", toString(*number));
       if (!mask)
         return std::unexpected(std::move(mask.error()));
-      layers.append({strf("{}?addmask={}", *base, *mask), *imageScale});
+      layers.push_back({strf("{}?addmask={}", *base, *mask), *imageScale});
     }
   } else if (*type == "FloatingDungeon") {
     auto image = celestialParameters.getParameter("image").and_then([](Json const& value) { return value.toString(); });
@@ -201,7 +201,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
-    layers.append({std::move(*image), *imageScale});
+    layers.push_back({std::move(*image), *imageScale});
     auto dynamicsImages = celestialParameters.getParameter("dynamicsImages").and_then([](Json const& value) { return value.toString(); });
     if (!dynamicsImages)
       return std::unexpected(std::move(dynamicsImages.error()));
@@ -212,7 +212,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto dynamic = dynamicsImages->replace("<num>", toString(*number));
       if (!dynamic)
         return std::unexpected(std::move(dynamic.error()));
-      layers.append({std::move(*dynamic), *imageScale});
+      layers.push_back({std::move(*dynamic), *imageScale});
     }
   } else if (*type == "GasGiant") {
     auto gfxConfig = (*assets)->json("/celestial.config:gasGiantGraphics");
@@ -242,7 +242,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     if (!hueShift)
       return std::unexpected(std::move(hueShift.error()));
     if (!baseImage->empty())
-      layers.append({strf("{}?hueshift={}", *baseImage, *hueShift), *imageScale});
+      layers.push_back({strf("{}?hueshift={}", *baseImage, *hueShift), *imageScale});
     if (!overlayImages->empty()) {
       for (int i = 0; i < *overlayCount; ++i) {
         auto offset = gfxConfig->getArray("hueShiftOffsetRange")
@@ -262,7 +262,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
         auto overlay = overlayImages->replace("<num>", toString(i));
         if (!overlay)
           return std::unexpected(std::move(overlay.error()));
-        layers.append({strf("{}?hueshift={}?addmask={}", *overlay, *hueShift, *mask), *imageScale});
+        layers.push_back({strf("{}?hueshift={}?addmask={}", *overlay, *hueShift, *mask), *imageScale});
       }
     }
     if (!shadowImages->empty()) {
@@ -274,7 +274,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto shadow = shadowImages->replace("<num>", toString(*number));
       if (!shadow)
         return std::unexpected(std::move(shadow.error()));
-      layers.append({std::move(*shadow), *imageScale});
+      layers.push_back({std::move(*shadow), *imageScale});
     }
   }
   return layers;
@@ -346,7 +346,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
         auto mask = random.randInt((*numMasks)[0], (*numMasks)[1]);
         if (!mask)
           return std::unexpected(std::move(mask.error()));
-        masks.append(*mask);
+        masks.push_back(*mask);
       }
       auto liquidName = (*liquidsDatabase)->liquidName(terrestrialParameters->primarySurfaceLiquid);
       if (!liquidName)
@@ -354,14 +354,14 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       auto liquidBase = liquidTextures->replace("<liquid>", *liquidName).and_then(getLR);
       if (!liquidBase)
         return std::unexpected(std::move(liquidBase.error()));
-      images.append(std::move(*liquidBase));
+      images.push_back(std::move(*liquidBase));
       StringList masksLeft, masksRight;
       for (auto mask : masks) {
         auto lr = maskTextures->replace("<mask>", toString(mask)).and_then(getLR);
         if (!lr)
           return std::unexpected(std::move(lr.error()));
-        masksLeft.append(std::move(lr->first));
-        masksRight.append(std::move(lr->second));
+        masksLeft.push_back(std::move(lr->first));
+        masksRight.push_back(std::move(lr->second));
       }
       String leftMask, rightMask;
       if (!masksLeft.empty())
@@ -371,12 +371,12 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       auto base = getLR(*baseImages + biomeHueShift);
       if (!base)
         return std::unexpected(std::move(base.error()));
-      images.append({base->first + leftMask, base->second + rightMask});
+      images.push_back({base->first + leftMask, base->second + rightMask});
     } else {
       auto base = getLR(*baseImages + biomeHueShift);
       if (!base)
         return std::unexpected(std::move(base.error()));
-      images.append(std::move(*base));
+      images.push_back(std::move(*base));
     }
     auto atmosphere = celestialParameters.getParameter("atmosphere", true).and_then([](Json const& value) { return value.toBool(); });
     if (!atmosphere)
@@ -385,18 +385,18 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       auto atmo = getLR(*atmoTextures);
       if (!atmo)
         return std::unexpected(std::move(atmo.error()));
-      images.append(std::move(*atmo));
+      images.push_back(std::move(*atmo));
     }
     auto shadow = getLR(*shadowTextures);
     if (!shadow)
       return std::unexpected(std::move(shadow.error()));
-    images.append(std::move(*shadow));
+    images.push_back(std::move(*shadow));
   } else if (*type == "Asteroids") {
     auto image = (*assets)->json("/celestial.config:asteroidsHorizons")
         .and_then([](Json const& value) { return value.toString(); }).and_then(getLR);
     if (!image)
       return std::unexpected(std::move(image.error()));
-    images.append(std::move(*image));
+    images.push_back(std::move(*image));
   } else if (*type == "FloatingDungeon") {
     auto dungeon = as<FloatingDungeonWorldParameters>(celestialParameters.visitableParameters());
     auto horizons = (*assets)->json("/celestial.config:floatingDungeonHorizons");
@@ -410,7 +410,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
           .and_then([](Json const& value) { return value.toString(); }).and_then(getLR);
       if (!image)
         return std::unexpected(std::move(image.error()));
-      images.append(std::move(*image));
+      images.push_back(std::move(*image));
     }
   }
   return images;

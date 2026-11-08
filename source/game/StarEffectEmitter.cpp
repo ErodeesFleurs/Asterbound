@@ -106,7 +106,7 @@ std::expected<void, StarException> EffectEmitter::tick(float dt, EntityMode mode
         auto source = (*config)->instance(c.first);
         if (!source)
           return std::unexpected(std::move(source.error()));
-        m_sources.append(std::move(*source));
+        m_sources.push_back(std::move(*source));
       }
     }
   }

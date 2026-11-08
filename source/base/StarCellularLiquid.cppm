@@ -339,7 +339,7 @@ template <typename LiquidId>
         return std::unexpected(std::move(found.error()));
       auto cell = *found;
       if (cell && cell->get().liquid == activeCellsPair.first)
-        m_currentActiveCells.append(*cell);
+        m_currentActiveCells.push_back(*cell);
       activeCellsPair.second.remove(pos);
       if (unlimited != m_unlimitedActiveCells.end())
         unlimited->second.remove(pos);

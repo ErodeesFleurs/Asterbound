@@ -380,7 +380,7 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
     if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != NPos)
-      list.append(cache.first);
+      list.push_back(cache.first);
   }
   return list;
 }
@@ -623,7 +623,7 @@ std::expected<void, StarException> PlayerStorage::writeMetadata() {
   lockWithDiagnostics(locker);
   JsonArray order;
   for (auto const& p : m_savedPlayersCache)
-    order.append(p.first.hex());
+    order.push_back(p.first.hex());
   m_metadata["order"] = std::move(order);
   Json metadata(m_metadata);
   if (m_writtenMetadata && *m_writtenMetadata == metadata)

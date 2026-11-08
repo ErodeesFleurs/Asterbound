@@ -20,8 +20,7 @@ std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& el
     auto result = element.enableNetInterpolation(m_extrapolationHint);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  m_elements.append(std::pair<std::reference_wrapper<NetElement>, bool>(std::ref(element), propagateInterpolation));
-
+  m_elements.push_back(std::pair<std::reference_wrapper<NetElement>, bool>(std::ref(element), propagateInterpolation));
 
   for (VersionNumber i = 0; i < (CurrentStreamVersion + 1); i++) {
     if (element.checkWithRules(NetCompatibilityRules(i)))

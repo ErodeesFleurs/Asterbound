@@ -386,7 +386,7 @@ std::expected<StringList, StarException> TextPainter::wrapText(StringView s, std
   unsigned lastLine = 0;
   TextPainter::WrapTextCallback textCallback = [&](StringView text, unsigned line) {
     if (lastLine != line) {
-      result.append(std::move(current));
+      result.push_back(std::move(current));
       lastLine = line;
     }
     current += text;
@@ -398,7 +398,7 @@ std::expected<StringList, StarException> TextPainter::wrapText(StringView s, std
     return std::unexpected(std::move(wrapped.error()));
 
   if (!current.empty())
-    result.append(std::move(current));
+    result.push_back(std::move(current));
 
   return result;
 };

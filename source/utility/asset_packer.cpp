@@ -99,7 +99,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
         auto serverPatterns = jsonToStringList(*serverIgnore);
         if (!serverPatterns)
           return std::unexpected(std::move(serverPatterns.error()));
-        ignoreFiles.appendAll(std::move(*serverPatterns));
+        ignoreFiles.append_range(std::move(*serverPatterns));
       }
       auto ordering = configFileJson->get("extensionOrdering", JsonArray());
       if (!ordering)

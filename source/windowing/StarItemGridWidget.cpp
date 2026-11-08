@@ -251,7 +251,7 @@ std::expected<void, StarException> ItemGridWidget::setItemBag(std::shared_ptr<It
     if (!slot) return std::unexpected(std::move(slot.error()));
     auto child = addChild(toString(i), *slot);
     if (!child) return std::unexpected(std::move(child.error()));
-    m_slots.append(*slot);
+    m_slots.push_back(*slot);
     (*slot)->setBackingImageAffinity(m_drawBackingImageWhenFull, m_drawBackingImageWhenEmpty);
     (*slot)->setProgress(m_progress);
     (*slot)->setPosition(locOfItemSlot(i));
@@ -337,9 +337,9 @@ List<String> ItemGridWidget::slotItemNames() {
   List<String> itemNames;
   for (auto const& slot : m_slots) {
     if (slot->item())
-      itemNames.append(slot->item()->name());
+      itemNames.push_back(slot->item()->name());
     else
-      itemNames.append(String());
+      itemNames.push_back(String());
   }
   return itemNames;
 }

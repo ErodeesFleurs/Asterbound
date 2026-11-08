@@ -196,7 +196,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
       auto descriptor = ItemDescriptor::create(item);
       if (!descriptor)
         return std::unexpected(std::move(descriptor.error()));
-      overflow.append(std::move(*descriptor));
+      overflow.push_back(std::move(*descriptor));
     }
     std::unique_lock locker(self.m_mutex, std::defer_lock);
     lockWithDiagnostics(locker);
@@ -224,7 +224,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
             if (!result)
               return std::unexpected(std::move(result.error()));
             if (*result && **result)
-              overflow.append((**result)->descriptor());
+              overflow.push_back((**result)->descriptor());
           }
         }
         return {};

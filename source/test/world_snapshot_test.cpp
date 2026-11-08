@@ -176,8 +176,8 @@ const GameTestRegistration worldMessageBatchDrainsAfterFailure(
     List<RpcPromise<Json>> promises;
     for (unsigned i = 0; i != 5; ++i) {
       auto [promise, keeper] = RpcPromise<Json>::createPair();
-      promises.append(std::move(promise));
-      messages.append({"batchRegression", {}, std::move(keeper)});
+      promises.push_back(std::move(promise));
+      messages.push_back({"batchRegression", {}, std::move(keeper)});
     }
     // Exercise an already-settled keeper both at the failure boundary and
     // during draining: neither error may leave the final request pending.

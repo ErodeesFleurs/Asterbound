@@ -44,6 +44,6 @@ TEST(OrderedSet, ReverseIterate) {
 
   List<int> vals;
   for (auto i = map.rbegin(); i != map.rend(); ++i)
-    vals.append(*i);
+    vals.push_back(*i);
   EXPECT_EQ(vals, List<int>({1, 2, 3, 4, 5}));
 }

@@ -245,7 +245,7 @@ std::expected<List<PhysicsForceRegion>, StarException> PhysicsObject::forceRegio
     if (p.second.enabled.get()) {
       PhysicsForceRegion forceRegion = p.second.forceRegion;
       std::visit([pos = position()](auto& fr) { fr.translate(pos); }, forceRegion);
-      forces.append(std::move(forceRegion));
+      forces.push_back(std::move(forceRegion));
     }
   }
   return forces;

@@ -711,7 +711,7 @@ std::expected<Json, StarException> Json::append(Json value) const {
   auto array = toArray();
   if (!array)
     return std::unexpected(std::move(array.error()));
-  array->append(std::move(value));
+  array->push_back(std::move(value));
   return Json(std::move(*array));
 }
 
@@ -959,7 +959,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
         auto item = ds.read<Json>();
         if (!item)
           return std::unexpected(std::move(item.error()));
-        items.append(std::move(*item));
+        items.push_back(std::move(*item));
       }
       value = Json(std::move(items));
       break;
@@ -1059,7 +1059,7 @@ void Json::getHash(XXHash3& hasher) const {
       List<JsonObject::const_iterator> iterators;
       iterators.reserve(object.size());
       for (auto i = object.begin(); i != object.end(); ++i)
-        iterators.append(i);
+        iterators.push_back(i);
       iterators.sort([](JsonObject::const_iterator a, JsonObject::const_iterator b) {
         return a->first < b->first;
       });

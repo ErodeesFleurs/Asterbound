@@ -52,8 +52,8 @@ ParticleManager::ParticleManager(Root& root, WorldGeometry const& worldGeometry,
   : m_root(root), m_worldGeometry(worldGeometry), m_undergroundLevel(0.0f), m_tileSectorArray(tileSectorArray) {}
 
 void ParticleManager::add(Particle particle) {
-  m_presentationHistory.append({particle.presentationState(), 0.0f,
-      s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
+  m_presentationHistory.push_back(
+    {particle.presentationState(), 0.0f, s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
   m_particles.push_back(std::move(particle));
 }
 
@@ -145,14 +145,14 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
       trail.trail = false;
       trail.timeToLive = 0;
       trail.velocity = {};
-      m_nextPresentationHistory.append({trail.presentationState(), 0.0f,
-          s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
-      m_nextParticles.append(std::move(trail));
+      m_nextPresentationHistory.push_back(
+        {trail.presentationState(), 0.0f, s_nextPresentationIdentity.fetch_add(1, std::memory_order_relaxed)});
+      m_nextParticles.push_back(std::move(trail));
     }
 
     if (!particle.dead()) {
-      m_nextPresentationHistory.append(std::move(history));
-      m_nextParticles.append(std::move(particle));
+      m_nextPresentationHistory.push_back(std::move(history));
+      m_nextParticles.push_back(std::move(particle));
     }
   }
 

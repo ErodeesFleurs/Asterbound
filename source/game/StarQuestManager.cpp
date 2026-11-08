@@ -349,14 +349,16 @@ void sortQuests(List<std::shared_ptr<Quest>>& quests) {
 List<std::shared_ptr<Quest>> QuestManager::listActiveQuests() const {
   List<std::shared_ptr<Quest>> result;
   for (auto const& [id, quest] : m_quests)
-    if (quest->state() == QuestState::Active && quest->showInLog() && questValidOnServer(quest)) result.append(quest);
+    if (quest->state() == QuestState::Active && quest->showInLog() && questValidOnServer(quest))
+      result.push_back(quest);
   sortQuests(result);
   return result;
 }
 List<std::shared_ptr<Quest>> QuestManager::listCompletedQuests() const {
   List<std::shared_ptr<Quest>> result;
   for (auto const& [id, quest] : m_quests)
-    if (quest->state() == QuestState::Complete && quest->showInLog() && questValidOnServer(quest)) result.append(quest);
+    if (quest->state() == QuestState::Complete && quest->showInLog() && questValidOnServer(quest))
+      result.push_back(quest);
   sortQuests(result);
   return result;
 }
@@ -507,7 +509,7 @@ std::expected<void, StarException> QuestManager::update(float dt) {
     if (state == QuestState::New || (finished && quest->ephemeral() && !quest->showDialog())) {
       auto uninitialized = quest->uninit();
       if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
-      expired.append(entry.first);
+      expired.push_back(entry.first);
     }
   }
   for (auto const& id : expired) m_quests.remove(id);

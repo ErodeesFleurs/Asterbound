@@ -69,7 +69,7 @@ void Tileset::defineTile(std::shared_ptr<::Star::Tile> const& tile) {
     Star::starAssertFailed((m_database->name() == tile->database));
   }
 
-  m_tiles.append(tile);
+  m_tiles.push_back(tile);
 }
 
 [[nodiscard]]
@@ -192,7 +192,7 @@ String Tileset::relativePathBase() const {
   } else {
     StringList path;
     for (int i = 0; i < subdirs; ++i)
-      path.append("..");
+      path.push_back("..");
     relativePathBase = path.join("/");
   }
   return relativePathBase;

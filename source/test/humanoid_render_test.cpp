@@ -136,7 +136,7 @@ const GameTestRegistration transientMovementAnimation(
     )LUA"),
                                  File::relative_to(overlay, "pose.lua")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
@@ -974,7 +974,7 @@ const GameTestRegistration humanoidTickOwnedPose(
     ])"),
                                  File::relative_to(overlay, "species/human.species.patch")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};

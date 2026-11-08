@@ -457,7 +457,7 @@ std::expected<JsonArray, StarException> LuaBindings::StatusControllerCallbacks::
   for (auto const& effect : statController.getPersistentEffects(arg1)) {
     auto json = jsonFromPersistentStatusEffect(effect);
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }
@@ -473,7 +473,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addPe
   for (auto const& json : arg2) {
     auto effect = jsonToPersistentStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.addPersistentEffects(arg1, effects);
 }
@@ -484,7 +484,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::setPe
   for (auto const& json : arg2) {
     auto effect = jsonToPersistentStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.setPersistentEffects(arg1, effects);
 }
@@ -510,7 +510,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addEp
   for (auto const& json : arg1) {
     auto effect = jsonToEphemeralStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.addEphemeralEffects(effects, sourceEntityId);
 }
@@ -533,7 +533,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
   for (auto const& notification : pair.first) {
     auto json = notification.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    notifications.append(std::move(*json));
+    notifications.push_back(std::move(*json));
   }
   return luaTupleReturn(std::move(notifications), pair.second);
 }
@@ -547,7 +547,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
     if (!json) return std::unexpected(std::move(json.error()));
     auto tagged = json->set("targetEntityId", hit.first);
     if (!tagged) return std::unexpected(std::move(tagged.error()));
-    hits.append(std::move(*tagged));
+    hits.push_back(std::move(*tagged));
   }
   return luaTupleReturn(std::move(hits), pair.second);
 }
@@ -559,7 +559,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
   for (auto const& notification : pair.first) {
     auto json = notification.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    notifications.append(std::move(*json));
+    notifications.push_back(std::move(*json));
   }
   return luaTupleReturn(std::move(notifications), pair.second);
 }
@@ -570,7 +570,7 @@ List<JsonArray> LuaBindings::StatusControllerCallbacks::activeUniqueStatusEffect
   return summary.transformed([](std::pair<UniqueStatusEffect, std::optional<float>> effect) {
     JsonArray effectJson = {effect.first};
     if (effect.second)
-      effectJson.append(*effect.second);
+      effectJson.push_back(*effect.second);
     return effectJson;
   });
 }

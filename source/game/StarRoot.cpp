@@ -477,7 +477,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   loaders.reserve(40);
 
   auto add = [&](auto method) {
-    loaders.append(workerPool.addWork([this, method]() -> std::expected<void, StarException> {
+    loaders.push_back(workerPool.addWork([this, method]() -> std::expected<void, StarException> {
       auto loaded = (this->*method)();
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
@@ -569,7 +569,7 @@ String Root::toStoragePath(String const& path) const {
 std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
   return loadMemberFunction<Assets>(m_assets, m_assetsMutex, "Assets", [this]() -> std::expected<std::shared_ptr<Assets>, StarException> {
       StringList assetDirectories = m_settings.assetDirectories;
-      assetDirectories.appendAll(m_modDirectories);
+      assetDirectories.append_range(m_modDirectories);
       auto assetSources = scanForAssetSources(assetDirectories, m_settings.assetSources);
       if (!assetSources)
         return std::unexpected(std::move(assetSources.error()));
@@ -926,10 +926,10 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
         }
       } else {
         namedSources[*assetSource->name] = assetSource;
-        assetSources.append(std::move(assetSource));
+        assetSources.push_back(std::move(assetSource));
       }
     } else {
-      assetSources.append(std::move(assetSource));
+      assetSources.push_back(std::move(assetSource));
     }
 
     return true;
@@ -1031,7 +1031,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
       ? m_logger.info("Root: Detected asset source named '{}'{} at '{}'", *source->name, source->version ? strf(" version '{}'", *source->version) : "", path)
       : m_logger.info("Root: Detected unnamed asset source at '{}'", path);
     if (!logged) return std::unexpected(std::move(logged.error()));
-    sourcePaths.append(path);
+    sourcePaths.push_back(path);
   }
 
   return sourcePaths;

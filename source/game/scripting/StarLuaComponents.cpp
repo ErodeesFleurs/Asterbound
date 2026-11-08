@@ -101,7 +101,7 @@ std::expected<bool, StarException> LuaBaseComponent::removeCallbacks(String cons
     // A host may unregister its services immediately after requesting uninit
     // from inside Lua. Keep them alive for the deferred shutdown hook.
     if (std::ranges::find(m_pendingCallbackRemovals, groupName) == m_pendingCallbackRemovals.end())
-      m_pendingCallbackRemovals.append(groupName);
+      m_pendingCallbackRemovals.push_back(groupName);
     return true;
   }
   auto scope = group->get().scope;
@@ -132,7 +132,7 @@ std::expected<void, StarException> LuaBaseComponent::addThreadCallbacks(String g
       }
       return std::unexpected(std::move(result.error()));
     }
-    changed.append(p.second);
+    changed.push_back(p.second);
   }
   m_threadCallbacks.insert(std::move(groupName), std::move(callbacks));
   return {};
@@ -151,7 +151,7 @@ std::expected<bool, StarException> LuaBaseComponent::removeThreadCallbacks(Strin
       }
       return std::unexpected(std::move(removed.error()));
     }
-    changed.append(p.second);
+    changed.push_back(p.second);
   }
   m_threadCallbacks.remove(groupName);
   return true;
@@ -413,7 +413,7 @@ std::expected<void, StarException> LuaBaseComponent::cleanThreads() {
   StringList expired;
   for (auto const& p : m_threads) {
     if (p.second->shouldExpire())
-      expired.append(p.first);
+      expired.push_back(p.first);
   }
   std::optional<StarException> error;
   for (auto const& name : expired) {
@@ -608,7 +608,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
   auto pair = RpcPromise<Json>::createPair();
   std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_threadMessages.append({.originThread = thread, .message = message, .args = args, .promise = pair.second});
+  m_threadMessages.push_back({.originThread = thread, .message = message, .args = args, .promise = pair.second});
   return pair.first;
 }
 

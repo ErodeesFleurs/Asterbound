@@ -130,9 +130,9 @@ std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& 
       auto end = jsonToVec2I(*endJson);
       if (!end)
         return std::unexpected(std::move(end.error()));
-      constellation.append({*start, *end});
+      constellation.push_back({*start, *end});
     }
-    chunk.constellations.append(std::move(constellation));
+    chunk.constellations.push_back(std::move(constellation));
   }
   auto systems = store.getArray("systemParameters");
   if (!systems)
@@ -212,15 +212,15 @@ std::expected<Json, StarException> CelestialChunk::toJson() const {
   for (auto const& constellation : constellations) {
     JsonArray lines;
     for (auto const& pair : constellation)
-      lines.append(JsonArray{jsonFromVec2I(pair.first), jsonFromVec2I(pair.second)});
-    constellationStore.append(std::move(lines));
+      lines.push_back(JsonArray{jsonFromVec2I(pair.first), jsonFromVec2I(pair.second)});
+    constellationStore.push_back(std::move(lines));
   }
   JsonArray systemParametersStore;
   for (auto const& pair : systemParameters) {
     auto parameters = pair.second.diskStore();
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
-    systemParametersStore.append(JsonArray{jsonFromVec3I(pair.first), std::move(*parameters)});
+    systemParametersStore.push_back(JsonArray{jsonFromVec3I(pair.first), std::move(*parameters)});
   }
   JsonArray systemObjectsStore;
   for (auto const& system : systemObjects) {
@@ -231,15 +231,15 @@ std::expected<Json, StarException> CelestialChunk::toJson() const {
         auto parameters = satellite.second.diskStore();
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        satellitesStore.append(JsonArray{satellite.first, std::move(*parameters)});
+        satellitesStore.push_back(JsonArray{satellite.first, std::move(*parameters)});
       }
       auto parameters = planet.second.planetParameters.diskStore();
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
-      planetsStore.append(JsonArray{planet.first, JsonObject{{"parameters", std::move(*parameters)},
-          {"satellites", std::move(satellitesStore)}}});
+      planetsStore.push_back(JsonArray{
+        planet.first, JsonObject{{"parameters", std::move(*parameters)}, {"satellites", std::move(satellitesStore)}}});
     }
-    systemObjectsStore.append(JsonArray{jsonFromVec3I(system.first), std::move(planetsStore)});
+    systemObjectsStore.push_back(JsonArray{jsonFromVec3I(system.first), std::move(planetsStore)});
   }
   return JsonObject{{"chunkIndex", jsonFromVec2I(chunkIndex)},
       {"constellations", std::move(constellationStore)},

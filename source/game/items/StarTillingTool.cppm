@@ -161,7 +161,7 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
     auto frame = item->m_image.replace("{frame}", toString(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
-    item->m_animationFrame.append(std::move(*frame));
+    item->m_animationFrame.push_back(std::move(*frame));
   }
   auto idle = item->m_image.replace("{frame}", "idle");
   if (!idle)

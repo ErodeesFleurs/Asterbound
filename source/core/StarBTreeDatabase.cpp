@@ -372,7 +372,8 @@ namespace Star {
     for (auto const& entry : *matches) {
       auto erased = remove(entry.first);
       if (!erased) return std::unexpected(std::move(erased.error()));
-      if (*erased) removed.append(entry.first);
+      if (*erased)
+        removed.push_back(entry.first);
     }
     return removed;
   }
@@ -557,14 +558,14 @@ namespace Star {
   void BTreeDatabase::IndexNode::removeBefore(std::size_t i) {
     if (i == 0) {
       beginPointer = pointers[0].pointer;
-      pointers.eraseAt(0);
+      pointers.erase_at(0);
     } else {
-      pointers.eraseAt(i - 1);
+      pointers.erase_at(i - 1);
     }
   }
 
   void BTreeDatabase::IndexNode::insertAfter(std::size_t i, ByteArray k, BlockIndex p) {
-    pointers.insertAt(i, Element{.key = std::move(k), .pointer = p});
+    pointers.insert_at(i, Element{.key = std::move(k), .pointer = p});
   }
 
   std::uint8_t BTreeDatabase::IndexNode::indexLevel() const {
@@ -581,7 +582,7 @@ namespace Star {
     if (count == 0)
     return;
 
-    pointers.append(Element{.key = mid, .pointer = *right.beginPointer});
+    pointers.push_back(Element{.key = mid, .pointer = *right.beginPointer});
 
     ElementList::iterator s = right.pointers.begin();
     std::advance(s, count - 1);
@@ -590,7 +591,7 @@ namespace Star {
     right.pointers.erase(right.pointers.begin(), s);
     if (right.pointers.size() != 0) {
       right.beginPointer = right.pointers[0].pointer;
-      right.pointers.eraseAt(0);
+      right.pointers.erase_at(0);
     } else {
       right.beginPointer.reset();
     }
@@ -612,7 +613,7 @@ namespace Star {
     left.pointers.erase(s, left.pointers.end());
     if (left.pointers.size() != 0) {
       beginPointer = left.pointers[left.pointers.size() - 1].pointer;
-      left.pointers.eraseAt(left.pointers.size() - 1);
+      left.pointers.erase_at(left.pointers.size() - 1);
     } else {
       beginPointer = std::exchange(left.beginPointer, std::nullopt);
     }
@@ -648,12 +649,10 @@ namespace Star {
   }
 
   void BTreeDatabase::LeafNode::insert(std::size_t i, ByteArray k, ByteArray d) {
-    elements.insertAt(i, Element{.key = std::move(k), .data = std::move(d)});
+    elements.insert_at(i, Element{.key = std::move(k), .data = std::move(d)});
   }
 
-  void BTreeDatabase::LeafNode::remove(std::size_t i) {
-    elements.eraseAt(i);
-  }
+  void BTreeDatabase::LeafNode::remove(std::size_t i) { elements.erase_at(i); }
 
   void BTreeDatabase::LeafNode::shiftLeft(LeafNode& right, std::size_t count) {
     count = std::min(right.count(), count);
@@ -1291,7 +1290,7 @@ namespace Star {
 
       auto result212 = buffer.read<BlockIndex>();
       if (!result212) return std::unexpected(std::move(result212.error()));
-      freeIndexBlock.freeBlocks.append((*result212));
+      freeIndexBlock.freeBlocks.push_back((*result212));
     }
 
     return freeIndexBlock;
@@ -1373,7 +1372,7 @@ namespace Star {
       if (!result190) return std::unexpected(std::move(result190.error()));
       leafPointer = (*result190);
       if (leafPointer != InvalidBlockIndex) {
-        tailBlocks.append(leafPointer);
+        tailBlocks.push_back(leafPointer);
       }
     }
     return tailBlocks;
@@ -1561,7 +1560,7 @@ namespace Star {
           auto result161 = m_availableBlocks.takeFirst();
           if (!result161) return std::unexpected(std::move(result161.error()));
           BlockIndex toAdd = (*result161);
-          indexBlock.freeBlocks.append(toAdd);
+          indexBlock.freeBlocks.push_back(toAdd);
         } else {
 
           // Update the current head free index block.
@@ -1653,8 +1652,8 @@ namespace Star {
         auto freeIndex = readFreeIndexBlock(indexBlockIndex);
         if (!freeIndex) return std::unexpected(std::move(freeIndex.error()));
         FreeIndexBlock indexBlock = std::move(*freeIndex);
-        availableBlocksList.appendAll(indexBlock.freeBlocks);
-        availableBlocksList.append(indexBlockIndex);
+        availableBlocksList.append_range(indexBlock.freeBlocks);
+        availableBlocksList.push_back(indexBlockIndex);
         indexBlockIndex = indexBlock.nextFreeBlock;
       } while (indexBlockIndex != InvalidBlockIndex);
       m_headFreeIndexBlock = InvalidBlockIndex;

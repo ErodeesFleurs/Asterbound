@@ -244,7 +244,7 @@ List<std::shared_ptr<Pane>> PaneManager::getAllPanes() {
   for (auto const& layerPair : m_displayedPanes) {
     for (auto const& panePair : layerPair.second) {
       if (panePair.first != m_activeTooltip && panePair.first->active())
-        list.append(panePair.first);
+        list.push_back(panePair.first);
     }
   }
   return list;
@@ -331,7 +331,7 @@ std::expected<List<std::shared_ptr<Pane>>, StarException> PaneManager::inputTarg
     for (auto const& entry : layer.second) {
       if (!entry.first->interactive())
         continue;
-      targets.append(entry.first);
+      targets.push_back(entry.first);
       if (layer.first == PaneLayer::ModalWindow)
         return targets;
     }

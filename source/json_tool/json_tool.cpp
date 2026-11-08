@@ -47,7 +47,7 @@ std::expected<FormattedJson, StarException> CommaSeparatedStrings::toJson(String
     auto field = text.trim();
     if (!field)
       return std::unexpected(std::move(field.error()));
-    array.append(Json(std::move(*field)));
+    array.push_back(Json(std::move(*field)));
   }
   return FormattedJson::create(Json(std::move(array)));
 }
@@ -61,7 +61,7 @@ std::expected<String, StarException> CommaSeparatedStrings::fromJson(FormattedJs
     auto text = entry.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    strings.append(std::move(*text));
+    strings.push_back(std::move(*text));
   }
   return strings.join(", ");
 }
@@ -103,7 +103,7 @@ std::expected<void, StarException> OutputOnSeparateLines::flush() {
 
 std::expected<void, StarException> ArrayOutput::out(FormattedJson const& json) {
   if (!m_unique || !m_results.contains(json))
-    m_results.append(json);
+    m_results.push_back(json);
   return {};
 }
 
@@ -193,7 +193,7 @@ std::expected<StringList, StarException> Star::findFiles(Logger& logger, FindInp
         if (!matchesSuffix)
           return std::unexpected(std::move(matchesSuffix.error()));
         if (*matchesSuffix)
-          matches.append(filename);
+          matches.push_back(filename);
         return {};
       });
   if (!visited)
@@ -292,7 +292,7 @@ std::expected<void, StarException> process(Logger& logger,
     return process(output, command, options, std::get<JsonLiteralInput>(input).json);
   StringList files;
   if (std::holds_alternative<FileInput>(input)) {
-    files.append(std::get<FileInput>(input).filename);
+    files.push_back(std::get<FileInput>(input).filename);
   } else {
     auto found = findFiles(logger, std::get<FindInput>(input));
     if (!found)
@@ -375,7 +375,7 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
     } else if (arg == "--editor-image") {
       if (available() < 1)
         return {};
-      parsed.options.editorImages.append(parsePath(take()));
+      parsed.options.editorImages.push_back(parsePath(take()));
     } else if (arg == "--input") {
       if (available() < 1)
         return {};
@@ -395,13 +395,13 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
     } else if (arg == "-j") {
       if (available() < 1)
         return {};
-      parsed.inputs.append(JsonLiteralInput{take()});
+      parsed.inputs.push_back(JsonLiteralInput{take()});
     } else if (arg == "--find") {
       if (available() < 2)
         return {};
       String directory = take();
       String suffix = take();
-      parsed.inputs.append(FindInput{std::move(directory), std::move(suffix)});
+      parsed.inputs.push_back(FindInput{std::move(directory), std::move(suffix)});
     } else if (arg == "-i") {
       parsed.options.inPlace = true;
     } else if (arg == "--at") {
@@ -430,7 +430,7 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
         cerrf("File {} doesn't exist\n", arg);
         return {};
       }
-      parsed.inputs.append(FileInput{std::move(arg)});
+      parsed.inputs.push_back(FileInput{std::move(arg)});
     }
   }
 

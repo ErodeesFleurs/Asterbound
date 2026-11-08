@@ -114,7 +114,7 @@ std::expected<String, StarException> ServerQueryThread::serverWorldNames() {
     auto name = printWorldId(world);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    names.append(std::move(*name));
+    names.push_back(std::move(*name));
   }
   return names.join(",");
 }
@@ -226,7 +226,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
   auto clientIds = m_universe.get().clientIdsAndCreationTime();
   if (!clientIds)
     return std::unexpected(std::move(clientIds.error()));
-  std::uint8_t count = static_cast<std::uint8_t>(clientIds->count());
+  std::uint8_t count = static_cast<std::uint8_t>(clientIds->size());
   std::int32_t kills = 0;
   m_playersResponse.clear();
   auto header = m_playersResponse << A2S_HEAD_INT << A2S_PLAYER_REPLY << count;

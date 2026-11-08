@@ -85,7 +85,7 @@ std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::par
     auto scripts = jsonToStringList(*scriptsConfig);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     for (auto const& script : *scripts)
-      effect.scripts.append(AssetPath::relative_to(path, script));
+      effect.scripts.push_back(AssetPath::relative_to(path, script));
     auto scriptDelta = config.getUInt("scriptDelta", 1);
     if (!scriptDelta) return std::unexpected(std::move(scriptDelta.error()));
     effect.scriptDelta = *scriptDelta;

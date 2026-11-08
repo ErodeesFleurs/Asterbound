@@ -165,7 +165,7 @@ std::expected<Json, StarException> inputDescriptorToJson(KeyChord const& chord) 
   JsonArray modNames;
   for (auto const& p : KeyModNames) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
-      modNames.append(String(p.second));
+      modNames.push_back(String(p.second));
   }
   auto name = enumName<KeyNames>(chord.key);
   if (!name)
@@ -177,7 +177,7 @@ std::expected<String, StarException> printInputDescriptor(KeyChord chord) {
   StringList modNames;
   for (auto const& p : KeyModNames) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
-      modNames.append(String(p.second));
+      modNames.push_back(String(p.second));
   }
   auto name = enumName<KeyNames>(chord.key);
   if (!name)
@@ -210,7 +210,7 @@ std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json c
           return std::unexpected(std::move(logged.error()));
         continue;
       }
-      bindings.m_actions[chord->key].append({chord->mods, action->get()});
+      bindings.m_actions[chord->key].push_back({chord->mods, action->get()});
     }
   }
   return bindings;

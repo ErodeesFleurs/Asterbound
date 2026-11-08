@@ -239,7 +239,7 @@ std::expected<PolyI, StarException> jsonToPolyI(Json const& v) {
 Json jsonFromPolyF(PolyF const& poly) {
   JsonArray result;
   for (auto const& vertex : poly.vertexes())
-    result.append(JsonArray{vertex[0], vertex[1]});
+    result.push_back(JsonArray{vertex[0], vertex[1]});
   return result;
 }
 std::expected<Line2F, StarException> jsonToLine2F(Json const& v) {
@@ -334,7 +334,7 @@ std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random,
       entry = (**array)[idx];
     }
     sum += weight;
-    options.append(std::pair<float, Json>{weight, std::move(entry)});
+    options.push_back(std::pair<float, Json>{weight, std::move(entry)});
   }
   if (options.empty())
     return default_;
@@ -357,7 +357,7 @@ std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float 
     auto minimum = entry.getFloat(0);
     if (!minimum)
       return std::unexpected(std::move(minimum.error()));
-    ordered.append({*minimum, entry});
+    ordered.push_back({*minimum, entry});
   }
   sortByComputedValue(ordered, [](auto const& entry) { return -entry.first; });
   for (auto const& entry : ordered)

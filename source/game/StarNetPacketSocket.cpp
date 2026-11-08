@@ -256,7 +256,7 @@ std::expected<void, StarException> LocalPacketSocket::sendPackets(List<std::shar
     }
 #endif
 
-    outgoingPipe->queue.appendAll(std::move(packets));
+    outgoingPipe->queue.append_range(std::move(packets));
     outgoingPipe->ready.notify_all();
   }
   return {};
@@ -271,7 +271,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> LocalPacketSocket::r
 
   std::lock_guard locker(incomingPipe->mutex);
   List<std::shared_ptr<Packet>> packets;
-  packets.appendAll(std::exchange(incomingPipe->queue, {}));
+  packets.append_range(std::exchange(incomingPipe->queue, {}));
   return packets;
 }
 
@@ -494,7 +494,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
         auto read = packet->read(packetStream, netRules());
         if (!read)
           return std::unexpected(std::move(read.error()));
-        packets.append(std::move(packet));
+        packets.push_back(std::move(packet));
         auto ended = packetStream.at_end();
         if (!ended)
           return std::unexpected(std::move(ended.error()));
@@ -681,7 +681,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
       auto compressed = m_compressionStream->compress(outBuffer.takeData());
       if (!compressed)
         return std::unexpected(std::move(compressed.error()));
-      m_outputMessages.append(std::move(*compressed));
+      m_outputMessages.push_back(std::move(*compressed));
     }
   } else {
     while (it != packets.end()) {
@@ -737,7 +737,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
           return std::unexpected(std::move(bodyWritten.error()));
         m_outgoingStats.mix(currentType, packetBuffer.size(), true);
       }
-      m_outputMessages.append(outBuffer.takeData());
+      m_outputMessages.push_back(outBuffer.takeData());
     }
   }
   return {};
@@ -780,7 +780,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
         auto read = packet->read(packetStream, netRules());
         if (!read)
           return std::unexpected(std::move(read.error()));
-        packets.append(std::move(packet));
+        packets.push_back(std::move(packet));
         auto ended = packetStream.at_end();
         if (!ended)
           return std::unexpected(std::move(ended.error()));
@@ -823,7 +823,7 @@ std::expected<bool, StarException> P2PPacketSocket::writeData() {
     if (!*sent)
       break;
     m_outgoingStats.mix(front->get().size());
-    auto removed = m_outputMessages.removeFirst();
+    auto removed = m_outputMessages.pop_front_checked();
     if (!removed)
       return std::unexpected(std::move(removed.error()));
     workDone = true;
@@ -845,9 +845,9 @@ std::expected<bool, StarException> P2PPacketSocket::readData() {
         auto decompressed = m_decompressionStream->decompress(**message);
         if (!decompressed)
           return std::unexpected(std::move(decompressed.error()));
-        m_inputMessages.append(std::move(*decompressed));
+        m_inputMessages.push_back(std::move(*decompressed));
       } else {
-        m_inputMessages.append(std::move(**message));
+        m_inputMessages.push_back(std::move(**message));
       }
       workDone = true;
     }

@@ -104,7 +104,7 @@ Json ShipUpgrades::toJson() const {
   JsonArray capabilitiesJson;
   capabilitiesJson.reserve(capabilities.size());
   for (auto const& capability : capabilities)
-    capabilitiesJson.append(capability);
+    capabilitiesJson.push_back(capability);
   return JsonObject{{"shipLevel", shipLevel},
       {"maxFuel", maxFuel},
       {"crewSize", crewSize},

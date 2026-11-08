@@ -379,7 +379,7 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     auto rate = validatedRenderFpsLimit(value);
     if (!rate)
       return std::unexpected(std::move(rate.error()));
-    m_renderFpsPresets.append(*rate);
+    m_renderFpsPresets.push_back(*rate);
   }
   if (m_renderFpsPresets.empty() || m_renderFpsPresets.front() != 0
       || !std::is_sorted(m_renderFpsPresets.begin(), m_renderFpsPresets.end()))

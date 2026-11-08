@@ -257,7 +257,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
         auto toVersion = lexicalCast<VersionNumber>((*parts)[2]);
         if (!toVersion)
           return std::unexpected(std::move(toVersion.error()));
-        m_versionUpdateScripts[*identifier].append({script, *firstVersion, *toVersion});
+        m_versionUpdateScripts[*identifier].push_back({script, *firstVersion, *toVersion});
       } else {
         auto subIdentifier = (*parts)[2].toLower();
         if (!subIdentifier)
@@ -268,7 +268,8 @@ std::expected<void, StarException> VersioningDatabase::init() {
         auto toVersion = lexicalCast<VersionNumber>((*parts)[4]);
         if (!toVersion)
           return std::unexpected(std::move(toVersion.error()));
-        m_subVersionUpdateScripts[*identifier][*firstVersion][*subIdentifier].append({script, *fromVersion, *toVersion});
+        m_subVersionUpdateScripts[*identifier][*firstVersion][*subIdentifier].push_back(
+          {script, *fromVersion, *toVersion});
       }
       return {};
     }();

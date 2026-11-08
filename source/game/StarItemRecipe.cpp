@@ -36,7 +36,7 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
   JsonArray inputList;
   inputList.reserve(inputs.size());
   for (auto const& input : inputs)
-    inputList.append(input.toJson());
+    inputList.push_back(input.toJson());
   auto currencies = jsonFromMap(currencyInputs);
   if (!currencies)
     return std::unexpected(std::move(currencies.error()));

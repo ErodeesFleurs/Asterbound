@@ -284,7 +284,7 @@ std::expected<void, StarException> InspectionTool::update(float, FireMode fireMo
     auto result = inspect(*inspectionPosition);
     if (!result)
       return std::unexpected(std::move(result.error()));
-    m_inspectionResults.append(std::move(*result));
+    m_inspectionResults.push_back(std::move(*result));
   }
   m_lastFireMode = fireMode;
   return {};

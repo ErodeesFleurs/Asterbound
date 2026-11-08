@@ -250,7 +250,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     auto image = *loaded;
-    layers.append(image);
+    layers.push_back(image);
     width = std::max(width, image->width());
     height = std::max(height, image->height());
   }

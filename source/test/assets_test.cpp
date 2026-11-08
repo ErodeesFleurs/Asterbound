@@ -72,7 +72,7 @@ struct AssetWorkerTestAccess {
       auto lower = entry.first.string().toLower();
       if (!lower)
         return std::unexpected(std::move(lower.error()));
-      paths.append(std::move(*lower));
+      paths.push_back(std::move(*lower));
     }
     paths.sort();
     for (auto const& path : paths) {
@@ -1358,7 +1358,7 @@ const GameTestRegistration
       return asset
     end)lua"),
                                    File::relative_to(*directory, name + ".patch.lua")));
-      paths.append("/" + name);
+      paths.push_back("/" + name);
     }
     Assets::Settings settings{};
     settings.workerPoolSize = 4;
@@ -1387,7 +1387,7 @@ const GameTestRegistration assetsSharedPatchStateAcrossDrains(
     for (unsigned i = 0; i <= 32; ++i) {
       auto name = strf("shared{}.json", i);
       ASSERT_TRUE(File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
-      paths.append("/" + name);
+      paths.push_back("/" + name);
       targets.emplace_back(paths.back());
     }
     Json patchList = JsonArray{JsonObject{{"paths", std::move(targets)}, {"patches", JsonArray{"/shared.lua"}}}};
@@ -1421,7 +1421,7 @@ end
       for (unsigned begin = 0; begin < 32; begin += 8) {
         StringList batch;
         for (unsigned i = begin; i < begin + 8; ++i)
-          batch.append(paths[i]);
+          batch.push_back(paths[i]);
         ASSERT_TRUE((*assets)->queueJsons(batch));
         auto drained = AssetWorkerTestAccess::drain(**assets);
         ASSERT_TRUE(drained) << drained.error().what();

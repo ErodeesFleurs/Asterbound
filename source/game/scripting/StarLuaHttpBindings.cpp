@@ -150,12 +150,12 @@ struct LuaHttpSession::Impl {
       }
       id = nextRequestId++;
       // Register the native source before attaching the eager stop callback.
-      pendingRequests.append({.id = id,
-                              .httpRequest = std::move(request),
-                              .rpcKeeper = keeper,
-                              .domain = *domain,
-                              .scopedPromise = {},
-                              .lifetime = lifetime});
+      pendingRequests.push_back({.id = id,
+                                 .httpRequest = std::move(request),
+                                 .rpcKeeper = keeper,
+                                 .domain = *domain,
+                                 .scopedPromise = {},
+                                 .lifetime = lifetime});
     }
     LuaHttpProgress progress{.session = std::move(owner), .id = id};
     auto scoped = promise.withCancellation(lifetime, "Lua session stopped", progress);
@@ -295,7 +295,7 @@ std::expected<void, StarException> LuaHttpSession::handleHttpTrustReply(String c
         else
           EmergencyLog::error("Error settling HTTP trust reply: {}", outputException(result.error(), true));
       }
-      retired.append(std::move(*it));
+      retired.push_back(std::move(*it));
       it = pending.erase(it);
     }
   }
@@ -331,7 +331,7 @@ std::expected<void, StarException> LuaHttpSession::poll() {
         else
           EmergencyLog::error("Error settling HTTP response: {}", outputException(settled.error(), true));
       }
-      retired.append(std::move(request));
+      retired.push_back(std::move(request));
       it = requests.erase(it);
     }
   }

@@ -432,13 +432,10 @@ Element& MultiArray<Element, Rank>::atIndex(std::size_t index) {
 
 template <typename Element, std::size_t Rank>
 Element const* MultiArray<Element, Rank>::data() const {
-  return m_data.ptr();
+  return m_data.data();
 }
 
-template <typename Element, std::size_t Rank>
-Element* MultiArray<Element, Rank>::data() {
-  return m_data.ptr();
-}
+template <typename Element, std::size_t Rank> Element* MultiArray<Element, Rank>::data() { return m_data.data(); }
 
 template <typename Element, std::size_t Rank>
 typename MultiArray<Element, Rank>::View MultiArray<Element, Rank>::view() &

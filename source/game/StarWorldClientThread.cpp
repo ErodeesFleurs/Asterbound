@@ -216,7 +216,7 @@ bool WorldClientThread::shouldExpire() {
 void WorldClientThread::pushIncomingPackets(List<std::shared_ptr<Packet>> packets) {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
   lockWithDiagnostics(queueLocker);
-  m_incomingPacketQueue.appendAll(std::move(packets));
+  m_incomingPacketQueue.append_range(std::move(packets));
 }
 
 List<std::shared_ptr<Packet>> WorldClientThread::pullOutgoingPackets() {
@@ -242,7 +242,7 @@ void WorldClientThread::setUpdateAction(WorldClientAction updateAction) {
 void WorldClientThread::passMessage(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_messages.append(std::move(message));
+  m_messages.push_back(std::move(message));
 }
 
 std::expected<void, StarException> WorldClientThread::clearMessages() {
@@ -321,7 +321,7 @@ std::expected<void, StarException> WorldClientThread::update() {
   if (!incoming) {
     auto logged = m_worldClient->root().logger().errorException("WorldClientThread error handling incoming packets", ExceptionDiagnostic(incoming.error()));
     lockWithDiagnostics(queueLocker);
-    m_outgoingPacketQueue.append(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
+    m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
     queueLocker.unlock();
     m_errorOccurred = true;
     if (!logged)
@@ -352,12 +352,12 @@ std::expected<void, StarException> WorldClientThread::update() {
   auto outgoingPackets = m_worldClient->getOutgoingPackets();
   auto shouldDestroy = m_worldClient->pullRequestedDestroy();
   lockWithDiagnostics(queueLocker);
-  m_outgoingPacketQueue.append(std::make_shared<ClientSubWorldPackets>(m_subWorldId, std::move(outgoingPackets)));
+  m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldPackets>(m_subWorldId, std::move(outgoingPackets)));
   if (shouldDestroy) {
     auto logged = m_worldClient->root().logger().info("WorldClientThread requesting destroy");
     if (!logged)
       return std::unexpected(std::move(logged.error()));
-    m_outgoingPacketQueue.append(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
+    m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
   }
   queueLocker.unlock();
 

@@ -356,7 +356,7 @@ auto paletteName = std::move(*result44);
     colorSwaps[std::move(*result47).toRgba()] = std::move(*result49).toRgba();
             }
   }
-          self.get().m_colorSwaps[paletteName].append(colorSwaps);
+  self.get().m_colorSwaps[paletteName].push_back(colorSwaps);
         }
 }
       return {};
@@ -640,8 +640,8 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
         auto array = std::move(*result94);
                       auto result95 = pair.second.toArray();
         if (!result95) return std::unexpected(std::move(result95.error()));
-        array.appendAll(std::move(*result95));
-                      value = std::move(array);
+        array.append_range(std::move(*result95));
+        value = std::move(array);
                     } else if (pair.second.type() == Json::Type::Object) {
                       auto result96 = value.toObject();
         if (!result96) return std::unexpected(std::move(result96.error()));
@@ -690,8 +690,8 @@ std::expected<Json, StarException> MonsterDatabase::mergeFinalParameters(JsonArr
   auto array = std::move(*result100).value_or(JsonArray{});
           auto result101 = pair.second.optArray();
   if (!result101) return std::unexpected(std::move(result101.error()));
-  array.appendAll(std::move(*result101).value_or(JsonArray{}));
-          value = std::move(array);
+  array.append_range(std::move(*result101).value_or(JsonArray{}));
+  value = std::move(array);
         } else {
           value = jsonMerge(value, pair.second);
         }
@@ -909,10 +909,10 @@ auto selectedPart = std::move(*result152);
       auto result155 = result149->get().get(*selectedPart);
       if (!result155)
         return std::unexpected(std::move(result155.error()));
-      monsterParts.append(result155->get());
+      monsterParts.push_back(result155->get());
 }
     else
-      monsterParts.append(randPart);
+  monsterParts.push_back(randPart);
   }
 
   for (auto const& partConfig : monsterParts) {
@@ -925,7 +925,7 @@ auto selectedPart = std::move(*result152);
   }
   JsonArray partParameterList;
   for (auto const& partConfig : monsterParts) {
-    partParameterList.append(partConfig.partParameters);
+    partParameterList.push_back(partConfig.partParameters);
     // Include part parameter overrides
     {
   bool condition158 = static_cast<bool>(!monsterType.partParameterOverrides.isNull());
@@ -938,7 +938,7 @@ auto selectedPart = std::move(*result152);
         {
     auto result159 = monsterType.partParameterOverrides.getObject(partConfig.name);
     if (!result159) return std::unexpected(std::move(result159.error()));
-    partParameterList.append(std::move(*result159));
+    partParameterList.push_back(std::move(*result159));
   }
 }
   }
@@ -1007,17 +1007,19 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
       // First, pick from base skills
       while (!baseSkillNames.empty() && skillNames.size() < skillCount)
         {
-    auto result174 = baseSkillNames.takeAt(rand.randInt(baseSkillNames.size() - 1));
-    if (!result174) return std::unexpected(std::move(result174.error()));
-    skillNames.append(std::move(*result174));
+        auto result174 = baseSkillNames.take_at(rand.randInt(baseSkillNames.size() - 1));
+        if (!result174)
+          return std::unexpected(std::move(result174.error()));
+        skillNames.push_back(std::move(*result174));
   }
 
       // ...then fill in from special skills as needed
       while (!specialSkillNames.empty() && skillNames.size() < skillCount)
         {
-    auto result176 = specialSkillNames.takeAt(rand.randInt(specialSkillNames.size() - 1));
-    if (!result176) return std::unexpected(std::move(result176.error()));
-    skillNames.append(std::move(*result176));
+        auto result176 = specialSkillNames.take_at(rand.randInt(specialSkillNames.size() - 1));
+        if (!result176)
+          return std::unexpected(std::move(result176.error()));
+        skillNames.push_back(std::move(*result176));
   }
 
       Json finalAnimatorConfig = animatorConfig;
@@ -1027,8 +1029,8 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
           auto result177 = m_skills.get(skillName);
   if (!result177) return std::unexpected(std::move(result177.error()));
   auto const& skill = result177->get();
-          allParameters.append(skill.parameters);
-          finalAnimatorConfig = jsonMerge(finalAnimatorConfig, skill.animationParameters);
+  allParameters.push_back(skill.parameters);
+  finalAnimatorConfig = jsonMerge(finalAnimatorConfig, skill.animationParameters);
         }
       }
 
@@ -1056,9 +1058,10 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
         List<String> skillNames;
         for (std::size_t i = 0; i < skillCount; ++i)
           {
-      auto result185 = availableSkillNames.takeAt(rand.randInt(availableSkillNames.size() - 1));
-      if (!result185) return std::unexpected(std::move(result185.error()));
-      skillNames.append(std::move(*result185));
+          auto result185 = availableSkillNames.take_at(rand.randInt(availableSkillNames.size() - 1));
+          if (!result185)
+            return std::unexpected(std::move(result185.error()));
+          skillNames.push_back(std::move(*result185));
     }
 
         Json finalAnimatorConfig = animatorConfig;
@@ -1068,8 +1071,8 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
             auto result186 = m_skills.get(skillName);
     if (!result186) return std::unexpected(std::move(result186.error()));
     auto const& skill = result186->get();
-            allParameters.append(skill.parameters);
-            finalAnimatorConfig = jsonMerge(finalAnimatorConfig, skill.animationParameters);
+    allParameters.push_back(skill.parameters);
+    finalAnimatorConfig = jsonMerge(finalAnimatorConfig, skill.animationParameters);
           }
         }
 

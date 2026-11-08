@@ -37,7 +37,7 @@ void appendHorizontalOverlaps(List<RectF>& overlaps,
     return;
   --i;
   while (!compare(box, *i)) {
-    overlaps.append(*i);
+    overlaps.push_back(*i);
     if (i == boxes.begin())
       return;
     --i;
@@ -88,8 +88,8 @@ RectF separateBubble(List<RectF> const& sortedLeftEdges, List<RectF> const& sort
     box.setYMax(box.yMin() + height);
   }
 
-  outLeftEdges.append(box);
-  outRightEdges.append(box);
+  outLeftEdges.push_back(box);
+  outRightEdges.push_back(box);
 
   return box;
 }

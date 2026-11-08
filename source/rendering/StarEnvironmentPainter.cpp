@@ -190,7 +190,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     for (auto const& type : **debrisSkyTypes) {
       auto name = type.toString();
       if (!name) return std::unexpected(std::move(name.error()));
-      allowedTypes.append(std::move(*name));
+      allowedTypes.push_back(std::move(*name));
     }
     auto allowed = allowedTypes.contains(skyType->get());
     if (!allowed) return std::unexpected(std::move(allowed.error()));

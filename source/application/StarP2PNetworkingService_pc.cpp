@@ -256,7 +256,7 @@ std::optional<std::pair<String, RpcPromiseKeeper<P2PJoinRequestReply>>> Star::Pc
   std::lock_guard serviceLocker(m_mutex);
 
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
-  if (auto request = m_discordJoinRequests.maybeTakeLast()) {
+  if (auto request = m_discordJoinRequests.try_take_back()) {
     auto promisePair = RpcPromise<P2PJoinRequestReply>::createPair();
     m_pendingDiscordJoinRequests.push_back(std::make_pair(request->first, promisePair.first));
     return std::make_pair(request->second, promisePair.second);
@@ -429,7 +429,7 @@ std::expected<std::optional<ByteArray>, StarException> PcP2PNetworkingService::S
   if (error)
     return std::unexpected(*error);
   if (!incoming.empty()) {
-    auto message = incoming.takeFirst();
+    auto message = incoming.take_front();
     if (!message)
       return std::unexpected(std::move(message.error()));
     return std::optional<ByteArray>(std::move(*message));
@@ -446,7 +446,7 @@ std::expected<std::optional<ByteArray>, StarException> PcP2PNetworkingService::S
 
     socketLocker.lock();
     if (!incoming.empty()) {
-      auto message = incoming.takeFirst();
+      auto message = incoming.take_front();
       if (!message)
         return std::unexpected(std::move(message.error()));
       return std::optional<ByteArray>(std::move(*message));
@@ -498,7 +498,7 @@ std::expected<void, StarException> PcP2PNetworkingService::steamOnSessionRequest
       callback.m_steamIDRemote.ConvertToUint64(), k_EFriendFlagImmediate)) {
     if (SteamAPI_ISteamNetworking_AcceptP2PSessionWithUser(SteamAPI_SteamNetworking(),
         callback.m_steamIDRemote.ConvertToUint64())) {
-      m_pendingIncomingConnections.append(createSteamP2PSocket(callback.m_steamIDRemote));
+      m_pendingIncomingConnections.push_back(createSteamP2PSocket(callback.m_steamIDRemote));
       return m_state->logger.info("Accepted Steam P2P connection with user {}", callback.m_steamIDRemote.ConvertToUint64());
     } else {
       return m_state->logger.error("Accepting Steam P2P connection from user {} failed!", callback.m_steamIDRemote.ConvertToUint64());
@@ -531,7 +531,7 @@ std::expected<void, StarException> PcP2PNetworkingService::steamReceiveAll() {
     data.resize(messageSize);
     if (auto openSocket = m_steamOpenSockets.find_ref(messageRemoteUser.ConvertToUint64())) {
       std::lock_guard socketLocker(openSocket->get().get().mutex);
-      openSocket->get().get().incoming.append(std::move(data));
+      openSocket->get().get().incoming.push_back(std::move(data));
     }
   }
   return {};
@@ -575,7 +575,7 @@ std::expected<std::optional<ByteArray>, StarException> PcP2PNetworkingService::D
   if (error)
     return std::unexpected(*error);
   if (!incoming.empty()) {
-    auto message = incoming.takeFirst();
+    auto message = incoming.take_front();
     if (!message)
       return std::unexpected(std::move(message.error()));
     return std::optional<ByteArray>(std::move(*message));
@@ -696,7 +696,7 @@ void PcP2PNetworkingService::discordOnReceiveMessage(discord::LobbyId lobbyId, d
   if (auto socket = m_discordOpenSockets.find_ref(userId)) {
     if (channel == DiscordMainNetworkChannel) {
       std::lock_guard socketLocker(socket->get().get().mutex);
-      socket->get().get().incoming.append(
+      socket->get().get().incoming.push_back(
         ByteArray(std::span(reinterpret_cast<char const*>(data.data()), data.size())));
     } else {
       recordDiscordCallbackError(
@@ -725,7 +725,7 @@ void PcP2PNetworkingService::discordOnLobbyMemberConnect(discord::LobbyId lobbyI
       socket->mode = DiscordSocketMode::Connected;
 
       m_discordOpenSockets.insert_or_assign(userId, std::ref(*socket));
-      m_pendingIncomingConnections.append(std::move(socket));
+      m_pendingIncomingConnections.push_back(std::move(socket));
       if (auto logged = m_state->logger.info("Accepted new Discord connection from remote user {}", userId); !logged)
         m_state->discordError = std::move(logged.error());
     }

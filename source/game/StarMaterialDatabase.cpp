@@ -194,7 +194,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!names)
           return std::unexpected(std::move(names.error()));
         for (auto const& name : *names)
-          material.miningSounds.append(AssetPath::relative_to(file, name));
+          material.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
       auto footstep = config->optString("footstepSound");
       if (!footstep)
@@ -401,7 +401,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!names)
           return std::unexpected(std::move(names.error()));
         for (auto const& name : *names)
-          mod.miningSounds.append(AssetPath::relative_to(file, name));
+          mod.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
       auto footstep = config->optString("footstepSound");
       if (!footstep)
@@ -511,7 +511,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
 
 StringList MaterialDatabase::materialNames() const {
   StringList names = m_materialIndex.keys();
-  names.appendAll(m_metaMaterialIndex.keys());
+  names.append_range(m_metaMaterialIndex.keys());
   return names;
 }
 
@@ -590,7 +590,7 @@ std::expected<String, StarException> MaterialDatabase::materialCategory(Material
 
 StringList MaterialDatabase::modNames() const {
   StringList modNames = m_modIndex.keys();
-  modNames.appendAll(m_metaModIndex.left_values());
+  modNames.append_range(m_metaModIndex.left_values());
   return modNames;
 }
 

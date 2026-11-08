@@ -130,7 +130,7 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
     auto parsed = jsonToEphemeralStatusEffect(effect);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
-    source.statusEffects.append(std::move(*parsed));
+    source.statusEffects.push_back(std::move(*parsed));
   }
   auto knockback = config.get("knockback", Json(0.0f));
   if (!knockback)
@@ -323,7 +323,7 @@ std::expected<DamageRequest, StarException> DamageRequest::create(Json const& v)
     auto parsed = jsonToEphemeralStatusEffect(effect);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
-    request.statusEffects.append(std::move(*parsed));
+    request.statusEffects.push_back(std::move(*parsed));
   }
   return request;
 }

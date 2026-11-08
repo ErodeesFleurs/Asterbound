@@ -286,7 +286,7 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
       auto effect = jsonToEphemeralStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      effects.append(std::move(*effect));
+      effects.push_back(std::move(*effect));
     }
     auto added = itemOwner->get().statusController().addEphemeralEffects(effects);
     if (!added)

@@ -1184,7 +1184,7 @@ const GameTestRegistration workerChainedReplyClosure(
     )LUA"),
                                  File::relative_to(overlay, "p6-worker.lua")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = String("p6-worker.config");
     settings.logDirectory = {};

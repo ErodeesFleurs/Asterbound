@@ -226,7 +226,7 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
     for (Json const& index : *data) {
       auto gid = index.toUInt();
       if (!gid) return std::unexpected(std::move(gid.error()));
-      result->m_tileData.append(*gid & ~TileFlip::AllBits);
+      result->m_tileData.push_back(*gid & ~TileFlip::AllBits);
     }
   } else {
     auto compression = layer.getString("compression");
@@ -251,10 +251,10 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
     for (std::size_t i = 0; i + 3 < bytes.size(); i += 4) {
       std::uint32_t gid = static_cast<std::uint8_t>(bytes[i]) | (static_cast<std::uint8_t>(bytes[i + 1]) << 8)
         | (static_cast<std::uint8_t>(bytes[i + 2]) << 16) | (static_cast<std::uint8_t>(bytes[i + 3]) << 24);
-      result->m_tileData.append(gid & ~TileFlip::AllBits);
+      result->m_tileData.push_back(gid & ~TileFlip::AllBits);
     }
   }
-  if (result->m_tileData.count() != layerWidth * layerHeight)
+  if (result->m_tileData.size() != layerWidth * layerHeight)
     return std::unexpected(StarException("TMXTileLayer data length was inconsistent with width/height"));
   return result;
 }
@@ -286,11 +286,11 @@ std::expected<std::shared_ptr<TMXMap>, StarException> TMXMap::create(Root& root,
     if (*type == "tilelayer") {
       auto layer = TMXTileLayer::create(tmxLayer);
       if (!layer) return std::unexpected(std::move(layer.error()));
-      result->m_tileLayers.append(std::move(*layer));
+      result->m_tileLayers.push_back(std::move(*layer));
     } else if (*type == "objectgroup") {
       auto group = TMXObjectGroup::create(root, tmxLayer, result->m_tilesets);
       if (!group) return std::unexpected(std::move(group.error()));
-      result->m_objectGroups.append(std::move(*group));
+      result->m_objectGroups.push_back(std::move(*group));
     } else {
       return std::unexpected(StarException::format("Unknown layer type '{}'", *type));
     }
@@ -334,16 +334,20 @@ std::expected<std::shared_ptr<TMXTilesets>, StarException> TMXTilesets::create(R
     if (!database) return std::unexpected(std::move(database.error()));
     auto tileset = (*database)->get(*path);
     if (!tileset) return std::unexpected(std::move(tileset.error()));
-    result->m_tilesets.append(*tileset);
+    result->m_tilesets.push_back(*tileset);
     auto firstGid = definition.getUInt("firstgid");
     if (!firstGid) return std::unexpected(std::move(firstGid.error()));
     for (std::size_t i = 0; i < (*tileset)->size(); ++i) {
       auto front = (*tileset)->getTile(i, TileLayer::Foreground);
       if (!front) return std::unexpected(std::move(front.error()));
-      result->m_foregroundTilesByGid.set(*firstGid + i, optionalRef(*front));
+      auto storedFront = result->m_foregroundTilesByGid.set(*firstGid + i, optionalRef(*front));
+      if (!storedFront)
+        return std::unexpected(std::move(storedFront.error()));
       auto back = (*tileset)->getTile(i, TileLayer::Background);
       if (!back) return std::unexpected(std::move(back.error()));
-      result->m_backgroundTilesByGid.set(*firstGid + i, optionalRef(*back));
+      auto storedBack = result->m_backgroundTilesByGid.set(*firstGid + i, optionalRef(*back));
+      if (!storedBack)
+        return std::unexpected(std::move(storedBack.error()));
     }
   }
   auto nullTile = Tiled::Tile::create(root, Tiled::Properties(), TileLayer::Foreground);
@@ -442,7 +446,7 @@ std::expected<std::shared_ptr<TMXObject>, StarException> TMXObject::create(Root&
     for (auto const& point : **polyline) {
       auto vertex = getPos(point);
       if (!vertex) return std::unexpected(std::move(vertex.error()));
-      result->m_polyline.append(*vertex);
+      result->m_polyline.push_back(*vertex);
     }
     computedProperties["wire"] = "_polylineWire" + toString(result->m_objectId);
     computedProperties["local"] = "true";
@@ -586,7 +590,7 @@ std::expected<std::shared_ptr<TMXObjectGroup>, StarException> TMXObjectGroup::cr
   for (Json const& definition : *objects) {
     auto object = TMXObject::create(root, *groupProperties, definition, tilesets);
     if (!object) return std::unexpected(std::move(object.error()));
-    result->m_objects.append(std::move(*object));
+    result->m_objects.push_back(std::move(*object));
   }
   return result;
 }
@@ -598,7 +602,7 @@ std::expected<void, StarException> TMXPartReader::readAsset(String const& asset)
   if (!json) return std::unexpected(std::move(json.error()));
   auto map = TMXMap::create(m_root, *json);
   if (!map) return std::unexpected(std::move(map.error()));
-  m_maps.append(std::make_pair(asset, std::move(*map)));
+  m_maps.push_back(std::make_pair(asset, std::move(*map)));
   return {};
 }
 

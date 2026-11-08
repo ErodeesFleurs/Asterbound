@@ -170,7 +170,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!writeAssets) return std::unexpected(std::move(writeAssets.error()));
   // Keep the fixture's legal base pak and production mod sources; only the
   // test-owned overlay, runtime configuration, storage, and logs are private.
-  settings.assetSources.append(overlay);
+  settings.assetSources.push_back(overlay);
   // Isolate explicit reload invalidation from maintenance-thread TTL eviction
   // while loading the real pak on slower test hosts.
   settings.assetsSettings.assetTimeToLive = std::numeric_limits<float>::max();

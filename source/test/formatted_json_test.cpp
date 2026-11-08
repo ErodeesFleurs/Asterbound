@@ -136,7 +136,7 @@ List<String> keyOrder(FormattedJson const& json) {
   List<String> keys;
   for (JsonElement const& elem : json.elements()) {
     if (std::holds_alternative<ObjectKeyElement>(elem))
-      keys.append(std::get<ObjectKeyElement>(elem).key);
+      keys.push_back(std::get<ObjectKeyElement>(elem).key);
   }
   return keys;
 }
@@ -152,7 +152,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result23 = json.set("foo", (*result201));
   ASSERT_TRUE(result23);
   json = (*result23);
-  expectedKeys.append("foo");
+  expectedKeys.push_back("foo");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result202 = FormattedJson::create(Json{"..."});
@@ -160,7 +160,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result24 = json.set("baz", (*result202));
   ASSERT_TRUE(result24);
   json = (*result24);
-  expectedKeys.append("baz");
+  expectedKeys.push_back("baz");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result203 = FormattedJson::create(Json{"world"});
@@ -168,7 +168,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result25 = json.prepend("hello", (*result203));
   ASSERT_TRUE(result25);
   json = (*result25);
-  expectedKeys.insertAt(0, "hello");
+  expectedKeys.insert_at(0, "hello");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result204 = FormattedJson::create(Json{"alal"});
@@ -176,7 +176,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result26 = json.insertBefore("lala", (*result204), "foo");
   ASSERT_TRUE(result26);
   json = (*result26);
-  expectedKeys.insertAt(1, "lala");
+  expectedKeys.insert_at(1, "lala");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result205 = FormattedJson::create(Json{"ipsum"});
@@ -184,7 +184,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result27 = json.insertAfter("lorem", (*result205), "foo");
   ASSERT_TRUE(result27);
   json = (*result27);
-  expectedKeys.insertAt(3, "lorem");
+  expectedKeys.insert_at(3, "lorem");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result206 = FormattedJson::create(Json{"sit amet"});
@@ -192,7 +192,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result28 = json.append("dolor", (*result206));
   ASSERT_TRUE(result28);
   json = (*result28);
-  expectedKeys.append("dolor");
+  expectedKeys.push_back("dolor");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   // If the key already exists, the key order doesn't change.
@@ -761,7 +761,7 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
       if (object)
         entries[String(key)] = Json(i);
       else
-        array.append(Json(i));
+        array.push_back(Json(i));
     }
     original += object ? '}' : ']';
     changed += object ? '}' : ']';
@@ -976,7 +976,7 @@ TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
        List<String>{"-0", "1.00", "6.25e2", "{ /* 日本語 🌟 */ \"dup\":1, \"dup\":2 }", "[\r\n  3,\r\n  4\r\n]"}) {
     auto parsed = FormattedJson::parse(text);
     ASSERT_TRUE(parsed);
-    values.append(std::move(*parsed));
+    values.push_back(std::move(*parsed));
   }
   auto empty = FormattedJson::createArray({});
   ASSERT_TRUE(empty);

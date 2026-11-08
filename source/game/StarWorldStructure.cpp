@@ -76,7 +76,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
     Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
-    result.m_backgroundOverlays.append(overlay);
+    result.m_backgroundOverlays.push_back(overlay);
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
@@ -99,7 +99,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (!autofullbrightResult1) return std::unexpected(std::move(autofullbrightResult1.error()));
     auto fullbright = std::move((*autofullbrightResult1));
     Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
-    result.m_foregroundOverlays.append(overlay);
+    result.m_foregroundOverlays.push_back(overlay);
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
@@ -295,29 +295,29 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
         }
 
         if (blockKey.foregroundBlock)
-          result.m_foregroundBlocks.append({.position = pos,
-                                            .materialId = blockKey.foregroundMat,
-                                            .residual = blockKey.foregroundResidual,
-                                            .materialColor = blockKey.foregroundMatColor,
-                                            .materialHue = blockKey.foregroundMatHue,
-                                            .materialMod = blockKey.foregroundMatMod});
+          result.m_foregroundBlocks.push_back({.position = pos,
+                                               .materialId = blockKey.foregroundMat,
+                                               .residual = blockKey.foregroundResidual,
+                                               .materialColor = blockKey.foregroundMatColor,
+                                               .materialHue = blockKey.foregroundMatHue,
+                                               .materialMod = blockKey.foregroundMatMod});
         if (blockKey.backgroundBlock)
-          result.m_backgroundBlocks.append({.position = pos,
-                                            .materialId = blockKey.backgroundMat,
-                                            .residual = blockKey.backgroundResidual,
-                                            .materialColor = blockKey.backgroundMatColor,
-                                            .materialHue = blockKey.foregroundMatHue,
-                                            .materialMod = blockKey.foregroundMatMod});
+          result.m_backgroundBlocks.push_back({.position = pos,
+                                               .materialId = blockKey.backgroundMat,
+                                               .residual = blockKey.backgroundResidual,
+                                               .materialColor = blockKey.backgroundMatColor,
+                                               .materialHue = blockKey.foregroundMatHue,
+                                               .materialMod = blockKey.foregroundMatMod});
 
         if (!blockKey.object.empty())
-          result.m_objects.append(Object{.position = pos,
-                                         .name = blockKey.object,
-                                         .direction = blockKey.objectDirection,
-                                         .parameters = blockKey.objectParameters,
-                                         .residual = blockKey.objectResidual});
+          result.m_objects.push_back(Object{.position = pos,
+                                            .name = blockKey.object,
+                                            .direction = blockKey.objectDirection,
+                                            .parameters = blockKey.objectParameters,
+                                            .residual = blockKey.objectResidual});
 
         for (auto const& flag : blockKey.flags)
-          result.m_flaggedBlocks[flag].append(pos);
+          result.m_flaggedBlocks[flag].push_back(pos);
 
         result.m_region.combine(pos);
       }
@@ -429,7 +429,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
   for (auto const& value : backgroundOverlays) {
     auto parsed = overlayFromJson(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result.m_backgroundOverlays.append(std::move(*parsed));
+    result.m_backgroundOverlays.push_back(std::move(*parsed));
   }
   auto autoforegroundOverlaysResult1 = store.getArray("foregroundOverlays");
   if (!autoforegroundOverlaysResult1) return std::unexpected(std::move(autoforegroundOverlaysResult1.error()));
@@ -437,7 +437,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
   for (auto const& value : foregroundOverlays) {
     auto parsed = overlayFromJson(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result.m_foregroundOverlays.append(std::move(*parsed));
+    result.m_foregroundOverlays.push_back(std::move(*parsed));
   }
   auto autobackgroundBlocksResult1 = store.getArray("backgroundBlocks");
   if (!autobackgroundBlocksResult1) return std::unexpected(std::move(autobackgroundBlocksResult1.error()));
@@ -445,7 +445,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
   for (auto const& value : backgroundBlocks) {
     auto parsed = blockFromJson(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result.m_backgroundBlocks.append(std::move(*parsed));
+    result.m_backgroundBlocks.push_back(std::move(*parsed));
   }
   auto autoforegroundBlocksResult1 = store.getArray("foregroundBlocks");
   if (!autoforegroundBlocksResult1) return std::unexpected(std::move(autoforegroundBlocksResult1.error()));
@@ -453,7 +453,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
   for (auto const& value : foregroundBlocks) {
     auto parsed = blockFromJson(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result.m_foregroundBlocks.append(std::move(*parsed));
+    result.m_foregroundBlocks.push_back(std::move(*parsed));
   }
   auto autoobjectsResult1 = store.getArray("objects");
   if (!autoobjectsResult1) return std::unexpected(std::move(autoobjectsResult1.error()));
@@ -461,7 +461,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
   for (auto const& value : objects) {
     auto parsed = objectFromJson(value);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    result.m_objects.append(std::move(*parsed));
+    result.m_objects.push_back(std::move(*parsed));
   }
   auto autoflaggedBlocksResult1 = store.getObject("flaggedBlocks");
   if (!autoflaggedBlocksResult1) return std::unexpected(std::move(autoflaggedBlocksResult1.error()));
@@ -473,7 +473,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     for (auto const& value : *values) {
       auto position = jsonToVec2I(value);
       if (!position) return std::unexpected(std::move(position.error()));
-      blocks.append(*position);
+      blocks.push_back(*position);
     }
   }
   return result;
@@ -580,7 +580,7 @@ std::expected<Json, StarException> WorldStructure::store() const {
   for (auto const& object : m_objects) {
     auto stored = objectToJson(object);
     if (!stored) return std::unexpected(std::move(stored.error()));
-    objects.append(std::move(*stored));
+    objects.push_back(std::move(*stored));
   }
   return JsonObject{{"region", jsonFromRectI(m_region)},
       {"anchorPosition", jsonFromVec2I(m_anchorPosition)},

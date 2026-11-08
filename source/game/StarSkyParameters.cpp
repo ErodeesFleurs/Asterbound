@@ -100,7 +100,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
         if (!parentParameters) return std::unexpected(std::move(parentParameters.error()));
         auto layers = CelestialGraphics::drawWorld(root, *satellite, *parentParameters);
         if (!layers) return std::unexpected(std::move(layers.error()));
-        sky.nearbyMoons.append({std::move(*layers), pos});
+        sky.nearbyMoons.push_back({std::move(*layers), pos});
       }
     }
   }
@@ -156,7 +156,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
       if (!image) return std::unexpected(std::move(image.error()));
       auto scale = layer.getFloat("scale");
       if (!scale) return std::unexpected(std::move(scale.error()));
-      layers.append({std::move(*image), *scale});
+      layers.push_back({std::move(*image), *scale});
     }
     return std::pair{std::move(layers), pos};
   };
@@ -173,7 +173,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
     for (auto const& satellite : **satellites) {
       auto layers = extractLayerData(satellite, sky.seed);
       if (!layers) return std::unexpected(std::move(layers.error()));
-      sky.nearbyMoons.append(std::move(*layers));
+      sky.nearbyMoons.push_back(std::move(*layers));
     }
   }
   auto horizons = config.optArray("horizonImages");
@@ -184,7 +184,7 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
       if (!left) return std::unexpected(std::move(left.error()));
       auto right = horizon.getString("right");
       if (!right) return std::unexpected(std::move(right.error()));
-      sky.horizonImages.append({std::move(*left), std::move(*right)});
+      sky.horizonImages.push_back({std::move(*left), std::move(*right)});
     }
   }
   auto clouds = config.getBool("horizonClouds", true);
@@ -235,16 +235,17 @@ std::expected<Json, StarException> SkyParameters::toJson() const {
   auto layerJson = [](std::pair<List<std::pair<String, float>>, Vec2F> const& planet) -> Json {
     JsonArray layers;
     for (auto const& layer : planet.first)
-      layers.append(JsonObject{{"image", layer.first}, {"scale", layer.second}});
+      layers.push_back(JsonObject{{"image", layer.first}, {"scale", layer.second}});
     return JsonObject{{"layers", std::move(layers)}, {"pos", jsonFromVec2F(planet.second)}};
   };
   Json planet;
   if (nearbyPlanet) planet = layerJson(*nearbyPlanet);
   JsonArray satellites;
-  for (auto const& moon : nearbyMoons) satellites.append(layerJson(moon));
+  for (auto const& moon : nearbyMoons)
+    satellites.push_back(layerJson(moon));
   JsonArray horizons;
   for (auto const& horizon : horizonImages)
-    horizons.append(JsonObject{{"left", horizon.first}, {"right", horizon.second}});
+    horizons.push_back(JsonObject{{"left", horizon.first}, {"right", horizon.second}});
   Json coloring;
   if (auto value = skyColoring.maybeLeftRef()) coloring = value->get().toJson();
   Json light;

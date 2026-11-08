@@ -38,19 +38,19 @@ TEST(WorkerPoolTest, All) {
   } releaseOnExit{released};
 
   for (std::size_t i = 0; i < 10; ++i)
-    handles.append(workerPool.addWork(incCounter));
+    handles.push_back(workerPool.addWork(incCounter));
 
   ASSERT_TRUE(workerPool.start(10));
   started.wait(false);
   EXPECT_EQ(counter, 0);
 
   for (std::size_t i = 0; i < 90; ++i)
-    handles.append(workerPool.addWork(incCounter));
+    handles.push_back(workerPool.addWork(incCounter));
 
   releaseOnExit.open();
 
   while (handles.size() > 20) {
-    auto handle = handles.takeFirst();
+    auto handle = handles.take_front();
     ASSERT_TRUE(handle);
     ASSERT_TRUE(handle->finish());
   }

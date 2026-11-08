@@ -90,7 +90,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeBehaviorCallbacks(Ro
     auto state = BehaviorState::create(*tree, std::move(context), board);
     if (!state)
       return std::unexpected(std::move(state.error()));
-    list.append(*state);
+    list.push_back(*state);
     return std::weak_ptr<BehaviorState>(*state);
   });
   if (!registration)

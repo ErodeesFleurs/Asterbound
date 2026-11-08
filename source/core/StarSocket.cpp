@@ -39,7 +39,7 @@ std::expected<std::optional<SocketPollResult>, StarException> Socket::poll(Socke
   // Prevent close from being called on any socket during this call.
   LinkedList<std::shared_lock<ReadersWriterMutex>> readLockers;
   for (auto const& p : query)
-    readLockers.emplaceAppend(p.first->m_mutex);
+    readLockers.emplace_back(p.first->m_mutex);
 
   // If any sockets are already closed, then this is an "event" according to
   // this api but we cannot call poll on a closed socket, so just poll the rest

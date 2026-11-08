@@ -379,7 +379,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
         auto instance = AudioInstance::create(**sfx);
         if (!instance) return std::unexpected(std::move(instance.error()));
         m_sentSFX = true;
-        res.append(std::move(*instance));
+        res.push_back(std::move(*instance));
         return res;
       }
     } else if (m_warpPhase == WarpPhase::Maintain && !m_sentSFX) {
@@ -399,7 +399,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
         auto instance = AudioInstance::create(**sfx);
         if (!instance) return std::unexpected(std::move(instance.error()));
         m_sentSFX = true;
-        res.append(std::move(*instance));
+        res.push_back(std::move(*instance));
         return res;
       }
     }
@@ -414,7 +414,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
       auto instance = AudioInstance::create(**sfx);
       if (!instance) return std::unexpected(std::move(instance.error()));
       m_sentSFX = true;
-      res.append(std::move(*instance));
+      res.push_back(std::move(*instance));
       return res;
     }
   }

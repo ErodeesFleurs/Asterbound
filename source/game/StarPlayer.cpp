@@ -526,7 +526,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
     if (!effectResult)
       return std::unexpected(std::move(effectResult.error()));
     auto effect = std::move(*effectResult);
-    m_foodLowStatusEffects.append(std::move(effect));
+    m_foodLowStatusEffects.push_back(std::move(effect));
   }
   auto foodEmptyStatusEffectsJsonResult = assets->json("/player.config:foodEmptyStatusEffects");
   if (!foodEmptyStatusEffectsJsonResult)
@@ -541,7 +541,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
     if (!effectResult)
       return std::unexpected(std::move(effectResult.error()));
     auto effect = std::move(*effectResult);
-    m_foodEmptyStatusEffects.append(std::move(effect));
+    m_foodEmptyStatusEffects.push_back(std::move(effect));
   }
 
   auto inCinematicStatusEffectsJsonResult = assets->json("/player.config:inCinematicStatusEffects");
@@ -557,7 +557,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
     if (!effectResult)
       return std::unexpected(std::move(effectResult.error()));
     auto effect = std::move(*effectResult);
-    m_inCinematicStatusEffects.append(std::move(effect));
+    m_inCinematicStatusEffects.push_back(std::move(effect));
   }
 
   if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController); !result)
@@ -1196,7 +1196,7 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
     if (!backResult)
       return std::unexpected(std::move(backResult.error()));
     auto back = std::move(*backResult);
-    drawables.appendAll(std::move(back));
+    drawables.append_range(std::move(back));
     if (!m_techController->parentHidden()) {
       if (auto result = m_tools->setupHumanoidHandItemDrawables(*humanoid(), interpolation); !result)
         return std::unexpected(std::move(result.error()));
@@ -1221,19 +1221,19 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
             }
           }
         }
-        drawables.append(std::move(drawable));
+        drawables.push_back(std::move(drawable));
       }
     }
     auto frontResult = m_techController->frontDrawables(interpolation);
     if (!frontResult)
       return std::unexpected(std::move(frontResult.error()));
     auto front = std::move(*frontResult);
-    drawables.appendAll(std::move(front));
+    drawables.append_range(std::move(front));
     auto statusResult = m_statusController->drawables(interpolation);
     if (!statusResult)
       return std::unexpected(std::move(statusResult.error()));
     auto status = std::move(*statusResult);
-    drawables.appendAll(std::move(status));
+    drawables.append_range(std::move(status));
     auto rangeResult = inToolRange();
     if (!rangeResult)
       return std::unexpected(std::move(rangeResult.error()));
@@ -1242,14 +1242,14 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
     if (!previewsResult)
       return std::unexpected(std::move(previewsResult.error()));
     auto previews = std::move(*previewsResult);
-    drawables.appendAll(std::move(previews));
+    drawables.append_range(std::move(previews));
   }
   auto effectsSample = m_effectsAnimator->sample(interpolation);
   auto effectsResult = effectsSample.drawables(position());
   if (!effectsResult)
     return std::unexpected(std::move(effectsResult.error()));
   auto effects = std::move(*effectsResult);
-  drawables.appendAll(std::move(effects));
+  drawables.append_range(std::move(effects));
   return drawables;
 }
 
@@ -1264,21 +1264,21 @@ std::expected<List<Particle>, StarException> Player::particles() {
   if (!splashResult)
     return std::unexpected(std::move(splashResult.error()));
   auto splash = std::move(*splashResult);
-  particles.appendAll(std::move(splash));
-  particles.appendAll(std::exchange(m_callbackParticles, {}));
-  particles.appendAll(m_humanoidDynamicTarget.pullNewParticles());
-  particles.appendAll(m_techController->pullNewParticles());
-  particles.appendAll(m_statusController->pullNewParticles());
+  particles.append_range(std::move(splash));
+  particles.append_range(std::exchange(m_callbackParticles, {}));
+  particles.append_range(m_humanoidDynamicTarget.pullNewParticles());
+  particles.append_range(m_techController->pullNewParticles());
+  particles.append_range(m_statusController->pullNewParticles());
   return particles;
 }
 
 std::expected<void, StarException> Player::addParticles(List<Particle> const& particles) {
-  m_callbackParticles.appendAll(particles);
+  m_callbackParticles.append_range(particles);
   return {};
 }
 
 std::expected<void, StarException> Player::addSound(String const& sound, float volume, float pitch) {
-  m_callbackSounds.emplaceAppend(sound, volume, pitch);
+  m_callbackSounds.emplace_back(sound, volume, pitch);
   return {};
 }
 
@@ -1339,17 +1339,17 @@ std::expected<List<LightSource>, StarException> Player::presentationLightSources
   if (!toolsResult)
     return std::unexpected(std::move(toolsResult.error()));
   auto tools = std::move(*toolsResult);
-  lights.appendAll(std::move(tools));
+  lights.append_range(std::move(tools));
   auto statusResult = m_statusController->lightSources(interpolation);
   if (!statusResult)
     return std::unexpected(std::move(statusResult.error()));
   auto status = std::move(*statusResult);
-  lights.appendAll(std::move(status));
+  lights.append_range(std::move(status));
   auto techResult = m_techController->lightSources(interpolation);
   if (!techResult)
     return std::unexpected(std::move(techResult.error()));
   auto tech = std::move(*techResult);
-  lights.appendAll(std::move(tech));
+  lights.append_range(std::move(tech));
   auto humanoidSample = humanoid()->networkedAnimator()->get().sample(interpolation);
   if (auto prepared = humanoid()->prepareAnimatorPose(humanoidSample); !prepared)
     return std::unexpected(std::move(prepared.error()));
@@ -1357,7 +1357,7 @@ std::expected<List<LightSource>, StarException> Player::presentationLightSources
   if (!humanoidLightsResult)
     return std::unexpected(std::move(humanoidLightsResult.error()));
   auto humanoidLights = std::move(*humanoidLightsResult);
-  lights.appendAll(std::move(humanoidLights));
+  lights.append_range(std::move(humanoidLights));
   return lights;
 }
 
@@ -3184,7 +3184,7 @@ std::expected<void, StarException> Player::interactWithEntity(std::shared_ptr<In
   if (!actionResult)
     return std::unexpected(std::move(actionResult.error()));
   auto action = std::move(*actionResult);
-  m_pendingInteractActions.append(std::move(action));
+  m_pendingInteractActions.push_back(std::move(action));
   return {};
 }
 
@@ -3295,7 +3295,7 @@ std::expected<List<InteractAction>, StarException> Player::pullInteractActions()
       return std::unexpected(std::move(responseResult.error()));
     auto response = std::move(*responseResult);
     if (response)
-      results.append(std::move(*response));
+      results.push_back(std::move(*response));
     auto finishedResult = it->finished();
     if (!finishedResult)
       return std::unexpected(std::move(finishedResult.error()));
@@ -3916,7 +3916,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
   if (m_newChatMessageNetState.pullOccurred() && !initial) {
     m_chatMessage = m_chatMessageNetState.get();
     m_chatMessageUpdated = true;
-    m_pendingChatActions.append(SayChatAction{entityId(), m_chatMessage, m_movementController->position()});
+    m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage, m_movementController->position()});
   }
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
@@ -4160,7 +4160,7 @@ std::expected<void, StarException> Player::teleportIn() {
     if (!effectResult)
       return std::unexpected(std::move(effectResult.error()));
     auto effect = std::move(*effectResult);
-    effects.append(std::move(effect));
+    effects.push_back(std::move(effect));
   }
   return m_statusController->addEphemeralEffects(effects);
 }
@@ -4456,13 +4456,13 @@ List<std::shared_ptr<Item>> Player::pullQueuedItemDrops() { return std::exchange
 
 std::expected<void, StarException> Player::queueUIMessage(String const& message) {
   if (!isSlave())
-    m_queuedMessages.append(message);
+    m_queuedMessages.push_back(message);
   return {};
 }
 
 void Player::queueItemPickupMessage(std::shared_ptr<Item> const& item) {
   if (!isSlave())
-    m_queuedItemPickups.append(item);
+    m_queuedItemPickups.push_back(item);
 }
 
 std::expected<void, StarException> Player::addChatMessage(String const& message, Json const& config) {
@@ -4476,7 +4476,7 @@ std::expected<void, StarException> Player::addChatMessage(String const& message,
   if (!mouthResult)
     return std::unexpected(std::move(mouthResult.error()));
   auto mouth = std::move(*mouthResult);
-  m_pendingChatActions.append(SayChatAction{entityId(), message, mouth, config});
+  m_pendingChatActions.push_back(SayChatAction{entityId(), message, mouth, config});
   return {};
 }
 
@@ -4553,7 +4553,7 @@ std::expected<void, StarException> Player::interact(InteractAction const& action
   if constexpr (Star::DebugEnabled) {
     Star::starAssertFailed((!isSlave()));
   }
-  m_pendingInteractActions.append(RpcPromise<InteractAction>::createFulfilled(action));
+  m_pendingInteractActions.push_back(RpcPromise<InteractAction>::createFulfilled(action));
   return {};
 }
 
@@ -4843,7 +4843,7 @@ std::expected<std::optional<RadioMessage>, StarException> Player::pullPendingRad
   auto const& first = m_pendingRadioMessages[0];
   if (first.unique)
     m_log->addRadioMessage(first.messageId);
-  auto messageResult = m_pendingRadioMessages.takeFirst();
+  auto messageResult = m_pendingRadioMessages.take_front();
   if (!messageResult)
     return std::unexpected(std::move(messageResult.error()));
   auto message = std::move(*messageResult);
@@ -4930,7 +4930,7 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     }
   }
   if (delay > 0) {
-    m_delayedRadioMessages.append(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
+    m_delayedRadioMessages.push_back(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
     return {};
   }
   return queueRadioMessage(std::move(message));
@@ -4939,9 +4939,9 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
 std::expected<void, StarException> Player::queueRadioMessage(RadioMessage message) {
   if (message.important) {
     m_interruptRadioMessage = true;
-    m_pendingRadioMessages.prepend(message);
+    m_pendingRadioMessages.push_front(message);
   } else {
-    m_pendingRadioMessages.append(message);
+    m_pendingRadioMessages.push_back(message);
   }
   return {};
 }
@@ -4997,7 +4997,7 @@ void Player::setPendingWarp(String const& action, std::optional<String> const& a
 std::expected<std::optional<std::pair<Json, RpcPromiseKeeper<Json>>>, StarException> Player::pullPendingConfirmation() {
   if (m_pendingConfirmations.empty())
     return std::optional<std::pair<Json, RpcPromiseKeeper<Json>>>{};
-  auto confirmationResult = m_pendingConfirmations.takeFirst();
+  auto confirmationResult = m_pendingConfirmations.take_front();
   if (!confirmationResult)
     return std::unexpected(std::move(confirmationResult.error()));
   auto confirmation = std::move(*confirmationResult);
@@ -5005,7 +5005,7 @@ std::expected<std::optional<std::pair<Json, RpcPromiseKeeper<Json>>>, StarExcept
 }
 
 void Player::queueConfirmation(Json const& dialogConfig, RpcPromiseKeeper<Json> const& resultPromise) {
-  m_pendingConfirmations.append(std::make_pair(dialogConfig, resultPromise));
+  m_pendingConfirmations.push_back(std::make_pair(dialogConfig, resultPromise));
 }
 
 AiState const& Player::aiState() const {

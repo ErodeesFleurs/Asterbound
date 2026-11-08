@@ -299,7 +299,7 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     beamParticle.timeToLive = 0.25f;
     beamParticle.destructionAction = Particle::DestructionAction::Shrink;
     beamParticle.destructionTime = 0.2f;
-    beamLeftovers.append(std::move(beamParticle));
+    beamLeftovers.push_back(std::move(beamParticle));
   }
   // Capture world positions at the producing tick, not at display sampling or
   // a later owner position.

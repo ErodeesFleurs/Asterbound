@@ -95,7 +95,7 @@ std::expected<void, StarException> ScriptableThread::addCallbacks(String const& 
       }
       return std::unexpected(std::move(result.error()));
     }
-    changed.append(p.second);
+    changed.push_back(p.second);
   }
   m_threadCallbacks.insert(group, callbacks);
   return {};
@@ -128,7 +128,7 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
     auto removed = p.second->removeCallbacks(group);
     if (!removed)
       return rollback(std::move(removed.error()));
-    changed.append({.component = p.second, .callbacks = *removed, .threadCallbacks = false});
+    changed.push_back({.component = p.second, .callbacks = *removed, .threadCallbacks = false});
     auto removedThread = p.second->removeThreadCallbacks(group);
     if (!removedThread)
       return rollback(std::move(removedThread.error()));
@@ -205,7 +205,7 @@ std::expected<void, StarException> ScriptableThread::passMessage(Message&& messa
     return message.promise.fail("Thread failed");
   if (m_stopSource.stop_requested() || m_shouldExpire)
     return message.promise.cancel("Thread is stopped").transform([](bool) {});
-  m_messages.append(std::move(message));
+  m_messages.push_back(std::move(message));
   return {};
 }
 

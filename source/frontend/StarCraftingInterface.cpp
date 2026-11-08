@@ -389,7 +389,7 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
             ItemDescriptor::create(std::move(*ingredientName), std::move(*ingredientCount), {});
           if (!ingredientDescriptor)
             return std::unexpected(std::move(ingredientDescriptor.error()));
-          m_upgradeRecipe->inputs.append(std::move(*ingredientDescriptor));
+          m_upgradeRecipe->inputs.push_back(std::move(*ingredientDescriptor));
         }
         auto setVisibilityResult361 = upgradeButton->setVisibility(true);
         if (!setVisibilityResult361)
@@ -1537,7 +1537,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
               return std::unexpected(std::move(getConfigResult541.error()));
             if (auto objectConfig = std::move(*getConfigResult541)) {
               if (objectConfig->printable && itemDb->hasItem(itemName))
-                printableItems.append(itemName);
+                printableItems.push_back(itemName);
             }
           }
         }

@@ -169,13 +169,13 @@ std::expected<Json, StarException> TechController::diskStore() {
   JsonArray modules;
   if (m_overriddenTech) {
     for (auto const& name : *m_overriddenTech)
-      modules.append(JsonObject{{"module", name}, {"scriptData", JsonObject()}});
+      modules.push_back(JsonObject{{"module", name}, {"scriptData", JsonObject()}});
   } else {
     for (auto const& module : m_techModules) {
       auto storage = module.scriptComponent.getScriptStorage();
       if (!storage)
         return std::unexpected(std::move(storage.error()));
-      modules.append(JsonObject{{"module", module.config.name}, {"scriptData", std::move(*storage)}});
+      modules.push_back(JsonObject{{"module", module.config.name}, {"scriptData", std::move(*storage)}});
     }
   }
   return JsonObject{{"techModules", std::move(modules)}};
@@ -193,7 +193,7 @@ std::expected<void, StarException> TechController::diskLoad(Json const& store) {
     auto data = module.getObject("scriptData", {});
     if (!data)
       return std::unexpected(std::move(data.error()));
-    moduleInits.append(std::make_tuple(std::move(*name), std::move(*data)));
+    moduleInits.push_back(std::make_tuple(std::move(*name), std::move(*data)));
   }
   return setupTechModules(moduleInits);
 }
@@ -412,7 +412,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
         if (piece.second < 0.0f)
-          drawables.append(std::move(piece.first));
+          drawables.push_back(std::move(piece.first));
       }
     }
   }
@@ -431,7 +431,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
         if (piece.second >= 0.0f)
-          drawables.append(std::move(piece.first));
+          drawables.push_back(std::move(piece.first));
       }
     }
   }
@@ -448,7 +448,7 @@ std::expected<List<LightSource>, StarException> TechController::lightSources(flo
       auto lights = sample.lightSources(m_movementController->get().position());
       if (!lights)
         return std::unexpected(std::move(lights.error()));
-      lightSources.appendAll(std::move(*lights));
+      lightSources.append_range(std::move(*lights));
     }
   }
 
@@ -460,7 +460,7 @@ List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible())
-      newAudios.appendAll(animator->dynamicTarget.pullNewAudios());
+      newAudios.append_range(animator->dynamicTarget.pullNewAudios());
     else
       animator->dynamicTarget.pullNewAudios();
   }
@@ -473,7 +473,7 @@ List<Particle> TechController::pullNewParticles() {
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible())
-      newParticles.appendAll(animator->dynamicTarget.pullNewParticles());
+      newParticles.append_range(animator->dynamicTarget.pullNewParticles());
     else
       animator->dynamicTarget.pullNewParticles();
   }
@@ -618,7 +618,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
         return std::unexpected(std::move(image.error()));
       (*moduleAnimator)->animator->setPartTag(entry.first, "partImage", std::move(*image));
     }
-    auto& module = m_techModules.emplaceAppend(m_root);
+    auto& module = m_techModules.emplace_back(m_root);
     module.config = std::move(*config);
     module.visible = *visible;
     module.toolUsageSuppressed = false;

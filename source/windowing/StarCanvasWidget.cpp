@@ -95,7 +95,7 @@ void CanvasWidget::pushClipRect(RectF const& rect) {
     clipped.limit(std::get<PushClipOp>(m_renderOps[*m_clipHead]).rect);
   clipped = RectF(clipped.min(), clipped.max().piecewiseMax(clipped.min()));
   auto index = m_renderOps.size();
-  m_renderOps.append(PushClipOp{.rect = clipped, .parent = m_clipHead});
+  m_renderOps.push_back(PushClipOp{.rect = clipped, .parent = m_clipHead});
   m_clipHead = index;
 }
 
@@ -106,21 +106,21 @@ std::expected<void, StarException> CanvasWidget::popClipRect() {
   std::optional<RectF> restored;
   if (parent)
     restored = std::get<PushClipOp>(m_renderOps[*parent]).rect;
-  m_renderOps.append(PopClipOp{restored});
+  m_renderOps.push_back(PopClipOp{restored});
   m_clipHead = parent;
   return {};
 }
 
 void CanvasWidget::drawImage(String texName, Vec2F const& position, float scale, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(std::move(texName), position, scale, color, false));
+  m_renderOps.push_back(std::make_tuple(std::move(texName), position, scale, color, false));
 }
 
 void CanvasWidget::drawImageCentered(String texName, Vec2F const& position, float scale, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(std::move(texName), position, scale, color, true));
+  m_renderOps.push_back(std::make_tuple(std::move(texName), position, scale, color, true));
 }
 
 void CanvasWidget::drawImageRect(String texName, RectF const& texCoords, RectF const& screenCoords, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(std::move(texName), texCoords, screenCoords, color));
+  m_renderOps.push_back(std::make_tuple(std::move(texName), texCoords, screenCoords, color));
 }
 
 void CanvasWidget::drawDrawable(Drawable drawable, Vec2F const& screenPos, float scale, Vec2F const& translation, float finalScale) {
@@ -130,7 +130,7 @@ void CanvasWidget::drawDrawable(Drawable drawable, Vec2F const& screenPos, float
     drawable.scale(scale);
   if (finalScale != 1)
     drawable.scale(finalScale);
-  m_renderOps.append(std::make_tuple(std::move(drawable), screenPos));
+  m_renderOps.push_back(std::make_tuple(std::move(drawable), screenPos));
 }
 
 void CanvasWidget::drawDrawables(List<Drawable> drawables, Vec2F const& screenPos, float scale, Vec2F const& translation, float finalScale) {
@@ -139,23 +139,23 @@ void CanvasWidget::drawDrawables(List<Drawable> drawables, Vec2F const& screenPo
 }
 
 void CanvasWidget::drawTiledImage(String texName, float textureScale, Vec2D const& offset, RectF const& screenCoords, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(std::move(texName), textureScale, offset, screenCoords, color));
+  m_renderOps.push_back(std::make_tuple(std::move(texName), textureScale, offset, screenCoords, color));
 }
 
 void CanvasWidget::drawLine(Vec2F const& begin, Vec2F const end, Vec4B const& color, float lineWidth) {
-  m_renderOps.append(std::make_tuple(begin, end, color, lineWidth));
+  m_renderOps.push_back(std::make_tuple(begin, end, color, lineWidth));
 }
 
 void CanvasWidget::drawRect(RectF const& coords, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(coords, color));
+  m_renderOps.push_back(std::make_tuple(coords, color));
 }
 
 void CanvasWidget::drawPoly(PolyF const& poly, Vec4B const& color, float lineWidth) {
-  m_renderOps.append(std::make_tuple(poly, color, lineWidth));
+  m_renderOps.push_back(std::make_tuple(poly, color, lineWidth));
 }
 
 void CanvasWidget::drawTriangles(List<std::tuple<Vec2F, Vec2F, Vec2F>> const& triangles, Vec4B const& color) {
-  m_renderOps.append(std::make_tuple(triangles, color));
+  m_renderOps.push_back(std::make_tuple(triangles, color));
 }
 
 void CanvasWidget::drawText(String s, TextPositioning position, unsigned fontSize, Vec4B const& color, FontMode mode, float lineSpacing, String font, String processingDirectives) {
@@ -166,11 +166,11 @@ void CanvasWidget::drawText(String s, TextPositioning position, unsigned fontSiz
   style.lineSpacing = lineSpacing;
   style.font = std::move(font);
   style.directives = processingDirectives;
-  m_renderOps.append(std::make_tuple(std::move(s), std::move(position), std::move(style)));
+  m_renderOps.push_back(std::make_tuple(std::move(s), std::move(position), std::move(style)));
 }
 
 void CanvasWidget::drawText(String s, TextPositioning position, TextStyle style) {
-  m_renderOps.append(std::make_tuple(std::move(s), std::move(position), std::move(style)));
+  m_renderOps.push_back(std::make_tuple(std::move(s), std::move(position), std::move(style)));
 }
 
 std::expected<RectF, StarException> CanvasWidget::measureText(String const& s, TextPositioning const& position, TextStyle const& style) const {
@@ -204,19 +204,19 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
   if (std::holds_alternative<MouseButtonDownEvent>(event)) {
     auto const& mouseButtonDown = std::get<MouseButtonDownEvent>(event);
     if (inMember(*context.mousePosition(event, interfaceScale)) && m_captureMouse) {
-      m_clickEvents.append({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
-                            .button = mouseButtonDown.mouseButton,
-                            .buttonDown = true});
-      m_clickEvents.limitSizeBack(MaximumEventBuffer);
+      m_clickEvents.push_back({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
+                               .button = mouseButtonDown.mouseButton,
+                               .buttonDown = true});
+      m_clickEvents.truncate_back(MaximumEventBuffer);
       return true;
     }
   } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
     auto const& mouseButtonUp = std::get<MouseButtonUpEvent>(event);
     if (m_captureMouse) {
-      m_clickEvents.append({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
-                            .button = mouseButtonUp.mouseButton,
-                            .buttonDown = false});
-      m_clickEvents.limitSizeBack(MaximumEventBuffer);
+      m_clickEvents.push_back({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
+                               .button = mouseButtonUp.mouseButton,
+                               .buttonDown = false});
+      m_clickEvents.truncate_back(MaximumEventBuffer);
       return true;
     }
   } else if (std::holds_alternative<MouseMoveEvent>(event)) {
@@ -225,14 +225,14 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
   } else if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
     if (m_captureKeyboard) {
-      m_keyEvents.append({.key = keyDown.key, .keyDown = true});
+      m_keyEvents.push_back({.key = keyDown.key, .keyDown = true});
       return true;
     }
   } else if (std::holds_alternative<KeyUpEvent>(event)) {
     auto const& keyUp = std::get<KeyUpEvent>(event);
     if (m_captureKeyboard) {
-      m_keyEvents.append({.key = keyUp.key, .keyDown = false});
-      m_keyEvents.limitSizeBack(MaximumEventBuffer);
+      m_keyEvents.push_back({.key = keyUp.key, .keyDown = false});
+      m_keyEvents.truncate_back(MaximumEventBuffer);
       return true;
     }
   }

@@ -65,7 +65,7 @@ std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::
   StringList arguments;
   arguments.reserve(argc > 0 ? static_cast<std::size_t>(argc - 1) : 0);
   for (int i = 1; i < argc; ++i)
-    arguments.append(String(std::string_view(argv[i])));
+    arguments.push_back(String(std::string_view(argv[i])));
   return parseOrDie(arguments);
 }
 

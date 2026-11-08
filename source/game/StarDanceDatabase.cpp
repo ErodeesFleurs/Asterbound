@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
     auto value = state.toString();
     if (!value)
       return std::unexpected(std::move(value.error()));
-    dance->states.append(std::move(*value));
+    dance->states.push_back(std::move(*value));
   }
   auto cycle = config->getFloat("cycle");
   if (!cycle)
@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
       result.frontArmRotation = rotation->value_or(0.0f);
       result.backArmRotation = rotation->value_or(0.0f);
     }
-    dance->steps.append(std::move(result));
+    dance->steps.push_back(std::move(result));
   }
   return dance;
   }();

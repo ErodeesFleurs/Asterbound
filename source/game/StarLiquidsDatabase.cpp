@@ -187,7 +187,9 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
         }
         entry->interactions[static_cast<LiquidId>(*liquid)] = std::move(interactionResult);
       }
-      result->m_settings.set(entry->id, entry);
+      auto stored = result->m_settings.set(entry->id, entry);
+      if (!stored)
+        return std::unexpected(std::move(stored.error()));
       auto added = result->m_liquidNames.add(entry->name, entry->id);
       if (!added)
         return std::unexpected(std::move(added.error()));

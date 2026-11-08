@@ -104,7 +104,7 @@ std::expected<List<std::shared_ptr<Tenant>>, StarException> TenantDatabase::getM
     if (!tenant)
       return std::unexpected(std::move(tenant.error()));
     if ((*tenant)->criteriaSatisfied(colonyTags))
-      matchingTenants.append(std::move(*tenant));
+      matchingTenants.push_back(std::move(*tenant));
   }
   return matchingTenants;
 }
@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
       if (!overrides)
         return std::unexpected(std::move(overrides.error()));
       if (*spawn == "monster") {
-        tenants.append(TenantMonsterSpawnable{*type, *level, *overrides});
+        tenants.push_back(TenantMonsterSpawnable{*type, *level, *overrides});
       } else {
         if (*spawn != "npc")
           return std::unexpected(TenantException::format("Unknown tenant spawn type '{}'", *spawn));
@@ -164,15 +164,15 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
             auto value = entry.toString();
             if (!value)
               return std::unexpected(std::move(value.error()));
-            species.append(std::move(*value));
+            species.push_back(std::move(*value));
           }
         } else {
           auto value = speciesConfig->toString();
           if (!value)
             return std::unexpected(std::move(value.error()));
-          species.append(std::move(*value));
+          species.push_back(std::move(*value));
         }
-        tenants.append(TenantNpcSpawnable{std::move(species), *type, *level, *overrides});
+        tenants.push_back(TenantNpcSpawnable{std::move(species), *type, *level, *overrides});
       }
     }
     auto rentConfig = config->opt("rent");

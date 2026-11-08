@@ -896,7 +896,7 @@ namespace LuaBindings {
           auto biome = std::move(*biomeResult);
           if (biome) {
           List<MaterialId> blocks = {biome->mainBlock};
-          blocks.appendAll(biome->subBlocks);
+          blocks.append_range(biome->subBlocks);
           return blocks;
           }
         }
@@ -1249,7 +1249,7 @@ namespace LuaBindings {
           if (!distributionResult)
             return std::unexpected(std::move(distributionResult.error()));
           auto distribution = std::move(*distributionResult);
-          distributions.append(std::move(distribution));
+          distributions.push_back(std::move(distribution));
         }
         return serverWorld->get().enqueuePlacement(std::move(distributions), id);
       }); !result)
@@ -2060,7 +2060,7 @@ namespace LuaBindings {
             List<Vec2I> tiles;
             for (auto const& tile : tileAreaBrush(radius, center, false)) {
               if (world.material(tile, layer) != EmptyMaterialId)
-                tiles.append(tile);
+                tiles.push_back(tile);
             }
             return tiles;
           });
@@ -2415,7 +2415,7 @@ namespace LuaBindings {
     auto blocksResult = world.forEachCollisionBlock(RectI::integral(poly.boundBox().padded(maximumCorrection + 1.0f)),
         [&](auto const& block) -> std::expected<void, StarException> {
           if (collisionSet.contains(block.kind))
-            collisions.append({block.poly, Vec2F(block.space), 0.0f});
+            collisions.push_back({block.poly, Vec2F(block.space), 0.0f});
           return {};
         });
     if (!blocksResult)
@@ -2483,7 +2483,7 @@ namespace LuaBindings {
           return std::unexpected(std::move(liquidLevelResult.error()));
         auto liquidLevel = std::move(*liquidLevelResult);
         if (liquidLevel.liquid != EmptyLiquidId)
-          levels.append(std::pair<Vec2I, LiquidLevel>(Vec2I(x, y), liquidLevel));
+          levels.push_back(std::pair<Vec2I, LiquidLevel>(Vec2I(x, y), liquidLevel));
         return true;
       });
     if (!traversed)
@@ -2597,7 +2597,7 @@ namespace LuaBindings {
         if (!entityResult)
           return std::unexpected(std::move(entityResult.error()));
         auto entity = std::move(*entityResult);
-        entities.append(entity->entityId());
+        entities.push_back(entity->entityId());
         if (auto operation = world.addEntity(entity); !operation)
           return std::unexpected(std::move(operation.error()));
       }
@@ -3458,7 +3458,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
       for (auto const& item : container->itemBag()->items())
-        res.append(itemDb->toJson(item));
+        res.push_back(itemDb->toJson(item));
       return res;
     }
 
@@ -3540,7 +3540,7 @@ namespace LuaBindings {
       if (itemList) {
         JsonArray res;
         for (auto const& item : *itemList)
-          res.append(itemDb->toJson(item));
+          res.push_back(itemDb->toJson(item));
         return res;
       }
     }
@@ -4154,7 +4154,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
       auto connectable = std::move(*connectableResult);
       if (!connectable)
         continue;
-      modifications.emplaceAppend(pos, placeMaterial);
+      modifications.emplace_back(pos, placeMaterial);
     }
 
     if (modifications.empty())

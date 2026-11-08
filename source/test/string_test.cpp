@@ -368,7 +368,7 @@ TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
   String source(std::string_view(inputBytes, sizeof(inputBytes) - 1));
   StringList visited;
   auto result = source.lookupTags([&](String const& key) -> std::expected<String, StarException> {
-    visited.append(key);
+    visited.push_back(key);
     if (key == "one")
       return String(std::string_view("x\0y", 3));
     if (key == "two")
@@ -380,13 +380,12 @@ TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
   EXPECT_EQ(visited, (StringList{"one", "two"}));
 
   visited.clear();
-  auto failed = String("<one><bad><later>").lookupTags(
-      [&](String const& key) -> std::expected<String, StarException> {
-        visited.append(key);
-        if (key == "bad")
-          return std::unexpected(OutOfRangeException("Tag lookup failure", false));
-        return key;
-      });
+  auto failed = String("<one><bad><later>").lookupTags([&](String const& key) -> std::expected<String, StarException> {
+    visited.push_back(key);
+    if (key == "bad")
+      return std::unexpected(OutOfRangeException("Tag lookup failure", false));
+    return key;
+  });
   ASSERT_FALSE(failed);
   EXPECT_TRUE(failed.error().is<OutOfRangeException>());
   EXPECT_EQ(visited, (StringList{"one", "bad"}));
@@ -532,7 +531,7 @@ TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues
 TEST(StringTest, FixedEnumNamesPreserveEnumSortedIterationAndText) {
   StringList modifiers;
   for (auto const& [value, name] : KeyModNames)
-    modifiers.append(String(name));
+    modifiers.push_back(String(name));
   EXPECT_EQ(modifiers, (StringList{"NoMod", "LShift", "RShift", "LCtrl", "RCtrl",
       "LAlt", "RAlt", "LMeta", "RMeta", "Num", "Caps", "AltGr"}));
   EXPECT_EQ(modifiers.join(" + "),
@@ -540,7 +539,7 @@ TEST(StringTest, FixedEnumNamesPreserveEnumSortedIterationAndText) {
   StringList tail;
   for (auto const& [value, name] : KeyNames)
     if (value >= Key::NumLock)
-      tail.append(String(name));
+      tail.push_back(String(name));
   EXPECT_EQ(tail, (StringList{"NumLock", "CapsLock", "ScrollLock", "RShift", "LShift",
       "RCtrl", "LCtrl", "RAlt", "LAlt", "RGui", "LGui", "AltGr", "Compose", "Help",
       "PrintScreen", "SysReq", "Pause", "Menu", "Power", "F16", "F17", "F18", "F19",

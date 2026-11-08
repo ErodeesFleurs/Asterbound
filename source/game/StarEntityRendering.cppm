@@ -94,7 +94,7 @@ public:
   std::expected<void, StarException> addParticle(Particle) override { return {}; }
   std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
     if (m_deferredLoops && audio->loops() != 0)
-      m_deferredLoops->append(std::move(audio));
+      m_deferredLoops->push_back(std::move(audio));
     return {};
   }
   std::expected<void, StarException> addTilePreview(PreviewTile) override { return {}; }

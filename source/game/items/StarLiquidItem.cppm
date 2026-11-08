@@ -245,7 +245,7 @@ std::expected<void, StarException> LiquidItem::fire(FireMode mode, bool shifting
     if (!placeable)
       return std::unexpected(std::move(placeable.error()));
     if (*placeable)
-      modifications.append({pos, placeLiquid});
+      modifications.push_back({pos, placeLiquid});
   }
   // Cap the batch before submitting or consuming.
   if (modifications.size() > count())
@@ -295,7 +295,7 @@ std::expected<List<PreviewTile>, StarException> LiquidItem::previewTiles(bool sh
         return std::unexpected(std::move(placeable.error()));
       if (*placeable)
         c++;
-      result.append({pos, liquid});
+      result.push_back({pos, liquid});
     }
   }
   return result;

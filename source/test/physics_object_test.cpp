@@ -50,7 +50,7 @@ const GameTestRegistration
     orientation->config = JsonObject();
     orientation->boundBox = RectI(0, 0, 0, 0);
     orientation->metaBoundBox = RectF(-1, -1, 1, 1);
-    config->orientations.append(orientation);
+    config->orientations.push_back(orientation);
 
     auto forceConfig = Json::parse(R"({
     "directional": {

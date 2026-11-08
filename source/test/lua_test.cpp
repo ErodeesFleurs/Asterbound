@@ -540,7 +540,7 @@ TEST(LuaTest, ArrayTest) {
   ASSERT_TRUE((arrayTable.iterate([&values](LuaValue const& key, LuaValue const& value) -> std::expected<void, StarException> {
     if (!std::holds_alternative<LuaInt>(key) || !std::holds_alternative<LuaInt>(value))
       return std::unexpected(LuaConversionException("Expected integer array key and value"));
-    values.append({std::get<LuaInt>(key), std::get<LuaInt>(value)});
+    values.push_back({std::get<LuaInt>(key), std::get<LuaInt>(value)});
     return {};
   })));
   List<std::pair<int, int>> compare = {{1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 10}};

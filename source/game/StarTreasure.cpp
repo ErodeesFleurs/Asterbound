@@ -165,7 +165,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           auto parsed = parseEntry(fillEntry);
           if (!parsed)
             return std::unexpected(std::move(parsed.error()));
-          itemPool.fill.append(std::move(*parsed));
+          itemPool.fill.push_back(std::move(*parsed));
         }
         auto pool = config->getArray("pool", {});
         if (!pool)
@@ -250,7 +250,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
         chest.minimumLevel = *minimumLevel;
         if (!database->m_treasurePools.contains(chest.treasurePool))
           return std::unexpected(TreasureException::format("No such TreasurePool '{}' for TreasureChestSet named '{}' in file '{}'", chest.treasurePool, pair.first, file));
-        chestSet.append(std::move(chest));
+        chestSet.push_back(std::move(chest));
       }
     }
   }
@@ -318,7 +318,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
         return std::unexpected(std::move(poolContents.error()));
       for (auto const& item : *poolContents) {
         if (itemPool.allowDuplication || previousDescriptors.add(item->descriptor().singular()))
-          treasureItems.append(item);
+          treasureItems.push_back(item);
       }
     } else {
       float itemLevel = level + itemPool.levelVariance[0]
@@ -328,7 +328,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
       if (!fillItem)
         return std::unexpected(std::move(fillItem.error()));
       if (itemPool.allowDuplication || previousDescriptors.add((*fillItem)->descriptor().singular()))
-        treasureItems.append(std::move(*fillItem));
+        treasureItems.push_back(std::move(*fillItem));
     }
   }
 
@@ -346,7 +346,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
           return std::unexpected(std::move(poolContents.error()));
         for (auto const& item : *poolContents) {
           if (itemPool.allowDuplication || previousDescriptors.add(item->descriptor().singular()))
-            treasureItems.append(item);
+            treasureItems.push_back(item);
         }
       } else {
         float itemLevel = level + itemPool.levelVariance[0]
@@ -357,7 +357,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
           auto item = itemCatalog->get().item(roundItem, itemLevel, seed + ++mix);
           if (!item)
             return std::unexpected(std::move(item.error()));
-          treasureItems.append(std::move(*item));
+          treasureItems.push_back(std::move(*item));
         }
       }
     }
@@ -382,7 +382,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::fill
     if (!overflow)
       return std::unexpected(std::move(overflow.error()));
     if (*overflow)
-      overflowItems.append(std::move(*overflow));
+      overflowItems.push_back(std::move(*overflow));
   }
   return overflowItems;
 }

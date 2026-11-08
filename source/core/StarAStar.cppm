@@ -337,7 +337,7 @@ namespace AStar {
       auto const& incomingEdge = m_nodeMeta[currentNode].cameFrom;
       if (!incomingEdge)
         break;
-      path.append(*incomingEdge);
+      path.push_back(*incomingEdge);
       currentNode = incomingEdge->source;
     }
     std::reverse(path.begin(), path.end());

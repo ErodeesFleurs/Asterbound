@@ -244,12 +244,12 @@ void CellularLightArray<LightTraits>::begin(std::size_t newWidth, std::size_t ne
 
 template <typename LightTraits>
 void CellularLightArray<LightTraits>::addSpreadLight(SpreadLight const& spreadLight) {
-  m_spreadLights.append(spreadLight);
+  m_spreadLights.push_back(spreadLight);
 }
 
 template <typename LightTraits>
 void CellularLightArray<LightTraits>::addPointLight(PointLight const& pointLight) {
-  m_pointLights.append(pointLight);
+  m_pointLights.push_back(pointLight);
 }
 
 template <typename LightTraits>

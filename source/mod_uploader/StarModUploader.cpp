@@ -312,7 +312,7 @@ std::expected<void, StarException> ModUploader::writeMetadataImpl() {
   StringList tags;
   for (auto const& pair : m_categorySelectors) {
     if (pair.second->isChecked())
-      tags.append(pair.first);
+      tags.push_back(pair.first);
   }
   setMetadata("tags", tags.join("|"));
   return m_assetSource->setMetadata(std::move(metadata));
@@ -462,12 +462,12 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     StringList tags;
     for (auto const& entry : m_categorySelectors) {
       if (entry.second->isChecked())
-        tags.append(entry.first);
+        tags.push_back(entry.first);
     }
     List<char const*> tagStrings(tags.size(), nullptr);
     for (std::size_t i = 0; i < tags.size(); ++i)
       tagStrings[i] = tags[i].utf8Ptr();
-    SteamParamStringArray_t itemTags = {tagStrings.ptr(), static_cast<std::int32_t>(tags.size())};
+    SteamParamStringArray_t itemTags = {tagStrings.data(), static_cast<std::int32_t>(tags.size())};
     if (!SteamAPI_ISteamUGC_SetItemTags(SteamAPI_SteamUGC(), updateHandle, &itemTags, false))
       return std::unexpected(StarException("Steam rejected the item tags"));
 

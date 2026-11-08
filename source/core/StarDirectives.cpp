@@ -370,7 +370,7 @@ std::expected<void, StarException> DirectivesGroup::applyExistingImage(Image& im
     // Accepted group prefixes only promote 24-bit input, already done by any
     // preceding executable operation. Omit redundant prefixes across groups.
     if (!std::holds_alternative<NullImageOperation>(operation) || operations.empty())
-      operations.append(&operation);
+      operations.push_back(&operation);
     first = false;
     return {};
   });

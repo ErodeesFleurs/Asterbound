@@ -281,7 +281,7 @@ std::expected<std::shared_ptr<Parallax>, StarException> Parallax::create(Root& r
   for (auto const& layer : *layers) {
     auto loaded = ParallaxLayer::create(layer);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
-    result->m_layers.append(std::move(*loaded));
+    result->m_layers.push_back(std::move(*loaded));
   }
   std::stable_sort(result->m_layers.begin(), result->m_layers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) { return a.zLevel > b.zLevel; });
   return result;
@@ -359,14 +359,14 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(baseCount.error()));
   int baseCountValue = *baseCount;
   int base = rnd.randInt(baseCountValue - 1) + 1;
-  layer.textures.append(AssetPath::relative_to(texPath, "base/" + toString<int>(base) + ".png"));
+  layer.textures.push_back(AssetPath::relative_to(texPath, "base/" + toString<int>(base) + ".png"));
   auto modCount = layerSettings.getInt("modCount", 0);
   if (!modCount)
     return std::unexpected(std::move(modCount.error()));
   int modCountValue = *modCount;
   int mod = rnd.randInt(modCountValue);
   if (mod != 0)
-    layer.textures.append(AssetPath::relative_to(texPath, "mod/" + toString<int>(mod) + ".png"));
+    layer.textures.push_back(AssetPath::relative_to(texPath, "mod/" + toString<int>(mod) + ".png"));
 
   auto parallaxConfig = layerSettings.get("parallax");
   if (!parallaxConfig)
@@ -508,7 +508,7 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(animationCycle.error()));
   layer.animationCycle = *animationCycle;
 
-  m_layers.append(std::move(layer));
+  m_layers.push_back(std::move(layer));
   return {};
 }
 

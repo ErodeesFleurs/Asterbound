@@ -157,7 +157,7 @@ std::expected<List<std::pair<Vec3I, OrbitBookmark>>, StarException> PlayerUniver
     return std::unexpected(std::move(map.error()));
   for (auto const& pair : map->get().systems)
     for (auto const& bookmark : pair.second.bookmarks)
-      bookmarks.append({pair.first, bookmark});
+      bookmarks.push_back({pair.first, bookmark});
   return bookmarks;
 }
 
@@ -253,7 +253,7 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::planetBookm
         if (!targetOrbit)
           return std::unexpected(std::move(targetOrbit.error()));
         if (*bookmarkOrbit == *targetOrbit)
-          bookmarks.append(bookmark);
+          bookmarks.push_back(bookmark);
       }
     }
   }
@@ -384,7 +384,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
 std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const {
   JsonArray planets;
   for (auto const& planet : mappedPlanets)
-    planets.append(planet.toJson());
+    planets.push_back(planet.toJson());
   JsonObject objects;
   for (auto const& pair : mappedObjects) {
     auto orbit = jsonFromOptional<CelestialOrbit>(pair.second.orbit, [](CelestialOrbit const& value) { return value.toJson(); });
@@ -398,7 +398,7 @@ std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const 
     auto stored = bookmark.toJson();
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    storedBookmarks.append(std::move(*stored));
+    storedBookmarks.push_back(std::move(*stored));
   }
   return JsonObject{{"mappedPlanets", std::move(planets)}, {"mappedObjects", std::move(objects)},
       {"bookmarks", std::move(storedBookmarks)}};
@@ -442,14 +442,14 @@ std::expected<Json, StarException> PlayerUniverseMap::UniverseMap::toJson() cons
     auto system = pair.second.toJson();
     if (!system)
       return std::unexpected(std::move(system.error()));
-    storedSystems.append(JsonArray{jsonFromVec3I(pair.first), std::move(*system)});
+    storedSystems.push_back(JsonArray{jsonFromVec3I(pair.first), std::move(*system)});
   }
   JsonArray bookmarks;
   for (auto const& bookmark : teleportBookmarks) {
     auto stored = bookmark.toJson();
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    bookmarks.append(std::move(*stored));
+    bookmarks.push_back(std::move(*stored));
   }
   return JsonObject{{"systems", std::move(storedSystems)}, {"teleportBookmarks", std::move(bookmarks)}};
 }

@@ -326,7 +326,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      target.get().append(std::move(*effect));
+      target.get().push_back(std::move(*effect));
     }
   }
   auto leveled = instanceValue("leveledStatusEffects", Json());
@@ -364,7 +364,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
         auto& modifier = std::get<StatEffectiveMultiplier>(*statModifier);
         modifier.effectiveMultiplier = 1 + (modifier.effectiveMultiplier - 1) * *factor;
       }
-      m_statusEffects.append(std::move(*statModifier));
+      m_statusEffects.push_back(std::move(*statModifier));
     }
   }
   auto augment = instanceValue("currentAugment", Json());
@@ -378,7 +378,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      m_statusEffects.append(std::move(*effect));
+      m_statusEffects.push_back(std::move(*effect));
     }
   }
   return {};

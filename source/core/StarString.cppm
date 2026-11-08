@@ -309,6 +309,7 @@ private:
 
 
 class StringList : public List<String> {
+  // Retain a concrete owning string sequence for text-specific operations and codecs.
 public:
   using Base = List<String>;
 
@@ -331,9 +332,9 @@ public:
   explicit StringList(std::size_t len, String const& s1 = String());
   StringList(std::initializer_list<String> list);
 
-  template <typename InputIterator>
-  StringList(InputIterator beg, InputIterator end)
-    : Base(beg, end) {}
+  template <std::input_iterator InputIterator>
+    requires std::constructible_from<String, std::iter_reference_t<InputIterator>>
+  StringList(InputIterator beg, InputIterator end) : Base(beg, end) {}
 
   StringList& operator=(Base const& rhs);
   StringList& operator=(Base&& rhs);
@@ -348,6 +349,7 @@ public:
   [[nodiscard]] std::expected<StringList, StarException> slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
 
   template <typename Comparator>
+    requires requires(List<String>& list, Comparator&& compare) { list.sort(std::forward<Comparator>(compare)); }
   StringList sorted(Comparator&& comparator) const;
 
   StringList sorted() const;
@@ -579,12 +581,12 @@ StringList StringList::from(Container const& m) {
 }
 
 template <typename Comparator>
+  requires requires(List<String>& list, Comparator&& compare) { list.sort(std::forward<Comparator>(compare)); }
 StringList StringList::sorted(Comparator&& comparator) const {
   StringList l(*this);
   l.sort(std::forward<Comparator>(comparator));
   return l;
 }
-
 }
 
 export module star.string;

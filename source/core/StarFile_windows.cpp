@@ -179,8 +179,8 @@ std::expected<List<std::pair<String, bool>>, StarException> File::directory_entr
   List<std::pair<String, bool>> files;
   // Windows root directories do not expose the special dot entries.
   if (!skipDots && path != path.root_path()) {
-    files.append({".", true});
-    files.append({"..", true});
+    files.push_back({".", true});
+    files.push_back({"..", true});
   }
   for (std::filesystem::directory_iterator end; entry != end; entry.increment(error)) {
     if (error)
@@ -190,7 +190,8 @@ std::expected<List<std::pair<String, bool>>, StarException> File::directory_entr
       return std::unexpected(std::move(name.error()));
     // Keep Windows' directory-reparse-point classification, even for a broken link.
     auto attributes = GetFileAttributesW(entry->path().c_str());
-    files.append({std::move(*name), attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)});
+    files.push_back(
+      {std::move(*name), attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)});
   }
   if (error)
     return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));

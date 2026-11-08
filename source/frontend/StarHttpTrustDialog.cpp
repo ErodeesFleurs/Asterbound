@@ -150,7 +150,7 @@ std::expected<void, StarException> HttpTrustDialog::reply(HttpTrustReply replyTy
       }
     }
     if (!exists) {
-      trustedSites.append(m_domain);
+      trustedSites.push_back(m_domain);
       auto saved = (*config)->setPath("safe.luaHttp.trustedSites", trustedSites);
       if (!saved)
         return std::unexpected(std::move(saved.error()));

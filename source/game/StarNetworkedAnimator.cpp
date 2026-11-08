@@ -626,7 +626,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       if (!offset) return std::unexpected(std::move(offset.error()));
       auto flip = particleConfig.getBool("flip", false);
       if (!flip) return std::unexpected(std::move(flip.error()));
-      emitter.particleList.append({*creator, static_cast<unsigned>(*count), *offset, *flip});
+      emitter.particleList.push_back({*creator, static_cast<unsigned>(*count), *offset, *flip});
     }
     auto burstCount = particleEmitterConfig.getUInt("burstCount", 1);
     if (!burstCount) return std::unexpected(std::move(burstCount.error()));
@@ -1117,7 +1117,7 @@ void NetworkedAnimator::setPartDrawables(String const& partName, List<Drawable> 
   m_partDrawables.set(partName, std::move(drawables));
 }
 void NetworkedAnimator::addPartDrawables(String const& partName, List<Drawable> drawables) {
-  m_partDrawables[partName].appendAll(drawables);
+  m_partDrawables[partName].append_range(drawables);
 }
 std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(String const& partName, String apply, Sample const* sample) const {
   HashMap<String, String> animationTags = m_localTags;
@@ -1530,7 +1530,7 @@ std::expected<List<Drawable>, StarException> NetworkedAnimator::queryDrawables(V
   auto rendered = queryDrawablesWithZLevel(position, sample);
   if (!rendered) return std::unexpected(std::move(rendered.error()));
   for (auto& p : *rendered)
-    drawables.append(std::move(p.first));
+    drawables.push_back(std::move(p.first));
   return drawables;
 }
 
@@ -1547,10 +1547,10 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       auto const& effect = pair.second;
       if (effect.type == "flash") {
         if (effectState.timer > effect.time / 2) {
-          baseProcessingDirectives.append(effect.directives);
+          baseProcessingDirectives.push_back(effect.directives);
         }
       } else if (effect.type == "directive") {
-        baseProcessingDirectives.append(effect.directives);
+        baseProcessingDirectives.push_back(effect.directives);
       } else {
         return std::unexpected(NetworkedAnimatorException(strf("No such NetworkedAnimator effect type '{}'", effect.type)));
       }
@@ -1619,7 +1619,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
 
     if (auto drawables = partDrawables(partName, sample))
       drawableCount += drawables->size();
-    parts.append(std::make_tuple(std::cref(activePart), std::cref(partName), maybeZLevel.value_or(0.0f)));
+    parts.push_back(std::make_tuple(std::cref(activePart), std::cref(partName), maybeZLevel.value_or(0.0f)));
     return {};
   }, sample ? &sample->m_presentation->parts : nullptr);
   if (!collected) return std::unexpected(std::move(collected.error()));
@@ -1678,7 +1678,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
         });
       }
       if (!directives) return std::unexpected(NetworkedAnimatorException("Processing directives tag lookup produced no value"));
-      baseProcessingDirectives.append(*directives);
+      baseProcessingDirectives.push_back(*directives);
     }
 
     std::optional<unsigned> frame;
@@ -1706,7 +1706,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
           });
         }
         if (!directives) return std::unexpected(NetworkedAnimatorException("Processing directives tag lookup produced no value"));
-        baseProcessingDirectives.append(*directives);
+        baseProcessingDirectives.push_back(*directives);
       }
     }
 
@@ -1771,14 +1771,14 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       }
       drawable.fullbright = fullbright;
       drawable.transform(transformation);
-      drawables.append({std::move(drawable), std::get<2>(entry)});
+      drawables.push_back({std::move(drawable), std::get<2>(entry)});
     }
 
     if (auto attached = partDrawables(partName, sample)) {
       for (auto const& attachedDrawable : *attached) {
         Drawable drawable = attachedDrawable;
         drawable.transform(transformation);
-        drawables.append({std::move(drawable), std::get<2>(entry)});
+        drawables.push_back({std::move(drawable), std::get<2>(entry)});
       }
     }
 
@@ -1828,14 +1828,9 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
     if (pair.second.flicker)
       color.setValue(std::clamp(color.value() * pair.second.flicker->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
-    lightSources.append(LightSource{
-      position + translate,
-      color.toRgbF(),
-      pair.second.pointLight ? LightType::Point : LightType::Spread,
-      pair.second.pointBeam,
-      pointAngle,
-      pair.second.beamAmbience
-    });
+    lightSources.push_back(LightSource{position + translate, color.toRgbF(),
+                                       pair.second.pointLight ? LightType::Point : LightType::Spread,
+                                       pair.second.pointBeam, pointAngle, pair.second.beamAmbience});
   }
   return lightSources;
 }
@@ -1892,7 +1887,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).toFloat();
             if (!stopTime) return std::unexpected(std::move(stopTime.error()));
             activePersistentSound.stopRampTime = *stopTime;
-            dynamicTarget->get().pendingAudios.append(activePersistentSound.audio);
+            dynamicTarget->get().pendingAudios.push_back(activePersistentSound.audio);
           } else {
             dynamicTarget->get().statePersistentSounds.remove(stateTypeName);
           }
@@ -1933,7 +1928,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             if (!range) return std::unexpected(std::move(range.error()));
             activeImmediateSound.audio->setRangeMultiplier(*range);
             activeImmediateSound.audio->setPosition(globalTransformation().transformVec2(Vec2F()));
-            dynamicTarget->get().pendingAudios.append(activeImmediateSound.audio);
+            dynamicTarget->get().pendingAudios.push_back(activeImmediateSound.audio);
           }
         }
       }
@@ -2031,7 +2026,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           particle.rotation += std::numbers::pi;
         }
 
-        dynamicTarget->get().pendingParticles.append(std::move(particle));
+        dynamicTarget->get().pendingParticles.push_back(std::move(particle));
       }
     };
 
@@ -2118,8 +2113,8 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             sound->setPosition(globalTransformation().transformVec2(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
             sound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
             sound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());
-            dynamicTarget->get().independentSounds[soundName].append(sound);
-            dynamicTarget->get().pendingAudios.append(std::move(sound));
+            dynamicTarget->get().independentSounds[soundName].push_back(sound);
+            dynamicTarget->get().pendingAudios.push_back(std::move(sound));
           }
         }
       }

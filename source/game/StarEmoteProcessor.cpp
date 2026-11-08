@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
       EmoteBinding value;
       value.emote = emote->get();
       value.text = std::move(*string);
-      result->m_emoteBindings.append(std::move(value));
+      result->m_emoteBindings.push_back(std::move(value));
     }
   }
   return result;

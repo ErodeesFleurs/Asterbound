@@ -121,11 +121,11 @@ BubbleFixture bubbleFixture() {
   for (int i = 0; i < 64; ++i) {
     float x = float((i % 8) * 9 - 32);
     float y = float((i / 8) * 8 - 12);
-    fixture.boxes.append(RectF{x, y, x + 16 + (i % 3) * 8, y + 10 + (i % 4) * 6});
+    fixture.boxes.push_back(RectF{x, y, x + 16 + (i % 3) * 8, y + 10 + (i % 4) * 6});
   }
   for (int i = 0; i < 16; ++i) {
     float x = float(i * 3 - 24);
-    fixture.boxes.append(RectF{x, 0, x + 10 + (i % 3) * 5, 10.f + (i % 2) * 5});
+    fixture.boxes.push_back(RectF{x, 0, x + 10 + (i % 3) * 5, 10.f + (i % 2) * 5});
   }
   return fixture;
 }

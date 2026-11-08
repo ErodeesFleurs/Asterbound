@@ -84,7 +84,7 @@ std::expected<BiomePlaceables, StarException> BiomePlaceables::create(Assets con
   for (auto const& item : *items) {
     auto distribution = BiomeItemDistribution::create(assets, item);
     if (!distribution) return std::unexpected(std::move(distribution.error()));
-    result.itemDistributions.append(std::move(*distribution));
+    result.itemDistributions.push_back(std::move(*distribution));
   }
   return result;
 }
@@ -94,7 +94,7 @@ std::expected<Json, StarException> BiomePlaceables::toJson() const {
   for (auto const& distribution : itemDistributions) {
     auto json = distribution.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    distributions.append(std::move(*json));
+    distributions.push_back(std::move(*json));
   }
   return JsonObject{{"grassMod", grassMod}, {"grassModDensity", grassModDensity}, {"ceilingGrassMod", ceilingGrassMod},
       {"ceilingGrassModDensity", ceilingGrassModDensity}, {"itemDistributions", std::move(distributions)}};
@@ -148,7 +148,7 @@ std::expected<Biome, StarException> Biome::create(Root& root, Json const& store)
   for (auto const& entry : *blocks) {
     auto block = entry.toUInt();
     if (!block) return std::unexpected(std::move(block.error()));
-    result.subBlocks.append(*block);
+    result.subBlocks.push_back(*block);
   }
   auto ores = store.getArray("ores");
   if (!ores) return std::unexpected(std::move(ores.error()));
@@ -157,7 +157,7 @@ std::expected<Biome, StarException> Biome::create(Root& root, Json const& store)
     if (!mod) return std::unexpected(std::move(mod.error()));
     auto density = entry.getFloat(1);
     if (!density) return std::unexpected(std::move(density.error()));
-    result.ores.append({static_cast<ModId>(*mod), *density});
+    result.ores.push_back({static_cast<ModId>(*mod), *density});
   }
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));

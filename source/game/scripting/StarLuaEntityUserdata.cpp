@@ -456,7 +456,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                 auto json = jsonFromPersistentStatusEffect(effect);
                 if (!json)
                   return std::unexpected(std::move(json.error()));
-                effects.append(std::move(*json));
+                effects.push_back(std::move(*json));
             }
             return effects;
         }
@@ -468,7 +468,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
             return actor->get().statusController().activeUniqueStatusEffectSummary().transformed([](std::pair<UniqueStatusEffect, std::optional<float>> effect) {
             JsonArray effectJson = {effect.first};
             if (effect.second)
-                effectJson.append(*effect.second);
+              effectJson.push_back(*effect.second);
             return effectJson;
             });;
         return {};
@@ -874,7 +874,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               return std::unexpected(std::move(itemDb.error()));
             JsonArray result;
             for (auto const& item : container->get().itemBag()->items())
-                result.append((*itemDb)->toJson(item));
+              result.push_back((*itemDb)->toJson(item));
             return result;
         }
         return Json();
@@ -951,7 +951,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
             if (*items) {
                 JsonArray result;
                 for (auto const& item : **items)
-                    result.append((*itemDb)->toJson(item));
+                  result.push_back((*itemDb)->toJson(item));
                 return result;
             }
         }

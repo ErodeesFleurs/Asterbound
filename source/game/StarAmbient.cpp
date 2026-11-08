@@ -50,7 +50,7 @@ std::expected<AmbientTrackGroup, StarException> AmbientTrackGroup::create(Json c
     return std::unexpected(std::move(values.error()));
   AmbientTrackGroup group;
   for (auto const& track : *values)
-    group.tracks.append(AssetPath::relative_to(directory, track));
+    group.tracks.push_back(AssetPath::relative_to(directory, track));
   return group;
 }
 
@@ -143,7 +143,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
     m_currentTrackName = "";
     if (!tracks.empty()) {
       while ((m_recentTracks.size() / 2) >= tracks.size()) {
-        auto removed = m_recentTracks.removeFirst();
+        auto removed = m_recentTracks.pop_front_checked();
         if (!removed)
           return std::unexpected(std::move(removed.error()));
       }
@@ -151,7 +151,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
         m_currentTrackName = m_root.random().randValueFrom(tracks);
         if (m_currentTrackName.empty() || !m_recentTracks.contains(m_currentTrackName))
           break;
-        auto removed = m_recentTracks.removeFirst();
+        auto removed = m_recentTracks.pop_front_checked();
         if (!removed)
           return std::unexpected(std::move(removed.error()));
       }
@@ -161,7 +161,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
       if (!audio)
         return std::unexpected(std::move(audio.error()));
       if (*audio) {
-        m_recentTracks.append(m_currentTrackName);
+        m_recentTracks.push_back(m_currentTrackName);
         auto instance = AudioInstance::create(**audio);
         if (!instance)
           return std::unexpected(std::move(instance.error()));

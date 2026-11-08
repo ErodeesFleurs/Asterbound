@@ -935,7 +935,7 @@ std::expected<std::shared_ptr<TextureGroup>, StarException> OpenGlRenderer::crea
 
   auto glTextureGroup = std::make_shared<GlTextureGroup>(atlasNumCells);
   glTextureGroup->textureAtlasSet.textureFiltering = filtering;
-  m_liveTextureGroups.append(glTextureGroup);
+  m_liveTextureGroups.push_back(glTextureGroup);
   return glTextureGroup;
 }
 
@@ -949,9 +949,7 @@ List<RenderPrimitive>& OpenGlRenderer::immediatePrimitives() {
   return m_immediatePrimitives;
 }
 
-void OpenGlRenderer::render(RenderPrimitive primitive) {
-  m_immediatePrimitives.append(std::move(primitive));
-}
+void OpenGlRenderer::render(RenderPrimitive primitive) { m_immediatePrimitives.push_back(std::move(primitive)); }
 
 std::expected<void, StarException> OpenGlRenderer::appendImmediate(DetachedRenderGeometry const& geometry) {
   auto legacy = m_immediateRenderBuffer->append(m_immediatePrimitives);
@@ -1716,8 +1714,8 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
   m_textureSizeUniforms.clear();
   if (effect.includeVBTextures) {
     for (std::size_t i = 0; i < MultiTextureCount; ++i) {
-      m_textureUniforms.append(effect.getUniform(strf("texture{}", i)));
-      m_textureSizeUniforms.append(effect.getUniform(strf("textureSize{}", i)));
+      m_textureUniforms.push_back(effect.getUniform(strf("texture{}", i)));
+      m_textureSizeUniforms.push_back(effect.getUniform(strf("textureSize{}", i)));
     }
   }
   m_screenSizeUniform = effect.getUniform("screenSize");

@@ -30,6 +30,8 @@ set (star_core_tests_SOURCES
       formatted_json_test.cpp
       line_test.cpp
       lexical_cast_test.cpp
+      list_contract_test.cpp
+      list_slice_test.cpp
       lua_test.cpp
       lua_json_test.cpp
       lua_syntax_test.cpp
