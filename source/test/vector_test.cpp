@@ -50,16 +50,24 @@ struct unassignable {
 
 struct throwing_assignment {
   int value = 0;
+  std::vector<int>* events = nullptr;
+  bool destination = false;
   throwing_assignment() noexcept = default;
   throwing_assignment(throwing_assignment const&) noexcept = default;
   throwing_assignment& operator=(throwing_assignment const& other) noexcept(false) {
+    if (destination && events)
+      events->push_back(100 + other.value);
     value = other.value;
+    events = other.events;
     return *this;
   }
   friend throwing_assignment operator+(throwing_assignment const& left,
                                        throwing_assignment const& right) noexcept(false) {
     throwing_assignment result;
+    if (left.events)
+      left.events->push_back(left.value);
     result.value = left.value + right.value;
+    result.events = left.events;
     return result;
   }
 };
@@ -220,6 +228,8 @@ static_assert(!can_sum<Vector<int, 0>>);
 static_assert(!can_product<Vector<int, 0>>);
 static_assert(!can_add<Vector<unrelated, 2>>);
 static_assert(!can_divide<Vector<unrelated, 2>>);
+static_assert(!can_add<Vector<unrelated, 4>>);
+static_assert(can_add<Vector<throwing_assignment, 4>>);
 static_assert(!can_transformed<Vec3I, mutable_only_callback>);
 static_assert(!can_transformed<Vec3I, rvalue_only_callback>);
 static_assert(!can_transform<Vec3I, rvalue_only_callback>);
@@ -296,8 +306,45 @@ constexpr bool constexpr_arithmetic_and_callbacks() {
     && left.product() == 48 && left.min() == 2 && left.max() == 6 && mapped[0] == 2 && mapped[2] == 4 && right[2] == 4;
 }
 
+constexpr bool constexpr_float4_component_arithmetic() {
+  Vec4F left(-3, 5, 0, 8);
+  Vec4F const right(2, -4, 7, 0.5f);
+  auto const added = left + right;
+  auto const subtracted = left - right;
+  auto const multiplied = left.piecewise_multiply(right);
+  auto const scaled = left * -2.0f;
+  auto const chained = (left + right).piecewise_multiply(right) - left * 2.0f;
+  left += left;
+  if (left[0] != -6 || left[1] != 10 || left[2] != 0 || left[3] != 16)
+    return false;
+  left -= left;
+  left += right;
+  left *= left[1];
+  for (std::size_t i = 0; i != 4; ++i) {
+    if (added[i] != std::array{-1.0f, 1.0f, 7.0f, 8.5f}[i]
+        || subtracted[i] != std::array{-5.0f, 9.0f, -7.0f, 7.5f}[i]
+        || multiplied[i] != std::array{-6.0f, -20.0f, 0.0f, 4.0f}[i]
+        || scaled[i] != std::array{6.0f, -10.0f, 0.0f, -16.0f}[i]
+        || chained[i] != std::array{4.0f, -14.0f, 49.0f, -11.75f}[i]
+        || left[i] != std::array{-8.0f, 16.0f, -28.0f, -2.0f}[i])
+      return false;
+  }
+  return true;
+}
+
 static_assert(constexpr_construction_fill_and_resize());
 static_assert(constexpr_arithmetic_and_callbacks());
+static_assert(constexpr_float4_component_arithmetic());
+
+Vec4F runtime_float4(std::array<float, 4> const& values) {
+  volatile float opaque[]{values[0], values[1], values[2], values[3]};
+  return Vec4F(float(opaque[0]), float(opaque[1]), float(opaque[2]), float(opaque[3]));
+}
+
+void expect_float4_exact(Vec4F const& actual, std::array<float, 4> const& expected) {
+  for (std::size_t i = 0; i != 4; ++i)
+    EXPECT_EQ(actual[i], expected[i]) << "coordinate " << i;
+}
 
 template <std::floating_point T, std::size_t N>
 void expect_vector_near(Vector<T, N> const& actual, Vector<T, N> const& expected, T tolerance) {
@@ -405,6 +452,119 @@ TEST(VectorGeometry, ZeroNormalizationProjectionAndAnglePolicies) {
   EXPECT_NEAR(Vec3D::angle(Vec3D(), Vec3D(1, 0, 0)), std::numbers::pi / 2, 1e-14);
   EXPECT_EQ(Vec3D().theta(), 0.0);
   EXPECT_EQ(Vec3D().theta_enu(), 0.0);
+}
+
+TEST(VectorArithmetic, Float4RuntimeComponentsRetainExactFiniteValuesAcrossMagnitudes) {
+  struct arithmetic_case {
+    std::array<float, 4> left;
+    std::array<float, 4> right;
+    float scalar;
+    std::array<float, 4> sum;
+    std::array<float, 4> difference;
+    std::array<float, 4> product;
+    std::array<float, 4> scaled;
+  };
+  // Dyadic inputs and normal finite outputs keep these exact under fast-math.
+  // Cover the smallest normal input, large exponents and integer precision edges.
+  arithmetic_case const cases[]{
+    {{-3.5f, 0.0f, 0x1p24f, 0x1p-60f}, {2.0f, -8.0f, -0x1p23f, 0x1p-60f}, -2.0f,
+     {-1.5f, -8.0f, 0x1p23f, 0x1p-59f}, {-5.5f, 8.0f, 0x1.8p24f, 0.0f},
+     {-7.0f, 0.0f, -0x1p47f, 0x1p-120f}, {7.0f, 0.0f, -0x1p25f, -0x1p-59f}},
+    {{0x1p-126f, -0x1p120f, 8388607.0f, -0.25f}, {2.0f, 0.5f, 1.0f, 0.5f}, 2.0f,
+     {2.0f, -0x1p120f, 8388608.0f, 0.25f}, {-2.0f, -0x1p120f, 8388606.0f, -0.75f},
+     {0x1p-125f, -0x1p119f, 8388607.0f, -0.125f}, {0x1p-125f, -0x1p121f, 16777214.0f, -0.5f}}
+  };
+  for (auto const& input : cases) {
+    auto const left = runtime_float4(input.left);
+    auto const right = runtime_float4(input.right);
+    volatile float opaque_scalar = input.scalar;
+    float const scalar = opaque_scalar;
+    expect_float4_exact(left + right, input.sum);
+    expect_float4_exact(left - right, input.difference);
+    expect_float4_exact(left.piecewise_multiply(right), input.product);
+    expect_float4_exact(left * scalar, input.scaled);
+    expect_float4_exact(left, input.left);
+    expect_float4_exact(right, input.right);
+  }
+}
+
+TEST(VectorArithmetic, FloatAlignedFloat4MembersPreserveNeighborsThroughAliasingAndChains) {
+  struct alignas(16) guarded_vector {
+    float before;
+    Vec4F value;
+    float after;
+  };
+  guarded_vector left{101.0f, runtime_float4({-3.0f, 5.0f, 0.0f, 8.0f}), 103.0f};
+  guarded_vector right{107.0f, runtime_float4({2.0f, -4.0f, 7.0f, 0.5f}), 109.0f};
+  guarded_vector output{113.0f, {}, 127.0f};
+  for (auto const* holder : {&left, &right, &output}) {
+    auto const address = reinterpret_cast<std::uintptr_t>(&holder->value);
+    ASSERT_EQ(address % alignof(float), 0u);
+    ASSERT_NE(address % 16, 0u);
+  }
+  auto expect_guards = [&] {
+    EXPECT_EQ(left.before, 101.0f);
+    EXPECT_EQ(left.after, 103.0f);
+    EXPECT_EQ(right.before, 107.0f);
+    EXPECT_EQ(right.after, 109.0f);
+    EXPECT_EQ(output.before, 113.0f);
+    EXPECT_EQ(output.after, 127.0f);
+  };
+  output.value = left.value + right.value;
+  expect_float4_exact(output.value, {-1.0f, 1.0f, 7.0f, 8.5f});
+  expect_guards();
+  output.value = left.value - right.value;
+  expect_float4_exact(output.value, {-5.0f, 9.0f, -7.0f, 7.5f});
+  expect_guards();
+  output.value = left.value.piecewise_multiply(right.value);
+  expect_float4_exact(output.value, {-6.0f, -20.0f, 0.0f, 4.0f});
+  expect_guards();
+  output.value = left.value * -2.0f;
+  expect_float4_exact(output.value, {6.0f, -10.0f, 0.0f, -16.0f});
+  expect_guards();
+  left.value += left.value;
+  expect_float4_exact(left.value, {-6.0f, 10.0f, 0.0f, 16.0f});
+  expect_guards();
+  left.value -= left.value;
+  expect_float4_exact(left.value, {0.0f, 0.0f, 0.0f, 0.0f});
+  expect_guards();
+  left.value = runtime_float4({-3.0f, 5.0f, 0.0f, 8.0f});
+  left.value *= left.value[1];
+  expect_float4_exact(left.value, {-15.0f, 25.0f, 0.0f, 40.0f});
+  expect_guards();
+  output.value = (left.value + right.value).piecewise_multiply(right.value) - left.value * 2.0f;
+  expect_float4_exact(output.value, {4.0f, -134.0f, 49.0f, -59.75f});
+  expect_float4_exact(left.value, {-15.0f, 25.0f, 0.0f, 40.0f});
+  expect_float4_exact(right.value, {2.0f, -4.0f, 7.0f, 0.5f});
+  expect_guards();
+}
+
+TEST(VectorArithmetic, CustomFloat4SizedElementsCalculateBeforeCompoundAssignment) {
+  Vector<throwing_assignment, 4> source;
+  std::vector<int> events;
+  for (std::size_t i = 0; i != 4; ++i) {
+    source[i].value = static_cast<int>(2 * i + 1);
+    source[i].events = &events;
+    source[i].destination = true;
+  }
+  source += source;
+  EXPECT_EQ(events, (std::vector<int>{1, 3, 5, 7, 102, 106, 110, 114}));
+  for (std::size_t i = 0; i != 4; ++i)
+    EXPECT_EQ(source[i].value, static_cast<int>(4 * i + 2)) << "coordinate " << i;
+}
+
+TEST(VectorCallbacks, Float4CombineRetainsOrderedStatefulByValueInvocation) {
+  auto const left = runtime_float4({-3.0f, 5.0f, 0.0f, 8.0f});
+  auto const right = runtime_float4({2.0f, -4.0f, 7.0f, 0.5f});
+  std::vector<std::pair<float, float>> seen;
+  auto callback = [count = 0, &seen](float const& a, float const& b) mutable {
+    seen.emplace_back(a, b);
+    return a - b + ++count;
+  };
+  auto const result = left.combine(right, callback);
+  expect_float4_exact(result, {-4.0f, 11.0f, -4.0f, 11.5f});
+  EXPECT_EQ(seen, (std::vector<std::pair<float, float>>{{-3.0f, 2.0f}, {5.0f, -4.0f}, {0.0f, 7.0f}, {8.0f, 0.5f}}));
+  EXPECT_EQ(callback(0.0f, 0.0f), 1.0f);
 }
 
 TEST(VectorArithmetic, AbsRetainsWideSignedIntegersAndUnsignedIdentity) {

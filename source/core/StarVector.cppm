@@ -9,6 +9,23 @@ import star.format;
 namespace Star {
 
 namespace vector_detail {
+// Keep SIMD registers out of Vector's storage and public interface. These
+// load/store boundaries can move to <simd> without changing coordinate layout.
+template <typename T, std::size_t N>
+concept simd_compatible = std::same_as<T, float> && N == 4;
+
+using float4 = float __attribute__((vector_size(16)));
+
+inline float4 load(float const* source) noexcept {
+  float4 result;
+  std::memcpy(&result, source, sizeof(result));
+  return result;
+}
+
+inline void store(float* destination, float4 value) noexcept {
+  std::memcpy(destination, &value, sizeof(value));
+}
+
 // A function parameter tests the implicit conversion used by initialization and
 // return, unlike constructible_from (which also accepts explicit conversions).
 template <typename T> void accept(T) noexcept;
@@ -501,6 +518,13 @@ public:
   constexpr Vector operator+(Vector const& other) const noexcept(noexcept(combine(other, std::plus<>{})))
     requires requires { combine(other, std::plus<>{}); }
   {
+    if constexpr (vector_detail::simd_compatible<T, N>) {
+      if !consteval {
+        Vector result;
+        vector_detail::store(result.data(), vector_detail::load(this->data()) + vector_detail::load(other.data()));
+        return result;
+      }
+    }
     return combine(other, std::plus<>{});
   }
 
