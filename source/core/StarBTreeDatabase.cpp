@@ -45,9 +45,11 @@ namespace Star {
   BTreeDatabase::~BTreeDatabase() noexcept {
     // Destruction cannot report a failed transaction to its caller.  In
     // particular, never retry a failed close/commit while unwinding.
-    if (m_open && (!m_availableBlocks.empty() || !m_uncommitted.empty() || !m_uncommittedWrites.empty()))
-    std::fprintf(stderr, "BTreeDatabase '%s' destroyed with uncommitted changes; call commit() or close() explicitly\n",
-    m_contentIdentifier.utf8_data());
+    if (m_open && (!m_availableBlocks.empty() || !m_uncommitted.empty() || !m_uncommittedWrites.empty())) {
+      if (auto written = Star::print(stderr, "BTreeDatabase '{}' destroyed with uncommitted changes; call commit() or close() explicitly\n",
+    m_contentIdentifier.utf8_data()); !written)
+        std::_Exit(1);
+    }
   }
 
   std::uint32_t BTreeDatabase::blockSize() const {
@@ -249,7 +251,7 @@ namespace Star {
       if (initialDeviceSize == 0 && m_device && m_device->is_open() && m_device->is_writable()) {
         auto truncated = m_device->resize(0);
         if (!truncated)
-          failure = DBException(strf("Opening database failed; removing the partial new database also failed: {}", truncated.error().what()), ExceptionDiagnostic(failure));
+          failure = DBException(Star::format("Opening database failed; removing the partial new database also failed: {}", truncated.error().what()), ExceptionDiagnostic(failure));
       }
       m_open = false;
       m_blockSize = oldBlockSize;
@@ -267,7 +269,7 @@ namespace Star {
       if (openedDevice && m_device->is_open()) {
         auto closed = m_device->close();
         if (!closed)
-          failure = DBException(strf("Opening database failed; closing its device also failed: {}", closed.error().what()), ExceptionDiagnostic(failure));
+          failure = DBException(Star::format("Opening database failed; closing its device also failed: {}", closed.error().what()), ExceptionDiagnostic(failure));
       }
       return std::unexpected(std::move(failure));
     }
@@ -825,7 +827,7 @@ namespace Star {
       auto result244 = buffer.write_bytes(i->key);
       if (!result244) return std::unexpected(std::move(result244.error()));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((i->key.size() == parent.m_keySize));
+        Star::star_assert_failed((i->key.size() == parent.m_keySize));
       }
       (*result244);
       auto result245 = buffer.write<BlockIndex>(i->pointer);
@@ -1078,7 +1080,7 @@ namespace Star {
       auto result227 = leafOutput.write_bytes(i->key);
       if (!result227) return std::unexpected(std::move(result227.error()));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((i->key.size() == parent.m_keySize));
+        Star::star_assert_failed((i->key.size() == parent.m_keySize));
       }
       auto result228 = leafOutput.write(i->data);
       if (!result228) return std::unexpected(std::move(result228.error()));

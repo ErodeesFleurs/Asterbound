@@ -619,7 +619,7 @@ std::expected<Json, StarException> SystemWorld::systemObjectTypeConfig(Root& roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  return (*assets)->json(strf("/system_objects.config:{}", name));
+  return (*assets)->json(Star::format("/system_objects.config:{}", name));
 }
 
 std::expected<std::optional<Vec2F>, StarException> SystemWorld::systemLocationPosition(SystemLocation const& location) const {

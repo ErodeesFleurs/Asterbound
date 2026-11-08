@@ -665,7 +665,7 @@ std::expected<void, StarException> Projectile::render(RenderCallback& renderCall
   int frame = m_frame;
   if (frame == getFrame())
     frame = frameAt(std::lerp(m_previousAnimationTimer, m_animationTimer, alpha), std::lerp(m_previousTimeToLive, m_timeToLive, alpha));
-  String image = strf("{}:{}{}", m_config->image, frame, m_imageSuffix);
+  String image = Star::format("{}:{}{}", m_config->image, frame, m_imageSuffix);
   auto result902 = this->root().imageMetadataDatabase();
 if (!result902) return std::unexpected(std::move(result902.error()));
 auto result1280 = Drawable::makeImage(*std::move(*result902), image, 1.0f / TilePixels, true, Vec2F());
@@ -893,7 +893,7 @@ void Projectile::setFrame(int frame) {
 }
 
 std::expected<String, StarException> Projectile::drawableFrame() {
-  String str = strf("{}:{}{}", m_config->image, m_frame, m_imageSuffix);
+  String str = Star::format("{}:{}{}", m_config->image, m_frame, m_imageSuffix);
   return m_imageDirectives.addToString(str);
 }
 
@@ -1555,7 +1555,7 @@ auto result884 = processAction(std::move(*result883));
 if (!result884) return std::unexpected(std::move(result884.error()));
 
   } else {
-    return std::unexpected(StarException(strf("Unknown projectile reap command {}", command)));
+    return std::unexpected(StarException(Star::format("Unknown projectile reap command {}", command)));
   }
   return {};
 }

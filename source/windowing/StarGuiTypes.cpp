@@ -19,7 +19,7 @@ GuiDirection otherDirection(GuiDirection direction) {
       return GuiDirection::Horizontal;
     default:
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((false));
+        Star::star_assert_failed((false));
       }
       return static_cast<GuiDirection>(-1);
   }
@@ -33,7 +33,7 @@ std::expected<String, StarException> rarityBorder(String rarity) {
   auto absolute = rarity.starts_with("/");
   if (!absolute)
     return std::unexpected(std::move(absolute.error()));
-  return (*absolute ? rarity : strf("/interface/inventory/itemborder{}.png", rarity)).to_lower();
+  return (*absolute ? rarity : Star::format("/interface/inventory/itemborder{}.png", rarity)).to_lower();
 }
 
 }

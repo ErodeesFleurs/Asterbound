@@ -107,7 +107,7 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
     auto assets = m_root.assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    auto tuning = (*assets)->json(strf("/sfx/instruments/{}/tuning.config", instrument));
+    auto tuning = (*assets)->json(Star::format("/sfx/instruments/{}/tuning.config", instrument));
     if (!tuning)
       return std::unexpected(std::move(tuning.error()));
     auto mapping = tuning->getObject("mapping");
@@ -763,7 +763,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               note = 0;
               break;
             }
-            default: return std::unexpected(StarException(strf("Unrecognized note {}", static_cast<char>(head))));
+            default: return std::unexpected(StarException(Star::format("Unrecognized note {}", static_cast<char>(head))));
             }
           if (note != 0) {
             bool accidentalActive = accidentalSpecified;
@@ -815,15 +815,10 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
                 case 'z': {
                   break;
                 }
-                default: return std::unexpected(StarException(strf("Unrecognized note {}", static_cast<char>(head))));
+                default: return std::unexpected(StarException(Star::format("Unrecognized note {}", static_cast<char>(head))));
                 }
             }
 
-            // std::cerr << ":" << note << ":" << (int)accidentalSpecified <<
-            // ":" <<
-            // (int)accidentalActive << ":" << accidentals << ":" << (note-base)
-            // << ":" << head <<
-            // "\n";
           }
           accidentals = 0;
           accidentalSpecified = false;
@@ -904,7 +899,7 @@ void Songbook::play(Json const& song, String const& timeSource) {
   m_song = song;
   m_timeSource = timeSource;
   if (m_timeSource.empty())
-    m_timeSource = toString(m_root.random().randu64());
+    m_timeSource = Star::to_string(m_root.random().randu64());
 
   {
     m_epochUpdated = false;

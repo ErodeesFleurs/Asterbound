@@ -1,7 +1,7 @@
 module;
 
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.array;
 import star.math_common;
@@ -448,11 +448,17 @@ Matrix3<T> operator*(T s, const Matrix3<T>& m) {
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, Matrix3<T> m) {
-  os << m[0][0] << ' ' << m[0][1] << ' ' << m[0][2] << std::endl;
-  os << m[1][0] << ' ' << m[1][1] << ' ' << m[1][2] << std::endl;
-  os << m[2][0] << ' ' << m[2][1] << ' ' << m[2][2];
-  return os;
+  requires nonfallible_text_writable<T>
+void write_text(TextBuffer& output, Matrix3<T> const& matrix) {
+  for (std::size_t row = 0; row != 3; ++row) {
+    if (row != 0)
+      output.push_back('\n');
+    for (std::size_t column = 0; column != 3; ++column) {
+      if (column != 0)
+        output.push_back(' ');
+      append_text(output, matrix[row][column]);
+    }
+  }
 }
 
 }
@@ -460,7 +466,8 @@ std::ostream& operator<<(std::ostream& os, Matrix3<T> m) {
 export module star.matrix3;
 
 export template <typename T>
-struct std::formatter<Star::Matrix3<T>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<T>
+struct std::formatter<Star::Matrix3<T>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Matrix3;
@@ -470,5 +477,5 @@ export namespace Star {
   using ::Star::transpose;
   using ::Star::ortho;
   using ::Star::operator*;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

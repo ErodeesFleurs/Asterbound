@@ -1,7 +1,7 @@
 module;
 import std;
 import star.format;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.string;
 import star.either;
@@ -20,7 +20,7 @@ enum class NetworkMode {
 
 class HostAddress {
 public:
-  friend std::ostream& operator<<(std::ostream& os, HostAddress const& address);
+  friend void write_text(TextBuffer& buffer, HostAddress const& address);
   friend struct hash<HostAddress>;
 
   static HostAddress localhost(NetworkMode mode = NetworkMode::IPv4);
@@ -51,7 +51,7 @@ private:
   std::uint8_t m_address[16];
 };
 
-std::ostream& operator<<(std::ostream& os, HostAddress const& address);
+void write_text(TextBuffer& buffer, HostAddress const& address);
 
 template <>
 struct hash<HostAddress> {
@@ -60,7 +60,7 @@ struct hash<HostAddress> {
 
 class HostAddressWithPort {
 public:
-  friend std::ostream& operator<<(std::ostream& os, HostAddressWithPort const& address);
+  friend void write_text(TextBuffer& buffer, HostAddressWithPort const& address);
   friend struct hash<HostAddressWithPort>;
 
   [[nodiscard]] static std::expected<HostAddressWithPort, StarException> lookup(String const& address, std::uint16_t port);
@@ -84,7 +84,7 @@ private:
   std::uint16_t m_port;
 };
 
-std::ostream& operator<<(std::ostream& os, HostAddressWithPort const& address);
+void write_text(TextBuffer& buffer, HostAddressWithPort const& address);
 
 template <>
 struct hash<HostAddressWithPort> {
@@ -103,8 +103,8 @@ export namespace Star {
 }
 
 
-export template <> struct std::formatter<Star::HostAddress> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::HostAddressWithPort> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::HostAddress> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::HostAddressWithPort> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::NetworkExceptionTag;
@@ -112,4 +112,5 @@ export namespace Star {
   using ::Star::NetworkMode;
   using ::Star::HostAddressWithPort;
   using ::Star::HostAddress;
+  using ::Star::write_text;
 }

@@ -83,7 +83,7 @@ void AudioInstance::setRangeMultiplier(float rangeMultiplier) {
 
 void AudioInstance::setVolume(float targetValue, float rampTime) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((targetValue >= 0));
+    Star::star_assert_failed((targetValue >= 0));
   }
   std::lock_guard locker(m_mutex);
 
@@ -102,7 +102,7 @@ void AudioInstance::setVolume(float targetValue, float rampTime) {
 
 void AudioInstance::setPitchMultiplier(float targetValue, float rampTime) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((targetValue >= 0));
+    Star::star_assert_failed((targetValue >= 0));
   }
   std::lock_guard locker(m_mutex);
 

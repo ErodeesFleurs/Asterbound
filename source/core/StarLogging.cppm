@@ -76,14 +76,19 @@ public:
   [[nodiscard]] std::expected<void, StarException> log(LogLevel level, std::string_view msg);
 
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   [[nodiscard]] std::expected<void, StarException> logf(LogLevel level, std::format_string<Args...> msg, Args const&... args);
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   [[nodiscard]] std::expected<void, StarException> debug(std::format_string<Args...> msg, Args const&... args);
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   [[nodiscard]] std::expected<void, StarException> info(std::format_string<Args...> msg, Args const&... args);
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   [[nodiscard]] std::expected<void, StarException> warn(std::format_string<Args...> msg, Args const&... args);
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   [[nodiscard]] std::expected<void, StarException> error(std::format_string<Args...> msg, Args const&... args);
 
   // Summary at the requested severity; complete diagnostics only for Debug sinks.
@@ -103,27 +108,32 @@ private:
 
 // Stateless diagnostics for process/bootstrap code without a business owner.
 // This path has no registry, sink configuration, or shared mutable cache.
+// Failed emergency output terminates with failure rather than recursively logging.
 class EmergencyLog {
 public:
   static void log(LogLevel level, std::string_view message);
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static void debug(std::format_string<Args...> format, Args const&... args) {
-    auto message = strfChecked(format, args...);
+    auto message = Star::format_checked(format, args...);
     log(LogLevel::Debug, message);
   }
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static void info(std::format_string<Args...> format, Args const&... args) {
-    auto message = strfChecked(format, args...);
+    auto message = Star::format_checked(format, args...);
     log(LogLevel::Info, message);
   }
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static void warn(std::format_string<Args...> format, Args const&... args) {
-    auto message = strfChecked(format, args...);
+    auto message = Star::format_checked(format, args...);
     log(LogLevel::Warn, message);
   }
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static void error(std::format_string<Args...> format, Args const&... args) {
-    auto message = strfChecked(format, args...);
+    auto message = Star::format_checked(format, args...);
     log(LogLevel::Error, message);
   }
 };
@@ -136,6 +146,7 @@ public:
   void setValue(String const& key, String const& value);
 
   template <typename T>
+    requires format_argument<T>
   void set(String const& key, T const& t);
 
   Map<String, String> getValues();
@@ -193,37 +204,43 @@ private:
 };
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::logf(LogLevel level, std::format_string<Args...> msg, Args const&... args) {
   if (loggable(level)) {
-    std::string output = strfChecked(msg, args...);
+    std::string output = Star::format_checked(msg, args...);
     return log(level, output);
   }
   return {};
 }
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::debug(std::format_string<Args...> msg, Args const&... args) {
   return logf(LogLevel::Debug, msg, args...);
 }
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::info(std::format_string<Args...> msg, Args const&... args) {
   return logf(LogLevel::Info, msg, args...);
 }
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::warn(std::format_string<Args...> msg, Args const&... args) {
   return logf(LogLevel::Warn, msg, args...);
 }
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::error(std::format_string<Args...> msg, Args const&... args) {
   return logf(LogLevel::Error, msg, args...);
 }
 
 template <typename T>
+  requires format_argument<T>
 void LogMap::set(String const& key, T const& t) {
-  setValue(key, toString(t));
+  setValue(key, Star::to_string(t));
 }
 
 }

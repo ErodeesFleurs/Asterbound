@@ -189,7 +189,7 @@ std::expected<void, StarException> readPngSignature(IODevice& device) {
     auto name = device.device_name();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    return std::unexpected(ImageException(strf("File {} is not a png image!", *name)));
+    return std::unexpected(ImageException(Star::format("File {} is not a png image!", *name)));
   }
   return {};
 }
@@ -375,7 +375,7 @@ std::expected<void, StarException> Image::fillRect(Vec2U const& pos, Vec2U const
 
 std::expected<void, StarException> Image::set(Vec2U const& pos, Vec4B const& c) {
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::set", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::set", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     m_data[offset] = c[0];
@@ -393,7 +393,7 @@ std::expected<void, StarException> Image::set(Vec2U const& pos, Vec4B const& c) 
 
 std::expected<void, StarException> Image::set(Vec2U const& pos, Vec3B const& c) {
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::set", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::set", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     m_data[offset] = c[0];
@@ -412,7 +412,7 @@ std::expected<void, StarException> Image::set(Vec2U const& pos, Vec3B const& c) 
 std::expected<Vec4B, StarException> Image::get(Vec2U const& pos) const {
   Vec4B c;
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::get", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::get", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     c[0] = m_data[offset];
@@ -482,7 +482,7 @@ Vec4B Image::clamprgb(Vec2I const& pos) const {
 
 std::expected<Image, StarException> Image::subImage(Vec2U const& pos, Vec2U const& size) const {
   if (pos[0] + size[0] > m_width || pos[1] + size[1] > m_height)
-    return std::unexpected(ImageException(strf("call to subImage with pos {} size {} out of image bounds ({}, {})", pos, size, m_width, m_height)));
+    return std::unexpected(ImageException(Star::format("call to subImage with pos {} size {} out of image bounds ({}, {})", pos, size, m_width, m_height)));
 
   Image sub(size[0], size[1], m_pixelFormat);
 

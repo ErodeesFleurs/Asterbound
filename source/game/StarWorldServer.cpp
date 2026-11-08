@@ -295,8 +295,10 @@ std::expected<std::shared_ptr<WorldServer>, StarException> WorldServer::create(R
 }
 
 WorldServer::~WorldServer() {
-  if (auto result = close(); !result)
-    std::fprintf(stderr, "Error closing world '%s' during destruction: %s\n", m_worldId.utf8_data(), result.error().what());
+  if (auto result = close(); !result) {
+    if (auto written = Star::print(stderr, "Error closing world '{}' during destruction: {}\n", m_worldId.utf8_data(), result.error().what()); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<void, StarException> WorldServer::close() {
@@ -306,7 +308,7 @@ std::expected<void, StarException> WorldServer::close() {
   std::optional<StarException> error;
   auto recordError = [&](StarException next) {
     if (error)
-      *error = error->withContext(strf("Additional error closing world: {}", next.what()));
+      *error = error->withContext(Star::format("Additional error closing world: {}", next.what()));
     else
       error = std::move(next);
   };
@@ -1011,7 +1013,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       return {};
       };
       if (auto accepted = acceptEntity(); !accepted) {
-        auto logged = this->root().logger().warnException(strf("WorldServer: rejected SpawnEntity from client {}", clientId), ExceptionDiagnostic(accepted.error()));
+        auto logged = this->root().logger().warnException(Star::format("WorldServer: rejected SpawnEntity from client {}", clientId), ExceptionDiagnostic(accepted.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       }
@@ -1117,7 +1119,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             if (published)
               world.m_entityMap->removeEntity(entity->entityId());
             if (auto result = entity->uninit(); !result)
-              error = error.withContext(strf("Error uninitializing rejected slave entity: {}", result.error().what()));
+              error = error.withContext(Star::format("Error uninitializing rejected slave entity: {}", result.error().what()));
             return std::unexpected(std::move(error));
           };
           if (auto result = entity->init(world, entityCreate->entityId, EntityMode::Slave); !result)
@@ -1132,7 +1134,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return {};
         };
         if (auto accepted = acceptEntity(); !accepted) {
-          auto logged = this->root().logger().warnException(strf("WorldServer: rejected EntityCreate from client {}", clientId), ExceptionDiagnostic(accepted.error()));
+          auto logged = this->root().logger().warnException(Star::format("WorldServer: rejected EntityCreate from client {}", clientId), ExceptionDiagnostic(accepted.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -1143,7 +1145,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         EntityId entityId = entity->entityId();
         if (connectionForEntity(entityId) == clientId) {
           if constexpr (Star::DebugEnabled) {
-            Star::starAssertFailed((entity->isSlave()));
+            Star::star_assert_failed((entity->isSlave()));
           }
           auto result101 = entity->readNetState(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, clientInfo->clientState->netCompatibilityRules());
           if (!result101)
@@ -1257,7 +1259,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(result118.error()));
           auto exists = assetPathExists(*result118);
           if (!exists) {
-            auto rejected = rejectMessage(strf("invalid cinematic asset path '{}': {}", *result118, exists.error().what()));
+            auto rejected = rejectMessage(Star::format("invalid cinematic asset path '{}': {}", *result118, exists.error().what()));
             if (!rejected)
               return std::unexpected(std::move(rejected.error()));
             continue;
@@ -1267,13 +1269,13 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             auto result119 = cinematicArg.toString();
             if (!result119)
               return std::unexpected(std::move(result119.error()));
-            auto result120 = rejectMessage(strf("invalid cinematic asset path '{}'", std::move(*result119)));
+            auto result120 = rejectMessage(Star::format("invalid cinematic asset path '{}'", std::move(*result119)));
             if (!result120)
               return std::unexpected(std::move(result120.error()));
           }
         } else if (!cinematicArg.isNull()) {
           auto result121 = rejectMessage(
-            strf("non-string/non-object cinematic argument of type {}", static_cast<int>(cinematicArg.type())));
+            Star::format("non-string/non-object cinematic argument of type {}", static_cast<int>(cinematicArg.type())));
           if (!result121)
             return std::unexpected(std::move(result121.error()));
         }
@@ -1294,7 +1296,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
                 return std::unexpected(std::move(result124.error()));
               auto exists = assetPathExists(*result124);
               if (!exists) {
-                auto rejected = rejectMessage(strf("invalid music asset path '{}': {}", *result124, exists.error().what()));
+                auto rejected = rejectMessage(Star::format("invalid music asset path '{}': {}", *result124, exists.error().what()));
                 if (!rejected)
                   return std::unexpected(std::move(rejected.error()));
                 valid = false;
@@ -1307,7 +1309,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
               auto result126 = trackJson.toString();
               if (!result126)
                 return std::unexpected(std::move(result126.error()));
-              auto result127 = rejectMessage(strf("invalid music asset path '{}'", std::move(*result126)));
+              auto result127 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result126)));
               if (!result127)
                 return std::unexpected(std::move(result127.error()));
               break;
@@ -1319,7 +1321,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(result128.error()));
           auto exists = assetPathExists(*result128);
           if (!exists) {
-            auto rejected = rejectMessage(strf("invalid music asset path '{}': {}", *result128, exists.error().what()));
+            auto rejected = rejectMessage(Star::format("invalid music asset path '{}': {}", *result128, exists.error().what()));
             if (!rejected)
               return std::unexpected(std::move(rejected.error()));
             continue;
@@ -1329,14 +1331,14 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             auto result129 = tracksArg.toString();
             if (!result129)
               return std::unexpected(std::move(result129.error()));
-            auto result130 = rejectMessage(strf("invalid music asset path '{}'", std::move(*result129)));
+            auto result130 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result129)));
             if (!result130)
               return std::unexpected(std::move(result130.error()));
           }
         } else {
           valid = false;
           auto result131 =
-            rejectMessage(strf("invalid playAltMusic argument of type {}", static_cast<int>(tracksArg.type())));
+            rejectMessage(Star::format("invalid playAltMusic argument of type {}", static_cast<int>(tracksArg.type())));
           if (!result131)
             return std::unexpected(std::move(result131.error()));
         }
@@ -1352,12 +1354,12 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           auto warpAction = parseWarpAction(*warpString);
           if (warpAction)
             valid = true; else {
-            auto result133 = rejectMessage(strf("invalid warp action '{}': {}", *warpString, warpAction.error().what()));
+            auto result133 = rejectMessage(Star::format("invalid warp action '{}': {}", *warpString, warpAction.error().what()));
             if (!result133)
               return std::unexpected(std::move(result133.error()));
           }
         } else {
-          auto result134 = rejectMessage(strf("non-string warp argument of type {}", static_cast<int>(warpArg.type())));
+          auto result134 = rejectMessage(Star::format("non-string warp argument of type {}", static_cast<int>(warpArg.type())));
           if (!result134)
             return std::unexpected(std::move(result134.error()));
         }
@@ -1368,7 +1370,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         bool valid = false;
         auto radioDatabase = this->root().radioMessageDatabase();
         if (!radioDatabase) {
-          auto rejected = rejectMessage(strf("invalid radio message: {}", radioDatabase.error().what()));
+          auto rejected = rejectMessage(Star::format("invalid radio message: {}", radioDatabase.error().what()));
           if (!rejected)
             return std::unexpected(std::move(rejected.error()));
           continue;
@@ -1376,7 +1378,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto radioMessage = (*radioDatabase)->createRadioMessage(configArg);
         if (radioMessage)
           valid = true; else {
-          auto result136 = rejectMessage(strf("invalid radio message: {}", radioMessage.error().what()));
+          auto result136 = rejectMessage(Star::format("invalid radio message: {}", radioMessage.error().what()));
           if (!result136)
             return std::unexpected(std::move(result136.error()));
         }
@@ -1856,10 +1858,10 @@ std::expected<void, StarException> WorldServer::update(float dt) {
 
   m_expiryTimer.tick(dt);
 
-  this->root().logMap().set(strf("server_{}_entities", m_worldId), strf("{} in {} sectors", m_entityMap->size(), m_tileArray->loadedSectorCount()));
-  this->root().logMap().set(strf("server_{}_time", m_worldId), strf("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
-  this->root().logMap().set(strf("server_{}_active_liquid", m_worldId), m_liquidEngine->activeCells());
-  this->root().logMap().set(strf("server_{}_lua_mem", m_worldId), m_luaRoot->luaMemoryUsage());
+  this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loadedSectorCount()));
+  this->root().logMap().set(Star::format("server_{}_time", m_worldId), Star::format("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
+  this->root().logMap().set(Star::format("server_{}_active_liquid", m_worldId), m_liquidEngine->activeCells());
+  this->root().logMap().set(Star::format("server_{}_lua_mem", m_worldId), m_luaRoot->luaMemoryUsage());
   return {};
 }
 
@@ -1910,12 +1912,12 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
     if (published) {
       if (auto tileEntity = as<TileEntity>(entity)) {
         if (auto result = world.updateTileEntityTiles(tileEntity, true, false); !result)
-          error = error.withContext(strf("Error clearing rejected entity tiles: {}", result.error().what()));
+          error = error.withContext(Star::format("Error clearing rejected entity tiles: {}", result.error().what()));
       }
       world.m_entityMap->removeEntity(entity->entityId());
     }
     if (auto result = entity->uninit(); !result)
-      error = error.withContext(strf("Error uninitializing rejected entity: {}", result.error().what()));
+      error = error.withContext(Star::format("Error uninitializing rejected entity: {}", result.error().what()));
     return std::unexpected(std::move(error));
   };
 
@@ -2011,7 +2013,7 @@ std::expected<void, StarException> WorldServer::forEachCollisionBlock(RectI cons
         return std::unexpected(std::move(result209.error()));
     } else {
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((!tile.collisionCacheDirty));
+        Star::star_assert_failed((!tile.collisionCacheDirty));
       }
       for (auto const& block : tile.collisionCache) {
         auto result210 = iterator(block);

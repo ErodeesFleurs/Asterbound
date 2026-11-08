@@ -478,7 +478,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
       return std::unexpected(std::move(fetchChildResult263.error()));
     if (auto countWidget = std::move(*fetchChildResult263))
       {
-        auto replaceResult264 = countWidget->text().replace("<slots>", toString(container->containerSize()));
+        auto replaceResult264 = countWidget->text().replace("<slots>", Star::to_string(container->containerSize()));
         if (!replaceResult264)
           return std::unexpected(std::move(replaceResult264.error()));
         auto setTextResult265 = countWidget->setText(std::move(*replaceResult264));

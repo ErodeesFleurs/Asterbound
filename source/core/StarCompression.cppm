@@ -80,8 +80,10 @@ std::expected<void, StarException> inflateData(std::span<char const> in, ByteArr
     return std::unexpected(IOException::format("Failed to initialise inflate ({})", status));
   auto cleanup = [](zng_stream* stream) noexcept {
     int status = zng_inflateEnd(stream);
-    if (status != Z_OK)
-      fprintf(stderr, "Failed to end inflate stream (%d)\n", status);
+    if (status != Z_OK) {
+      if (!Star::print(stderr, "Failed to end inflate stream ({})\n", status))
+        std::_Exit(1);
+    }
   };
   std::unique_ptr<zng_stream, decltype(cleanup)> owner(&stream, cleanup);
   std::size_t consumed = 0;
@@ -132,8 +134,10 @@ std::expected<void, StarException> compressData(ByteArray const& in, ByteArray& 
     return std::unexpected(IOException::format("Failed to initialise deflate ({})", status));
   auto cleanup = [](zng_stream* stream) noexcept {
     int status = zng_deflateEnd(stream);
-    if (status != Z_OK)
-      fprintf(stderr, "Failed to end deflate stream (%d)\n", status);
+    if (status != Z_OK) {
+      if (auto written = Star::print(stderr, "Failed to end deflate stream ({})\n", status); !written)
+        std::_Exit(1);
+    }
   };
   std::unique_ptr<zng_stream, decltype(cleanup)> owner(&stream, cleanup);
   std::size_t consumed = 0;
@@ -222,8 +226,10 @@ CompressedFile::CompressedFile(String filename)
 
 CompressedFile::~CompressedFile() {
   auto result = close();
-  if (!result)
-    fprintf(stderr, "Failed to close compressed file: %s\n", result.error().what());
+  if (!result) {
+    if (auto written = Star::print(stderr, "Failed to close compressed file: {}\n", result.error().what()); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<StreamOffset, StarException> CompressedFile::pos() {

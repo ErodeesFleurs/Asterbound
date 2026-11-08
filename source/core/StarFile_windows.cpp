@@ -22,8 +22,10 @@ OVERLAPPED make_overlapped(StreamOffset offset) {
 }
 
 void close_after_failure(HANDLE file) {
-  if (!CloseHandle(file))
-    std::fprintf(stderr, "Error closing file after failed acquisition: %lu\n", GetLastError());
+  if (!CloseHandle(file)) {
+    if (!Star::print(stderr, "Error closing file after failed acquisition: {}\n", GetLastError()))
+      std::_Exit(1);
+  }
 }
 
 std::expected<String, StarException> temporary_root() {
@@ -241,7 +243,7 @@ std::expected<String, StarException> File::temporary_file_name(RandomService& ra
   auto root = temporary_root();
   if (!root)
     return std::unexpected(std::move(root.error()));
-  return relative_to(*root, strf("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
+  return relative_to(*root, Star::format("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
 }
 
 std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomService& random) {
@@ -287,7 +289,7 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
   if (!root)
     return std::unexpected(std::move(root.error()));
   for (;;) {
-    auto directory = relative_to(*root, strf("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
+    auto directory = relative_to(*root, Star::format("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
     auto path = stringToUtf16(directory);
     if (!path)
       return std::unexpected(std::move(path.error()));
@@ -422,8 +424,11 @@ std::expected<std::size_t, StarException> File::pread(void* file, char* data, st
   auto error = read ? ERROR_SUCCESS : GetLastError();
   auto restored = fseek(file, *cursor, IOSeek::Absolute);
   if (!read && error != ERROR_HANDLE_EOF) {
-    if (!restored)
-      std::fprintf(stderr, "Error restoring file cursor after failed pread: %s\n", restored.error().what());
+    if (!restored) {
+      if (auto written = Star::print(stderr, "Error restoring file cursor after failed pread: {}\n", restored.error().what()); !written)
+        return std::unexpected(IOException::format("pread error {}", error).withContext(
+            Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
+    }
     return std::unexpected(IOException::format("pread error {}", error));
   }
   if (!restored)
@@ -445,8 +450,11 @@ std::expected<std::size_t, StarException> File::pwrite(void* file, char const* d
   auto error = written ? ERROR_SUCCESS : GetLastError();
   auto restored = fseek(file, *cursor, IOSeek::Absolute);
   if (!written) {
-    if (!restored)
-      std::fprintf(stderr, "Error restoring file cursor after failed pwrite: %s\n", restored.error().what());
+    if (!restored) {
+      if (auto written = Star::print(stderr, "Error restoring file cursor after failed pwrite: {}\n", restored.error().what()); !written)
+        return std::unexpected(IOException::format("pwrite error {}", error).withContext(
+            Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
+    }
     return std::unexpected(IOException::format("pwrite error {}", error));
   }
   if (!restored)
@@ -467,8 +475,11 @@ std::expected<void, StarException> File::resize(void* file, StreamOffset size) {
   auto error = resized ? ERROR_SUCCESS : GetLastError();
   auto restored = fseek(file, *cursor, IOSeek::Absolute);
   if (!resized) {
-    if (!restored)
-      std::fprintf(stderr, "Error restoring file cursor after failed resize: %s\n", restored.error().what());
+    if (!restored) {
+      if (auto written = Star::print(stderr, "Error restoring file cursor after failed resize: {}\n", restored.error().what()); !written)
+        return std::unexpected(IOException::format("resize error {}", error).withContext(
+            Star::format("Could not report cursor restoration failure ({}): {}", restored.error().what(), written.error().what())));
+    }
     return std::unexpected(IOException::format("resize error {}", error));
   }
   return restored;

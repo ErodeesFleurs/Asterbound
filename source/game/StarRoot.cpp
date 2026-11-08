@@ -306,7 +306,7 @@ std::expected<void, StarException> Root::initialize() {
 
 Root::~Root() {
   if (auto logged = m_logger.info("Root: Shutting down Root"); !logged)
-    EmergencyLog::error("Root: Shutdown log failed: {}", outputException(logged.error(), true));
+    EmergencyLog::error("Root: Shutdown log failed: {}", Star::output_exception(logged.error(), true));
 
   {
     std::lock_guard locker(m_maintenanceStopMutex);
@@ -315,15 +315,15 @@ Root::~Root() {
   }
   if (m_maintenanceThread) {
     if (auto finished = m_maintenanceThread.finish(); !finished)
-      EmergencyLog::error("Root: Maintenance failed during shutdown: {}", outputException(finished.error(), true));
+      EmergencyLog::error("Root: Maintenance failed during shutdown: {}", Star::output_exception(finished.error(), true));
   }
   if (auto finished = m_workers.finish(); !finished)
-    EmergencyLog::error("Root: Worker shutdown failed: {}", outputException(finished.error(), true));
+    EmergencyLog::error("Root: Worker shutdown failed: {}", Star::output_exception(finished.error(), true));
 
   m_reloadListeners.clearAllListeners();
 
   if (auto written = writeConfig(); !written)
-    EmergencyLog::error("Root: Could not write configuration during shutdown: {}", outputException(written.error(), true));
+    EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
 
 }
 
@@ -629,7 +629,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
           if (loaded) {
             currentConfig = std::move(*loaded);
           } else {
-            auto logged = m_logger.warnException(strf("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
+            auto logged = m_logger.warnException(Star::format("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             auto backup = File::rename(*m_runtimeConfigFile, *m_runtimeConfigFile + ".old");
@@ -908,7 +908,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     assetSource->includes = std::move(*included);
 
     if (assetSource->name.value_or(String{}) == "opensb_base" && assetSource->version.value_or(String{}) != OpenStarVersionString) {
-      return std::unexpected(AssetSourceException(strf("\n\nOpenStarbound assets version mismatch!\nOpenStarbound v{}, but opensb.pak is v{}\n",
+      return std::unexpected(AssetSourceException(Star::format("\n\nOpenStarbound assets version mismatch!\nOpenStarbound v{}, but opensb.pak is v{}\n",
         OpenStarVersionString, assetSource->version.value_or(String{})), false));
     }
 
@@ -1006,7 +1006,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
         auto visited = dependencySortVisit(requirement->get());
         if (!visited) return std::unexpected(std::move(visited.error()));
       } else {
-        return std::unexpected(AssetSourceException(strf("Asset source '{}' is missing dependency '{}'{}", source->name ? *source->name : "<unnamed>", requirementName,
+        return std::unexpected(AssetSourceException(Star::format("Asset source '{}' is missing dependency '{}'{}", source->name ? *source->name : "<unnamed>", requirementName,
           requirementName != "base" ? "" :
             "\n\nThe base Starbound asset package could not be found, please copy it from another Starbound install!\n"
             "(Locate 'packed.pak' in vanilla Starbound's assets folder, then copy it to OpenStarbound's assets folder.)\n"), false));
@@ -1028,7 +1028,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
   for (auto const& source : dependencySortedSources) {
     auto path = File::convert_dir_separators(source->path);
     auto logged = source->name
-      ? m_logger.info("Root: Detected asset source named '{}'{} at '{}'", *source->name, source->version ? strf(" version '{}'", *source->version) : "", path)
+      ? m_logger.info("Root: Detected asset source named '{}'{} at '{}'", *source->name, source->version ? Star::format(" version '{}'", *source->version) : "", path)
       : m_logger.info("Root: Detected unnamed asset source at '{}'", path);
     if (!logged) return std::unexpected(std::move(logged.error()));
     sourcePaths.push_back(path);

@@ -205,7 +205,7 @@ std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json c
       auto chord = inputDescriptorFromJson(input);
       if (!chord) {
         auto logged = root.logger().warn("Could not load keybinding for {}: {}\n",
-            entry.first, outputException(ExceptionDiagnostic(chord.error()), false));
+            entry.first, Star::output_exception(ExceptionDiagnostic(chord.error()), false));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         continue;

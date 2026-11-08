@@ -24,6 +24,7 @@
 #endif
 
 import std;
+import star.text_formatter;
 import star.format;
 import star.string;
 import star.either;
@@ -199,14 +200,14 @@ void HostAddress::set(NetworkMode mode, std::span<std::uint8_t const> addr) {
     std::memset(m_address, 0, 16);
 }
 
-std::ostream& operator<<(std::ostream& os, HostAddress const& address) {
+void write_text(TextBuffer& buffer, HostAddress const& address) {
   switch (address.mode()) {
     case NetworkMode::IPv4:
-      format(os, "{}.{}.{}.{}", address.octet(0), address.octet(1), address.octet(2), address.octet(3));
+      std::format_to(std::back_inserter(buffer), "{}.{}.{}.{}", address.octet(0), address.octet(1), address.octet(2), address.octet(3));
       break;
 
     case NetworkMode::IPv6:
-      format(os,
+      std::format_to(std::back_inserter(buffer),
           "{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}:{:02x}{:02x}",
           address.octet(0),
           address.octet(1),
@@ -229,7 +230,6 @@ std::ostream& operator<<(std::ostream& os, HostAddress const& address) {
     default:
       std::unreachable(); // NetworkMode is established by construction/native conversion.
   }
-  return os;
 }
 
 std::size_t hash<HostAddress>::operator()(HostAddress const& address) const {
@@ -290,9 +290,10 @@ bool HostAddressWithPort::operator==(HostAddressWithPort const& rhs) const {
   return std::tie(m_address, m_port) == std::tie(rhs.m_address, rhs.m_port);
 }
 
-std::ostream& operator<<(std::ostream& os, HostAddressWithPort const& addressWithPort) {
-  os << addressWithPort.address() << ":" << addressWithPort.port();
-  return os;
+void write_text(TextBuffer& buffer, HostAddressWithPort const& addressWithPort) {
+  append_text(buffer, addressWithPort.address());
+  buffer.push_back(':');
+  append_text(buffer, addressWithPort.port());
 }
 
 std::size_t hash<HostAddressWithPort>::operator()(HostAddressWithPort const& addressWithPort) const {

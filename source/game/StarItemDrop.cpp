@@ -394,7 +394,7 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
   if (!setup) {
     auto cleaned = uninit();
     if (!cleaned)
-      return std::unexpected(cleaned.error().withContext(printException(setup.error(), true)));
+      return std::unexpected(cleaned.error().withContext(Star::print_exception(setup.error(), true)));
   }
   return setup;
 }
@@ -408,7 +408,7 @@ std::expected<void, StarException> ItemDrop::uninit() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        error = result.error().withContext(printException(*error, true));
+        error = result.error().withContext(Star::print_exception(*error, true));
       else
         error = std::move(result.error());
     }

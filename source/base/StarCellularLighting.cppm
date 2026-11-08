@@ -54,7 +54,7 @@ private:
 
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, float v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::set", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] = pixels[1] = pixels[2] = v;
   return {};
@@ -62,7 +62,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::set", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] = v.x();
   pixels[1] = v.y();
@@ -72,7 +72,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 
 inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::add", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::add", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] += v.x();
   pixels[1] += v.y();
@@ -82,7 +82,7 @@ inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, 
 
 inline std::expected<Vec3F, StarException> Lightmap::get(unsigned x, unsigned y) const {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::get", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::get", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   return Vec3F(pixels[0], pixels[1], pixels[2]);
 }

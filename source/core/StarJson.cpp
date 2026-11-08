@@ -9,6 +9,7 @@ import star.data_stream;
 import star.algorithm;
 import star.lexical_cast;
 import star.format;
+import star.text_formatter;
 
 import star.json_parser;
 import star.json_builder;
@@ -115,7 +116,7 @@ std::expected<Json::Type, StarException> Json::typeFromName(String const& t) {
   else if (t == "null")
     return Type::Null;
   else
-    return std::unexpected(JsonException(strf("String '{}' is not a valid json type", t)));
+    return std::unexpected(JsonException(Star::format("String '{}' is not a valid json type", t)));
 }
 
 String Json::typeName(Type t) {
@@ -824,15 +825,23 @@ std::expected<String, StarException> Json::printString() const {
   return repr(0, false);
 }
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Json const& value) {
-  auto written = outputUtf8Json(value, std::ostream_iterator<char>(os), 0, false);
-  if (!written)
-    return std::unexpected(std::move(written.error()));
-  return std::ref(os);
+std::expected<void, StarException> write_text(TextBuffer& output, Json const& value) {
+  struct Sink {
+    TextBuffer& output;
+    std::expected<void, StarException> push(char c) {
+      output.push_back(c);
+      return {};
+    }
+    std::expected<void, StarException> append(std::string_view bytes) {
+      output.append(bytes);
+      return {};
+    }
+  };
+  return outputUtf8Json(value, Sink{output}, 0, false);
 }
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, JsonObject const& value) {
-  return os << Json(value);
+std::expected<void, StarException> write_text(TextBuffer& output, JsonObject const& value) {
+  return write_text(output, Json(value));
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Json const& value) {

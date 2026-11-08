@@ -248,7 +248,7 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
   if (!setup) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(setup.error().withContext(strf("Companion initialization rollback failed: {}", cleanup.error().what())));
+      return std::unexpected(setup.error().withContext(Star::format("Companion initialization rollback failed: {}", cleanup.error().what())));
   }
   return setup;
 }

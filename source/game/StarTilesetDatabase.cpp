@@ -409,12 +409,12 @@ namespace Tiled {
     return values[id];
   }
   std::size_t Tileset::size() const {
-    if constexpr (Star::DebugEnabled) Star::starAssertFailed((m_tilesBack.size() == m_tilesFront.size()));
+    if constexpr (Star::DebugEnabled) Star::star_assert_failed((m_tilesBack.size() == m_tilesFront.size()));
     return m_tilesBack.size();
   }
   List<std::shared_ptr<Tile const>> const& Tileset::tiles(TileLayer layer) const {
     if (layer == TileLayer::Background) return m_tilesBack;
-    if constexpr (Star::DebugEnabled) Star::starAssertFailed((layer == TileLayer::Foreground));
+    if constexpr (Star::DebugEnabled) Star::star_assert_failed((layer == TileLayer::Foreground));
     return m_tilesFront;
   }
 

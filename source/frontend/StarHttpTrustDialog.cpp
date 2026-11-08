@@ -103,7 +103,7 @@ std::expected<void, StarException> HttpTrustDialog::displayRequest(String const&
     return std::unexpected(std::move(domainLabel.error()));
   if (!*domainLabel)
     return std::unexpected(GUIBuilderException("Missing HTTP trust domain label"));
-  auto text = (*domainLabel)->setText(strf("^green;{}^reset;", domain));
+  auto text = (*domainLabel)->setText(Star::format("^green;{}^reset;", domain));
   if (!text)
     return std::unexpected(std::move(text.error()));
   auto yes = fetchChild<ButtonWidget>("yes");

@@ -288,7 +288,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
         if (blockKey.anchor) {
           if (anchorPosition)
             return std::unexpected(WorldStructureException(
-                strf("Multiple anchor points defined in blockImage, first point is at {}, second at {}",
+                Star::format("Multiple anchor points defined in blockImage, first point is at {}, second at {}",
                     *anchorPosition,
                     pos)));
           anchorPosition = pos;

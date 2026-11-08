@@ -95,7 +95,7 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
   payloads.reserve(count);
   auto memory = std::make_shared<Star::MemoryAssetSource>("batch-benchmark");
   for (std::size_t i = 0; i != count; ++i) {
-    auto name = Star::strf("asset-{:05}.bin", i);
+    auto name = Star::format("asset-{:05}.bin", i);
     paths.push_back("/" + name);
     Star::ByteArray bytes(1 + (i * 37) % 512, '\0');
     for (std::size_t j = 0; j != bytes.size(); ++j)

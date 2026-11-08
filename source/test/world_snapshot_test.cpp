@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json_extra;
 import star.json;
 import star.xx_hash;
@@ -369,8 +370,8 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     ASSERT_TRUE(firstHash) << firstHash.error().what();
     auto secondHash = sampleWorld(**secondWorld, surfaceLevel);
     ASSERT_TRUE(secondHash) << secondHash.error().what();
-    std::cerr << "WorldSnapshot: " << coordinate->id() << " hashes to 0x" << std::hex << *firstHash << std::dec
-              << std::endl;
+    auto reported = Star::print(stderr, "WorldSnapshot: {} hashes to 0x{:x}\n", coordinate->id(), *firstHash);
+    ASSERT_TRUE(reported) << reported.error().what();
 
     EXPECT_EQ(*firstHash, *secondHash);
     EXPECT_EQ(*firstHash, 0x801745d507acfcaaull) << "update the expected hash (printed above)";
@@ -440,7 +441,8 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
         ++nonEmptyTiles;
     }
   }
-  std::cerr << "WorldSnapshot: ship world hashes to 0x" << std::hex << firstHash << std::dec << std::endl;
+  auto reported = Star::print(stderr, "WorldSnapshot: ship world hashes to 0x{:x}\n", firstHash);
+  ASSERT_TRUE(reported) << reported.error().what();
 
   EXPECT_GT(nonEmptyTiles, 0u) << "the sampled region does not contain any ship structure";
   EXPECT_EQ(firstHash, secondHash);

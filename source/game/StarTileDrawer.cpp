@@ -198,8 +198,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
 
   auto getPieceImage = [](std::shared_ptr<MaterialRenderPiece const> const& piece, Box<float, 2> const& box, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives) -> AssetPath {
     String path = (hue == 0)
-      ? strf("{}?crop={};{};{};{}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax())
-      : strf("{}?crop={};{};{};{}?hueshift={}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax(), materialHueToDegrees(hue));
+      ? Star::format("{}?crop={};{};{};{}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax())
+      : Star::format("{}?crop={};{};{};{}?hueshift={}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax(), materialHueToDegrees(hue));
 
     AssetPath image(path);
     if (directives)

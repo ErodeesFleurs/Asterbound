@@ -294,7 +294,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
         auto metadata = root.imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto added = drawable.imagePart().addDirectives(**metadata, Directives(String(strf("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
+        auto added = drawable.imagePart().addDirectives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }

@@ -103,7 +103,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
       };
       auto result = invoke();
       if (!result) {
-        auto logged = m_logger.error("Error while handling variant rpc request handler call. {}", outputException(ExceptionDiagnostic(result.error()), false));
+        auto logged = m_logger.error("Error while handling variant rpc request handler call. {}", Star::output_exception(ExceptionDiagnostic(result.error()), false));
         m_pending.push_back(JsonObject{{"command", "fail"}, {"id", *id}});
         if (!logged)
           return std::unexpected(std::move(logged.error()));
@@ -126,7 +126,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
         return keeper->fulfill(std::move(*result));
       };
       if (auto status = complete(); !status) {
-        if (auto logged = m_logger.error("Error while handling variant rpc response handler call. {}", outputException(ExceptionDiagnostic(status.error()), true)); !logged)
+        if (auto logged = m_logger.error("Error while handling variant rpc response handler call. {}", Star::output_exception(ExceptionDiagnostic(status.error()), true)); !logged)
           return std::unexpected(std::move(logged.error()));
       }
     }

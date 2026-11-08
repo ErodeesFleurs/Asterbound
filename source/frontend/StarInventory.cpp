@@ -874,7 +874,7 @@ std::expected<std::shared_ptr<Pane>, StarException> InventoryPane::createTooltip
       return std::unexpected(enumResult109.error());
     for (auto const& p : (*enumResult109)) {
       {
-        auto fetchChildResult110 = fetchChild<ImageWidget>(strf("tech{}", p.second));
+        auto fetchChildResult110 = fetchChild<ImageWidget>(Star::format("tech{}", p.second));
         if (!fetchChildResult110)
           return std::unexpected(std::move(fetchChildResult110.error()));
         if (auto techIcon = std::move(*fetchChildResult110)) {
@@ -1117,7 +1117,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       return std::unexpected(enumResult137.error());
     for (auto const& p : (*enumResult137)) {
       {
-        auto fetchChildResult138 = fetchChild<ImageWidget>(strf("tech{}", p.second));
+        auto fetchChildResult138 = fetchChild<ImageWidget>(Star::format("tech{}", p.second));
         if (!fetchChildResult138)
           return std::unexpected(std::move(fetchChildResult138.error()));
         if (auto techIcon = std::move(*fetchChildResult138)) {
@@ -1218,7 +1218,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto maxHealthResult152 = m_player->maxHealth();
   if (!maxHealthResult152)
     return std::unexpected(std::move(maxHealthResult152.error()));
-  auto setTextResult153 = healthLabel->setText(strf("{:.1f}", std::move(*maxHealthResult152)));
+  auto setTextResult153 = healthLabel->setText(Star::format("{:.1f}", std::move(*maxHealthResult152)));
   if (!setTextResult153)
     return std::unexpected(std::move(setTextResult153.error()));
   auto fetchChildResult154 = fetchChild<LabelWidget>("energytext");
@@ -1228,7 +1228,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto maxEnergyResult155 = m_player->maxEnergy();
   if (!maxEnergyResult155)
     return std::unexpected(std::move(maxEnergyResult155.error()));
-  auto setTextResult156 = energyLabel->setText(strf("{:.1f}", std::move(*maxEnergyResult155)));
+  auto setTextResult156 = energyLabel->setText(Star::format("{:.1f}", std::move(*maxEnergyResult155)));
   if (!setTextResult156)
     return std::unexpected(std::move(setTextResult156.error()));
   auto fetchChildResult157 = fetchChild<LabelWidget>("weapontext");
@@ -1238,7 +1238,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto powerMultiplierResult158 = m_player->powerMultiplier();
   if (!powerMultiplierResult158)
     return std::unexpected(std::move(powerMultiplierResult158.error()));
-  auto setTextResult159 = weaponLabel->setText(strf("{:.1f}%", std::move(*powerMultiplierResult158) * 100));
+  auto setTextResult159 = weaponLabel->setText(Star::format("{:.1f}%", std::move(*powerMultiplierResult158) * 100));
   if (!setTextResult159)
     return std::unexpected(std::move(setTextResult159.error()));
   auto fetchChildResult160 = fetchChild<LabelWidget>("defensetext");
@@ -1254,7 +1254,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     }
   else
     {
-      auto setTextResult162 = defenseLabel->setText(strf("{:.1f}", m_player->protection()));
+      auto setTextResult162 = defenseLabel->setText(Star::format("{:.1f}", m_player->protection()));
       if (!setTextResult162)
         return std::unexpected(std::move(setTextResult162.error()));
       
@@ -1264,7 +1264,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   if (!fetchChildResult163)
     return std::unexpected(std::move(fetchChildResult163.error()));
   auto moneyLabel = std::move(*fetchChildResult163);
-  auto setTextResult164 = moneyLabel->setText(toString(m_player->currency("money")));
+  auto setTextResult164 = moneyLabel->setText(Star::to_string(m_player->currency("money")));
   if (!setTextResult164)
     return std::unexpected(std::move(setTextResult164.error()));
 
@@ -1282,7 +1282,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     auto showResult168 = essenceLabel->show();
     if (!showResult168)
       return std::unexpected(std::move(showResult168.error()));
-    auto setTextResult169 = essenceLabel->setText(toString(m_player->currency("essence")));
+    auto setTextResult169 = essenceLabel->setText(Star::to_string(m_player->currency("essence")));
     if (!setTextResult169)
       return std::unexpected(std::move(setTextResult169.error()));
   } else {
@@ -1362,7 +1362,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       if (!statResult188)
         return std::unexpected(std::move(statResult188.error()));
       if (auto attack = std::move(*statResult188)) {
-        auto setTextResult189 = attackLabel->setText(strf("{:.1f}", *attack));
+        auto setTextResult189 = attackLabel->setText(Star::format("{:.1f}", *attack));
         if (!setTextResult189)
           return std::unexpected(std::move(setTextResult189.error()));
       } else {
@@ -1381,7 +1381,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       if (!statResult192)
         return std::unexpected(std::move(statResult192.error()));
       if (auto defense = std::move(*statResult192)) {
-        auto setTextResult193 = defenseLabel->setText(strf("{:.1f}", *defense));
+        auto setTextResult193 = defenseLabel->setText(Star::format("{:.1f}", *defense));
         if (!setTextResult193)
           return std::unexpected(std::move(setTextResult193.error()));
       } else {

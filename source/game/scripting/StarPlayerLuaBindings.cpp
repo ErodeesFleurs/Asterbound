@@ -202,7 +202,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (loaded) return {};
     auto rollback = player.diskLoad(*saved);
     if (!rollback)
-      return std::unexpected(loaded.error().withContext(strf("Player load failed; restoring saved player state also failed: {}", printException(ExceptionDiagnostic(rollback.error()), true))));
+      return std::unexpected(loaded.error().withContext(Star::format("Player load failed; restoring saved player state also failed: {}", Star::print_exception(ExceptionDiagnostic(rollback.error()), true))));
     return std::unexpected(std::move(loaded.error()));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
@@ -1471,7 +1471,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.registerCallback("currentQuestWorld", [&player]() -> std::expected<std::optional<String>, StarException> {
     if (auto quest = player.questManager()->currentQuest()) {
       if (auto worldId = (*quest)->worldId()) {
-        auto id = printWorldId(*worldId);
+        auto id = Star::print_world_id(*worldId);
     if (!id) return std::unexpected(std::move(id.error()));
     return std::move(*id);
       }
@@ -1485,7 +1485,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto current = player.questManager()->currentQuest();
     for (auto const& quest : player.questManager()->listActiveQuests()) {
       if (auto worldId = quest->worldId()) {
-        auto id = printWorldId(*worldId);
+        auto id = Star::print_world_id(*worldId);
     if (!id) return std::unexpected(std::move(id.error()));
     bool selected = current && (*current)->questId() == quest->questId();
     result.push_back({std::move(*id), selected});
@@ -1563,7 +1563,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback("worldId", [&player]() -> std::expected<String, StarException> {
-    return printWorldId(player.clientContext()->playerWorldId());
+    return Star::print_world_id(player.clientContext()->playerWorldId());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -1575,7 +1575,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.registerCallback("ownShipWorldId", [&player]() -> std::expected<String, StarException> {
     auto uuid = player.uuid();
     if (!uuid) return std::unexpected(std::move(uuid.error()));
-    return printWorldId(ClientShipWorldId(*uuid));
+    return Star::print_world_id(ClientShipWorldId(*uuid));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

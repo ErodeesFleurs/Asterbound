@@ -253,7 +253,7 @@ auto StaticVector<Element, MaxSize>::at(std::size_t i) const -> std::expected<st
 template <typename Element, std::size_t MaxSize>
 auto StaticVector<Element, MaxSize>::operator[](std::size_t i) -> reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return ptr()[i];
 }
@@ -261,7 +261,7 @@ auto StaticVector<Element, MaxSize>::operator[](std::size_t i) -> reference {
 template <typename Element, std::size_t MaxSize>
 auto StaticVector<Element, MaxSize>::operator[](std::size_t i) const -> const_reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return ptr()[i];
 }

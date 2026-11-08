@@ -62,7 +62,7 @@ template<> [[nodiscard]] std::expected<OrbitTarget, StarException> jsonToBookmar
 }
 
 template<> [[nodiscard]] std::expected<Json, StarException> jsonFromBookmarkTarget<TeleportTarget>(TeleportTarget const& target) {
-  auto world = printWorldId(target.first);
+  auto world = Star::print_world_id(target.first);
   if (!world)
     return std::unexpected(std::move(world.error()));
   return JsonArray{std::move(*world), spawnTargetToJson(target.second)};

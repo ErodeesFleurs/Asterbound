@@ -695,7 +695,7 @@ std::expected<std::size_t, StarException> Audio::resample(unsigned destinationCh
           if (sourceSample < readSamples) {
             unsigned sourceBufferIndex = sourceSample * sourceChannels;
             if constexpr (Star::DebugEnabled) {
-              Star::starAssertFailed((sourceBufferIndex + sourceChannel < sourceBufferSize));
+              Star::star_assert_failed((sourceBufferIndex + sourceChannel < sourceBufferSize));
             }
             sample += sourceBuffer[sourceBufferIndex + sourceChannel];
             ++sampleCount;

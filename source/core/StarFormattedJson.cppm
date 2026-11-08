@@ -1,5 +1,6 @@
 module;
 import star.format;
+import star.text_formatter;
 import star.string;
 import star.list;
 
@@ -51,7 +52,7 @@ struct CommaElement {
 using JsonElement = std::variant<ValueElement, ObjectKeyElement, WhitespaceElement, ColonElement, CommaElement>;
 
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, JsonElement const& elem);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, JsonElement const& elem);
 
 // Class representing formatted JSON data. Preserves whitespace and comments.
 class FormattedJson {
@@ -141,7 +142,7 @@ private:
   List<ElementLocation> m_arrayElementLocations;
 };
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, FormattedJson const& json);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, FormattedJson const& json);
 
 }
 
@@ -157,5 +158,5 @@ export namespace Star {
   using ::Star::WhitespaceElement;
   using ::Star::ColonElement;
   using ::Star::CommaElement;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

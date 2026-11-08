@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -277,7 +278,8 @@ public:
 int main(int argc, char** argv) {
   auto runtime = Star::NativeRuntime::create();
   if (!runtime) {
-    std::cerr << runtime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", runtime.error().what()))
+      return 1;
     return 1;
   }
   register_family<float, 2>("Float");

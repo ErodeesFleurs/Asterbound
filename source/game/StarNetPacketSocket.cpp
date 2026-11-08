@@ -559,7 +559,7 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
   auto written = write();
   if (!written) {
     if (written.error().is<SocketClosedException>()) {
-      auto logged = m_logger.debug("TcpPacketSocket socket closed: {}", outputException(written.error(), false));
+      auto logged = m_logger.debug("TcpPacketSocket socket closed: {}", Star::output_exception(written.error(), false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (written.error().is<IOException>()) {
@@ -603,7 +603,7 @@ std::expected<bool, StarException> TcpPacketSocket::readData() {
   auto received = read();
   if (!received) {
     if (received.error().is<SocketClosedException>()) {
-      auto logged = m_logger.debug("TcpPacketSocket socket closed: {}", outputException(received.error(), false));
+      auto logged = m_logger.debug("TcpPacketSocket socket closed: {}", Star::output_exception(received.error(), false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (received.error().is<IOException>()) {

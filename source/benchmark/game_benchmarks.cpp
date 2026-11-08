@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -310,7 +311,7 @@ void worldLayoutToJson(benchmark::State& state, BenchmarkSession& session) {
       return;
     }
   }
-  state.SetLabel(strf("{}/{}; seed={}; toJson only, no text encoding", *type, *size, seed));
+  state.SetLabel(Star::format("{}/{}; seed={}; toJson only, no text encoding", *type, *size, seed));
   for (auto _ : state) {
     (void)_;
     auto stored = layout->toJson();
@@ -397,7 +398,7 @@ std::expected<void, StarException> inspectProfile(Json const& entries, std::size
     shape.depth = std::max(shape.depth, depth);
     for (unsigned branch = 0; branch != 8; ++branch) {
       for (unsigned leaf = 0; leaf != 8; ++leaf) {
-        if (*name == strf("leaf_{}_{}", branch, leaf))
+        if (*name == Star::format("leaf_{}_{}", branch, leaf))
           shape.leaves[branch * 8 + leaf] = true;
       }
     }
@@ -523,7 +524,8 @@ void luaNestedProfileExport(benchmark::State& state, BenchmarkSession& session) 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   // Recognized Google Benchmark flags are removed first. Remaining -bootconfig
@@ -532,17 +534,20 @@ int main(int argc, char** argv) {
   BenchmarkLifetime benchmarkLifetime;
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    std::fprintf(stderr, "%s\n", storage.error().what());
+    if (!Star::print(stderr, "{}\n", storage.error().what()))
+      return 1;
     return 1;
   }
   // Never persist configuration or rotate logs, even if extra RootLoader flags
@@ -551,7 +556,8 @@ int main(int argc, char** argv) {
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   BenchmarkSession session{**root};

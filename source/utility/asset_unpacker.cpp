@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.memory;
 import star.io_device;
 import star.json;
@@ -82,8 +83,7 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
           unsafeName = true;
       }
       if (unsafeName) {
-        cerrf("Skipping entry with unsafe path: {}\n", file);
-        return {};
+        return Star::print(stderr, "Skipping entry with unsafe path: {}\n", file);
       }
 
       auto fileData = (*assetsPack)->read(file);
@@ -97,16 +97,20 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
       auto written = File::write_file(*fileData, relativePath);
       if (!written)
         return std::unexpected(std::move(written.error()));
-      if (verbose)
-        coutf("Extracting file '{}' to the output directory as '{}'\n", file, relativePath);
+      if (verbose) {
+        if (auto written = Star::print("Extracting file '{}' to the output directory as '{}'\n", file, relativePath); !written)
+          return std::unexpected(std::move(written.error()));
+      }
       return {};
     };
     auto extracted = extractEntry();
     if (!extracted) {
       if (!extracted.error().is<AssetSourceException>())
         return std::unexpected(std::move(extracted.error()));
-      cerrf("Could not open file: {}\n", file);
-      cerrf("Reason: {}\n", outputException(ExceptionDiagnostic(extracted.error()), false));
+      if (auto written = Star::print(stderr, "Could not open file: {}\n", file); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Reason: {}\n", Star::output_exception(ExceptionDiagnostic(extracted.error()), false)); !written)
+        return std::unexpected(std::move(written.error()));
     }
   }
 
@@ -120,19 +124,22 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
       return std::unexpected(std::move(written.error()));
   }
 
-  coutf("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count());
+  if (auto written = Star::print("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+    return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = unpackAssets(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

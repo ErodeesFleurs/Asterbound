@@ -189,7 +189,7 @@ std::expected<String, StarException> AiDatabase::portraitImage(String const& spe
   auto parameters = m_speciesParameters.get(species);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  return strf("/ai/{}:{}", parameters->get().portraitFrames, frame);
+  return Star::format("/ai/{}:{}", parameters->get().portraitFrames, frame);
 }
 
 std::expected<Animation, StarException> AiDatabase::animation(String const& species, String const& animationName) const {

@@ -197,7 +197,7 @@ String hexEncode(std::span<char const> data) {
   res.resize_and_overwrite(data.size() * 2, [data](char* output, std::size_t size) noexcept {
     std::size_t encoded = hexEncode(data, {output, size});
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((encoded == size));
+      Star::star_assert_failed((encoded == size));
     }
     return encoded;
   });
@@ -209,7 +209,7 @@ String base64Encode(std::span<char const> data) {
   res.resize_and_overwrite(data.size() * 4 / 3 + 3, [data](char* output, std::size_t size) noexcept {
     std::size_t encoded = base64Encode(data, {output, size});
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((encoded <= size));
+      Star::star_assert_failed((encoded <= size));
     }
     return encoded;
   });

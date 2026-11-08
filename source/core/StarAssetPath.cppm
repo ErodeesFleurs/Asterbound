@@ -2,7 +2,7 @@ module;
 import std;
 import star.format;
 import star.string;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 
 import star.data_stream;
@@ -25,7 +25,7 @@ namespace Star {
 struct AssetPath {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, AssetPath& path);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, AssetPath const& path);
-  friend std::ostream& operator<<(std::ostream& os, AssetPath const& rhs);
+  friend void write_text(TextBuffer& buffer, AssetPath const& rhs);
   friend struct hash<AssetPath>;
   static AssetPath split(String const& path);
   static String join(AssetPath const& path);
@@ -81,7 +81,7 @@ struct AssetPath {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, AssetPath& path);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, AssetPath const& path);
 
-std::ostream& operator<<(std::ostream& os, AssetPath const& rhs);
+void write_text(TextBuffer& buffer, AssetPath const& rhs);
 
 template <>
 struct hash<AssetPath> {
@@ -98,8 +98,9 @@ export namespace Star {
 }
 
 
-export template <> struct std::formatter<Star::AssetPath> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::AssetPath> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::AssetPath;
+  using ::Star::write_text;
 }

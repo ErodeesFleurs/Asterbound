@@ -33,7 +33,7 @@ std::expected<String, StarException> printEdge(Edge const& edge) {
   auto name = actionName(edge.action);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return strf("Edge{{cost = {}, action = {}, jumpVelocity = {}, source = {}, target = {}}}",
+  return Star::format("Edge{{cost = {}, action = {}, jumpVelocity = {}, source = {}, target = {}}}",
       edge.cost, name->get(), edge.jumpVelocity, edge.source, edge.target);
 }
 

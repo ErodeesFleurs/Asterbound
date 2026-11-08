@@ -299,7 +299,7 @@ std::expected<void, StarException> CharSelectionPane::updateCharacterPlates() {
     return {};
   };
   for (unsigned i = 0; i < 4; ++i) {
-    if (auto result = updatePlayerLine(strf("charSelector{}", i + 1), m_downScroll + i); !result)
+    if (auto result = updatePlayerLine(Star::format("charSelector{}", i + 1), m_downScroll + i); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto up = requireChild("playerUpButton");

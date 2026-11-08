@@ -26,13 +26,13 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
   lockWithDiagnostics(locker);
 
   if (nick.empty())
-    nick = strf("Player_{}", clientId);
+    nick = Star::format("Player_{}", clientId);
 
   nick = makeNickUnique(nick);
 
   for (auto&& pair : m_clients) {
     pair.second.pendingMessages.push_back(
-      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, strf("Player '{}' connected", nick)});
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' connected", nick)});
   }
 
   auto added = m_clients.add(clientId, ClientInfo(clientId, nick));
@@ -56,7 +56,7 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
 
   for (auto&& pair : m_clients) {
     pair.second.pendingMessages.push_back(
-      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, strf("Player '{}' disconnected", clientInfo.nick)});
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' disconnected", clientInfo.nick)});
   }
 
   return clientInfo.pendingMessages;
@@ -297,7 +297,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
     if (!trimmed) return std::unexpected(std::move(trimmed.error()));
     auto newNick = renick(message.fromConnection, *trimmed);
     if (!newNick) return std::unexpected(std::move(newNick.error()));
-    response = strf("Nick changed to {}", *newNick);
+    response = Star::format("Nick changed to {}", *newNick);
   } else if (*command == "w") {
     auto target = commandLine.extract();
     if (!target) return std::unexpected(std::move(target.error()));
@@ -307,7 +307,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
       auto sent = whisper(message.fromConnection, id->get(), *trimmed, {});
       if (!sent) return std::unexpected(std::move(sent.error()));
     } else {
-      response = strf("No such nick {}", *target);
+      response = Star::format("No such nick {}", *target);
     }
   } else if (m_commandHandler) {
     auto res = m_commandHandler(message.fromConnection, *command, commandLine);
@@ -319,7 +319,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
       m_commandPromises[uuid] = std::make_pair(message.fromConnection, std::move(std::get<RpcPromise<String>>(*res)));
     }
   } else {
-    response = strf("No such command {}", *command);
+    response = Star::format("No such command {}", *command);
   }
   if (!response.empty()) {
     auto client = m_clients.get(message.fromConnection);
@@ -350,7 +350,7 @@ std::expected<void, StarException> ChatProcessor::updatePromises() {
         auto error = entry.second.error();
         if (!error) return std::unexpected(std::move(error.error()));
         if (!*error) return std::unexpected(RpcPromiseException("Failed command has no error"));
-        response = strf("Error: {}", **error);
+        response = Star::format("Error: {}", **error);
       }
       if (!response.empty()) {
         auto client = m_clients.get(entry.first);

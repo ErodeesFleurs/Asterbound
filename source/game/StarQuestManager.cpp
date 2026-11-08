@@ -416,7 +416,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
         if (*start && !arc.quests.empty()) {
           auto config = (*templates)->questTemplate(arc.quests[0].templateId);
           if (!config) return std::unexpected(std::move(config.error()));
-          if (!*config) return std::unexpected(StarException(strf("No quest template found for id '{}'", arc.quests[0].templateId)));
+          if (!*config) return std::unexpected(StarException(Star::format("No quest template found for id '{}'", arc.quests[0].templateId)));
           type = (*config)->questGiverIndicator;
           break;
         }
@@ -523,7 +523,7 @@ std::expected<void, StarException> QuestManager::update(float dt) {
 std::expected<void, StarException> QuestManager::startInitialQuests() {
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto json = (*assets)->json(strf("/quests/quests.config:initialquests.{}", m_player->get().species()));
+  auto json = (*assets)->json(Star::format("/quests/quests.config:initialquests.{}", m_player->get().species()));
   if (!json) return std::unexpected(std::move(json.error()));
   auto initial = json->toArray();
   if (!initial) return std::unexpected(std::move(initial.error()));

@@ -415,7 +415,7 @@ template <typename Element>
 void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
   std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
+    Star::star_assert_failed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
   m_changeData.push_back({currentVersion, std::move(change)});

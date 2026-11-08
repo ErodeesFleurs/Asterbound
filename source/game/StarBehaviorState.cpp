@@ -81,7 +81,7 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
         auto vector = value.toArray();
         if (!vector) return std::unexpected(std::move(vector.error()));
         if (vector->size() < 2)
-          return std::unexpected(StarException(strf("Vec2 parameter must contain at least two elements for key {}", p.first)));
+          return std::unexpected(StarException(Star::format("Vec2 parameter must contain at least two elements for key {}", p.first)));
         auto createdVector = m_luaContext.engine().createTable();
         if (!createdVector) return std::unexpected(std::move(createdVector.error()));
         LuaTable luaVector = std::move(*createdVector);
@@ -223,7 +223,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
     auto resumed = thread->resume<ActionReturn>(*parameters, blackboardPtr(), id, m_lastDt);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught running action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
+      return std::unexpected(StarException(Star::format("Lua Exception caught running action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
     auto status = std::get<0>(result);
@@ -233,7 +233,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
     auto resumed = thread.resume<ActionReturn>(m_lastDt);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught resuming action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
+      return std::unexpected(StarException(Star::format("Lua Exception caught resuming action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
     auto status = std::get<0>(result);
@@ -259,7 +259,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNo
     auto resumed = thread->resume<NodeStatus>(*parameters, blackboardPtr(), id);
     if (!resumed) {
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-      return std::unexpected(StarException(strf("Lua Exception caught initializing decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
+      return std::unexpected(StarException(Star::format("Lua Exception caught initializing decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
     status = resumed->value_or(NodeStatus::Invalid);
     if (status == NodeStatus::Success || status == NodeStatus::Failure) return status;
@@ -273,7 +273,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDecorator(DecoratorNo
       auto resumed = decorator.thread.resume<NodeStatus>(*child);
       if (!resumed) {
         if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
-        return std::unexpected(StarException(strf("Lua Exception caught resuming decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
+        return std::unexpected(StarException(Star::format("Lua Exception caught resuming decorator node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
       }
       status = resumed->value_or(NodeStatus::Invalid);
     } else return NodeStatus::Running;

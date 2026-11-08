@@ -255,10 +255,10 @@ inline void Image::set32(Vec2U const& pos, Vec4B const& c) {
 
 inline void Image::set32(unsigned x, unsigned y, Vec4B const& c) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed((m_data && x < m_width && y < m_height));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bytesPerPixel() == 4));
+    Star::star_assert_failed((bytesPerPixel() == 4));
   }
 
   std::size_t offset = y * m_width * 4 + x * 4;
@@ -270,10 +270,10 @@ inline void Image::set32(unsigned x, unsigned y, Vec4B const& c) {
 
 inline Vec4B Image::get32(unsigned x, unsigned y) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed((m_data && x < m_width && y < m_height));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bytesPerPixel() == 4));
+    Star::star_assert_failed((bytesPerPixel() == 4));
   }
 
   Vec4B c;
@@ -291,10 +291,10 @@ inline void Image::set24(Vec2U const& pos, Vec3B const& c) {
 
 inline void Image::set24(unsigned x, unsigned y, Vec3B const& c) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed((m_data && x < m_width && y < m_height));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bytesPerPixel() == 3));
+    Star::star_assert_failed((bytesPerPixel() == 3));
   }
 
   std::size_t offset = y * m_width * 3 + x * 3;
@@ -305,10 +305,10 @@ inline void Image::set24(unsigned x, unsigned y, Vec3B const& c) {
 
 inline Vec3B Image::get24(unsigned x, unsigned y) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed((m_data && x < m_width && y < m_height));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bytesPerPixel() == 3));
+    Star::star_assert_failed((bytesPerPixel() == 3));
   }
 
   Vec3B c;

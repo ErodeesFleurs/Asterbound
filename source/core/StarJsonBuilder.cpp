@@ -23,7 +23,7 @@ std::expected<void, StarException> JsonBuilderStream::endObject() {
     auto key = keyJson->stringPtr();
     if (!key) return std::unexpected(std::move(key.error()));
     if (!object.insert(**key, std::move(*value)).second)
-      return std::unexpected(JsonParsingException(strf("Json object contains a duplicate entry for key '{}'", **key)));
+      return std::unexpected(JsonParsingException(Star::format("Json object contains a duplicate entry for key '{}'", **key)));
   }
   return set(Json(std::move(object)));
 }

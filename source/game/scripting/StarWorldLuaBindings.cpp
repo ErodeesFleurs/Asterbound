@@ -631,7 +631,7 @@ namespace LuaBindings {
       } else if (*order == "random") {
         world.root().random().shuffle(entities);
       } else {
-        return std::unexpected(StarException(strf("Unsupported query order {}", order->view())));
+        return std::unexpected(StarException(Star::format("Unsupported query order {}", order->view())));
       }
     }
 
@@ -2525,7 +2525,7 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(strf("Could not create placable object of kind '{}'", objectType), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not create placable object of kind '{}'", objectType), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return false;
     }
@@ -2573,7 +2573,7 @@ namespace LuaBindings {
       if (!itemKindResult)
         return std::unexpected(std::move(itemKindResult.error()));
       auto itemKind = std::move(*itemKindResult);
-      if (auto logged = world.root().logger().warnException(strf("Could not spawn Item of kind '{}'", itemKind), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Item of kind '{}'", itemKind), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2604,7 +2604,7 @@ namespace LuaBindings {
       return {};
     };
     if (auto result = spawn(); !result) {
-      if (auto operation = world.root().logger().warnException(strf("Could not spawn treasure from pool '{}'", pool), ExceptionDiagnostic(result.error())); !operation)
+      if (auto operation = world.root().logger().warnException(Star::format("Could not spawn treasure from pool '{}'", pool), ExceptionDiagnostic(result.error())); !operation)
         return std::unexpected(std::move(operation.error()));
     }
     return entities;
@@ -2648,7 +2648,7 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(strf("Could not spawn Monster of type '{}'", arg1), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Monster of type '{}'", arg1), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2683,7 +2683,7 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(strf("Could not spawn NPC of species '{}' and type '{}'", arg2, arg3), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn NPC of species '{}' and type '{}'", arg2, arg3), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2708,7 +2708,7 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(strf("Could not spawn Stagehand of type '{}'", typeName), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Stagehand of type '{}'", typeName), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2740,7 +2740,7 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(strf("Could not spawn Projectile of type '{}'", projectileType), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Projectile of type '{}'", projectileType), ExceptionDiagnostic(result.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -3094,7 +3094,7 @@ namespace LuaBindings {
     else if (orientationName.empty())
       orientation = LoungeOrientation::None;
     else
-      return std::unexpected(StarException(strf("Unsupported loungeableQuery orientation {}", orientationName)));
+      return std::unexpected(StarException(Star::format("Unsupported loungeableQuery orientation {}", orientationName)));
 
     auto filter = [orientation](std::shared_ptr<LoungeableObject> const& entity) -> std::expected<bool, StarException> {
       auto loungeable = as<LoungeableEntity>(entity);
@@ -3339,7 +3339,7 @@ namespace LuaBindings {
     } else if (handName == "alt") {
       toolHand = ToolHand::Alt;
     } else {
-      return std::unexpected(StarException(strf("Unknown tool hand {}", handName)));
+      return std::unexpected(StarException(Star::format("Unknown tool hand {}", handName)));
     }
 
     if (auto entity = world.get<ToolUserEntity>(entityId)) {
@@ -3358,7 +3358,7 @@ namespace LuaBindings {
     } else if (handName == "alt") {
       toolHand = ToolHand::Alt;
     } else {
-      return std::unexpected(StarException(strf("Unknown tool hand {}", handName)));
+      return std::unexpected(StarException(Star::format("Unknown tool hand {}", handName)));
     }
 
     if (auto entity = world.get<ToolUserEntity>(entityId)) {
@@ -3898,7 +3898,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported material layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
     auto materialId = world.material(Vec2I::floor(position), layer);
@@ -3926,7 +3926,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported mod layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported mod layer {}", layerName)));
     }
 
     auto modId = world.mod(Vec2I::floor(position), layer);
@@ -3952,7 +3952,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported material layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
     return world.materialHueShift(Vec2I::floor(position), layer);
@@ -3965,7 +3965,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported material layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
     return world.modHueShift(Vec2I::floor(position), layer);
@@ -3978,7 +3978,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported material layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
     return world.colorVariant(Vec2I::floor(position), layer);
@@ -3991,7 +3991,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported material layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
     if (auto operation =
@@ -4018,7 +4018,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported tile layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
     }
 
     unsigned harvestLevel = 999;
@@ -4070,7 +4070,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
       else if (overrideName == "platform")
         placeMaterial.collisionOverride = TileCollisionOverride::Platform;
       else
-        return std::unexpected(StarException(strf("Unsupported collision override {}", overrideName)));
+        return std::unexpected(StarException(Star::format("Unsupported collision override {}", overrideName)));
     }
 
     if (layerName == "foreground")
@@ -4078,7 +4078,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     else if (layerName == "background")
       placeMaterial.layer = TileLayer::Background;
     else
-      return std::unexpected(StarException(strf("Unsupported tile layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
 
     auto materialName = arg3;
     auto materialDatabaseResult = world.root().materialDatabase();
@@ -4086,7 +4086,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
         return std::unexpected(std::move(materialDatabaseResult.error()));
       auto materialDatabase = std::move(*materialDatabaseResult);
     if (!materialDatabase->materialNames().contains(materialName))
-      return std::unexpected(StarException(strf("Unknown material name {}", materialName)));
+      return std::unexpected(StarException(Star::format("Unknown material name {}", materialName)));
     auto idResult = materialDatabase->materialId(materialName);
     if (!idResult)
       return std::unexpected(std::move(idResult.error()));
@@ -4121,7 +4121,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
       else if (overrideName == "platform")
         placeMaterial.collisionOverride = TileCollisionOverride::Platform;
       else
-        return std::unexpected(StarException(strf("Unsupported collision override {}", overrideName)));
+        return std::unexpected(StarException(Star::format("Unsupported collision override {}", overrideName)));
     }
 
     if (layerName == "foreground")
@@ -4129,14 +4129,14 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     else if (layerName == "background")
       placeMaterial.layer = TileLayer::Background;
     else
-      return std::unexpected(StarException(strf("Unsupported tile layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
 
     auto materialDatabaseResult = world.root().materialDatabase();
       if (!materialDatabaseResult)
         return std::unexpected(std::move(materialDatabaseResult.error()));
       auto materialDatabase = std::move(*materialDatabaseResult);
     if (!materialDatabase->materialNames().contains(materialName))
-      return std::unexpected(StarException(strf("Unknown material name {}", materialName)));
+      return std::unexpected(StarException(Star::format("Unknown material name {}", materialName)));
     auto idResult = materialDatabase->materialId(materialName);
     if (!idResult)
       return std::unexpected(std::move(idResult.error()));
@@ -4197,7 +4197,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
     } else if (layerName == "background") {
       placeMod.layer = TileLayer::Background;
     } else {
-      return std::unexpected(StarException(strf("Unsupported tile layer {}", layerName)));
+      return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
     }
 
     auto modName = arg3;
@@ -4206,7 +4206,7 @@ auto slotsResult = jsonFromList<std::size_t>(res.slots);
         return std::unexpected(std::move(materialDatabaseResult.error()));
       auto materialDatabase = std::move(*materialDatabaseResult);
     if (!materialDatabase->modNames().contains(modName))
-      return std::unexpected(StarException(strf("Unknown mod name {}", modName)));
+      return std::unexpected(StarException(Star::format("Unknown mod name {}", modName)));
     auto idResult = materialDatabase->modId(modName);
     if (!idResult)
       return std::unexpected(std::move(idResult.error()));

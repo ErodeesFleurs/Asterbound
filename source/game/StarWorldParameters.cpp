@@ -1630,7 +1630,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!subsurfaceLayerOptional) return std::unexpected(StarException("Required terrestrial layer subsurface is missing or disabled"));
   parameters->subsurfaceLayer = std::move(*subsurfaceLayerOptional);
   for (;;) {
-    auto underground = readLayer(strf("underground{}", parameters->undergroundLayers.size() + 1));
+    auto underground = readLayer(Star::format("underground{}", parameters->undergroundLayers.size() + 1));
     if (!underground) return std::unexpected(std::move(underground.error()));
     if (!*underground) break;
     parameters->undergroundLayers.push_back(std::move(**underground));

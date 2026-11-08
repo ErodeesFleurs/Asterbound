@@ -127,12 +127,12 @@ HttpClient::~HttpClient() = default;
       timeout
     );
   } else {
-    response.error = strf("Unsupported HTTP method: {}", req.method);
+    response.error = Star::format("Unsupported HTTP method: {}", req.method);
     return response;
   }
 
   if (r.error.code != cpr::ErrorCode::OK) {
-    response.error = strf("HTTP error: {}", r.error.message);
+    response.error = Star::format("HTTP error: {}", r.error.message);
     return response;
   }
 

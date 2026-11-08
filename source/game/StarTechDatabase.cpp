@@ -129,7 +129,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     return tech;
   }();
   if (!parsed)
-    return std::unexpected(TechDatabaseException(strf("Error reading tech config {}", path), parsed.error()));
+    return std::unexpected(TechDatabaseException(Star::format("Error reading tech config {}", path), parsed.error()));
   return parsed;
 }
 

@@ -677,7 +677,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         } else if (handName == "alt") {
             toolHand = ToolHand::Alt;
         } else {
-            return std::unexpected(StarException(strf("Unknown tool hand {}", handName)));
+            return std::unexpected(StarException(Star::format("Unknown tool hand {}", handName)));
         }
 
         if (auto toolUser = asRef<ToolUserEntity>(*entity)) {
@@ -698,7 +698,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         } else if (handName == "alt") {
             toolHand = ToolHand::Alt;
         } else {
-            return std::unexpected(StarException(strf("Unknown tool hand {}", handName)));
+            return std::unexpected(StarException(Star::format("Unknown tool hand {}", handName)));
         }
 
         if (auto toolUser = asRef<ToolUserEntity>(*entity)) {

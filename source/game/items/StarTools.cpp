@@ -170,7 +170,7 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
   item->m_frameCycle = *cycle;
   item->m_frameTiming = 0;
   for (std::size_t i = 0; i < static_cast<std::size_t>(item->m_frames); i++) {
-    auto frame = item->m_image.replace("{frame}", toString(i));
+    auto frame = item->m_image.replace("{frame}", Star::to_string(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
     item->m_animationFrame.push_back(std::move(*frame));
@@ -447,7 +447,7 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
   for (std::size_t i = 0; i < static_cast<std::size_t>(item->m_frames); i++) {
-    auto frame = item->m_image.replace("{frame}", toString(i));
+    auto frame = item->m_image.replace("{frame}", Star::to_string(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
     item->m_animationFrame.push_back(std::move(*frame));

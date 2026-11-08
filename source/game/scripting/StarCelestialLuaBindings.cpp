@@ -459,7 +459,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       return std::unexpected(std::move(action.error()));
     if (*action)
       if (std::holds_alternative<WarpToWorld>(**action))
-        return printWorldId(std::get<WarpToWorld>(**action).world);
+        return Star::print_world_id(std::get<WarpToWorld>(**action).world);
     return {};
   }); !registration)
       return std::unexpected(std::move(registration.error()));

@@ -118,7 +118,7 @@ T clamp(T const val, T const min, T const max) {
 template <typename IntType, typename PowType>
 IntType intPow(IntType i, PowType p) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((p >= 0));
+    Star::star_assert_failed((p >= 0));
   }
 
   if (p == 0)

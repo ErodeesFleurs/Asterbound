@@ -157,20 +157,20 @@ std::expected<RootLoader, StarException> RootLoader::create(Defaults defaults) {
     "Boot time configuration file, defaults to sbinit.config");
   if (!boot) return std::unexpected(std::move(boot.error()));
   auto logfile = loader.addParameter("logfile", "logfile", Optional,
-    strf("Log to the given logfile relative to the root directory, defaults to {}",
+    Star::format("Log to the given logfile relative to the root directory, defaults to {}",
       loader.m_defaults.logFile ? *loader.m_defaults.logFile : "no log file"));
   if (!logfile) return std::unexpected(std::move(logfile.error()));
   auto levelName = enumName<LogLevelNames>(loader.m_defaults.logLevel);
   if (!levelName) return std::unexpected(std::move(levelName.error()));
   auto loglevel = loader.addParameter("loglevel", "level", Optional,
-    strf("Sets the logging level (debug|info|warn|error), defaults to {}", *levelName));
+    Star::format("Sets the logging level (debug|info|warn|error), defaults to {}", *levelName));
   if (!loglevel) return std::unexpected(std::move(loglevel.error()));
-  auto quiet = loader.addSwitch("quiet", strf("Do not log to stdout, defaults to {}", loader.m_defaults.quiet));
+  auto quiet = loader.addSwitch("quiet", Star::format("Do not log to stdout, defaults to {}", loader.m_defaults.quiet));
   if (!quiet) return std::unexpected(std::move(quiet.error()));
-  auto verbose = loader.addSwitch("verbose", strf("Log to stdout, defaults to {}", !loader.m_defaults.quiet));
+  auto verbose = loader.addSwitch("verbose", Star::format("Log to stdout, defaults to {}", !loader.m_defaults.quiet));
   if (!verbose) return std::unexpected(std::move(verbose.error()));
   auto runtime = loader.addSwitch("runtimeconfig",
-    strf("Sets the path to the runtime configuration storage file relative to root directory, defauts to {}",
+    Star::format("Sets the path to the runtime configuration storage file relative to root directory, defauts to {}",
       loader.m_defaults.runtimeConfigFile ? *loader.m_defaults.runtimeConfigFile : "no storage file"));
   if (!runtime) return std::unexpected(std::move(runtime.error()));
   return loader;

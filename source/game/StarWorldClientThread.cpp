@@ -158,7 +158,7 @@ std::expected<std::shared_ptr<WorldClientThread>, StarException> WorldClientThre
 }
 
 WorldClientThread::WorldClientThread(ClientSubWorldId subWorldId, std::shared_ptr<WorldClient> worldClient)
-  : Thread(strf("WorldClientThread: {}", subWorldId)),
+  : Thread(Star::format("WorldClientThread: {}", subWorldId)),
     m_worldClient(std::move(worldClient)),
     m_subWorldId(subWorldId),
     m_stopSource(std::nostopstate),
@@ -169,7 +169,7 @@ WorldClientThread::~WorldClientThread() {
   if (auto stopped = stop(); !stopped)
     EmergencyLog::error("Error stopping client world thread during destruction: {}", stopped.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy WorldClientThread while its native thread still borrows world state", false);
+    Star::fatal_error("Cannot destroy WorldClientThread while its native thread still borrows world state", false);
   if (auto closed = m_worldClient->close(); !closed)
     EmergencyLog::error("Error closing client world during destruction: {}", closed.error().what());
 }
@@ -297,7 +297,7 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
 
   TickRateApproacher tickApproacher(1.0f / root.timing().timestep, *updateMeasureWindow);
   while (!stopToken.stop_requested() && !m_errorOccurred) {
-    root.logMap().set(strf("client_{}_update", m_subWorldId), strf("{:4.2f}Hz", tickApproacher.rate()));
+    root.logMap().set(Star::format("client_{}_update", m_subWorldId), Star::format("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));

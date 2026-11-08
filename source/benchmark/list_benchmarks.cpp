@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
+import star.format;
 import star.list;
 import star.native_runtime;
 import star.string;
@@ -129,7 +131,8 @@ public:
 int main(int argc, char** argv) {
   auto runtime = Star::NativeRuntime::create();
   if (!runtime) {
-    std::cerr << runtime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", runtime.error().what()))
+      return 1;
     return 1;
   }
   runtime_salt = static_cast<std::uint64_t>(argc + 73);

@@ -82,7 +82,7 @@ namespace Tiled {
       return lexicalCast<T>(propertyValue);
     }
     [[nodiscard]] static std::expected<String, StarException> from(T const& propertyValue) {
-      return toString(propertyValue);
+      return Star::to_string(propertyValue);
     }
   };
   template <>

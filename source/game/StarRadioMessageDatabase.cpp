@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
         return std::unexpected(std::move(entries.error()));
       for (auto const& pair : *entries) {
         if (result->m_radioMessages.contains(pair.first))
-          return std::unexpected(RadioMessageDatabaseException(strf("Duplicate radiomessage {} in file {}", pair.first, file)));
+          return std::unexpected(RadioMessageDatabaseException(Star::format("Duplicate radiomessage {} in file {}", pair.first, file)));
         auto message = result->createRadioMessage(pair.second, pair.first);
         if (!message)
           return std::unexpected(std::move(message.error()));
@@ -64,7 +64,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
       return {};
     }();
     if (!loaded)
-      return std::unexpected(RadioMessageDatabaseException(strf("Error loading radiomessages file {}", file), (*assets)->withAssetContext(std::move(loaded.error()), file, "Loading radio messages")));
+      return std::unexpected(RadioMessageDatabaseException(Star::format("Error loading radiomessages file {}", file), (*assets)->withAssetContext(std::move(loaded.error()), file, "Loading radio messages")));
   }
   return result;
 }
@@ -72,7 +72,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
 std::expected<RadioMessage, StarException> RadioMessageDatabase::radioMessage(String const& messageName) const {
   if (auto message = m_radioMessages.find_ref(messageName))
     return message->get();
-  return std::unexpected(RadioMessageDatabaseException(strf("Unknown radio message {}", messageName)));
+  return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message {}", messageName)));
 }
 
 std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMessage(Json const& config, std::optional<String> const& messageId) const {
@@ -107,7 +107,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (!*type)
-    return std::unexpected(RadioMessageDatabaseException(strf("Unknown radio message type '{}'", *typeName)));
+    return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message type '{}'", *typeName)));
   message.type = (*type)->get();
   // Mission messages may repeat when the mission is replayed.
   auto unique = message.type == RadioMessageType::Mission ? config.getBool("unique", false) : mergedConfig.getBool("unique");
@@ -168,7 +168,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
     }
   }
   if (message.portraitFrames <= 0)
-    return std::unexpected(RadioMessageDatabaseException(strf("Invalid portraitFrames {} in radio message config!", message.portraitFrames)));
+    return std::unexpected(RadioMessageDatabaseException(Star::format("Invalid portraitFrames {} in radio message config!", message.portraitFrames)));
   return message;
 }
 

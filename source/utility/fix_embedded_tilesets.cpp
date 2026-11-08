@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.json;
 import star.native_runtime;
@@ -185,7 +186,8 @@ int main(int argc, char* argv[]) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

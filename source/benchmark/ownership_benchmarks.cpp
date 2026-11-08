@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -612,31 +613,36 @@ void assetsMixedCleanup(benchmark::State& state, BenchmarkSession& session) {
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);
   BenchmarkLifetime benchmarkLifetime;
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    std::fprintf(stderr, "%s\n", storage.error().what());
+    if (!Star::print(stderr, "{}\n", storage.error().what()))
+      return 1;
     return 1;
   }
   settings.runtimeConfigFile.reset();
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   BenchmarkSession session{**root};

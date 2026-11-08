@@ -37,7 +37,7 @@ StringList SteamUserGeneratedContentService::subscribedContentIds() const {
   List<PublishedFileId_t> contentIds(SteamAPI_ISteamUGC_GetNumSubscribedItems(SteamAPI_SteamUGC(), false), {});
   SteamAPI_ISteamUGC_GetSubscribedItems(SteamAPI_SteamUGC(), contentIds.data(), contentIds.size(), false);
   return contentIds.transformed([](PublishedFileId_t id) {
-      return String(toString(id));
+      return String(Star::to_string(id));
     });
 }
 

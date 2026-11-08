@@ -239,14 +239,14 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
   if (!result) {
     if (result.error().diagnosticSummary()->operation.empty()) {
       auto summary = *result.error().diagnosticSummary();
-      summary.operation = name.empty() ? std::string(operation) : strf("{} '{}'", operation, name);
+      summary.operation = name.empty() ? std::string(operation) : Star::format("{} '{}'", operation, name);
       result.error() = std::move(result.error()).withSummary(std::move(summary));
     }
-    result.error() = result.error().withContext(strf("{} '{}'", operation, name));
+    result.error() = result.error().withContext(Star::format("{} '{}'", operation, name));
     if (!m_boundaryError)
       m_boundaryError = result.error();
     if (policy == ErrorPolicy::DisableContext) {
-      m_error = printException(result.error(), false);
+      m_error = Star::print_exception(result.error(), false);
       m_shutdownPending = true;
     }
   }
@@ -297,7 +297,7 @@ template <typename Ret, typename... V>
         auto response = handleThreadMessage(message);
         std::expected<void, StarException> settled;
         if (!response) {
-          settled = message.promise.fail(printException(response.error(), false));
+          settled = message.promise.fail(Star::print_exception(response.error(), false));
           if (!error)
             error = std::move(response.error());
         } else if (!*response) {

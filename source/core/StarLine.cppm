@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 
 import star.math_common;
@@ -279,9 +279,13 @@ using Line2D = Line<double, 2>;
 using Line2I = Line<int, 2>;
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Line<T, N> const& l) {
-  os << '[' << l.min() << ", " << l.max() << ']';
-  return os;
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Line<T, N> const& line) {
+  output.push_back('[');
+  append_text(output, line.min());
+  output.append(", ");
+  append_text(output, line.max());
+  output.push_back(']');
 }
 
 template <typename T, std::size_t N>
@@ -306,13 +310,14 @@ export namespace Star {
 
 
 export template <typename T, std::size_t N>
-struct std::formatter<Star::Line<T, N>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
+struct std::formatter<Star::Line<T, N>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Line;
   using ::Star::Line2F;
   using ::Star::Line2D;
   using ::Star::Line2I;
-  using ::Star::operator<<;
+  using ::Star::write_text;
   using ::Star::hash;
 }

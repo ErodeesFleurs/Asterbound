@@ -1,3 +1,4 @@
+#include <stdio.h>
 import std;
 import star.memory;
 import star.string;
@@ -15,10 +16,34 @@ import star.input_event;
 import star.logging;
 import star.map;
 import star.text;
+import star.text_formatter;
 
 #include "gtest/gtest.h"
 
 using namespace Star;
+
+// Importing domain writers must not change primitive dispatch through implicit
+// Json/String constructors. These are the types consumed by nested diagnostics.
+static_assert(nonfallible_text_writable<bool>);
+static_assert(nonfallible_text_writable<int>);
+static_assert(nonfallible_text_writable<double>);
+static_assert(nonfallible_text_writable<char>);
+static_assert(nonfallible_text_writable<std::string>);
+static_assert(nonfallible_text_writable<std::string_view>);
+static_assert(std::same_as<decltype(append_text(std::declval<TextBuffer&>(), true)), void>);
+static_assert(std::same_as<decltype(write_text(std::declval<TextBuffer&>(), std::declval<Json const&>())),
+    std::expected<void, StarException>>);
+
+TEST(StringTest, PointerKeyDiagnosticsIdentifyThePointeeRatherThanTheWrapper) {
+  Map<std::shared_ptr<int>, int> values;
+  auto owner = std::make_shared<int>(42);
+  auto missing = values.get(owner);
+  ASSERT_FALSE(missing);
+  auto identity = std::format("{}", static_cast<void const*>(owner.get()));
+  EXPECT_NE(std::string_view(missing.error().what()).find(identity), std::string_view::npos);
+  EXPECT_EQ(std::format("{}", List<std::nullptr_t>{nullptr}), "(nullptr)");
+  EXPECT_EQ(std::format("{}", List<void*>{nullptr}), "(0)");
+}
 
 TEST(StringTest, SortedComparatorPreservesInputAndDuplicates) {
   StringList input{"b", "a", "b"};
@@ -192,90 +217,92 @@ TEST(StringTest, contains) {
 }
 
 TEST(StringTest, format) {
-  EXPECT_EQ(strf("({}, {}, {})", 1, "foo", 3.2), "(1, foo, 3.2)");
-  EXPECT_EQ(strf("{} ({}, {}, {})", String(std::string_view("asdf\0", 5)), 1, "foo", 3.2), String(std::string_view("asdf\0 (1, foo, 3.2)", 19)));
+  EXPECT_EQ(Star::format("({}, {}, {})", 1, "foo", 3.2), "(1, foo, 3.2)");
+  EXPECT_EQ(Star::format("{} ({}, {}, {})", String(std::string_view("asdf\0", 5)), 1, "foo", 3.2), String(std::string_view("asdf\0 (1, foo, 3.2)", 19)));
 }
 
 TEST(StringTest, CompileTimeFormattingPreservesByteLengths) {
-  EXPECT_EQ(strf("{1}:{0:04x}", 42, String("日")), "日:002a");
+  EXPECT_EQ(Star::format("{1}:{0:04x}", 42, String("日")), "日:002a");
   constexpr std::string_view withNull("x\0{}", 4);
-  EXPECT_EQ(strf(withNull, "y"), std::string("x\0y", 3));
+  EXPECT_EQ(Star::format(withNull, "y"), std::string("x\0y", 3));
 }
 
-TEST(StringTest, StreamFormattingPreservesBinaryTextAndFieldPadding) {
-  std::ostringstream output;
-  Star::format(output, "{}:{:04x}", String(std::string_view("日\0x", 5)), 42);
-  EXPECT_EQ(output.str(), std::string("日\0x:002a", 10));
-  output.str("");
-  output << std::setfill('_') << std::setw(8) << std::left;
-  Star::format(output, "{}:{}", "日", 42);
-  output << '!';
-  EXPECT_EQ(output.str(), "日:42__!");
-  EXPECT_EQ(output.width(), 0);
+TEST(StringTest, CheckedConsoleOutputPreservesBinaryTextAndNewlines) {
+  std::unique_ptr<std::FILE, decltype(&std::fclose)> file(std::tmpfile(), &std::fclose);
+  ASSERT_TRUE(file);
+  ASSERT_TRUE(Star::print(file.get(), "{}:{:04x}", String(std::string_view("水\0x", 5)), 42));
+  ASSERT_TRUE(Star::println(file.get(), ":{}", 7));
+  ASSERT_EQ(std::fseek(file.get(), 0, SEEK_SET), 0);
+  std::array<char, 32> bytes;
+  auto count = ::fread(bytes.data(), 1, bytes.size(), file.get());
+  EXPECT_EQ(std::string_view(bytes.data(), count), std::string_view("水\0x:002a:7\n", 13));
+  EXPECT_EQ(std::ferror(file.get()), 0);
 }
 
-TEST(StringTest, StreamFormattingReportsShortWrites) {
-  class LimitedBuffer : public std::streambuf {
-  public:
-    LimitedBuffer() { setp(m_bytes.data(), m_bytes.data() + m_bytes.size()); }
-    std::string_view written() const { return {pbase(), static_cast<std::size_t>(pptr() - pbase())}; }
-
-  private:
-    std::array<char, 4> m_bytes;
-  } buffer;
-  std::ostream output(&buffer);
-  Star::format(output, "{}", "abcdef");
-  EXPECT_TRUE(output.bad());
-  EXPECT_EQ(buffer.written(), "abcd");
+#if defined(STAR_SYSTEM_LINUX)
+TEST(StringTest, CheckedConsoleOutputReportsFlushFailureWithoutPoisoningLaterOutput) {
+  std::unique_ptr<std::FILE, decltype(&std::fclose)> full(std::fopen("/dev/full", "w"), &std::fclose);
+  ASSERT_TRUE(full);
+  auto failed = Star::print(full.get(), "{}", "buffered bytes");
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<IOException>());
+  std::unique_ptr<std::FILE, decltype(&std::fclose)> valid(std::tmpfile(), &std::fclose);
+  ASSERT_TRUE(valid);
+  ASSERT_TRUE(Star::print(valid.get(), "{}", "recovered"));
+  ASSERT_EQ(std::fseek(valid.get(), 0, SEEK_SET), 0);
+  std::array<char, 16> bytes;
+  auto count = ::fread(bytes.data(), 1, bytes.size(), valid.get());
+  EXPECT_EQ(std::string_view(bytes.data(), count), "recovered");
 }
+#endif
 
-TEST(StringTest, StreamFormattingHonorsTiedStreamsAndUnitbuf) {
-  class SyncBuffer : public std::stringbuf {
-  public:
-    int sync() override {
-      flushed = str();
-      return 0;
+TEST(StringTest, NestedFormattingRetainsBinaryBytesAcrossShortAndLongRepresentations) {
+  for (std::size_t count : {0u, 1u, 56u, 57u, 256u}) {
+    StringList values;
+    std::string expected = "(";
+    for (std::size_t i = 0; i != count; ++i) {
+      values.push_back(String(std::string_view("水\0x", 5)));
+      if (i)
+        expected += ", ";
+      expected += '\'';
+      expected.append("水\0x", 5);
+      expected += '\'';
     }
-    std::string flushed;
-  } tiedBuffer, outputBuffer;
-  std::ostream tied(&tiedBuffer);
-  std::ostream output(&outputBuffer);
-  tied << "pending";
-  output.tie(&tied);
-  output << std::unitbuf;
-  Star::format(output, "{}:{}", "日", 42);
-  EXPECT_EQ(tiedBuffer.flushed, "pending");
-  EXPECT_EQ(outputBuffer.flushed, "日:42");
+    expected += ')';
+    EXPECT_EQ(std::format("{}", values), expected);
+    EXPECT_EQ(std::format("{:>80.40}", values), std::format("{:>80.40}", std::string_view(expected)));
+  }
 }
+
 
 TEST(StringTest, TagTemplatesPreserveByteLengthsAndRejectInvalidTags) {
   std::array<std::pair<std::string_view, std::string_view>, 3> bindings{{
       {"name", "日"}, {"value", "002a"}, {"name", "ignored"}}};
-  auto formatted = formatTags("<name>:<value>", bindings);
+  auto formatted = Star::format_tags("<name>:<value>", bindings);
   ASSERT_TRUE(formatted);
   EXPECT_EQ(*formatted, "日:002a");
   std::string_view withNull("x\0<name>", 8);
-  auto binary = formatTags(withNull, bindings);
+  auto binary = Star::format_tags(withNull, bindings);
   ASSERT_TRUE(binary);
   EXPECT_EQ(*binary, std::string("x\0日", 5));
   std::array<std::pair<std::string_view, std::string_view>, 1> binaryBindings{{
       {"bytes", std::string_view("\xff\0z", 3)}}};
-  auto binaryReplacement = formatTags("a<bytes>b", binaryBindings);
+  auto binaryReplacement = Star::format_tags("a<bytes>b", binaryBindings);
   ASSERT_TRUE(binaryReplacement);
   EXPECT_EQ(*binaryReplacement, std::string("a\xff\0zb", 5));
-  auto escaped = formatTags("<<name> <name> {not:std-format}", bindings);
+  auto escaped = Star::format_tags("<<name> <name> {not:std-format}", bindings);
   ASSERT_TRUE(escaped);
   EXPECT_EQ(*escaped, "<name> 日 {not:std-format}");
-  auto plain = formatTags("unchanged", bindings);
+  auto plain = Star::format_tags("unchanged", bindings);
   ASSERT_TRUE(plain);
   EXPECT_EQ(*plain, "unchanged");
   for (std::string_view invalid : {"<missing>", "<>", "<name"}) {
-    auto result = formatTags(invalid, bindings);
+    auto result = Star::format_tags(invalid, bindings);
     ASSERT_FALSE(result);
     EXPECT_TRUE(result.error().is<FormatException>());
   }
   // Invalid dynamic text must not poison subsequent valid substitutions.
-  auto recovered = formatTags("<value>", bindings);
+  auto recovered = Star::format_tags("<value>", bindings);
   ASSERT_TRUE(recovered);
   EXPECT_EQ(*recovered, "002a");
 }
@@ -284,6 +311,7 @@ TEST(StringTest, StandardFormattersPreserveProjectRepresentations) {
   EXPECT_EQ(std::format("{:>6.2}", String("abcd")), "    ab");
   EXPECT_EQ(std::format("{}", Line2I(Vec2I(1, 2), Vec2I(3, 4))), "[(1, 2), (3, 4)]");
   EXPECT_EQ(std::format("{}", Mat3F(1, 2, 3, 4, 5, 6, 7, 8, 9)), "1 2 3\n4 5 6\n7 8 9");
+  EXPECT_EQ(std::format("{}", List<bool>{false, true, false}), "(0, 1, 0)");
 }
 
 TEST(StringTest, StreamFormattingPreservesLongEscapedJson) {

@@ -133,13 +133,13 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       layers.push_back({std::move(*image), *imageScale});
     } else if (*baseCount > 0) {
       auto image = baseImages->replace("<biome>", terrestrialParameters->primaryBiome)
-          .and_then([&](String const& value) { return value.replace("<num>", toString(*baseCount)); });
+          .and_then([&](String const& value) { return value.replace("<num>", Star::to_string(*baseCount)); });
       if (!image)
         return std::unexpected(std::move(image.error()));
-      layers.push_back({strf("{}?hueshift={}", *image, terrestrialParameters->hueShift), *imageScale});
+      layers.push_back({Star::format("{}?hueshift={}", *image, terrestrialParameters->hueShift), *imageScale});
     }
     for (int i = 0; i < *baseCount; ++i) {
-      auto baseImage = baseImages->replace("<num>", toString(*baseCount - i));
+      auto baseImage = baseImages->replace("<num>", Star::to_string(*baseCount - i));
       if (!baseImage)
         return std::unexpected(std::move(baseImage.error()));
       String hueShiftString, dynamicMaskString;
@@ -149,13 +149,13 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
             .and_then([](Json const& value) { return value.toInt(); });
         if (!dynamic)
           return std::unexpected(std::move(dynamic.error()));
-        auto mask = dynamicsImages->replace("<num>", toString(*dynamic));
+        auto mask = dynamicsImages->replace("<num>", Star::to_string(*dynamic));
         if (!mask)
           return std::unexpected(std::move(mask.error()));
         dynamicMaskString = "?addmask=" + *mask;
       }
       if (terrestrialParameters->hueShift != 0)
-        hueShiftString = strf("?hueshift={}", terrestrialParameters->hueShift);
+        hueShiftString = Star::format("?hueshift={}", terrestrialParameters->hueShift);
       layers.push_back({*baseImage + hueShiftString + dynamicMaskString, *imageScale});
     }
     if (!shadowImages->empty()) {
@@ -164,7 +164,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
           .and_then([](Json const& value) { return value.toInt(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
-      auto shadow = shadowImages->replace("<num>", toString(*number));
+      auto shadow = shadowImages->replace("<num>", Star::to_string(*number));
       if (!shadow)
         return std::unexpected(std::move(shadow.error()));
       layers.push_back({std::move(*shadow), *imageScale});
@@ -183,16 +183,16 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
     for (int i = 0; i < *maskCount; ++i) {
-      auto base = maskImages->replace("<num>", toString(*maskCount - i));
+      auto base = maskImages->replace("<num>", Star::to_string(*maskCount - i));
       if (!base)
         return std::unexpected(std::move(base.error()));
       auto number = celestialParameters.randomizeParameterRange("dynamicsRange", i).and_then([](Json const& value) { return value.toInt(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
-      auto mask = dynamicsImages->replace("<num>", toString(*number));
+      auto mask = dynamicsImages->replace("<num>", Star::to_string(*number));
       if (!mask)
         return std::unexpected(std::move(mask.error()));
-      layers.push_back({strf("{}?addmask={}", *base, *mask), *imageScale});
+      layers.push_back({Star::format("{}?addmask={}", *base, *mask), *imageScale});
     }
   } else if (*type == "FloatingDungeon") {
     auto image = celestialParameters.getParameter("image").and_then([](Json const& value) { return value.toString(); });
@@ -209,7 +209,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       auto number = celestialParameters.randomizeParameterRange("dynamicsRange").and_then([](Json const& value) { return value.toInt(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
-      auto dynamic = dynamicsImages->replace("<num>", toString(*number));
+      auto dynamic = dynamicsImages->replace("<num>", Star::to_string(*number));
       if (!dynamic)
         return std::unexpected(std::move(dynamic.error()));
       layers.push_back({std::move(*dynamic), *imageScale});
@@ -242,7 +242,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     if (!hueShift)
       return std::unexpected(std::move(hueShift.error()));
     if (!baseImage->empty())
-      layers.push_back({strf("{}?hueshift={}", *baseImage, *hueShift), *imageScale});
+      layers.push_back({Star::format("{}?hueshift={}", *baseImage, *hueShift), *imageScale});
     if (!overlayImages->empty()) {
       for (int i = 0; i < *overlayCount; ++i) {
         auto offset = gfxConfig->getArray("hueShiftOffsetRange")
@@ -256,13 +256,13 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
             .and_then([](Json const& value) { return value.toInt(); });
         if (!number)
           return std::unexpected(std::move(number.error()));
-        auto mask = dynamicsImages->replace("<num>", toString(*number));
+        auto mask = dynamicsImages->replace("<num>", Star::to_string(*number));
         if (!mask)
           return std::unexpected(std::move(mask.error()));
-        auto overlay = overlayImages->replace("<num>", toString(i));
+        auto overlay = overlayImages->replace("<num>", Star::to_string(i));
         if (!overlay)
           return std::unexpected(std::move(overlay.error()));
-        layers.push_back({strf("{}?hueshift={}?addmask={}", *overlay, *hueShift, *mask), *imageScale});
+        layers.push_back({Star::format("{}?hueshift={}?addmask={}", *overlay, *hueShift, *mask), *imageScale});
       }
     }
     if (!shadowImages->empty()) {
@@ -271,7 +271,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
           .and_then([](Json const& value) { return value.toInt(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
-      auto shadow = shadowImages->replace("<num>", toString(*number));
+      auto shadow = shadowImages->replace("<num>", Star::to_string(*number));
       if (!shadow)
         return std::unexpected(std::move(shadow.error()));
       layers.push_back({std::move(*shadow), *imageScale});
@@ -357,7 +357,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       images.push_back(std::move(*liquidBase));
       StringList masksLeft, masksRight;
       for (auto mask : masks) {
-        auto lr = maskTextures->replace("<mask>", toString(mask)).and_then(getLR);
+        auto lr = maskTextures->replace("<mask>", Star::to_string(mask)).and_then(getLR);
         if (!lr)
           return std::unexpected(std::move(lr.error()));
         masksLeft.push_back(std::move(lr->first));
@@ -461,7 +461,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
   if (!background)
     return std::unexpected(std::move(background.error()));
   double frame = std::fmod<double>(time / *duration, 1.0f) * *count;
-  return List<std::pair<String, float>>{{std::move(*background), 1.0f}, {strf("{}:{}", *frames, static_cast<int>(frame)), *scale}};
+  return List<std::pair<String, float>>{{std::move(*background), 1.0f}, {Star::format("{}:{}", *frames, static_cast<int>(frame)), *scale}};
 }
 
 std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::drawSystemPlanetaryObject(

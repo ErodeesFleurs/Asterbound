@@ -51,7 +51,7 @@ LuaBaseComponent::~LuaBaseComponent() {
     group.second.scope.request_stop();
   (void)m_callbackScope.request_stop();
   if (auto stopped = stopThreads(); !stopped)
-    EmergencyLog::error("Error stopping Lua component threads: {}", outputException(stopped.error(), true));
+    EmergencyLog::error("Error stopping Lua component threads: {}", Star::output_exception(stopped.error(), true));
   m_threads.clear();
 }
 
@@ -201,7 +201,7 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
       m_callbackScope = std::stop_source{};
       auto context = m_luaRoot->createContext(m_scripts, m_callbackScope.get_token());
       if (!context)
-        return std::unexpected(context.error().withContext(strf("Creating Lua context for scripts '{}'", m_scripts)));
+        return std::unexpected(context.error().withContext(Star::format("Creating Lua context for scripts '{}'", m_scripts)));
       m_context = std::move(*context);
       LuaEnginePtr engine(&m_context->engine());
       auto previousLifetime = engine->setPromiseLifetime(m_callbackScope.get_token());
@@ -566,7 +566,7 @@ LuaScriptUpdate::LuaScriptUpdate(LuaBaseComponent& host) : m_host(host), m_lastD
 void LuaScriptUpdate::destroy() {
   // Child threads must stop before the parent-message queue is destroyed.
   if (auto stopped = m_host.stopThreads(); !stopped)
-    EmergencyLog::error("Error stopping Lua component threads: {}", outputException(stopped.error(), true));
+    EmergencyLog::error("Error stopping Lua component threads: {}", Star::output_exception(stopped.error(), true));
   List<ThreadMessage> messages;
   {
     std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
@@ -575,7 +575,7 @@ void LuaScriptUpdate::destroy() {
   }
   for (auto& message : messages) {
     if (auto failed = message.promise.cancel("Lua component destroyed"); !failed)
-      EmergencyLog::error("Error settling destroyed Lua component message: {}", outputException(failed.error(), true));
+      EmergencyLog::error("Error settling destroyed Lua component message: {}", Star::output_exception(failed.error(), true));
   }
 }
 

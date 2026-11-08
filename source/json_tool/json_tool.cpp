@@ -86,15 +86,14 @@ std::expected<String, StarException> Star::reprWithLineEnding(FormattedJson cons
   auto repr = json.repr();
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  return repr->utf8().find('\r') != std::string::npos ? strf("{}\r\n", *repr) : strf("{}\n", *repr);
+  return repr->utf8().find('\r') != std::string::npos ? Star::format("{}\r\n", *repr) : Star::format("{}\n", *repr);
 }
 
 std::expected<void, StarException> OutputOnSeparateLines::out(FormattedJson const& json) {
   auto repr = reprWithLineEnding(json);
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  coutf("{}", *repr);
-  return {};
+  return Star::print("{}", *repr);
 }
 
 std::expected<void, StarException> OutputOnSeparateLines::flush() {
@@ -114,7 +113,8 @@ std::expected<void, StarException> ArrayOutput::flush() {
   auto repr = reprWithLineEnding(*array);
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  coutf("{}", *repr);
+  if (auto written = Star::print("{}", *repr); !written)
+    return std::unexpected(std::move(written.error()));
   return {};
 }
 
@@ -427,7 +427,8 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (!*exists) {
-        cerrf("File {} doesn't exist\n", arg);
+        if (auto written = Star::print(stderr, "File {} doesn't exist\n", arg); !written)
+          return std::unexpected(std::move(written.error()));
         return {};
       }
       parsed.inputs.push_back(FileInput{std::move(arg)});
@@ -446,23 +447,28 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
   }
   bool editing = std::holds_alternative<EditCommand>(parsed.command);
   if (editing && !anyFileInputs) {
-    cerrf("Files to edit must be supplied when using --edit.\n");
+    if (auto written = Star::print(stderr, "Files to edit must be supplied when using --edit.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && !anyFileInputs) {
-    cerrf("In-place writing (-i) can only be used with files specified on the command line.\n");
+    if (auto written = Star::print(stderr, "In-place writing (-i) can only be used with files specified on the command line.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && editing) {
-    cerrf("Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n");
+    if (auto written = Star::print(stderr, "Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (editing && anyNonFileInputs) {
-    cerrf("Interactive edit (--edit) can only be used with file input sources.\n");
+    if (auto written = Star::print(stderr, "Interactive edit (--edit) can only be used with file input sources.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.editFormat && !editing) {
-    cerrf("--input can only be used with --edit.\n");
+    if (auto written = Star::print(stderr, "--input can only be used with --edit.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (!parsed.options.editFormat && editing)
@@ -490,23 +496,31 @@ std::expected<int, StarException> run(int argc, char** argv) {
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     if (!*parsed) {
-      cerrf("Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]);
-      cerrf(
+      if (auto written = Star::print(stderr, "Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --set <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
-          argv[0]);
-      cerrf(
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --add <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
-          argv[0]);
-      cerrf(
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --edit <json-path> [(--at (beginning|end) | --before <key> | --after <key>)] [--input "
           "(csv|json|string)] <json-file>+\n",
-          argv[0]);
-      cerrf("\n");
-      cerrf("Example: {} --get /dialog/0/message guard.npctype\n", argv[0]);
-      cerrf("Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]);
-      cerrf("Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]);
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "\n"); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --get /dialog/0/message guard.npctype\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
       return 1;
     }
 
@@ -538,15 +552,19 @@ std::expected<int, StarException> run(int argc, char** argv) {
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Error initializing native runtime: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Error initializing native runtime: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = run(argc, argv);
   if (result)
     return *result;
-  if (result.error().is<JsonParsingException>() || result.error().is<JsonException>())
-    cerrf("{}\n", result.error().what());
-  else
-    cerrf("Error: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+  if (result.error().is<JsonParsingException>() || result.error().is<JsonException>()) {
+    if (!Star::print(stderr, "{}\n", result.error().what()))
+      return 1;
+  } else {
+    if (!Star::print(stderr, "Error: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)))
+      return 1;
+  }
   return 1;
 }

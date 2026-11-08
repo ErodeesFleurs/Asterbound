@@ -741,7 +741,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
 
   String name = item->friendlyName();
   if (item->count() > 1)
-    name = strf("{} (x{})", name, item->count());
+    name = Star::format("{} (x{})", name, item->count());
 
   auto fetchChildResult656 = widget->fetchChild<LabelWidget>("itemName");
   if (!fetchChildResult656)
@@ -755,7 +755,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
   if (!getIntResult658)
     return std::unexpected(std::move(getIntResult658.error()));
   unsigned price = std::ceil(std::move(*getIntResult658) * m_buyFactor);
-  auto setLabelResult659 = widget->setLabel("priceLabel", toString(price));
+  auto setLabelResult659 = widget->setLabel("priceLabel", Star::to_string(price));
   if (!setLabelResult659)
     return std::unexpected(std::move(setLabelResult659.error()));
   widget->setData(price);
@@ -848,7 +848,7 @@ std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   else
     m_buyTotal = 0;
 
-  auto setTextResult675 = m_buyTotalLabel->setText(toString(m_buyTotal));
+  auto setTextResult675 = m_buyTotalLabel->setText(Star::to_string(m_buyTotal));
   if (!setTextResult675)
     return std::unexpected(std::move(setTextResult675.error()));
 
@@ -926,7 +926,7 @@ std::expected<void, StarException> MerchantPane::updateSellTotal() {
     if (item)
       m_sellTotal += std::round(item->price() * m_sellFactor);
   }
-  auto setTextResult686 = m_sellTotalLabel->setText(toString(m_sellTotal));
+  auto setTextResult686 = m_sellTotalLabel->setText(Star::to_string(m_sellTotal));
   if (!setTextResult686)
     return std::unexpected(std::move(setTextResult686.error()));
   if (m_sellTotal > 0)
@@ -990,7 +990,7 @@ std::expected<int, StarException> MerchantPane::maxBuyCount() {
 }
 
 std::expected<void, StarException> MerchantPane::countChanged() {
-  auto setTextResult697 = m_countTextBox->setText(strf("x{}", m_buyCount));
+  auto setTextResult697 = m_countTextBox->setText(Star::format("x{}", m_buyCount));
   if (!setTextResult697)
     return std::unexpected(std::move(setTextResult697.error()));
   auto updateBuyTotalResult698 = updateBuyTotal();

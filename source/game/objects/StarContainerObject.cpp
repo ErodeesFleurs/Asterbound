@@ -250,7 +250,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
   if (!initialized) {
     auto cleaned = Object::uninit();
     if (!cleaned)
-      return std::unexpected(initialized.error().withContext(strf("Container initialization cleanup failed: {}", outputException(cleaned.error(), false))));
+      return std::unexpected(initialized.error().withContext(Star::format("Container initialization cleanup failed: {}", Star::output_exception(cleaned.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   return {};
@@ -338,7 +338,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
         return std::unexpected(std::move(operation4.error()));
     }
   } else {
-    setImageKey("key", toString(m_currentState));
+    setImageKey("key", Star::to_string(m_currentState));
     setImageKey("state", m_crafting.get() ? String("crafting") : String("idle"));
     m_animationFrameCooldown -= 1;
   }
@@ -717,7 +717,7 @@ std::expected<Json, StarException> ContainerObject::containerGuiConfig() const {
   if (!pathResult)
     return std::unexpected(std::move(pathResult.error()));
   auto path = std::move(*pathResult);
-  auto resolvedResult = path.replace("<slots>", toString(m_items->size()));
+  auto resolvedResult = path.replace("<slots>", Star::to_string(m_items->size()));
   if (!resolvedResult)
     return std::unexpected(std::move(resolvedResult.error()));
   auto resolved = std::move(*resolvedResult);
@@ -1125,7 +1125,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
           level = std::min(maxLevel, level + fuelSingle * count);
           auto consumed = item->consume(count);
           if constexpr (Star::DebugEnabled) {
-            Star::starAssertFailed((consumed));
+            Star::star_assert_failed((consumed));
           }
           ((void)(consumed));
         }
@@ -1311,7 +1311,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
       bool consumed = m_items->consumeItems(input);
       ((void)(consumed));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((consumed));
+        Star::star_assert_failed((consumed));
       }
     }
     auto databaseResult = root().itemDatabase();

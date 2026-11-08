@@ -23,8 +23,10 @@ IOException zstdError(std::string_view operation, std::size_t status) {
 
 void CompressionStream::StreamDeleter::operator()(ZSTD_CStream* stream) const noexcept {
   auto status = ZSTD_freeCStream(stream);
-  if (ZSTD_isError(status))
-    fprintf(stderr, "Failed to free ZSTD compression stream (%zu): %s\n", status, ZSTD_getErrorName(status));
+  if (ZSTD_isError(status)) {
+    if (auto written = Star::print(stderr, "Failed to free ZSTD compression stream ({}): {}\n", status, ZSTD_getErrorName(status)); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<std::unique_ptr<CompressionStream>, StarException> CompressionStream::create() {
@@ -89,8 +91,10 @@ std::expected<ByteArray, StarException> CompressionStream::compress(ByteArray co
 
 void DecompressionStream::StreamDeleter::operator()(ZSTD_DStream* stream) const noexcept {
   auto status = ZSTD_freeDStream(stream);
-  if (ZSTD_isError(status))
-    fprintf(stderr, "Failed to free ZSTD decompression stream (%zu): %s\n", status, ZSTD_getErrorName(status));
+  if (ZSTD_isError(status)) {
+    if (auto written = Star::print(stderr, "Failed to free ZSTD decompression stream ({}): {}\n", status, ZSTD_getErrorName(status)); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<std::unique_ptr<DecompressionStream>, StarException> DecompressionStream::create() {

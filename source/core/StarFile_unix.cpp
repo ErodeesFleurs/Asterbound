@@ -26,7 +26,8 @@ void* handle_from_fd(int handle) { return (void*)((std::intptr_t)handle + 1); }
 void close_after_failure(int fd) {
   if (::close(fd) < 0) {
     auto error = errno;
-    std::fprintf(stderr, "Error closing file after failed acquisition: %s\n", std::strerror(error));
+    if (!Star::print(stderr, "Error closing file after failed acquisition: {}\n", std::strerror(error)))
+      std::_Exit(1);
   }
 }
 
@@ -115,7 +116,7 @@ std::expected<String, StarException> File::full_path(String const& fileName) {
 }
 
 std::expected<String, StarException> File::temporary_file_name(RandomService& random) {
-  return relative_to(P_tmpdir, strf("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
+  return relative_to(P_tmpdir, Star::format("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
 }
 
 std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomService& random) {
@@ -160,7 +161,7 @@ std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomS
 
 std::expected<String, StarException> File::temporary_directory(RandomService& random) {
   for (;;) {
-    auto directory = relative_to(P_tmpdir, strf("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
+    auto directory = relative_to(P_tmpdir, Star::format("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
     int result;
     do {
       result = ::mkdir(directory.utf8_data(), 0777);
@@ -214,9 +215,12 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
   auto size = fsize(handle);
   auto closed = fclose(handle);
   if (!size) {
-    if (!closed)
-      std::fprintf(stderr, "Error closing file '%s' after failed metadata query: %s\n", path.utf8_data(),
-                   closed.error().what());
+    if (!closed) {
+      if (auto written = Star::print(stderr, "Error closing file '{}' after failed metadata query: {}\n", path.utf8_data(),
+                   closed.error().what()); !written)
+        return std::unexpected(std::move(size.error()).withContext(
+            Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
+    }
     return std::unexpected(std::move(size.error()));
   }
   if (!closed)

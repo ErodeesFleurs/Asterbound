@@ -1021,7 +1021,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
   } else
-    return std::unexpected(StarException(strf("Unknown spawnable kind '{}'", kind)));
+    return std::unexpected(StarException(Star::format("Unknown spawnable kind '{}'", kind)));
 
   return {};
 }
@@ -1051,7 +1051,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setLiquid(Vec2I const&
   if (!ServerTiletileResult1) return std::unexpected(std::move(ServerTiletileResult1.error()));
   auto tile = std::move((*ServerTiletileResult1));
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((tile));
+    Star::star_assert_failed((tile));
   }
   if (tile)
     tile->get().liquid = liquid;
@@ -1581,7 +1581,7 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
       Vec2I pos(x, y);
       auto tile = tileArray->modifyTile(pos);
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((tile));
+        Star::star_assert_failed((tile));
       }
       if (!tile)
         continue;
@@ -1717,7 +1717,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
       auto const& dungeonName = std::move(selected_dungeon->get());
       std::optional<DungeonId> dungeonId;
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((!dungeonName.empty()));
+        Star::star_assert_failed((!dungeonName.empty()));
       }
       auto generateResultCheckedResult1 = m_worldServer.threatLevel();
       if (!generateResultCheckedResult1) return std::unexpected(std::move(generateResultCheckedResult1.error()));
@@ -1811,7 +1811,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
       return {};
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId) {
       // Not sure why this doesn't poison solid materials, but it does (occasionally) encounter that case
@@ -1864,7 +1864,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
     visitedNodes.add(position);
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId)
       return;
@@ -1885,7 +1885,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   auto solids = [&](Vec2I position) {
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId)
       solidSurroundings.add(position);
@@ -1904,7 +1904,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   for (auto iter = drops.begin(); iter != drops.end(); ++iter) {
     auto tile = tileArray->modifyTile(wrapCoords(iter->first));
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((tile));
+      Star::star_assert_failed((tile));
     }
     if (!tile)
       continue;
@@ -1932,12 +1932,12 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
       Vec2I position(x, y);
       auto tile = tileArray->modifyTile(position);
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((tile));
+        Star::star_assert_failed((tile));
       }
       if (!tile)
         continue;
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((tile->get().foreground != NullMaterialId));
+        Star::star_assert_failed((tile->get().foreground != NullMaterialId));
       }
 
       if (tile->get().liquid.source) {
@@ -2192,7 +2192,7 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
       if (!ServerTiletileResult1) return std::unexpected(std::move(ServerTiletileResult1.error()));
       auto tile = std::move((*ServerTiletileResult1));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((tile));
+        Star::star_assert_failed((tile));
       }
       if (!tile)
         continue;

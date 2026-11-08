@@ -180,7 +180,7 @@ std::expected<void, StarException> DamageManager::pushRemoteHitRequest(RemoteHit
 
   if (auto causingEntity = m_world.get().entity(remoteHitRequest.causingEntityId)) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((causingEntity->isMaster()));
+      Star::star_assert_failed((causingEntity->isMaster()));
     }
     return causingEntity->hitOther(remoteHitRequest.targetEntityId, remoteHitRequest.damageRequest);
   }
@@ -193,7 +193,7 @@ std::expected<void, StarException> DamageManager::pushRemoteDamageRequest(Remote
 
   if (auto targetEntity = m_world.get().entity(remoteDamageRequest.targetEntityId)) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((targetEntity->isMaster()));
+      Star::star_assert_failed((targetEntity->isMaster()));
     }
     auto notifications = targetEntity->applyDamage(remoteDamageRequest.damageRequest);
     if (!notifications) return std::unexpected(std::move(notifications.error()));

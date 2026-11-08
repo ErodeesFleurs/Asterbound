@@ -105,7 +105,7 @@ std::expected<std::shared_ptr<DisplacementSelector>, StarException> Displacement
   auto result = std::make_shared<DisplacementSelector>(ConstructionKey{}, config, parameters);
   RandomSource random(parameters.seed);
   auto readFunction = [&](char axis) -> std::expected<PerlinF, StarException> {
-    auto key = [axis](std::string_view suffix) { return strf("{}{}", axis, suffix); };
+    auto key = [axis](std::string_view suffix) { return Star::format("{}{}", axis, suffix); };
     auto name = config.getString(key("Type"));
     if (!name)
       return std::unexpected(std::move(name.error()));

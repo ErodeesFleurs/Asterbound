@@ -1143,8 +1143,8 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
   if (activePart.activeState) {
     unsigned stateFrame = activePart.activeState->frame;
     frame = stateFrame;
-    frameStr = static_cast<String>(toString(stateFrame + 1));
-    frameIndexStr = static_cast<String>(toString(stateFrame));
+    frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
+    frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
   }
   if (version() > 0) {
     animationTags.set("relativePath", m_relativePath);
@@ -1158,8 +1158,8 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
       String frameIndexStr;
 
       frame = stateFrame;
-      frameStr = static_cast<String>(toString(stateFrame + 1));
-      frameIndexStr = static_cast<String>(toString(stateFrame));
+      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
+      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
       if (frame) {
         animationTags.set(stateTypeName + "_frame", frameStr);
         animationTags.set(stateTypeName + "_frameIndex", frameIndexStr);
@@ -1552,7 +1552,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       } else if (effect.type == "directive") {
         baseProcessingDirectives.push_back(effect.directives);
       } else {
-        return std::unexpected(NetworkedAnimatorException(strf("No such NetworkedAnimator effect type '{}'", effect.type)));
+        return std::unexpected(NetworkedAnimatorException(Star::format("No such NetworkedAnimator effect type '{}'", effect.type)));
       }
     }
   }
@@ -1579,8 +1579,8 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       String frameIndexStr;
 
       frame = stateFrame;
-      frameStr = static_cast<String>(toString(stateFrame + 1));
-      frameIndexStr = static_cast<String>(toString(stateFrame));
+      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
+      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
       if (frame) {
         animationTags.set(stateTypeName + "_frame", frameStr);
         animationTags.set(stateTypeName + "_frameIndex", frameIndexStr);
@@ -1687,8 +1687,8 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     if (activePart.activeState) {
       unsigned stateFrame = activePart.activeState->frame;
       frame = stateFrame;
-      frameStr = static_cast<String>(toString(stateFrame + 1));
-      frameIndexStr = static_cast<String>(toString(stateFrame));
+      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
+      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
 
       auto stateDirectives = activePart.activeState->properties.value("processingDirectives").optString();
       if (!stateDirectives) return std::unexpected(std::move(stateDirectives.error()));

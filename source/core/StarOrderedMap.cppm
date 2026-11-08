@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.map;
 import star.flat_hash_map;
@@ -196,7 +196,7 @@ private:
     -> std::expected<std::reference_wrapper<std::remove_reference_t<decltype((self.m_order.begin()->second))>>,
                      StarException> {
     if (index >= self.size())
-      return std::unexpected(MapException(strf("index {} out of range in OrderedMap::value_at()", index)));
+      return std::unexpected(MapException(Star::format("index {} out of range in OrderedMap::value_at()", index)));
     auto position = self.m_order.begin();
     std::advance(position, index);
     return std::reference_wrapper<std::remove_reference_t<decltype((self.m_order.begin()->second))>>(position->second);
@@ -207,8 +207,8 @@ private:
 };
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
-auto operator<<(std::ostream& os, OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...> const& m)
-  -> decltype(print_map(os, m));
+auto write_text(TextBuffer& output, OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...> const& map)
+  -> decltype(print_map(output, map));
 
 template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using OrderedMap = OrderedMapWrapper<std::map, Key, Value, Allocator, Compare>;
@@ -544,7 +544,7 @@ template <template <typename...> class Map, typename Key, typename Value, typena
 auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::key_at(std::size_t i) const
   -> std::expected<std::reference_wrapper<key_type const>, StarException> {
   if (i >= size())
-    return std::unexpected(MapException(strf("index {} out of range in OrderedMap::at()", i)));
+    return std::unexpected(MapException(Star::format("index {} out of range in OrderedMap::at()", i)));
 
   auto it = begin();
   std::advance(it, i);
@@ -688,21 +688,21 @@ void OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::sort_by_value() 
 }
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
-auto operator<<(std::ostream& os, OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...> const& m)
-  -> decltype(print_map(os, m)) {
-  return print_map(os, m);
+auto write_text(TextBuffer& output, OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...> const& map)
+  -> decltype(print_map(output, map)) {
+  return print_map(output, map);
 }
 }
 
 export module star.ordered_map;
 
 export template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...> const&>()), std::ostream&>
-struct std::formatter<Star::OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>>
+struct std::formatter<Star::OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::OrderedMapWrapper;
   using ::Star::OrderedMap;
   using ::Star::OrderedHashMap;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

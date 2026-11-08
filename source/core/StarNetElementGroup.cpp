@@ -12,7 +12,7 @@ namespace Star {
 
 std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& element, bool propagateInterpolation) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!m_elements.any([&element](auto p) { return &p.first.get() == &element; })));
+    Star::star_assert_failed((!m_elements.any([&element](auto p) { return &p.first.get() == &element; })));
   }
 
   element.initNetVersion(m_version);

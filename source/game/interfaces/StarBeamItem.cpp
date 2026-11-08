@@ -392,7 +392,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
       if (!endImage.empty()) {
         if (!m_beamCanPlace) {
           ImageOperation op = HueShiftImageOperation::hueShiftDegrees(120);
-          endImage = strf("{}?{}", endImage, imageOperationToString(op));
+          endImage = Star::format("{}?{}", endImage, imageOperationToString(op));
         }
         auto metadata = beamRoot().imageMetadataDatabase();
         if (!metadata)

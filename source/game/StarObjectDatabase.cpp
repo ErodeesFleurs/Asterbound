@@ -729,7 +729,7 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
       return config->getString("objectName");
     }();
     if (!name) {
-      auto logged = root.logger().errorException(strf("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
+      auto logged = root.logger().errorException(Star::format("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (database->m_paths.contains(*name)) {
@@ -867,12 +867,12 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
       return std::unexpected(std::move(details.error()));
   }
   if (*originalName == "perfectlygenericitem") {
-    auto logged = m_root.logger().errorException(strf("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+    auto logged = m_root.logger().errorException(Star::format("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     return createObject(*originalName, *originalParams);
   }
-  auto logged = m_root.logger().errorException(strf("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+  auto logged = m_root.logger().errorException(Star::format("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return createObject("perfectlygenericitem", JsonObject{
@@ -1023,7 +1023,7 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
 std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::readConfig(String const& path) const {
   auto assetsResult = m_root.assets();
   if (!assetsResult)
-    return std::unexpected(ObjectException(strf("Error loading object '{}'", path), std::move(assetsResult.error())));
+    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), std::move(assetsResult.error())));
   auto assets = std::move(*assetsResult);
   auto result = [&, &root = m_root]() -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
     auto configResult = assets->json(path);
@@ -1381,7 +1381,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     return objectConfig;
   }();
   if (!result)
-    return std::unexpected(ObjectException(strf("Error loading object '{}'", path), assets->withAssetContext(std::move(result.error()), path, "Loading object configuration")));
+    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), assets->withAssetContext(std::move(result.error()), path, "Loading object configuration")));
   return result;
 }
 

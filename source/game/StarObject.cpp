@@ -682,7 +682,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
   if (!initialized) {
     auto cleaned = uninit();
     if (!cleaned)
-      return std::unexpected(initialized.error().withContext(strf("Object initialization cleanup failed: {}", outputException(cleaned.error(), false))));
+      return std::unexpected(initialized.error().withContext(Star::format("Object initialization cleanup failed: {}", Star::output_exception(cleaned.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   return {};
@@ -860,7 +860,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
       auto frame = clamp<int>(std::floor(m_animationTimer / orientation->animationCycle * orientation->frames), 0, orientation->frames - 1);
       if (m_currentFrame != frame) {
         m_currentFrame = frame;
-        setImageKey("frame", toString(frame));
+        setImageKey("frame", Star::to_string(frame));
       }
       m_animationTimer = std::fmod(m_animationTimer + dt, orientation->animationCycle);
     }
@@ -1140,7 +1140,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       return {};
     }();
     if (!dropped) {
-      auto operation8 = root().logger().warnException(strf("Failed to create treasure for object '{}'", m_config->name), ExceptionDiagnostic(dropped.error()));
+      auto operation8 = root().logger().warnException(Star::format("Failed to create treasure for object '{}'", m_config->name), ExceptionDiagnostic(dropped.error()));
       if (!operation8)
         return std::unexpected(std::move(operation8.error()));
     }
@@ -1269,7 +1269,7 @@ std::expected<std::optional<String>, StarException> Object::inspectionDescriptio
   if (!generalResult)
     return std::unexpected(std::move(generalResult.error()));
   auto general = std::move(*generalResult);
-  auto specificConfigResult = configValue(strf("{}Description", species));
+  auto specificConfigResult = configValue(Star::format("{}Description", species));
   if (!specificConfigResult)
     return std::unexpected(std::move(specificConfigResult.error()));
   auto specificConfig = std::move(*specificConfigResult);

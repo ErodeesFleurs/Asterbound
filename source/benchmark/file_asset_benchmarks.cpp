@@ -63,7 +63,7 @@ void asset_lengths(benchmark::State& state, asset_kind kind) {
   auto memory = std::make_shared<Star::MemoryAssetSource>("file-benchmark");
   Star::StreamOffset expected_total = 0;
   for (std::size_t i = 0; i != count; ++i) {
-    auto name = Star::strf("asset-{:05}.bin", i);
+    auto name = Star::format("asset-{:05}.bin", i);
     paths.push_back("/" + name);
     payloads.push_back(deterministic_bytes(1 + (i * 37) % 512, i, 0));
     expected_total += static_cast<Star::StreamOffset>(payloads.back().size());

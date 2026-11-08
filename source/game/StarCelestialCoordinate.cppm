@@ -3,7 +3,7 @@ import std;
 import star.string;
 import star.data_stream;
 import star.format;
-import star.stream_formatter;
+import star.text_formatter;
 import star.json;
 
 import star.vector;
@@ -82,7 +82,7 @@ public:
   bool operator!=(CelestialCoordinate const& rhs) const;
 
   // Prints in the same format accepted by parser.  Each coordinate is unique.
-  friend std::ostream& operator<<(std::ostream& os, CelestialCoordinate const& coord);
+  friend void write_text(TextBuffer& buffer, CelestialCoordinate const& coord);
 
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialCoordinate& coordinate);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialCoordinate const& coordinate);
@@ -95,15 +95,17 @@ private:
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialCoordinate& coordinate);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialCoordinate const& coordinate);
+void write_text(TextBuffer& buffer, CelestialCoordinate const& coord);
 
 }
 
 export module star.celestial_coordinate;
 
-export template <> struct std::formatter<Star::CelestialCoordinate> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::CelestialCoordinate> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::CelestialExceptionTag;
   using ::Star::CelestialException;
   using ::Star::CelestialCoordinate;
+  using ::Star::write_text;
 }

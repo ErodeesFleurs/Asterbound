@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json;
 import star.output_proxy;
 import star.native_runtime;
@@ -133,13 +134,13 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   if (!loader)
     return std::unexpected(std::move(loader.error()));
   auto& rootLoader = *loader;
-  auto worldParameter = rootLoader.addParameter("dungeonWorld", "dungeonWorld", OptionParser::Optional, strf("dungeonWorld to test, default is {}", dungeonWorldName));
+  auto worldParameter = rootLoader.addParameter("dungeonWorld", "dungeonWorld", OptionParser::Optional, Star::format("dungeonWorld to test, default is {}", dungeonWorldName));
   if (!worldParameter)
     return std::unexpected(std::move(worldParameter.error()));
-  auto repetitionsParameter = rootLoader.addParameter("repetitions", "repetitions", OptionParser::Optional, strf("number of times to generate, default {}", repetitions));
+  auto repetitionsParameter = rootLoader.addParameter("repetitions", "repetitions", OptionParser::Optional, Star::format("number of times to generate, default {}", repetitions));
   if (!repetitionsParameter)
     return std::unexpected(std::move(repetitionsParameter.error()));
-  auto reportParameter = rootLoader.addParameter("reportevery", "report repetitions", OptionParser::Optional, strf("number of repetitions before each progress report, default {}", reportEvery));
+  auto reportParameter = rootLoader.addParameter("reportevery", "report repetitions", OptionParser::Optional, Star::format("number of repetitions before each progress report, default {}", reportEvery));
   if (!reportParameter)
     return std::unexpected(std::move(reportParameter.error()));
 
@@ -148,11 +149,13 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     return std::unexpected(std::move(initialized.error()));
   auto& [root, options] = *initialized;
 
-  coutf("Fully loading root...");
+  if (auto written = Star::print("Fully loading root..."); !written)
+    return std::unexpected(std::move(written.error()));
   auto loaded = root->fullyLoad();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
-  coutf(" done\n");
+  if (auto written = Star::print(" done\n"); !written)
+    return std::unexpected(std::move(written.error()));
 
   if (auto repetitionsOption = options.parameters.maybe("repetitions")) {
     auto text = repetitionsOption->first();
@@ -181,13 +184,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 
   auto start = std::chrono::steady_clock::now();
   auto lastReport = std::chrono::steady_clock::now();
-  coutf("testing {} generations of dungeonWorld {}\n", repetitions, dungeonWorldName);
+  if (auto written = Star::print("testing {} generations of dungeonWorld {}\n", repetitions, dungeonWorldName); !written)
+    return std::unexpected(std::move(written.error()));
 
   for (unsigned i = 0; i < repetitions; ++i) {
     if (i > 0 && i % reportEvery == 0) {
       float gps = reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
       lastReport = std::chrono::steady_clock::now();
-      coutf("[{}] {}s | Generations Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps);
+      if (auto written = Star::print("[{}] {}s | Generations Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps); !written)
+        return std::unexpected(std::move(written.error()));
     }
 
     auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeonWorldName);
@@ -207,14 +212,16 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(closed.error()));
   }
 
-  coutf("Finished {} generations of dungeonWorld {} in {} seconds", repetitions, dungeonWorldName, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+  if (auto written = Star::print("Finished {} generations of dungeonWorld {} in {} seconds", repetitions, dungeonWorldName, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
+    return std::unexpected(std::move(written.error()));
   return {};
 }
 
 int main(int argc, char** argv) {
   auto result = run(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return 0;

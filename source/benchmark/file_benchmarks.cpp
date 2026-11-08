@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 #ifdef __linux__
 #include <fcntl.h>
@@ -5,6 +6,7 @@
 #endif
 
 import std;
+import star.format;
 import star.byte_array;
 import star.file;
 import star.io_device;
@@ -356,7 +358,8 @@ public:
 int main(int argc, char** argv) {
   auto native_runtime = Star::NativeRuntime::create();
   if (!native_runtime) {
-    std::cerr << native_runtime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);

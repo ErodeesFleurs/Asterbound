@@ -1,6 +1,7 @@
 module;
 import std;
 import star.format;
+import star.text_formatter;
 import star.string;
 import star.hash;
 import star.json;
@@ -69,7 +70,7 @@ public:
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& itemDescriptor);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& itemDescriptor);
 
-  friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemDescriptor const& descriptor);
+  friend std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
 
   friend struct hash<ItemDescriptor>;
 
@@ -88,7 +89,7 @@ private:
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& itemDescriptor);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& itemDescriptor);
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemDescriptor const& descriptor);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
 
 template <>
 struct hash<ItemDescriptor> {
@@ -108,6 +109,7 @@ export namespace Star {
 
 export namespace Star {
   using ::Star::ItemDescriptor;
+  using ::Star::write_text;
   using ::Star::Item;
   using ::Star::VersionedJson;
 }

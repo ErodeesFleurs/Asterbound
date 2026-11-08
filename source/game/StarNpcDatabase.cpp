@@ -152,14 +152,14 @@ if (!result5) return std::unexpected(std::move(result5.error()));
 String typeName = std::move(*result5);
 
       if (types.contains(typeName))
-        return std::unexpected(NpcException(strf("Repeat npc type name '{}'", typeName)));
+        return std::unexpected(NpcException(Star::format("Repeat npc type name '{}'", typeName)));
 
       types[typeName] = config;
 
       return {};
     }();
     if (!loaded)
-      return std::unexpected(NpcException(strf("Error loading npc type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading NPC type")));
+      return std::unexpected(NpcException(Star::format("Error loading npc type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading NPC type")));
   }
   return {};
 }

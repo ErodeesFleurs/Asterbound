@@ -301,8 +301,8 @@ NetCompatibilityRules ServerClientContext::netRules() const {
 String ServerClientContext::descriptiveName() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  String hostName = m_remoteAddress ? toString(*m_remoteAddress) : "local";
-  return strf("'{}' <{}> ({})", m_playerName, m_clientId, hostName);
+  String hostName = m_remoteAddress ? Star::to_string(*m_remoteAddress) : "local";
+  return Star::format("'{}' <{}> ({})", m_playerName, m_clientId, hostName);
 }
 
 std::expected<void, StarException> ServerClientContext::registerRpcHandlers(JsonRpcHandlers const& rpcHandlers) {

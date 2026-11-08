@@ -8,9 +8,9 @@ namespace Star {
 
 BadLexicalCast lexicalCastError(std::errc ec, std::string_view str) {
   if (ec == std::errc::invalid_argument)
-    return BadLexicalCast(strf("Lexical cast failed on '{}' (invalid argument)", str));
+    return BadLexicalCast(Star::format("Lexical cast failed on '{}' (invalid argument)", str));
   else
-    return BadLexicalCast(strf("Lexical cast failed on '{}'", str));
+    return BadLexicalCast(Star::format("Lexical cast failed on '{}'", str));
 }
 
 template <>

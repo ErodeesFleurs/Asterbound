@@ -228,7 +228,7 @@ std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(R
   if (!initialized) {
     auto cleared = client->close();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(strf("Error rolling back client creation: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back client creation: {}", cleared.error().what())));
     return std::unexpected(std::move(initialized.error()));
   }
   return client;
@@ -417,7 +417,7 @@ std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(R
   if (!initialized) {
     auto cleared = client->close();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(strf("Error rolling back client creation: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back client creation: {}", cleared.error().what())));
     return std::unexpected(std::move(initialized.error()));
   }
   return client;
@@ -574,7 +574,7 @@ std::expected<void, StarException> WorldClient::reviveMainPlayer() {
     if (!added) {
       auto cleared = m_mainPlayer->uninit();
       if (!cleared)
-        return std::unexpected(added.error().withContext(strf("Error uninitializing revived player: {}", cleared.error().what())));
+        return std::unexpected(added.error().withContext(Star::format("Error uninitializing revived player: {}", cleared.error().what())));
     }
     return added;
   }
@@ -626,7 +626,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     if (!collected) {
       if (entity->isMaster())
         return std::unexpected(std::move(collected.error()));
-      auto issue = printException(collected.error(), true);
+      auto issue = Star::print_exception(collected.error(), true);
       if (!m_entityExceptionsLogged.insert(hash_of(issue)).second)
         issue = collected.error().what();
       auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events during removal: {}", entityId, issue);
@@ -766,7 +766,7 @@ std::expected<void, StarException> WorldClient::forEachCollisionBlock(RectI cons
     if (tile.getCollision() == CollisionKind::Null)
       return iterator(CollisionBlock::nullBlock(pos));
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((!tile.collisionCacheDirty));
+      Star::star_assert_failed((!tile.collisionCacheDirty));
     for (auto const& block : tile.collisionCache) {
       auto visited = iterator(block);
       if (!visited)
@@ -1182,7 +1182,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           return std::unexpected(std::move(rendered.error()));
         } else {
           // this is THEIR problem!!
-          auto issue = printException(e, true);
+          auto issue = Star::print_exception(e, true);
           auto hash = hash_of(issue);
           if (!self.m_entityExceptionsLogged.contains(hash)) {
             self.m_entityExceptionsLogged.insert(hash);
@@ -1204,7 +1204,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
             auto result65 = enumName<DirectionNames>(toolUser->facingDirection());
             if (!result65)
               return std::unexpected(std::move(result65.error()));
-            image = strf("/rendering/sprites/error_{}.png", *result65);
+            image = Star::format("/rendering/sprites/error_{}.png", *result65);
           }
           Color color = Color::rgbf(
             0.8f + static_cast<float>(std::sin(self.m_currentTime * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
@@ -1629,7 +1629,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result103) {
         auto cleared = entity->uninit();
         if (!cleared)
-          return std::unexpected(result103.error().withContext(strf("Error uninitializing rejected entity: {}", cleared.error().what())));
+          return std::unexpected(result103.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
         return std::unexpected(std::move(result103.error()));
       }
       
@@ -1652,7 +1652,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
               EntityId entityId = entity->entityId();
               if (connectionForEntity(entityId) == entityUpdateSet->forConnection) {
                 if (Star::DebugEnabled) {
-                  Star::starAssertFailed((entity->isSlave()));
+                  Star::star_assert_failed((entity->isSlave()));
                 }
                 auto result105 = entity->readNetState(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, self.m_clientState->netCompatibilityRules());
                 if (!result105)
@@ -2181,7 +2181,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
           return std::unexpected(std::move(updated.error()));
         } else {
           // this is THEIR problem!!
-          auto issue = printException(e, true);
+          auto issue = Star::print_exception(e, true);
           auto hash = hash_of(issue);
           if (!self.m_entityExceptionsLogged.contains(hash)) {
             self.m_entityExceptionsLogged.insert(hash);
@@ -2390,7 +2390,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!collected) {
         if (entity->isMaster())
           return std::unexpected(std::move(collected.error()));
-        auto issue = printException(collected.error(), true);
+        auto issue = Star::print_exception(collected.error(), true);
         if (!m_entityExceptionsLogged.insert(hash_of(issue)).second)
           issue = collected.error().what();
         auto logged = this->root().logger().error("WorldClient: Exception caught collecting entity {} presentation events: {}", entity->entityId(), issue);
@@ -2548,7 +2548,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     m_outgoingPackets.push_back(std::make_shared<PingPacket>(m_pingTime->time_since_epoch().count()));
   }
   
-  this->root().logMap().set(strf("client_{}_ping",m_subWorldId), m_latency.count());
+  this->root().logMap().set(Star::format("client_{}_ping",m_subWorldId), m_latency.count());
   
   // Remove active sectors that are outside of the current monitoring region
   Set<ClientTileSectorArray::Sector> neededSectors;
@@ -2578,9 +2578,9 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       return std::unexpected(std::move(result196.error()));
   }
   
-  this->root().logMap().set(strf("client_{}_entities",m_subWorldId), m_entityMap->size());
-  this->root().logMap().set(strf("client_{}_sectors",m_subWorldId), toString(loadedSectors.size()));
-  this->root().logMap().set(strf("client_{}_lua_mem",m_subWorldId), m_luaRoot->luaMemoryUsage());
+  this->root().logMap().set(Star::format("client_{}_entities",m_subWorldId), m_entityMap->size());
+  this->root().logMap().set(Star::format("client_{}_sectors",m_subWorldId), Star::to_string(loadedSectors.size()));
+  this->root().logMap().set(Star::format("client_{}_lua_mem",m_subWorldId), m_luaRoot->luaMemoryUsage());
   auto endPresentation = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
     if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
@@ -2675,7 +2675,7 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
     if (!added) {
       auto cleared = entity->uninit();
       if (!cleared)
-        return std::unexpected(added.error().withContext(strf("Error uninitializing rejected entity: {}", cleared.error().what())));
+        return std::unexpected(added.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
       return std::unexpected(std::move(added.error()));
     }
     return notifyEntityCreate(entity);
@@ -2923,7 +2923,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       return std::unexpected(std::move(result212.error()));
     Particle particle = (std::move(*result212));
     particle.position += position;
-    auto result213 = particle.string.replace("$dmg$", toString(displayValue));
+    auto result213 = particle.string.replace("$dmg$", Star::to_string(displayValue));
     if (!result213)
       return std::unexpected(std::move(result213.error()));
     particle.string = (std::move(*result213));
@@ -3226,7 +3226,7 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
                                              *liquidsDatabase, environmentLight, undergroundLevel);
   if (!result237)
     return std::unexpected(std::move(result237.error()));
-  this->root().logMap().set("client_render_world_async_light_gather", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
+  this->root().logMap().set("client_render_world_async_light_gather", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   return {};
 }
 
@@ -3327,13 +3327,13 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
     m_lightMap = std::move(m_pendingLightMap);
   }
   auto publicationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  root.logMap().set("client_render_world_async_light_prep_wait", strf("{:05d}\u00b5s", (prepStart - prepWaitStart).count()));
-  root.logMap().set("client_render_world_async_light_prep", strf("{:05d}\u00b5s", (prepEnd - prepStart).count()));
-  root.logMap().set("client_render_world_async_light_propagation", strf("{:05d}\u00b5s", (propagationEnd - prepEnd).count()));
+  root.logMap().set("client_render_world_async_light_prep_wait", Star::format("{:05d}\u00b5s", (prepStart - prepWaitStart).count()));
+  root.logMap().set("client_render_world_async_light_prep", Star::format("{:05d}\u00b5s", (prepEnd - prepStart).count()));
+  root.logMap().set("client_render_world_async_light_propagation", Star::format("{:05d}\u00b5s", (propagationEnd - prepEnd).count()));
   root.logMap().set("client_render_world_async_light_publication_wait",
-                    strf("{:05d}\u00b5s", (publicationStart - propagationEnd).count()));
+                    Star::format("{:05d}\u00b5s", (publicationStart - propagationEnd).count()));
   root.logMap().set("client_render_world_async_light_publication",
-                    strf("{:05d}\u00b5s", (publicationEnd - publicationStart).count()));
+                    Star::format("{:05d}\u00b5s", (publicationEnd - publicationStart).count()));
   return {};
 }
 
@@ -3351,7 +3351,7 @@ std::expected<void, StarException> WorldClient::lightingMain(std::stop_token sto
     auto result250 = lightingCalc();
     if (!result250)
       return std::unexpected(std::move(result250.error()));
-    this->root().logMap().set("client_render_world_async_light_calc", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
+    this->root().logMap().set("client_render_world_async_light_calc", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   }
   return {};
 }
@@ -3499,7 +3499,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
         if (!result275) {
           auto cleared = m_mainPlayer->uninit();
           if (!cleared)
-            return std::unexpected(result275.error().withContext(strf("Error uninitializing rejected entity: {}", cleared.error().what())));
+            return std::unexpected(result275.error().withContext(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
           return std::unexpected(std::move(result275.error()));
         }
       }
@@ -3579,7 +3579,7 @@ std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const
   if (!initialized) {
     auto cleared = clearWorld();
     if (!cleared)
-      return std::unexpected(initialized.error().withContext(strf("Error rolling back world initialization: {}", cleared.error().what())));
+      return std::unexpected(initialized.error().withContext(Star::format("Error rolling back world initialization: {}", cleared.error().what())));
   }
   return initialized;
 }
@@ -3591,7 +3591,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(strf("Additional client world cleanup failure: {}", result.error().what()));
+        *error = error->withContext(Star::format("Additional client world cleanup failure: {}", result.error().what()));
       else
         error.emplace(std::move(result.error()));
     }
@@ -4142,7 +4142,7 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
   dmg.damageDealt = dmg.healthLost = 0.0f;
   dmg.hitType = HitType::Hit;
   dmg.damageSourceKind = "nodamage";
-  dmg.targetMaterialKind = raw ? String(broadcast) : String(strf("{}{}{}", SECRET_BROADCAST_PREFIX,
+  dmg.targetMaterialKind = raw ? String(broadcast) : String(Star::format("{}{}{}", SECRET_BROADCAST_PREFIX,
       StringView(std::string_view(reinterpret_cast<char const*>(signature.data()), signature.size())), broadcast));
   dmg.position = m_mainPlayer->position();
 

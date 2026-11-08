@@ -382,13 +382,13 @@ void TextureAtlasSet<AtlasTextureHandle>::setAtlasRegionUsed(TextureAtlas& textu
       val = used;
       if (oldVal && !val) {
         if constexpr (Star::DebugEnabled) {
-          Star::starAssertFailed((textureAtlas.usedCellCount != 0));
+          Star::star_assert_failed((textureAtlas.usedCellCount != 0));
         }
         textureAtlas.usedCellCount -= 1;
       } else if (!oldVal && used) {
         textureAtlas.usedCellCount += 1;
         if constexpr (Star::DebugEnabled) {
-          Star::starAssertFailed((textureAtlas.usedCellCount <= square(m_atlasNumCells)));
+          Star::star_assert_failed((textureAtlas.usedCellCount <= square(m_atlasNumCells)));
         }
       }
     }

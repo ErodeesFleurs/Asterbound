@@ -338,7 +338,7 @@ std::expected<void, StarException> WorldStorage::loadSector(Sector sector) {
     setSectorTimeToLive(sector, ttl);
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to load sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to load sector {}", sector)));
   return result;
 }
 
@@ -354,7 +354,7 @@ std::expected<void, StarException> WorldStorage::activateSector(Sector sector) {
     setSectorTimeToLive(sector, ttl);
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to load sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to load sector {}", sector)));
   return result;
 }
 
@@ -388,11 +388,11 @@ std::expected<void, StarException> WorldStorage::triggerTerraformSector(Sector s
 
       p->get().generationLevel = SectorGenerationLevel::Terraform;
     } else {
-      return std::unexpected(WorldStorageException(strf("Couldn't flag sector {} for terraforming; metadata unavailable", sector)));
+      return std::unexpected(WorldStorageException(Star::format("Couldn't flag sector {} for terraforming; metadata unavailable", sector)));
     }
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to terraform sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to terraform sector {}", sector)));
   return result;
 }
 
@@ -606,8 +606,8 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
       }
     }
     if (worldId) {
-      this->root().logMap().set(strf("server_{}_storage", worldId->get()),
-        strf("{} active, {}/{} unloaded ({} held)", m_sectorMetadata.size(), unloaded, skipped + unloaded, skipped));
+      this->root().logMap().set(Star::format("server_{}_storage", worldId->get()),
+        Star::format("{} active, {}/{} unloaded ({} held)", m_sectorMetadata.size(), unloaded, skipped + unloaded, skipped));
     }
     return {};
   }();
@@ -910,7 +910,7 @@ std::expected<ByteArray, StarException> WorldStorage::writeTileSector(TileSector
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((store.tiles));
+    Star::star_assert_failed((store.tiles));
   }
   for (std::size_t y = 0; y < WorldSectorSize; ++y) {
     for (std::size_t x = 0; x < WorldSectorSize; ++x)
@@ -1071,10 +1071,10 @@ std::expected<void, StarException> WorldStorage::initialize() {
 StarException WorldStorage::invalidate(StarException error, std::string context) {
   auto rollback = m_db.rollback();
   if (!rollback) {
-    error = rollback.error().withContext(strf("Rollback failed after {}", error.what()));
+    error = rollback.error().withContext(Star::format("Rollback failed after {}", error.what()));
   } else {
     auto closed = m_db.close();
-    if (!closed) error = closed.error().withContext(strf("Close failed after {}", error.what()));
+    if (!closed) error = closed.error().withContext(Star::format("Close failed after {}", error.what()));
   }
   return WorldStorageException(std::move(context), ExceptionDiagnostic(error));
 }
@@ -1211,7 +1211,7 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
           if (entity) {
             addedEntities.push_back(std::move(*entity));
           } else {
-            auto logged = this->root().logger().warnException(strf("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
+            auto logged = this->root().logger().warnException(Star::format("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
             if (!logged) return std::unexpected(std::move(logged.error()));
             if (this->root().logger().loggable(LogLevel::Debug)) {
               auto stored = entityStore.toJson().repr();

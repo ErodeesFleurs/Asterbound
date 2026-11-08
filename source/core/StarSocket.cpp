@@ -211,7 +211,7 @@ std::expected<void, StarException> Socket::bind(Logger& logger, HostAddressWithP
   if (auto status = setNativeFromAddress(m_localAddress, &sockAddr, &sockAddrLen); !status)
     return std::unexpected(std::move(status.error()));
   if (::bind(m_impl->socketDesc, (struct sockaddr*)&sockAddr, sockAddrLen) < 0)
-    return std::unexpected(NetworkException(strf("Cannot bind socket to {}: {}", m_localAddress, netErrorString())));
+    return std::unexpected(NetworkException(Star::format("Cannot bind socket to {}: {}", m_localAddress, netErrorString())));
   if (addressWithPort.port() == 0) {
     sockAddrLen = sizeof(sockAddr);
     if (::getsockname(m_impl->socketDesc, (struct sockaddr*)&sockAddr, &sockAddrLen) != 0)
@@ -231,7 +231,7 @@ std::expected<void, StarException> Socket::listen(int backlog) {
     return std::unexpected(std::move(status.error()));
 
   if (::listen(m_impl->socketDesc, backlog) != 0)
-    return std::unexpected(NetworkException(strf("Could not listen on socket: '{}'", netErrorString())));
+    return std::unexpected(NetworkException(Star::format("Could not listen on socket: '{}'", netErrorString())));
   return {};
 }
 

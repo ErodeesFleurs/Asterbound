@@ -1,82 +1,66 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.type_identity;
 import star.optional;
 import star.format;
 
 namespace Star {
 
-namespace OutputAnyDetail {
-  template<typename T, typename CharT, typename Traits>
-  std::basic_string<CharT, Traits> string(T const& t) {
-    return std::format("<type {} at address: {}>", typeName<T>(), (void*)&t);
-  }
-
-  template<typename T, typename CharT, typename Traits>
-  std::basic_ostream<CharT, Traits>& output(std::basic_ostream<CharT, Traits>& os, T const& t) {
-    return os << string<T, CharT, Traits>(t);
-  }
-
-  namespace Operator {
-    template<typename T, typename CharT, typename Traits>
-    std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os, T const& t) {
-      return output(os, t);
-    }
-  }
-
+namespace output_any_detail {
   template <typename T>
   struct Wrapper {
     T const& wrapped;
   };
 
   template <typename T>
-  decltype(auto) outputValue(std::ostream& os, T const& value) {
-    using namespace Operator;
-    if constexpr (requires { outputOptional(value); })
-      return os << outputOptional(value);
-    else
-      return os << value;
+  decltype(auto) append_value(TextBuffer& buffer, T const& value) {
+    if constexpr (requires { output_optional(value); }) {
+      if constexpr (text_writable<decltype(output_optional(value))>)
+        return append_text(buffer, output_optional(value));
+      else
+        std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", typeName<T>(),
+            static_cast<void const*>(std::addressof(value)));
+    } else if constexpr (text_writable<T>) {
+      return append_text(buffer, value);
+    } else {
+      std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", typeName<T>(),
+          static_cast<void const*>(std::addressof(value)));
+    }
   }
 
   template <typename T>
-    requires std::same_as<decltype(outputValue(std::declval<std::ostream&>(), std::declval<T const&>())), std::ostream&>
-  std::ostream& operator<<(std::ostream& os, Wrapper<T> const& wrapper) {
-    return outputValue(os, wrapper.wrapped);
-  }
-
-  template <typename T>
-    requires std::same_as<decltype(outputValue(std::declval<std::ostream&>(), std::declval<T const&>())),
-        std::expected<std::reference_wrapper<std::ostream>, StarException>>
-  [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Wrapper<T> const& wrapper) {
-    return outputValue(os, wrapper.wrapped);
+  decltype(auto) write_text(TextBuffer& buffer, Wrapper<T> const& wrapper) {
+    return append_value(buffer, wrapper.wrapped);
   }
 }
 
-// Unprintable values use diagnostic type/address text; fallible printers retain
-// their checked result rather than being erased into a void callback.
+// Unprintable values use diagnostic type/address text; supported fallible
+// printers are always dispatched and their exact checked result is preserved.
 template <typename T>
-OutputAnyDetail::Wrapper<T> outputAny(T const& t) {
-  return OutputAnyDetail::Wrapper<T>{t};
+output_any_detail::Wrapper<T> output_any(T const& value) {
+  return {value};
 }
 
 struct OutputProxy {
-  using PrintFunction = std::function<void(std::ostream&)>;
+  using PrintFunction = std::function<void(TextBuffer&)>;
 
   template <typename Printer>
-    requires std::invocable<Printer&, std::ostream&>
-        && (!requires { typename std::remove_cvref_t<std::invoke_result_t<Printer&, std::ostream&>>::error_type; })
+    requires std::is_copy_constructible_v<std::remove_cvref_t<Printer>>
+        && requires(Printer& printer, TextBuffer& buffer) {
+          { std::invoke(printer, buffer) } -> std::same_as<void>;
+          PrintFunction(std::forward<Printer>(printer));
+        }
   OutputProxy(Printer&& printer)
     : m_print(std::forward<Printer>(printer)) {}
 
 private:
-  friend std::ostream& operator<<(std::ostream& os, OutputProxy const& p);
+  friend void write_text(TextBuffer& buffer, OutputProxy const& proxy);
   PrintFunction m_print;
 };
 
-inline std::ostream& operator<<(std::ostream& os, OutputProxy const& p) {
-  p.m_print(os);
-  return os;
+inline void write_text(TextBuffer& buffer, OutputProxy const& proxy) {
+  proxy.m_print(buffer);
 }
 
 }
@@ -84,22 +68,19 @@ inline std::ostream& operator<<(std::ostream& os, OutputProxy const& p) {
 export module star.output_proxy;
 
 export namespace Star {
-  using ::Star::outputAny;
+  using ::Star::output_any;
   using ::Star::OutputProxy;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }
 
-export namespace Star::OutputAnyDetail {
-  using ::Star::OutputAnyDetail::string;
-  using ::Star::OutputAnyDetail::output;
-  using ::Star::OutputAnyDetail::Wrapper;
-  using ::Star::OutputAnyDetail::operator<<;
-}
-
-export namespace Star::OutputAnyDetail::Operator {
-  using ::Star::OutputAnyDetail::Operator::operator<<;
+export namespace Star::output_any_detail {
+  using ::Star::output_any_detail::Wrapper;
+  using ::Star::output_any_detail::write_text;
 }
 
 export template <typename T>
-struct std::formatter<Star::OutputAnyDetail::Wrapper<T>> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::OutputProxy> : Star::StreamFormatter {};
+  requires requires(Star::TextBuffer& buffer, Star::output_any_detail::Wrapper<T> const& value) {
+    { write_text(buffer, value) } -> std::same_as<void>;
+  }
+struct std::formatter<Star::output_any_detail::Wrapper<T>> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::OutputProxy> : Star::TextFormatter {};

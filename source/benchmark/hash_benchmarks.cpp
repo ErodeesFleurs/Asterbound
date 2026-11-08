@@ -1,8 +1,10 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 #define XXH_INLINE_ALL
 #include "xxhash.h"
 
 import std;
+import star.format;
 import star.array;
 import star.byte_array;
 import star.flat_hash_map;
@@ -578,7 +580,8 @@ public:
 int main(int argc, char** argv) {
   auto native_runtime = Star::NativeRuntime::create();
   if (!native_runtime) {
-    std::cerr << native_runtime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
+      return 1;
     return 1;
   }
   // Same deterministic runtime salt in before/after even if binary paths differ.

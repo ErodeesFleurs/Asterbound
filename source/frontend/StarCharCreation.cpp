@@ -337,7 +337,7 @@ std::expected<void, StarException> CharCreationPane::createPlayer() {
   if (*portrait)
     return (*portrait)->setEntity(m_previewPlayer);
   auto error = CharCreationException("The charPreview portrait has the wrong type.");
-  return context().root().logger().error("Character Preview portrait was not found in the json specification. {}", outputException(ExceptionDiagnostic(error), false));
+  return context().root().logger().error("Character Preview portrait was not found in the json specification. {}", Star::output_exception(ExceptionDiagnostic(error), false));
 }
 
 std::expected<void, StarException> CharCreationPane::randomize() {
@@ -476,21 +476,21 @@ std::expected<void, StarException> CharCreationPane::changed() {
     if (auto result = (*child)->setVisibility(!altyLabel->get().empty()); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto speciesButton = fetchChild<ButtonWidget>(strf("species.{}", m_speciesChoice));
+  auto speciesButton = fetchChild<ButtonWidget>(Star::format("species.{}", m_speciesChoice));
   if (!speciesButton)
     return std::unexpected(std::move(speciesButton.error()));
   if (*speciesButton) {
     if (auto result = (*speciesButton)->check(); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto genderButton = fetchChild<ButtonWidget>(strf("gender.{}", genderIdx));
+  auto genderButton = fetchChild<ButtonWidget>(Star::format("gender.{}", genderIdx));
   if (!genderButton)
     return std::unexpected(std::move(genderButton.error()));
   if (*genderButton) {
     if (auto result = (*genderButton)->check(); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto modeButton = requireChild<ButtonWidget>(strf("mode.{}", m_modeChoice));
+  auto modeButton = requireChild<ButtonWidget>(Star::format("mode.{}", m_modeChoice));
   if (!modeButton)
     return std::unexpected(std::move(modeButton.error()));
   if (auto result = (*modeButton)->check(); !result)
@@ -501,7 +501,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
   if (auto result = setRequiredLabel("labelMode", *description); !result)
     return std::unexpected(std::move(result.error()));
   for (std::size_t i = 0; i < species.genderOptions.size(); ++i) {
-    auto button = fetchChild<ButtonWidget>(strf("gender.{}", i));
+    auto button = fetchChild<ButtonWidget>(Star::format("gender.{}", i));
     if (!button)
       return std::unexpected(std::move(button.error()));
     if (*button)
@@ -509,7 +509,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
   }
   for (auto const& [name, definition] : (*database)->allSpecies()) {
     if (auto it = std::ranges::find(m_speciesList, name); it != m_speciesList.end()) {
-      auto button = fetchChild<ButtonWidget>(strf("species.{}", static_cast<std::size_t>(it - m_speciesList.begin())));
+      auto button = fetchChild<ButtonWidget>(Star::format("species.{}", static_cast<std::size_t>(it - m_speciesList.begin())));
       if (!button)
         return std::unexpected(std::move(button.error()));
       if (*button) {

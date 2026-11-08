@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.format;
 import star.string;
@@ -63,10 +64,10 @@ void Tileset::defineTile(std::shared_ptr<::Star::Tile> const& tile) {
   // check if a tile still exists in the database and should be exported
   // despite no longer belonging to the tileset.
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_source == tile->source));
+    Star::star_assert_failed((m_source == tile->source));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_database->name() == tile->database));
+    Star::star_assert_failed((m_database->name() == tile->database));
   }
 
   m_tiles.push_back(tile);
@@ -129,7 +130,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   if (!invalidated)
     return std::unexpected(std::move(invalidated.error()));
   for (std::size_t id = 0; id < next_id; ++id) {
-    String idKey = toString(id);
+    String idKey = Star::to_string(id);
     if (!tileProperties.contains(idKey))
       tileProperties[idKey] = JsonObject{{"invalid", "true"}};
     if (!tileImages.contains(idKey))
@@ -294,12 +295,13 @@ std::expected<StringSet, StarException> Tileset::updateTiles(JsonObject& tilePro
     if (auto existing = existingTiles.find_ref(tile->name)) {
       id = existing->get();
     } else {
-      coutf("Adding '{}' to {}\n", tile->name, tilesetPath);
+      if (auto written = Star::print("Adding '{}' to {}\n", tile->name, tilesetPath); !written)
+        return std::unexpected(std::move(written.error()));
       id = next_id++;
     }
 
-    tileProperties[toString(id)] = std::move(properties);
-    tileImages[toString(id)] = tileImageReference(tile->name, tile->database);
+    tileProperties[Star::to_string(id)] = std::move(properties);
+    tileImages[Star::to_string(id)] = tileImageReference(tile->name, tile->database);
 
     updatedTiles.add(tile->name);
   }
@@ -320,16 +322,18 @@ std::expected<void, StarException> Tileset::invalidateTiles(StringSet const& inv
     if (std::shared_ptr<::Star::Tile> const& tile = m_database->getTile(tileName)) {
       // Tile has moved category, but we're leaving it in this tileset to avoid
       // breaking existing maps.
-      tileProperties[toString(id)] = tile->properties;
-      tileImages[toString(id)] = tileImageReference(tile->name, tile->database);
+      tileProperties[Star::to_string(id)] = tile->properties;
+      tileImages[Star::to_string(id)] = tileImageReference(tile->name, tile->database);
     } else {
-      auto invalid = tileProperties[toString(id)].contains("invalid");
+      auto invalid = tileProperties[Star::to_string(id)].contains("invalid");
       if (!invalid)
         return std::unexpected(std::move(invalid.error()));
-      if (!*invalid)
-        coutf("Removing '{}' from {}\n", tileName, tilesetPath);
-      tileProperties[toString(id)] = JsonObject{{"//name", tileName}, {"invalid", "true"}};
-      tileImages[toString(id)] = imageFileReference(InvalidTileImage);
+      if (!*invalid) {
+        if (auto written = Star::print("Removing '{}' from {}\n", tileName, tilesetPath); !written)
+          return std::unexpected(std::move(written.error()));
+      }
+      tileProperties[Star::to_string(id)] = JsonObject{{"//name", tileName}, {"invalid", "true"}};
+      tileImages[Star::to_string(id)] = imageFileReference(InvalidTileImage);
     }
   }
   return {};
@@ -434,7 +438,8 @@ std::expected<void, StarException> TilesetUpdater::exportTilesets() {
           return std::unexpected(std::move(file.error()));
         if (!*file)
           return std::unexpected(StarException::format("Expected unused tile image file: {}", tileImagePath));
-        coutf("Removing unused tile image tiled/{}/{}/{}.png\n", sourceName, database->name(), tileName);
+        if (auto written = Star::print("Removing unused tile image tiled/{}/{}/{}.png\n", sourceName, database->name(), tileName); !written)
+          return std::unexpected(std::move(written.error()));
         auto removed = File::remove(tileImagePath);
         if (!removed)
           return std::unexpected(std::move(removed.error()));

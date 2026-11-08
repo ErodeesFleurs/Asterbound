@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.json;
+import star.text_formatter;
 import star.string;
 import star.unicode;
 import star.file;
@@ -212,8 +213,8 @@ TEST(JsonTest, TokenFailuresRetainCodepointPositions) {
     auto parsed = Json::parse(String(failure.input));
     ASSERT_FALSE(parsed);
     EXPECT_TRUE(parsed.error().is<JsonParsingException>());
-    auto diagnostic = printException(parsed.error(), false);
-    EXPECT_NE(diagnostic.find(strf("Error parsing json at {}", failure.position)), std::string::npos);
+    auto diagnostic = Star::print_exception(parsed.error(), false);
+    EXPECT_NE(diagnostic.find(Star::format("Error parsing json at {}", failure.position)), std::string::npos);
   }
 }
 
@@ -560,6 +561,26 @@ TEST(JsonTest, Utf8OutputPreservesFirstSinkErrorBeforeInvalidLaterValues) {
       EXPECT_EQ(prefix, validPrefix);
     }
   }
+}
+
+TEST(JsonTest, CheckedTextPreservesEscapesNumbersAndFailurePrefix) {
+  Json input = JsonArray{String(std::string_view("a\0b\n", 4)), "é水😀",
+      Json(std::int64_t(-9223372036854775807ll - 1)), Json(1.2345678901234567), true, Json()};
+  auto expected = input.repr();
+  ASSERT_TRUE(expected);
+  TextBuffer output;
+  output.append("prefix:");
+  auto written = write_text(output, input);
+  static_assert(std::same_as<decltype(written), std::expected<void, StarException>>);
+  ASSERT_TRUE(written);
+  EXPECT_EQ(output.view(), std::string("prefix:") + expected->utf8());
+
+  TextBuffer invalid_output;
+  invalid_output.append("prefix:");
+  auto invalid = write_text(invalid_output, Json(JsonArray{1, String(std::string_view("bad\xff", 4)), 2}));
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<UnicodeException>());
+  EXPECT_EQ(invalid_output.view(), "prefix:[1,");
 }
 
 TEST(JsonTest, Utf8WhitespaceValidatesBeforeOutputAndPreservesBytes) {

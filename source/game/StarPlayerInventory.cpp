@@ -538,7 +538,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
       auto res = pair.second->consumeItems(one.multiply(quantity), exactMatch);
       ((void)(res));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((res));
+        Star::star_assert_failed((res));
       }
       leftoverCount -= quantity;
     }
@@ -555,14 +555,14 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
         normalizeItem(p.second);
         ((void)(res));
         if constexpr (Star::DebugEnabled) {
-          Star::starAssertFailed((res));
+          Star::star_assert_failed((res));
         }
 
         leftoverQuantity -= toConsume;
       }
     }
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((leftoverQuantity == 0));
+      Star::star_assert_failed((leftoverQuantity == 0));
     }
     leftoverCount -= quantity;
   }
@@ -575,12 +575,12 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
       normalizeItem(m_swapSlot);
       ((void)(res));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((res));
+        Star::star_assert_failed((res));
       }
 
       quantity -= toConsume;
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((quantity == 0));
+        Star::star_assert_failed((quantity == 0));
       }
     }
     leftoverCount -= std::min(leftoverCount, consumeFromSwap);
@@ -594,19 +594,19 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
       normalizeItem(m_trashSlot);
       ((void)(res));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((res));
+        Star::star_assert_failed((res));
       }
 
       quantity -= toConsume;
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((quantity == 0));
+        Star::star_assert_failed((quantity == 0));
       }
     }
     leftoverCount -= std::min(leftoverCount, consumeFromTrash);
   }
 
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((leftoverCount == 0));
+    Star::star_assert_failed((leftoverCount == 0));
   }
   return true;
 }
@@ -1079,7 +1079,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   };
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
   for (auto const& slot : *EquipmentSlotNames) {
-    auto loaded = loadItem(strf("{}Slot", slot.second), m_equipment[slot.first], true);
+    auto loaded = loadItem(Star::format("{}Slot", slot.second), m_equipment[slot.first], true);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
   }
   auto bags = store.getObject("itemBags");
@@ -1206,7 +1206,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
     if (equipment.first <= EquipmentSlot::BackCosmetic || equipment.second) {
       auto name = EquipmentSlotNames->get_right(equipment.first);
       if (!name) return std::unexpected(std::move(name.error()));
-      auto saved = saveItem(strf("{}Slot", name->get()), equipment.second);
+      auto saved = saveItem(Star::format("{}Slot", name->get()), equipment.second);
       if (!saved) return std::unexpected(std::move(saved.error()));
     }
   }

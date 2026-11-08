@@ -530,7 +530,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   } else if (auto result = (*resSlider)->setVal(m_resList.size() - 1); !result) {
     return std::unexpected(std::move(result.error()));
   }
-  if (auto result = setRequiredLabel("resValueLabel", strf("{}x{}", (*resolution)[0], (*resolution)[1])); !result)
+  if (auto result = setRequiredLabel("resValueLabel", Star::format("{}x{}", (*resolution)[0], (*resolution)[1])); !result)
     return std::unexpected(std::move(result.error()));
 
   auto scaleSetting = m_localChanges.get("interfaceScale");
@@ -551,7 +551,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   };
   if (auto result = updateFloatSlider("interfaceScaleSlider", m_interfaceScaleList, interfaceScale); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = setRequiredLabel("interfaceScaleValueLabel", interfaceScale != 0 ? toString(interfaceScale) : "AUTO"); !result)
+  if (auto result = setRequiredLabel("interfaceScaleValueLabel", interfaceScale != 0 ? Star::to_string(interfaceScale) : "AUTO"); !result)
     return std::unexpected(std::move(result.error()));
   auto zoomSetting = m_localChanges.get("zoomLevel");
   if (!zoomSetting)
@@ -561,7 +561,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     return std::unexpected(std::move(zoom.error()));
   if (auto result = updateFloatSlider("zoomSlider", m_zoomList, *zoom); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = setRequiredLabel("zoomValueLabel", strf("{}x", *zoom)); !result)
+  if (auto result = setRequiredLabel("zoomValueLabel", Star::format("{}x", *zoom)); !result)
     return std::unexpected(std::move(result.error()));
   auto speedSetting = m_localChanges.get("cameraSpeedFactor");
   if (!speedSetting)
@@ -571,7 +571,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     return std::unexpected(std::move(speed.error()));
   if (auto result = updateFloatSlider("cameraSpeedSlider", m_cameraSpeedList, *speed); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = setRequiredLabel("cameraSpeedValueLabel", strf("{}x", *speed)); !result)
+  if (auto result = setRequiredLabel("cameraSpeedValueLabel", Star::format("{}x", *speed)); !result)
     return std::unexpected(std::move(result.error()));
   auto fpsSetting = m_localChanges.get("renderFpsLimit");
   if (!fpsSetting)
@@ -585,7 +585,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto fpsIt = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), *fps);
   if (auto result = (*fpsSlider)->setVal(fpsIt - m_renderFpsList.begin(), false); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = setRequiredLabel("renderFpsValueLabel", *fps == 0 ? "UNLIMITED" : toString(*fps)); !result)
+  if (auto result = setRequiredLabel("renderFpsValueLabel", *fps == 0 ? "UNLIMITED" : Star::to_string(*fps)); !result)
     return std::unexpected(std::move(result.error()));
   for (auto const& [name, key] : {
       std::pair{std::string_view("speechBubbleCheckbox"), std::string_view("speechBubbles")},

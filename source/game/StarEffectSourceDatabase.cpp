@@ -60,7 +60,7 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (result->m_sourceConfigs.contains((*config)->kind()))
-        return std::unexpected(StarException(strf("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
+        return std::unexpected(StarException(Star::format("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
       auto key = (*config)->kind().to_lower();
       if (!key)
         return std::unexpected(std::move(key.error()));
@@ -79,7 +79,7 @@ std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceDa
     return std::unexpected(std::move(key.error()));
   if (auto config = m_sourceConfigs.find_ref(*key))
     return config->get();
-  return std::unexpected(StarException(strf("Unknown effect source definition with kind '{}'.", kind)));
+  return std::unexpected(StarException(Star::format("Unknown effect source definition with kind '{}'.", kind)));
 }
 
 std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceConfig::create(Root& root, Json const& config) {

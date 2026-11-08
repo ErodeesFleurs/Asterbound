@@ -20,7 +20,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarDataStreamDevices.cppm StarDataStreamExtra.cppm
           StarJsonExtra.cppm StarLuaConverters.cppm StarNetImpl.cppm
           scripting/StarUtilityLuaBindings.cppm
-          StarFormat.cppm StarStreamFormatter.cppm
+          StarFormat.cppm StarTextFormatter.cppm
           StarHash.cppm StarFlatHashTable.cppm StarFlatHashMap.cppm StarFlatHashSet.cppm
           StarOptional.cppm StarList.cppm StarMap.cppm StarSet.cppm
           StarOrderedMap.cppm StarOrderedSet.cppm

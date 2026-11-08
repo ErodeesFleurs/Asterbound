@@ -104,7 +104,7 @@ Buffer::Buffer(Buffer&& buffer)
 }
 
 [[nodiscard]] std::expected<String, StarException> Buffer::device_name() const {
-  return strf("Buffer <{}>", (void*)this);
+  return Star::format("Buffer <{}>", (void*)this);
 }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> Buffer::size() {
@@ -268,7 +268,7 @@ ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuf
 }
 
 [[nodiscard]] std::expected<String, StarException> ExternalBuffer::device_name() const {
-  return strf("ExternalBuffer <{}>", (void*)this);
+  return Star::format("ExternalBuffer <{}>", (void*)this);
 }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> ExternalBuffer::size() {

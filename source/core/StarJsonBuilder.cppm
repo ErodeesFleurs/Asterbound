@@ -88,7 +88,7 @@ std::expected<Jsonlike, StarException> inputUtf32Json(InputIterator begin, Input
     return std::unexpected(std::move(parsed.error()));
   }
   if (*parsed != end)
-    return std::unexpected(JsonParsingException(strf("Error extra data at end of input at {}:{}", parser.line(), parser.column())));
+    return std::unexpected(JsonParsingException(Star::format("Error extra data at end of input at {}:{}", parser.line(), parser.column())));
   return stream.takeTop();
 }
 

@@ -782,15 +782,15 @@ if (!checked97) return std::unexpected(std::move(checked97.error()));
 
 m_networkedAnimator->setLocalTag(
   "hairFrameset",
-  m_identity.hairType.empty() ? "" : String(strf("{}/{}.png", m_identity.hairGroup, m_identity.hairType)));
+  m_identity.hairType.empty() ? "" : String(Star::format("{}/{}.png", m_identity.hairGroup, m_identity.hairType)));
 m_networkedAnimator->setLocalTag("facialHairFrameset",
                                  m_identity.facialHairType.empty()
                                    ? ""
-                                   : String(strf("{}/{}.png", m_identity.facialHairGroup, m_identity.facialHairType)));
+                                   : String(Star::format("{}/{}.png", m_identity.facialHairGroup, m_identity.facialHairType)));
 m_networkedAnimator->setLocalTag("facialMaskFrameset",
                                  m_identity.facialMaskType.empty()
                                    ? ""
-                                   : String(strf("{}/{}.png", m_identity.facialMaskGroup, m_identity.facialMaskType)));
+                                   : String(Star::format("{}/{}.png", m_identity.facialMaskGroup, m_identity.facialMaskType)));
 
 for (auto const& p : m_identityFramesetTags) {
   auto checked98 = m_networkedAnimator->applyPartTags("anchor", p.first);
@@ -1380,15 +1380,15 @@ Wearable& current = checked246->get();
   wornHead.frameset = head.frameset(gender);
   wornHead.maskDirectives = head.maskDirectives();
   wornHead.animationTags.clear();
-  wornHead.animationTags.set(strf("headCosmetic{}Frameset", slot+1), wornHead.frameset);
-  wornHead.animationTags.set(strf("headCosmetic{}Directives", slot+1), wornHead.directives.string());
+  wornHead.animationTags.set(Star::format("headCosmetic{}Frameset", slot+1), wornHead.frameset);
+  wornHead.animationTags.set(Star::format("headCosmetic{}Directives", slot+1), wornHead.directives.string());
   {
 auto checked247 = head.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked247) return std::unexpected(std::move(checked247.error()));
 auto checked248 = std::move(*checked247).iterateObject();
 if (!checked248) return std::unexpected(std::move(checked248.error()));
 for (auto const& tag : std::move(*checked248)) {
-  auto checked249 = tag.first.replace("<slot>", toString(slot + 1));
+  auto checked249 = tag.first.replace("<slot>", Star::to_string(slot + 1));
   if (!checked249)
     return std::unexpected(std::move(checked249.error()));
   auto checked250 = m_networkedAnimator->applyPartTags(m_headArmorOffsetPoint.first, std::move(*checked249));
@@ -1423,17 +1423,17 @@ Wearable& current = checked253->get();
   wornChest.backSleeveFrameset = chest.backSleeveFrameset(gender);
   wornChest.frontSleeveFrameset = chest.frontSleeveFrameset(gender);
   wornChest.animationTags.clear();
-  wornChest.animationTags.set(strf("chestCosmetic{}Frameset", slot+1), wornChest.frameset);
-  wornChest.animationTags.set(strf("frontSleeve{}Frameset", slot+1), wornChest.frontSleeveFrameset);
-  wornChest.animationTags.set(strf("backSleeve{}Frameset", slot+1), wornChest.backSleeveFrameset);
-  wornChest.animationTags.set(strf("chestCosmetic{}Directives", slot+1), wornChest.directives.string());
+  wornChest.animationTags.set(Star::format("chestCosmetic{}Frameset", slot+1), wornChest.frameset);
+  wornChest.animationTags.set(Star::format("frontSleeve{}Frameset", slot+1), wornChest.frontSleeveFrameset);
+  wornChest.animationTags.set(Star::format("backSleeve{}Frameset", slot+1), wornChest.backSleeveFrameset);
+  wornChest.animationTags.set(Star::format("chestCosmetic{}Directives", slot+1), wornChest.directives.string());
   {
 auto checked254 = chest.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked254) return std::unexpected(std::move(checked254.error()));
 auto checked255 = std::move(*checked254).iterateObject();
 if (!checked255) return std::unexpected(std::move(checked255.error()));
 for (auto const& tag : std::move(*checked255)) {
-  auto checked256 = tag.first.replace("<slot>", toString(slot + 1));
+  auto checked256 = tag.first.replace("<slot>", Star::to_string(slot + 1));
   if (!checked256)
     return std::unexpected(std::move(checked256.error()));
   auto checked257 = m_networkedAnimator->applyPartTags(m_chestArmorOffsetPoint.first, std::move(*checked256));
@@ -1466,15 +1466,15 @@ Wearable& current = checked260->get();
   wornLegs.fullbright = legs.fullbright();
   wornLegs.frameset = legs.frameset(gender);
   wornLegs.animationTags.clear();
-  wornLegs.animationTags.set(strf("legsCosmetic{}Frameset", slot+1), wornLegs.frameset);
-  wornLegs.animationTags.set(strf("legsCosmetic{}Directives", slot+1), wornLegs.directives.string());
+  wornLegs.animationTags.set(Star::format("legsCosmetic{}Frameset", slot+1), wornLegs.frameset);
+  wornLegs.animationTags.set(Star::format("legsCosmetic{}Directives", slot+1), wornLegs.directives.string());
   {
 auto checked261 = legs.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked261) return std::unexpected(std::move(checked261.error()));
 auto checked262 = std::move(*checked261).iterateObject();
 if (!checked262) return std::unexpected(std::move(checked262.error()));
 for (auto const& tag : std::move(*checked262)) {
-  auto checked263 = tag.first.replace("<slot>", toString(slot + 1));
+  auto checked263 = tag.first.replace("<slot>", Star::to_string(slot + 1));
   if (!checked263)
     return std::unexpected(std::move(checked263.error()));
   auto checked264 = m_networkedAnimator->applyPartTags(m_legsArmorOffsetPoint.first, std::move(*checked263));
@@ -1512,15 +1512,15 @@ auto checked269 = std::move(*checked268).optBool();
 if (!checked269) return std::unexpected(std::move(checked269.error()));
 wornBack.rotateWithHead = std::move(*checked269).value_or(false);
   wornBack.animationTags.clear();
-  wornBack.animationTags.set(strf("backCosmetic{}Frameset", slot+1), wornBack.frameset);
-  wornBack.animationTags.set(strf("backCosmetic{}Directives", slot+1), wornBack.directives.string());
+  wornBack.animationTags.set(Star::format("backCosmetic{}Frameset", slot+1), wornBack.frameset);
+  wornBack.animationTags.set(Star::format("backCosmetic{}Directives", slot+1), wornBack.directives.string());
   {
 auto checked270 = back.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked270) return std::unexpected(std::move(checked270.error()));
 auto checked271 = std::move(*checked270).iterateObject();
 if (!checked271) return std::unexpected(std::move(checked271.error()));
 for (auto const& tag : std::move(*checked271)) {
-  auto checked272 = tag.first.replace("<slot>", toString(slot + 1));
+  auto checked272 = tag.first.replace("<slot>", Star::to_string(slot + 1));
   if (!checked272)
     return std::unexpected(std::move(checked272.error()));
   auto checked273 = m_networkedAnimator->applyPartTags(m_backArmorOffsetPoint.first, std::move(*checked272));
@@ -1894,7 +1894,7 @@ if (!checked294) return std::unexpected(std::move(checked294.error()));
     for (std::uint8_t i : fashion.wornBacks) {
       if (i == 0)
         break;
-      auto checked295 = animator.resetLocalTransformationGroup("backCosmetic" + toString(i) + "Rotation");
+      auto checked295 = animator.resetLocalTransformationGroup("backCosmetic" + Star::to_string(i) + "Rotation");
 if (!checked295) return std::unexpected(std::move(checked295.error()));
     }
     if (headRotation != 0.f) {
@@ -1923,9 +1923,9 @@ if (!checked302) return std::unexpected(std::move(checked302.error()));
           break;
         auto& back = std::get<WornBack>(fashion.wearables[std::size_t(i) - 1]);
         if (back.rotateWithHead) {
-          auto checked303 = animator.rotateLocalTransformationGroup("backCosmetic" + toString(i) + "Rotation", headRotation * dir, bodyHeadRotationCenter);
+          auto checked303 = animator.rotateLocalTransformationGroup("backCosmetic" + Star::to_string(i) + "Rotation", headRotation * dir, bodyHeadRotationCenter);
 if (!checked303) return std::unexpected(std::move(checked303.error()));
-          auto checked304 = animator.translateLocalTransformationGroup("backCosmetic" + toString(i) + "Rotation", translate);
+          auto checked304 = animator.translateLocalTransformationGroup("backCosmetic" + Star::to_string(i) + "Rotation", translate);
 if (!checked304) return std::unexpected(std::move(checked304.error()));
         }
       }
@@ -2191,7 +2191,7 @@ auto animatorDrawables = std::move(*checked341);
     };
 
     auto backArmDrawable = [&](String const& frameSet, Directives const& directives) -> std::expected<Drawable, StarException> {
-      String image = strf("{}:{}{}", frameSet, backHand.backFrame, directives.prefix());
+      String image = Star::format("{}:{}{}", frameSet, backHand.backFrame, directives.prefix());
       auto checked342 = m_root.imageMetadataDatabase();
 if (!checked342) return std::unexpected(std::move(checked342.error()));
 auto checked343 = Drawable::makeImage(*std::move(*checked342), std::move(image), 1.0f / TilePixels, true, backArmFrameOffset);
@@ -2250,11 +2250,11 @@ auto frameGroup = std::move(*checked348);
           frameGroup = "runbackwards";
         String image;
         if (dance.has_value() && danceStep->bodyFrame)
-          image = strf("{}:{}{}", back.frameset, *danceStep->bodyFrame, prefix);
+          image = Star::format("{}:{}{}", back.frameset, *danceStep->bodyFrame, prefix);
         else if (m_state == Idle)
-          image = strf("{}:{}{}", back.frameset, m_identity.personality.idle, prefix);
+          image = Star::format("{}:{}{}", back.frameset, m_identity.personality.idle, prefix);
         else
-          image = strf("{}:{}.{}{}", back.frameset, frameGroup, bodyStateSeq, prefix);
+          image = Star::format("{}:{}.{}{}", back.frameset, frameGroup, bodyStateSeq, prefix);
 
         auto checked349 = m_root.imageMetadataDatabase();
 if (!checked349) return std::unexpected(std::move(checked349.error()));
@@ -2284,16 +2284,16 @@ addDrawable(std::move(*checked353), m_bodyFullbright);
         Vec2F position;
         auto prefix = bodyDirectives.prefix();
         if (dance.has_value() && danceStep->backArmFrame) {
-          image = strf("{}:{}{}", m_backArmFrameset, *danceStep->backArmFrame, prefix);
+          image = Star::format("{}:{}{}", m_backArmFrameset, *danceStep->backArmFrame, prefix);
           position = danceStep->backArmOffset / TilePixels;
         } else if (m_state == Idle) {
-          image = strf("{}:{}{}", m_backArmFrameset, m_identity.personality.armIdle, prefix);
+          image = Star::format("{}:{}{}", m_backArmFrameset, m_identity.personality.armIdle, prefix);
           position = m_identity.personality.armOffset / TilePixels;
         } else
           {
 auto checked354 = frameBase(m_state);
 if (!checked354) return std::unexpected(std::move(checked354.error()));
-image = strf("{}:{}.{}{}", m_backArmFrameset, std::move(*checked354), armStateSeq, prefix);
+image = Star::format("{}:{}.{}{}", m_backArmFrameset, std::move(*checked354), armStateSeq, prefix);
 }
         auto checked355 = m_root.imageMetadataDatabase();
 if (!checked355) return std::unexpected(std::move(checked355.error()));
@@ -2323,16 +2323,16 @@ addDrawable(std::move(*checked359), chest.fullbright);
             Vec2F position;
             auto prefix = chest.directives.prefix();
             if (dance.has_value() && danceStep->backArmFrame) {
-              image = strf("{}:{}{}", chest.backSleeveFrameset, *danceStep->backArmFrame, prefix);
+              image = Star::format("{}:{}{}", chest.backSleeveFrameset, *danceStep->backArmFrame, prefix);
               position = danceStep->backArmOffset / TilePixels;
             } else if (m_state == Idle) {
-              image = strf("{}:{}{}", chest.backSleeveFrameset, m_identity.personality.armIdle, prefix);
+              image = Star::format("{}:{}{}", chest.backSleeveFrameset, m_identity.personality.armIdle, prefix);
               position = m_identity.personality.armOffset / TilePixels;
             } else
               {
 auto checked360 = frameBase(m_state);
 if (!checked360) return std::unexpected(std::move(checked360.error()));
-image = strf("{}:{}.{}{}", chest.backSleeveFrameset, std::move(*checked360), armStateSeq, prefix);
+image = Star::format("{}:{}.{}{}", chest.backSleeveFrameset, std::move(*checked360), armStateSeq, prefix);
 }
             auto checked361 = m_root.imageMetadataDatabase();
 if (!checked361) return std::unexpected(std::move(checked361.error()));
@@ -2382,7 +2382,7 @@ if (!checked366) return std::unexpected(std::move(checked366.error()));
     };
 
     if (!m_headFrameset.empty() && !m_bodyHidden) {
-      String image = strf("{}:normal", m_headFrameset);
+      String image = Star::format("{}:normal", m_headFrameset);
       auto checked367 = m_root.imageMetadataDatabase();
 if (!checked367) return std::unexpected(std::move(checked367.error()));
 auto checked368 = Drawable::makeImage(*std::move(*checked367), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2399,7 +2399,7 @@ if (!checked370) return std::unexpected(std::move(checked370.error()));
       auto emoteDirectives = getEmoteDirectives();
       auto checked371 = emoteFrameBase(m_emoteState);
 if (!checked371) return std::unexpected(std::move(checked371.error()));
-String image = strf("{}:{}.{}{}", m_emoteFrameset, std::move(*checked371), emoteStateSeq, emoteDirectives.prefix());
+String image = Star::format("{}:{}.{}{}", m_emoteFrameset, std::move(*checked371), emoteStateSeq, emoteDirectives.prefix());
       auto checked372 = m_root.imageMetadataDatabase();
 if (!checked372) return std::unexpected(std::move(checked372.error()));
 auto checked373 = Drawable::makeImage(*std::move(*checked372), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2413,7 +2413,7 @@ if (!checked375) return std::unexpected(std::move(checked375.error()));
     }
 
     if (!m_hairFrameset.empty() && !m_bodyHidden) {
-      String image = strf("{}:normal", m_hairFrameset);
+      String image = Star::format("{}:normal", m_hairFrameset);
       auto checked376 = m_root.imageMetadataDatabase();
 if (!checked376) return std::unexpected(std::move(checked376.error()));
 auto checked377 = Drawable::makeImage(*std::move(*checked376), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2435,16 +2435,16 @@ if (!checked381) return std::unexpected(std::move(checked381.error()));
       auto prefix = bodyDirectives.prefix();
       String frameName;
       if (dance.has_value() && danceStep->bodyFrame)
-        frameName = strf("{}{}", *danceStep->bodyFrame, prefix);
+        frameName = Star::format("{}{}", *danceStep->bodyFrame, prefix);
       else if (m_state == Idle)
-        frameName = strf("{}{}", m_identity.personality.idle, prefix);
+        frameName = Star::format("{}{}", m_identity.personality.idle, prefix);
       else
         {
 auto checked382 = frameBase(m_state);
 if (!checked382) return std::unexpected(std::move(checked382.error()));
-frameName = strf("{}.{}{}", std::move(*checked382), bodyStateSeq, prefix);
+frameName = Star::format("{}.{}{}", std::move(*checked382), bodyStateSeq, prefix);
 }
-      String image = strf("{}:{}",m_bodyFrameset,frameName);
+      String image = Star::format("{}:{}",m_bodyFrameset,frameName);
       auto checked383 = m_root.imageMetadataDatabase();
 if (!checked383) return std::unexpected(std::move(checked383.error()));
 auto checked384 = Drawable::makeImage(*std::move(*checked383), m_useBodyHeadMask ? image : std::move(image), 1.0f / TilePixels, true, {});
@@ -2455,7 +2455,7 @@ if (!checked385) return std::unexpected(std::move(checked385.error()));
 auto checked386 = drawable.imagePart().addDirectives(*std::move(*checked385), bodyDirectives, true);
 if (!checked386) return std::unexpected(std::move(checked386.error()));
       if (m_useBodyMask && !m_bodyMaskFrameset.empty()) {
-        String maskImage = strf("{}:{}",m_bodyMaskFrameset,frameName);
+        String maskImage = Star::format("{}:{}",m_bodyMaskFrameset,frameName);
         Directives maskDirectives = "?addmask="+maskImage+";0;0";
         auto checked387 = m_root.imageMetadataDatabase();
 if (!checked387) return std::unexpected(std::move(checked387.error()));
@@ -2464,7 +2464,7 @@ if (!checked388) return std::unexpected(std::move(checked388.error()));
       }
       addDrawable(std::move(drawable), m_bodyFullbright);
       if (m_useBodyHeadMask && !m_bodyHeadMaskFrameset.empty()) {
-        String maskImage = strf("{}:{}",m_bodyHeadMaskFrameset,frameName);
+        String maskImage = Star::format("{}:{}",m_bodyHeadMaskFrameset,frameName);
         Directives maskDirectives = "?addmask="+maskImage+";0;0";
         auto checked389 = m_root.imageMetadataDatabase();
 if (!checked389) return std::unexpected(std::move(checked389.error()));
@@ -2492,14 +2492,14 @@ if (!checked394) return std::unexpected(std::move(checked394.error()));
         String image;
         auto prefix = legs.directives.prefix();
         if (dance.has_value() && danceStep->bodyFrame)
-          image = strf("{}:{}{}", legs.frameset, *danceStep->bodyFrame, prefix);
+          image = Star::format("{}:{}{}", legs.frameset, *danceStep->bodyFrame, prefix);
         else if (m_state == Idle)
-          image = strf("{}:{}{}", legs.frameset, m_identity.personality.idle, prefix);
+          image = Star::format("{}:{}{}", legs.frameset, m_identity.personality.idle, prefix);
         else
           {
 auto checked395 = frameBase(m_state);
 if (!checked395) return std::unexpected(std::move(checked395.error()));
-image = strf("{}:{}.{}{}", legs.frameset, std::move(*checked395), bodyStateSeq, prefix);
+image = Star::format("{}:{}.{}{}", legs.frameset, std::move(*checked395), bodyStateSeq, prefix);
 }
         auto checked396 = m_root.imageMetadataDatabase();
 if (!checked396) return std::unexpected(std::move(checked396.error()));
@@ -2518,17 +2518,17 @@ if (!checked399) return std::unexpected(std::move(checked399.error()));
           Vec2F position;
           auto prefix = chest.directives.prefix();
           if (dance.has_value() && danceStep->bodyFrame)
-            image = strf("{}:{}{}", chest.frameset, *danceStep->bodyFrame, prefix);
+            image = Star::format("{}:{}{}", chest.frameset, *danceStep->bodyFrame, prefix);
           else if (m_state == Run)
-            image = strf("{}:run{}", chest.frameset, prefix);
+            image = Star::format("{}:run{}", chest.frameset, prefix);
           else if (m_state == Idle)
-            image = strf("{}:{}{}", chest.frameset, m_identity.personality.idle, prefix);
+            image = Star::format("{}:{}{}", chest.frameset, m_identity.personality.idle, prefix);
           else if (m_state == Duck)
-            image = strf("{}:duck{}", chest.frameset, prefix);
+            image = Star::format("{}:duck{}", chest.frameset, prefix);
           else if ((m_state == Swim) || (m_state == SwimIdle))
-            image = strf("{}:swim{}", chest.frameset, prefix);
+            image = Star::format("{}:swim{}", chest.frameset, prefix);
           else
-            image = strf("{}:chest.1{}", chest.frameset, prefix);
+            image = Star::format("{}:chest.1{}", chest.frameset, prefix);
           if (m_state != Duck)
             position[1] += bobYOffset;
           auto checked400 = m_root.imageMetadataDatabase();
@@ -2546,7 +2546,7 @@ if (!checked403) return std::unexpected(std::move(checked403.error()));
     }
 
     if (!m_facialHairFrameset.empty() && !m_bodyHidden) {
-      String image = strf("{}:normal", m_facialHairFrameset);
+      String image = Star::format("{}:normal", m_facialHairFrameset);
       auto checked404 = m_root.imageMetadataDatabase();
 if (!checked404) return std::unexpected(std::move(checked404.error()));
 auto checked405 = Drawable::makeImage(*std::move(*checked404), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2564,7 +2564,7 @@ if (!checked409) return std::unexpected(std::move(checked409.error()));
     }
 
     if (!m_facialMaskFrameset.empty() && !m_bodyHidden) {
-      String image = strf("{}:normal", m_facialMaskFrameset);
+      String image = Star::format("{}:normal", m_facialMaskFrameset);
       auto checked410 = m_root.imageMetadataDatabase();
 if (!checked410) return std::unexpected(std::move(checked410.error()));
 auto checked411 = Drawable::makeImage(*std::move(*checked410), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2586,7 +2586,7 @@ if (!checked415) return std::unexpected(std::move(checked415.error()));
         break;
       auto& head = std::get<WornHead>(fashion.wearables[std::size_t(i) - 1]);
       if (!head.frameset.empty()) {
-        String image = strf("{}:normal{}", head.frameset, head.directives.prefix());
+        String image = Star::format("{}:normal{}", head.frameset, head.directives.prefix());
         auto checked416 = m_root.imageMetadataDatabase();
 if (!checked416) return std::unexpected(std::move(checked416.error()));
 auto checked417 = Drawable::makeImage(*std::move(*checked416), std::move(image), 1.0f / TilePixels, true, headPosition);
@@ -2601,7 +2601,7 @@ if (!checked419) return std::unexpected(std::move(checked419.error()));
     }
 
     auto frontArmDrawable = [&](String const& frameSet, Directives const& directives) -> std::expected<Drawable, StarException> {
-      String image = strf("{}:{}{}", frameSet, frontHand.frontFrame, directives.prefix());
+      String image = Star::format("{}:{}{}", frameSet, frontHand.frontFrame, directives.prefix());
       auto checked420 = m_root.imageMetadataDatabase();
 if (!checked420) return std::unexpected(std::move(checked420.error()));
 auto checked421 = Drawable::makeImage(*std::move(*checked420), image, 1.0f / TilePixels, true, frontArmFrameOffset);
@@ -2633,16 +2633,16 @@ addDrawable(std::move(*checked426), m_bodyFullbright);
         Vec2F position;
         auto prefix = bodyDirectives.prefix();
         if (dance.has_value() && danceStep->frontArmFrame) {
-          image = strf("{}:{}{}", m_frontArmFrameset, *danceStep->frontArmFrame, prefix);
+          image = Star::format("{}:{}{}", m_frontArmFrameset, *danceStep->frontArmFrame, prefix);
           position = danceStep->frontArmOffset / TilePixels;
         } else if (m_state == Idle) {
-          image = strf("{}:{}{}", m_frontArmFrameset, m_identity.personality.armIdle, prefix);
+          image = Star::format("{}:{}{}", m_frontArmFrameset, m_identity.personality.armIdle, prefix);
           position = m_identity.personality.armOffset / TilePixels;
         } else
           {
 auto checked427 = frameBase(m_state);
 if (!checked427) return std::unexpected(std::move(checked427.error()));
-image = strf("{}:{}.{}{}", m_frontArmFrameset, std::move(*checked427), armStateSeq, prefix);
+image = Star::format("{}:{}.{}{}", m_frontArmFrameset, std::move(*checked427), armStateSeq, prefix);
 }
         auto checked428 = m_root.imageMetadataDatabase();
 if (!checked428) return std::unexpected(std::move(checked428.error()));
@@ -2672,16 +2672,16 @@ addDrawable(std::move(*checked432), chest.fullbright);
             Vec2F position;
             auto prefix = chest.directives.prefix();
             if (dance.has_value() && danceStep->frontArmFrame) {
-              image = strf("{}:{}{}", chest.frontSleeveFrameset, *danceStep->frontArmFrame, prefix);
+              image = Star::format("{}:{}{}", chest.frontSleeveFrameset, *danceStep->frontArmFrame, prefix);
               position = danceStep->frontArmOffset / TilePixels;
             } else if (m_state == Idle) {
-              image = strf("{}:{}{}", chest.frontSleeveFrameset, m_identity.personality.armIdle, prefix);
+              image = Star::format("{}:{}{}", chest.frontSleeveFrameset, m_identity.personality.armIdle, prefix);
               position = m_identity.personality.armOffset / TilePixels;
             } else
               {
 auto checked433 = frameBase(m_state);
 if (!checked433) return std::unexpected(std::move(checked433.error()));
-image = strf("{}:{}.{}{}", chest.frontSleeveFrameset, std::move(*checked433), armStateSeq, prefix);
+image = Star::format("{}:{}.{}{}", chest.frontSleeveFrameset, std::move(*checked433), armStateSeq, prefix);
 }
             auto checked434 = m_root.imageMetadataDatabase();
 if (!checked434) return std::unexpected(std::move(checked434.error()));
@@ -2723,7 +2723,7 @@ if (!checked439) return std::unexpected(std::move(checked439.error()));
     }
 
     if (m_drawVaporTrail) {
-      auto image = strf("{}:{}",
+      auto image = Star::format("{}:{}",
           m_vaporTrailFrameset,
           m_timing.genericSeq(lerp(interpolation, m_previousAnimationTimer, m_animationTimer), m_vaporTrailCycle, m_vaporTrailFrames, true));
       auto checked440 = m_root.imageMetadataDatabase();
@@ -2772,7 +2772,7 @@ if (!checked443) return std::unexpected(std::move(checked443.error()));
     for (std::uint8_t i : fashion.wornBacks) {
       if (i == 0)
         break;
-      auto checked444 = portraitAnimator->resetLocalTransformationGroup("backCosmetic" + toString(i) + "Rotation");
+      auto checked444 = portraitAnimator->resetLocalTransformationGroup("backCosmetic" + Star::to_string(i) + "Rotation");
 if (!checked444) return std::unexpected(std::move(checked444.error()));
     }
     auto checked445 = portraitAnimator->resetLocalTransformationGroup("frontArmRotation");
@@ -2874,7 +2874,7 @@ personality = checked463->get();
     if (mode != PortraitMode::Head) {
       if (!m_backArmFrameset.empty()) {
         auto& bodyDirectives = getBodyDirectives();
-        String image = strf("{}:{}{}", m_backArmFrameset, personality.armIdle, bodyDirectives.prefix());
+        String image = Star::format("{}:{}{}", m_backArmFrameset, personality.armIdle, bodyDirectives.prefix());
         auto checked464 = m_root.imageMetadataDatabase();
 if (!checked464) return std::unexpected(std::move(checked464.error()));
 auto checked465 = Drawable::makeImage(*std::move(*checked464), std::move(image), 1.0f, true, personality.armOffset);
@@ -2894,7 +2894,7 @@ if (!checked468) return std::unexpected(std::move(checked468.error()));
           auto const& wearable = fashion.wearables[std::size_t(i) - 1];
           if (std::holds_alternative<WornChest>(wearable) && !std::get<WornChest>(wearable).backSleeveFrameset.empty()) {
             auto const& chest = std::get<WornChest>(wearable);
-            String image = strf("{}:{}{}", chest.backSleeveFrameset, personality.armIdle, chest.directives.prefix());
+            String image = Star::format("{}:{}{}", chest.backSleeveFrameset, personality.armIdle, chest.directives.prefix());
             auto checked469 = m_root.imageMetadataDatabase();
 if (!checked469) return std::unexpected(std::move(checked469.error()));
 auto checked470 = Drawable::makeImage(*std::move(*checked469), std::move(image), 1.0f, true, personality.armOffset);
@@ -2916,7 +2916,7 @@ if (!checked473) return std::unexpected(std::move(checked473.error()));
           auto& back = std::get<WornBack>(fashion.wearables[std::size_t(i) - 1]);
           if (!back.frameset.empty()) {
             auto backDirectives = back.directives;
-            String image = strf("{}:{}{}", back.frameset, personality.idle, backDirectives.prefix());
+            String image = Star::format("{}:{}{}", back.frameset, personality.idle, backDirectives.prefix());
             auto checked474 = m_root.imageMetadataDatabase();
 if (!checked474) return std::unexpected(std::move(checked474.error()));
 auto checked475 = Drawable::makeImage(*std::move(*checked474), std::move(image), 1.0f, true, {});
@@ -2935,7 +2935,7 @@ if (!checked478) return std::unexpected(std::move(checked478.error()));
 
     if (!m_headFrameset.empty()) {
       auto& bodyDirectives = getBodyDirectives();
-      String image = strf("{}:normal{}", m_headFrameset, bodyDirectives.prefix());
+      String image = Star::format("{}:normal{}", m_headFrameset, bodyDirectives.prefix());
       auto checked479 = m_root.imageMetadataDatabase();
 if (!checked479) return std::unexpected(std::move(checked479.error()));
 auto checked480 = Drawable::makeImage(*std::move(*checked479), std::move(image), 1.0f, true, personality.headOffset);
@@ -2953,7 +2953,7 @@ if (!checked483) return std::unexpected(std::move(checked483.error()));
       auto& emoteDirectives = getEmoteDirectives();
       auto checked484 = emoteFrameBase(m_emoteState);
 if (!checked484) return std::unexpected(std::move(checked484.error()));
-String image = strf("{}:{}.{}{}", m_emoteFrameset, std::move(*checked484), emoteStateSeq, emoteDirectives.prefix());
+String image = Star::format("{}:{}.{}{}", m_emoteFrameset, std::move(*checked484), emoteStateSeq, emoteDirectives.prefix());
       auto checked485 = m_root.imageMetadataDatabase();
 if (!checked485) return std::unexpected(std::move(checked485.error()));
 auto checked486 = Drawable::makeImage(*std::move(*checked485), std::move(image), 1.0f, true, personality.headOffset);
@@ -2969,7 +2969,7 @@ if (!checked489) return std::unexpected(std::move(checked489.error()));
 
     if (!m_hairFrameset.empty()) {
       auto& hairDirectives = getHairDirectives();
-      String image = strf("{}:normal{}", m_hairFrameset, hairDirectives.prefix());
+      String image = Star::format("{}:normal{}", m_hairFrameset, hairDirectives.prefix());
       auto checked490 = m_root.imageMetadataDatabase();
 if (!checked490) return std::unexpected(std::move(checked490.error()));
 auto checked491 = Drawable::makeImage(*std::move(*checked490), std::move(image), 1.0f, true, personality.headOffset);
@@ -2989,7 +2989,7 @@ if (!checked496) return std::unexpected(std::move(checked496.error()));
 
     if (!m_bodyFrameset.empty()) {
       auto& bodyDirectives = getBodyDirectives();
-      String image = strf("{}:{}{}", m_bodyFrameset, personality.idle, bodyDirectives.prefix());
+      String image = Star::format("{}:{}{}", m_bodyFrameset, personality.idle, bodyDirectives.prefix());
       auto checked497 = m_root.imageMetadataDatabase();
 if (!checked497) return std::unexpected(std::move(checked497.error()));
 auto checked498 = Drawable::makeImage(*std::move(*checked497), std::move(image), 1.0f, true, {});
@@ -3010,7 +3010,7 @@ if (!checked501) return std::unexpected(std::move(checked501.error()));
         auto& wearable = fashion.wearables[std::size_t(i) - 1];
         if (std::holds_alternative<WornLegs>(wearable) && !std::get<WornLegs>(wearable).frameset.empty()) {
           auto const& legs = std::get<WornLegs>(wearable);
-          String image = strf("{}:{}{}", legs.frameset, personality.idle, legs.directives.prefix());
+          String image = Star::format("{}:{}{}", legs.frameset, personality.idle, legs.directives.prefix());
           auto checked502 = m_root.imageMetadataDatabase();
 if (!checked502) return std::unexpected(std::move(checked502.error()));
 auto checked503 = Drawable::makeImage(*std::move(*checked502), std::move(image), 1.0f, true, {});
@@ -3025,7 +3025,7 @@ if (!checked506) return std::unexpected(std::move(checked506.error()));
         } else {
           if (std::holds_alternative<WornChest>(wearable) && !std::get<WornChest>(wearable).frameset.empty()) {
             auto const& chest = std::get<WornChest>(wearable);
-            String image = strf("{}:{}{}", chest.frameset, personality.idle, chest.directives.prefix());
+            String image = Star::format("{}:{}{}", chest.frameset, personality.idle, chest.directives.prefix());
             auto checked507 = m_root.imageMetadataDatabase();
 if (!checked507) return std::unexpected(std::move(checked507.error()));
 auto checked508 = Drawable::makeImage(*std::move(*checked507), std::move(image), 1.0f, true, {});
@@ -3044,7 +3044,7 @@ if (!checked511) return std::unexpected(std::move(checked511.error()));
 
     if (!m_facialHairFrameset.empty()) {
       auto facialHairDirectives = getFacialHairDirectives();
-      String image = strf("{}:normal{}", m_facialHairFrameset, facialHairDirectives.prefix());
+      String image = Star::format("{}:normal{}", m_facialHairFrameset, facialHairDirectives.prefix());
       auto checked512 = m_root.imageMetadataDatabase();
 if (!checked512) return std::unexpected(std::move(checked512.error()));
 auto checked513 = Drawable::makeImage(*std::move(*checked512), std::move(image), 1.0f, true, personality.headOffset);
@@ -3064,7 +3064,7 @@ if (!checked518) return std::unexpected(std::move(checked518.error()));
 
     if (!m_facialMaskFrameset.empty()) {
       auto facialMaskDirectives = getFacialMaskDirectives();
-      String image = strf("{}:normal{}", m_facialMaskFrameset, facialMaskDirectives.prefix());
+      String image = Star::format("{}:normal{}", m_facialMaskFrameset, facialMaskDirectives.prefix());
       auto checked519 = m_root.imageMetadataDatabase();
 if (!checked519) return std::unexpected(std::move(checked519.error()));
 auto checked520 = Drawable::makeImage(*std::move(*checked519), std::move(image), 1.0f, true, personality.headOffset);
@@ -3088,7 +3088,7 @@ if (!checked525) return std::unexpected(std::move(checked525.error()));
           break;
         auto& head = std::get<WornHead>(fashion.wearables[std::size_t(i) - 1]);
         if (!head.frameset.empty()) {
-          String image = strf("{}:normal{}", head.frameset, head.directives.prefix());
+          String image = Star::format("{}:normal{}", head.frameset, head.directives.prefix());
           auto checked526 = m_root.imageMetadataDatabase();
 if (!checked526) return std::unexpected(std::move(checked526.error()));
 auto checked527 = Drawable::makeImage(*std::move(*checked526), std::move(image), 1.0f, true, personality.headOffset);
@@ -3107,7 +3107,7 @@ if (!checked530) return std::unexpected(std::move(checked530.error()));
     if (mode != PortraitMode::Head) {
       if (!m_frontArmFrameset.empty()) {
         auto bodyDirectives = getBodyDirectives();
-        String image = strf("{}:{}{}", m_frontArmFrameset, personality.armIdle, bodyDirectives.prefix());
+        String image = Star::format("{}:{}{}", m_frontArmFrameset, personality.armIdle, bodyDirectives.prefix());
         auto checked531 = m_root.imageMetadataDatabase();
 if (!checked531) return std::unexpected(std::move(checked531.error()));
 auto checked532 = Drawable::makeImage(*std::move(*checked531), std::move(image), 1.0f, true, personality.armOffset);
@@ -3128,7 +3128,7 @@ if (!checked535) return std::unexpected(std::move(checked535.error()));
           auto const& wearable = fashion.wearables[std::size_t(i) - 1];
           if (std::holds_alternative<WornChest>(wearable) && !std::get<WornChest>(wearable).frontSleeveFrameset.empty()) {
             auto const& chest = std::get<WornChest>(wearable);
-            String image = strf("{}:{}{}", chest.frontSleeveFrameset, personality.armIdle, chest.directives.prefix());
+            String image = Star::format("{}:{}{}", chest.frontSleeveFrameset, personality.armIdle, chest.directives.prefix());
             auto checked536 = m_root.imageMetadataDatabase();
 if (!checked536) return std::unexpected(std::move(checked536.error()));
 auto checked537 = Drawable::makeImage(*std::move(*checked536), std::move(image), 1.0f, true, personality.armOffset);
@@ -3597,7 +3597,7 @@ std::expected<String, StarException> Humanoid::frameBase(State state) const {
       {
         auto name = StateNames->get_right(state);
         if (!name) return std::unexpected(std::move(name.error()));
-        return std::unexpected(StarException(strf("No such state '{}'", name->get())));
+        return std::unexpected(StarException(Star::format("No such state '{}'", name->get())));
       }
   }
 }
@@ -3638,43 +3638,43 @@ std::expected<String, StarException> Humanoid::emoteFrameBase(HumanoidEmote stat
       {
         auto name = HumanoidEmoteNames->get_right(state);
         if (!name) return std::unexpected(std::move(name.error()));
-        return std::unexpected(StarException(strf("No such emote state '{}'", name->get())));
+        return std::unexpected(StarException(Star::format("No such emote state '{}'", name->get())));
       }
   }
 }
 
 String Humanoid::getHeadFromIdentity() const {
-  return strf("/humanoid/{}/{}head.png",
+  return Star::format("/humanoid/{}/{}head.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_genderName);
 }
 
 String Humanoid::getBodyFromIdentity() const {
-  return strf("/humanoid/{}/{}body.png",
+  return Star::format("/humanoid/{}/{}body.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_genderName);
 }
 
 String Humanoid::getBodyMaskFromIdentity() const {
-  return strf("/humanoid/{}/mask/{}body.png",
+  return Star::format("/humanoid/{}/mask/{}body.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_genderName);
 }
 
 String Humanoid::getBodyHeadMaskFromIdentity() const {
-  return strf("/humanoid/{}/headmask/{}body.png",
+  return Star::format("/humanoid/{}/headmask/{}body.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_genderName);
 }
 
 String Humanoid::getFacialEmotesFromIdentity() const {
-  return strf("/humanoid/{}/emote.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
+  return Star::format("/humanoid/{}/emote.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
 }
 
 String Humanoid::getHairFromIdentity() const {
   if (m_identity.hairType.empty())
     return "";
-  return strf("/humanoid/{}/{}/{}.png",
+  return Star::format("/humanoid/{}/{}/{}.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_identity.hairGroup,
       m_identity.hairType);
@@ -3683,7 +3683,7 @@ String Humanoid::getHairFromIdentity() const {
 String Humanoid::getFacialHairFromIdentity() const {
   if (m_identity.facialHairType.empty())
     return "";
-  return strf("/humanoid/{}/{}/{}.png",
+  return Star::format("/humanoid/{}/{}/{}.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_identity.facialHairGroup,
       m_identity.facialHairType);
@@ -3692,18 +3692,18 @@ String Humanoid::getFacialHairFromIdentity() const {
 String Humanoid::getFacialMaskFromIdentity() const {
   if (m_identity.facialMaskType.empty())
     return "";
-  return strf("/humanoid/{}/{}/{}.png",
+  return Star::format("/humanoid/{}/{}/{}.png",
       m_identity.imagePath ? *m_identity.imagePath : m_identity.species,
       m_identity.facialMaskGroup,
       m_identity.facialMaskType);
 }
 
 String Humanoid::getBackArmFromIdentity() const {
-  return strf("/humanoid/{}/backarm.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
+  return Star::format("/humanoid/{}/backarm.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
 }
 
 String Humanoid::getFrontArmFromIdentity() const {
-  return strf("/humanoid/{}/frontarm.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
+  return Star::format("/humanoid/{}/frontarm.png", m_identity.imagePath ? *m_identity.imagePath : m_identity.species);
 }
 
 String Humanoid::getVaporTrailFrameset() const {

@@ -136,7 +136,7 @@ std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseCompone
   auto cleaned = script.uninit();
   if (!cleaned) {
     if (!result)
-      return std::unexpected(cleaned.error().withContext(printException(result.error(), true)));
+      return std::unexpected(cleaned.error().withContext(Star::print_exception(result.error(), true)));
     return std::unexpected(std::move(cleaned.error()));
   }
   return result;
@@ -809,7 +809,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
   if (*rebuilt)
     return result;
   auto logged = m_root.logger().errorException(
-      strf("Could not {} item '{}' (count {})",
+      Star::format("Could not {} item '{}' (count {})",
           descriptor.name() == "perfectlygenericitem" ? "re-instantiate" : "instantiate", descriptor.name(), descriptor.count()),
       ExceptionDiagnostic(originalError));
   if (!logged)
@@ -912,7 +912,7 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       return data;
     }();
     if (!loaded)
-      return std::unexpected(ItemException(strf("Could not load item asset {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading item asset"))));
+      return std::unexpected(ItemException(Star::format("Could not load item asset {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading item asset"))));
     if (m_items.contains(loaded->name))
       return std::unexpected((*assets)->withAssetContext(ItemException::format("Duplicate item name '{}' found", loaded->name), file, "Loading item asset"));
     m_items[loaded->name] = std::move(*loaded);
@@ -1052,7 +1052,7 @@ std::expected<void, StarException> ItemDatabase::scanRecipes() {
     if (recipe) {
       m_recipes.add(std::move(*recipe));
     } else {
-      auto logged = m_root.logger().errorException(strf("Could not load recipe {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
+      auto logged = m_root.logger().errorException(Star::format("Could not load recipe {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1069,7 +1069,7 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
     auto baseItem = itemShared(baseDesc, {}, {});
     if (!baseItem)
       return std::unexpected(std::move(baseItem.error()));
-    String blueprintName = strf("{}-recipe", (*baseItem)->name());
+    String blueprintName = Star::format("{}-recipe", (*baseItem)->name());
     if (m_items.contains(blueprintName))
       continue;
     String sourcePath;
@@ -1146,7 +1146,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
   if (!codexDatabase)
     return std::unexpected(std::move(codexDatabase.error()));
   for (auto const& codexPair : (*codexDatabase)->codexes()) {
-    String codexItemName = strf("{}-codex", codexPair.second->id());
+    String codexItemName = Star::format("{}-codex", codexPair.second->id());
     if (m_items.contains(codexItemName)) {
       auto logged = m_root.logger().warn("Couldn't create codex item {} because an item with that name is already defined", codexItemName);
       if (!logged)
@@ -1177,7 +1177,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       return {};
     }();
     if (!created) {
-      auto logged = m_root.logger().errorException(strf("Could not create item for codex {}", codexPair.second->id()), ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item")));
+      auto logged = m_root.logger().errorException(Star::format("Could not create item for codex {}", codexPair.second->id()), ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }

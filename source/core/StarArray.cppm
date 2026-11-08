@@ -4,6 +4,7 @@ import star.memory;
 import std;
 import star.hash;
 import star.optional;
+import star.text_formatter;
 import star.format;
 
 namespace Star {
@@ -30,13 +31,10 @@ concept array_hashable = requires(Star::hash<Element> const& hasher, Element con
 };
 
 template <typename Element>
-concept array_optional_output = requires(Element const& element) { outputOptional(element); };
-
-template <typename Element>
-concept array_streamable =
-  (array_optional_output<Element>
-   && requires(std::ostream& output, Element const& element) { output << outputOptional(element); })
-  || (!array_optional_output<Element> && requires(std::ostream& output, Element const& element) { output << element; });
+concept array_text_writable = requires(TextBuffer& output, Element const& element) {
+  append_text(output, optional_diagnostic_value(element));
+} && (std::same_as<optional_diagnostic_result<Element>, void>
+      || std::same_as<optional_diagnostic_result<Element>, std::expected<void, StarException>>);
 
 // Value-initialized by default; element constructors deliberately default-
 // construct storage, then assign in order with the historical narrowing rules.
@@ -332,22 +330,29 @@ constexpr std::weak_ordering Array<Element, Size>::operator<=>(Array const& a) c
 }
 
 template <typename Element, std::size_t Size>
-std::ostream& operator<<(std::ostream& os, Array<Element, Size> const& a)
-  requires(Size == 0 || array_streamable<Element>)
+auto write_text(TextBuffer& output, Array<Element, Size> const& array)
+  requires(Size == 0 || array_text_writable<Element>)
 {
-  os << '[';
-  if constexpr (Size != 0) {
+  output.push_back('[');
+  if constexpr (Size == 0) {
+    output.push_back(']');
+  } else {
+    using Result = optional_diagnostic_result<Element>;
     for (std::size_t i = 0; i < Size; ++i) {
-      if constexpr (array_optional_output<Element>)
-        os << outputOptional(a[i]);
-      else
-        os << a[i];
+      if constexpr (std::same_as<Result, void>) {
+        append_text(output, optional_diagnostic_value(array[i]));
+      } else {
+        auto written = append_text(output, optional_diagnostic_value(array[i]));
+        if (!written)
+          return Result(std::unexpected(std::move(written.error())));
+      }
       if (i != Size - 1)
-        os << ", ";
+        output.append(", ");
     }
+    output.push_back(']');
+    if constexpr (!std::same_as<Result, void>)
+      return Result{};
   }
-  os << ']';
-  return os;
 }
 
 template <typename DataT, std::size_t SizeT>
@@ -394,9 +399,8 @@ using ::Star::array_assignable;
 using ::Star::array_copy_iterator;
 using ::Star::array_hashable;
 using ::Star::array_less;
-using ::Star::array_optional_output;
-using ::Star::array_streamable;
+using ::Star::array_text_writable;
 using ::Star::array_unequal;
 using ::Star::hash;
-using ::Star::operator<<;
+using ::Star::write_text;
 }

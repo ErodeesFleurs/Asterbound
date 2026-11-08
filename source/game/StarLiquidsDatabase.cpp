@@ -93,7 +93,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
         return std::unexpected(std::move(id.error()));
       if (*id != static_cast<LiquidId>(*id))
         return std::unexpected(LiquidException(
-          strf("Liquid id {} does not fall in the valid range, wrapped to {}\n", *id, static_cast<LiquidId>(*id))));
+          Star::format("Liquid id {} does not fall in the valid range, wrapped to {}\n", *id, static_cast<LiquidId>(*id))));
       auto entry = std::make_shared<LiquidSettings>();
       entry->id = static_cast<LiquidId>(*id);
       {
@@ -196,7 +196,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(LiquidException(strf("Error loading liquid file {}", file), loaded.error()), file, "Loading liquid"));
+    if (!loaded) return std::unexpected(assets->withAssetContext(LiquidException(Star::format("Error loading liquid file {}", file), loaded.error()), file, "Loading liquid"));
   }
   return result;
 }
@@ -232,7 +232,7 @@ std::expected<String, StarException> LiquidsDatabase::liquidDescription(LiquidId
   if (auto settings = liquidSettings(liquidId)) {
     auto description = settings->descriptions.getString("description");
     if (!description) return std::unexpected(std::move(description.error()));
-    return settings->descriptions.getString(strf("{}Description", species), *description);
+    return settings->descriptions.getString(Star::format("{}Description", species), *description);
   }
   return std::unexpected(LiquidException::format("invalid liquid id {}", liquidId));
 }

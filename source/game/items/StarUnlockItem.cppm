@@ -234,7 +234,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
           return std::unexpected(std::move(blueprint.error()));
         blueprints.push_back(std::move(*blueprint));
       }
-      auto speciesConfig = (*assets)->json(strf("/species/{}.species", player->get().species()));
+      auto speciesConfig = (*assets)->json(Star::format("/species/{}.species", player->get().species()));
       if (!speciesConfig)
         return std::unexpected(std::move(speciesConfig.error()));
       auto speciesBlueprints = speciesConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.getArray(*m_tierRecipesUnlock, JsonArray()); });

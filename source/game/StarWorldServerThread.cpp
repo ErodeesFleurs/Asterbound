@@ -158,7 +158,7 @@ std::expected<std::shared_ptr<WorldServerThread>, StarException> WorldServerThre
     std::shared_ptr<WorldServer> server, WorldId worldId) {
   if (!server)
     return std::unexpected(StarException("Cannot create a world thread without a server"));
-  auto worldName = printWorldId(worldId);
+  auto worldName = Star::print_world_id(worldId);
   if (!worldName)
     return std::unexpected(std::move(worldName.error()));
   return std::shared_ptr<WorldServerThread>(new WorldServerThread(std::move(server), std::move(worldId), std::move(*worldName)));
@@ -179,7 +179,7 @@ WorldServerThread::~WorldServerThread() {
   if (auto closed = close(); !closed)
     EmergencyLog::error("Error stopping world thread during destruction: {}", closed.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy WorldServerThread while its native thread still borrows world state", false);
+    Star::fatal_error("Cannot destroy WorldServerThread while its native thread still borrows world state", false);
 }
 
 std::expected<void, StarException> WorldServerThread::recordError(StarException const& error) const {
@@ -534,8 +534,8 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
     auto fidelityName = WorldServerFidelityNames->get_right(fidelity);
     if (!fidelityName)
       return std::unexpected(std::move(fidelityName.error()));
-    root.logMap().set(strf("server_{}_fidelity", m_worldName), fidelityName->get());
-    root.logMap().set(strf("server_{}_update", m_worldName), strf("{:4.2f}Hz", tickApproacher.rate()));
+    root.logMap().set(Star::format("server_{}_fidelity", m_worldName), fidelityName->get());
+    root.logMap().set(Star::format("server_{}_update", m_worldName), Star::format("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update(fidelity);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
@@ -578,7 +578,7 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
     auto handled = m_worldServer->handleIncomingPackets(clientId, std::move(incomingPackets));
     if (!handled) {
       auto logged = m_worldServer->root().logger().errorException(
-          strf("WorldServerThread error handling incoming packets for client {}", clientId), ExceptionDiagnostic(handled.error()));
+          Star::format("WorldServerThread error handling incoming packets for client {}", clientId), ExceptionDiagnostic(handled.error()));
       auto removed = m_worldServer->removeClient(clientId);
       if (!removed)
         return std::unexpected(std::move(removed.error()));

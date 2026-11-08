@@ -1,6 +1,7 @@
 module;
 import std;
 import star.format;
+import star.text_formatter;
 import star.string;
 import star.json;
 
@@ -36,7 +37,7 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
 
 using BagSlot = std::pair<String, std::uint8_t>;
 
-// Keep native wrappers so SwapSlot can declare precise stream ADL.
+// Keep native wrappers so SwapSlot can declare precise text ADL.
 template <typename BaseType> struct TrashSlotWrapper;
   template <typename BaseType>
   struct SwapSlotWrapper : BaseType {
@@ -72,7 +73,7 @@ template <typename BaseType> struct TrashSlotWrapper;
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
-    friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& ostream,
+    friend std::expected<void, StarException> write_text(TextBuffer& output,
         std::variant<EquipmentSlot, BagSlot, SwapSlotWrapper<std::monostate>, TrashSlotWrapper<std::monostate>> const& slot);
   };
   using SwapSlot = SwapSlotWrapper<std::monostate>;
@@ -118,8 +119,7 @@ template <typename BaseType> struct TrashSlotWrapper;
   [[nodiscard]] std::expected<InventorySlot, StarException> jsonToInventorySlot(Json const& json);
   [[nodiscard]] std::expected<Json, StarException> jsonFromInventorySlot(InventorySlot const& slot);
 
-  [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException>
-  operator<<(std::ostream& ostream, InventorySlot const& slot);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, InventorySlot const& slot);
 
   // Special items in the player inventory that are not generally manageable
   enum class EssentialItem : std::uint8_t { BeamAxe = 0, WireTool = 1, PaintTool = 2, InspectionTool = 3 };
@@ -162,4 +162,5 @@ export namespace Star {
   using ::Star::jsonFromSelectedActionBarLocation;
   using ::Star::EquipmentSize;
   using ::Star::EssentialItemCount;
+  using ::Star::write_text;
 }

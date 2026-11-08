@@ -13,6 +13,7 @@ import star.map;
 import star.set;
 import star.optional;
 import star.format;
+import star.text_formatter;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
@@ -231,8 +232,8 @@ struct LuaRegistryReference {
 }
 
 // Rendering may inspect tables and therefore reports recoverable Lua errors.
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, LuaValue const& value);
-[[nodiscard]] std::expected<String, StarException> printLuaValue(LuaValue const& value);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, LuaValue const& value);
+[[nodiscard]] std::expected<String, StarException> print_lua_value(LuaValue const& value);
 
 // Holds a reference to a LuaEngine and a value held internally inside the
 // registry of that engine.  The lifetime of the LuaEngine will be extended
@@ -990,9 +991,9 @@ struct LuaConverter<String> {
     if (v.is<LuaString>())
       return v.toString();
     if (v.is<LuaInt>())
-      return String(toString(v.as<LuaInt>()));
+      return String(Star::to_string(v.as<LuaInt>()));
     if (v.is<LuaFloat>())
-      return String(toString(v.as<LuaFloat>()));
+      return String(Star::to_string(v.as<LuaFloat>()));
     return std::nullopt;
   }
 };
@@ -1056,9 +1057,9 @@ template <> struct LuaConverter<LuaString> : LuaValueConverter<LuaString> {
     if (v.is<LuaString>())
       return LuaValueConverter<LuaString>::to(v);
     if (v.is<LuaInt>())
-      return v.stack().engine().createString(toString(v.as<LuaInt>()));
+      return v.stack().engine().createString(Star::to_string(v.as<LuaInt>()));
     if (v.is<LuaFloat>())
-      return v.stack().engine().createString(toString(v.as<LuaFloat>()));
+      return v.stack().engine().createString(Star::to_string(v.as<LuaFloat>()));
     return std::nullopt;
   }
 };
@@ -2771,7 +2772,8 @@ export namespace Star {
   using ::Star::LuaUserData;
   using ::Star::LuaValue;
   using ::Star::LuaVariadic;
-  using ::Star::printLuaValue;
+  using ::Star::print_lua_value;
+  using ::Star::write_text;
   template <> struct LuaConverter<LuaStackValue>;
   using ::Star::LuaProfileEntry;
   using ::Star::LuaConverter;

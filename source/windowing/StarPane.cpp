@@ -196,7 +196,7 @@ std::expected<void, StarException> Pane::dismissed() {
     auto result = m_mouseOver->mouseOut();
     if (!result) {
       if (error)
-        error = GuiException(strf("Pane dismissal also failed: {}", outputException(ExceptionDiagnostic(result.error()), true)),
+        error = GuiException(Star::format("Pane dismissal also failed: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)),
             ExceptionDiagnostic(*error));
       else
         error = std::move(result.error());
@@ -206,7 +206,7 @@ std::expected<void, StarException> Pane::dismissed() {
   auto hidden = hide();
   if (!hidden) {
     if (error)
-      error = GuiException(strf("Hiding dismissed pane also failed: {}", outputException(ExceptionDiagnostic(hidden.error()), true)),
+      error = GuiException(Star::format("Hiding dismissed pane also failed: {}", Star::output_exception(ExceptionDiagnostic(hidden.error()), true)),
           ExceptionDiagnostic(*error));
     else
       error = std::move(hidden.error());
@@ -670,7 +670,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
 
   auto addWidget = registerPaneCallback("addWidget",
     [](Pane& pane, Json const& config, std::optional<String> const& widgetName) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-      String name = widgetName.value_or(toString(pane.context().root().random().randu64()));
+      String name = widgetName.value_or(Star::to_string(pane.context().root().random().randu64()));
       auto guiReader = pane.reader();
       auto widget = guiReader->makeSingle(name, config);
       if (!widget)
@@ -789,7 +789,7 @@ std::expected<void, StarException> Pane::renderImpl() {
       auto reset = m_context.resetInterfaceScissorRect();
       if (!rendered && !reset)
         return std::unexpected(GuiException(
-            strf("Restoring pane scissor also failed: {}", outputException(ExceptionDiagnostic(reset.error()), true)),
+            Star::format("Restoring pane scissor also failed: {}", Star::output_exception(ExceptionDiagnostic(reset.error()), true)),
             ExceptionDiagnostic(rendered.error())));
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
@@ -821,7 +821,7 @@ std::expected<void, StarException> Pane::renderImpl() {
     auto cleared = m_context.clearTextStyle();
     if (!drawn && !cleared)
       return std::unexpected(GuiException(
-          strf("Clearing pane text style also failed: {}", outputException(ExceptionDiagnostic(cleared.error()), true)),
+          Star::format("Clearing pane text style also failed: {}", Star::output_exception(ExceptionDiagnostic(cleared.error()), true)),
           ExceptionDiagnostic(drawn.error())));
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));

@@ -121,7 +121,7 @@ std::expected<bool, StarException> TMXObject::forEachTile(TMXMap const& map, Til
     return false;
   }
   if constexpr (Star::DebugEnabled)
-    Star::starAssertFailed((m_kind == ObjectKind::Polyline));
+    Star::star_assert_failed((m_kind == ObjectKind::Polyline));
   for (Vec2I point : m_polyline) {
     Vec2I position(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
     if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
@@ -184,7 +184,7 @@ std::expected<bool, StarException> TMXObject::forEachTileAt(Vec2I pos, TMXMap co
     return callback(pos, tile());
   }
   if constexpr (Star::DebugEnabled)
-    Star::starAssertFailed((m_kind == ObjectKind::Polyline));
+    Star::star_assert_failed((m_kind == ObjectKind::Polyline));
   for (Vec2I point : m_polyline) {
     Vec2I pointPos(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
     if (pos == pointPos) {
@@ -324,7 +324,7 @@ std::expected<std::shared_ptr<TMXTilesets>, StarException> TMXTilesets::create(R
     if (!*hasSource) {
       auto name = definition.optString("name");
       if (!name) return std::unexpected(std::move(name.error()));
-      return std::unexpected(StarException::format("Tiled map has embedded tileset {}", outputOptional(*name)));
+      return std::unexpected(StarException::format("Tiled map has embedded tileset {}", Star::output_optional(*name)));
     }
     auto source = definition.getString("source");
     if (!source) return std::unexpected(std::move(source.error()));
@@ -448,7 +448,7 @@ std::expected<std::shared_ptr<TMXObject>, StarException> TMXObject::create(Root&
       if (!vertex) return std::unexpected(std::move(vertex.error()));
       result->m_polyline.push_back(*vertex);
     }
-    computedProperties["wire"] = "_polylineWire" + toString(result->m_objectId);
+    computedProperties["wire"] = "_polylineWire" + Star::to_string(result->m_objectId);
     computedProperties["local"] = "true";
   }
   auto inherited = properties.inherit(computedProperties);

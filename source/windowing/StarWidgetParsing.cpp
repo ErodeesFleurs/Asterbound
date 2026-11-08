@@ -875,7 +875,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
     auto result11 = common(button, btnConfig);
     if (!result11)
       return std::unexpected(std::move(result11.error()));
-    auto result12 = buttonGroup->addChild(toString(button->buttonGroupId()), button);
+    auto result12 = buttonGroup->addChild(Star::to_string(button->buttonGroupId()), button);
     if (!result12)
       return std::unexpected(std::move(result12.error()));
   }
@@ -1800,7 +1800,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::stackHandler(S
       if (!result1)
         return std::unexpected(std::move(result1.error()));
       widget->determineSizeFromChildren();
-      auto result2 = stack->addChild(toString(stack->numChildren()), widget);
+      auto result2 = stack->addChild(Star::to_string(stack->numChildren()), widget);
       if (!result2)
         return std::unexpected(std::move(result2.error()));
     }

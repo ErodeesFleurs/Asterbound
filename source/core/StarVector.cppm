@@ -2,6 +2,7 @@ module;
 import std;
 import star.hash;
 import star.optional;
+import star.text_formatter;
 
 import star.array;
 import star.format;
@@ -958,19 +959,28 @@ using Vec4B = Vector<std::uint8_t, 4>;
 using Vec4S = Vector<std::size_t, 4>;
 
 template <typename T, std::size_t N>
-  requires array_streamable<T>
-std::ostream& operator<<(std::ostream& output, Vector<T, N> const& vector) {
-  output << '(';
-  for (std::size_t i = 0; i < N; ++i) {
-    if constexpr (requires { outputOptional(vector[i]); })
-      output << outputOptional(vector[i]);
-    else
-      output << vector[i];
-    if (i != N - 1)
-      output << ", ";
+  requires (N == 0 || array_text_writable<T>)
+auto write_text(TextBuffer& output, Vector<T, N> const& vector) {
+  output.push_back('(');
+  if constexpr (N == 0) {
+    output.push_back(')');
+  } else {
+    using Result = optional_diagnostic_result<T>;
+    for (std::size_t i = 0; i < N; ++i) {
+      if constexpr (std::same_as<Result, void>) {
+        append_text(output, optional_diagnostic_value(vector[i]));
+      } else {
+        auto written = append_text(output, optional_diagnostic_value(vector[i]));
+        if (!written)
+          return Result(std::unexpected(std::move(written.error())));
+      }
+      if (i != N - 1)
+        output.append(", ");
+    }
+    output.push_back(')');
+    if constexpr (!std::same_as<Result, void>)
+      return Result{};
   }
-  output << ')';
-  return output;
 }
 
 template <typename T, std::size_t N>
@@ -1092,7 +1102,7 @@ using ::Star::vmax;
 using ::Star::vmin;
 using ::Star::vmult;
 using ::Star::vnorm;
-using ::Star::operator<<;
+using ::Star::write_text;
 using ::Star::operator*;
 using ::Star::operator^;
 using ::Star::hash;

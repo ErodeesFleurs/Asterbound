@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json;
 import star.output_proxy;
 import star.native_runtime;
@@ -159,7 +160,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     }
   }
 
-  coutf("Generating {} size image for selector with scale {}\n", size, scale);
+  if (auto written = Star::print("Generating {} size image for selector with scale {}\n", size, scale); !written)
+    return std::unexpected(std::move(written.error()));
   auto outputImage = std::make_shared<Image>(size, PixelFormat::RGB24);
   for (std::size_t x = 0; x < size[0]; ++x) {
     for (std::size_t y = 0; y < size[1]; ++y) {
@@ -193,7 +195,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 int main(int argc, char** argv) {
   auto result = run(argc, argv);
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return 0;

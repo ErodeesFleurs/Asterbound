@@ -176,12 +176,12 @@ EntityDamageTeam Entity::getTeam() const {
 bool Entity::inWorld() const {
   if (m_world) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((m_world && m_entityId != NullEntityId && m_entityMode));
+      Star::star_assert_failed((m_world && m_entityId != NullEntityId && m_entityMode));
     }
     return true;
   } else {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((!m_world && m_entityId == NullEntityId && !m_entityMode));
+      Star::star_assert_failed((!m_world && m_entityId == NullEntityId && !m_entityMode));
     }
     return false;
   }

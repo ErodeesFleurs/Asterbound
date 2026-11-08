@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
+import star.format;
 import star.array;
 import star.native_runtime;
 import star.string;
@@ -243,7 +245,8 @@ public:
 int main(int argc, char** argv) {
   auto native_runtime = Star::NativeRuntime::create();
   if (!native_runtime) {
-    std::cerr << native_runtime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
+      return 1;
     return 1;
   }
   register_family<std::int64_t, 2>("Scalar");

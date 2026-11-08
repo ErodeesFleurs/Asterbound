@@ -1,5 +1,5 @@
 module;
-import star.stream_formatter;
+import star.text_formatter;
 
 import std;
 import star.flat_hash_set;
@@ -475,47 +475,42 @@ using HashSet = BasicSet<FlatHashSet<Value, Hash, Equals, Allocator>>;
 template <typename Value, typename Hash = hash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
 using StableHashSet = BasicSet<std::unordered_set<Value, Hash, Equals, Allocator>>;
 
-template <typename T>
-decltype(auto) set_output_value(T const& value) {
-  if constexpr (requires { outputOptional(value); })
-    return outputOptional(value);
-  else
-    return (value);
-}
-
 template <typename Container>
-using set_output_result = decltype(std::declval<std::ostream&>() << set_output_value(std::declval<typename Container::value_type const&>()));
+using set_output_result = optional_diagnostic_result<typename Container::value_type>;
 
 template <set_container Container>
-std::ostream& operator<<(std::ostream& os, Container const& set)
-    requires std::same_as<set_output_result<Container>, std::ostream&>;
+void write_text(TextBuffer& output, Container const& set)
+    requires std::same_as<set_output_result<Container>, void>;
 
 template <set_container Container>
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& set)
-    requires std::same_as<set_output_result<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, Container const& set)
+    requires std::same_as<set_output_result<Container>, std::expected<void, StarException>>;
 
 template <set_container Container>
-std::ostream& operator<<(std::ostream& os, Container const& set)
-    requires std::same_as<set_output_result<Container>, std::ostream&> {
-  os << "(";
+void write_text(TextBuffer& output, Container const& set)
+    requires std::same_as<set_output_result<Container>, void> {
+  output.push_back('(');
   for (auto i = set.begin(); i != set.end(); ++i) {
-    if (i != set.begin()) os << ", ";
-    os << set_output_value(*i);
+    if (i != set.begin())
+      output.append(", ");
+    append_text(output, optional_diagnostic_value(*i));
   }
-  return os << ")";
+  output.push_back(')');
 }
 
 template <set_container Container>
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& set)
-    requires std::same_as<set_output_result<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
-  os << "(";
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, Container const& set)
+    requires std::same_as<set_output_result<Container>, std::expected<void, StarException>> {
+  output.push_back('(');
   for (auto i = set.begin(); i != set.end(); ++i) {
-    if (i != set.begin()) os << ", ";
-    auto written = os << set_output_value(*i);
-    if (!written) return std::unexpected(std::move(written.error()));
+    if (i != set.begin())
+      output.append(", ");
+    auto written = append_text(output, optional_diagnostic_value(*i));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
   }
-  os << ")";
-  return std::ref(os);
+  output.push_back(')');
+  return {};
 }
 
 }
@@ -523,8 +518,8 @@ template <set_container Container>
 export module star.set;
 
 export template <typename Storage>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::BasicSet<Storage> const&>()), std::ostream&>
-struct std::formatter<Star::BasicSet<Storage>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::BasicSet<Storage>>
+struct std::formatter<Star::BasicSet<Storage>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::SetExceptionTag;
@@ -538,5 +533,5 @@ export namespace Star {
   using ::Star::Set;
   using ::Star::HashSet;
   using ::Star::StableHashSet;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

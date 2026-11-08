@@ -333,7 +333,7 @@ std::expected<Input::BindEntry, StarException> Input::BindEntry::create(Input& i
     auto bind = bindFromJson(jBind);
     if (!bind) {
       if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-      auto logged = input.m_root.logger().errorException(strf("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id), ExceptionDiagnostic(bind.error()));
+      auto logged = input.m_root.logger().errorException(Star::format("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id), ExceptionDiagnostic(bind.error()));
       if (!logged) return std::unexpected(std::move(logged.error()));
     } else result.defaultBinds.emplace_back(std::move(*bind));
   }
@@ -354,13 +354,13 @@ std::expected<void, StarException> Input::BindEntry::updated() {
   if (!root->isType(Json::Type::Object)) {
     if (auto r = (*config)->set(InputBindingConfigRoot, JsonObject()); !r) return std::unexpected(std::move(r.error()));
   }
-  String path = strf("{}.{}", InputBindingConfigRoot, category.get().id);
+  String path = Star::format("{}.{}", InputBindingConfigRoot, category.get().id);
   auto category = (*config)->getPath(path);
   if (!category) return std::unexpected(std::move(category.error()));
   if (!category->isType(Json::Type::Object)) {
     if (auto r = (*config)->setPath(path, JsonObject{{id, std::move(array)}}); !r) return std::unexpected(std::move(r.error()));
   } else {
-    path = strf("{}.{}", path, id);
+    path = Star::format("{}.{}", path, id);
     if (auto r = (*config)->setPath(path, array); !r) return std::unexpected(std::move(r.error()));
   }
   owner.rebuildMappings();
@@ -403,13 +403,13 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
     if (!built) return std::unexpected(std::move(built.error()));
     auto& entry = entries.try_emplace(bindId, std::move(*built)).first->second;
     if (userBindings->isType(Json::Type::Object)) {
-      auto bindings = userBindings->queryArray(strf("{}.{}", id, bindId), {});
+      auto bindings = userBindings->queryArray(Star::format("{}.{}", id, bindId), {});
       if (!bindings) return std::unexpected(std::move(bindings.error()));
       for (auto const& jBind : *bindings) {
         auto bind = bindFromJson(jBind);
         if (!bind) {
           if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-          auto logged = owner.m_root.logger().errorException(strf("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
+          auto logged = owner.m_root.logger().errorException(Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
           if (!logged) return std::unexpected(std::move(logged.error()));
         } else entry.customBinds.emplace_back(std::move(*bind));
       }

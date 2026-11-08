@@ -397,7 +397,7 @@ treeVariant.tileDamageParameters = std::move(*result248);
 
 std::expected<TreeVariant, StarException> PlantDatabase::buildTreeVariant(String const& stemName, float stemHueShift) const {
   if (!m_treeStemConfigs.contains(stemName))
-    return std::unexpected(PlantDatabaseException(strf("stemName '{}' not found in plant database", stemName)));
+    return std::unexpected(PlantDatabaseException(Star::format("stemName '{}' not found in plant database", stemName)));
 
   TreeVariant treeVariant;
 
@@ -465,7 +465,7 @@ if (std::move(*result224) == ceiling)
 
 std::expected<GrassVariant, StarException> PlantDatabase::buildGrassVariant(String const& name, float hueShift) const {
   if (!m_grassConfigs.contains(name))
-    return std::unexpected(PlantDatabaseException(strf("grass '{}' not found in plant database", name)));
+    return std::unexpected(PlantDatabaseException(Star::format("grass '{}' not found in plant database", name)));
 
   GrassVariant grassVariant;
   auto result212 = m_grassConfigs.get(name);
@@ -538,7 +538,7 @@ std::expected<StringList, StarException> PlantDatabase::bushMods(String const& b
 
 std::expected<BushVariant, StarException> PlantDatabase::buildBushVariant(String const& bushName, float baseHueShift, String const& modName, float modHueShift) const {
   if (!m_bushConfigs.contains(bushName))
-    return std::unexpected(PlantDatabaseException(strf("bush '{}' not found in plant database", bushName)));
+    return std::unexpected(PlantDatabaseException(Star::format("bush '{}' not found in plant database", bushName)));
 
   BushVariant bushVariant;
   auto result193 = m_bushConfigs.get(bushName);
@@ -618,19 +618,19 @@ bushVariant.tileDamageParameters = std::move(*result210);
 
 std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(TreeVariant const& treeVariant, std::uint64_t seed) const {
   auto plant = Plant::create(m_root, treeVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(strf("Error constructing plant from tree variant stem: {} foliage: {}", treeVariant.stemName, treeVariant.foliageName),plant.error()));
+  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from tree variant stem: {} foliage: {}", treeVariant.stemName, treeVariant.foliageName),plant.error()));
   return plant;
 }
 
 std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(GrassVariant const& grassVariant, std::uint64_t seed) const {
   auto plant = Plant::create(m_root, grassVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(strf("Error constructing plant from grass variant name: {}", grassVariant.name),plant.error()));
+  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from grass variant name: {}", grassVariant.name),plant.error()));
   return plant;
 }
 
 std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(BushVariant const& bushVariant, std::uint64_t seed) const {
   auto plant = Plant::create(m_root, bushVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(strf("Error constructing plant from bush variant name: {} mod: {}", bushVariant.bushName, bushVariant.modName),plant.error()));
+  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from bush variant name: {} mod: {}", bushVariant.bushName, bushVariant.modName),plant.error()));
   return plant;
 }
 

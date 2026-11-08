@@ -1,5 +1,5 @@
 module;
-import star.stream_formatter;
+import star.text_formatter;
 
 import std;
 
@@ -538,18 +538,31 @@ template <typename Value, typename Hash = Star::hash<Value>, typename Equals = s
 using OrderedHashSet = OrderedSetWrapper<FlatHashMap, Value, Allocator, Hash, Equals>;
 
 template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
-std::ostream& operator<<(std::ostream& os, OrderedSetWrapper<Map, Value, Allocator, Args...> const& set) {
-  os << "(";
+  requires std::same_as<optional_diagnostic_result<Value>, void>
+void write_text(TextBuffer& output, OrderedSetWrapper<Map, Value, Allocator, Args...> const& set) {
+  output.push_back('(');
   for (auto position = set.begin(); position != set.end(); ++position) {
     if (position != set.begin())
-      os << ", ";
-    if constexpr (requires { outputOptional(*position); })
-      os << outputOptional(*position);
-    else
-      os << *position;
+      output.append(", ");
+    append_text(output, optional_diagnostic_value(*position));
   }
-  os << ")";
-  return os;
+  output.push_back(')');
+}
+
+template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
+  requires std::same_as<optional_diagnostic_result<Value>, std::expected<void, StarException>>
+[[nodiscard]] std::expected<void, StarException>
+write_text(TextBuffer& output, OrderedSetWrapper<Map, Value, Allocator, Args...> const& set) {
+  output.push_back('(');
+  for (auto position = set.begin(); position != set.end(); ++position) {
+    if (position != set.begin())
+      output.append(", ");
+    auto written = append_text(output, optional_diagnostic_value(*position));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
+  }
+  output.push_back(')');
+  return {};
 }
 
 }
@@ -557,11 +570,12 @@ std::ostream& operator<<(std::ostream& os, OrderedSetWrapper<Map, Value, Allocat
 export module star.ordered_set;
 
 export template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>
-struct std::formatter<Star::OrderedSetWrapper<Map, Value, Allocator, Args...>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::OrderedSetWrapper<Map, Value, Allocator, Args...>>
+struct std::formatter<Star::OrderedSetWrapper<Map, Value, Allocator, Args...>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::OrderedSetWrapper;
   using ::Star::OrderedSet;
   using ::Star::OrderedHashSet;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

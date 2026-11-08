@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json;
 import star.output_proxy;
 import star.native_runtime;
@@ -141,7 +142,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     if (!coordinate)
       return std::unexpected(StarException("Could not find world to generate, try again"));
 
-    coutf("Generating world with coordinate {}\n", *coordinate);
+    if (auto written = Star::print("Generating world with coordinate {}\n", *coordinate); !written)
+      return std::unexpected(std::move(written.error()));
     auto createdTemplate = WorldTemplate::create(*root, *coordinate, *celestialDatabase);
     if (!createdTemplate)
       return std::unexpected(std::move(createdTemplate.error()));
@@ -169,7 +171,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       size[0] = 1000;
     }
 
-    coutf("Generating {} size image for world of type '{}'\n", size, worldTemplate.worldParameters()->typeName);
+    if (auto written = Star::print("Generating {} size image for world of type '{}'\n", size, worldTemplate.worldParameters()->typeName); !written)
+      return std::unexpected(std::move(written.error()));
     auto outputImage = std::make_shared<Image>(size, PixelFormat::RGB24);
 
     Color groundColor = Color::rgb(255, 0, 0);
@@ -265,7 +268,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 int main(int argc, char** argv) {
   auto result = run(argc, argv);
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return 0;

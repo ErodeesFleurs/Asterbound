@@ -564,7 +564,7 @@ std::expected<StringList, StarException> LuaBindings::UniverseServerCallbacks::a
     return std::unexpected(std::move(worlds.error()));
   StringList result;
   for (auto const& world : *worlds) {
-    auto id = printWorldId(world);
+    auto id = Star::print_world_id(world);
     if (!id)
       return std::unexpected(std::move(id.error()));
     result.push_back(std::move(*id));
@@ -595,7 +595,7 @@ std::expected<String, StarException> LuaBindings::UniverseServerCallbacks::clien
   auto world = universe.clientWorld(clientId);
   if (!world)
     return std::unexpected(std::move(world.error()));
-  return printWorldId(*world);
+  return Star::print_world_id(*world);
 }
 
 std::expected<void, StarException> LuaBindings::UniverseServerCallbacks::disconnectClient(UniverseServer& universe, ConnectionId clientId, std::optional<String> const& reason) {

@@ -77,7 +77,7 @@ namespace Dungeon {
     if (variant == 4)
       return Biome4MaterialId;
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((variant == 5));
+      Star::star_assert_failed((variant == 5));
     }
     return Biome5MaterialId;
   }
@@ -1035,7 +1035,7 @@ namespace Dungeon {
       }
       return false;
     });
-    if (!visited) return std::unexpected(DungeonException(strf("Exception in connector {}", m_name), ExceptionDiagnostic(visited.error())));
+    if (!visited) return std::unexpected(DungeonException(Star::format("Exception in connector {}", m_name), ExceptionDiagnostic(visited.error())));
     return {};
   }
 
@@ -1066,7 +1066,7 @@ namespace Dungeon {
         }
         return false;
       });
-    if (!visited) return std::unexpected(DungeonException(strf("Exception in part {}", m_name), ExceptionDiagnostic(visited.error())));
+    if (!visited) return std::unexpected(DungeonException(Star::format("Exception in part {}", m_name), ExceptionDiagnostic(visited.error())));
 
     highestGound = std::max(highestGound, highestLiquid);
     if (highestGound == -1)
@@ -1139,7 +1139,7 @@ namespace Dungeon {
     if (m_direction == Direction::Up)
       return Vec2I(0, 1);
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((m_direction == Direction::Down));
+      Star::star_assert_failed((m_direction == Direction::Down));
     }
     return Vec2I(0, -1);
   }
@@ -1555,7 +1555,7 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     return DungeonDefinition::create(this->root(), *definition, AssetPath::directory(path));
   };
   auto result = load();
-  if (!result) return std::unexpected(DungeonException(strf("Error loading dungeon '{}'", path), ExceptionDiagnostic(result.error())));
+  if (!result) return std::unexpected(DungeonException(Star::format("Error loading dungeon '{}'", path), ExceptionDiagnostic(result.error())));
   return result;
 }
 
@@ -1729,7 +1729,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
     return std::optional<std::pair<List<RectI>, Set<Vec2I>>>();
   };
   auto result = generate();
-  if (!result) return std::unexpected(DungeonException(strf("Error generating dungeon named '{}'", name), ExceptionDiagnostic(result.error())));
+  if (!result) return std::unexpected(DungeonException(Star::format("Error generating dungeon named '{}'", name), ExceptionDiagnostic(result.error())));
   return result;
 }
 

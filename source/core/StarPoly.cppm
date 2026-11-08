@@ -1,6 +1,7 @@
 module;
 
 import std;
+import star.text_formatter;
 import star.list;
 
 import star.math_common;
@@ -158,7 +159,8 @@ private:
 };
 
 template <typename DataType>
-std::ostream& operator<<(std::ostream& os, Polygon<DataType> const& poly);
+  requires nonfallible_text_writable<Vector<DataType, 2>>
+void write_text(TextBuffer& output, Polygon<DataType> const& poly);
 
 using PolyI = Polygon<int>;
 using PolyF = Polygon<float>;
@@ -734,25 +736,29 @@ auto Polygon<DataType>::sideAt(std::size_t i) const -> Line {
 }
 
 template <typename DataType>
-std::ostream& operator<<(std::ostream& os, Polygon<DataType> const& poly) {
-  os << "[Poly: ";
+  requires nonfallible_text_writable<Vector<DataType, 2>>
+void write_text(TextBuffer& output, Polygon<DataType> const& poly) {
+  output.append("[Poly: ");
   for (auto i = poly.begin(); i != poly.end(); ++i) {
     if (i != poly.begin())
-      os << ", ";
-    os << *i;
+      output.append(", ");
+    append_text(output, *i);
   }
-  os << "]";
-  return os;
+  output.push_back(']');
 }
 
 }
 
 export module star.poly;
 
+export template <typename DataType>
+  requires Star::nonfallible_text_writable<Star::Vector<DataType, 2>>
+struct std::formatter<Star::Polygon<DataType>> : Star::TextFormatter {};
+
 export namespace Star {
   using ::Star::Polygon;
   using ::Star::PolyI;
   using ::Star::PolyF;
   using ::Star::PolyD;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

@@ -225,7 +225,7 @@ EntityId EntityMap::uniqueEntityId(String const& uniqueId) const {
 std::shared_ptr<Entity> EntityMap::entity(EntityId entityId) const {
   auto entity = m_spatialMap.value(entityId);
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!entity || entity->entityId() == entityId));
+    Star::star_assert_failed((!entity || entity->entityId() == entityId));
   }
   return entity;
 }

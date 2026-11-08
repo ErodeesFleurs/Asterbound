@@ -1,4 +1,5 @@
 import star.memory;
+import star.text_formatter;
 import star.string;
 import star.string_view;
 import star.hash;
@@ -157,7 +158,7 @@ std::expected<String::Char, StarException> String::at(std::size_t index) const {
     offset += *width;
     ++position;
   }
-  if (index >= position) return std::unexpected(OutOfRangeException(strf("Out of range in String::at({})", index)));
+  if (index >= position) return std::unexpected(OutOfRangeException(Star::format("Out of range in String::at({})", index)));
   return result;
 }
 CaseInsensitiveString::CaseInsensitiveString() : m_hash(PLHasher().hash()) {}
@@ -523,7 +524,7 @@ std::expected<bool, StarException> String::equals_ignore_case(String const& othe
 std::expected<String, StarException> String::substr(std::size_t position, std::size_t count) const {
   auto bounds = string_byte_bounds(m_string, position, count);
   if (!bounds) return std::unexpected(std::move(bounds.error()));
-  if (position > bounds->length) return std::unexpected(OutOfRangeException(strf("out of range in String::substr({}, {})", position, count)));
+  if (position > bounds->length) return std::unexpected(OutOfRangeException(Star::format("out of range in String::substr({}, {})", position, count)));
   return String(std::string_view(m_string).substr(bounds->start, bounds->stop - bounds->start));
 }
 std::expected<void, StarException> String::erase(std::size_t pos, std::size_t count) {
@@ -584,8 +585,7 @@ std::expected<String, StarException> operator+(String a, String::Char point) { a
 std::expected<String, StarException> operator+(String::Char point, String const& b) { auto text = String::create(point); if (!text) return std::unexpected(std::move(text.error())); text->append(b); return std::move(*text); }
 String operator*(String const& text, unsigned times) { String result; for (unsigned i = 0; i != times; ++i) result.append(text); return result; }
 String operator*(unsigned times, String const& text) { return text * times; }
-std::ostream& operator<<(std::ostream& os, String const& text) { return os << text.utf8(); }
-std::istream& operator>>(std::istream& is, String& text) { std::string bytes; is >> bytes; text = String(std::move(bytes)); return is; }
+void write_text(TextBuffer& output, String const& text) { output.append(text.utf8()); }
 StringList::StringList() = default;
 StringList::StringList(Base const& list) : Base(list) {}
 StringList::StringList(Base&& list) noexcept : Base(std::move(list)) {}
@@ -642,10 +642,16 @@ String StringList::join(String const& separator) const {
 }
 std::expected<StringList, StarException> StringList::slice(SliceIndex a, SliceIndex b, int step) const { return Star::slice(*this, a, b, step); }
 StringList StringList::sorted() const { StringList result = *this; result.sort(); return result; }
-std::ostream& operator<<(std::ostream& os, StringList const& list) {
-  os << "(";
-  for (auto it = list.begin(); it != list.end(); ++it) { if (it != list.begin()) os << ", "; os << '\'' << *it << '\''; }
-  return os << ")";
+void write_text(TextBuffer& output, StringList const& list) {
+  output.push_back('(');
+  for (auto it = list.begin(); it != list.end(); ++it) {
+    if (it != list.begin())
+      output.append(", ");
+    output.push_back('\'');
+    output.append(it->utf8());
+    output.push_back('\'');
+  }
+  output.push_back(')');
 }
 std::size_t hash<StringList>::operator()(StringList const& list) const {
   std::size_t hash = 0;

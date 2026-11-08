@@ -174,7 +174,7 @@ std::expected<std::shared_ptr<Widget>, StarException> ListWidget::addItem(std::s
   auto item = constructWidget();
   if (!item)
     return std::unexpected(std::move(item.error()));
-  auto added = addChildAt(toString(context().root().random().randu64()), *item, at);
+  auto added = addChildAt(Star::to_string(context().root().random().randu64()), *item, at);
   if (!added)
     return std::unexpected(std::move(added.error()));
   updateSizeAndPosition();
@@ -187,7 +187,7 @@ std::expected<std::shared_ptr<Widget>, StarException> ListWidget::addItem(std::s
 }
 
 std::expected<std::shared_ptr<Widget>, StarException> ListWidget::addItem(std::shared_ptr<Widget> item) {
-  auto added = addChild(toString(context().root().random().randu64()), item);
+  auto added = addChild(Star::to_string(context().root().random().randu64()), item);
   if (!added)
     return std::unexpected(std::move(added.error()));
   updateSizeAndPosition();

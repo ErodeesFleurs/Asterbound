@@ -5,6 +5,7 @@
 import std;
 import star.format;
 import star.output_proxy;
+import star.text_formatter;
 import star.logging;
 import star.string_windows;
 import star.version;
@@ -36,7 +37,7 @@ std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::crea
   WSADATA wsaData;
   auto status = WSAStartup(MAKEWORD(2, 2), &wsaData);
   if (status != 0)
-    return std::unexpected(StarException(strf("WSAStartup failed: {}", status), false));
+    return std::unexpected(StarException(Star::format("WSAStartup failed: {}", status), false));
   runtime->m_winsockInitialized = true;
 
   DWORD symbolError = ERROR_SUCCESS;
@@ -57,7 +58,7 @@ std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::crea
     }
   }
   if (!initialized)
-    return std::unexpected(StarException(strf("SymInitialize failed: {}", symbolError), false));
+    return std::unexpected(StarException(Star::format("SymInitialize failed: {}", symbolError), false));
   return runtime;
 }
 
@@ -102,7 +103,7 @@ private:
   HMODULE m_module = nullptr;
 };
 
-static CapturedModule describeModule(HMODULE module) {
+static CapturedModule describe_module(HMODULE module) {
   auto const* dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(module);
   auto const* headers = reinterpret_cast<IMAGE_NT_HEADERS const*>(
       reinterpret_cast<std::byte const*>(module) + dos->e_lfanew);
@@ -112,12 +113,12 @@ static CapturedModule describeModule(HMODULE module) {
       length && length < path.size() ? std::wstring(path.data(), length) : std::wstring()};
 }
 
-static bool sameModule(CapturedModule const& left, CapturedModule const& right) {
+static bool same_module(CapturedModule const& left, CapturedModule const& right) {
   return !left.path.empty() && left.base == right.base && left.imageSize == right.imageSize
       && left.timestamp == right.timestamp && left.path == right.path;
 }
 
-static std::string modulePathUtf8(std::wstring const& path) {
+static std::string module_path_utf8(std::wstring const& path) {
   if (path.empty())
     return {};
   auto length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
@@ -125,10 +126,10 @@ static std::string modulePathUtf8(std::wstring const& path) {
   if (!length) {
     // Windows paths may contain unpaired UTF-16 units. Retain those units
     // explicitly instead of replacing or dropping the captured module name.
-    std::string escaped;
+    TextBuffer escaped;
     for (wchar_t unit : path)
-      escaped += strf("\\u{:04x}", static_cast<unsigned int>(unit));
-    return escaped;
+      std::format_to(std::back_inserter(escaped), "\\u{:04x}", static_cast<unsigned int>(unit));
+    return std::move(escaped).str();
   }
   std::string result(length, '\0');
   WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
@@ -136,7 +137,7 @@ static std::string modulePathUtf8(std::wstring const& path) {
   return result;
 }
 
-static std::function<void(std::ostream&, bool)> captureStack() {
+static std::function<void(TextBuffer&, bool)> capture_stack() {
   struct Frame {
     void* address;
     std::size_t module;
@@ -154,14 +155,14 @@ static std::function<void(std::ostream&, bool)> captureStack() {
           [&](auto const& captured) { return captured.base == module.get(); });
       if (found == modules.end()) {
         moduleIndex = modules.size();
-        modules.push_back(describeModule(module.get()));
+        modules.push_back(describe_module(module.get()));
       } else {
         moduleIndex = static_cast<std::size_t>(found - modules.begin());
       }
     }
     frames.push_back({addresses[i], moduleIndex});
   }
-  return [frames = std::move(frames), modules = std::move(modules)](std::ostream& os, bool) {
+  return [frames = std::move(frames), modules = std::move(modules)](TextBuffer& output, bool) {
     struct CurrentModule {
       ModuleReference reference;
       std::string path;
@@ -170,8 +171,8 @@ static std::function<void(std::ostream&, bool)> captureStack() {
     std::vector<CurrentModule> current;
     current.reserve(modules.size());
     for (auto const& captured : modules) {
-      auto& module = current.emplace_back(ModuleReference(captured.base), modulePathUtf8(captured.path), false);
-      module.matches = module.reference.get() && sameModule(captured, describeModule(module.reference.get()));
+      auto& module = current.emplace_back(ModuleReference(captured.base), module_path_utf8(captured.path), false);
+      module.matches = module.reference.get() && same_module(captured, describe_module(module.reference.get()));
     }
     HANDLE process = GetCurrentProcess();
     // Release the symbol lock before dropping module references: a last
@@ -192,12 +193,12 @@ static std::function<void(std::ostream&, bool)> captureStack() {
     for (std::size_t i = 0; i < frames.size(); ++i) {
       auto const& frame = frames[i];
       if (i)
-        os << '\n';
-      format(os, "[{}] {}", i, frame.address);
+        output.push_back('\n');
+      std::format_to(std::back_inserter(output), "[{}] {}", i, frame.address);
       if (frame.module == std::numeric_limits<std::size_t>::max())
         continue;
       auto const& captured = modules[frame.module];
-      format(os, " {} +0x{:x} (image size 0x{:x}, timestamp 0x{:x})", current[frame.module].path,
+      std::format_to(std::back_inserter(output), " {} +0x{:x} (image size 0x{:x}, timestamp 0x{:x})", current[frame.module].path,
           reinterpret_cast<std::uintptr_t>(frame.address) - reinterpret_cast<std::uintptr_t>(captured.base),
           captured.imageSize, captured.timestamp);
       if (!current[frame.module].matches)
@@ -211,49 +212,50 @@ static std::function<void(std::ostream&, bool)> captureStack() {
         auto slash = file.find_last_of("\\/");
         if (slash != std::string_view::npos)
           file.remove_prefix(slash + 1);
-        format(os, " ({}:{})", file, line.LineNumber);
+        std::format_to(std::back_inserter(output), " ({}:{})", file, line.LineNumber);
       }
       alignas(SYMBOL_INFO) std::array<std::byte, sizeof(SYMBOL_INFO) + MAX_SYM_NAME> buffer{};
       auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer.data());
       symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
       symbol->MaxNameLen = MAX_SYM_NAME;
       if (SymFromAddr(process, address, nullptr, symbol))
-        format(os, " {}", std::string_view(symbol->Name, symbol->NameLen));
+        std::format_to(std::back_inserter(output), " {}", std::string_view(symbol->Name, symbol->NameLen));
     }
     if (frames.size() == StackLimit)
-      os << "\n[Stack Output Limit Reached]";
+      output.append("\n[Stack Output Limit Reached]");
   };
 }
 
-static std::string captureBacktrace() {
-  std::ostringstream os;
-  captureStack()(os, true);
-  return os.str();
+static std::string capture_backtrace() {
+  TextBuffer buffer;
+  capture_stack()(buffer, true);
+  return std::move(buffer).str();
 }
 
-std::function<void(std::ostream&, bool)> StarException::captureOriginStack() {
-  return captureStack();
+std::function<void(TextBuffer&, bool)> StarException::capture_origin_stack() {
+  return capture_stack();
 }
 
-OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return OutputProxy([payload = e.m_payload, fullStacktrace](std::ostream& os) {
-    os << payload->rendered(fullStacktrace);
+OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace) {
+  return OutputProxy([payload = e.m_payload, fullStacktrace](TextBuffer& buffer) {
+    buffer.append(payload->rendered(fullStacktrace));
   });
 }
 
-void printStack(std::string_view message) {
-  EmergencyLog::info("Stack Trace ({})...\n{}", message, captureBacktrace());
+void print_stack(std::string_view message) {
+  EmergencyLog::info("Stack Trace ({})...\n{}", message, capture_backtrace());
 }
 
-void fatalError(std::string_view message, bool showStackTrace) {
-  std::ostringstream ss;
-  ss << "v" << OpenStarVersionString << " (" << StarSourceIdentifierString << ")\n"
-     << "Fatal Error: " << message << std::endl;
+void fatal_error(std::string_view message, bool showStackTrace) {
+  TextBuffer buffer;
+  std::format_to(std::back_inserter(buffer), "v{} ({})\nFatal Error: {}\n",
+      OpenStarVersionString, StarSourceIdentifierString, message);
   if (showStackTrace)
-    ss << captureBacktrace();
+    buffer.append(capture_backtrace());
 
-  EmergencyLog::log(LogLevel::Error, ss.str());
-  auto text = stringToUtf16(ss.str());
+  auto diagnostic = std::move(buffer).str();
+  EmergencyLog::log(LogLevel::Error, diagnostic);
+  auto text = stringToUtf16(diagnostic);
   MessageBoxW(NULL, text ? text->get() : L"Fatal error; diagnostic text could not be converted. See the log.",
       L"Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 

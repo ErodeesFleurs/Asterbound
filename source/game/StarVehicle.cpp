@@ -1018,7 +1018,7 @@ return std::move(*result1140);
       auto result1142 = m_networkedAnimator->partPoint(thisLounge.part,thisLounge.partAnchor);
 if (!result1142) return std::unexpected(std::move(result1142.error()));
 auto thisAnchor = std::move(*result1142);
-      if (!thisAnchor) return std::unexpected(VehicleException(strf("Missing lounge anchor '{}' on part '{}'",thisLounge.partAnchor,thisLounge.part)));
+      if (!thisAnchor) return std::unexpected(VehicleException(Star::format("Missing lounge anchor '{}' on part '{}'",thisLounge.partAnchor,thisLounge.part)));
       Vec2F thisLoungePosition = *thisAnchor + position();
 
       auto result1143 = m_loungePositions.value_at(*index);
@@ -1028,7 +1028,7 @@ auto thisAnchor = std::move(*result1142);
       auto result1144 = m_networkedAnimator->partPoint(selectedLounge.part,selectedLounge.partAnchor);
 if (!result1144) return std::unexpected(std::move(result1144.error()));
 auto selectedAnchor = std::move(*result1144);
-      if (!selectedAnchor) return std::unexpected(VehicleException(strf("Missing lounge anchor '{}' on part '{}'",selectedLounge.partAnchor,selectedLounge.part)));
+      if (!selectedAnchor) return std::unexpected(VehicleException(Star::format("Missing lounge anchor '{}' on part '{}'",selectedLounge.partAnchor,selectedLounge.part)));
       Vec2F selectedLoungePosition = *selectedAnchor + position();
 
       if (vmag_squared(thisLoungePosition - request.interactPosition)
@@ -1390,7 +1390,7 @@ return std::move(*result1103);
 
 std::expected<std::size_t, StarException> Vehicle::loungeIndex(String const& name) const {
   auto index = m_loungePositions.index_of(name);
-  if (!index) return std::unexpected(VehicleException(strf("No such lounge position '{}'",name)));
+  if (!index) return std::unexpected(VehicleException(Star::format("No such lounge position '{}'",name)));
   return *index;
 }
 

@@ -36,7 +36,7 @@ namespace Star {
 namespace {
 StarException patchFailure(StarException error, std::string_view context) {
   if (error.is<JsonException>())
-    return JsonPatchException(strf("{} {}", context, error.what()), false);
+    return JsonPatchException(Star::format("{} {}", context, error.what()), false);
   return error;
 }
 }// namespace
@@ -55,7 +55,7 @@ std::expected<Json, StarException> jsonPatch(Json const& base, JsonArray const& 
 // Zero means absent; otherwise the result is the matching index plus one.
 std::expected<std::size_t, StarException> findJsonMatch(Json const& searchable, Json const& value, JsonPath::Pointer const& pointer) {
   if (!searchable.isType(Json::Type::Array))
-    return std::unexpected(JsonPatchException(strf("Search operation failure, value at '{}' is not an array.", pointer.path()), false));
+    return std::unexpected(JsonPatchException(Star::format("Search operation failure, value at '{}' is not an array.", pointer.path()), false));
   auto array = searchable.arrayPtr();
   if (!array)
     return std::unexpected(std::move(array.error()));
@@ -81,7 +81,7 @@ namespace JsonPatching {
       return std::unexpected(patchFailure(std::move(operation.error()), "Could not apply operation to base."));
     auto function = std::ranges::find(functionMap, operation->utf8(), &OperationEntry::first);
     if (function == functionMap.end())
-      return std::unexpected(JsonPatchException(strf("Invalid operation: {}", *operation), false));
+      return std::unexpected(JsonPatchException(Star::format("Invalid operation: {}", *operation), false));
     return function->second(base, op).transform_error(
       [](StarException error) { return patchFailure(std::move(error), "Could not apply operation to base."); });
   }
@@ -113,8 +113,8 @@ namespace JsonPatching {
           if (!text)
             return std::unexpected(std::move(text.error()));
           if (*inverse)
-            return std::unexpected(JsonPatchTestFail(strf("Test operation failure, expected {} to be missing.", *text), false));
-          return std::unexpected(JsonPatchTestFail(strf("Test operation failure, could not find {}.", *text), false));
+            return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", *text), false));
+          return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, could not find {}.", *text), false));
         }
         return base;
       }
@@ -126,7 +126,7 @@ namespace JsonPatching {
         return std::unexpected(std::move(actual.error()));
       if (!*value) {
         if (*inverse)
-          return std::unexpected(JsonPatchTestFail(strf("Test operation failure, expected {} to be missing.", *path), false));
+          return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", *path), false));
         return base;
       }
       if ((**value == actual->get()) != *inverse)
@@ -137,12 +137,12 @@ namespace JsonPatching {
       auto actualText = actual->get().repr();
       if (!actualText)
         return std::unexpected(std::move(actualText.error()));
-      return std::unexpected(JsonPatchTestFail(strf("Test operation failure, expected Just ({}) found {}.", *expectedText, *actualText), false));
+      return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected Just ({}) found {}.", *expectedText, *actualText), false));
     }();
     if (!tested && tested.error().is<JsonPath::TraversalException>()) {
       if (*inverse)
         return base;
-      return std::unexpected(JsonPatchTestFail(strf("Test operation failure: {}", tested.error().what()), false));
+      return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure: {}", tested.error().what()), false));
     }
     return tested;
   }

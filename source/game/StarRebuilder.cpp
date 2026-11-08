@@ -87,7 +87,7 @@ std::expected<bool, StarException> Rebuilder::rebuild(Json store, StarException 
   std::unique_lock locker(m_luaMutex, std::defer_lock);
   lockWithDiagnostics(locker);
   for (auto& context : *m_contexts) {
-    auto next = context.invokePath<Json>("error", store, strf("{}", outputException(lastError, false)));
+    auto next = context.invokePath<Json>("error", store, Star::format("{}", Star::output_exception(lastError, false)));
     if (!next)
       return std::unexpected(std::move(next.error()));
     if (!*next || *next == store)

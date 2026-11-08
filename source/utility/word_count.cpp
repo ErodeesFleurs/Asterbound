@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.format;
 import star.output_proxy;
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
         auto count = countFunction(*json);
         if (!count)
           return std::unexpected(std::move(count.error()));
-        String countKey = wordCountKey ? *wordCountKey : String(strf(".{} files", type));
+        String countKey = wordCountKey ? *wordCountKey : String(Star::format(".{} files", type));
         wordCounts[countKey] += *count;
       }
       return {};
@@ -305,15 +306,18 @@ int main(int argc, char** argv) {
     wordCounts["planet descriptions (cockpit.config)"] = cockpitCount;
     int total = 0;
     for (auto const& count : wordCounts) {
-      coutf("{} words in {}\n", count.second, count.first);
+      if (auto written = Star::print("{} words in {}\n", count.second, count.first); !written)
+        return std::unexpected(std::move(written.error()));
       total += count.second;
     }
-    coutf("approximately {} words total\n", total);
+    if (auto written = Star::print("approximately {} words total\n", total); !written)
+      return std::unexpected(std::move(written.error()));
     return 0;
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

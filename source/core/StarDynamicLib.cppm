@@ -55,7 +55,8 @@ public:
     // acquired by LoadLibraryW. Only release references we actually own.
     if (m_owned && !FreeLibrary(m_handle)) {
       auto status = GetLastError();
-      fprintf(stderr, "Failed to unload dynamic library (Windows error %lu)\n", static_cast<unsigned long>(status));
+      if (!Star::print(stderr, "Failed to unload dynamic library (Windows error {})\n", static_cast<unsigned long>(status)))
+        std::_Exit(1);
     }
   }
 
@@ -108,7 +109,8 @@ public:
   ~PrivateDynLib() override {
     if (dlclose(m_handle)) {
       auto detail = dlerror();
-      fprintf(stderr, "Failed to unload dynamic library: %s\n", detail ? detail : "no loader diagnostic");
+      if (auto written = Star::print(stderr, "Failed to unload dynamic library: {}\n", detail ? detail : "no loader diagnostic"); !written)
+        std::_Exit(1);
     }
   }
 

@@ -93,7 +93,7 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
         if (!name)
           return std::unexpected(std::move(name.error()));
         if (map.contains(*name))
-          return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
+          return std::unexpected(BiomeException(Star::format("Duplicate {} generator name '{}'", type, *name)));
         map[*name] = {path, *name, std::move(*parameters)};
         return {};
       };
@@ -332,17 +332,17 @@ StringList BiomeDatabase::weatherNames() const {
 }
 
 std::expected<WeatherType, StarException> BiomeDatabase::weatherType(String const& name) const {
-  if (!m_weathers.contains(name)) return std::unexpected(BiomeException(strf("No such weather type '{}'", name)));
+  if (!m_weathers.contains(name)) return std::unexpected(BiomeException(Star::format("No such weather type '{}'", name)));
   auto config = m_weathers.get(name);
   if (!config) return std::unexpected(std::move(config.error()));
   auto result = WeatherType::create(m_root, config->get().parameters, config->get().path);
   if (!result && result.error().is<MapException>())
-    return std::unexpected(BiomeException(strf("Required key not found in weather config {}", config->get().path), result.error()));
+    return std::unexpected(BiomeException(Star::format("Required key not found in weather config {}", config->get().path), result.error()));
   return result;
 }
 
 std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(String const& biomeName, std::uint64_t seed, float verticalMidPoint, float threatLevel) const {
-  if (!m_biomes.contains(biomeName)) return std::unexpected(BiomeException(strf("No such biome '{}'", biomeName)));
+  if (!m_biomes.contains(biomeName)) return std::unexpected(BiomeException(Star::format("No such biome '{}'", biomeName)));
   auto materials = m_root.materialDatabase();
   if (!materials) return std::unexpected(std::move(materials.error()));
   auto parse = [&]() -> std::expected<std::shared_ptr<Biome>, StarException> {
@@ -438,7 +438,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     return biome;
   };
   auto result = parse();
-  if (!result) return std::unexpected(BiomeException(strf("Failed to parse biome: '{}'", biomeName), result.error()));
+  if (!result) return std::unexpected(BiomeException(Star::format("Failed to parse biome: '{}'", biomeName), result.error()));
   return result;
 }
 

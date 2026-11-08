@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.json;
 import star.vector;
 import star.casting;
@@ -554,7 +555,7 @@ String Widget::toStringImpl(int indentLevel) const {
   for (auto const& child : m_members) {
     childrenString.append(child->toStringImpl(indentLevel + 4));
   }
-  String output = strf(R"OUTPUT({}{} : {{
+  String output = Star::format(R"OUTPUT({}{} : {{
 {}  address : {},
 {}  visible : {},
 {}  position : {},
@@ -595,9 +596,8 @@ std::expected<bool, StarException> Widget::setLabel(String const& name, String c
   return false;
 }
 
-std::ostream& operator<<(std::ostream& os, Widget const& widget) {
-  os << widget.toStringImpl(0);
-  return os;
+void write_text(TextBuffer& buffer, Widget const& widget) {
+  append_text(buffer, widget.toStringImpl(0));
 }
 
 }

@@ -1,5 +1,5 @@
 module;
-import star.stream_formatter;
+import star.text_formatter;
 
 import std;
 import star.flat_hash_map;
@@ -26,19 +26,18 @@ concept map_lookup = requires(Storage& storage, Key const& key) { storage.find(k
 
 template <typename T> [[nodiscard]] std::expected<std::string, StarException> map_diagnostic_value(T const& value) {
   if constexpr (std::is_enum_v<T>) {
-    return strf("{}", std::to_underlying(value));
+    return Star::format("{}", std::to_underlying(value));
   } else {
-    std::ostringstream stream;
-    stream.imbue(std::locale::classic());
-    using PrintResult = decltype(stream << outputAny(value));
-    if constexpr (std::same_as<PrintResult, std::expected<std::reference_wrapper<std::ostream>, StarException>>) {
-      auto printed = stream << outputAny(value);
+    TextBuffer output;
+    using PrintResult = decltype(append_text(output, output_any(value)));
+    if constexpr (std::same_as<PrintResult, std::expected<void, StarException>>) {
+      auto printed = append_text(output, output_any(value));
       if (!printed)
         return std::unexpected(std::move(printed.error()));
     } else {
-      stream << outputAny(value);
+      append_text(output, output_any(value));
     }
-    return std::move(stream).str();
+    return std::move(output).str();
   }
 }
 
@@ -48,7 +47,7 @@ template <typename Error = MapException, typename T>
   auto rendered = map_diagnostic_value(value);
   if (!rendered)
     return std::move(rendered.error()).withContext(std::string(context));
-  return Error(strf(message, std::move(*rendered)));
+  return Error(Star::format(message, std::move(*rendered)));
 }
 
 // Optional storage vocabulary is void when it does not apply to that storage kind.
@@ -440,66 +439,54 @@ template <typename Key, typename Value, typename Hash = hash<Key>, typename Equa
           typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using StableHashMap = BasicMap<std::unordered_map<Key, Value, Hash, Equals, Allocator>>;
 
-template <typename T> decltype(auto) map_output_value(T const& value) {
-  if constexpr (requires { outputOptional(value); })
-    return outputOptional(value);
-  else
-    return (value);
-}
+template <typename T>
+using map_element_output_result = optional_diagnostic_result<T>;
 
 template <typename T>
-using MapElementOutputResult = decltype(std::declval<std::ostream&>() << map_output_value(std::declval<T const&>()));
+concept map_element_text_writable =
+    std::same_as<map_element_output_result<T>, void>
+    || std::same_as<map_element_output_result<T>, std::expected<void, StarException>>;
 
 template <typename MapType>
-using MapOutputResult = std::conditional_t<
-    std::same_as<MapElementOutputResult<typename MapType::key_type>, std::ostream&>
-        && std::same_as<MapElementOutputResult<typename MapType::mapped_type>, std::ostream&>,
-    std::ostream&, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
+using map_output_result = std::conditional_t<
+    std::same_as<map_element_output_result<typename MapType::key_type>, void>
+        && std::same_as<map_element_output_result<typename MapType::mapped_type>, void>,
+    void, std::expected<void, StarException>>;
 
-template <map_container Container>
-std::ostream& operator<<(std::ostream& os, Container const& map)
-    requires std::same_as<MapOutputResult<Container>, std::ostream&>;
-
-template <map_container Container>
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& map)
-    requires std::same_as<MapOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
-
-template <typename MapType> MapOutputResult<MapType> print_map(std::ostream& os, MapType const& map) {
-  os << "{ ";
+template <typename MapType>
+  requires map_element_text_writable<typename MapType::key_type>
+      && map_element_text_writable<typename MapType::mapped_type>
+map_output_result<MapType> print_map(TextBuffer& output, MapType const& map) {
+  output.append("{ ");
   for (auto i = map.begin(); i != map.end(); ++i) {
-    os << (i == map.begin() ? "\"" : ", \"");
-    if constexpr (std::same_as<MapElementOutputResult<typename MapType::key_type>, std::ostream&>) {
-      os << map_output_value(i->first);
+    output.append(i == map.begin() ? "\"" : ", \"");
+    if constexpr (std::same_as<map_element_output_result<typename MapType::key_type>, void>) {
+      append_text(output, optional_diagnostic_value(i->first));
     } else {
-      auto written = os << map_output_value(i->first);
-      if (!written) return std::unexpected(std::move(written.error()));
+      auto written = append_text(output, optional_diagnostic_value(i->first));
+      if (!written)
+        return std::unexpected(std::move(written.error()));
     }
-    os << "\" : \"";
-    if constexpr (std::same_as<MapElementOutputResult<typename MapType::mapped_type>, std::ostream&>) {
-      os << map_output_value(i->second);
+    output.append("\" : \"");
+    if constexpr (std::same_as<map_element_output_result<typename MapType::mapped_type>, void>) {
+      append_text(output, optional_diagnostic_value(i->second));
     } else {
-      auto written = os << map_output_value(i->second);
-      if (!written) return std::unexpected(std::move(written.error()));
+      auto written = append_text(output, optional_diagnostic_value(i->second));
+      if (!written)
+        return std::unexpected(std::move(written.error()));
     }
-    os << "\"";
+    output.push_back('"');
   }
-  os << " }";
-  if constexpr (std::same_as<MapOutputResult<MapType>, std::ostream&>)
-    return os;
-  else
-    return std::ref(os);
+  output.append(" }");
+  if constexpr (!std::same_as<map_output_result<MapType>, void>)
+    return {};
 }
 
 template <map_container Container>
-std::ostream& operator<<(std::ostream& os, Container const& map)
-    requires std::same_as<MapOutputResult<Container>, std::ostream&> {
-  return print_map(os, map);
-}
-
-template <map_container Container>
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& map)
-    requires std::same_as<MapOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
-  return print_map(os, map);
+  requires map_element_text_writable<typename Container::key_type>
+      && map_element_text_writable<typename Container::mapped_type>
+map_output_result<Container> write_text(TextBuffer& output, Container const& map) {
+  return print_map(output, map);
 }
 
 }
@@ -508,9 +495,8 @@ export module star.map;
 
 // Specialize on the ordinary wrapper, not aliases with non-deduced parameters.
 export template <typename Storage>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::BasicMap<Storage> const&>()),
-                        std::ostream&>
-struct std::formatter<Star::BasicMap<Storage>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::BasicMap<Storage>>
+struct std::formatter<Star::BasicMap<Storage>> : Star::TextFormatter {};
 
 export namespace Star {
 using ::Star::BasicMap;
@@ -523,5 +509,5 @@ using ::Star::MapException;
 using ::Star::MapExceptionTag;
 using ::Star::print_map;
 using ::Star::StableHashMap;
-using ::Star::operator<<;
+using ::Star::write_text;
 }

@@ -249,7 +249,7 @@ std::expected<void, StarException> ItemGridWidget::setItemBag(std::shared_ptr<It
     if (!item) return std::unexpected(std::move(item.error()));
     auto slot = ItemSlotWidget::create(context(), *item, m_backingImage);
     if (!slot) return std::unexpected(std::move(slot.error()));
-    auto child = addChild(toString(i), *slot);
+    auto child = addChild(Star::to_string(i), *slot);
     if (!child) return std::unexpected(std::move(child.error()));
     m_slots.push_back(*slot);
     (*slot)->setBackingImageAffinity(m_drawBackingImageWhenFull, m_drawBackingImageWhenEmpty);

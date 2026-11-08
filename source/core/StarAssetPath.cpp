@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.memory;
 import star.format;
 import star.string;
@@ -211,19 +212,17 @@ AssetPath::AssetPath(String const& basePath, std::optional<String> const& subPat
   this->directives = directives;
 }
 
-std::ostream& operator<<(std::ostream& os, AssetPath const& rhs) {
-  os << rhs.basePath;
+void write_text(TextBuffer& buffer, AssetPath const& rhs) {
+  append_text(buffer, rhs.basePath);
   if (rhs.subPath) {
-    os << ":";
-    os << *rhs.subPath;
+    buffer.push_back(':');
+    append_text(buffer, *rhs.subPath);
   }
 
   rhs.directives.forEach([&](Directives::Entry const& entry, Directives const& directives) {
-    os << "?";
-    os << entry.string(*directives.m_shared);
+    buffer.push_back('?');
+    append_text(buffer, entry.string(*directives.m_shared));
   });
-
-  return os;
 }
 
 std::size_t hash<AssetPath>::operator()(AssetPath const& s) const {

@@ -57,10 +57,10 @@ inline String netErrorString() {
   // This is already a diagnostic boundary: preserve the native status even if
   // its human-readable message cannot be converted to UTF-8.
   if (!text)
-    return strf("{} - native error text conversion failed: {}", error, text.error().what());
-  return strf("{} - {}", error, *text);
+    return Star::format("{} - native error text conversion failed: {}", error, text.error().what());
+  return Star::format("{} - {}", error, *text);
 #else
-  return strf("{} - {}", errno, std::strerror(errno));
+  return Star::format("{} - {}", errno, std::strerror(errno));
 #endif
 }
 
@@ -163,7 +163,7 @@ struct SocketImpl {
     int ret = ::setsockopt(socketDesc, level, optname, optval, len);
 #endif
     if (ret < 0)
-      return std::unexpected(NetworkException(strf("setSockOpt failed to set {}, {}: {}", level, optname, netErrorString())));
+      return std::unexpected(NetworkException(Star::format("setSockOpt failed to set {}, {}: {}", level, optname, netErrorString())));
     return {};
   }
 

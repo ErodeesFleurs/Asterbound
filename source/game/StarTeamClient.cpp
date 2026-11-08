@@ -273,9 +273,9 @@ std::expected<void, StarException> TeamClient::update() {
     }
     auto value = interfaceConfig->get(key);
     if (!value) {
-      auto path = strf("/interface.config:{}", key);
+      auto path = Star::format("/interface.config:{}", key);
       auto error = (*assets)->withAssetContext(
-          AssetException(strf("Could not read JSON value {}", path), value.error()), "/interface.config", "");
+          AssetException(Star::format("Could not read JSON value {}", path), value.error()), "/interface.config", "");
       auto summary = *error.diagnosticSummary();
       summary.kind = ExceptionSummaryKind::Resource;
       summary.asset = std::move(path);
@@ -536,7 +536,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
   request["energy"] = *energy / *maximumEnergy;
   request["x"] = player->position()[0];
   request["y"] = player->position()[1];
-  auto world = printWorldId(m_clientContext->playerWorldId());
+  auto world = Star::print_world_id(m_clientContext->playerWorldId());
   if (!world) return std::unexpected(std::move(world.error()));
   request["world"] = *world;
 

@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.list;
 
 import star.array;
@@ -262,7 +262,8 @@ protected:
 };
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Box<T, N> const& box);
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Box<T, N> const& box);
 
 template<typename T>
 using Rect = Box<T, 2>;
@@ -814,9 +815,13 @@ template <typename... TN>
 void Box<T, N>::combineThings(Box&) {}
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Box<T, N> const& box) {
-  os << "Box{min:" << box.min() << " max:" << box.max() << "}";
-  return os;
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Box<T, N> const& box) {
+  output.append("Box{min:");
+  append_text(output, box.min());
+  output.append(" max:");
+  append_text(output, box.max());
+  output.push_back('}');
 }
 
 template <typename T, std::size_t N>
@@ -1073,7 +1078,8 @@ auto Box<T, N>::nearestCoordTo(Coord const& c) const -> Coord {
 export module star.rect;
 
 export template <typename T, std::size_t N>
-struct std::formatter<Star::Box<T, N>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
+struct std::formatter<Star::Box<T, N>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Box;
@@ -1082,5 +1088,5 @@ export namespace Star {
   using ::Star::RectU;
   using ::Star::RectF;
   using ::Star::RectD;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

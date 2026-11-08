@@ -244,52 +244,52 @@ ImageOperation imageOperationFromString(StringView string) {
 
 String imageOperationToString(ImageOperation const& operation) {
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
-    return strf("hueshift={}", op->get().hueShiftAmount * 360.0f);
+    return Star::format("hueshift={}", op->get().hueShiftAmount * 360.0f);
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
-    return strf("saturation={}", op->get().saturationShiftAmount * 100.0f);
+    return Star::format("saturation={}", op->get().saturationShiftAmount * 100.0f);
   } else if (auto op = (std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<BrightnessMultiplyImageOperation>(operation))} : std::nullopt)) {
-    return strf("brightness={}", (op->get().brightnessMultiply - 1.0f) * 100.0f);
+    return Star::format("brightness={}", (op->get().brightnessMultiply - 1.0f) * 100.0f);
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
-    return strf("fade={}={}", Color::rgb(op->get().color).toHex(), op->get().amount);
+    return Star::format("fade={}={}", Color::rgb(op->get().color).toHex(), op->get().amount);
   } else if (auto op = (std::holds_alternative<ScanLinesImageOperation>(operation) ? std::optional{std::cref(std::get<ScanLinesImageOperation>(operation))} : std::nullopt)) {
-    return strf("scanlines={}={}={}={}",
+    return Star::format("scanlines={}={}={}={}",
         Color::rgb(op->get().fade1.color).toHex(),
         op->get().fade1.amount,
         Color::rgb(op->get().fade2.color).toHex(),
         op->get().fade2.amount);
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
-    return strf("setcolor={}", Color::rgb(op->get().color).toHex());
+    return Star::format("setcolor={}", Color::rgb(op->get().color).toHex());
   } else if (auto op = (std::holds_alternative<ColorReplaceImageOperation>(operation) ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))} : std::nullopt)) {
     String str = "replace";
     for (auto const& pair : op->get().colorReplaceMap)
-      str += strf(";{}={}", Color::rgba(pair.first).toHex(), Color::rgba(pair.second).toHex());
+      str += Star::format(";{}={}", Color::rgba(pair.first).toHex(), Color::rgba(pair.second).toHex());
     return str;
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == AlphaMaskImageOperation::Additive)
-      return strf("addmask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("addmask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
     else if (op->get().mode == AlphaMaskImageOperation::Subtractive)
-      return strf("submask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("submask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
   } else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == BlendImageOperation::Multiply)
-      return strf("blendmult={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("blendmult={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
     else if (op->get().mode == BlendImageOperation::Screen)
-      return strf("blendscreen={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("blendscreen={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
-    return strf("multiply={}", Color::rgba(op->get().color).toHex());
+    return Star::format("multiply={}", Color::rgba(op->get().color).toHex());
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
     if (op->get().outlineOnly)
-      return strf("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
     else
-      return strf("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
   } else if (auto op = (std::holds_alternative<ScaleImageOperation>(operation) ? std::optional{std::cref(std::get<ScaleImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == ScaleImageOperation::Nearest)
-      return strf("scalenearest={}", op->get().scale);
+      return Star::format("scalenearest={}", op->get().scale);
     else if (op->get().mode == ScaleImageOperation::Bilinear)
-      return strf("scalebilinear={}", op->get().scale);
+      return Star::format("scalebilinear={}", op->get().scale);
     else if (op->get().mode == ScaleImageOperation::Bicubic)
-      return strf("scalebicubic={}", op->get().scale);
+      return Star::format("scalebicubic={}", op->get().scale);
   } else if (auto op = (std::holds_alternative<CropImageOperation>(operation) ? std::optional{std::cref(std::get<CropImageOperation>(operation))} : std::nullopt)) {
-    return strf("crop={};{};{};{}", op->get().subset.xMin(), op->get().subset.xMax(), op->get().subset.yMin(), op->get().subset.yMax());
+    return Star::format("crop={};{};{};{}", op->get().subset.xMin(), op->get().subset.xMax(), op->get().subset.yMin(), op->get().subset.yMax());
   } else if (auto op = (std::holds_alternative<FlipImageOperation>(operation) ? std::optional{std::cref(std::get<FlipImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == FlipImageOperation::FlipX)
       return "flipx";

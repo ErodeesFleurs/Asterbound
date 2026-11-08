@@ -112,7 +112,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
   };
   auto result = generate();
   if (!result)
-    return std::unexpected(DungeonException(strf("Error generating microdungeon named '{}'", (*dungeonGenerator)->definition()->name()), ExceptionDiagnostic(result.error())));
+    return std::unexpected(DungeonException(Star::format("Error generating microdungeon named '{}'", (*dungeonGenerator)->definition()->name()), ExceptionDiagnostic(result.error())));
   return result;
 }
 

@@ -1345,8 +1345,8 @@ const GameTestRegistration
                                  File::relative_to(*directory, "broken.json.patch.lua")));
     StringList paths{"/broken.json"};
     for (unsigned i = 0; i != 32; ++i) {
-      auto name = strf("queued{}.json", i);
-      ASSERT_TRUE(File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
+      auto name = Star::format("queued{}.json", i);
+      ASSERT_TRUE(File::write_file(String(Star::format("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
       ASSERT_TRUE(File::write_file(String(R"lua(function patch(asset)
       local garbage = {}
       for i = 1, 128 do
@@ -1385,8 +1385,8 @@ const GameTestRegistration assetsSharedPatchStateAcrossDrains(
     StringList paths;
     JsonArray targets;
     for (unsigned i = 0; i <= 32; ++i) {
-      auto name = strf("shared{}.json", i);
-      ASSERT_TRUE(File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
+      auto name = Star::format("shared{}.json", i);
+      ASSERT_TRUE(File::write_file(String(Star::format("{{\"index\":{}}}", i)), File::relative_to(*directory, name)));
       paths.push_back("/" + name);
       targets.emplace_back(paths.back());
     }

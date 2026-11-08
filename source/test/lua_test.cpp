@@ -5,6 +5,7 @@ import star.string;
 import star.list;
 import star.json;
 import star.lua;
+import star.text_formatter;
 import star.lua_converters;
 import star.lexical_cast;
 import star.rpc_promise;
@@ -50,11 +51,45 @@ void expectLuaAlternative(std::expected<LuaValue, StarException> result, U const
 void expectLuaNil(std::expected<LuaValue, StarException> result) {
   ASSERT_TRUE(result) << result.error().what();
   if (!std::holds_alternative<LuaNilType>(*result)) {
-    auto rendered = printLuaValue(*result);
+    auto rendered = print_lua_value(*result);
     ASSERT_TRUE(rendered) << rendered.error().what();
-    ADD_FAILURE() << "Expected Lua nil; actual result: " << *rendered;
+    ADD_FAILURE() << "Expected Lua nil; actual result: " << rendered->utf8();
   }
 }
+}
+
+TEST(LuaTest, CheckedTextPreservesDiagnosticSpellings) {
+  for (auto const& [value, expected] : List<std::pair<LuaValue, std::string_view>>{
+           {LuaValue(LuaNil), "nil"}, {LuaValue(LuaBoolean(true)), "true"},
+           {LuaValue(LuaBoolean(false)), "false"}, {LuaValue(LuaInt(-42)), "-42"},
+           {LuaValue(LuaFloat(1.23456789)), "1.23457"},
+           {LuaValue(LuaFloat(-0.0)), "-0"}}) {
+    TextBuffer output;
+    auto written = write_text(output, value);
+    static_assert(std::same_as<decltype(written), std::expected<void, StarException>>);
+    ASSERT_TRUE(written);
+    EXPECT_EQ(output.view(), expected);
+    auto printed = print_lua_value(value);
+    ASSERT_TRUE(printed);
+    EXPECT_EQ(printed->utf8(), expected);
+  }
+}
+
+TEST(LuaTest, CheckedTextRetainsStringNulAndNestedTableConventions) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto string = (*engine)->createString(std::string_view("é\0suffix", 9));
+  ASSERT_TRUE(string);
+  TextBuffer text;
+  ASSERT_TRUE(write_text(text, LuaValue(*string)));
+  EXPECT_EQ(text.view(), "é");
+
+  auto table = (*engine)->createTable();
+  ASSERT_TRUE(table);
+  ASSERT_TRUE(table->set("key", LuaInt(42)));
+  TextBuffer output;
+  ASSERT_TRUE(write_text(output, LuaValue(*table)));
+  EXPECT_EQ(output.view(), "{key: 42}");
 }
 
 TEST(LuaTest, ImGuiRejectsSimulationCallsWithoutAbortingOrPoisoningLua) {

@@ -27,7 +27,7 @@ public:
   std::string_view dynamicTypeName() const noexcept override {
     return Star::typeName<PackedAssetSource>();
   }
-  using BuildProgressCallback = std::function<void(std::size_t, std::size_t, String, String)>;
+  using BuildProgressCallback = std::function<std::expected<void, StarException>(std::size_t, std::size_t, String, String)>;
 
   // Build a packed file, sorting specified extensions before all others and
   // sorting names case-insensitively within each extension group.
@@ -117,7 +117,9 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
       auto filesystem = directorySource.toFilesystem(assetPath);
       if (!filesystem)
         return std::unexpected(std::move(filesystem.error()));
-      progressCallback(i, entries.size(), std::move(*filesystem), assetPath);
+      auto reported = progressCallback(i, entries.size(), std::move(*filesystem), assetPath);
+      if (!reported)
+        return std::unexpected(std::move(reported.error()));
     }
     auto position = ds.pos();
     if (!position)
@@ -256,7 +258,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(
       auto name = file->device_name();
       if (!name)
         return std::unexpected(std::move(name.error()));
-      return strf("{}:{}", *name, path);
+      return Star::format("{}:{}", *name, path);
     }
     [[nodiscard]] std::expected<bool, StarException> at_end() override { return assetPos >= assetSize; }
     [[nodiscard]] std::expected<void, StarException> seek(StreamOffset p, IOSeek mode) override {

@@ -285,7 +285,7 @@ const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation"
   auto listener = TcpSocket::listen((*root)->logger(), {HostAddress::localhost(), 0});
   ASSERT_TRUE(listener) << listener.error().what();
   ASSERT_TRUE((*listener)->setNonBlocking(true));
-  ASSERT_TRUE(context->setPath("url", strf("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
+  ASSERT_TRUE(context->setPath("url", Star::format("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
   unsigned trustRequests = 0;
   (*session)->setHttpTrustRequestCallback([&](String const&) -> std::expected<void, StarException> {
     ++trustRequests;
@@ -402,7 +402,7 @@ const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation"
   ASSERT_TRUE(active) << active.error().what() << "; "
                       << context
                            ->eval<String>("return active:status() .. ': ' .. tostring(active:error()) .. ' at ' .. url")
-                           .value_or("Lua query failed");
+                           .value_or("Lua query failed").utf8();
   (*engine)->setPromiseLifetime({});
   ASSERT_TRUE(context->eval<void>("successful = http.get(url, {timeout = 5})"));
   auto successful = acceptRequest();
@@ -624,7 +624,7 @@ const GameTestRegistration monsterDropPoolBoundaries("RootTest", "MonsterDropPoo
 void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
   auto message = result.getString(field);
   ASSERT_TRUE(message) << message.error().what();
-  EXPECT_TRUE(message->contains(fragment)) << *message;
+  EXPECT_TRUE(message->contains(fragment)) << message->utf8();
 }
 
 const GameTestRegistration

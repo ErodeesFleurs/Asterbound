@@ -429,7 +429,7 @@ std::expected<AnimatedPartSet::AnimationMode, StarException> AnimatedPartSet::st
   auto transition = string.equals("transition", String::CaseInsensitive);
   if (!transition) return std::unexpected(std::move(transition.error()));
   if (*transition) return Transition;
-  return std::unexpected(AnimatedPartSetException(strf("No such AnimationMode '{}'", string)));
+  return std::unexpected(AnimatedPartSetException(Star::format("No such AnimationMode '{}'", string)));
 }
 
 std::expected<void, StarException> AnimatedPartSet::freshenActiveState(StateType const& stateType, Sample* sample) const {

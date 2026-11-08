@@ -179,7 +179,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_functions.contains(entry.first))
-        return std::unexpected(StarException(strf("Named Function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named Function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = parametricFunctionFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -199,7 +199,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_functions2.contains(entry.first))
-        return std::unexpected(StarException(strf("Named 2-ary Function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named 2-ary Function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = multiTable2DFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -216,7 +216,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_configFunctions.contains(entry.first))
-        return std::unexpected(StarException(strf("Named config function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named config function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = parametricTableFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -304,7 +304,7 @@ namespace {
     return std::unexpected(std::move(cubic.error()));
   if (*cubic)
     return InterpolationMode::Cubic;
-  return std::unexpected(StoredFunctionException(strf("Unrecognized InterpolationMode '{}'", name)));
+  return std::unexpected(StoredFunctionException(Star::format("Unrecognized InterpolationMode '{}'", name)));
 }
 
 [[nodiscard]] std::expected<BoundMode, StarException> storedBoundMode(String const& name) {
@@ -323,7 +323,7 @@ namespace {
     return std::unexpected(std::move(wrap.error()));
   if (*wrap)
     return BoundMode::Wrap;
-  return std::unexpected(StoredFunctionException(strf("Unrecognized BoundMode '{}'", name)));
+  return std::unexpected(StoredFunctionException(Star::format("Unrecognized BoundMode '{}'", name)));
 }
 
 }

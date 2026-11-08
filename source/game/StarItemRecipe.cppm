@@ -3,6 +3,7 @@ import std;
 import star.string;
 import star.list;
 import star.format;
+import star.text_formatter;
 import star.hash;
 
 import star.json;
@@ -19,7 +20,7 @@ struct RecipeExceptionTag {
 using RecipeException = StarError<RecipeExceptionTag, StarException>;
 
 struct ItemRecipe {
-  friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemRecipe const& recipe);
+  friend std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe);
   [[nodiscard]]
   std::expected<Json, StarException> toJson() const;
 
@@ -45,7 +46,7 @@ struct hash<ItemRecipe> {
 };
 
 [[nodiscard]]
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemRecipe const& recipe);
+std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe);
 }
 
 export module star.item_recipe;
@@ -62,4 +63,5 @@ export namespace Star {
   using ::Star::RecipeException;
   using ::Star::ItemRecipe;
   using ::Star::hash;
+  using ::Star::write_text;
 }

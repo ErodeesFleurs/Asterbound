@@ -549,30 +549,31 @@ struct SimpleBTree : public BTree<SimpleBTreeStorage> {
     auto printed = forAllNodes(Printer());
     if (!printed)
       return std::unexpected(std::move(printed.error()));
-    std::cout << std::endl;
-    return {};
+    return Star::print("\n");
   }
 
   struct Printer {
     [[nodiscard]] std::expected<bool, StarException> operator()(Index const& index) {
-      std::cout << "[" << index.level << ":" << index.self << "]"
-           << " " << outputOptional(index.beginPointer) << " ";
+      if (auto written = Star::print("[{}:{}] {} ", index.level, index.self, Star::output_optional(index.beginPointer)); !written)
+        return std::unexpected(std::move(written.error()));
       for (Index::Element e : index.pointers) {
-        std::cout << "(" << e.key << ")"
-             << " " << e.pointer << " ";
+        if (auto written = Star::print("({}) {} ", e.key, e.pointer); !written)
+          return std::unexpected(std::move(written.error()));
       }
-      std::cout << std::endl;
+      if (auto written = Star::print("\n"); !written)
+        return std::unexpected(std::move(written.error()));
       return true;
     }
 
     [[nodiscard]] std::expected<bool, StarException> operator()(Leaf const& leaf) {
-      std::cout << "[" << leaf.self << "]"
-           << " ";
+      if (auto written = Star::print("[{}] ", leaf.self); !written)
+        return std::unexpected(std::move(written.error()));
       for (Leaf::Element e : leaf.elements) {
-        std::cout << "(" << e.key << ")"
-             << " " << e.data << " ";
+        if (auto written = Star::print("({}) {} ", e.key, e.data); !written)
+          return std::unexpected(std::move(written.error()));
       }
-      std::cout << std::endl;
+      if (auto written = Star::print("\n"); !written)
+        return std::unexpected(std::move(written.error()));
       return true;
     }
   };
@@ -584,7 +585,7 @@ const std::size_t WriteRepeat = 3;
 const std::size_t ShrinkCount = 5;
 
 String genValue(int k) {
-  return toString(k * RandFactor);
+  return Star::to_string(k * RandFactor);
 }
 
 bool checkValue(int k, String v) {

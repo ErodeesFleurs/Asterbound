@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
       return {};
     }();
     if (!loaded)
-      return std::unexpected(NameGeneratorException(strf("Error reading name source config {}", file), loaded.error()));
+      return std::unexpected(NameGeneratorException(Star::format("Error reading name source config {}", file), loaded.error()));
   }
   auto profanityConfig = (*assets)->json("/names/profanityfilter.config");
   if (!profanityConfig)

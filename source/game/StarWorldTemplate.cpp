@@ -883,7 +883,7 @@ std::expected<void, StarException> WorldTemplate::setupWeatherDomains() {
     List<LayerDefinition> definitions;
     definitions.push_back({.name = "core", .layer = std::cref(terrestrial->coreLayer), .inheritsSurface = false});
     for (std::size_t i = terrestrial->undergroundLayers.size(); i != 0; --i)
-      definitions.push_back({.name = strf("underground{}", i),
+      definitions.push_back({.name = Star::format("underground{}", i),
                              .layer = std::cref(terrestrial->undergroundLayers[i - 1]),
                              .inheritsSurface = false});
     definitions.push_back(

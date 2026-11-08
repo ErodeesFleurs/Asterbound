@@ -16,7 +16,7 @@ Uuid::Uuid(RandomService& random) {
 
 std::expected<Uuid, StarException> Uuid::create(ByteArray const& bytes) {
   if (bytes.size() != UuidSize)
-    return std::unexpected(UuidException(strf("Size mismatch in reading Uuid from ByteArray: {} vs {}", bytes.size(), UuidSize)));
+    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from ByteArray: {} vs {}", bytes.size(), UuidSize)));
   auto uuid = nil();
   bytes.copyTo({uuid.m_data.data(), UuidSize});
   return uuid;

@@ -1,6 +1,6 @@
 module;
 import star.memory;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 
 import std;
@@ -864,7 +864,7 @@ public:
     requires std::is_lvalue_reference_v<const_reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type const>(operator[](n));
   }
 
@@ -872,20 +872,20 @@ public:
     requires std::is_lvalue_reference_v<reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type>(operator[](n));
   }
 
   auto operator[](std::size_t n) const -> const_reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
@@ -934,21 +934,21 @@ public:
 
   void erase_at(std::size_t i) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((i < m_storage.size()));
+      Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((b < m_storage.size() && e <= m_storage.size()));
+      Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
 
@@ -956,7 +956,7 @@ public:
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
 
@@ -1402,7 +1402,7 @@ public:
     requires std::is_lvalue_reference_v<const_reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type const>(operator[](n));
   }
 
@@ -1410,20 +1410,20 @@ public:
     requires std::is_lvalue_reference_v<reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type>(operator[](n));
   }
 
   auto operator[](std::size_t n) const -> const_reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
@@ -1472,21 +1472,21 @@ public:
 
   void erase_at(std::size_t i) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((i < m_storage.size()));
+      Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((b < m_storage.size() && e <= m_storage.size()));
+      Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     auto added = m_storage.insert(m_storage.begin() + pos, std::move(e));
     if (!added)
       return std::unexpected(std::move(added.error()));
@@ -1497,7 +1497,7 @@ public:
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
 
@@ -1906,7 +1906,7 @@ public:
     requires std::is_lvalue_reference_v<const_reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type const>(operator[](n));
   }
 
@@ -1914,20 +1914,20 @@ public:
     requires std::is_lvalue_reference_v<reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type>(operator[](n));
   }
 
   auto operator[](std::size_t n) const -> const_reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
@@ -1976,21 +1976,21 @@ public:
 
   void erase_at(std::size_t i) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((i < m_storage.size()));
+      Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((b < m_storage.size() && e <= m_storage.size()));
+      Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
 
@@ -1998,7 +1998,7 @@ public:
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
 
@@ -2417,7 +2417,7 @@ public:
     requires std::is_lvalue_reference_v<const_reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type const>(operator[](n));
   }
 
@@ -2425,20 +2425,20 @@ public:
     requires std::is_lvalue_reference_v<reference>
   {
     if (n >= m_storage.size())
-      return std::unexpected(OutOfRangeException(strf("out of range list::at({})", n)));
+      return std::unexpected(OutOfRangeException(Star::format("out of range list::at({})", n)));
     return std::reference_wrapper<value_type>(operator[](n));
   }
 
   auto operator[](std::size_t n) const -> const_reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((n < m_storage.size()));
+      Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
@@ -2487,21 +2487,21 @@ public:
 
   void erase_at(std::size_t i) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((i < m_storage.size()));
+      Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((b < m_storage.size() && e <= m_storage.size()));
+      Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
 
@@ -2509,7 +2509,7 @@ public:
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
     if constexpr (Star::DebugEnabled)
-      Star::starAssertFailed((pos <= m_storage.size()));
+      Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
 
@@ -3321,52 +3321,48 @@ auto LinkedList<Element, Allocator>::transformed(Function&& function) const {
   return Star::transform<LinkedList<typename AlgorithmResultInfo<Invocation>::Value>>(*this, std::forward<Function>(function));
 }
 
-template <typename T>
-decltype(auto) listDiagnosticValue(T const& value) {
-  if constexpr (requires { outputOptional(value); })
-    return outputOptional(value);
-  else
-    return (value);
-}
-
 template <typename Sequence>
-using ListDiagnosticResult = decltype(std::declval<std::ostream&>() << listDiagnosticValue(std::declval<typename Sequence::value_type const&>()));
+using list_diagnostic_result = optional_diagnostic_result<typename Sequence::value_type>;
 
 template <sequence_container Sequence>
-std::ostream& operator<<(std::ostream& os, Sequence const& list)
-    requires std::same_as<ListDiagnosticResult<Sequence>, std::ostream&>;
+void write_text(TextBuffer& output, Sequence const& list)
+    requires std::same_as<list_diagnostic_result<Sequence>, void>;
 
 template <sequence_container Sequence>
 [[nodiscard]]
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Sequence const& list)
-    requires std::same_as<ListDiagnosticResult<Sequence>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
+std::expected<void, StarException> write_text(TextBuffer& output, Sequence const& list)
+    requires std::same_as<list_diagnostic_result<Sequence>, std::expected<void, StarException>>;
 
 template <sequence_container Sequence>
-std::ostream& operator<<(std::ostream& os, Sequence const& list)
-    requires std::same_as<ListDiagnosticResult<Sequence>, std::ostream&> {
-  os << "(";
+void write_text(TextBuffer& output, Sequence const& list)
+    requires std::same_as<list_diagnostic_result<Sequence>, void> {
+  output.push_back('(');
   for (auto i = list.begin(); i != list.end(); ++i) {
     if (i != list.begin())
-      os << ", ";
-    os << listDiagnosticValue(*i);
+      output.append(", ");
+    // Packed-bit iterator proxies have their own boolalpha standard formatter.
+    if constexpr (std::same_as<typename Sequence::value_type, bool>)
+      append_text(output, static_cast<bool>(*i));
+    else
+      append_text(output, optional_diagnostic_value(*i));
   }
-  return os << ")";
+  output.push_back(')');
 }
 
 template <sequence_container Sequence>
 [[nodiscard]]
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Sequence const& list)
-    requires std::same_as<ListDiagnosticResult<Sequence>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
-  os << "(";
+std::expected<void, StarException> write_text(TextBuffer& output, Sequence const& list)
+    requires std::same_as<list_diagnostic_result<Sequence>, std::expected<void, StarException>> {
+  output.push_back('(');
   for (auto i = list.begin(); i != list.end(); ++i) {
     if (i != list.begin())
-      os << ", ";
-    auto written = os << listDiagnosticValue(*i);
+      output.append(", ");
+    auto written = append_text(output, optional_diagnostic_value(*i));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
-  os << ")";
-  return std::ref(os);
+  output.push_back(')');
+  return {};
 }
 
 template <typename List>
@@ -3397,24 +3393,24 @@ export namespace Star {
 }
 
 export template <typename Element, typename Allocator>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::List<Element, Allocator> const&>()), std::ostream&>
-struct std::formatter<Star::List<Element, Allocator>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::List<Element, Allocator>>
+struct std::formatter<Star::List<Element, Allocator>> : Star::TextFormatter {};
 
 export template <typename Element, std::size_t Capacity>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::StaticList<Element, Capacity> const&>()), std::ostream&>
-struct std::formatter<Star::StaticList<Element, Capacity>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::StaticList<Element, Capacity>>
+struct std::formatter<Star::StaticList<Element, Capacity>> : Star::TextFormatter {};
 
 export template <typename Element, std::size_t Capacity>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::SmallList<Element, Capacity> const&>()), std::ostream&>
-struct std::formatter<Star::SmallList<Element, Capacity>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::SmallList<Element, Capacity>>
+struct std::formatter<Star::SmallList<Element, Capacity>> : Star::TextFormatter {};
 
 export template <typename Element, typename Allocator>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::Deque<Element, Allocator> const&>()), std::ostream&>
-struct std::formatter<Star::Deque<Element, Allocator>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::Deque<Element, Allocator>>
+struct std::formatter<Star::Deque<Element, Allocator>> : Star::TextFormatter {};
 
 export template <typename Element, typename Allocator>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::LinkedList<Element, Allocator> const&>()), std::ostream&>
-struct std::formatter<Star::LinkedList<Element, Allocator>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::LinkedList<Element, Allocator>>
+struct std::formatter<Star::LinkedList<Element, Allocator>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::sequence_container;
@@ -3425,6 +3421,6 @@ export namespace Star {
   using ::Star::SmallList;
   using ::Star::Deque;
   using ::Star::LinkedList;
-  using ::Star::operator<<;
+  using ::Star::write_text;
   using ::Star::hash;
 }

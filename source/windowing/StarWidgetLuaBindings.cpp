@@ -519,7 +519,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("addChild", [parentWidget, reader](String const& widgetName, Json const& config, std::optional<String> const& childName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
-      String name = childName.value_or(toString(widget->context().root().random().randu64()));
+      String name = childName.value_or(Star::to_string(widget->context().root().random().randu64()));
       auto child = reader->makeSingle(name, config);
       if (!child)
         return std::unexpected(std::move(child.error()));

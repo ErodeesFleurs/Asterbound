@@ -475,7 +475,7 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
       if (++visits == 1) {
         for (int i = 0; i < 256; ++i) {
           auto added = receiver.registerHandler(
-            strf("generated-{}", i), [i](Json const&) -> std::expected<Json, StarException> { return Json(i); });
+            Star::format("generated-{}", i), [i](Json const&) -> std::expected<Json, StarException> { return Json(i); });
           if (!added)
             return std::unexpected(std::move(added.error()));
         }

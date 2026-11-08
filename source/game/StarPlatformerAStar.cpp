@@ -534,7 +534,7 @@ namespace PlatformerAStar {
     }
 
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((velocity[1] != 0.0f));
+      Star::star_assert_failed((velocity[1] != 0.0f));
     }
     if (auto result = func(Node{position, velocity}, false); !result) return std::unexpected(std::move(result.error()));
     return {};

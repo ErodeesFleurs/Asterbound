@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.tileset_database;
 import star.native_runtime;
 import star.json_extra;
@@ -296,8 +297,8 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   if (!description)
     return std::unexpected(std::move(description.error()));
   JsonObject properties{{"object", objectName},
-      {"imagePositionX", toString(imagePosition.x())},
-      {"imagePositionY", toString(imagePosition.y())},
+      {"imagePositionX", Star::to_string(imagePosition.x())},
+      {"imagePositionY", Star::to_string(imagePosition.y())},
       {"//shortdescription", *shortDescription}, {"//description", *description}};
   if (orientation->directionAffinity.has_value()) {
     Direction direction = *orientation->directionAffinity;
@@ -318,7 +319,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   // for each orientation.
   String tileName = objectName;
   if (orientationIndex != 0)
-    tileName += "_orientation" + toString(orientationIndex);
+    tileName += "_orientation" + Star::to_string(orientationIndex);
   properties["//name"] = tileName;
   auto source = assets->assetSource((*objectConfig)->path);
   if (!source)
@@ -399,7 +400,8 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto run = [&]() -> std::expected<int, StarException> {
@@ -439,7 +441,8 @@ int main(int argc, char** argv) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

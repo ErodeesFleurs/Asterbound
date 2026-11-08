@@ -126,7 +126,7 @@ namespace JsonExtraDetail {
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size != Size)
-      return std::unexpected(JsonException(strf("Json array not of size {} in {}", Size, name)));
+      return std::unexpected(JsonException(Star::format("Json array not of size {} in {}", Size, name)));
     Array<T, Size> result;
     for (std::size_t i = 0; i < Size; ++i) {
       auto item = std::invoke(getter, v, i);

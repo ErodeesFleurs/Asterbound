@@ -109,7 +109,7 @@ std::expected<BiomeItem, StarException> variantToBiomeItem(Assets const& assets,
   }
   auto text = type->repr();
   if (!text) return std::unexpected(std::move(text.error()));
-  return std::unexpected(BiomeException(strf("Unrecognized biome item type '{}'", *text)));
+  return std::unexpected(BiomeException(Star::format("Unrecognized biome item type '{}'", *text)));
 }
 
 std::expected<Json, StarException> variantFromBiomeItem(BiomeItem const& item) {
@@ -303,7 +303,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     if (!names) return std::unexpected(std::move(names.error()));
     return BiomeItem{MicroDungeonNames(std::move(*names))};
   } else {
-    return std::unexpected(BiomeException(strf("No such item type '{}' in item distribution", *type)));
+    return std::unexpected(BiomeException(Star::format("No such item type '{}' in item distribution", *type)));
   }
   return std::optional<BiomeItem>();
 }

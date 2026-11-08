@@ -772,7 +772,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
       return std::unexpected(std::move(updateCraftButtonsResult423.error()));
   }
 
-  auto moneyLabelUpdated = setLabel("lblPlayerMoney", toString(static_cast<int>(m_player->currency("money"))));
+  auto moneyLabelUpdated = setLabel("lblPlayerMoney", Star::to_string(static_cast<int>(m_player->currency("money"))));
   if (!moneyLabelUpdated)
     return std::unexpected(std::move(moneyLabelUpdated.error()));
 
@@ -996,7 +996,7 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
 
   String name = item->friendlyName();
   if (recipe.output.count() > 1)
-    name = strf("{} (x{})", name, recipe.output.count());
+    name = Star::format("{} (x{})", name, recipe.output.count());
 
   auto fetchChildResult457 = widget->fetchChild<LabelWidget>("itemName");
   if (!fetchChildResult457)
@@ -1024,7 +1024,7 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
   }
 
   if (price > 0) {
-    auto setLabelResult462 = widget->setLabel("priceLabel", toString(price));
+    auto setLabelResult462 = widget->setLabel("priceLabel", Star::to_string(price));
     if (!setLabelResult462)
       return std::unexpected(std::move(setLabelResult462.error()));
     {
@@ -1151,7 +1151,7 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
       if (!fetchChildResult487)
         return std::unexpected(std::move(fetchChildResult487.error()));
       auto countWidget = std::move(*fetchChildResult487);
-      auto setTextResult488 = countWidget->setText(strf("{}/{}", availableCount, requiredCount));
+      auto setTextResult488 = countWidget->setText(Star::format("{}/{}", availableCount, requiredCount));
       if (!setTextResult488)
         return std::unexpected(std::move(setTextResult488.error()));
       if (availableCount < requiredCount)
@@ -1436,7 +1436,7 @@ std::expected<void, StarException> CraftingPane::countTextChanged() {
 std::expected<void, StarException> CraftingPane::countChanged() {
   if (m_textBox)
     {
-      auto setTextResult528 = m_textBox->setText(strf("x{}", m_count), false);
+      auto setTextResult528 = m_textBox->setText(Star::format("x{}", m_count), false);
       if (!setTextResult528)
         return std::unexpected(std::move(setTextResult528.error()));
       

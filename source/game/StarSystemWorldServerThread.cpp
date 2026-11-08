@@ -101,7 +101,7 @@ import star.algorithm;
 namespace Star {
 
 SystemWorldServerThread::SystemWorldServerThread(Vec3I const& location, std::shared_ptr<SystemWorldServer> systemWorld, String storageFile)
-  : Thread(strf("SystemWorldServer: {}", location))
+  : Thread(Star::format("SystemWorldServer: {}", location))
   , m_systemLocation(location)
   , m_systemWorld(std::move(systemWorld))
   , m_storageFile(std::move(storageFile))
@@ -112,10 +112,10 @@ SystemWorldServerThread::~SystemWorldServerThread() {
   m_stopSource.request_stop();
   auto joined = join();
   if (!joined)
-    EmergencyLog::error("System world thread cleanup failed: {}", outputException(joined.error(), true));
+    EmergencyLog::error("System world thread cleanup failed: {}", Star::output_exception(joined.error(), true));
   if (!isJoined()) {
     EmergencyLog::error("System world thread {} remains unjoined during owner destruction", name());
-    fatalError("Cannot destroy a system world thread with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy a system world thread with an unjoined native worker", false);
   }
 }
 
@@ -176,7 +176,7 @@ std::expected<void, StarException> SystemWorldServerThread::run() {
   auto stopToken = m_stopSource.get_token();
   TickRateApproacher tickApproacher(1.0 / SystemWorldTimestep, 0.5);
   while (!stopToken.stop_requested()) {
-    m_systemWorld->root().logMap().set(strf("system_{}_update_rate", m_systemLocation), strf("{:4.2f}Hz", tickApproacher.rate()));
+    m_systemWorld->root().logMap().set(Star::format("system_{}_update_rate", m_systemLocation), Star::format("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));

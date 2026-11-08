@@ -50,8 +50,8 @@ public:
   // and a list of all the errors encountered while parsing.
   std::expected<std::pair<Options, StringList>, StarException> parseOptions(StringList const& arguments) const;
 
-  // Print help text to the given std::ostream
-  void printHelp(std::ostream& os) const;
+  // Print help text, checking writes and flushing the destination.
+  [[nodiscard]] std::expected<void, StarException> print_help(std::FILE* output) const;
 
 private:
   struct Switch {

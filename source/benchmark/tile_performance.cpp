@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "GL/glew.h"
 #include <benchmark/benchmark.h>
 
@@ -189,7 +190,7 @@ std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, Tile
   std::vector<char> pixels(640 * 360 * 4);
   glReadPixels(0, 0, 640, 360, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
   if (auto error = glGetError(); error != GL_NO_ERROR)
-    return std::unexpected(StarException(strf("Tile fixture framebuffer read failed: {}", error)));
+    return std::unexpected(StarException(Star::format("Tile fixture framebuffer read failed: {}", error)));
   painter.cleanup();
   auto advanced = advanceNativeFrame(renderer);
   if (!advanced)
@@ -228,10 +229,10 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
     auto hashes = TilePainterPerformanceAccess::hashes(**cached, fixture->data, {30, 29});
     if (!hashes)
       return std::unexpected(std::move(hashes.error()));
-    std::printf("TILE_FIXTURE change=%d before=%016llx cached=%016llx fresh=%016llx terrain=%016llx liquid=%016llx\n",
-                static_cast<int>(change), static_cast<unsigned long long>(*before),
-                static_cast<unsigned long long>(*observed), static_cast<unsigned long long>(*expected),
-                static_cast<unsigned long long>(hashes->first), static_cast<unsigned long long>(hashes->second));
+    auto reported = Star::print("TILE_FIXTURE change={} before={:016x} cached={:016x} fresh={:016x} terrain={:016x} liquid={:016x}\n",
+        static_cast<int>(change), *before, *observed, *expected, hashes->first, hashes->second);
+    if (!reported)
+      return std::unexpected(std::move(reported.error()));
     if (*observed != *expected)
       return std::unexpected(StarException("Cached tile output differs from fresh TilePainter output"));
   }
@@ -259,9 +260,10 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
   if (!expected)
     return std::unexpected(std::move(expected.error()));
   bool matches = *observed == *expected;
-  std::printf("TILE_LIQUID_BOTTOM_INVALIDATION before=%016llx cached=%016llx fresh=%016llx matches=%d\n",
-              static_cast<unsigned long long>(*before), static_cast<unsigned long long>(*observed),
-              static_cast<unsigned long long>(*expected), matches);
+  auto reported = Star::print("TILE_LIQUID_BOTTOM_INVALIDATION before={:016x} cached={:016x} fresh={:016x} matches={}\n",
+      *before, *observed, *expected, static_cast<int>(matches));
+  if (!reported)
+    return std::unexpected(std::move(reported.error()));
   if (*before == *expected)
     return std::unexpected(StarException("Liquid-bottom fixture does not distinguish the two geometries"));
   if (!matches)
@@ -302,9 +304,10 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
     if (!reference) return std::unexpected(std::move(reference.error()));
     auto expected = imageHash(**reference, *fixture, *renderer);
     if (!expected) return std::unexpected(std::move(expected.error()));
-    std::printf("TILE_EXTRA damage=%d before=%016llx cached=%016llx fresh=%016llx\n", damage,
-        static_cast<unsigned long long>(*before), static_cast<unsigned long long>(*observed),
-        static_cast<unsigned long long>(*expected));
+    auto reported = Star::print("TILE_EXTRA damage={} before={:016x} cached={:016x} fresh={:016x}\n",
+        static_cast<int>(damage), *before, *observed, *expected);
+    if (!reported)
+      return std::unexpected(std::move(reported.error()));
     if (*observed != *expected || *before == *expected)
       return std::unexpected(StarException("Damage or midground fixture failed its visible pixel oracle"));
   }
@@ -333,9 +336,10 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
   if (!restored) return std::unexpected(std::move(restored.error()));
   if (*retained != *normal || *restored != *normal)
     return std::unexpected(StarException("Failed setup did not retain and restore its visible frame"));
-  std::printf("TILE_FAILED_SETUP_RETAINED normal=%016llx retained=%016llx restored=%016llx uploadsCleared=1\n",
-      static_cast<unsigned long long>(*normal), static_cast<unsigned long long>(*retained),
-      static_cast<unsigned long long>(*restored));
+  auto retained_report = Star::print("TILE_FAILED_SETUP_RETAINED normal={:016x} retained={:016x} restored={:016x} uploadsCleared=1\n",
+      *normal, *retained, *restored);
+  if (!retained_report)
+    return std::unexpected(std::move(retained_report.error()));
   return {};
 }
 
@@ -506,11 +510,11 @@ public:
     PerformanceBenchmarkSession session{*m_root};
     auto registered = registerTilePerformanceBenchmarks(session, renderer);
     if (!registered) {
-      std::fprintf(stderr, "%s\n", registered.error().what());
+      auto reported = Star::print(stderr, "{}\n", registered.error().what());
       benchmark::ClearRegisteredBenchmarks();
       m_result = 1;
       appController()->quit();
-      return {};
+      return reported;
     }
     CheckedReporter reporter;
     auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
@@ -537,7 +541,8 @@ private:
 int main(int argc, char** argv) {
   auto native = Star::NativeRuntime::create();
   if (!native) {
-    std::fprintf(stderr, "%s\n", native.error().what());
+    if (!Star::print(stderr, "{}\n", native.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);

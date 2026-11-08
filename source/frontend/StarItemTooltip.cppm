@@ -266,7 +266,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   auto setLabelResult786 = container->setLabel("nameLabel", item->name());
   if (!setLabelResult786)
     return std::unexpected(std::move(setLabelResult786.error()));
-  auto setLabelResult787 = container->setLabel("countLabel", toString(item->count()));
+  auto setLabelResult787 = container->setLabel("countLabel", Star::to_string(item->count()));
   if (!setLabelResult787)
     return std::unexpected(std::move(setLabelResult787.error()));
 
@@ -301,10 +301,10 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   auto toUIntResult795 = std::move(*instanceValueResult794).toUInt();
   if (!toUIntResult795)
     return std::unexpected(std::move(toUIntResult795.error()));
-  auto setLabelResult796 = container->setLabel("countLabel", toString(std::move(*toUIntResult795) * item->count()));
+  auto setLabelResult796 = container->setLabel("countLabel", Star::to_string(std::move(*toUIntResult795) * item->count()));
   if (!setLabelResult796)
     return std::unexpected(std::move(setLabelResult796.error()));
-  auto priceLabelUpdated = container->setLabel("priceLabel", toString(static_cast<int>(item->price())));
+  auto priceLabelUpdated = container->setLabel("priceLabel", Star::to_string(static_cast<int>(item->price())));
   if (!priceLabelUpdated)
     return std::unexpected(std::move(priceLabelUpdated.error()));
 
@@ -350,7 +350,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           auto reprResult805 = std::move(*instanceValueResult804).repr();
           if (!reprResult805)
             return std::unexpected(std::move(reprResult805.error()));
-          auto setLabelResult806 = container->setLabel("slotCountLabel", strf("Holds {} Items", std::move(*reprResult805)));
+          auto setLabelResult806 = container->setLabel("slotCountLabel", Star::format("Holds {} Items", std::move(*reprResult805)));
           if (!setLabelResult806)
             return std::unexpected(std::move(setLabelResult806.error()));
           
@@ -371,7 +371,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
       return {};
     }();
     if (!objectDescription) {
-      auto logged = context.root().logger().error("Failed to instantiate object for object item tooltip. {}", outputException(ExceptionDiagnostic(objectDescription.error()), false));
+      auto logged = context.root().logger().error("Failed to instantiate object for object item tooltip. {}", Star::output_exception(ExceptionDiagnostic(objectDescription.error()), false));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -527,13 +527,13 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   }
 
   if (auto fireable = as<FireableItem>(item)) {
-    auto setLabelResult840 = container->setLabel("cooldownTimeLabel", strf("{:.2f}", fireable->cooldownTime()));
+    auto setLabelResult840 = container->setLabel("cooldownTimeLabel", Star::format("{:.2f}", fireable->cooldownTime()));
     if (!setLabelResult840)
       return std::unexpected(std::move(setLabelResult840.error()));
-    auto setLabelResult841 = container->setLabel("windupTimeLabel", strf("{:.2f}", fireable->windupTime()));
+    auto setLabelResult841 = container->setLabel("windupTimeLabel", Star::format("{:.2f}", fireable->windupTime()));
     if (!setLabelResult841)
       return std::unexpected(std::move(setLabelResult841.error()));
-    auto setLabelResult842 = container->setLabel("speedLabel", strf("{:.2f}", 1.0f / (fireable->cooldownTime() + fireable->windupTime())));
+    auto setLabelResult842 = container->setLabel("speedLabel", Star::format("{:.2f}", 1.0f / (fireable->cooldownTime() + fireable->windupTime())));
     if (!setLabelResult842)
       return std::unexpected(std::move(setLabelResult842.error()));
   }
@@ -723,7 +723,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
                       ->setImage(std::move(*getStringResult878));
           if (!setImageResult879)
             return std::unexpected(std::move(setImageResult879.error()));
-          auto setLabelResult880 = listItem->setLabel("statusLabel", strf("{:.1f}%", (baseMultiplier.baseMultiplier - 1) * 100));
+          auto setLabelResult880 = listItem->setLabel("statusLabel", Star::format("{:.1f}%", (baseMultiplier.baseMultiplier - 1) * 100));
           if (!setLabelResult880)
             return std::unexpected(std::move(setLabelResult880.error()));
         }
@@ -752,7 +752,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
                       ->setImage(std::move(*getStringResult885));
           if (!setImageResult886)
             return std::unexpected(std::move(setImageResult886.error()));
-          auto setLabelResult887 = listItem->setLabel("statusLabel", strf("{}{:.2f}", valueModifier.value < 0 ? "-" : "", valueModifier.value));
+          auto setLabelResult887 = listItem->setLabel("statusLabel", Star::format("{}{:.2f}", valueModifier.value < 0 ? "-" : "", valueModifier.value));
           if (!setLabelResult887)
             return std::unexpected(std::move(setLabelResult887.error()));
         }
@@ -781,7 +781,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
                       ->setImage(std::move(*getStringResult892));
           if (!setImageResult893)
             return std::unexpected(std::move(setImageResult893.error()));
-          auto setLabelResult894 = listItem->setLabel("statusLabel", strf("{:.1f}%", (effectiveMultiplier.effectiveMultiplier - 1) * 100));
+          auto setLabelResult894 = listItem->setLabel("statusLabel", Star::format("{:.1f}%", (effectiveMultiplier.effectiveMultiplier - 1) * 100));
           if (!setLabelResult894)
             return std::unexpected(std::move(setLabelResult894.error()));
         }

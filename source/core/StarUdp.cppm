@@ -96,7 +96,7 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
     else if (netErrorInterrupt())
       return 0;
     else
-      return std::unexpected(NetworkException(strf("udp recv error: {}", netErrorString())));
+      return std::unexpected(NetworkException(Star::format("udp recv error: {}", netErrorString())));
   }
 
   if (address) {
@@ -124,7 +124,7 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
     else if (netErrorInterrupt())
       len = 0;
     else
-      return std::unexpected(NetworkException(strf("udp send error: {}", netErrorString())));
+      return std::unexpected(NetworkException(Star::format("udp send error: {}", netErrorString())));
   }
 
   return len;

@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.map;
 import star.string;
 import star.byte_array;
@@ -245,7 +246,7 @@ std::expected<Color, StarException> Color::create(StringView name) {
   auto i = NamedColors->find(*key);
   if (i != NamedColors->end())
     return i->second;
-  return std::unexpected(ColorException(strf("Named color {} not found", name), false));
+  return std::unexpected(ColorException(Star::format("Named color {} not found", name), false));
 }
 
 float Color::redF() const {
@@ -440,9 +441,8 @@ bool Color::operator!=(const Color& c) const {
   return m_data != c.m_data;
 }
 
-std::ostream& operator<<(std::ostream& os, const Color& c) {
-  os << c.toRgbaF();
-  return os;
+void write_text(TextBuffer& buffer, Color const& c) {
+  append_text(buffer, c.toRgbaF());
 }
 
 float Color::toLinear(float in) {
@@ -635,7 +635,7 @@ std::expected<Vec4B, StarException> Color::hexToVec4B(StringView s) {
     if (s.utf8_size() == 6)
       cbytes[3] = 255;
   } else {
-    return std::unexpected(ColorException(strf("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8_size(), s), false));
+    return std::unexpected(ColorException(Star::format("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8_size(), s), false));
   }
   return Vec4B(std::move(cbytes));
 }

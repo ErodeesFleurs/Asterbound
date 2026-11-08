@@ -346,7 +346,7 @@ std::expected<String, StarException> questParamText(Root& root, QuestParam const
     for (auto const& descriptor : std::get<QuestItemList>(parameter.detail)) {
       auto item = (*database)->itemShared(descriptor);
       if (!item) return std::unexpected(std::move(item.error()));
-      strings.push_back(strf("{} {}", descriptor.count(), (*item)->friendlyName()));
+      strings.push_back(Star::format("{} {}", descriptor.count(), (*item)->friendlyName()));
     }
     return strings.join(", ");
   }

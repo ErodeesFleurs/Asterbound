@@ -44,10 +44,10 @@ std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> DirectoryAss
         return std::unexpected(std::move(contents.error()));
       auto parsed = Json::parseJson(*contents);
       if (!parsed)
-        return std::unexpected(AssetSourceException(strf("Could not load metadata file '{}' from assets", *metadataFile), parsed.error()));
+        return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), parsed.error()));
       auto metadata = parsed->toObject();
       if (!metadata)
-        return std::unexpected(AssetSourceException(strf("Could not load metadata file '{}' from assets", *metadataFile), metadata.error()));
+        return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), metadata.error()));
       source->m_metadataFile = String(fileName);
       source->m_metadata = std::move(*metadata);
       break;

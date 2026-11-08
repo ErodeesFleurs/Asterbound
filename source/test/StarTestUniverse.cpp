@@ -283,7 +283,7 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   if (!connected)
     return std::unexpected(std::move(connected.error()));
   if (*connected)
-    return std::unexpected(StarException(strf("Test universe login rejected: {}", **connected)));
+    return std::unexpected(StarException(Star::format("Test universe login rejected: {}", **connected)));
   return fixture;
 }
 
@@ -437,7 +437,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
       return std::unexpected(std::move(updated.error()));
     if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - start >= timeout)
       return std::unexpected(TestUniverseTimeoutException(
-        strf("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
+        Star::format("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
              ready.firstServerStep, ready.readyServerStep, ready.observedScriptedNpcs, ready.observedCoordinators)));
     if (currentPlayerWorld() != worldId)
       return std::unexpected(StarException("Test player left the world while waiting for readiness"));
@@ -451,7 +451,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         if (!error)
           return std::unexpected(std::move(error.error()));
         if (*error)
-          return std::unexpected(StarException(strf("Test world readiness message failed: {}", **error)));
+          return std::unexpected(StarException(Star::format("Test world readiness message failed: {}", **error)));
         continue;
       }
       // WorldServerThread settles messages only after WorldServer::update
@@ -499,7 +499,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         for (auto const& [name, scripts] : *configuredContexts) {
           auto context = world.scriptContext(name);
           if (!context || context->error() || !context->context())
-            return std::unexpected(StarException(strf("Test world script context is not healthy: {}", name)));
+            return std::unexpected(StarException(Star::format("Test world script context is not healthy: {}", name)));
           auto& observation = observedWorldScripts.try_emplace(name.utf8(), Observation{step}).first->second;
           settled(observation, context->updateDt());
         }

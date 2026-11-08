@@ -312,7 +312,7 @@ auto NetElementMapWrapper<BaseMap>::insert(key_type k, mapped_type v) -> std::pa
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::add(key_type k, mapped_type v) {
   if (BaseMap::contains(k))
-    return std::unexpected(MapException::format("Entry with key '{}' already present.", outputAny(k)));
+    return std::unexpected(MapException::format("Entry with key '{}' already present.", Star::output_any(k)));
   insert(value_type(std::move(k), std::move(v)));
   return {};
 }
@@ -370,7 +370,7 @@ template <typename BaseMap>
   -> std::expected<mapped_type, StarException> {
   auto i = BaseMap::find(k);
   if (i == BaseMap::end())
-    return std::unexpected(MapException::format("Key '{}' not found in Map::extract_value()", outputAny(k)));
+    return std::unexpected(MapException::format("Key '{}' not found in Map::extract_value()", Star::output_any(k)));
   auto m = std::move(i->second);
   erase(i);
   return m;
@@ -489,7 +489,7 @@ template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
   std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
+    Star::star_assert_failed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
   m_changeData.push_back({currentVersion, std::move(change)});

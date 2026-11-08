@@ -155,7 +155,7 @@ void JsonEditor::displayCurrentFile() {
   String const& file = m_files[m_fileIndex];
 
   std::size_t progress = (m_fileIndex + 1) * 100 / m_files.size();
-  String status = strf("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
+  String status = Star::format("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
   m_statusLabel->setText(status.utf8_data());
 
   m_backButton->setEnabled(m_fileIndex != 0);

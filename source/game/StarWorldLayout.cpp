@@ -1032,7 +1032,7 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
   // auto printRegionCells = [](List<RegionCell> const& cells) {
   //   String output = "";
   //   for (auto cell : cells)
-  //     output += strf("[{} {}]  ", cell.lBound, cell.rBound);
+  //     output += Star::format("[{} {}]  ", cell.lBound, cell.rBound);
   //   return output;
   // };
 
@@ -1089,10 +1089,10 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
     // this->root().logger().info("before expansion:\ntarget cells are: {}\nother cells are: {}", printRegionCells(targetCells), printRegionCells(otherCells));
 
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((targetCells.size() > 0));
+      Star::star_assert_failed((targetCells.size() > 0));
     }
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((targetCells.size() < 3));
+      Star::star_assert_failed((targetCells.size() < 3));
     }
 
     // check the current width to see how much (if any) to expand

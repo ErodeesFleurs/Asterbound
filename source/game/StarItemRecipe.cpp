@@ -3,6 +3,7 @@ import star.json_extra;
 import star.json;
 import star.item_recipe;
 import star.format;
+import star.text_formatter;
 import star.set;
 import star.string;
 import star.color;
@@ -64,23 +65,28 @@ bool ItemRecipe::operator!=(ItemRecipe const& rhs) const {
   return std::tie(currencyInputs, inputs, output) != std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);
 }
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemRecipe const& recipe) {
-  os << "CurrencyInputs: " << recipe.currencyInputs << "Inputs: [";
+std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe) {
+  output.append("CurrencyInputs: ");
+  append_text(output, recipe.currencyInputs);
+  output.append("Inputs: [");
   bool first = true;
   for (auto const& input : recipe.inputs) {
     if (!first)
-      os << ", ";
+      output.append(", ");
     first = false;
-    auto written = os << input;
+    auto written = write_text(output, input);
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
-  os << "]\nOutput: ";
-  auto output = os << recipe.output;
-  if (!output)
-    return std::unexpected(std::move(output.error()));
-  os << "\nDuration: " << recipe.duration << "\nGroups: " << recipe.groups;
-  return std::ref(os);
+  output.append("]\nOutput: ");
+  auto written = write_text(output, recipe.output);
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  output.append("\nDuration: ");
+  append_text(output, recipe.duration);
+  output.append("\nGroups: ");
+  append_text(output, recipe.groups);
+  return {};
 }
 
 std::size_t hash<ItemRecipe>::operator()(ItemRecipe const& v) const {

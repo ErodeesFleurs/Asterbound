@@ -295,7 +295,7 @@ std::expected<Json, StarException> ArmorWearer::diskStore() const {
     auto stored = armor.item->descriptor().diskStore(**versioning);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    String id = i < 8 ? String(slotNames[i]) : strf("cosmetic{}Item", i - 7);
+    String id = i < 8 ? String(slotNames[i]) : Star::format("cosmetic{}Item", i - 7);
     res[id] = std::move(*stored);
   }
   return res;
@@ -309,7 +309,7 @@ std::expected<void, StarException> ArmorWearer::diskLoad(Json const& diskStore) 
       "headItem", "chestItem", "legsItem", "backItem",
       "headCosmeticItem", "chestCosmeticItem", "legsCosmeticItem", "backCosmeticItem"};
   for (std::size_t i = 0; i != m_armors.size(); ++i) {
-    String id = i < 8 ? String(slotNames[i]) : strf("cosmetic{}Item", i - 7);
+    String id = i < 8 ? String(slotNames[i]) : Star::format("cosmetic{}Item", i - 7);
     auto itemJson = diskStore.get(id, {});
     if (!itemJson)
       return std::unexpected(std::move(itemJson.error()));

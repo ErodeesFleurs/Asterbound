@@ -3,7 +3,7 @@ import star.memory;
 import star.hash;
 
 import star.format;
-import star.stream_formatter;
+import star.text_formatter;
 import std;
 
 import star.byte_array;
@@ -293,8 +293,7 @@ public:
   friend String operator*(String const& s, unsigned times);
   friend String operator*(unsigned times, String const& s);
 
-  friend std::ostream& operator<<(std::ostream& os, String const& s);
-  friend std::istream& operator>>(std::istream& is, String& s);
+  friend void write_text(TextBuffer& output, String const& text);
 
   // String view functions
   String(StringView s);
@@ -384,7 +383,7 @@ public:
   StringList sorted() const;
 };
 
-std::ostream& operator<<(std::ostream& os, StringList const& list);
+void write_text(TextBuffer& output, StringList const& list);
 
 template <>
 struct hash<String> {
@@ -415,7 +414,7 @@ public:
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(Owner&&) = delete;
   std::string_view utf8() const { return m_bytes; }
   std::size_t hash() const { return m_hash; }
-  friend std::ostream& operator<<(std::ostream& stream, CaseInsensitiveStringView const& key) { return stream << key.utf8(); }
+  friend void write_text(TextBuffer& output, CaseInsensitiveStringView const& key) { output.append(key.utf8()); }
 private:
   friend class CaseInsensitiveString;
   CaseInsensitiveStringView(std::string_view bytes, std::size_t hash) : m_bytes(bytes), m_hash(hash) {}
@@ -446,7 +445,7 @@ public:
   std::size_t hash() const { return m_hash; }
   CaseInsensitiveStringView view() const & { return CaseInsensitiveStringView(m_string.utf8(), m_hash); }
   CaseInsensitiveStringView view() const && = delete;
-  friend std::ostream& operator<<(std::ostream& stream, CaseInsensitiveString const& key) { return stream << key.string(); }
+  friend void write_text(TextBuffer& output, CaseInsensitiveString const& key) { output.append(key.string().utf8()); }
   friend bool operator==(CaseInsensitiveString const& lhs, CaseInsensitiveString const& rhs);
 private:
   CaseInsensitiveString(String&& string, std::size_t hash) : m_string(std::move(string)), m_hash(hash) {}
@@ -663,7 +662,7 @@ export namespace Star {
   using ::Star::StableStringMap;
   using ::Star::CaseInsensitiveStringMap;
   using ::Star::hash;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }
 
 export template <> struct std::formatter<Star::String> : std::formatter<std::string> {
@@ -686,4 +685,4 @@ export template <> struct std::formatter<Star::CaseInsensitiveString> : std::for
   }
 };
 
-export template <> struct std::formatter<Star::StringList> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::StringList> : Star::TextFormatter {};

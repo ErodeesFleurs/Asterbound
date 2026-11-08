@@ -94,7 +94,7 @@ std::expected<void, StarException> Font::setPixelSize(unsigned pixelSize) {
     return {};
 
   if (m_fontImpl && FT_Set_Pixel_Sizes(m_fontImpl->face, pixelSize, 0))
-    return std::unexpected(FontException(strf("Cannot set font pixel size to: {}", pixelSize)));
+    return std::unexpected(FontException(Star::format("Cannot set font pixel size to: {}", pixelSize)));
   m_pixelSize = pixelSize;
   return {};
 }

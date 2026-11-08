@@ -1242,7 +1242,7 @@ void OpenGlRenderer::GlGroupedTexture::incrementBufferUseCount() {
 
 void OpenGlRenderer::GlGroupedTexture::decrementBufferUseCount() {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bufferUseCount != 0));
+    Star::star_assert_failed((bufferUseCount != 0));
   }
   if (bufferUseCount == 1)
     parentAtlasTexture->setLocked(false);
@@ -1714,8 +1714,8 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
   m_textureSizeUniforms.clear();
   if (effect.includeVBTextures) {
     for (std::size_t i = 0; i < MultiTextureCount; ++i) {
-      m_textureUniforms.push_back(effect.getUniform(strf("texture{}", i)));
-      m_textureSizeUniforms.push_back(effect.getUniform(strf("textureSize{}", i)));
+      m_textureUniforms.push_back(effect.getUniform(Star::format("texture{}", i)));
+      m_textureSizeUniforms.push_back(effect.getUniform(Star::format("textureSize{}", i)));
     }
   }
   m_screenSizeUniform = effect.getUniform("screenSize");

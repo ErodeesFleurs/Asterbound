@@ -52,19 +52,19 @@ String printDuration(double time) {
 
   if (time >= 3600) {
     int numHours = static_cast<int>(time) / 3600;
-    hours = strf("{} hour{}", numHours, numHours == 1 ? "" : "s");
+    hours = Star::format("{} hour{}", numHours, numHours == 1 ? "" : "s");
   }
   if (time >= 60) {
     int numMinutes = static_cast<int>((time / 60)) % 60;
-    minutes = strf("{} minute{}", numMinutes, numMinutes == 1 ? "" : "s");
+    minutes = Star::format("{} minute{}", numMinutes, numMinutes == 1 ? "" : "s");
   }
   if (time >= 1) {
     int numSeconds = static_cast<int>(time) % 60;
-    seconds = strf("{} second{}", numSeconds, numSeconds == 1 ? "" : "s");
+    seconds = Star::format("{} second{}", numSeconds, numSeconds == 1 ? "" : "s");
   }
 
   int numMilliseconds = std::round(std::fmod(time, 1.0) * 1000);
-  milliseconds = strf("{} millisecond{}", numMilliseconds, numMilliseconds == 1 ? "" : "s");
+  milliseconds = Star::format("{} millisecond{}", numMilliseconds, numMilliseconds == 1 ? "" : "s");
 
   String result;
   for (auto component : {std::cref(hours), std::cref(minutes), std::cref(seconds), std::cref(milliseconds)}) {

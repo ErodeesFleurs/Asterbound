@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.format;
 import star.output_proxy;
@@ -13,12 +14,14 @@ using namespace Star;
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    coutf("Error! Caught exception {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print("Error! Caught exception {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto run = [&]() -> std::expected<int, StarException> {
     if (argc != 3) {
-      coutf("Usage, {} <versioned_json_binary> <versioned_json_json>\n", argv[0]);
+      if (auto written = Star::print("Usage, {} <versioned_json_binary> <versioned_json_json>\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
       return -1;
     }
 
@@ -36,7 +39,8 @@ int main(int argc, char** argv) {
   };
   auto result = run();
   if (!result) {
-    coutf("Error! Caught exception {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print("Error! Caught exception {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

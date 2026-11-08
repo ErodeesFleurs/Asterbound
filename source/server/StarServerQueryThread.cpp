@@ -66,7 +66,7 @@ ServerQueryThread::~ServerQueryThread() {
   if (auto joined = join(); !joined)
     EmergencyLog::error("Query server shutdown failed: {}", joined.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy a query server with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy a query server with an unjoined native worker", false);
 }
 
 std::expected<void, StarException> ServerQueryThread::start() {
@@ -111,7 +111,7 @@ std::expected<String, StarException> ServerQueryThread::serverWorldNames() {
     return String("Unknown");
   StringList names;
   for (auto const& world : *activeWorlds) {
-    auto name = printWorldId(world);
+    auto name = Star::print_world_id(world);
     if (!name)
       return std::unexpected(std::move(name.error()));
     names.push_back(std::move(*name));
@@ -292,7 +292,7 @@ std::expected<void, StarException> ServerQueryThread::run() {
   auto report = [this](StarException const& error) -> std::expected<void, StarException> {
     if (!error.is<SocketClosedException>())
       return m_universe.get().root().logger().error("ServerQueryThread error: {}",
-                                                    outputException(ExceptionDiagnostic(error), true));
+                                                    Star::output_exception(ExceptionDiagnostic(error), true));
     return {};
   };
   while (!stopToken.stop_requested()) {

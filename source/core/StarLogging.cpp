@@ -37,8 +37,7 @@ std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogL
   auto name = enumName<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  coutf("[{}] {}\n", *name, msg);
-  return {};
+  return Star::print("[{}] {}\n", *name, msg);
 }
 
 std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
@@ -61,7 +60,7 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
   auto name = enumName<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto line = strf("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
+  auto line = Star::format("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
   auto written = m_output->write(line);
   if (!written)
     return std::unexpected(std::move(written.error()));
@@ -95,7 +94,7 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
       if (l->level() <= level) {
         auto result = l->log(msg, level);
         if (!result)
-          return std::unexpected(std::move(result.error()).withContext(strf("While writing log message: {}", msg)));
+          return std::unexpected(std::move(result.error()).withContext(Star::format("While writing log message: {}", msg)));
       }
     }
   }
@@ -105,11 +104,11 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
 std::expected<void, StarException> Logger::logException(
     LogLevel level, std::string_view operation, ExceptionDiagnostic const& diagnostic) {
   if (loggable(level)) {
-    if (auto result = logf(level, "{}: {}", operation, exceptionSummary(diagnostic)); !result)
+    if (auto result = logf(level, "{}: {}", operation, Star::exception_summary(diagnostic)); !result)
       return std::unexpected(std::move(result.error()));
   }
   if (loggable(LogLevel::Debug))
-    return debug("{} details:\n{}", operation, outputException(diagnostic, true));
+    return debug("{} details:\n{}", operation, Star::output_exception(diagnostic, true));
   return {};
 }
 
@@ -136,8 +135,8 @@ bool Logger::loggable(LogLevel level) {
 }
 
 void EmergencyLog::log(LogLevel, std::string_view message) {
-  std::fwrite(message.data(), 1, message.size(), stderr);
-  std::fputc('\n', stderr);
+  if (!Star::println(stderr, "{}", message))
+    std::_Exit(1);
 }
 
 String LogMap::getValue(String const& key) {

@@ -485,7 +485,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
 
   auto getPieceTexture = [this, &assets](MaterialId material, std::shared_ptr<MaterialRenderPiece const> const& piece, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives, bool mod) -> std::expected<TexturePtr, StarException> {
     auto cached = m_textureCache.get(MaterialPieceTextureKey(material, piece->pieceId, hue, mod), [&](auto const&) -> std::expected<TexturePtr, StarException> {
-        AssetPath texture = (hue == 0) ? piece->texture : strf("{}?hueshift={}", piece->texture, materialHueToDegrees(hue));
+        AssetPath texture = (hue == 0) ? piece->texture : Star::format("{}?hueshift={}", piece->texture, materialHueToDegrees(hue));
 
         if (directives)
           texture.directives += directives->get();

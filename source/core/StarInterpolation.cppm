@@ -423,10 +423,10 @@ typename YContainer::value_type parametricInterpolate2(XContainer const& xvals,
     WeightOp weightOp,
     BoundMode bmode) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xvals.size() != 0));
+    Star::star_assert_failed((xvals.size() != 0));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xvals.size() == yvals.size()));
+    Star::star_assert_failed((xvals.size() == yvals.size()));
   }
 
   if (yvals.size() == 1)
@@ -444,10 +444,10 @@ typename YContainer::value_type parametricInterpolate4(XContainer const& xvals,
     WeightOp weightOp,
     BoundMode bmode) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xvals.size() != 0));
+    Star::star_assert_failed((xvals.size() != 0));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xvals.size() == yvals.size()));
+    Star::star_assert_failed((xvals.size() == yvals.size()));
   }
 
   if (yvals.size() == 1)

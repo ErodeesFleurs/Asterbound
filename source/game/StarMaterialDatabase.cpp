@@ -288,11 +288,11 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         material.blocksLiquidFlow = std::move(*value);
       }
       if (material.id != *id || !isRealMaterial(material.id))
-        return std::unexpected(MaterialException(strf("Material id {} does not fall in the valid range\n", *id)));
+        return std::unexpected(MaterialException(Star::format("Material id {} does not fall in the valid range\n", *id)));
       if (database.containsMaterial(material.id))
-        return std::unexpected(MaterialException(strf("Duplicate material id {} found for material {}", material.id, material.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate material id {} found for material {}", material.id, material.name)));
       if (database.isMaterialName(material.name))
-        return std::unexpected(MaterialException(strf("Duplicate material name '{}' found", material.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate material name '{}' found", material.name)));
       database.setMaterial(material.id, material);
 
       auto interactions = config->getArray("liquidInteractions", {});
@@ -326,7 +326,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading material file {}", file), loaded.error()), file, "Loading material"));
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading material file {}", file), loaded.error()), file, "Loading material"));
   }
   for (auto const& path : mods->get()) {
     auto const& file = path.string();
@@ -459,11 +459,11 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       }
 
       if (mod.id != *id || !isRealMod(mod.id))
-        return std::unexpected(MaterialException(strf("Mod id {} does not fall in the valid range\n", mod.id)));
+        return std::unexpected(MaterialException(Star::format("Mod id {} does not fall in the valid range\n", mod.id)));
       if (database.containsMod(mod.id))
-        return std::unexpected(MaterialException(strf("Duplicate mod id {} found for mod {}", mod.id, mod.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate mod id {} found for mod {}", mod.id, mod.name)));
       if (database.m_modIndex.contains(mod.name) || database.m_metaModIndex.contains_left(mod.name))
-        return std::unexpected(MaterialException(strf("Duplicate mod name '{}' found", mod.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate mod name '{}' found", mod.name)));
       database.setMod(mod.id, mod);
       database.m_modIndex[mod.name] = mod.id;
       auto interactions = config->getArray("liquidInteractions", {});
@@ -497,7 +497,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
   }
   auto footstepConfig = assets->json("/client.config:defaultFootstepSound");
   if (!footstepConfig) return std::unexpected(assets->withAssetContext(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
@@ -567,7 +567,7 @@ std::expected<String, StarException> MaterialDatabase::materialDescription(Mater
   if (!info) return std::unexpected(std::move(info.error()));
   auto description = info->get().descriptions.getString("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(strf("{}Description", species), *description);
+  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::materialDescription(MaterialId id) const {
@@ -640,7 +640,7 @@ std::expected<String, StarException> MaterialDatabase::modDescription(ModId id, 
   if (!info) return std::unexpected(std::move(info.error()));
   auto description = info->get().descriptions.getString("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(strf("{}Description", species), *description);
+  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::modDescription(ModId id) const {
@@ -886,17 +886,17 @@ void MaterialDatabase::setMod(ModId modId, ModInfo info) {
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::MetaMaterialInfo const>, StarException> MaterialDatabase::getMetaMaterialInfo(MaterialId id) const {
-  if (!containsMetaMaterial(id)) return std::unexpected(MaterialException(strf("No such metamaterial id: {}\n", id)));
+  if (!containsMetaMaterial(id)) return std::unexpected(MaterialException(Star::format("No such metamaterial id: {}\n", id)));
   return std::cref(*m_metaMaterials[metaMaterialIndex(id)]);
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::MaterialInfo const>, StarException> MaterialDatabase::getMaterialInfo(MaterialId id) const {
-  if (!containsMaterial(id)) return std::unexpected(MaterialException(strf("No such material id: {}\n", id)));
+  if (!containsMaterial(id)) return std::unexpected(MaterialException(Star::format("No such material id: {}\n", id)));
   return std::cref(*m_materials[id]);
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::ModInfo const>, StarException> MaterialDatabase::getModInfo(ModId id) const {
-  if (!containsMod(id)) return std::unexpected(MaterialException(strf("No such mod id: {}\n", id)));
+  if (!containsMod(id)) return std::unexpected(MaterialException(Star::format("No such mod id: {}\n", id)));
   return std::cref(*m_mods[id]);
 }
 

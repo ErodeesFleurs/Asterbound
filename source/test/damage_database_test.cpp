@@ -104,7 +104,7 @@ const GameTestRegistration
       auto caseDirectory = File::relative_to(*directory, duplicate);
       auto database = damageFixture(fixture, caseDirectory,
                                     {{"damage/first.damage", R"({"kind":"MiXeD"})"},
-                                     {"damage/second.damage", strf(R"({{"kind":"{}"}})", duplicate)}});
+                                     {"damage/second.damage", Star::format(R"({{"kind":"{}"}})", duplicate)}});
       ASSERT_FALSE(database);
       auto message = std::string_view(database.error().what());
       EXPECT_NE(message.find("Duplicate damage kind Name"), std::string_view::npos);
@@ -201,7 +201,7 @@ const GameTestRegistration
     unsigned index = 0;
     for (auto const& failure : cases) {
       SCOPED_TRACE(index);
-      auto caseDirectory = File::relative_to(*directory, strf("case{}", index++));
+      auto caseDirectory = File::relative_to(*directory, Star::format("case{}", index++));
       auto database = failure.elements.empty()
         ? damageFixture(fixture, caseDirectory, {{"damage/invalid.damage", failure.damage}})
         : damageFixture(

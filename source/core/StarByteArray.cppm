@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 
 import star.format;
@@ -118,7 +118,7 @@ struct hash<ByteArray> {
   std::size_t operator()(ByteArray const& b) const;
 };
 
-std::ostream& operator<<(std::ostream& os, ByteArray const& b);
+void write_text(TextBuffer& buffer, ByteArray const& b);
 
 inline void ByteArray::clear() {
   resize(0);
@@ -239,21 +239,21 @@ inline ByteArray::const_iterator ByteArray::end() const {
 
 inline char& ByteArray::operator[](std::size_t i) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return m_data[i];
 }
 
 inline char ByteArray::operator[](std::size_t i) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return m_data[i];
 }
 
 [[nodiscard]] inline std::expected<std::reference_wrapper<char const>, StarException> ByteArray::at(std::size_t i) const {
   if (i >= m_size)
-    return std::unexpected(OutOfRangeException(strf("Out of range in ByteArray::at({})", i)));
+    return std::unexpected(OutOfRangeException(Star::format("Out of range in ByteArray::at({})", i)));
 
   return std::cref(m_data[i]);
 }
@@ -269,10 +269,10 @@ export namespace Star {
 }
 
 
-export template <> struct std::formatter<Star::ByteArray> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::ByteArray> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::ByteArray;
   using ::Star::hash;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

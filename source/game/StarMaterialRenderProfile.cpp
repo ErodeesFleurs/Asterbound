@@ -69,7 +69,7 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
         point.position = std::move(*value);
       }
       if (std::abs(point.position[0]) > MaterialRenderProfileMaxNeighborDistance || std::abs(point.position[1]) > MaterialRenderProfileMaxNeighborDistance)
-        return std::unexpected(MaterialRenderProfileException(strf("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
+        return std::unexpected(MaterialRenderProfileException(Star::format("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
       auto name = pointConfig.getString(1);
       if (!name) return std::unexpected(std::move(name.error()));
       auto rule = ruleMap.get(*name);
@@ -136,12 +136,12 @@ std::expected<String, StarException> MaterialRenderProfile::pieceImage(String co
   auto piece = pieces.get(pieceName);
   if (!piece) return std::unexpected(std::move(piece.error()));
   String texture = piece->get()->texture;
-  if (hueShift != MaterialHue()) texture = strf("{}?hueshift={}", texture, materialHueToDegrees(hueShift));
+  if (hueShift != MaterialHue()) texture = Star::format("{}?hueshift={}", texture, materialHueToDegrees(hueShift));
   auto variants = piece->get()->variants.get(colorVariant);
   if (!variants) return std::unexpected(std::move(variants.error()));
   auto rect = variants->get().wrap(variant);
   if (!rect) return std::unexpected(std::move(rect.error()));
-  return strf("{}?crop={};{};{};{}", texture, rect->get().xMin(), rect->get().yMin(), rect->get().xMax(), rect->get().yMax());
+  return Star::format("{}?crop={};{};{};{}", texture, rect->get().xMin(), rect->get().yMin(), rect->get().xMax(), rect->get().yMax());
 }
 
 std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarException> MaterialRenderProfile::damageImage(float damageLevel, TileDamageType damageType) const {

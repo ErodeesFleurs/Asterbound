@@ -228,7 +228,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     return std::unexpected(std::move(list.error()));
   if (list->size() != 2)
     return std::unexpected(CelestialException(
-        strf("Parameter '{}' does not appear to be a range in CelestialParameters::randomizeRange", name)));
+        Star::format("Parameter '{}' does not appear to be a range in CelestialParameters::randomizeRange", name)));
   return randomizeParameterRange(*list, mix, name);
 }
 

@@ -101,12 +101,12 @@ namespace {
   template <typename Rect, typename Vec, typename Getter, typename Converter>
   std::expected<Rect, StarException> jsonRect(Json const& v, Getter getter, Converter& converter, std::string_view name) {
     if (v.type() != Json::Type::Array)
-      return std::unexpected(JsonException(strf("Json not an array in {}", name)));
+      return std::unexpected(JsonException(Star::format("Json not an array in {}", name)));
     auto size = v.size();
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size != 4 && *size != 2)
-      return std::unexpected(JsonException(strf("Json not an array of proper size in {}", name)));
+      return std::unexpected(JsonException(Star::format("Json not an array of proper size in {}", name)));
     if (*size == 4) {
       Vec lowerLeft, upperRight;
       for (std::size_t i = 0; i < 4; ++i) {
@@ -133,7 +133,7 @@ namespace {
       return Rect(*lowerLeft, *upperRight);
     }();
     if (!inner && inner.error().template is<JsonException>())
-      return std::unexpected(JsonException(strf("Inner position not well formed in {}: {}", name, outputException(ExceptionDiagnostic(inner.error()), true))));
+      return std::unexpected(JsonException(Star::format("Inner position not well formed in {}: {}", name, Star::output_exception(ExceptionDiagnostic(inner.error()), true))));
     return inner;
   }
 }
@@ -188,7 +188,7 @@ std::expected<Color, StarException> jsonToColor(Json const& v) {
       return std::unexpected(std::move(text.error()));
     return Color::create(*text);
   }
-  return std::unexpected(JsonException(strf("Json of type {} cannot be converted to color", v.typeName())));
+  return std::unexpected(JsonException(Star::format("Json of type {} cannot be converted to color", v.typeName())));
 }
 Json jsonFromColor(Color const& color) {
   JsonArray result{color.red(), color.green(), color.blue()};

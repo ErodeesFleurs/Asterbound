@@ -4204,7 +4204,7 @@ const GameTestRegistration
     ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', true)"));
     // Invoke through Lua pcall so the intentional domain exception is observed,
     // not converted to a component error/log or silently suppressed.
-    auto thrown = controller->eval<Json>(strf("local ok,err=pcall(player.finishQuestDialog,{},'cancel'); return "
+    auto thrown = controller->eval<Json>(Star::format("local ok,err=pcall(player.finishQuestDialog,{},'cancel'); return "
                                               "{{ok,tostring(err):find('quest decision regression',1,true)~=nil}}",
                                               *errorToken));
     ASSERT_TRUE(thrown);
@@ -4470,7 +4470,7 @@ const GameTestRegistration
     ASSERT_TRUE((*player)->uninit());
     for (auto [duration, fadeTime] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f}, std::pair{0.7f, 0.0f},
                                       std::pair{0.7f, -0.2f}, std::pair{0.7f, 1.3f}}) {
-      SCOPED_TRACE(strf("duration={}, fade={}", duration, fadeTime));
+      SCOPED_TRACE(Star::format("duration={}, fade={}", duration, fadeTime));
       auto boundaryPane = ScriptTestPane::create(**context, Json(*paneConfig));
       ASSERT_TRUE(boundaryPane) << boundaryPane.error().what();
       auto boundaryText = textEditor(**context, "");
@@ -4557,7 +4557,7 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
   ASSERT_TRUE(maximum);
   auto capacity = maximum->toUInt();
   ASSERT_TRUE(capacity);
-  ASSERT_TRUE(pane->evaluate(strf(
+  ASSERT_TRUE(pane->evaluate(Star::format(
       "for index=1,{} do push({{text=tostring(index),cooldown=100}}) end", *capacity + 3)));
   for (unsigned i = 0; i < 3; ++i)
     ASSERT_TRUE(pane->tick(0.125f));
@@ -4571,7 +4571,7 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
   ASSERT_TRUE(overflow && *overflow);
   JsonArray remaining;
   for (unsigned i = 4; i <= *capacity + 3; ++i)
-    remaining.push_back(strf("{}", i));
+    remaining.push_back(Star::format("{}", i));
   EXPECT_EQ(**overflow, (JsonArray{*capacity + 1, 3, remaining}));
   ASSERT_TRUE(fixture.root().reload());
   ASSERT_TRUE(pane->tick(0));
@@ -4618,13 +4618,13 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
   ASSERT_TRUE(script->setCallbacks("root", *callbacks));
   for (Vec2U screen : {Vec2U{800, 600}, Vec2U{801, 601}}) {
     for (float scale : {1.0f, 1.25f, 3.0f}) {
-      auto layout = script->eval<Json>(strf(
+      auto layout = script->eval<Json>(Star::format(
           "layout=mainbarPresentation.layout(root.assetJson('/interface.config:mainBar'), {{{},{}}}, {}); return layout",
           screen[0], screen[1], scale));
       ASSERT_TRUE(layout) << layout.error().what();
       Vec2F origin = Vec2F(screen) - Vec2F(*barSize) * scale;
       for (String const& name : StringList{"inventory", "craft", "codex", "deploy", "beam", "questLog", "mmUpgrade", "collections"}) {
-        SCOPED_TRACE(strf("{} {}x{} scale{}", name, screen[0], screen[1], scale));
+        SCOPED_TRACE(Star::format("{} {}x{} scale{}", name, screen[0], screen[1], scale));
         auto button = config->get(name);
         ASSERT_TRUE(button);
         auto polygonJson = button->get("poly");
@@ -4639,7 +4639,7 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
             Vec2F{bounds.xMin(), bounds.center().y()}, Vec2F{bounds.xMax(), bounds.center().y()},
             Vec2F{bounds.center().x(), bounds.yMin()}, Vec2F{bounds.center().x(), bounds.yMax()},
             Vec2F{bounds.xMin() - 0.25f, bounds.center().y()}, Vec2F{bounds.xMax() + 0.25f, bounds.center().y()}}) {
-          auto hit = script->eval<bool>(strf(
+          auto hit = script->eval<bool>(Star::format(
               "return mainbarPresentation.contains(layout.polygons.{}, {{{},{}}})", name, point[0], point[1]));
           ASSERT_TRUE(hit) << hit.error().what();
           EXPECT_EQ(*hit, polygon.contains(point));

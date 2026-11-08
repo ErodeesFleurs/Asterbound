@@ -274,7 +274,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
       return {};
     }();
     if (!parse)
-      return std::unexpected(VersioningDatabaseException(strf("Error parsing version information from versioning script '{}'", script), (*assets)->withAssetContext(std::move(parse.error()), script, "Parsing versioning script filename")));
+      return std::unexpected(VersioningDatabaseException(Star::format("Error parsing version information from versioning script '{}'", script), (*assets)->withAssetContext(std::move(parse.error()), script, "Parsing versioning script filename")));
   }
   // Preserve the existing stable selection order for matching upgrades.
   auto order = [](VersionUpdateScript const& lhs, VersionUpdateScript const& rhs) {
@@ -380,7 +380,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
             if (!content) return std::unexpected(std::move(content.error()));
             result.content = std::move(*content);
             if (!result.content)
-              return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script of sub identifier '{}' from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, outputOptional(targetVersion), subScripts.first, subScript.fromVersion, subScript.toVersion));
+              return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script of sub identifier '{}' from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, Star::output_optional(targetVersion), subScripts.first, subScript.fromVersion, subScript.toVersion));
             auto logged = m_root.logger().debug("Brought versionedJson '{}' sub identifier '{}' from version {} to {}", versionedJson.identifier, subScripts.first, result.subVersions.value(subScripts.first), subScript.toVersion);
             if (!logged) return std::unexpected(std::move(logged.error()));
             result.subVersions[subScripts.first] = subScript.toVersion;
@@ -393,7 +393,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
         if (!content) return std::unexpected(std::move(content.error()));
         result.content = std::move(*content);
         if (!result.content)
-          return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, outputOptional(targetVersion), script.fromVersion, script.toVersion));
+          return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, Star::output_optional(targetVersion), script.fromVersion, script.toVersion));
         auto logged = m_root.logger().debug("Brought versionedJson '{}' from version {} to {}", versionedJson.identifier, result.version, script.toVersion);
         if (!logged) return std::unexpected(std::move(logged.error()));
         result.version = script.toVersion;
@@ -402,11 +402,11 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
     return {};
   }();
   if (!updated)
-    return std::unexpected(VersioningDatabaseException(strf("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}", versionedJson.identifier, result.version, outputOptional(targetVersion)), std::move(updated.error())));
+    return std::unexpected(VersioningDatabaseException(Star::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}", versionedJson.identifier, result.version, Star::output_optional(targetVersion)), std::move(updated.error())));
   if (result.version > *targetVersion)
-    return std::unexpected(VersioningDatabaseException::format("VersionedJson with identifier '{}' and version {} is newer than current version of {}, cannot load", versionedJson.identifier, result.version, outputOptional(targetVersion)));
+    return std::unexpected(VersioningDatabaseException::format("VersionedJson with identifier '{}' and version {} is newer than current version of {}, cannot load", versionedJson.identifier, result.version, Star::output_optional(targetVersion)));
   if (result.version != *targetVersion)
-    return std::unexpected(VersioningDatabaseException::format("Could not bring VersionedJson with identifier '{}' and version {} forward to current version of {}, best version was {}", versionedJson.identifier, result.version, outputOptional(targetVersion), result.version));
+    return std::unexpected(VersioningDatabaseException::format("Could not bring VersionedJson with identifier '{}' and version {} forward to current version of {}, best version was {}", versionedJson.identifier, result.version, Star::output_optional(targetVersion), result.version));
   return result;
 }
 std::expected<Json, StarException> VersioningDatabase::loadVersionedJson(VersionedJson const& json, String const& expectedIdentifier) const {
@@ -451,7 +451,7 @@ std::expected<LuaCallbacks, StarException> VersioningDatabase::makeVersioningCal
       if (!loaded && loaded.error().is<IOException>()) {
         auto logged =
           database.m_root.logger().debug("Unable to load versioned JSON file {} in versioning script: {}", storagePath,
-                                         outputException(ExceptionDiagnostic(loaded.error()), false));
+                                         Star::output_exception(ExceptionDiagnostic(loaded.error()), false));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         return Json();

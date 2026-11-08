@@ -136,7 +136,7 @@ namespace Dungeon {
   }
 
   String connectorColorValue(Vec4B const& color) {
-    return strf("{},{},{},{}", color[0], color[1], color[2], color[3]);
+    return Star::format("{},{},{},{}", color[0], color[1], color[2], color[3]);
   }
 
   [[nodiscard]] std::expected<Tile, StarException> variantMapToTile(Root& root, JsonObject const& tile) {
@@ -220,7 +220,7 @@ namespace Dungeon {
   unsigned ImageTileset::colorAsInt(Vec4B color) const {
     if ((color[3] != 0) && (color[3] != 255)) {
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((false));
+        Star::star_assert_failed((false));
       }
       return 0;
     }

@@ -239,12 +239,12 @@ TEST(ListTest, OwningSequencesOptInWithoutStandardContainerInheritance) {
   EXPECT_EQ(hash<List<int>>{}(list), hash<Deque<int>>{}(deque));
   EXPECT_EQ(hash<List<int>>{}(list), hash<LinkedList<int>>{}(linked));
   EXPECT_EQ(hash<List<int>>{}(list), (hash<StaticList<int, 3>>{}(*bounded)));
-  EXPECT_EQ(strf("{}", list), "(1, 2, 1)");
-  EXPECT_EQ(strf("{}", small), "(1, 2, 1)");
-  EXPECT_EQ(strf("{}", deque), "(1, 2, 1)");
-  EXPECT_EQ(strf("{}", linked), "(1, 2, 1)");
-  EXPECT_EQ(strf("{}", *bounded), "(1, 2, 1)");
-  EXPECT_EQ(strf("{}", StringList{"a", "b"}), "('a', 'b')");
+  EXPECT_EQ(Star::format("{}", list), "(1, 2, 1)");
+  EXPECT_EQ(Star::format("{}", small), "(1, 2, 1)");
+  EXPECT_EQ(Star::format("{}", deque), "(1, 2, 1)");
+  EXPECT_EQ(Star::format("{}", linked), "(1, 2, 1)");
+  EXPECT_EQ(Star::format("{}", *bounded), "(1, 2, 1)");
+  EXPECT_EQ(Star::format("{}", StringList{"a", "b"}), "('a', 'b')");
 }
 
 TEST(ListTest, IndexedQueriesRetainDefaultArguments) {

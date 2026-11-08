@@ -47,7 +47,7 @@ discord::NetworkChannelId const DiscordMainNetworkChannel = 0;
 static void recordDiscordCallbackError(PcPlatformServicesState& state, StarException error) {
   auto logged = state.logger.error("{}", error.what());
   if (!logged)
-    error = StarException(strf("Discord callback logging failed: {}", logged.error().what()), ExceptionDiagnostic(error));
+    error = StarException(Star::format("Discord callback logging failed: {}", logged.error().what()), ExceptionDiagnostic(error));
   state.discordError = std::move(error);
 }
 
@@ -88,7 +88,7 @@ PcP2PNetworkingService::PcP2PNetworkingService(std::shared_ptr<PcPlatformService
           service.m_state->discordError = std::move(logged.error());
           return;
         }
-        auto joined = service.addPendingJoin(strf("+platform:{}", peerId));
+        auto joined = service.addPendingJoin(Star::format("+platform:{}", peerId));
         if (!joined) {
           std::lock_guard serviceLocker(service.m_mutex);
           recordDiscordCallbackError(*service.m_state, std::move(joined.error()));
@@ -201,18 +201,18 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
       }
   
       if (auto lobby = m_discordServerLobby)
-        activity.GetParty().SetId(toString(lobby->first).c_str());
+        activity.GetParty().SetId(Star::to_string(lobby->first).c_str());
 
       if (std::holds_alternative<JoinLocal>(m_joinLocation)) {
         if (auto lobby = m_discordServerLobby; lobby && m_state->discordCurrentUser) {
-          String joinSecret = strf("connect:discord_{}_{}_{}", m_state->discordCurrentUser->GetId(), lobby->first, lobby->second);
+          String joinSecret = Star::format("connect:discord_{}_{}_{}", m_state->discordCurrentUser->GetId(), lobby->first, lobby->second);
           if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
             return std::unexpected(std::move(logged.error()));
           activity.GetSecrets().SetJoin(joinSecret.utf8_data());
         }
       } else if (std::holds_alternative<JoinRemote>(m_joinLocation)) {
-        String address = toString((HostAddressWithPort)std::get<JoinRemote>(m_joinLocation));
-        String joinSecret = strf("connect:address_{}", address);
+        String address = Star::to_string((HostAddressWithPort)std::get<JoinRemote>(m_joinLocation));
+        String joinSecret = Star::format("connect:address_{}", address);
         if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
           return std::unexpected(std::move(logged.error()));
         activity.GetSecrets().SetJoin(joinSecret.utf8_data());
@@ -235,7 +235,7 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
           }
           if (res != discord::Result::Ok) {
             if (auto logged = state.logger.warn("Failed to set Discord activity (err {})", (int)res); !logged)
-              state.discordError = StarException(strf("Discord activity failure logging failed: {}", logged.error().what()),
+              state.discordError = StarException(Star::format("Discord activity failure logging failed: {}", logged.error().what()),
                 ExceptionDiagnostic(ApplicationException::format("Failed to set Discord activity (err {})", (int)res)));
           }
         });
@@ -393,7 +393,7 @@ std::expected<void, StarException> PcP2PNetworkingService::addPendingJoin(String
       return std::unexpected(std::move(address.error()));
     m_pendingJoin = std::move(*address);
   } else {
-    m_pendingJoin = P2PNetworkingPeerId(strf("{}_{}", *targetType, connectionString));
+    m_pendingJoin = P2PNetworkingPeerId(Star::format("{}_{}", *targetType, connectionString));
   }
   return {};
 }
@@ -792,7 +792,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
       if (auto logged = m_state->logger.info("Setting Steam rich presence connection as steamid_{}", steamId); !logged)
         return std::unexpected(std::move(logged.error()));
       if (!SteamAPI_ISteamFriends_SetRichPresence(SteamAPI_SteamFriends(), "connect",
-          strf("+platform:connect:steamid_{}", steamId).c_str()))
+          Star::format("+platform:connect:steamid_{}", steamId).c_str()))
         return std::unexpected(ApplicationException("Steam rejected local rich presence"));
 
     } else if (std::holds_alternative<JoinRemote>(location)) {
@@ -800,7 +800,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
       if (auto logged = m_state->logger.info("Setting Steam rich presence connection as address_{}", address); !logged)
         return std::unexpected(std::move(logged.error()));
       if (!SteamAPI_ISteamFriends_SetRichPresence(SteamAPI_SteamFriends(), "connect",
-          strf("+platform:connect:address_{}", address).c_str()))
+          Star::format("+platform:connect:address_{}", address).c_str()))
         return std::unexpected(ApplicationException("Steam rejected remote rich presence"));
     }
   }

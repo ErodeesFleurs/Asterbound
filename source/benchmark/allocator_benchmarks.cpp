@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
+import star.format;
 import star.block_allocator;
 import star.hash;
 import star.json;
@@ -676,7 +678,8 @@ public:
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    std::cerr << nativeRuntime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);

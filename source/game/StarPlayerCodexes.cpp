@@ -126,7 +126,7 @@ std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String con
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto config = (*assets)->json(strf("/player.config:defaultCodexes.{}", playerSpecies));
+  auto config = (*assets)->json(Star::format("/player.config:defaultCodexes.{}", playerSpecies));
   if (!config)
     return std::unexpected(std::move(config.error()));
   auto codexes = jsonToStringList(*config);

@@ -94,7 +94,7 @@ private:
   using CharArray = std::basic_string<char32_t>;
 
   std::unexpected<StarException> diagnostic(StarException error) const {
-    return std::unexpected(error.withContext(strf("Error parsing json at {}:{}", line(), column())));
+    return std::unexpected(error.withContext(Star::format("Error parsing json at {}:{}", line(), column())));
   }
 
   std::expected<void, StarException> error(std::string_view message) const {

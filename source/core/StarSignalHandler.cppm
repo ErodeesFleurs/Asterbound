@@ -153,20 +153,20 @@ struct SignalHandlerImpl {
       else if (modeFlag == 8)
         mode = "Execute";
       else
-        mode = strf("Mode({})", modeFlag);
-      message = strf("Access violation detected at {} ({} of address {})",
+        mode = Star::format("Mode({})", modeFlag);
+      message = Star::format("Access violation detected at {} ({} of address {})",
           exception.ExceptionAddress,
           mode,
           (PVOID)exception.ExceptionInformation[1]);
     } else {
-      message = strf("{} (0x{:08X} @ {})",
+      message = Star::format("{} (0x{:08X} @ {})",
           fatalSignalBridge.message,
           exception.ExceptionCode,
           exception.ExceptionAddress);
       for (DWORD i = 0; i < exception.NumberParameters; i++)
-        message = strf("{} [{}]", message, (PVOID)exception.ExceptionInformation[i]);
+        message = Star::format("{} [{}]", message, (PVOID)exception.ExceptionInformation[i]);
     }
-    fatalError(message.utf8_data(), true);
+    Star::fatal_error(message.utf8_data(), true);
     TerminateProcess(GetCurrentProcess(), EXIT_FAILURE);
   }
 

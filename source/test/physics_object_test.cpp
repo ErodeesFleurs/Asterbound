@@ -90,7 +90,7 @@ const GameTestRegistration
       // Reinitialize the same object at two translations, including coordinates
       // that made the old local/world union exceed MaximumEntityBoundBox.
       for (auto const& tilePosition : {Vec2I(512, 256), farPosition}) {
-        SCOPED_TRACE(strf("position {}", tilePosition));
+        SCOPED_TRACE(Star::format("position {}", tilePosition));
         ASSERT_TRUE(object->setTilePosition(tilePosition));
         auto id = entities.reserveEntityId();
         ASSERT_TRUE(id) << id.error().what();

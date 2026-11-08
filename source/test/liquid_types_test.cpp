@@ -121,7 +121,7 @@ const GameTestRegistration
         SCOPED_TRACE(missing);
         auto changed = missing ? engine.eraseKey(name) : engine.set(name, "not a float");
         ASSERT_TRUE(changed);
-        auto loaded = liquidsFixture(fixture, File::relative_to(*directory, strf("case{}", index++)),
+        auto loaded = liquidsFixture(fixture, File::relative_to(*directory, Star::format("case{}", index++)),
                                      JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});
         ASSERT_FALSE(loaded);
         EXPECT_TRUE(loaded.error().is<JsonException>());
@@ -232,7 +232,7 @@ public:
   std::expected<void, StarException> record(char kind) {
     calls.push_back(kind);
     if (failure == kind && (kind != 'w' || !committedWrites.empty()))
-      return std::unexpected(LiquidCallbackFailure(strf("Injected liquid callback {}", kind)));
+      return std::unexpected(LiquidCallbackFailure(Star::format("Injected liquid callback {}", kind)));
     return {};
   }
 

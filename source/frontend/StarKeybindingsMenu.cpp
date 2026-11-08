@@ -282,7 +282,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& category : {std::pair{std::ref(*m_playerList), std::string_view("player")}, std::pair{std::ref(*m_toolBarList), std::string_view("toolbar")}, std::pair{std::ref(*m_gameList), std::string_view("game")}}) {
-    auto keybinds = (*assets)->json(strf("/interface/windowconfig/keybindingsmenu.config:keyActions.{}", category.second));
+    auto keybinds = (*assets)->json(Star::format("/interface/windowconfig/keybindingsmenu.config:keyActions.{}", category.second));
     if (!keybinds)
       return std::unexpected(std::move(keybinds.error()));
     if (auto result = doKeybindingsFor(category.first.get(), *keybinds); !result)

@@ -203,7 +203,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
         bindings.reserve(tags.size());
         for (auto const& entry : tags)
           bindings.emplace_back(entry.first.utf8(), entry.second.utf8());
-        auto formatted = Star::formatTags(text.utf8(), bindings);
+        auto formatted = Star::format_tags(text.utf8(), bindings);
         if (!formatted)
           return std::unexpected(std::move(formatted.error()));
         return String(std::move(*formatted));
@@ -356,7 +356,7 @@ std::expected<String, StarException> LuaBindings::UtilityCallbacks::printJson(Js
 }
 
 std::expected<String, StarException> LuaBindings::UtilityCallbacks::print(LuaValue const& value) {
-  return printLuaValue(value);
+  return Star::print_lua_value(value);
 }
 
 std::expected<LuaValue, StarException> LuaBindings::UtilityCallbacks::interpolateSinEase(LuaEngine& engine, double offset, LuaValue const& value1, LuaValue const& value2) {

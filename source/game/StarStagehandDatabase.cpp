@@ -66,12 +66,12 @@ std::expected<std::shared_ptr<StagehandDatabase>, StarException> StagehandDataba
       if (!typeName)
         return std::unexpected(std::move(typeName.error()));
       if (database->m_stagehandTypes.contains(*typeName))
-        return std::unexpected(StagehandDatabaseException(strf("Repeat stagehand type name '{}'", *typeName)));
+        return std::unexpected(StagehandDatabaseException(Star::format("Repeat stagehand type name '{}'", *typeName)));
       database->m_stagehandTypes[*typeName] = std::move(*config);
       return {};
     }();
     if (!load)
-      return std::unexpected(StagehandDatabaseException(strf("Error loading stagehand type '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading stagehand type")));
+      return std::unexpected(StagehandDatabaseException(Star::format("Error loading stagehand type '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading stagehand type")));
   }
   return database;
 }

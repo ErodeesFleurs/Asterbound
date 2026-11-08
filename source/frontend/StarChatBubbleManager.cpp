@@ -451,7 +451,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
         frame = static_cast<int>((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
       // 255 here because portrait bubbles are always full opacity
       for (auto const& bubbleImage : portraitBubble.backgroundImages) {
-        auto frameImage = std::get<0>(bubbleImage).replace("<frame>", toString(frame));
+        auto frameImage = std::get<0>(bubbleImage).replace("<frame>", Star::to_string(frame));
         if (!frameImage) return std::unexpected(std::move(frameImage.error()));
         auto drawn = drawBubbleImage(screenPos, std::make_tuple(std::move(*frameImage), std::get<1>(bubbleImage)), pixelRatio, 255);
         if (!drawn) return std::unexpected(std::move(drawn.error()));

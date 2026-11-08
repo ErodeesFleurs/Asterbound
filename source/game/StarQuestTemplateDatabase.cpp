@@ -150,7 +150,7 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
     auto quest = QuestTemplate::create(*config);
     if (!quest) return std::unexpected(std::move(quest.error()));
     if (!database->m_templates.insert((*quest)->templateId, *quest).second)
-      return std::unexpected(StarException(strf("Duplicate quest template '{}'", (*quest)->templateId)));
+      return std::unexpected(StarException(Star::format("Duplicate quest template '{}'", (*quest)->templateId)));
     return {};
     }();
     if (!loaded)

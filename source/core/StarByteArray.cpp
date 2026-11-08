@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.format;
 import star.string;
 import star.byte_array;
@@ -89,14 +90,14 @@ void ByteArray::reserve(std::size_t newCapacity) {
     if (!m_data) {
       auto newMem = static_cast<char*>(Star::malloc(newCapacity));
       if (!newMem)
-        fatalError("Could not allocate ByteArray capacity", false);
+        Star::fatal_error("Could not allocate ByteArray capacity", false);
       m_data = newMem;
       m_capacity = newCapacity;
     } else {
       newCapacity = std::max({m_capacity * 2, newCapacity, static_cast<std::size_t>(8)});
       auto newMem = static_cast<char*>(Star::realloc(m_data, newCapacity));
       if (!newMem)
-        fatalError("Could not allocate ByteArray capacity", false);
+        Star::fatal_error("Could not allocate ByteArray capacity", false);
       m_data = newMem;
       m_capacity = newCapacity;
     }
@@ -200,7 +201,7 @@ ByteArray ByteArray::xorWith(ByteArray const& rhs, bool extend) {
 
 void ByteArray::insert(std::size_t pos, char byte) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((pos <= m_size));
+    Star::star_assert_failed((pos <= m_size));
   }
   resize(m_size + 1);
   for (std::size_t i = m_size - 1; i > pos; --i)
@@ -231,9 +232,16 @@ bool ByteArray::operator!=(const ByteArray& b) const {
   return compare(b) != 0;
 }
 
-std::ostream& operator<<(std::ostream& os, const ByteArray& b) {
-  os << "0x" << hexEncode(b);
-  return os;
+void write_text(TextBuffer& buffer, ByteArray const& b) {
+  buffer.append("0x");
+  std::array<char, 256> encoded;
+  auto remaining = b.span();
+  while (!remaining.empty()) {
+    auto input = remaining.first(std::min(remaining.size(), encoded.size() / 2));
+    auto size = hexEncode(input, encoded);
+    buffer.append(std::string_view(encoded.data(), size));
+    remaining = remaining.subspan(input.size());
+  }
 }
 
 }

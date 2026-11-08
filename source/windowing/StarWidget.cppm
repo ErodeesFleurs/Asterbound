@@ -2,7 +2,7 @@ module;
 import std;
 import star.type_identity;
 import star.format;
-import star.stream_formatter;
+import star.text_formatter;
 import star.json;
 
 import star.vector;
@@ -151,7 +151,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> setLabel(String const& name, String const& value);
 
 protected:
-  friend std::ostream& operator<<(std::ostream& os, Widget const& widget);
+  friend void write_text(TextBuffer& buffer, Widget const& widget);
   String toStringImpl(int indentLevel) const;
 
   [[nodiscard]] virtual std::expected<void, StarException> renderImpl();
@@ -185,7 +185,7 @@ protected:
   Json m_data;
 };
 
-std::ostream& operator<<(std::ostream& os, Widget const& widget);
+void write_text(TextBuffer& buffer, Widget const& widget);
 
 template <typename WidgetType>
 [[nodiscard]] std::expected<std::shared_ptr<WidgetType>, StarException> Widget::getChildNum(std::size_t num) const {
@@ -228,7 +228,7 @@ template <typename WidgetType>
 
 export module star.widget;
 
-export template <> struct std::formatter<Star::Widget> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::Widget> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::GuiExceptionTag;
@@ -238,4 +238,5 @@ export namespace Star {
   using ::Star::GuiException;
   using ::Star::WidgetCallbackFunc;
   using ::Star::GuiContext;
+  using ::Star::write_text;
 }

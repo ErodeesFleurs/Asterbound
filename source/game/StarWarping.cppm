@@ -2,7 +2,7 @@ module;
 import std;
 import star.format;
 import star.string;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 import star.json;
 
@@ -55,7 +55,7 @@ struct hash<InstanceWorldId> {
 struct ClientCustomWorldId {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ClientCustomWorldId& clientWorldId);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ClientCustomWorldId const& clientWorldId);
-  friend std::ostream& operator<<(std::ostream& os, ClientCustomWorldId const& worldId);
+  friend void write_text(TextBuffer& output, ClientCustomWorldId const& worldId);
 
   Uuid uuid;
   String name;
@@ -76,7 +76,7 @@ struct hash<ClientCustomWorldId> {
 
   template <typename BaseType>
   struct CelestialWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, CelestialWorldIdWrapper<CelestialCoordinate> const& worldId);
+    friend void write_text(TextBuffer& output, CelestialWorldIdWrapper<CelestialCoordinate> const& worldId);
     using BaseType::BaseType;
 
     CelestialWorldIdWrapper() : BaseType() {}
@@ -119,7 +119,7 @@ struct hash<ClientCustomWorldId> {
 
   template <typename BaseType>
   struct ClientShipWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, ClientShipWorldIdWrapper<Uuid> const& worldId);
+    friend void write_text(TextBuffer& output, ClientShipWorldIdWrapper<Uuid> const& worldId);
     using BaseType::BaseType;
 
 
@@ -161,7 +161,7 @@ struct hash<ClientCustomWorldId> {
 
   template <typename BaseType>
   struct CustomWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, CustomWorldIdWrapper<String> const& worldId);
+    friend void write_text(TextBuffer& output, CustomWorldIdWrapper<String> const& worldId);
     using BaseType::BaseType;
 
     CustomWorldIdWrapper() : BaseType() {}
@@ -205,13 +205,15 @@ struct hash<ClientCustomWorldId> {
                                ClientCustomWorldId>;
 
   // A negative instance level is reported rather than formatted as a valid world ID.
-  [[nodiscard]] std::expected<String, StarException> printWorldId(WorldId const& worldId);
+  [[nodiscard]] std::expected<String, StarException> print_world_id(WorldId const& worldId);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, WorldId const& worldId);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, InstanceWorldId const& worldId);
   [[nodiscard]] std::expected<WorldId, StarException> parseWorldId(String const& printedId);
 
-  std::ostream& operator<<(std::ostream& os, CelestialWorldId const& worldId);
-  std::ostream& operator<<(std::ostream& os, ClientShipWorldId const& worldId);
-  std::ostream& operator<<(std::ostream& os, CustomWorldId const& worldId);
-  std::ostream& operator<<(std::ostream& os, ClientCustomWorldId const& worldId);
+  void write_text(TextBuffer& output, CelestialWorldId const& worldId);
+  void write_text(TextBuffer& output, ClientShipWorldId const& worldId);
+  void write_text(TextBuffer& output, CustomWorldId const& worldId);
+  void write_text(TextBuffer& output, ClientCustomWorldId const& worldId);
 
   template <typename BaseType> struct SpawnTargetUniqueEntityWrapper : BaseType {
     using BaseType::BaseType;
@@ -287,7 +289,7 @@ struct hash<ClientCustomWorldId> {
   Json spawnTargetToJson(SpawnTarget spawnTarget);
   [[nodiscard]] std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v);
 
-  String printSpawnTarget(SpawnTarget spawnTarget);
+  String print_spawn_target(SpawnTarget spawnTarget);
 
   struct WarpToWorld {
     friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
@@ -352,7 +354,7 @@ enum class WarpAlias {
 using WarpAction = std::variant<std::monostate, WarpToWorld, WarpToPlayer, WarpAlias>;
 
 [[nodiscard]] std::expected<WarpAction, StarException> parseWarpAction(String const& warpString);
-[[nodiscard]] std::expected<String, StarException> printWarpAction(WarpAction const& warpAction);
+[[nodiscard]] std::expected<String, StarException> print_warp_action(WarpAction const& warpAction);
 [[nodiscard]] std::expected<JsonObject, StarException> warpActionToJson(WarpAction const& warpAction);
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WarpToWorld& warpToWorld);
@@ -389,10 +391,10 @@ namespace Star {
 }
 
 
-export template <> struct std::formatter<Star::CelestialWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::ClientShipWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::CustomWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::ClientCustomWorldId> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::CelestialWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::ClientShipWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::CustomWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::ClientCustomWorldId> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::WarpMode;
@@ -406,7 +408,8 @@ export namespace Star {
   using ::Star::CustomWorldIdWrapper;
   using ::Star::CustomWorldId;
   using ::Star::WorldId;
-  using ::Star::printWorldId;
+  using ::Star::print_world_id;
+  using ::Star::write_text;
   using ::Star::parseWorldId;
   using ::Star::SpawnTargetUniqueEntityWrapper;
   using ::Star::SpawnTargetUniqueEntity;
@@ -417,13 +420,13 @@ export namespace Star {
   using ::Star::SpawnTarget;
   using ::Star::spawnTargetToJson;
   using ::Star::spawnTargetFromJson;
-  using ::Star::printSpawnTarget;
+  using ::Star::print_spawn_target;
   using ::Star::WarpToWorld;
   using ::Star::WarpToPlayerWrapper;
   using ::Star::WarpToPlayer;
   using ::Star::WarpAlias;
   using ::Star::WarpAction;
   using ::Star::parseWarpAction;
-  using ::Star::printWarpAction;
+  using ::Star::print_warp_action;
   using ::Star::warpActionToJson;
 }

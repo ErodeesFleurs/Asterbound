@@ -705,38 +705,38 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.registerCallback("getConfiguration", [&root](String const& key) -> std::expected<Json, StarException> {
-    if (key == "title") return std::unexpected(StarException(strf("Cannot get {}", key)));
+    if (key == "title") return std::unexpected(StarException(Star::format("Cannot get {}", key)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
     return (*configuration)->get(key);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.registerCallback("setConfiguration", [&root](String const& key, Json const& value) -> std::expected<void, StarException> {
-    if (key == "safeScripts" || key == "safe") return std::unexpected(StarException(strf("Cannot set {}", key)));
+    if (key == "safeScripts" || key == "safe") return std::unexpected(StarException(Star::format("Cannot set {}", key)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
     return (*configuration)->set(key, value);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.registerCallback("getConfigurationPath", [&root](String const& path) -> std::expected<Json, StarException> {
-    if (path.empty()) return std::unexpected(ConfigurationException(strf("cannot get {}", path)));
+    if (path.empty()) return std::unexpected(ConfigurationException(Star::format("cannot get {}", path)));
     auto title = path.starts_with("title");
     if (!title) return std::unexpected(std::move(title.error()));
-    if (*title) return std::unexpected(ConfigurationException(strf("cannot get {}", path)));
+    if (*title) return std::unexpected(ConfigurationException(Star::format("cannot get {}", path)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
     return (*configuration)->getPath(path);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.registerCallback("setConfigurationPath", [&root](String const& path, Json const& value) -> std::expected<void, StarException> {
-    if (path.empty()) return std::unexpected(ConfigurationException(strf("cannot set {}", path)));
+    if (path.empty()) return std::unexpected(ConfigurationException(Star::format("cannot set {}", path)));
     auto safeScripts = path.starts_with("safeScripts");
     if (!safeScripts) return std::unexpected(std::move(safeScripts.error()));
-    if (*safeScripts) return std::unexpected(ConfigurationException(strf("cannot set {}", path)));
+    if (*safeScripts) return std::unexpected(ConfigurationException(Star::format("cannot set {}", path)));
     auto parts = path.split_any("[].");
     if (!parts) return std::unexpected(std::move(parts.error()));
     if (!parts->empty() && (*parts)[0] == "safe")
-      return std::unexpected(ConfigurationException(strf("cannot set {}", path)));
+      return std::unexpected(ConfigurationException(Star::format("cannot set {}", path)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
     return (*configuration)->setPath(path, value);
@@ -1027,7 +1027,7 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::questConfig(Root&
   auto quest = (*database)->questTemplate(templateId);
   if (!quest) return std::unexpected(std::move(quest.error()));
   if (*quest) return (*quest)->config;
-  return std::unexpected(StarException(strf("No quest template found for id '{}'", templateId)));
+  return std::unexpected(StarException(Star::format("No quest template found for id '{}'", templateId)));
 }
 
 std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog,

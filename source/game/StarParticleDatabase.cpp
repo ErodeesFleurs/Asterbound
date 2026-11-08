@@ -85,7 +85,7 @@ std::expected<std::shared_ptr<ParticleDatabase>, StarException> ParticleDatabase
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (result->m_configs.contains((*config)->kind()))
-        return std::unexpected(StarException(strf("Duplicate particle asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
+        return std::unexpected(StarException(Star::format("Duplicate particle asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
       result->m_configs[(*config)->kind()] = std::move(*config);
       return {};
     }();
@@ -101,7 +101,7 @@ std::expected<std::shared_ptr<ParticleConfig>, StarException> ParticleDatabase::
     return std::unexpected(std::move(key.error()));
   if (auto config = m_configs.find_ref(*key))
     return config->get();
-  return std::unexpected(StarException(strf("Unknown particle definition with kind {}.", kind)));
+  return std::unexpected(StarException(Star::format("Unknown particle definition with kind {}.", kind)));
 }
 
 std::expected<ParticleVariantCreator, StarException> ParticleDatabase::particleCreator(Json const& kindOrConfig, String const& relativePath) const {

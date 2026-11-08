@@ -54,9 +54,9 @@ WorkerPool::~WorkerPool() {
   std::lock_guard threadLock(m_threadMutex);
   auto result = stopWorkers();
   if (!result)
-    EmergencyLog::error("Worker pool {} failed during destruction: {}", m_name, outputException(ExceptionDiagnostic(result.error()), true));
+    EmergencyLog::error("Worker pool {} failed during destruction: {}", m_name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
   if (!m_workerThreads.empty())
-    fatalError("Cannot destroy a worker pool with unjoined workers", false);
+    Star::fatal_error("Cannot destroy a worker pool with unjoined workers", false);
 }
 
 std::expected<void, StarException> WorkerPool::start(unsigned threadCount) {
@@ -95,7 +95,7 @@ std::expected<void, StarException> WorkerPool::start(unsigned threadCount) {
   if (failure) {
     auto stopped = stopWorkers();
     if (!stopped)
-      EmergencyLog::error("Worker pool {} rollback failed: {}", m_name, outputException(ExceptionDiagnostic(stopped.error()), true));
+      EmergencyLog::error("Worker pool {} rollback failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(stopped.error()), true));
     return std::unexpected(std::move(*failure));
   }
   return {};
@@ -128,13 +128,13 @@ std::expected<void, StarException> WorkerPool::stopWorkers() {
       if (!failure)
         failure.emplace(std::move(result.error()));
       else
-        EmergencyLog::error("Worker pool {} cancellation failed: {}", m_name, outputException(ExceptionDiagnostic(result.error()), true));
+        EmergencyLog::error("Worker pool {} cancellation failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
     }
   }
   auto joined = joinWorkers();
   if (!joined) {
     if (failure)
-      EmergencyLog::error("Worker pool {} cancellation also failed: {}", m_name, outputException(ExceptionDiagnostic(*failure), true));
+      EmergencyLog::error("Worker pool {} cancellation also failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(*failure), true));
     return std::unexpected(std::move(joined.error()));
   }
   if (failure)
@@ -150,7 +150,7 @@ std::expected<void, StarException> WorkerPool::joinWorkers() {
       if (!failure)
         failure.emplace(std::move(result.error()));
       else
-        EmergencyLog::error("Worker pool {} join failed: {}", m_name, outputException(ExceptionDiagnostic(result.error()), true));
+        EmergencyLog::error("Worker pool {} join failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
     }
   }
   {
@@ -179,7 +179,7 @@ std::expected<void, StarException> WorkerPool::finish() {
       if (!failure)
         failure.emplace(std::move(result.error()));
       else
-        EmergencyLog::error("Worker pool {} completion failed: {}", m_name, outputException(ExceptionDiagnostic(result.error()), true));
+        EmergencyLog::error("Worker pool {} completion failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
     }
     std::this_thread::yield();
     workLock.lock();
@@ -191,7 +191,7 @@ std::expected<void, StarException> WorkerPool::finish() {
   auto joined = joinWorkers();
   if (!joined) {
     if (failure)
-      EmergencyLog::error("Worker pool {} completion also failed: {}", m_name, outputException(ExceptionDiagnostic(*failure), true));
+      EmergencyLog::error("Worker pool {} completion also failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(*failure), true));
     return std::unexpected(std::move(joined.error()));
   }
   if (failure)
@@ -218,13 +218,13 @@ bool WorkerPool::isWorkerThread() const {
 }
 
 WorkerPool::WorkerThread::WorkerThread(WorkerPool& parent, std::stop_token stopToken)
-  : Thread(strf("WorkerThread for WorkerPool '{}'", parent.m_name)),
+  : Thread(Star::format("WorkerThread for WorkerPool '{}'", parent.m_name)),
     parent(parent), stopToken(std::move(stopToken)) {}
 
 WorkerPool::WorkerThread::~WorkerThread() {
   auto result = join();
   if (!result)
-    EmergencyLog::error("Worker thread failed during destruction: {}", outputException(ExceptionDiagnostic(result.error()), true));
+    EmergencyLog::error("Worker thread failed during destruction: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true));
 }
 
 std::expected<void, StarException> WorkerPool::WorkerThread::run() {
@@ -257,7 +257,7 @@ void WorkerPool::queueWork(QueuedWork work) {
     workLock.unlock();
     auto result = work(WorkerPoolException("Cannot submit work to a stopped worker pool"));
     if (!result)
-      EmergencyLog::error("Worker pool {} cancellation failed: {}", m_name, outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Worker pool {} cancellation failed: {}", m_name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
   }
 }
 

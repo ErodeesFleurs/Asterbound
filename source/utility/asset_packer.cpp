@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.io_device;
 import star.json;
 import star.asset_source;
@@ -70,8 +71,10 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
     if (!configFileContents) {
       if (!configFileContents.error().is<IOException>())
         return std::unexpected(std::move(configFileContents.error()));
-      cerrf("Could not open specified configFile: {}\n", configFile);
-      cerrf("For the following reason: {}\n", outputException(ExceptionDiagnostic(configFileContents.error()), false));
+      if (auto written = Star::print(stderr, "Could not open specified configFile: {}\n", configFile); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(configFileContents.error()), false)); !written)
+        return std::unexpected(std::move(written.error()));
       return 1;
     }
 
@@ -79,8 +82,10 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
     if (!configFileJson) {
       if (!configFileJson.error().is<JsonParsingException>())
         return std::unexpected(std::move(configFileJson.error()));
-      cerrf("Could not parse the specified configFile: {}\n", configFile);
-      cerrf("For the following reason: {}\n", outputException(ExceptionDiagnostic(configFileJson.error()), false));
+      if (auto written = Star::print(stderr, "Could not parse the specified configFile: {}\n", configFile); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(configFileJson.error()), false)); !written)
+        return std::unexpected(std::move(written.error()));
       return 1;
     }
 
@@ -114,16 +119,19 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
     if (!configRead) {
       if (!configRead.error().is<JsonException>())
         return std::unexpected(std::move(configRead.error()));
-      cerrf("Could not read the asset_packer config file {}\n", configFile);
-      cerrf("{}\n", outputException(ExceptionDiagnostic(configRead.error()), false));
+      if (auto written = Star::print(stderr, "Could not read the asset_packer config file {}\n", configFile); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "{}\n", Star::output_exception(ExceptionDiagnostic(configRead.error()), false)); !written)
+        return std::unexpected(std::move(written.error()));
       return 1;
     }
   }
 
   bool verbose = opts.switches.contains("v");
-  auto progressCallback = [verbose](std::size_t, std::size_t, String filePath, String assetPath) {
+  auto progressCallback = [verbose](std::size_t, std::size_t, String filePath, String assetPath) -> std::expected<void, StarException> {
     if (verbose)
-      coutf("Adding file '{}' to the target pak as '{}'\n", filePath, assetPath);
+      return Star::print("Adding file '{}' to the target pak as '{}'\n", filePath, assetPath);
+    return {};
   };
 
   auto outputDirectory = File::full_path(File::dir_name(outputFilename));
@@ -137,19 +145,22 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
   if (!built)
     return std::unexpected(std::move(built.error()));
 
-  coutf("Output packed assets to {} in {}s\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count());
+  if (auto written = Star::print("Output packed assets to {} in {}s\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+    return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = packAssets(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

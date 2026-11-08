@@ -19,6 +19,7 @@ import star.logging;
 import star.listener;
 import star.version;
 import std;
+import star.text_formatter;
 
 import star.drawable;
 import star.celestial_coordinate;
@@ -70,9 +71,12 @@ import star.world_server;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
-  auto printed = *stream << descriptor;
+  TextBuffer output;
+  auto printed = write_text(output, descriptor);
   if (!printed)
     *stream << "<ItemDescriptor rendering failed: " << printed.error().what() << ">";
+  else
+    *stream << output.view();
 }
 
 }

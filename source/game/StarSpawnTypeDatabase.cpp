@@ -232,7 +232,7 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
     };
     auto loaded = read_file();
     if (!loaded)
-      return std::unexpected(SpawnTypeDatabaseException(strf("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
+      return std::unexpected(SpawnTypeDatabaseException(Star::format("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
   }
   return result;
 }

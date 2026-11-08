@@ -840,7 +840,7 @@ std::expected<void, StarException> MainInterface::createPane(String const& id, J
   auto available = paneIdAvailable(id);
   if (!available) return std::unexpected(std::move(available.error()));
   if (!*available || m_paneInstances.contains(id))
-    return std::unexpected(GuiException(strf("Pane id '{}' is already registered", id)));
+    return std::unexpected(GuiException(Star::format("Pane id '{}' is already registered", id)));
   if (!PaneLayerNames) return std::unexpected(PaneLayerNames.error());
   auto parsed = PaneLayerNames->get_left(layer);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
@@ -917,7 +917,7 @@ std::expected<std::optional<Json>, StarException> MainInterface::callPane(String
   if (!pane) return std::unexpected(std::move(pane.error()));
   auto scripted = as<BaseScriptPane>(*pane);
   if (!scripted)
-    return std::unexpected(GuiException(strf("Pane '{}' does not expose Lua methods", id)));
+    return std::unexpected(GuiException(Star::format("Pane '{}' does not expose Lua methods", id)));
   return scripted->call(method, arguments);
 }
 
@@ -1031,7 +1031,7 @@ std::expected<bool, StarException> MainInterface::travel(String const& operation
     return true;
   }
   if (operation != "beamUp" && operation != "beamDown" && operation != "deploy")
-    return std::unexpected(GuiException(strf("Unknown travel operation '{}'", operation)));
+    return std::unexpected(GuiException(Star::format("Unknown travel operation '{}'", operation)));
   auto allowed = operation == "beamUp" ? m_client->canBeamUp() : m_client->canBeamDown(operation == "deploy");
   if (!allowed) return std::unexpected(std::move(allowed.error()));
   if (!*allowed) return false;
@@ -2100,7 +2100,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       int counter = 0;
       for (auto const& pair : logMapValues) {
         TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.fontSize * interfaceScale() * counter++)};
-        String& text = formatted.emplace_back(strf("{}^lightgray;:^green,set; {}", pair.first, pair.second));
+        String& text = formatted.emplace_back(Star::format("{}^lightgray;:^green,set; {}", pair.first, pair.second));
         auto size = context().determineTextSize(text, positioning);
         if (!size) return std::unexpected(std::move(size.error()));
         m_debugTextRect.combine(size->padded(m_config->debugBackgroundPad));

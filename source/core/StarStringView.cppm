@@ -4,6 +4,7 @@ import std;
 import star.memory;
 import star.format;
 import star.string;
+import star.text_formatter;
 import star.unicode;
 
 import star.byte_array;
@@ -128,7 +129,7 @@ public:
   friend bool operator!=(StringView s1, StringView s2);
   friend bool operator<(StringView s1, StringView s2);
 
-  friend std::ostream& operator<<(std::ostream& os, StringView const& s);
+  friend void write_text(TextBuffer& output, StringView const& text);
 
 private:
   template <split_view_callback Callback>
@@ -177,6 +178,7 @@ export module star.string_view;
 export namespace Star {
   using ::Star::StringView;
   using ::Star::split_view_callback;
+  using ::Star::write_text;
 }
 
 export template <> struct std::formatter<Star::StringView> : std::formatter<std::string_view> {

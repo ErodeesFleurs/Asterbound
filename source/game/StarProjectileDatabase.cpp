@@ -87,7 +87,7 @@ std::expected<std::shared_ptr<ProjectileDatabase>, StarException> ProjectileData
     String file = scannedFile.string();
     auto config = database->readConfig(file);
     if (!config) {
-      if (auto logged = root.logger().errorException(strf("Could not read projectile '{}'", file), ExceptionDiagnostic(config.error())); !logged)
+      if (auto logged = root.logger().errorException(Star::format("Could not read projectile '{}'", file), ExceptionDiagnostic(config.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
@@ -110,25 +110,25 @@ bool ProjectileDatabase::isProjectile(String const& projectileName) const {
 
 std::expected<Json, StarException> ProjectileDatabase::projectileConfig(String const& type) const {
   auto config = m_configs.find_ref(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->config;
 }
 
 std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::createProjectile(String const& type, Json const& parameters) const {
   auto config = m_configs.find_ref(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return Projectile::create(m_root, config->get(), parameters);
 }
 
 std::expected<String, StarException> ProjectileDatabase::damageKindImage(String const& type) const {
   auto config = m_configs.find_ref(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->damageKindImage;
 }
 
 std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String const& type) const {
   auto config = m_configs.find_ref(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->movementSettings.getFloat("gravityMultiplier", 1);
 }
 
@@ -138,7 +138,7 @@ std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::ne
   auto typeName = ds.read<String>();
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   auto config = m_configs.find_ref(*typeName);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", *typeName)));
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", *typeName)));
   return Projectile::create(m_root, config->get(), ds, rules);
 }
 
@@ -177,7 +177,7 @@ auto physicsType = std::move(*result78);
   auto result79 = config.getObject("movementSettings", JsonObject());
 if (!result79) return std::unexpected(std::move(result79.error()));
 JsonObject movementSettings = std::move(*result79);
-  auto physicsPath = strf("/projectiles/physics.config:{}", physicsType);
+  auto physicsPath = Star::format("/projectiles/physics.config:{}", physicsType);
   auto result80 = assets->json(physicsPath);
 if (!result80) return std::unexpected(assets->withAssetContext(std::move(result80.error()), physicsPath, "Loading projectile physics"));
   projectileConfig->movementSettings = jsonMerge(std::move(*result80), movementSettings);

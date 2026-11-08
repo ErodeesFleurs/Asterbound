@@ -6,6 +6,7 @@ import star.lexical_cast;
 import star.unicode;
 
 import star.formatted_json;
+import star.text_formatter;
 import star.json_path;
 
 #include "gtest/gtest.h"
@@ -940,7 +941,7 @@ TEST(FormattedJsonTest, Utf8WriterPreservesKeyQuirksAndValueNuls) {
   EXPECT_EQ(*value, text);
 }
 
-TEST(FormattedJsonTest, UnicodeAndOutputFailuresKeepTheirFirstError) {
+TEST(FormattedJsonTest, UnicodeFailuresKeepTheirFirstError) {
   std::string invalidKey = "key";
   invalidKey.push_back('\0');
   invalidKey.push_back(static_cast<char>(0xff));
@@ -956,18 +957,14 @@ TEST(FormattedJsonTest, UnicodeAndOutputFailuresKeepTheirFirstError) {
   EXPECT_TRUE(parsed.error().is<JsonParsingException>());
   EXPECT_FALSE(parsed.error().is<UnicodeException>());
 
-  auto valid = FormattedJson::parse("[1]");
-  ASSERT_TRUE(valid);
-  std::ostream failed(nullptr);
-  auto outputFailure = Star::operator<<(failed, *valid);
-  ASSERT_FALSE(outputFailure);
-  EXPECT_TRUE(outputFailure.error().is<JsonException>());
-
   auto invalidScalar = FormattedJson::create(Json(String(std::string(1, static_cast<char>(0xff)))));
   ASSERT_TRUE(invalidScalar);
-  auto earlierFailure = Star::operator<<(failed, *invalidScalar);
+  TextBuffer output;
+  output.append("unchanged");
+  auto earlierFailure = write_text(output, *invalidScalar);
   ASSERT_FALSE(earlierFailure);
   EXPECT_TRUE(earlierFailure.error().is<UnicodeException>());
+  EXPECT_EQ(output.view(), "unchanged");
 }
 
 TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
@@ -1022,10 +1019,10 @@ TEST(FormattedJsonTest, BatchArrayUnicodeFailureDoesNotWritePartialOutput) {
   List<FormattedJson> values{*valid, *invalid};
   auto batch = FormattedJson::createArray(values);
   ASSERT_TRUE(batch);
-  std::ostringstream output;
-  output << "unchanged";
-  auto written = Star::operator<<(output, *batch);
+  TextBuffer output;
+  output.append("unchanged");
+  auto written = write_text(output, *batch);
   ASSERT_FALSE(written);
   EXPECT_TRUE(written.error().is<UnicodeException>());
-  EXPECT_EQ(output.str(), "unchanged");
+  EXPECT_EQ(output.view(), "unchanged");
 }

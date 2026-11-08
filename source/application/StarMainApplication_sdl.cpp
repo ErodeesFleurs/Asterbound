@@ -537,7 +537,7 @@ public:
 
       EmergencyLog::info("Application: Initializing SDL");
       if (!SDL_Init(0))
-        return std::unexpected(ApplicationException(strf("Couldn't initialize SDL: {}", SDL_GetError())));
+        return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL: {}", SDL_GetError())));
       m_sdlInitialized = true;
       auto contextScope = NativeUiContextScope::create(nullptr, nullptr, nullptr);
       if (!contextScope)
@@ -581,7 +581,7 @@ public:
     if (auto result = (*m_logger).info("Application: Initializing SDL Video"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
-      return std::unexpected(ApplicationException(strf("Couldn't initialize SDL Video: {}", SDL_GetError())));
+      return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Video: {}", SDL_GetError())));
 
     if (auto result = (*m_logger).info("Application: using Video Driver '{}'", SDL_GetCurrentVideoDriver()); !result)
       return std::unexpected(std::move(result.error()));
@@ -589,12 +589,12 @@ public:
     if (auto result = (*m_logger).info("Application: Initializing SDL Controller"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
-      return std::unexpected(ApplicationException(strf("Couldn't initialize SDL Controller: {}", SDL_GetError())));
+      return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Controller: {}", SDL_GetError())));
 
     if (auto result = (*m_logger).info("Application: Initializing SDL Audio"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
-      return std::unexpected(ApplicationException(strf("Couldn't initialize SDL Audio: {}", SDL_GetError())));
+      return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Audio: {}", SDL_GetError())));
 
     if (auto result = (*m_logger).info("Application: using Audio Driver '{}'", SDL_GetCurrentAudioDriver()); !result)
       return std::unexpected(std::move(result.error()));
@@ -809,7 +809,7 @@ public:
 
   ~SdlPlatform() {
     if (auto result = releaseResources(); !result)
-      EmergencyLog::error("Application: cleanup failed: {}", outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Application: cleanup failed: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true));
   }
 
   using AudioCallback = ApplicationController::AudioCallback;
@@ -855,7 +855,7 @@ public:
   bool closeAudioInputDevice() {
     if (m_sdlAudioInputStream) {
       if (auto result = (*m_logger).info("Closing audio input device"); !result)
-        EmergencyLog::error("Application: cleanup logging failed: {}", outputException(ExceptionDiagnostic(result.error()), true));
+        EmergencyLog::error("Application: cleanup logging failed: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true));
       // Detaching takes the stream lock and waits for an in-flight callback.
       SDL_SetAudioStreamPutCallback(m_sdlAudioInputStream.get(), nullptr, nullptr);
       m_sdlAudioInputStream.reset();
@@ -913,8 +913,8 @@ public:
         result = std::unexpected(std::move(nativeReleased.error()));
       if (!result && m_logger) {
         if (auto logged = m_logger->errorException("Application: failed", ExceptionDiagnostic(result.error())); !logged) {
-          EmergencyLog::error("{}", exceptionReport(result.error()));
-          EmergencyLog::error("Application: failure logging failed: {}", exceptionReport(logged.error()));
+          EmergencyLog::error("{}", Star::exception_report(result.error()));
+          EmergencyLog::error("Application: failure logging failed: {}", Star::exception_report(logged.error()));
         }
         m_failureReported = true;
       }
@@ -956,7 +956,7 @@ public:
       if (result)
         result = std::unexpected(std::move(released.error()));
       else
-        EmergencyLog::error("Application: native cleanup failed: {}", exceptionReport(released.error()));
+        EmergencyLog::error("Application: native cleanup failed: {}", Star::exception_report(released.error()));
     }
     return result;
   }
@@ -1244,8 +1244,8 @@ private:
       m_audioError.emplace(std::move(error));
     else
       if (auto logged = (*m_logger).errorException("Application: audio callback failed", ExceptionDiagnostic(error)); !logged) {
-        EmergencyLog::error("Application: audio callback failed: {}", outputException(ExceptionDiagnostic(error), true));
-        EmergencyLog::error("Application: audio failure logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
+        EmergencyLog::error("Application: audio callback failed: {}", Star::output_exception(ExceptionDiagnostic(error), true));
+        EmergencyLog::error("Application: audio failure logging failed: {}", Star::output_exception(ExceptionDiagnostic(logged.error()), true));
       }
   }
 
@@ -2186,8 +2186,8 @@ private:
 
 int runMainApplication(std::unique_ptr<Application> application, StringList cmdLineArgs) {
   auto reportError = [](StarException const& error, bool diagnosticReported) {
-    auto diagnostic = exceptionSummary(error);
-    EmergencyLog::error("{}", diagnosticReported ? diagnostic : exceptionReport(error));
+    auto diagnostic = Star::exception_summary(error);
+    EmergencyLog::error("{}", diagnosticReported ? diagnostic : Star::exception_report(error));
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", diagnostic.c_str(), nullptr);
     return 1;
   };

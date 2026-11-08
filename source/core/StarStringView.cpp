@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.memory;
 import star.string_view;
 import star.string;
@@ -247,5 +248,5 @@ bool operator==(StringView a, String const& b) { return a.m_view.compare(std::st
 bool operator==(StringView a, StringView b) { return a.m_view == b.m_view; }
 bool operator!=(StringView a, StringView b) { return a.m_view != b.m_view; }
 bool operator<(StringView a, StringView b) { return a.m_view < b.m_view; }
-std::ostream& operator<<(std::ostream& os, StringView const& s) { return os << s.utf8(); }
+void write_text(TextBuffer& output, StringView const& text) { output.append(text.utf8()); }
 }

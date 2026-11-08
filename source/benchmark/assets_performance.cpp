@@ -64,8 +64,8 @@ void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session,
     return;
   }
   for (unsigned i = 0; i != count; ++i) {
-    auto name = strf("asset{}.json", i);
-    auto written = File::write_file(String(strf("{{\"index\":{}}}", i)), File::relative_to(*directory, name));
+    auto name = Star::format("asset{}.json", i);
+    auto written = File::write_file(String(Star::format("{{\"index\":{}}}", i)), File::relative_to(*directory, name));
     if (!written) {
       session.fail(state, written.error());
       return;

@@ -277,7 +277,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
   m_stopSource = std::stop_source{};
   auto stopToken = m_stopSource.get_token();
   for (std::size_t i = 0; i < m_numWorkerThreads; ++i) {
-    auto thread = Thread::invoke(strf("UniverseConnectionServer::worker_{}", i), [&server = *this, i, stopToken]() -> std::expected<void, StarException> {
+    auto thread = Thread::invoke(Star::format("UniverseConnectionServer::worker_{}", i), [&server = *this, i, stopToken]() -> std::expected<void, StarException> {
       auto processed = server.processConnections(i, stopToken);
       if (!processed) {
         std::unique_lock connectionsLocker(server.m_connectionsMutex, std::defer_lock);
@@ -340,7 +340,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
       if (!transmitted) {
         p.second->packetSocket->close();
         connectionLocker.unlock();
-        auto logged = m_logger.errorException(strf("Error receiving incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(transmitted.error()));
+        auto logged = m_logger.errorException(Star::format("Error receiving incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(transmitted.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         continue;
@@ -354,7 +354,7 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
           if (p.second->packetSocket)
             p.second->packetSocket->close();
           connectionLocker.unlock();
-          auto logged = m_logger.errorException(strf("Error handling incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(received.error()));
+          auto logged = m_logger.errorException(Star::format("Error handling incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(received.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -373,10 +373,10 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
 UniverseConnectionServer::~UniverseConnectionServer() {
   auto closed = close();
   if (!closed)
-    EmergencyLog::error("UniverseConnectionServer worker cleanup failed: {}", outputException(closed.error(), true));
+    EmergencyLog::error("UniverseConnectionServer worker cleanup failed: {}", Star::output_exception(closed.error(), true));
   if (!isClosed()) {
     EmergencyLog::error("UniverseConnectionServer retains unjoined native workers during owner destruction");
-    fatalError("Cannot destroy a universe connection server with unjoined native workers", false);
+    Star::fatal_error("Cannot destroy a universe connection server with unjoined native workers", false);
   }
 }
 

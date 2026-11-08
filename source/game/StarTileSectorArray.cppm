@@ -525,7 +525,7 @@ template <typename Tile, unsigned SectorSize>
 [[nodiscard]] auto TileSectorArray<Tile, SectorSize>::splitRect(RectI rect) const -> std::expected<StaticList<SplitRect, 2>, StarException> {
   // TODO: Offset here does not support rects outside of -m_worldSize[0] to 2 * m_worldSize[0]!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed(
+    Star::star_assert_failed(
       (rect.xMin() >= -static_cast<int>(m_worldSize[0]) && rect.xMax() <= 2 * static_cast<int>(m_worldSize[0])));
   }
 

@@ -926,7 +926,7 @@ auto treasureDatabase = std::move(*result175);
     }();
     if (!dropped) {
       auto const& e = dropped.error();
-      auto result181 = this->root().logger().warnException(strf("Failed to create treasure for NPC '{}'", npcType()), ExceptionDiagnostic(e));
+      auto result181 = this->root().logger().warnException(Star::format("Failed to create treasure for NPC '{}'", npcType()), ExceptionDiagnostic(e));
 if (!result181) return std::unexpected(std::move(result181.error()));
     
     }

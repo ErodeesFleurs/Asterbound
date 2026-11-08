@@ -62,7 +62,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       return codex;
     }();
     if (!loaded)
-      return std::unexpected(CodexDatabaseException(strf("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
+      return std::unexpected(CodexDatabaseException(Star::format("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
     result->m_codexes[(*loaded)->id()] = std::move(*loaded);
   }
   return result;

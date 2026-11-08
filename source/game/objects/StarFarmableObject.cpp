@@ -320,7 +320,7 @@ std::expected<bool, StarException> FarmableObject::harvest() {
     if (!objectNameResult)
       return std::unexpected(std::move(objectNameResult.error()));
     auto objectName = std::move(*objectNameResult);
-    auto operation9 = root().logger().warnException(strf("Failed to create treasure for farmable object '{}'", objectName), ExceptionDiagnostic(dropped.error()));
+    auto operation9 = root().logger().warnException(Star::format("Failed to create treasure for farmable object '{}'", objectName), ExceptionDiagnostic(dropped.error()));
     if (!operation9)
       return std::unexpected(std::move(operation9.error()));
   }
@@ -531,8 +531,8 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     m_stageAlt = alt;
   }
   m_stage = newStage;
-  setImageKey("stage", toString(m_stage));
-  setImageKey("alt", toString(m_stageAlt));
+  setImageKey("stage", Star::to_string(m_stage));
+  setImageKey("alt", Star::to_string(m_stageAlt));
   return {};
 }
 
@@ -561,8 +561,8 @@ std::expected<void, StarException> FarmableObject::readStoredData(Json const& di
   auto nextStageTime = std::move(*nextStageTimeResult);
   m_nextStageTime = nextStageTime;
   m_finalStage = (m_stage == static_cast<int>(m_stages.size()) - 1);
-  setImageKey("stage", toString(m_stage));
-  setImageKey("alt", toString(m_stageAlt));
+  setImageKey("stage", Star::to_string(m_stage));
+  setImageKey("alt", Star::to_string(m_stageAlt));
   return {};
 }
 

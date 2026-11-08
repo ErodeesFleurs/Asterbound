@@ -68,7 +68,7 @@ std::expected<std::shared_ptr<TcpSocket>, StarException> TcpSocket::accept(Logge
   if (invalidSocketDescriptor(socketDesc)) {
     if (netErrorInterrupt())
       return std::shared_ptr<TcpSocket>{};
-    return std::unexpected(NetworkException(strf("Cannot accept connection: {}", netErrorString())));
+    return std::unexpected(NetworkException(Star::format("Cannot accept connection: {}", netErrorString())));
   }
 
   auto socketImpl = std::make_shared<SocketImpl>();
@@ -124,7 +124,7 @@ std::expected<std::size_t, StarException> TcpSocket::receive(std::span<char> dat
     } else if (netErrorInterrupt()) {
       r = 0;
     } else {
-      return std::unexpected(NetworkException(strf("tcp recv error: {}", netErrorString())));
+      return std::unexpected(NetworkException(Star::format("tcp recv error: {}", netErrorString())));
     }
   } else if (r == 0 && !data.empty()) {
     doShutdown();
@@ -154,7 +154,7 @@ std::expected<std::size_t, StarException> TcpSocket::send(std::span<char const> 
     } else if (netErrorInterrupt()) {
       w = 0;
     } else {
-      return std::unexpected(NetworkException(strf("tcp send error: {}", netErrorString())));
+      return std::unexpected(NetworkException(Star::format("tcp send error: {}", netErrorString())));
     }
   }
 
@@ -189,7 +189,7 @@ std::expected<void, StarException> TcpSocket::connect(HostAddressWithPort const&
   if (auto status = setNativeFromAddress(addressWithPort, &sockAddr, &sockAddrLen); !status)
     return std::unexpected(std::move(status.error()));
   if (::connect(m_impl->socketDesc, (struct sockaddr*)&sockAddr, sockAddrLen) < 0)
-    return std::unexpected(NetworkException(strf("cannot connect to {}: {}", addressWithPort, netErrorString())));
+    return std::unexpected(NetworkException(Star::format("cannot connect to {}: {}", addressWithPort, netErrorString())));
 
 #if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD
   // Don't generate sigpipe
@@ -225,11 +225,11 @@ std::expected<std::unique_ptr<TcpServer>, StarException> TcpServer::create(Logge
 
 TcpServer::~TcpServer() {
   if (auto status = stop(); !status) {
-    if (auto logged = m_logger.error("TcpServer shutdown failed: {}", outputException(ExceptionDiagnostic(status.error()), true)); !logged)
-      EmergencyLog::error("TcpServer shutdown diagnostic failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
+    if (auto logged = m_logger.error("TcpServer shutdown failed: {}", Star::output_exception(ExceptionDiagnostic(status.error()), true)); !logged)
+      EmergencyLog::error("TcpServer shutdown diagnostic failed: {}", Star::output_exception(ExceptionDiagnostic(logged.error()), true));
   }
   if (!isClosed())
-    fatalError("Cannot destroy a TCP server with an unjoined callback thread", false);
+    Star::fatal_error("Cannot destroy a TCP server with an unjoined callback thread", false);
 }
 
 std::expected<void, StarException> TcpServer::stop() {
@@ -274,14 +274,14 @@ std::expected<void, StarException> TcpServer::setAcceptCallback(AcceptCallback c
       while (true) {
         auto connection = accept(timeout);
         if (!connection) {
-          if (auto logged = m_logger.error("TcpServer caught error accepting connection {}", outputException(ExceptionDiagnostic(connection.error()), false)); !logged) {
+          if (auto logged = m_logger.error("TcpServer caught error accepting connection {}", Star::output_exception(ExceptionDiagnostic(connection.error()), false)); !logged) {
             m_listenSocket->close();
             return std::unexpected(std::move(logged.error()));
           }
         } else if (*connection) {
           auto status = m_callback(*connection);
           if (!status) {
-            auto logged = m_logger.error("TcpServer will close, listener callback failed: {}", outputException(ExceptionDiagnostic(status.error()), true));
+            auto logged = m_logger.error("TcpServer will close, listener callback failed: {}", Star::output_exception(ExceptionDiagnostic(status.error()), true));
             m_listenSocket->close();
             if (!logged)
               return std::unexpected(std::move(logged.error()));

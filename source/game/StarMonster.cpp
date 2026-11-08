@@ -836,7 +836,7 @@ treasurePool = std::move(*result121);
     }();
     if (!dropped) {
       auto const& e = dropped.error();
-      auto result130 = this->root().logger().warnException(strf("Failed to create treasure for monster '{}'", m_monsterVariant.type), ExceptionDiagnostic(e));
+      auto result130 = this->root().logger().warnException(Star::format("Failed to create treasure for monster '{}'", m_monsterVariant.type), ExceptionDiagnostic(e));
 if (!result130) return std::unexpected(std::move(result130.error()));
     
     }
@@ -1121,7 +1121,7 @@ std::expected<LuaCallbacks, StarException> Monster::makeMonsterCallbacks() {
 if (!result180) return std::unexpected(std::move(result180.error()));
 
   auto result181 = callbacks.registerCallback("seed", [this]() {
-      return toString(m_monsterVariant.seed);
+      return Star::to_string(m_monsterVariant.seed);
     });
 if (!result181) return std::unexpected(std::move(result181.error()));
 

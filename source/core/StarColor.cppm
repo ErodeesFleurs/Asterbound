@@ -1,7 +1,7 @@
 module;
 import std;
 import star.string;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.string_view;
 import star.vector;
@@ -156,7 +156,7 @@ private:
   Vec4F m_data;
 };
 
-std::ostream& operator<<(std::ostream& os, Color const& c);
+void write_text(TextBuffer& buffer, Color const& c);
 
 inline Vec3F Color::v3bToFloat(Vec3B const& b) {
   return Vec3F(byteToFloat(b[0]), byteToFloat(b[1]), byteToFloat(b[2]));
@@ -178,11 +178,11 @@ inline Vec4B Color::v4fToByte(Vec4F const& f, bool doClamp) {
 
 export module star.color;
 
-export template <> struct std::formatter<Star::Color> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::Color> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::ColorExceptionTag;
   using ::Star::ColorException;
   using ::Star::Color;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

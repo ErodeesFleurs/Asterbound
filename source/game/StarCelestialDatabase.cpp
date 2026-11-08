@@ -443,7 +443,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
       auto closed = m_database.close();
       if (!closed)
         return std::unexpected(std::move(closed.error()));
-      auto renamed = File::rename(*databaseFile, strf("{}.{}.fail", *databaseFile, Time::millisecondsSinceEpoch()));
+      auto renamed = File::rename(*databaseFile, Star::format("{}.{}.fail", *databaseFile, Time::millisecondsSinceEpoch()));
       if (!renamed)
         return std::unexpected(std::move(renamed.error()));
       auto replacement = File::open(*databaseFile, IOMode::ReadWrite);
@@ -1008,19 +1008,19 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
   String prefix = m_generationInformation.systemPrefixNames.select(random);
   String mid = m_generationInformation.systemNames.select(random);
   String suffix = m_generationInformation.systemSuffixNames.select(random);
-  auto systemName = String(strf("{} {} {}", prefix, mid, suffix)).trim();
+  auto systemName = String(Star::format("{} {} {}", prefix, mid, suffix)).trim();
   if (!systemName)
     return std::unexpected(std::move(systemName.error()));
-  auto oneDigit = systemName->replace("<onedigit>", strf("{:01d}", random.randu32() % 10));
+  auto oneDigit = systemName->replace("<onedigit>", Star::format("{:01d}", random.randu32() % 10));
   if (!oneDigit)
     return std::unexpected(std::move(oneDigit.error()));
-  auto twoDigits = oneDigit->replace("<twodigit>", strf("{:02d}", random.randu32() % 100));
+  auto twoDigits = oneDigit->replace("<twodigit>", Star::format("{:02d}", random.randu32() % 100));
   if (!twoDigits)
     return std::unexpected(std::move(twoDigits.error()));
-  auto threeDigits = twoDigits->replace("<threedigit>", strf("{:03d}", random.randu32() % 1000));
+  auto threeDigits = twoDigits->replace("<threedigit>", Star::format("{:03d}", random.randu32() % 1000));
   if (!threeDigits)
     return std::unexpected(std::move(threeDigits.error()));
-  auto fourDigits = threeDigits->replace("<fourdigit>", strf("{:04d}", random.randu32() % 10000));
+  auto fourDigits = threeDigits->replace("<fourdigit>", Star::format("{:04d}", random.randu32() % 10000));
   if (!fourDigits)
     return std::unexpected(std::move(fourDigits.error()));
   systemName = std::move(fourDigits);
@@ -1044,7 +1044,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
       auto planetarySuffix = m_generationInformation.planetarySuffixes.at(static_cast<std::size_t>(planetIndex));
       if (!planetarySuffix)
         return std::unexpected(std::move(planetarySuffix.error()));
-      String planetName = strf("{} {}", *systemName, planetarySuffix->get());
+      String planetName = Star::format("{} {}", *systemName, planetarySuffix->get());
       auto parameters = CelestialParameters::create(m_root, planetCoordinate, planetSeed, planetName, planetaryParameters);
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
@@ -1067,7 +1067,7 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
           auto satelliteSuffix = m_generationInformation.satelliteSuffixes.at(static_cast<std::size_t>(satelliteIndex));
           if (!satelliteSuffix)
             return std::unexpected(std::move(satelliteSuffix.error()));
-          String satelliteName = strf("{} {}", planetName, satelliteSuffix->get());
+          String satelliteName = Star::format("{} {}", planetName, satelliteSuffix->get());
           auto parameters = CelestialParameters::create(m_root, satelliteCoordinate, satelliteSeed, satelliteName, satelliteParameters);
           if (!parameters)
             return std::unexpected(std::move(parameters.error()));

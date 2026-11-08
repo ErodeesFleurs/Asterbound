@@ -69,7 +69,7 @@ std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bbox.xMax() - bbox.xMin() <= static_cast<float>(m_size[0])));
+    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<float>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
@@ -96,7 +96,7 @@ std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bbox.xMax() - bbox.xMin() <= static_cast<int>(m_size[0])));
+    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<int>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
@@ -210,12 +210,12 @@ std::expected<StaticList<Vec2I, 2>, StarException> WorldGeometry::splitXRegion(V
     return StaticList<Vec2I, 2>::create({xRegion});
 
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] >= xRegion[0]));
+    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
   }
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] - xRegion[0] <= static_cast<int>(m_size[0])));
+    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<int>(m_size[0])));
   }
 
   int x1 = xwrap(xRegion[0]);
@@ -233,12 +233,12 @@ std::expected<StaticList<Vec2F, 2>, StarException> WorldGeometry::splitXRegion(V
     return StaticList<Vec2F, 2>::create({xRegion});
 
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] >= xRegion[0]));
+    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
   }
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] - xRegion[0] <= static_cast<float>(m_size[0])));
+    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<float>(m_size[0])));
   }
 
   float x1 = xwrap(xRegion[0]);

@@ -154,7 +154,7 @@ std::expected<Drawable, StarException> Animation::drawable(float pixelSize) cons
     return Drawable();
   String baseFrame = AssetPath::relative_to(m_directory, m_base).replace_tags(m_tagValues);
   if (m_appendFrame)
-    baseFrame += ":" + toString(m_frame);
+    baseFrame += ":" + Star::to_string(m_frame);
   auto imageMetadata = m_root.get().imageMetadataDatabase();
   if (!imageMetadata)
     return std::unexpected(std::move(imageMetadata.error()));
@@ -188,7 +188,7 @@ void Animation::update(float dt) {
     m_completed = true;
   }
 
-  m_tagValues["index"] = toString(m_frame);
+  m_tagValues["index"] = Star::to_string(m_frame);
 }
 
 Animation::PlaybackState Animation::playbackState() const {
@@ -214,7 +214,7 @@ void Animation::samplePlayback(PlaybackState const& previous, float elapsed) {
     m_frame = m_variantOffset + clamp<int>(withinCycle / (m_animationCycle / m_frameNumber), 0, m_frameNumber - 1);
   }
   if (m_frame != previousFrame)
-    m_tagValues["index"] = toString(m_frame);
+    m_tagValues["index"] = Star::to_string(m_frame);
 }
 
 bool Animation::isComplete() const {

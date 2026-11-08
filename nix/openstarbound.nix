@@ -159,6 +159,7 @@ let
     "vector_benchmarks"
     "set_benchmarks"
     "string_benchmarks"
+    "format_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

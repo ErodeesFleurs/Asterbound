@@ -528,7 +528,7 @@ std::expected<void, StarException> Cinematic::render() {
         m_completable = true;
       if (!values.alpha)
         continue;
-      auto frame = toString(static_cast<int>(values.frame) % panel->animationFrames);
+      auto frame = Star::to_string(static_cast<int>(values.frame) % panel->animationFrames);
       auto alphaColor = Color::rgbaf(1.0f, 1.0f, 1.0f, values.alpha);
       for (auto const& d : panel->drawables) {
         auto metadata = m_guiContext.get().root().imageMetadataDatabase();
@@ -600,8 +600,8 @@ std::expected<void, StarException> Cinematic::render() {
     if (!resetScissor) {
       if (!panelsRendered)
         return std::unexpected(panelsRendered.error().withContext(
-            strf("Cinematic scissor restoration failed: {}",
-                printException(ExceptionDiagnostic(resetScissor.error()), true))));
+            Star::format("Cinematic scissor restoration failed: {}",
+                Star::print_exception(ExceptionDiagnostic(resetScissor.error()), true))));
       return std::unexpected(std::move(resetScissor.error()));
     }
   }

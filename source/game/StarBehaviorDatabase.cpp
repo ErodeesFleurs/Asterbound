@@ -86,7 +86,7 @@ std::expected<NodeParameterValue, StarException> replaceBehaviorTag(NodeParamete
         auto key = text->substr(1, *size - 2);
         if (!key) return std::unexpected(std::move(key.error()));
         if (auto replacement = treeParameters.maybe(*key)) return *replacement;
-        return std::unexpected(StarException(strf("No parameter specified for tag '{}'", *text)));
+        return std::unexpected(StarException(Star::format("No parameter specified for tag '{}'", *text)));
       }
     }
   }
@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       }
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
   }
   auto behaviors = assets->scanExtension("behavior");
   if (!behaviors) return std::unexpected(std::move(behaviors.error()));
@@ -167,12 +167,12 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       if (!config) return std::unexpected(std::move(config.error()));
       auto name = config->getString("name");
       if (!name) return std::unexpected(std::move(name.error()));
-      if (database->m_configs.contains(*name)) return std::unexpected(StarException(strf("Duplicate behavior tree '{}'", *name)));
+      if (database->m_configs.contains(*name)) return std::unexpected(StarException(Star::format("Duplicate behavior tree '{}'", *name)));
       database->m_configs[*name] = std::move(*config);
       database->m_configPaths[*name] = file;
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
   }
   for (auto const& pair : database->m_configs) {
     if (!database->m_behaviors.contains(pair.first)) {
@@ -184,11 +184,11 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
 }
 std::expected<std::shared_ptr<BehaviorTree const>, StarException> BehaviorDatabase::behaviorTree(String const& name) const {
   if (auto tree = m_behaviors.maybe(name)) return *tree;
-  return std::unexpected(StarException(strf("No such behavior tree '{}'", name)));
+  return std::unexpected(StarException(Star::format("No such behavior tree '{}'", name)));
 }
 std::expected<Json, StarException> BehaviorDatabase::behaviorConfig(String const& name) const {
   if (auto config = m_configs.maybe(name)) return *config;
-  return std::unexpected(StarException(strf("No such behavior tree '{}'", name)));
+  return std::unexpected(StarException(Star::format("No such behavior tree '{}'", name)));
 }
 std::expected<void, StarException> BehaviorDatabase::loadTree(String const& name) {
   auto config = behaviorConfig(name);
@@ -265,7 +265,7 @@ std::expected<CompositeNode, StarException> BehaviorDatabase::compositeNode(Json
     return CompositeNode(ParallelNode(succeed, fail, std::move(children)));
   }
   }
-  return std::unexpected(StarException(strf("Composite node type '{}' could not be created from JSON", *name)));
+  return std::unexpected(StarException(Star::format("Composite node type '{}' could not be created from JSON", *name)));
 }
 std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDatabase::behaviorNode(Json const& json, StringMap<NodeParameterValue> const& treeParameters, BehaviorTree& tree) const {
   auto typeName = json.getString("type");
@@ -339,6 +339,6 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!composite) return std::unexpected(std::move(composite.error()));
     return std::make_shared<BehaviorNode>(std::move(*composite));
   }
-  return std::unexpected(StarException(strf("Behavior node type '{}' could not be created from JSON", *typeName)));
+  return std::unexpected(StarException(Star::format("Behavior node type '{}' could not be created from JSON", *typeName)));
 }
 }

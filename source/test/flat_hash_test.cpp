@@ -1,3 +1,4 @@
+import star.text_formatter;
 import std;
 import star.format;
 import star.flat_hash_set;
@@ -922,10 +923,7 @@ void expectMapOwnershipContract() {
   EXPECT_TRUE(owners.empty());
 
   MapType<int, int> printed{{1, 2}};
-  std::ostringstream stream;
-  stream << printed;
-  EXPECT_EQ(stream.str(), "{ \"1\" : \"2\" }");
-  EXPECT_EQ(std::format("{}", printed), stream.str());
+  EXPECT_EQ(std::format("{}", printed), "{ \"1\" : \"2\" }");
 }
 
 template <template <typename...> class MapType> void expect_map_reference_slots() {
@@ -1101,12 +1099,12 @@ struct FallibleSetValue {
   int value;
   std::reference_wrapper<std::vector<int>> visited;
   friend bool operator<(FallibleSetValue const& a, FallibleSetValue const& b) { return a.value < b.value; }
-  friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& stream, FallibleSetValue const& value) {
+  friend std::expected<void, StarException> write_text(TextBuffer& output, FallibleSetValue const& value) {
     value.visited.get().push_back(value.value);
     if (value.value == 2)
       return std::unexpected(OutOfRangeException("first diagnostic error", false));
-    stream << value.value;
-    return std::ref(stream);
+    append_text(output, value.value);
+    return {};
   }
 };
 
@@ -1174,25 +1172,25 @@ TEST(SetComposition, TakeTransfersMoveOnlyValues) {
 TEST(MapComposition, CheckedDiagnosticStopsAtFirstValueError) {
   std::vector<int> visited;
   Map<int, FallibleSetValue> values{{1, {1, std::ref(visited)}}, {2, {2, std::ref(visited)}}, {3, {3, std::ref(visited)}}};
-  std::ostringstream stream;
-  auto printed = stream << values;
-  static_assert(std::same_as<decltype(printed), std::expected<std::reference_wrapper<std::ostream>, StarException>>);
+  TextBuffer output;
+  auto printed = write_text(output, values);
+  static_assert(std::same_as<decltype(printed), std::expected<void, StarException>>);
   ASSERT_FALSE(printed);
   EXPECT_TRUE(printed.error().is<OutOfRangeException>());
   EXPECT_EQ(visited, (std::vector<int>{1, 2}));
-  EXPECT_EQ(stream.str(), "{ \"1\" : \"1\", \"2\" : \"");
+  EXPECT_EQ(output.view(), "{ \"1\" : \"1\", \"2\" : \"");
 }
 
 TEST(SetComposition, CheckedDiagnosticStopsAtFirstElementError) {
   std::vector<int> visited;
   Set<FallibleSetValue> values{{1, std::ref(visited)}, {2, std::ref(visited)}, {3, std::ref(visited)}};
-  std::ostringstream stream;
-  auto printed = stream << values;
-  static_assert(std::same_as<decltype(printed), std::expected<std::reference_wrapper<std::ostream>, StarException>>);
+  TextBuffer output;
+  auto printed = write_text(output, values);
+  static_assert(std::same_as<decltype(printed), std::expected<void, StarException>>);
   ASSERT_FALSE(printed);
   EXPECT_TRUE(printed.error().is<OutOfRangeException>());
   EXPECT_EQ(visited, (std::vector<int>{1, 2}));
-  EXPECT_EQ(stream.str(), "(1, ");
+  EXPECT_EQ(output.view(), "(1, ");
 
   Set<int> ordered{1, 2};
   HashSet<int> flat{1};

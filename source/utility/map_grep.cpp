@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.json;
 import star.native_runtime;
@@ -24,7 +25,7 @@ using MatchCriteria = std::variant<TileName, TileProperty>;
 struct SearchParameters {
   MatchCriteria criteria;
 };
-using MatchReporter = std::function<void(String const&, Vec2I const&)>;
+using MatchReporter = std::function<std::expected<void, StarException>(String const&, Vec2I const&)>;
 String const MapFilenameSuffix = ".json";
 
 [[nodiscard]]
@@ -68,8 +69,11 @@ std::expected<void, StarException> grepTileLayer(SearchParameters const& search,
     auto name = matchTile(search, static_cast<Tiled::Tile const&>(tile));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (*name)
-      callback(**name, pos);
+    if (*name) {
+      auto reported = callback(**name, pos);
+      if (!reported)
+        return std::unexpected(std::move(reported.error()));
+    }
     return false;
   });
   if (!visited)
@@ -83,8 +87,11 @@ std::expected<void, StarException> grepObjectGroup(SearchParameters const& searc
     auto name = matchTile(search, object->tile());
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (*name)
-      callback(**name, object->pos());
+    if (*name) {
+      auto reported = callback(**name, object->pos());
+      if (!reported)
+        return std::unexpected(std::move(reported.error()));
+    }
   }
   return {};
 }
@@ -102,14 +109,14 @@ std::expected<void, StarException> grepMap(Root& root, SearchParameters const& s
     return std::unexpected(std::move(map.error()));
   for (auto const& layer : (*map)->tileLayers()) {
     auto searched = grepTileLayer(search, **map, *layer, [&](String const& name, Vec2I const& pos) {
-      coutf("{}: {}: {} @ {}\n", file, layer->name(), name, pos);
+      return Star::print("{}: {}: {} @ {}\n", file, layer->name(), name, pos);
     });
     if (!searched)
       return std::unexpected(std::move(searched.error()));
   }
   for (auto const& group : (*map)->objectGroups()) {
     auto searched = grepObjectGroup(search, *group, [&](String const& name, Vec2I const& pos) {
-      coutf("{}: {}: {} @ {}\n", file, group->name(), name, pos);
+      return Star::print("{}: {}: {} @ {}\n", file, group->name(), name, pos);
     });
     if (!searched)
       return std::unexpected(std::move(searched.error()));
@@ -211,7 +218,8 @@ int main(int argc, char* argv[]) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

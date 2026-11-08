@@ -442,7 +442,7 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
             float time_per_frame = layer.animationCycle / layer.frameNumber;
             float frame_number = time_within_cycle / time_per_frame;
             int frame = (layer.frameOffset + clamp<int>(frame_number, 0, layer.frameNumber - 1)) % layer.frameNumber;
-            withDirectives.subPath.emplace(toString(frame));
+            withDirectives.subPath.emplace(Star::to_string(frame));
           }
           auto texture = m_textureGroup->tryTexture(withDirectives);
           if (!texture) return std::unexpected(std::move(texture.error()));
@@ -609,7 +609,7 @@ std::expected<void, StarException> EnvironmentPainter::setupStars(SkyRenderData 
   textures.resize(starTypesSize * sky.starFrames);
   for (std::size_t i = 0; i < starTypesSize; ++i) {
     for (std::size_t j = 0; j < sky.starFrames; ++j) {
-      auto texture = m_textureGroup->loadTexture(starTypes[i] + ":" + toString(j));
+      auto texture = m_textureGroup->loadTexture(starTypes[i] + ":" + Star::to_string(j));
       if (!texture) return std::unexpected(std::move(texture.error()));
       textures[i * sky.starFrames + j] = std::move(*texture);
     }

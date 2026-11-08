@@ -55,7 +55,7 @@ std::expected<void, StarException> IODevice::close() {
 
 std::expected<void, StarException> IODevice::sync() { return {}; }
 
-std::expected<String, StarException> IODevice::device_name() const { return strf("IODevice <{}>", (void*)this); }
+std::expected<String, StarException> IODevice::device_name() const { return Star::format("IODevice <{}>", (void*)this); }
 
 std::expected<bool, StarException> IODevice::at_end() {
   auto position = pos();

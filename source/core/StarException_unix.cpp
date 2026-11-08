@@ -8,6 +8,7 @@
 #endif
 import star.format;
 import star.logging;
+import star.text_formatter;
 
 import std;
 
@@ -16,19 +17,22 @@ namespace Star {
 
 // Capture object identity before a module can be unloaded, but leave symbol
 // resolution to the origin payload's independently cached full rendering.
-static std::function<void(std::ostream&, bool)> captureStack() {
+static std::function<void(TextBuffer&, bool)> capture_stack() {
 #ifdef STAR_USE_CPPTRACE
-  return [stack = cpptrace::generate_object_trace(1)](std::ostream& os, bool) {
+  return [stack = cpptrace::generate_object_trace(1)](TextBuffer& buffer, bool) {
         auto formatter = cpptrace::formatter{}
           .paths(cpptrace::formatter::path_mode::basename);
-        formatter.print(os, stack.resolve());
+        // cpptrace's string API omits the newline appended by its print API.
+        buffer.append(formatter.format(stack.resolve()));
+        buffer.push_back('\n');
         // The resolver may have lost access to an unloaded or removed object.
         // Keep every captured address and module-relative address regardless of
         // how many frames (including inlined frames) it can resolve later.
-        os << "\nCaptured objects:";
+        buffer.append("\nCaptured objects:");
         for (std::size_t i = 0; i < stack.frames.size(); ++i) {
           auto const& frame = stack.frames[i];
-          os << strf("\n[{}] 0x{:x} {} +0x{:x}", i, frame.raw_address, frame.object_path, frame.object_address);
+          std::format_to(std::back_inserter(buffer), "\n[{}] 0x{:x} {} +0x{:x}",
+              i, frame.raw_address, frame.object_path, frame.object_address);
         }
       };
 #else
@@ -51,49 +55,51 @@ static std::function<void(std::ostream&, bool)> captureStack() {
       frame.base = info.dli_fbase;
     }
   }
-  return [frames = std::move(frames)](std::ostream& os, bool) {
+  return [frames = std::move(frames)](TextBuffer& buffer, bool) {
         for (std::size_t i = 0; i < frames.size(); ++i) {
           auto const& frame = frames[i];
           if (i)
-            os << '\n';
-          os << strf("[{}] {}", i, frame.address);
+            buffer.push_back('\n');
+          std::format_to(std::back_inserter(buffer), "[{}] {}", i, frame.address);
           if (!frame.module.empty())
-            os << strf(" {} +0x{:x}", frame.module,
+            std::format_to(std::back_inserter(buffer), " {} +0x{:x}", frame.module,
                 reinterpret_cast<std::uintptr_t>(frame.address) - reinterpret_cast<std::uintptr_t>(frame.base));
           Dl_info current{};
           if (dladdr(frame.address, &current) && current.dli_fbase == frame.base
-              && current.dli_fname && frame.module == current.dli_fname && current.dli_sname)
-            os << " " << current.dli_sname;
+              && current.dli_fname && frame.module == current.dli_fname && current.dli_sname) {
+            buffer.push_back(' ');
+            buffer.append(current.dli_sname);
+          }
         }
         if (frames.size() == StackLimit)
-          os << "\n[Stack Output Limit Reached]";
+          buffer.append("\n[Stack Output Limit Reached]");
       };
 #endif
 }
 
-static std::string captureBacktrace() {
-  std::ostringstream os;
-  captureStack()(os, true);
-  return os.str();
+static std::string capture_backtrace() {
+  TextBuffer buffer;
+  capture_stack()(buffer, true);
+  return std::move(buffer).str();
 }
 
-std::function<void(std::ostream&, bool)> StarException::captureOriginStack() {
-  return captureStack();
+std::function<void(TextBuffer&, bool)> StarException::capture_origin_stack() {
+  return capture_stack();
 }
 
-OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return OutputProxy([payload = e.m_payload, fullStacktrace](std::ostream& os) {
-    os << payload->rendered(fullStacktrace);
+OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace) {
+  return OutputProxy([payload = e.m_payload, fullStacktrace](TextBuffer& buffer) {
+    buffer.append(payload->rendered(fullStacktrace));
   });
 }
 
-void printStack(std::string_view message) {
-  EmergencyLog::info("Stack Trace ({})...\n{}", message, captureBacktrace());
+void print_stack(std::string_view message) {
+  EmergencyLog::info("Stack Trace ({})...\n{}", message, capture_backtrace());
 }
 
-void fatalError(std::string_view message, bool showStackTrace) {
+void fatal_error(std::string_view message, bool showStackTrace) {
   if (showStackTrace)
-    EmergencyLog::error("Fatal Error: {}\n{}", message, captureBacktrace());
+    EmergencyLog::error("Fatal Error: {}\n{}", message, capture_backtrace());
   else
     EmergencyLog::error("Fatal Error: {}", message);
 

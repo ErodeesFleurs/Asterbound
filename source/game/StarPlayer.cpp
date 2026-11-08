@@ -3992,13 +3992,13 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
   if (!storeResult)
     return std::unexpected(std::move(storeResult.error()));
   auto store = std::move(*storeResult);
-  if (auto result = setSecretProperty(strf("armorWearer.{}.data", slotName), store); !result)
+  if (auto result = setSecretProperty(Star::format("armorWearer.{}.data", slotName), store); !result)
     return std::unexpected(std::move(result.error()));
   if (m_armorSecretNetVersions.empty()) {
     if (auto result = setSecretProperty("armorWearer.replicating", true); !result)
       return std::unexpected(std::move(result.error()));
   }
-  return setSecretProperty(strf("armorWearer.{}.version", slotName), ++m_armorSecretNetVersions[slot]);
+  return setSecretProperty(Star::format("armorWearer.{}.version", slotName), ++m_armorSecretNetVersions[slot]);
 }
 
 std::expected<void, StarException> Player::setNetArmorSecrets(bool includeEmpty) {
@@ -4036,7 +4036,7 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
       auto const& slotName = slotNameResult->get();
       auto& currentVersion = m_armorSecretNetVersions[slot];
       std::uint64_t newVersion = 0;
-      auto versionResult = getSecretProperty(strf("armorWearer.{}.version", slotName), 0);
+      auto versionResult = getSecretProperty(Star::format("armorWearer.{}.version", slotName), 0);
       if (!versionResult)
         return std::unexpected(std::move(versionResult.error()));
       auto version = std::move(*versionResult);
@@ -4050,7 +4050,7 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
       if (newVersion > currentVersion) {
         currentVersion = newVersion;
         std::shared_ptr<ArmorItem> item;
-        auto storeResult = getSecretProperty(strf("armorWearer.{}.data", slotName));
+        auto storeResult = getSecretProperty(Star::format("armorWearer.{}.data", slotName));
         if (!storeResult)
           return std::unexpected(std::move(storeResult.error()));
         auto store = std::move(*storeResult);
@@ -4467,7 +4467,7 @@ void Player::queueItemPickupMessage(std::shared_ptr<Item> const& item) {
 
 std::expected<void, StarException> Player::addChatMessage(String const& message, Json const& config) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!isSlave()));
+    Star::star_assert_failed((!isSlave()));
   }
   m_chatMessage = message;
   m_chatMessageUpdated = true;
@@ -4482,14 +4482,14 @@ std::expected<void, StarException> Player::addChatMessage(String const& message,
 
 void Player::addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!isSlave()));
+    Star::star_assert_failed((!isSlave()));
   }
   m_emoteState = emote;
   m_emoteCooldownTimer = GameTimer(emoteCooldown.value_or(m_emoteCooldown));
 }
 std::expected<void, StarException> Player::setDance(std::optional<String> const& danceName) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!isSlave()));
+    Star::star_assert_failed((!isSlave()));
   }
   assert(!isSlave());
   m_dance = danceName;
@@ -4551,7 +4551,7 @@ std::expected<void, StarException> Player::instrumentEquipped(String const& inst
 
 std::expected<void, StarException> Player::interact(InteractAction const& action) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!isSlave()));
+    Star::star_assert_failed((!isSlave()));
   }
   m_pendingInteractActions.push_back(RpcPromise<InteractAction>::createFulfilled(action));
   return {};
@@ -4559,7 +4559,7 @@ std::expected<void, StarException> Player::interact(InteractAction const& action
 
 std::expected<void, StarException> Player::addEffectEmitters(StringSet const& emitters) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!isSlave()));
+    Star::star_assert_failed((!isSlave()));
   }
   m_effectEmitter->addEffectSources("normal", emitters);
   return {};
@@ -4751,7 +4751,7 @@ std::expected<void, StarException> Player::finalizeCreation() {
   if (auto result = m_statusController->resetAllResources(); !result)
     return std::unexpected(std::move(result.error()));
   m_effectEmitter->reset();
-  m_description = strf("This {} seems to have nothing to say for {}self.", m_identity.gender == Gender::Male ? "guy" : "gal", m_identity.gender == Gender::Male ? "him" : "her");
+  m_description = Star::format("This {} seems to have nothing to say for {}self.", m_identity.gender == Gender::Male ? "guy" : "gal", m_identity.gender == Gender::Male ? "him" : "her");
   return {};
 }
 
@@ -4904,7 +4904,7 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     if (!descriptionResult)
       return std::unexpected(std::move(descriptionResult.error()));
     auto description = std::move(*descriptionResult);
-    if (auto result = root().logger().errorException(strf("Couldn't queue radio message '{}'", description), ExceptionDiagnostic(decoded.error())); !result)
+    if (auto result = root().logger().errorException(Star::format("Couldn't queue radio message '{}'", description), ExceptionDiagnostic(decoded.error())); !result)
       return std::unexpected(std::move(result.error()));
     return {};
   }
@@ -5104,7 +5104,7 @@ std::expected<Json, StarException> Player::getSecretProperty(String const& name,
     auto value = buffer.read<Json>();
     if (value)
       return std::move(*value);
-    if (auto result = root().logger().errorException(strf("Exception reading secret player property '{}'", name), ExceptionDiagnostic(value.error())); !result)
+    if (auto result = root().logger().errorException(Star::format("Exception reading secret player property '{}'", name), ExceptionDiagnostic(value.error())); !result)
       return std::unexpected(std::move(result.error()));
   }
   return defaultValue;

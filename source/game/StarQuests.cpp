@@ -429,7 +429,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   JsonObject result{{"state", state->get()}, {"arc", *arc}, {"arcPos", m_arcPos},
       {"parameters", *parameters}, {"money", m_money}};
-  auto world = jsonFromOptional(m_worldId, printWorldId);
+  auto world = jsonFromOptional(m_worldId, Star::print_world_id);
   if (!world) return std::unexpected(std::move(world.error()));
   result["worldId"] = std::move(*world);
   auto location = jsonFromOptional(m_location, [](std::pair<Vec3I, SystemLocation> const& location) -> Json {
@@ -962,7 +962,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("worldId", [&quest = *this]() -> std::expected<std::optional<String>, StarException> {
     if (!quest.m_worldId) return std::optional<String>();
-    auto name = printWorldId(*quest.m_worldId);
+    auto name = Star::print_world_id(*quest.m_worldId);
     if (!name) return std::unexpected(std::move(name.error()));
     return std::optional<String>(*name);
   }); !r) return std::unexpected(std::move(r.error()));

@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -174,40 +175,47 @@ void resolveGameplayChords(benchmark::State& state, KeyBindings const& bindings)
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);
   BenchmarkLifetime benchmarkLifetime;
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    std::fprintf(stderr, "%s\n", storage.error().what());
+    if (!Star::print(stderr, "{}\n", storage.error().what()))
+      return 1;
     return 1;
   }
   settings.runtimeConfigFile.reset();
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   auto keysValid = keybindingPreflight(**root);
   if (!keysValid) {
-    std::fprintf(stderr, "%s\n", keysValid.error().what());
+    if (!Star::print(stderr, "{}\n", keysValid.error().what()))
+      return 1;
     return 1;
   }
   if (!*keysValid || !bubblePreflight()) {
-    std::fprintf(stderr, "Frontend semantic preflight failed\n");
+    if (!Star::print(stderr, "Frontend semantic preflight failed\n"))
+      return 1;
     return 1;
   }
   // RootLoader's standalone defaults intentionally do not contain the client's
@@ -227,12 +235,14 @@ int main(int argc, char** argv) {
     "EmoteHappy": [{"type":"key","value":"E","mods":["LShift","LAlt"]}]
   })JSON");
   if (!config) {
-    std::fprintf(stderr, "%s\n", config.error().what());
+    if (!Star::print(stderr, "{}\n", config.error().what()))
+      return 1;
     return 1;
   }
   auto bindings = KeyBindings::create(**root, *config);
   if (!bindings) {
-    std::fprintf(stderr, "%s\n", bindings.error().what());
+    if (!Star::print(stderr, "{}\n", bindings.error().what()))
+      return 1;
     return 1;
   }
   auto bubbles = bubbleFixture();

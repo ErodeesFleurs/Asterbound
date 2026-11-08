@@ -228,7 +228,7 @@ void CellularLightArray<LightTraits>::begin(std::size_t newWidth, std::size_t ne
   m_spreadLights.clear();
   m_pointLights.clear();
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((newWidth > 0 && newHeight > 0));
+    Star::star_assert_failed((newWidth > 0 && newHeight > 0));
   }
 
   if (!m_cells || newWidth != m_width || newHeight != m_height) {
@@ -275,7 +275,7 @@ bool CellularLightArray<LightTraits>::getObstacle(std::size_t x, std::size_t y) 
 template <typename LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -> Cell const & {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((x < m_width && y < m_height));
+    Star::star_assert_failed((x < m_width && y < m_height));
   }
   return m_cells[x * m_height + y];
 }
@@ -283,7 +283,7 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -
 template <typename LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell & {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((x < m_width && y < m_height));
+    Star::star_assert_failed((x < m_width && y < m_height));
   }
   return m_cells[x * m_height + y];
 }
@@ -291,7 +291,7 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell
 template <typename LightTraits>
 auto CellularLightArray<LightTraits>::cellAtIndex(std::size_t index) const -> Cell const & {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((index < m_width * m_height));
+    Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];
 }
@@ -299,7 +299,7 @@ auto CellularLightArray<LightTraits>::cellAtIndex(std::size_t index) const -> Ce
 template <typename LightTraits>
 auto CellularLightArray<LightTraits>::cellAtIndex(std::size_t index) -> Cell & {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((index < m_width * m_height));
+    Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];
 }
@@ -353,7 +353,7 @@ void CellularLightArray<LightTraits>::setSpreadLightingPoints() {
 template <typename LightTraits>
 void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std::size_t yMin, std::size_t xMax, std::size_t yMax) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_width > 0 && m_height > 0));
+    Star::star_assert_failed((m_width > 0 && m_height > 0));
   }
 
   float dropoffAir = 1.0f / m_spreadMaxAir;

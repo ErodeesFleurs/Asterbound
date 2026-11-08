@@ -62,7 +62,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     }();
     if (!loggingResult) return std::unexpected(std::move(loggingResult.error()));
     if (!loaded) {
-      if (auto result = m_root.logger().errorException(strf("Error loading event file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading statistics event"))); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = m_root.logger().errorException(Star::format("Error loading event file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading statistics event"))); !result) return std::unexpected(std::move(result.error()));
     }
   }
   for (auto const& path : achievementFiles->get()) {
@@ -88,7 +88,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     }();
     if (!loggingResult) return std::unexpected(std::move(loggingResult.error()));
     if (!loaded) {
-      if (auto result = m_root.logger().errorException(strf("Error loading achievement file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading achievement"))); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = m_root.logger().errorException(Star::format("Error loading achievement file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading achievement"))); !result) return std::unexpected(std::move(result.error()));
     }
   }
   return {};

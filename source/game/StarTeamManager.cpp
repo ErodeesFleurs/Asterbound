@@ -318,7 +318,7 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
         // caller is too old to handle custom worlds, pretend they're testarena instead to prevent invalid worldid disconnects
         member["world"] = "InstanceWorld:testarena";
       } else {
-          auto world = printWorldId(mem.world);
+          auto world = Star::print_world_id(mem.world);
         if (!world) return std::unexpected(std::move(world.error()));
         member["world"] = *world;
       }

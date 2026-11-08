@@ -298,7 +298,7 @@ auto SmallVector<Element, MaxStackSize>::at(std::size_t i) const -> std::expecte
 template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) -> reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < size()));
+    Star::star_assert_failed((i < size()));
   }
   return m_begin[i];
 }
@@ -306,7 +306,7 @@ auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) -> reference 
 template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) const -> const_reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < size()));
+    Star::star_assert_failed((i < size()));
   }
   return m_begin[i];
 }

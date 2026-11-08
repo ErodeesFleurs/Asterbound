@@ -114,9 +114,12 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
   auto contents = read_all();
   auto closed = file.close();
   if (!contents) {
-    if (!closed)
-      std::fprintf(stderr, "Error closing file '%s' after failed read: %s\n", filename.utf8_data(),
-                   closed.error().what());
+    if (!closed) {
+      if (auto written = Star::print(stderr, "Error closing file '{}' after failed read: {}\n", filename.utf8_data(),
+                   closed.error().what()); !written)
+        return std::unexpected(std::move(contents.error()).withContext(
+            Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
+    }
     return std::unexpected(std::move(contents.error()));
   }
   if (!closed)
@@ -284,11 +287,15 @@ std::expected<void, StarException> File::overwrite_file_with_rename(std::span<ch
     if (!owns_stage)
       return;
     auto closed = staging.close();
-    if (!closed)
-      std::fprintf(stderr, "Error closing staging file '%s': %s\n", new_file.utf8_data(), closed.error().what());
+    if (!closed) {
+      if (auto written = Star::print(stderr, "Error closing staging file '{}': {}\n", new_file.utf8_data(), closed.error().what()); !written)
+        std::_Exit(1);
+    }
     auto removed = remove(new_file);
-    if (!removed)
-      std::fprintf(stderr, "Error removing staging file '%s': %s\n", new_file.utf8_data(), removed.error().what());
+    if (!removed) {
+      if (auto written = Star::print(stderr, "Error removing staging file '{}': {}\n", new_file.utf8_data(), removed.error().what()); !written)
+        std::_Exit(1);
+    }
   });
   auto written = staging.write_full(data);
   if (!written)
@@ -327,8 +334,8 @@ std::expected<void, StarException> File::backup_file_in_sequence(String const& i
   for (unsigned i = maximumBackups; i > 0; --i) {
     bool initial = i == 1;
     String const& sourceFile = initial ? initialFile : targetFile;
-    String curExtension = initial ? "" : strf("{}{}", backupExtensionPrefix, i - 1);
-    String nextExtension = strf("{}{}", backupExtensionPrefix, i);
+    String curExtension = initial ? "" : Star::format("{}{}", backupExtensionPrefix, i - 1);
+    String nextExtension = Star::format("{}{}", backupExtensionPrefix, i);
     auto sourceExists = File::is_regular_file(sourceFile + curExtension);
     if (!sourceExists)
       return std::unexpected(std::move(sourceExists.error()));
@@ -353,8 +360,10 @@ File::File(String filename)
 
 File::~File() noexcept {
   auto result = close();
-  if (!result)
-    std::fprintf(stderr, "Error closing file '%s' during destruction: %s\n", m_filename.utf8_data(), result.error().what());
+  if (!result) {
+    if (auto written = Star::print(stderr, "Error closing file '{}' during destruction: {}\n", m_filename.utf8_data(), result.error().what()); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<StreamOffset, StarException> File::pos() {

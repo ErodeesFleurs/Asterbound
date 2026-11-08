@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> LuaRoot::create(Root& roo
 LuaRoot::~LuaRoot() {
   if (auto result = shutdown(); !result) {
     if (auto logged = m_root.logger().errorException("Error while shutting down Lua root", ExceptionDiagnostic(result.error())); !logged)
-      EmergencyLog::error("Could not log Lua root shutdown failure: {}; original failure: {}", outputException(logged.error(), true), outputException(result.error(), true));
+      EmergencyLog::error("Could not log Lua root shutdown failure: {}; original failure: {}", Star::output_exception(logged.error(), true), Star::output_exception(result.error(), true));
   }
 }
 
@@ -154,7 +154,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     JsonObject value;
     value.set("function", entry.name.value_or("<function>"));
     value.set("scope", entry.nameScope.value_or("?"));
-    value.set("source", strf("{}:{}", entry.source, entry.sourceLine));
+    value.set("source", Star::format("{}:{}", entry.source, entry.sourceLine));
     value.set("self", entry.selfTime);
     value.set("total", entry.totalTime);
     // The detached engine and profile retain the entire call tree during export.
@@ -187,7 +187,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     return std::unexpected(std::move(timestamp.error()));
   auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(*timestamp);
   auto millis = *timestamp - wholeSeconds;
-  String filename = strf("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
+  String filename = Star::format("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
   String path = File::relative_to(m_storageDirectory, filename);
   if (auto logged = m_root.logger().info("Writing lua profile {}", filename); !logged)
     return std::unexpected(std::move(logged.error()));
@@ -349,7 +349,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
       if (!found)
         summary.locations.push_back({.source = path.utf8(), .line = -1, .provider = diagnostic->get().utf8()});
       return std::unexpected(std::move(bytes.error()).withSummary(std::move(summary)).withContext(
-          strf("Lua source '{}': {}", path, diagnostic->get())));
+          Star::format("Lua source '{}': {}", path, diagnostic->get())));
     }
     return std::unexpected(std::move(bytes.error()));
   }

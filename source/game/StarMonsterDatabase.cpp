@@ -152,7 +152,7 @@ if (!result11) return std::unexpected(std::move(result11.error()));
 String typeName = std::move(*result11);
 
       if (self.get().m_monsterTypes.contains(typeName))
-        return std::unexpected(MonsterException(strf("Repeat monster type name '{}'", typeName)));
+        return std::unexpected(MonsterException(Star::format("Repeat monster type name '{}'", typeName)));
 
       MonsterType& monsterType = self.get().m_monsterTypes[typeName];
 
@@ -240,7 +240,7 @@ monsterType.baseParameters = std::move(*result23);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster type")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster type")));
   }
 
   for (auto const& assetFile : monsterParts) {
@@ -273,13 +273,13 @@ part.partParameters = std::move(*result35);
       auto& partMap = self.get().m_partDirectory[part.category][part.type];
 
       if (partMap.contains(part.name))
-        return std::unexpected(MonsterException(strf("Repeat monster part name '{}' for category '{}'", part.name, part.category)));
+        return std::unexpected(MonsterException(Star::format("Repeat monster part name '{}' for category '{}'", part.name, part.category)));
       else
         partMap[part.name] = part;
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster part '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster part")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster part '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster part")));
   }
 
   for (auto const& assetFile : monsterSkills) {
@@ -313,13 +313,13 @@ if (!result42) return std::unexpected(std::move(result42.error()));
 skill.animationParameters = std::move(*result42);
 
       if (self.get().m_skills.contains(skill.name))
-        return std::unexpected(MonsterException(strf("Repeat monster skill name '{}'", skill.name)));
+        return std::unexpected(MonsterException(Star::format("Repeat monster skill name '{}'", skill.name)));
       else
         self.get().m_skills[skill.name] = skill;
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster skill '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster skill")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster skill '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster skill")));
   }
 
   for (auto const& assetFile : monsterColors) {
@@ -335,7 +335,7 @@ auto config = std::move(*result43);
 if (!result44) return std::unexpected(std::move(result44.error()));
 auto paletteName = std::move(*result44);
       if (self.get().m_colorSwaps.contains(paletteName))
-        return std::unexpected(MonsterException(strf("Duplicate monster colors name '{}'", paletteName)));
+        return std::unexpected(MonsterException(Star::format("Duplicate monster colors name '{}'", paletteName)));
 
       ColorReplaceMap colorSwaps;
       {
@@ -362,7 +362,7 @@ auto paletteName = std::move(*result44);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(strf("Error loading monster colors '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster colors")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster colors '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading monster colors")));
   }
   return {};
 }
