@@ -27,7 +27,7 @@ PhysicsCategoryFilter::PhysicsCategoryFilter(Type type, StringSet categories)
   : type(type), categories(std::move(categories)) {}
 
 bool PhysicsCategoryFilter::check(StringSet const& otherCategories) const {
-  bool intersection = categories.hasIntersection(otherCategories);
+  bool intersection = categories.has_intersection(otherCategories);
   if (type == Whitelist)
     return intersection;
   else

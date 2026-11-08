@@ -1,6 +1,7 @@
 import star.format;
 import star.random;
 import star.static_random;
+import star.set;
 
 import std;
 
@@ -20,6 +21,38 @@ TEST(StaticRandomTest, FromEmptyContainerReturnsError) {
   auto selected = static_random_from(one, 1);
   ASSERT_TRUE(selected);
   EXPECT_EQ(selected->get(), 7);
+}
+
+TEST(RandTest, BorrowingPreservesReadOnlyKeysAndMutableReferenceSlots) {
+  auto check = []<typename Random>(Random& random)
+    requires (std::same_as<Random, RandomSource> || std::same_as<Random, RandomService>)
+  {
+    HashSet<int> keys{7};
+    auto selected = random.randFrom(keys);
+    static_assert(std::same_as<decltype(selected), std::expected<std::reference_wrapper<int const>, StarException>>);
+    ASSERT_TRUE(selected);
+    EXPECT_EQ(std::addressof(selected->get()), std::addressof(*keys.begin()));
+    EXPECT_EQ(selected->get(), 7);
+    int first = 1, second = 2;
+    std::vector<std::reference_wrapper<int>> slots{std::ref(first)};
+    auto slot = random.randFrom(slots);
+    ASSERT_TRUE(slot);
+    slot->get() = std::ref(second);
+    EXPECT_EQ(std::addressof(slots.front().get()), std::addressof(second));
+    std::vector<int> mutable_values{3};
+    auto mutable_value = random.randFrom(mutable_values);
+    ASSERT_TRUE(mutable_value);
+    mutable_value->get() = 4;
+    EXPECT_EQ(mutable_values.front(), 4);
+    HashSet<int> empty;
+    auto rejected = random.randFrom(empty);
+    ASSERT_FALSE(rejected);
+    EXPECT_TRUE(rejected.error().template is<RandomException>());
+  };
+  RandomSource source(17);
+  RandomService service(17);
+  check(source);
+  check(service);
 }
 
 TEST(RandTest, All) {

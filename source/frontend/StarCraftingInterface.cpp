@@ -1591,7 +1591,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
                 auto toStringResult550 = entry.toString();
                 if (!toStringResult550)
                   return std::unexpected(std::move(toStringResult550.error()));
-                recipes.addAll(itemDb->recipesForOutputItem(std::move(*toStringResult550)));
+                recipes.insert_range(itemDb->recipesForOutputItem(std::move(*toStringResult550)));
               }
             else
               {
@@ -1608,7 +1608,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
           auto availableItems = m_player->inventory()->availableItems();
           if (!availableItems)
             return std::unexpected(std::move(availableItems.error()));
-          recipes.addAll(itemDb->recipesFromSubset(std::move(*availableItems),
+          recipes.insert_range(itemDb->recipesFromSubset(std::move(*availableItems),
                                                    m_player->inventory()->availableCurrencies(),
                                                    std::exchange(recipes, {}), m_filter));
           }
@@ -1618,10 +1618,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
             auto availableItemsResult553 = m_player->inventory()->availableItems();
             if (!availableItemsResult553)
               return std::unexpected(std::move(availableItemsResult553.error()));
-            recipes.addAll(itemDb->recipesFromBagContents(std::move(*availableItemsResult553), m_player->inventory()->availableCurrencies(), m_filter));
+            recipes.insert_range(itemDb->recipesFromBagContents(std::move(*availableItemsResult553), m_player->inventory()->availableCurrencies(), m_filter));
           }
         else
-          recipes.addAll(itemDb->allRecipes(m_filter));
+          recipes.insert_range(itemDb->allRecipes(m_filter));
       }
            }
   }
@@ -1646,7 +1646,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
   if (!categoryFilter.empty()) {
     auto temprecipes = std::exchange(recipes, {});
     for (auto const& recipe : temprecipes) {
-      if (recipe.groups.hasIntersection(categoryFilter))
+      if (recipe.groups.has_intersection(categoryFilter))
         recipes.add(recipe);
     }
   }

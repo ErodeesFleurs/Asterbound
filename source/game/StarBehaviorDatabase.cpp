@@ -293,8 +293,8 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
         return std::unexpected(m_assets->withAssetContext(std::move(module.error()), path->get(), "Building behavior tree"));
       return std::unexpected(std::move(module.error()));
     }
-    tree.scripts.addAll((*module)->scripts);
-    tree.functions.addAll((*module)->functions);
+    tree.scripts.insert_range((*module)->scripts);
+    tree.functions.insert_range((*module)->functions);
     return (*module)->root;
   }
   auto defaults = m_nodeParameters.get(*name);

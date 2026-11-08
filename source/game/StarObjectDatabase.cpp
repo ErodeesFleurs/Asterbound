@@ -462,7 +462,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);
-          spaceScanSpaces.addAll(scanned);
+          spaceScanSpaces.insert_range(scanned);
         }
       }
       orientation->spaces = spaceScanSpaces.values();

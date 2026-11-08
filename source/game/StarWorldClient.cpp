@@ -2562,7 +2562,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto result195 = m_tileArray->validSectorsFor(monitoredRegion.padded(WorldSectorSize));
     if (!result195)
       return std::unexpected(std::move(result195.error()));
-    neededSectors.addAll((std::move(*result195)));
+    neededSectors.insert_range((std::move(*result195)));
   }
 
   auto loadedSectors = m_tileArray->loadedSectors();

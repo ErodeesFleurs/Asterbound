@@ -186,7 +186,7 @@ HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std:
   HashSet<ItemRecipe> res;
   for (auto const& recipe : subset) {
     // is it the right kind of recipe for this check ?
-    if (recipe.groups.hasIntersection(allowedTypes) || allowedTypes.empty() || recipe.groups.empty()) {
+    if (recipe.groups.has_intersection(allowedTypes) || allowedTypes.empty() || recipe.groups.empty()) {
       // do we have the ingredients to make it.
       if (canMakeRecipe(recipe, normalizedBag, availableCurrencies)) {
         res.add(recipe);
@@ -613,7 +613,7 @@ HashSet<ItemRecipe> const& ItemDatabase::allRecipes() const {
 HashSet<ItemRecipe> ItemDatabase::allRecipes(StringSet const& types) const {
   HashSet<ItemRecipe> res;
   for (auto const& i : m_recipes) {
-    if (i.groups.hasIntersection(types))
+    if (i.groups.has_intersection(types))
       res.add(i);
   }
   return res;

@@ -97,7 +97,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
     auto foldedExtension = extension.toLower();
     if (!foldedExtension)
       return std::unexpected(std::move(foldedExtension.error()));
-    auto order = extensionOrdering.indexOf(*foldedExtension);
+    auto order = extensionOrdering.index_of(*foldedExtension);
     auto foldedPath = path.toLower();
     if (!foldedPath)
       return std::unexpected(std::move(foldedPath.error()));

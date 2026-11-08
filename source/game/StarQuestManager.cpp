@@ -463,7 +463,7 @@ std::expected<StringSet, StarException> QuestManager::interestingObjects() {
       if (std::holds_alternative<Json>(**response)) {
         auto objects = jsonToStringSet(std::get<Json>(**response));
         if (!objects) return std::unexpected(std::move(objects.error()));
-        result.addAll(*objects);
+        result.insert_range(*objects);
       }
     }
   }

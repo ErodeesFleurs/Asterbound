@@ -157,6 +157,7 @@ let
     "hash_benchmarks"
     "list_benchmarks"
     "vector_benchmarks"
+    "set_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

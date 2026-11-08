@@ -5,6 +5,14 @@ import std;
 
 namespace Star {
 
+template <typename Hash, typename Equal, typename Key, typename Query>
+concept transparent_hash_lookup = requires(Hash& hash, Equal& equal, Key const& key, Query const& query) {
+  typename Hash::is_transparent;
+  typename Equal::is_transparent;
+  { hash(query) } -> std::convertible_to<std::size_t>;
+  equal(key, query) ? 0 : 0;
+};
+
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 struct FlatHashTable {
 private:
@@ -75,8 +83,12 @@ public:
   };
 
   FlatHashTable(std::size_t bucketCount, GetKey const& getKey, Hash const& hash, Equals const& equal, Allocator const& alloc);
-  FlatHashTable(FlatHashTable const&) = default;
+  FlatHashTable(FlatHashTable const&)
+    requires (std::is_copy_constructible_v<GetKey>
+      && std::is_copy_constructible_v<Hash> && std::is_copy_constructible_v<Equals>) = default;
   FlatHashTable(FlatHashTable const& other, Allocator const& alloc)
+    requires (std::is_copy_constructible_v<Value> && std::is_copy_constructible_v<GetKey>
+      && std::is_copy_constructible_v<Hash> && std::is_copy_constructible_v<Equals>)
       : m_buckets(other.m_buckets, alloc), m_filledCount(other.m_filledCount), m_getKey(other.m_getKey),
         m_hash(other.m_hash), m_equals(other.m_equals) {}
   FlatHashTable(FlatHashTable&& other)
@@ -89,7 +101,9 @@ public:
         m_getKey(std::move(other.m_getKey)), m_hash(std::move(other.m_hash)), m_equals(std::move(other.m_equals)) {
     other.clear();
   }
-  FlatHashTable& operator=(FlatHashTable const&) = default;
+  FlatHashTable& operator=(FlatHashTable const&)
+    requires (std::is_copy_assignable_v<GetKey>
+      && std::is_copy_assignable_v<Hash> && std::is_copy_assignable_v<Equals>) = default;
   FlatHashTable& operator=(FlatHashTable&& other) {
     if (this == &other)
       return *this;
@@ -130,6 +144,11 @@ public:
 
   iterator erase(const_iterator pos);
   iterator erase(const_iterator first, const_iterator last);
+  Value extract_value(const_iterator pos) requires std::is_move_constructible_v<Value> {
+    Value value(std::move(*const_cast<Bucket*>(pos.current)->value_ptr()));
+    erase(pos);
+    return value;
+  }
 
   template <typename LookupKey>
     requires requires(Hash& hash, GetKey& get_key, Equals& equal, Value& value, LookupKey const& query,
@@ -147,9 +166,9 @@ public:
   iterator find(LookupKey const& key);
 
   void reserve(std::size_t capacity);
-  Allocator get_allocator() const;
-  Hash hash_function() const { return m_hash; }
-  Equals key_eq() const { return m_equals; }
+  Allocator get_allocator() const noexcept;
+  Hash hash_function() const noexcept(std::is_nothrow_copy_constructible_v<Hash>) { return m_hash; }
+  Equals key_eq() const noexcept(std::is_nothrow_copy_constructible_v<Equals>) { return m_equals; }
 
   bool operator==(FlatHashTable const& rhs) const;
   bool operator!=(FlatHashTable const& rhs) const;
@@ -172,6 +191,9 @@ private:
       equal(get_key(value), query) ? 0 : 0;
     }
   iterator find_prehashed(LookupKey const& key, std::size_t hash);
+  template <typename Match>
+    requires requires(Match& match, Value& value) { std::invoke(match, value) ? 0 : 0; }
+  iterator find_prehashed_if(std::size_t hash, Match&& match);
 
   Buckets m_buckets;
   std::size_t m_filledCount = 0;
@@ -423,10 +445,15 @@ void FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::clear() {
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::insert(Value value) -> std::pair<iterator, bool> {
-  if (m_buckets.empty() || m_filledCount + 1 > (m_buckets.size() - 1) * MaxFillLevel)
+  std::size_t hash = m_hash(m_getKey(value)) | FilledHashBit;
+  // A duplicate must not reallocate: source ranges may borrow this table.
+  if (m_buckets.empty() || m_filledCount + 1 > (m_buckets.size() - 1) * MaxFillLevel) {
+    auto position = find_prehashed_if(hash, [&](Value& stored) { return m_equals(m_getKey(stored), m_getKey(value)); });
+    if (position != end())
+      return {position, false};
     check_capacity(1);
-
-  return insert_prehashed(std::move(value), m_hash(m_getKey(value)) | FilledHashBit);
+  }
+  return insert_prehashed(std::move(value), hash);
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
@@ -468,37 +495,65 @@ auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::insert_prehashe
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::erase(const_iterator pos) -> iterator {
-  std::size_t bucketIndex = pos.current - m_buckets.data();
-  std::size_t currentBucketIndex = bucketIndex;
-  auto currentBucket = &m_buckets[currentBucketIndex];
-
+  auto const bucket_index = static_cast<std::size_t>(pos.current - m_buckets.data());
+  auto current = bucket_index;
   while (true) {
-    std::size_t nextBucketIndex = hash_bucket(currentBucketIndex + 1);
-    auto nextBucket = &m_buckets[nextBucketIndex];
-    if (auto nextPtr = nextBucket->value_ptr()) {
-      if (bucket_error(nextBucketIndex, nextBucket->hash) > 0) {
-        currentBucket->set_filled(nextBucket->hash, std::move(*nextPtr));
-        currentBucketIndex = nextBucketIndex;
-        currentBucket = nextBucket;
-      } else {
-        break;
-      }
-    } else {
+    auto next = hash_bucket(current + 1);
+    auto& bucket = m_buckets[next];
+    auto value = bucket.value_ptr();
+    if (!value || bucket_error(next, bucket.hash) == 0)
       break;
-    }
+    m_buckets[current].set_filled(bucket.hash, std::move(*value));
+    current = next;
   }
-
-  m_buckets[currentBucketIndex].set_empty();
+  m_buckets[current].set_empty();
   --m_filledCount;
-
-  return iterator{scan(m_buckets.data() + bucketIndex)};
+  // A wrapped prefix is not the successor of the last physical bucket.
+  if (bucket_index == m_buckets.size() - 2)
+    return end();
+  return iterator{scan(m_buckets.data() + bucket_index)};
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::erase(const_iterator first, const_iterator last) -> iterator {
-  while (first != last)
-    first = erase(first);
-  return iterator{const_cast<Bucket*>(first.current)};
+  if (first == last)
+    return iterator{const_cast<Bucket*>(last.current)};
+
+  auto const first_index = static_cast<std::size_t>(first.current - m_buckets.data());
+  auto const last_index = static_cast<std::size_t>(last.current - m_buckets.data());
+  auto result_index = last_index;
+
+  // Clear the original interval before relocating anything. Repeated erasure
+  // loses both interval boundaries when a cluster wraps through bucket zero.
+  for (auto index = first_index; index != last_index; ++index) {
+    if (m_buckets[index].value_ptr()) {
+      m_buckets[index].set_empty();
+      --m_filledCount;
+    }
+  }
+
+  auto hole = first_index;
+  auto current = hash_bucket(last_index);
+  while (current != first_index && m_buckets[current].value_ptr()) {
+    auto& bucket = m_buckets[current];
+    auto const displacement = bucket_error(current, bucket.hash);
+    if (displacement == 0)
+      break;
+    // Robin Hood clusters have nondecreasing home buckets in cyclic order.
+    // Holes before this value's home cannot be filled by later values either.
+    while (hole != current
+        && (bucket_error(current, hole) > displacement || m_buckets[hole].value_ptr()))
+      hole = hash_bucket(hole + 1);
+    if (hole != current) {
+      m_buckets[hole].set_filled(bucket.hash, std::move(*bucket.value_ptr()));
+      bucket.set_empty();
+      if (current == last_index)
+        result_index = hole;
+      hole = hash_bucket(hole + 1);
+    }
+    current = hash_bucket(current + 1);
+  }
+  return iterator{m_buckets.data() + result_index};
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
@@ -532,6 +587,14 @@ template <typename LookupKey>
   }
 auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find_prehashed(LookupKey const& key, std::size_t hash)
   -> iterator {
+  return find_prehashed_if(hash, [&](Value& stored) { return m_equals(m_getKey(stored), key); });
+}
+
+template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
+template <typename Match>
+  requires requires(Match& match, Value& value) { std::invoke(match, value) ? 0 : 0; }
+auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find_prehashed_if(std::size_t hash, Match&& match)
+  -> iterator {
   if (m_buckets.empty())
     return end();
 
@@ -540,7 +603,7 @@ auto FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::find_prehashed(
   while (true) {
     auto& bucket = m_buckets[currentBucket];
     if (auto value = bucket.value_ptr()) {
-      if (bucket.hash == hash && m_equals(m_getKey(*value), key))
+      if (bucket.hash == hash && std::invoke(match, *value))
         return iterator{m_buckets.data() + currentBucket};
 
       std::size_t entryError = bucket_error(currentBucket, bucket.hash);
@@ -564,7 +627,7 @@ void FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::reserve(std::si
 }
 
 template <typename Value, typename Key, typename GetKey, typename Hash, typename Equals, typename Allocator>
-Allocator FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::get_allocator() const {
+Allocator FlatHashTable<Value, Key, GetKey, Hash, Equals, Allocator>::get_allocator() const noexcept {
   return m_buckets.get_allocator();
 }
 
@@ -666,4 +729,5 @@ export module star.flat_hash_table;
 
 export namespace Star {
   using ::Star::FlatHashTable;
+  using ::Star::transparent_hash_lookup;
 }

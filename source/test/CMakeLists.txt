@@ -47,6 +47,8 @@ set (star_core_tests_SOURCES
       rect_test.cpp
       rpc_promise_test.cpp
       serialization_test.cpp
+      set_test.cpp
+      set_storage_test.cpp
       static_vector_test.cpp
       small_vector_test.cpp
       sha_test.cpp

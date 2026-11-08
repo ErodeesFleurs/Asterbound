@@ -8,14 +8,6 @@ import star.hash;
 
 namespace Star {
 
-template <typename Hash, typename Equal, typename Key, typename Query>
-concept transparent_hash_lookup = requires(Hash const& hash, Equal const& equal, Key const& key, Query const& query) {
-  typename Hash::is_transparent;
-  typename Equal::is_transparent;
-  { hash(query) } -> std::convertible_to<std::size_t>;
-  { equal(key, query) } -> std::convertible_to<bool>;
-};
-
 template <typename Key, typename Mapped, typename Hash = hash<Key>, typename Equals = std::equal_to<>, typename Allocator = std::allocator<Key>>
 class FlatHashMap {
 public:
@@ -215,9 +207,9 @@ public:
   std::pair<const_iterator, const_iterator> equal_range(key_type const& key) const;
 
   void reserve(std::size_t capacity);
-  hasher hash_function() const { return m_table.hash_function(); }
-  key_equal key_eq() const { return m_table.key_eq(); }
-  allocator_type get_allocator() const { return m_table.get_allocator(); }
+  hasher hash_function() const noexcept(std::is_nothrow_copy_constructible_v<hasher>) { return m_table.hash_function(); }
+  key_equal key_eq() const noexcept(std::is_nothrow_copy_constructible_v<key_equal>) { return m_table.key_eq(); }
+  allocator_type get_allocator() const noexcept { return m_table.get_allocator(); }
 
   bool operator==(FlatHashMap const& rhs) const;
   bool operator!=(FlatHashMap const& rhs) const;
@@ -467,8 +459,6 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(const_iterator, T
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 template <typename InputIt>
 void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(InputIt first, InputIt last) {
-  if constexpr (std::forward_iterator<InputIt>)
-    m_table.reserve(m_table.size() + std::distance(first, last));
   for (auto i = first; i != last; ++i)
     m_table.insert(*i);
 }

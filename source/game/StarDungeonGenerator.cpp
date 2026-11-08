@@ -1335,7 +1335,7 @@ namespace Dungeon {
       auto& unpressurized = liquidPair.second;
       while (!unpressurized.empty()) {
         // Start with the first unpressurized block as the open set.
-        auto first = unpressurized.takeFirst();
+        auto first = unpressurized.take_first();
         if (!first) return std::unexpected(std::move(first.error()));
         Vec2I firstBlock = *first;
         List<Vec2I> openSet = {firstBlock};

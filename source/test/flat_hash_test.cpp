@@ -241,6 +241,8 @@ TEST(FlatHashSet, NonassignableAlignedKeysSurviveCollisionRelocation) {
   EXPECT_EQ(FlatMoveKey::live_count, 0);
   {
     FlatHashSet<FlatMoveKey, FlatWrapHash, FlatMoveEqual> values;
+    static_assert(std::same_as<decltype(*values.begin()), FlatMoveKey const&>);
+    static_assert(std::same_as<decltype(*values.find(1)), FlatMoveKey const&>);
     for (int key : {1, 0, 2, 3})
       ASSERT_TRUE(values.insert(FlatMoveKey(key)).second);
     values.erase(values.find(0));
@@ -1011,12 +1013,14 @@ template <typename Container> void expect_map_allocator_construction(Container c
 template <typename Container>
 void expectSetAlgebraContract() {
   Container values{1, 2, 3, 4};
+  static_assert(std::same_as<decltype(*values.begin()), typename Container::value_type const&>);
+  static_assert(std::same_as<std::ranges::range_reference_t<decltype(values.value_view())>, typename Container::value_type const&>);
   Container other{2, 4, 5};
   EXPECT_EQ(values.intersection(other), (Container{2, 4}));
   EXPECT_EQ(values.difference(other), (Container{1, 3}));
   EXPECT_EQ(values.combination(other), (Container{1, 2, 3, 4, 5}));
-  EXPECT_TRUE(values.hasIntersection(other));
-  EXPECT_FALSE(values.hasIntersection(Container{9}));
+  EXPECT_TRUE(values.has_intersection(other));
+  EXPECT_FALSE(values.has_intersection(Container{9}));
   auto snapshot = values.values();
   EXPECT_EQ(std::ranges::distance(values.value_view()), 4);
   EXPECT_FALSE(values.add(1));
@@ -1024,18 +1028,18 @@ void expectSetAlgebraContract() {
   EXPECT_EQ(snapshot.size(), 4u);
   EXPECT_EQ(std::ranges::count(snapshot, 1), 1);
   while (!values.empty()) {
-    auto taken = values.takeFirst();
+    auto taken = values.take_first();
     ASSERT_TRUE(taken);
     EXPECT_FALSE(values.contains(*taken));
   }
   EXPECT_FALSE(values.first());
   EXPECT_FALSE(values.last());
-  EXPECT_FALSE(values.takeFirst());
-  EXPECT_FALSE(values.takeLast());
-  EXPECT_FALSE(values.maybeFirst());
-  EXPECT_FALSE(values.maybeLast());
-  EXPECT_FALSE(values.maybeTakeFirst());
-  EXPECT_FALSE(values.maybeTakeLast());
+  EXPECT_FALSE(values.take_first());
+  EXPECT_FALSE(values.take_last());
+  EXPECT_FALSE(values.maybe_first());
+  EXPECT_FALSE(values.maybe_last());
+  EXPECT_FALSE(values.maybe_take_first());
+  EXPECT_FALSE(values.maybe_take_last());
 }
 
 struct SetRecord {
@@ -1082,12 +1086,12 @@ void expectSetOwnershipTransfer() {
   auto identity = owner.get();
   EXPECT_TRUE(values.add(std::move(owner)));
   EXPECT_FALSE(owner);
-  auto extracted = values.takeFirst();
+  auto extracted = values.take_first();
   ASSERT_TRUE(extracted);
   EXPECT_EQ(extracted->get(), identity);
   EXPECT_TRUE(values.empty());
   values.add(std::move(*extracted));
-  auto last = values.maybeTakeLast();
+  auto last = values.maybe_take_last();
   ASSERT_TRUE(last);
   EXPECT_EQ(last->get(), identity);
   EXPECT_TRUE(values.empty());

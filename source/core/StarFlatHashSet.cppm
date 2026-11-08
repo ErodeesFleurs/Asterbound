@@ -16,500 +16,241 @@ public:
   using hasher = Hash;
   using key_equal = Equals;
   using allocator_type = Allocator;
-  using reference = value_type&;
+  using reference = value_type const&;
   using const_reference = value_type const&;
-  using pointer = value_type*;
+  using pointer = value_type const*;
   using const_pointer = value_type const*;
 
 private:
   struct GetKey {
-    key_type const& operator()(value_type const& value) const;
+    key_type const& operator()(value_type const& value) const { return value; }
   };
-
   using Table = FlatHashTable<Key, Key, GetKey, Hash, Equals, Allocator>;
 
 public:
   struct const_iterator {
     using iterator_category = std::forward_iterator_tag;
-    using value_type = typename FlatHashSet::value_type const;
+    using iterator_concept = std::forward_iterator_tag;
+    using value_type = Key;
     using difference_type = std::ptrdiff_t;
-    using pointer = value_type*;
-    using reference = value_type&;
+    using pointer = Key const*;
+    using reference = Key const&;
 
-    bool operator==(const_iterator const& rhs) const;
-    bool operator!=(const_iterator const& rhs) const;
+    bool operator==(const_iterator const& rhs) const { return inner == rhs.inner; }
+    bool operator!=(const_iterator const& rhs) const { return inner != rhs.inner; }
+    const_iterator& operator++() { ++inner; return *this; }
+    const_iterator operator++(int) { auto copy = *this; ++*this; return copy; }
+    reference operator*() const { return *inner; }
+    pointer operator->() const { return std::addressof(*inner); }
 
-    const_iterator& operator++();
-    const_iterator operator++(int);
-
-    value_type& operator*() const;
-    value_type* operator->() const;
-
-    typename Table::const_iterator inner;
+    typename Table::const_iterator inner{};
   };
+  using iterator = const_iterator;
 
-  struct iterator {
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = typename FlatHashSet::value_type;
-    using difference_type = std::ptrdiff_t;
-    using pointer = value_type*;
-    using reference = value_type&;
+  FlatHashSet() : FlatHashSet(0) {}
+  explicit FlatHashSet(size_type bucket_count, hasher const& hash = hasher(),
+      key_equal const& equal = key_equal(), allocator_type const& alloc = allocator_type())
+    : m_table(bucket_count, GetKey(), hash, equal, alloc) {}
+  FlatHashSet(size_type bucket_count, allocator_type const& alloc)
+    : FlatHashSet(bucket_count, hasher(), key_equal(), alloc) {}
+  FlatHashSet(size_type bucket_count, hasher const& hash, allocator_type const& alloc)
+    : FlatHashSet(bucket_count, hash, key_equal(), alloc) {}
+  explicit FlatHashSet(allocator_type const& alloc)
+    : FlatHashSet(0, hasher(), key_equal(), alloc) {}
 
-    bool operator==(iterator const& rhs) const;
-    bool operator!=(iterator const& rhs) const;
-
-    iterator& operator++();
-    iterator operator++(int);
-
-    value_type& operator*() const;
-    value_type* operator->() const;
-
-    operator const_iterator() const;
-
-    typename Table::iterator inner;
-  };
-
-  FlatHashSet();
-  explicit FlatHashSet(std::size_t bucketCount, hasher const& hash = hasher(),
-      key_equal const& equal = key_equal(), allocator_type const& alloc = allocator_type());
-  FlatHashSet(std::size_t bucketCount, allocator_type const& alloc);
-  FlatHashSet(std::size_t bucketCount, hasher const& hash, allocator_type const& alloc);
-  explicit FlatHashSet(allocator_type const& alloc);
-
-  template <typename InputIt>
-  FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount = 0,
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+  FlatHashSet(InputIt first, Sentinel last, size_type bucket_count = 0,
       hasher const& hash = hasher(), key_equal const& equal = key_equal(),
-      allocator_type const& alloc = allocator_type());
-  template <typename InputIt>
-  FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount, allocator_type const& alloc);
-  template <typename InputIt>
-  FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount,
-      hasher const& hash, allocator_type const& alloc);
+      allocator_type const& alloc = allocator_type())
+    : FlatHashSet(bucket_count, hash, equal, alloc) {
+    // A fresh owner cannot alias its input. Keep reservation here, not in
+    // insert_range, where reallocation could invalidate a borrowed source.
+    if constexpr (std::sized_sentinel_for<Sentinel, InputIt>)
+      m_table.reserve(static_cast<size_type>(last - first));
+    else if constexpr (std::forward_iterator<InputIt>)
+      m_table.reserve(static_cast<size_type>(std::ranges::distance(first, last)));
+    insert(std::move(first), std::move(last));
+  }
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+  FlatHashSet(InputIt first, Sentinel last, size_type bucket_count, allocator_type const& alloc)
+    : FlatHashSet(std::move(first), std::move(last), bucket_count, hasher(), key_equal(), alloc) {}
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+  FlatHashSet(InputIt first, Sentinel last, size_type bucket_count,
+      hasher const& hash, allocator_type const& alloc)
+    : FlatHashSet(std::move(first), std::move(last), bucket_count, hash, key_equal(), alloc) {}
 
-  FlatHashSet(FlatHashSet const& other);
-  FlatHashSet(FlatHashSet const& other, allocator_type const& alloc);
-  FlatHashSet(FlatHashSet&& other);
-  FlatHashSet(FlatHashSet&& other, allocator_type const& alloc);
-
-  FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount = 0,
+  template <std::ranges::input_range Range>
+    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+  FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count = 0,
       hasher const& hash = hasher(), key_equal const& equal = key_equal(),
-      allocator_type const& alloc = allocator_type());
-  FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount, allocator_type const& alloc);
-  FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount, hasher const& hash,
-      allocator_type const& alloc);
+      allocator_type const& alloc = allocator_type())
+    : FlatHashSet(bucket_count, hash, equal, alloc) {
+    if constexpr (std::ranges::sized_range<Range>)
+      m_table.reserve(std::ranges::size(range));
+    else if constexpr (std::ranges::forward_range<Range>)
+      m_table.reserve(static_cast<size_type>(std::ranges::distance(range)));
+    insert_range(std::forward<Range>(range));
+  }
+  template <std::ranges::input_range Range>
+    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+  FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count, allocator_type const& alloc)
+    : FlatHashSet(std::from_range, std::forward<Range>(range), bucket_count, hasher(), key_equal(), alloc) {}
+  template <std::ranges::input_range Range>
+    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+  FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count,
+      hasher const& hash, allocator_type const& alloc)
+    : FlatHashSet(std::from_range, std::forward<Range>(range), bucket_count, hash, key_equal(), alloc) {}
 
-  FlatHashSet& operator=(FlatHashSet const& other);
-  FlatHashSet& operator=(FlatHashSet&& other);
-  FlatHashSet& operator=(std::initializer_list<value_type> init);
+  FlatHashSet(FlatHashSet const&)
+    requires (std::is_copy_constructible_v<value_type> && std::is_copy_constructible_v<Table>) = default;
+  FlatHashSet(FlatHashSet const& other, allocator_type const& alloc)
+    requires (std::is_copy_constructible_v<value_type>
+      && std::is_constructible_v<Table, Table const&, allocator_type const&>)
+    : m_table(other.m_table, alloc) {}
+  FlatHashSet(FlatHashSet&&) = default;
+  FlatHashSet(FlatHashSet&& other, allocator_type const& alloc)
+    : m_table(std::move(other.m_table), alloc) {}
+  FlatHashSet& operator=(FlatHashSet const&)
+    requires (std::is_copy_constructible_v<value_type> && std::is_copy_assignable_v<Table>) = default;
+  FlatHashSet& operator=(FlatHashSet&&) = default;
 
-  iterator begin();
-  iterator end();
+  FlatHashSet(std::initializer_list<value_type> init, size_type bucket_count = 0,
+      hasher const& hash = hasher(), key_equal const& equal = key_equal(),
+      allocator_type const& alloc = allocator_type())
+    : FlatHashSet(init.begin(), init.end(), bucket_count, hash, equal, alloc) {}
+  FlatHashSet(std::initializer_list<value_type> init, size_type bucket_count, allocator_type const& alloc)
+    : FlatHashSet(init, bucket_count, hasher(), key_equal(), alloc) {}
+  FlatHashSet(std::initializer_list<value_type> init, size_type bucket_count,
+      hasher const& hash, allocator_type const& alloc)
+    : FlatHashSet(init, bucket_count, hash, key_equal(), alloc) {}
+  FlatHashSet& operator=(std::initializer_list<value_type> init) {
+    clear();
+    insert(init.begin(), init.end());
+    return *this;
+  }
 
-  const_iterator begin() const;
-  const_iterator end() const;
+  iterator begin() { return iterator{m_table.begin()}; }
+  iterator end() { return iterator{m_table.end()}; }
+  const_iterator begin() const { return const_iterator{m_table.begin()}; }
+  const_iterator end() const { return const_iterator{m_table.end()}; }
+  const_iterator cbegin() const { return begin(); }
+  const_iterator cend() const { return end(); }
+  bool empty() const noexcept { return m_table.empty(); }
+  size_type size() const noexcept { return m_table.size(); }
+  void clear() { m_table.clear(); }
 
-  const_iterator cbegin() const;
-  const_iterator cend() const;
+  std::pair<iterator, bool> insert(value_type const& value)
+    requires std::is_copy_constructible_v<value_type> {
+    auto result = m_table.insert(value);
+    return {iterator{result.first}, result.second};
+  }
+  std::pair<iterator, bool> insert(value_type&& value)
+    requires std::is_move_constructible_v<value_type> {
+    auto result = m_table.insert(std::move(value));
+    return {iterator{result.first}, result.second};
+  }
+  iterator insert(const_iterator, value_type const& value)
+    requires std::is_copy_constructible_v<value_type> { return insert(value).first; }
+  iterator insert(const_iterator, value_type&& value)
+    requires std::is_move_constructible_v<value_type> { return insert(std::move(value)).first; }
 
-  std::size_t empty() const;
-  std::size_t size() const;
-  void clear();
-
-  std::pair<iterator, bool> insert(value_type const& value);
-  std::pair<iterator, bool> insert(value_type&& value);
-  iterator insert(const_iterator hint, value_type const& value);
-  iterator insert(const_iterator hint, value_type&& value);
-  template <typename InputIt>
-  void insert(InputIt first, InputIt last);
-  void insert(std::initializer_list<value_type> init);
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+  void insert(InputIt first, Sentinel last) {
+    // Do not pre-count or reserve: an input is single-pass, and a directly
+    // aliased key range contains only duplicates and must remain valid.
+    // Opaque projections producing new keys must not borrow this storage;
+    // discovering that overlap would evaluate projections or require snapshots.
+    for (; first != last; ++first)
+      m_table.insert(value_type(*first));
+  }
+  template <std::ranges::input_range Range>
+    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+  void insert_range(Range&& range) {
+    insert(std::ranges::begin(range), std::ranges::end(range));
+  }
+  void insert(std::initializer_list<value_type> init) { insert(init.begin(), init.end()); }
 
   template <typename... Args>
-  std::pair<iterator, bool> emplace(Args&&... args);
+    requires std::is_constructible_v<value_type, Args&&...>
+  std::pair<iterator, bool> emplace(Args&&... args) {
+    return insert(value_type(std::forward<Args>(args)...));
+  }
   template <typename... Args>
-  iterator emplace_hint(const_iterator hint, Args&&... args);
+    requires std::is_constructible_v<value_type, Args&&...>
+  iterator emplace_hint(const_iterator, Args&&... args) { return emplace(std::forward<Args>(args)...).first; }
 
-  iterator erase(const_iterator pos);
-  iterator erase(const_iterator first, const_iterator last);
-  std::size_t erase(key_type const& key);
+  iterator erase(const_iterator pos) { return iterator{m_table.erase(pos.inner)}; }
+  iterator erase(const_iterator first, const_iterator last) { return iterator{m_table.erase(first.inner, last.inner)}; }
+  size_type erase(key_type const& key) {
+    auto position = find(key);
+    if (position == end())
+      return 0;
+    erase(position);
+    return 1;
+  }
+  // Like erase(pos), extraction requires a valid, dereferenceable iterator.
+  value_type extract_value(const_iterator pos) requires std::is_move_constructible_v<value_type> {
+    return m_table.extract_value(pos.inner);
+  }
 
-  std::size_t count(key_type const& key) const;
-  const_iterator find(key_type const& key) const;
-  iterator find(key_type const& key);
+  size_type count(key_type const& key) const { return find(key) == end() ? 0 : 1; }
+  bool contains(key_type const& key) const { return find(key) != end(); }
+  const_iterator find(key_type const& key) const { return const_iterator{m_table.find(key)}; }
+  iterator find(key_type const& key) { return iterator{m_table.find(key)}; }
+  template <typename Query> requires transparent_hash_lookup<hasher, key_equal, key_type, Query>
+  const_iterator find(Query const& key) const { return const_iterator{m_table.find(key)}; }
+  template <typename Query> requires transparent_hash_lookup<hasher, key_equal, key_type, Query>
+  iterator find(Query const& key) { return iterator{m_table.find(key)}; }
+  template <typename Query> requires transparent_hash_lookup<hasher, key_equal, key_type, Query>
+  bool contains(Query const& key) const { return find(key) != end(); }
+  template <typename Query> requires transparent_hash_lookup<hasher, key_equal, key_type, Query>
+  size_type count(Query const& key) const { return contains(key) ? 1 : 0; }
 
-  template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
+  std::pair<iterator, iterator> equal_range(key_type const& key) {
+    auto first = find(key);
+    auto last = first;
+    if (last != end())
+      ++last;
+    return {first, last};
+  }
+  std::pair<const_iterator, const_iterator> equal_range(key_type const& key) const {
+    auto first = find(key);
+    auto last = first;
+    if (last != end())
+      ++last;
+    return {first, last};
+  }
+
+  void reserve(size_type capacity) { m_table.reserve(capacity); }
+  allocator_type get_allocator() const noexcept { return m_table.get_allocator(); }
+  hasher hash_function() const noexcept(std::is_nothrow_copy_constructible_v<hasher>) { return m_table.hash_function(); }
+  key_equal key_eq() const noexcept(std::is_nothrow_copy_constructible_v<key_equal>) { return m_table.key_eq(); }
+
+  bool operator==(FlatHashSet const& rhs) const
+    requires requires(value_type const& left, value_type const& right) { left != right ? 0 : 0; } {
+    if (size() != rhs.size())
+      return false;
+    for (auto const& value : *this) {
+      auto found = rhs.find(value);
+      if (found == rhs.end())
+        return false;
+      if (value != *found)
+        return false;
     }
-  const_iterator find(LookupKey const& key) const { return const_iterator{m_table.find(key)}; }
-
-  template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
-    }
-  iterator find(LookupKey const& key) { return iterator{m_table.find(key)}; }
-  std::pair<iterator, iterator> equal_range(key_type const& key);
-  std::pair<const_iterator, const_iterator> equal_range(key_type const& key) const;
-
-  void reserve(std::size_t capacity);
-
-  bool operator==(FlatHashSet const& rhs) const;
-  bool operator!=(FlatHashSet const& rhs) const;
+    return true;
+  }
+  bool operator!=(FlatHashSet const& rhs) const
+    requires requires(value_type const& left, value_type const& right) { left != right ? 0 : 0; } {
+    return !(*this == rhs);
+  }
 
 private:
   Table m_table;
 };
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::GetKey::operator()(value_type const& value) const -> key_type const& {
-  return value;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator==(const_iterator const& rhs) const {
-  return inner == rhs.inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator!=(const_iterator const& rhs) const {
-  return inner != rhs.inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator++() -> const_iterator& {
-  ++inner;
-  return *this;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator++(int) -> const_iterator {
-  const_iterator copy(*this);
-  operator++();
-  return copy;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator*() const -> value_type& {
-  return *inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator::operator->() const -> value_type* {
-  return &operator*();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator==(iterator const& rhs) const {
-  return inner == rhs.inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator!=(iterator const& rhs) const {
-  return inner != rhs.inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator++() -> iterator& {
-  ++inner;
-  return *this;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator++(int) -> iterator {
-  iterator copy(*this);
-  operator++();
-  return copy;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator*() const -> value_type& {
-  return *inner;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator->() const -> value_type* {
-  return &operator*();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::iterator::operator typename FlatHashSet<Key, Hash, Equals, Allocator>::const_iterator() const {
-  return const_iterator{inner};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet()
-  : FlatHashSet(0) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::size_t bucketCount, hasher const& hash,
-    key_equal const& equal, allocator_type const& alloc)
-  : m_table(bucketCount, GetKey(), hash, equal, alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::size_t bucketCount, allocator_type const& alloc)
-  : FlatHashSet(bucketCount, hasher(), key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::size_t bucketCount, hasher const& hash,
-    allocator_type const& alloc)
-  : FlatHashSet(bucketCount, hash, key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(allocator_type const& alloc)
-  : FlatHashSet(0, hasher(), key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount,
-    hasher const& hash, key_equal const& equal, allocator_type const& alloc)
-  : FlatHashSet(bucketCount, hash, equal, alloc) {
-  insert(first, last);
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount,
-    allocator_type const& alloc)
-  : FlatHashSet(first, last, bucketCount, hasher(), key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(InputIt first, InputIt last, std::size_t bucketCount,
-    hasher const& hash, allocator_type const& alloc)
-  : FlatHashSet(first, last, bucketCount, hash, key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet const& other)
-    : FlatHashSet(other, other.m_table.get_allocator()) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet const& other, allocator_type const& alloc)
-  : FlatHashSet(alloc) {
-  operator=(other);
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet&& other)
-    : FlatHashSet(std::move(other), other.m_table.get_allocator()) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(FlatHashSet&& other, allocator_type const& alloc)
-  : FlatHashSet(alloc) {
-  operator=(std::move(other));
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount,
-    hasher const& hash, key_equal const& equal, allocator_type const& alloc)
-  : FlatHashSet(bucketCount, hash, equal, alloc) {
-  operator=(init);
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount, allocator_type const& alloc)
-  : FlatHashSet(init, bucketCount, hasher(), key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>::FlatHashSet(std::initializer_list<value_type> init, std::size_t bucketCount,
-    hasher const& hash, allocator_type const& alloc)
-  : FlatHashSet(init, bucketCount, hash, key_equal(), alloc) {}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>& FlatHashSet<Key, Hash, Equals, Allocator>::operator=(FlatHashSet const& other) {
-  m_table.clear();
-  m_table.reserve(other.size());
-  for (auto const& p : other)
-    m_table.insert(p);
-  return *this;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>& FlatHashSet<Key, Hash, Equals, Allocator>::operator=(FlatHashSet&& other) {
-  m_table = std::move(other.m_table);
-  return *this;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-FlatHashSet<Key, Hash, Equals, Allocator>& FlatHashSet<Key, Hash, Equals, Allocator>::operator=(std::initializer_list<value_type> init) {
-  clear();
-  insert(init.begin(), init.end());
-  return *this;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::begin() -> iterator {
-  return iterator{m_table.begin()};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::end() -> iterator {
-  return iterator{m_table.end()};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::begin() const -> const_iterator {
-  return const_iterator{m_table.begin()};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::end() const -> const_iterator {
-  return const_iterator{m_table.end()};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::cbegin() const -> const_iterator {
-  return begin();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::cend() const -> const_iterator {
-  return end();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-std::size_t FlatHashSet<Key, Hash, Equals, Allocator>::empty() const {
-  return m_table.empty();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-std::size_t FlatHashSet<Key, Hash, Equals, Allocator>::size() const {
-  return m_table.size();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-void FlatHashSet<Key, Hash, Equals, Allocator>::clear() {
-  m_table.clear();
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::insert(value_type const& value) -> std::pair<iterator, bool> {
-  auto res = m_table.insert(value);
-  return {iterator{res.first}, res.second};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::insert(value_type&& value) -> std::pair<iterator, bool> {
-  auto res = m_table.insert(std::move(value));
-  return {iterator{res.first}, res.second};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::insert(const_iterator i, value_type const& value) -> iterator {
-  return insert(i, value_type(value));
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::insert(const_iterator, value_type&& value) -> iterator {
-  return insert(std::move(value)).first;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-void FlatHashSet<Key, Hash, Equals, Allocator>::insert(InputIt first, InputIt last) {
-  if constexpr (std::forward_iterator<InputIt>)
-    m_table.reserve(m_table.size() + std::distance(first, last));
-  for (auto i = first; i != last; ++i)
-    m_table.insert(*i);
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-void FlatHashSet<Key, Hash, Equals, Allocator>::insert(std::initializer_list<value_type> init) {
-  insert(init.begin(), init.end());
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename... Args>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::emplace(Args&&... args) -> std::pair<iterator, bool> {
-  return insert(value_type(std::forward<Args>(args)...));
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-template <typename... Args>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::emplace_hint(const_iterator i, Args&&... args) -> iterator {
-  return insert(i, value_type(std::forward<Args>(args)...));
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::erase(const_iterator pos) -> iterator {
-  return iterator{m_table.erase(pos.inner)};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::erase(const_iterator first, const_iterator last) -> iterator {
-  return iterator{m_table.erase(first.inner, last.inner)};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-std::size_t FlatHashSet<Key, Hash, Equals, Allocator>::erase(key_type const& key) {
-  auto i = m_table.find(key);
-  if (i != m_table.end()) {
-    m_table.erase(i);
-    return 1;
-  }
-  return 0;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-std::size_t FlatHashSet<Key, Hash, Equals, Allocator>::count(Key const& key) const {
-  if (m_table.find(key) != m_table.end())
-    return 1;
-  else
-    return 0;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::find(key_type const& key) const -> const_iterator {
-  return const_iterator{m_table.find(key)};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::find(key_type const& key) -> iterator {
-  return iterator{m_table.find(key)};
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::equal_range(key_type const& key) -> std::pair<iterator, iterator> {
-  auto i = find(key);
-  if (i != end()) {
-    auto j = i;
-    ++j;
-    return {i, j};
-  } else {
-    return {i, i};
-  }
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-auto FlatHashSet<Key, Hash, Equals, Allocator>::equal_range(key_type const& key) const -> std::pair<const_iterator, const_iterator> {
-  auto i = find(key);
-  if (i != end()) {
-    auto j = i;
-    ++j;
-    return {i, j};
-  } else {
-    return {i, i};
-  }
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-void FlatHashSet<Key, Hash, Equals, Allocator>::reserve(std::size_t capacity) {
-  m_table.reserve(capacity);
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::operator==(FlatHashSet const& rhs) const {
-  return m_table == rhs.m_table;
-}
-
-template <typename Key, typename Hash, typename Equals, typename Allocator>
-bool FlatHashSet<Key, Hash, Equals, Allocator>::operator!=(FlatHashSet const& rhs) const {
-  return m_table != rhs.m_table;
-}
 
 }
 

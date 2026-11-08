@@ -219,7 +219,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       auto ores = (*biomeDatabase)->biomeOres(biomeName, threatLevel);
       if (!ores)
         return std::unexpected(std::move(ores.error()));
-      planetOres.addAll(*ores);
+      planetOres.insert_range(*ores);
       return {};
     };
     if (auto terrestrial = as<TerrestrialWorldParameters>(visitableParameters)) {

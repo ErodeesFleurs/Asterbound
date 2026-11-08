@@ -1211,7 +1211,7 @@ piece.imageSize = std::move(*result625);
 if (!result626) return std::unexpected(std::move(result626.error()));
 piece.spaces = Set<Vec2I>::from(
         std::move(*result626));
-    spaces.addAll(piece.spaces);
+    spaces.insert_range(piece.spaces);
   }
 
   m_spaces = spaces.values();

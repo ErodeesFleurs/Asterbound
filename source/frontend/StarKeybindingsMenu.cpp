@@ -341,7 +341,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
     bindings.clear();
   bindings.add(*out);
   if (bindings.size() > m_maxBindings) {
-    if (auto result = bindings.removeFirst(); !result)
+    if (auto result = bindings.remove_first(); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto updated = base->set(key->get(), JsonArray::from(bindings));

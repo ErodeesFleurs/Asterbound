@@ -11,6 +11,19 @@ struct RandomExceptionTag {
 };
 using RandomException = StarError<RandomExceptionTag, StarException>;
 
+template <typename Range>
+concept random_borrowable_range = std::ranges::input_range<Range>
+  && std::is_lvalue_reference_v<std::ranges::range_reference_t<Range>>
+  && requires(Range& range) {
+    typename std::remove_cvref_t<Range>::value_type;
+    range.empty() ? 0 : 0;
+    range.size() - 1;
+    range.begin();
+  };
+
+template <random_borrowable_range Range>
+using random_reference_t = std::reference_wrapper<std::remove_reference_t<std::ranges::range_reference_t<Range>>>;
+
 // Deterministic random number source.  Uses multiply-with-carry algorithm.
 // Much higher quality than the predictable random number generators.  Not
 // thread safe (won't crash or anything, but might return less than optimal
@@ -67,9 +80,10 @@ public:
 
   // Pick a random value out of a container
   template <typename Container>
+    requires random_borrowable_range<Container const>
   [[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type const>, StarException> randFrom(Container const& container);
-  template <typename Container>
-  [[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type>, StarException> randFrom(Container& container);
+  template <random_borrowable_range Container>
+  [[nodiscard]] std::expected<random_reference_t<Container>, StarException> randFrom(Container& container);
   template <typename Container>
   typename Container::value_type randValueFrom(Container const& container);
   template <typename Container>
@@ -120,9 +134,10 @@ public:
   ByteArray randBytes(std::size_t len);
 
   template <typename Container>
+    requires random_borrowable_range<Container const>
   [[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type const>, StarException> randFrom(Container const& container);
-  template <typename Container>
-  [[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type>, StarException> randFrom(Container& container);
+  template <random_borrowable_range Container>
+  [[nodiscard]] std::expected<random_reference_t<Container>, StarException> randFrom(Container& container);
   template <typename Container>
   typename Container::value_type randValueFrom(Container const& container);
   template <typename Container>
@@ -136,6 +151,7 @@ private:
 };
 
 template <typename Container>
+  requires random_borrowable_range<Container const>
 std::expected<std::reference_wrapper<typename Container::value_type const>, StarException> RandomSource::randFrom(Container const& container) {
   if (container.empty())
     return std::unexpected(RandomException("Empty container in randFrom"));
@@ -145,17 +161,18 @@ std::expected<std::reference_wrapper<typename Container::value_type const>, Star
   return std::reference_wrapper<typename Container::value_type const>(*i);
 }
 
-template <typename Container>
-std::expected<std::reference_wrapper<typename Container::value_type>, StarException> RandomSource::randFrom(Container& container) {
+template <random_borrowable_range Container>
+std::expected<random_reference_t<Container>, StarException> RandomSource::randFrom(Container& container) {
   if (container.empty())
     return std::unexpected(RandomException("Empty container in randFrom"));
 
   auto i = container.begin();
   std::advance(i, randUInt(container.size() - 1));
-  return std::reference_wrapper<typename Container::value_type>(*i);
+  return random_reference_t<Container>(*i);
 }
 
 template <typename Container>
+  requires random_borrowable_range<Container const>
 std::expected<std::reference_wrapper<typename Container::value_type const>, StarException> RandomService::randFrom(Container const& container) {
   if (container.empty())
     return std::unexpected(RandomException("Empty container in randFrom"));
@@ -165,14 +182,14 @@ std::expected<std::reference_wrapper<typename Container::value_type const>, Star
   return std::reference_wrapper<typename Container::value_type const>(*i);
 }
 
-template <typename Container>
-std::expected<std::reference_wrapper<typename Container::value_type>, StarException> RandomService::randFrom(Container& container) {
+template <random_borrowable_range Container>
+std::expected<random_reference_t<Container>, StarException> RandomService::randFrom(Container& container) {
   if (container.empty())
     return std::unexpected(RandomException("Empty container in randFrom"));
 
   auto i = container.begin();
   std::advance(i, randUInt(container.size() - 1));
-  return std::reference_wrapper<typename Container::value_type>(*i);
+  return random_reference_t<Container>(*i);
 }
 
 template <typename Container>
@@ -226,6 +243,8 @@ export module star.random;
 export namespace Star {
   using ::Star::RandomExceptionTag;
   using ::Star::RandomException;
+  using ::Star::random_borrowable_range;
+  using ::Star::random_reference_t;
   using ::Star::RandomSource;
   using ::Star::RandomService;
 }

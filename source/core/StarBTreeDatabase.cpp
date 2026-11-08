@@ -1379,7 +1379,6 @@ namespace Star {
   }
 
   void BTreeDatabase::freeBlock(BlockIndex b) {
-    if (m_uncommitted.contains(b))
     m_uncommitted.remove(b);
     if (m_uncommittedWrites.contains(b))
     m_uncommittedWrites.remove(b);
@@ -1414,7 +1413,7 @@ namespace Star {
       }
     }
 
-    auto result187 = m_availableBlocks.takeFirst();
+    auto result187 = m_availableBlocks.take_first();
     if (!result187) return std::unexpected(std::move(result187.error()));
     BlockIndex block = (*result187);
     m_uncommitted.add(block);
@@ -1537,7 +1536,7 @@ namespace Star {
 
       auto newBlock = [&]() -> std::expected<BlockIndex, StarException> {
         if (!m_availableBlocks.empty())
-          return m_availableBlocks.takeFirst();
+          return m_availableBlocks.take_first();
         return makeEndBlock();
       };
 
@@ -1557,7 +1556,7 @@ namespace Star {
         // If we have room on our current FreeIndexBlock, just add a block to it.
         if (!m_availableBlocks.empty() && indexBlock.freeBlocks.size() < maxFreeIndexLength()) {
 
-          auto result161 = m_availableBlocks.takeFirst();
+          auto result161 = m_availableBlocks.take_first();
           if (!result161) return std::unexpected(std::move(result161.error()));
           BlockIndex toAdd = (*result161);
           indexBlock.freeBlocks.push_back(toAdd);

@@ -81,7 +81,7 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
 }
 
 bool SpawnParameters::compatible(SpawnParameters const& parameters) const {
-  return areas.hasIntersection(parameters.areas)
+  return areas.has_intersection(parameters.areas)
       && (region == Region::All || parameters.region == Region::All || region == parameters.region)
       && (time == Time::All || parameters.time == Time::All || time == parameters.time);
 }
@@ -191,7 +191,7 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
     }
     auto count = group.getUInt("select");
     if (!count) return std::unexpected(std::move(count.error()));
-    result.spawnTypes.addAll(pool->selectUniques(*count, ++seed));
+    result.spawnTypes.insert_range(pool->selectUniques(*count, ++seed));
   }
   auto parameters = config.getObject("monsterParameters", JsonObject());
   if (!parameters) return std::unexpected(std::move(parameters.error()));

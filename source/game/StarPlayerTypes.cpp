@@ -96,7 +96,7 @@ std::expected<ShipUpgrades, StarException> ShipUpgrades::create(Json config) {
   auto capabilities = jsonToStringList(*capabilitiesJson);
   if (!capabilities)
     return std::unexpected(std::move(capabilities.error()));
-  result.capabilities.addAll(*capabilities);
+  result.capabilities.insert_range(*capabilities);
   return result;
 }
 
@@ -144,7 +144,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
     auto additional = jsonToStringList(*json);
     if (!additional)
       return std::unexpected(std::move(additional.error()));
-    capabilities.addAll(*additional);
+    capabilities.insert_range(*additional);
   }
   return std::ref(*this);
 }

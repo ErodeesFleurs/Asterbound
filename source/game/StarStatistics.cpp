@@ -192,7 +192,7 @@ std::expected<void, StarException> Statistics::setStat(String const& name, Strin
   }
   auto database = m_root.statisticsDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  m_pendingAchievementChecks.addAll((*database)->achievementsForStat(name));
+  m_pendingAchievementChecks.insert_range((*database)->achievementsForStat(name));
   return {};
 }
 
@@ -270,7 +270,7 @@ std::expected<void, StarException> Statistics::mergeServiceStatistics() {
     if (!unlocked) return std::unexpected(std::move(unlocked.error()));
   }
   // Locally store all the achievements we unlocked in a different install:
-  m_achievements.addAll(serviceAchievements);
+  m_achievements.insert_range(serviceAchievements);
 
   // Publish our local statistics, in case we made progress while the service
   // was unavailable.

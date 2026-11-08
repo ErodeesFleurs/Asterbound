@@ -914,10 +914,10 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto result71 = m_tileArray->validSectorsFor(monitoredRegion);
         if (!result71)
           return std::unexpected(std::move(result71.error()));
-        clientInfo->activeSectors.addAll(std::move(*result71));
+        clientInfo->activeSectors.insert_range(std::move(*result71));
       }
 
-      clientInfo->pendingSectors.addAll(clientInfo->activeSectors.difference(oldSectors));
+      clientInfo->pendingSectors.insert_range(clientInfo->activeSectors.difference(oldSectors));
     } else if (auto mtpacket = as<ModifyTileListPacket>(packet)) {
       auto result72 = this->root().liquidsDatabase();
       if (!result72)
@@ -2284,7 +2284,13 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
             for (auto const& space : entity->spaces())
               entitySpacesSet.add(m_geometry.xwrap(entity->tilePosition() + space));
 
-            auto result238 = entity->damageTiles(entitySpacesSet.intersection(damagePositionSet).values(), sourcePosition, tileDamage);
+            List<Vec2I> entityDamagePositions;
+            entityDamagePositions.reserve(std::min(entitySpacesSet.size(), damagePositionSet.size()));
+            for (auto const& space : entitySpacesSet) {
+              if (damagePositionSet.contains(space))
+                entityDamagePositions.push_back(space);
+            }
+            auto result238 = entity->damageTiles(entityDamagePositions, sourcePosition, tileDamage);
             if (!result238)
               return std::unexpected(std::move(result238.error()));
             bool broken = std::move(*result238);

@@ -249,13 +249,13 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effectEmi
       if (!newEffects)
         return std::unexpected(std::move(newEffects.error()));
       if (armorType == ArmorType::Head)
-        headEffects.addAll(*newEffects);
+        headEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Chest)
-        chestEffects.addAll(*newEffects);
+        chestEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Legs)
-        legsEffects.addAll(*newEffects);
+        legsEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Back)
-        backEffects.addAll(*newEffects);
+        backEffects.insert_range(*newEffects);
     }
   }
 
