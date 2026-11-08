@@ -138,12 +138,13 @@ TEST(FileTest, CloneDoesNotRecreateAnUnlinkedOriginal) {
   auto cloned = (*opened)->clone();
   ASSERT_FALSE(cloned);
   EXPECT_TRUE(cloned.error().is<IOException>());
-  EXPECT_EQ(File::exists(path), false);
   EXPECT_EQ((*opened)->pos(), 4);
   char bytes[4]{};
   ASSERT_TRUE((*opened)->read_full_absolute(0, bytes));
   EXPECT_EQ(ByteArray(bytes), ByteArray::fromCString("kept"));
   EXPECT_TRUE((*opened)->close());
+  // Windows keeps a delete-pending directory entry until the last handle closes.
+  EXPECT_EQ(File::exists(path), false);
 
   auto ephemeral = File::ephemeral_file(**random);
   ASSERT_TRUE(ephemeral);
