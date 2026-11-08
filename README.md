@@ -284,14 +284,14 @@ Use `--benchmark_filter='Lua/'` for invocation, callback, return-arity, context 
 ## Development
 
 - C++ uses named modules, `import std;` and `std::expected`, without RTTI or exceptions. Use fresh build trees after compiler, ABI or sanitizer changes.
-- Configure clangd with the [configure-only IDE workflow](#clangd-and-zed); C++23 module support and the Nix driver/header configuration are required.
+- Generate the local compilation database with the [configure-only IDE workflow](#c-language-servers). Clice supports module navigation; clangd requires its experimental module support.
 - Check changed C++/module lines with the pinned formatter; use `--apply` to format or `--base <commit>` for a branch comparison:
 
 ```sh
 nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/format-source.sh --check
 ```
 
-### clangd and Zed
+### C++ language servers
 
 Generate the local compilation database from the project root:
 
@@ -299,20 +299,21 @@ Generate the local compilation database from the project root:
 nix develop -c bash scripts/ide/configure-clangd.sh
 ```
 
-This configures `build/clangd` without building game targets. The first invocation may download or build development dependencies. Regenerate after changing CMake source lists or the Nix toolchain; a database copied from another machine is not portable.
+Despite its name, this script also prepares the database used by Clice. It configures `build/clangd` without building game targets. The first invocation may download or build development dependencies. Regenerate after changing CMake source lists or the Nix toolchain; a database copied from another machine is not portable.
 
-Use clangd 23 with `--experimental-modules-support`. For Zed, merge the following into the local, Git-ignored `.zed/settings.json`, replacing the database path with this checkout's absolute path. If needed, set `lsp.clangd.binary.path` to an installed clangd 23 executable.
+#### Clice and Zed
+
+The checked-in `clice.toml` selects `build/clangd/compile_commands.json`, including the toolchain's external `std.cppm`. Clice queries the compiler and builds its own module cache; do not reuse compiler- or clangd-generated BMIs.
+
+Install Clice and its [official Zed extension](https://github.com/clice-io/clice/tree/main/editors/zed). Merge the following into Zed settings, replacing the executable path with the installed Clice binary. Disable clangd for these languages to avoid duplicate diagnostics and completion providers.
 
 ```json
 {
   "lsp": {
-    "clangd": {
+    "clice": {
       "binary": {
-        "arguments": [
-          "--experimental-modules-support",
-          "--compile-commands-dir=/absolute/path/to/OpenStarbound/build/clangd",
-          "--query-driver=/nix/store/*-xclang-wrapper-*/bin/clang++,/nix/store/*-xclang-wrapper-*/bin/clang"
-        ],
+        "path": "/absolute/path/to/clice",
+        "arguments": ["serve"],
         "env": {
           "LC_ALL": "C",
           "LANGUAGE": "C"
@@ -320,15 +321,23 @@ Use clangd 23 with `--experimental-modules-support`. For Zed, merge the followin
       }
     }
   },
+  "languages": {
+    "C": { "language_servers": ["clice", "!clangd", "..."] },
+    "C++": { "language_servers": ["clice", "!clangd", "..."] }
+  },
   "file_types": {
     "C++": ["cppm", "ixx"]
   }
 }
 ```
 
-Explicit database selection also covers the toolchain's external `std.cppm`. The configure script preserves Nix wrapper header flags, and the driver allowlist permits system-header discovery outside `nix develop`. clangd builds its own module cache; do not point it at compiler-generated BMIs.
+Clice remains pre-release software; pin a verified version rather than updating the server independently of its extension. Restart it after changing `clice.toml` or the toolchain. Its background index supplies project-wide references; successfully parsing an open file is not proof that indexing has finished. Zed's clangd-only **Switch Source/Header** action is unavailable when clangd is disabled.
 
-Restart the language server after configuration or toolchain changes. If logs report `clangd fallback`, check that `build/clangd/compile_commands.json` exists and is selected before addressing cascaded `import` or missing-type errors.
+#### clangd
+
+For clangd users, `.clangd` selects the same database. Use clangd 23 with `--experimental-modules-support`, `--compile-commands-dir=/absolute/path/to/OpenStarbound/build/clangd`, and `--query-driver=/nix/store/*-xclang-wrapper-*/bin/clang++,/nix/store/*-xclang-wrapper-*/bin/clang`. Set the server environment to `LC_ALL=C`, `LANGUAGE=C`. The configure script preserves Nix wrapper header flags, and the driver allowlist permits system-header discovery outside `nix develop`.
+
+Restart the language server after configuration or toolchain changes. If logs report `clangd fallback`, check that `build/clangd/compile_commands.json` exists and is selected before addressing cascaded `import` or missing-type errors. Module parsing and cross-module navigation are separate capabilities.
 
 
 ### C++ implementation boundaries
