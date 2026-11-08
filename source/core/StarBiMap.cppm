@@ -183,7 +183,7 @@ template <auto const& Names>
   static_assert(validEnumNames<Names>(), "Fixed enum names must be unique ASCII spellings in enum order");
   auto bytes = name.utf8();
   if (!std::ranges::all_of(bytes, [](unsigned char c) { return c < 0x80; })) {
-    // String::toLower only folds ASCII, so non-ASCII cannot match this table.
+    // String::to_lower only folds ASCII, so non-ASCII cannot match this table.
     // Still validate the whole input: a malformed suffix must remain an error.
     auto length = name.size();
     if (!length)

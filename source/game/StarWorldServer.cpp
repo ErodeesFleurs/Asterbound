@@ -296,7 +296,7 @@ std::expected<std::shared_ptr<WorldServer>, StarException> WorldServer::create(R
 
 WorldServer::~WorldServer() {
   if (auto result = close(); !result)
-    std::fprintf(stderr, "Error closing world '%s' during destruction: %s\n", m_worldId.utf8Ptr(), result.error().what());
+    std::fprintf(stderr, "Error closing world '%s' during destruction: %s\n", m_worldId.utf8_data(), result.error().what());
 }
 
 std::expected<void, StarException> WorldServer::close() {

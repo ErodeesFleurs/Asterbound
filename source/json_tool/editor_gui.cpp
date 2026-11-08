@@ -123,7 +123,7 @@ void JsonEditor::updatePreview(QString const& valueStr) {
     m_errorDialog->showMessage(repr.error().what());
     return;
   }
-  m_jsonDocument->setPlainText(repr->utf8Ptr());
+  m_jsonDocument->setPlainText(repr->utf8_data());
 }
 
 bool JsonEditor::saveChanges() {
@@ -156,12 +156,13 @@ void JsonEditor::displayCurrentFile() {
 
   std::size_t progress = (m_fileIndex + 1) * 100 / m_files.size();
   String status = strf("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
-  m_statusLabel->setText(status.utf8Ptr());
+  m_statusLabel->setText(status.utf8_data());
 
   m_backButton->setEnabled(m_fileIndex != 0);
   m_nextButton->setText(m_fileIndex == m_files.size() - 1 ? "Done" : "Next »");
 
-  m_pathLabel->setText(m_path->path().utf8Ptr());
+  auto const& document_path = m_path->path();
+  m_pathLabel->setText(document_path.utf8_data());
 
   m_imageLabel->setText("No preview");
   m_jsonDocument->setPlainText("");
@@ -179,7 +180,7 @@ void JsonEditor::displayCurrentFile() {
     if (!repr)
       return std::unexpected(std::move(repr.error()));
     m_currentJson = std::move(*parsed);
-    m_jsonDocument->setPlainText(repr->utf8Ptr());
+    m_jsonDocument->setPlainText(repr->utf8_data());
     updateValueEditor();
     updateImagePreview();
     return {};
@@ -223,7 +224,7 @@ void JsonEditor::updateValueEditor() {
       return;
     }
   }
-  m_valueEditor->setText(text->utf8Ptr());
+  m_valueEditor->setText(text->utf8_data());
   m_valueEditor->setEnabled(true);
 }
 
@@ -248,7 +249,7 @@ void JsonEditor::updateImagePreview() {
       return;
     }
     String imageName = File::relative_to(File::dir_name(file), *imageFile);
-    QPixmap pixmap = QPixmap(imageName.utf8Ptr()).scaledToWidth(ImagePreviewWidth);
+    QPixmap pixmap = QPixmap(imageName.utf8_data()).scaledToWidth(ImagePreviewWidth);
     if (pixmap.height() > ImagePreviewHeight)
       pixmap = pixmap.scaledToHeight(ImagePreviewHeight);
     m_imageLabel->setPixmap(pixmap);

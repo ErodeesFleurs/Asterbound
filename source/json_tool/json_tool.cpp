@@ -189,7 +189,7 @@ std::expected<StringList, StarException> Star::findFiles(Logger& logger, FindInp
   StringList matches;
   auto visited = forEachFileRecursive(logger, findArgs.directory,
       [&findArgs, &matches](String const& filename) -> std::expected<void, StarException> {
-        auto matchesSuffix = filename.endsWith(findArgs.filenameSuffix);
+        auto matchesSuffix = filename.ends_with(findArgs.filenameSuffix);
         if (!matchesSuffix)
           return std::unexpected(std::move(matchesSuffix.error()));
         if (*matchesSuffix)

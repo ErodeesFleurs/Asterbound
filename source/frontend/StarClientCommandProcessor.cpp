@@ -308,7 +308,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::handleCommand(S
 }
 
 std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(String const& commandLine) {
-  auto prefixed = commandLine.beginsWith("/");
+  auto prefixed = commandLine.starts_with("/");
   if (!prefixed) return std::unexpected(std::move(prefixed.error()));
   if (!*prefixed)
     return std::unexpected(StarException("ClientCommandProcessor expected command, does not start with '/'"));
@@ -326,7 +326,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
     result.push_back(std::move(*output));
   } else if (auto macro = m_macroCommands.maybe(*command)) {
     for (auto const& entry : *macro) {
-      auto isCommand = entry.beginsWith("/");
+      auto isCommand = entry.starts_with("/");
       if (!isCommand) return std::unexpected(std::move(isCommand.error()));
       if (*isCommand) {
         auto output = handleCommand(entry);
@@ -441,7 +441,7 @@ std::expected<String, StarException> ClientCommandProcessor::debug(String const&
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   bool hud = false;
   if (!parsed->empty()) {
-    auto matches = (*parsed)[0].equalsIgnoreCase("hud");
+    auto matches = (*parsed)[0].equals_ignore_case("hud");
     if (!matches) return std::unexpected(std::move(matches.error()));
     hud = *matches;
   }
@@ -799,11 +799,11 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   bool outputSheet = false;
   String outputName = "render";
   auto player = m_universeClient->mainPlayer();
-  if (player && path.utf8Size() < 100) {
+  if (player && path.utf8_size() < 100) {
     auto parsedArgs = m_parser.tokenizeToStringList(path);
     if (!parsedArgs) return std::unexpected(std::move(parsedArgs.error()));
     auto& args = *parsedArgs;
-    auto lowered = args.front_value().value_or(String{}).toLower();
+    auto lowered = args.front_value().value_or(String{}).to_lower();
     if (!lowered) return std::unexpected(std::move(lowered.error()));
     auto const& first = *lowered;
     auto humanoid = player->humanoid();
@@ -819,7 +819,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
                "^white;/render chest ^cyan;front^reset;/^cyan;torso^reset;/^cyan;back^reset;. "
                "To repair old generated clothes, then also specify ^cyan;old^reset;.";
       }
-      auto loweredSheet = args[1].toLower();
+      auto loweredSheet = args[1].to_lower();
       if (!loweredSheet) return std::unexpected(std::move(loweredSheet.error()));
       String sheet = std::move(*loweredSheet);
       outputName += " " + sheet;
@@ -837,10 +837,10 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       }
       // recovery for custom chests made by a very old generator
       if (args.size() > 2) {
-        auto old = args[2].toLower();
+        auto old = args[2].to_lower();
         if (!old) return std::unexpected(std::move(old.error()));
         if (*old == "old") {
-          auto prefix = assetPath.basePath.beginsWith("/items/armors/avian/avian-tier6separator/");
+          auto prefix = assetPath.basePath.starts_with("/items/armors/avian/avian-tier6separator/");
           if (!prefix) return std::unexpected(std::move(prefix.error()));
           if (*prefix) {
             auto suffix = assetPath.basePath.substr(41);
@@ -894,7 +894,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   }
   if (assetPath == AssetPath()) {
     assetPath = AssetPath::split(path);
-    auto absolute = assetPath.basePath.beginsWith("/");
+    auto absolute = assetPath.basePath.starts_with("/");
     if (!absolute) return std::unexpected(std::move(absolute.error()));
     if (!*absolute)
       assetPath.basePath = "/assetmissing.png" + assetPath.basePath;

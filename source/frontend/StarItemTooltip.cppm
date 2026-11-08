@@ -167,7 +167,7 @@ std::expected<std::shared_ptr<Pane>, StarException> ItemTooltipBuilder::buildIte
     if (tooltipKind.empty())
       tooltipKind = "base";
     {
-      auto endsWithResult771 = tooltipKind.endsWith(".tooltip");
+      auto endsWithResult771 = tooltipKind.ends_with(".tooltip");
       if (!endsWithResult771)
         return std::unexpected(std::move(endsWithResult771.error()));
       if (!std::move(*endsWithResult771))
@@ -198,7 +198,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescription(GuiC
   if (tooltipKind.empty())
     tooltipKind = "base";
   {
-    auto endsWithResult775 = tooltipKind.endsWith(".itemdescription");
+    auto endsWithResult775 = tooltipKind.ends_with(".itemdescription");
     if (!endsWithResult775)
       return std::unexpected(std::move(endsWithResult775.error()));
     if (!std::move(*endsWithResult775))
@@ -273,7 +273,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   auto rarityName = enumName<RarityNames>(item->rarity());
   if (!rarityName)
     return std::unexpected(std::move(rarityName.error()));
-  auto rarityTitle = String(*rarityName).titleCase();
+  auto rarityTitle = String(*rarityName).title_case();
   if (!rarityTitle)
     return std::unexpected(std::move(rarityTitle.error()));
   auto rarityLabel = container->setLabel("rarityLabel", std::move(*rarityTitle));
@@ -436,7 +436,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
       return std::unexpected(std::move(iterateObjectResult821.error()));
     for (auto const& pair : std::move(*iterateObjectResult821)) {
       {
-        auto equalsIgnoreCaseResult822 = pair.first.equalsIgnoreCase("subtitle");
+        auto equalsIgnoreCaseResult822 = pair.first.equals_ignore_case("subtitle");
         if (!equalsIgnoreCaseResult822)
           return std::unexpected(std::move(equalsIgnoreCaseResult822.error()));
         if (std::move(*equalsIgnoreCaseResult822))
@@ -448,7 +448,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           }
       }
       {
-        auto endsWithResult824 = pair.first.endsWith("Label");
+        auto endsWithResult824 = pair.first.ends_with("Label");
         if (!endsWithResult824)
           return std::unexpected(std::move(endsWithResult824.error()));
         if (std::move(*endsWithResult824))
@@ -472,7 +472,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           }
       }
       {
-        auto endsWithResult829 = pair.first.endsWith("Image");
+        auto endsWithResult829 = pair.first.ends_with("Image");
         if (!endsWithResult829)
           return std::unexpected(std::move(endsWithResult829.error()));
         bool condition831 = static_cast<bool>(std::move(*endsWithResult829));

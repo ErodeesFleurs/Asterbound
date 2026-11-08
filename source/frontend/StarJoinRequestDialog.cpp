@@ -107,7 +107,7 @@ std::expected<void, StarException> JoinRequestDialog::displayRequest(String cons
     return std::unexpected(std::move(label.error()));
   if (!*label)
     return std::unexpected(GUIBuilderException("Missing join request message label"));
-  auto text = (*label)->setText(message->replaceTags(StringMap<String>{{"username", userName}}));
+  auto text = (*label)->setText(message->replace_tags(StringMap<String>{{"username", userName}}));
   if (!text)
     return std::unexpected(std::move(text.error()));
   return show();

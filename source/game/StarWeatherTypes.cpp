@@ -122,7 +122,7 @@ std::expected<WeatherType, StarException> WeatherType::create(Root& root, Json c
   auto parallax = config.optString("parallax");
   if (!parallax) return std::unexpected(std::move(parallax.error()));
   if (*parallax && !(*parallax)->empty()) {
-    auto absolute = (*parallax)->beginsWith("/");
+    auto absolute = (*parallax)->starts_with("/");
     if (!absolute) return std::unexpected(std::move(absolute.error()));
     result.parallax = *absolute ? **parallax : "/parallax/weather/" + **parallax + ".parallax";
   }

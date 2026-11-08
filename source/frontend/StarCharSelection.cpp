@@ -165,7 +165,7 @@ std::expected<void, StarException> CharSelectionPane::init() {
     auto trimmed = textBox->get().getText().trim();
     if (!trimmed)
       return std::unexpected(std::move(trimmed.error()));
-    auto lowered = trimmed->toLower();
+    auto lowered = trimmed->to_lower();
     if (!lowered)
       return std::unexpected(std::move(lowered.error()));
     m_search = std::move(*lowered);

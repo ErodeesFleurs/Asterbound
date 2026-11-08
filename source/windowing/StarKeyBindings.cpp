@@ -182,7 +182,7 @@ std::expected<String, StarException> printInputDescriptor(KeyChord chord) {
   auto name = enumName<KeyNames>(chord.key);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return String::joinWith(" + ", modNames.join(" + "), String(*name));
+  return String::join_with(" + ", modNames.join(" + "), String(*name));
 }
 
 KeyBindings::KeyBindings() = default;

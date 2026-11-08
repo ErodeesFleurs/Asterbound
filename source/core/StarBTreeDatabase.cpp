@@ -47,7 +47,7 @@ namespace Star {
     // particular, never retry a failed close/commit while unwinding.
     if (m_open && (!m_availableBlocks.empty() || !m_uncommitted.empty() || !m_uncommittedWrites.empty()))
     std::fprintf(stderr, "BTreeDatabase '%s' destroyed with uncommitted changes; call commit() or close() explicitly\n",
-    m_contentIdentifier.utf8Ptr());
+    m_contentIdentifier.utf8_data());
   }
 
   std::uint32_t BTreeDatabase::blockSize() const {
@@ -204,7 +204,7 @@ namespace Star {
         if (m_contentIdentifier.empty()) {
           return std::unexpected(DBException("Opening new database and no content identifier set!"));
         }
-        if (m_contentIdentifier.utf8Size() > ContentIdentifierStringSize) {
+        if (m_contentIdentifier.utf8_size() > ContentIdentifierStringSize) {
           return std::unexpected(DBException("contentIdentifier in BTreeDatabase implementation is greater than maximum identifier length"));
         }
         if (m_keySize == 0 || m_blockSize < 44 || m_keySize > m_blockSize - 11) {
@@ -1818,7 +1818,7 @@ namespace Star {
     auto database = std::make_unique<BTreeSha256Database>(logger);
     if (contentIdentifier.empty())
       return std::unexpected(DBException("Opening new database and no content identifier set!"));
-    if (contentIdentifier.utf8Size() > database->ContentIdentifierStringSize)
+    if (contentIdentifier.utf8_size() > database->ContentIdentifierStringSize)
       return std::unexpected(DBException("contentIdentifier in BTreeDatabase implementation is greater than maximum identifier length"));
     auto configured = database->setContentIdentifier(contentIdentifier);
     if (!configured) return std::unexpected(std::move(configured.error()));

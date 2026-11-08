@@ -516,7 +516,7 @@ public:
 
     StringList platformArguments;
     for (auto it = cmdLineArgs.begin(); it != cmdLineArgs.end();) {
-      auto platformArgument = it->beginsWith("+platform");
+      auto platformArgument = it->starts_with("+platform");
       if (!platformArgument)
         return std::unexpected(std::move(platformArgument.error()));
       if (*platformArgument) {
@@ -618,9 +618,9 @@ public:
     if (auto result = (*m_logger).info("Application: Creating SDL window"); !result)
       return std::unexpected(std::move(result.error()));
 #ifdef STAR_SYSTEM_MACOS
-    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8Ptr(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE));
+    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE));
 #else
-    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8Ptr(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY));
+    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY));
 #endif
     if (!m_sdlWindow)
       return std::unexpected(ApplicationException::format("Application: Could not create SDL Window: {}", SDL_GetError()));
@@ -679,12 +679,12 @@ public:
       const char* Home = std::getenv("HOME");
 
       if (XdgDataHome && XdgDataHome[0] != '\0') {
-        auto path = String::joinWith("", String(std::string_view(XdgDataHome)), "/icons");
+        auto path = String::join_with("", String(std::string_view(XdgDataHome)), "/icons");
         if (!path)
           return std::unexpected(std::move(path.error()));
         XdgIconsPath = std::move(*path);
       } else if (Home && Home[0] != '\0') {
-        auto path = String::joinWith("", String(std::string_view(Home)), "/.local/share/icons");
+        auto path = String::join_with("", String(std::string_view(Home)), "/.local/share/icons");
         if (!path)
           return std::unexpected(std::move(path.error()));
         XdgIconsPath = std::move(*path);
@@ -697,7 +697,7 @@ public:
       if (!iconsDirectoryExists)
         return std::unexpected(std::move(iconsDirectoryExists.error()));
       if (*iconsDirectoryExists) {
-        auto icon = String::joinWith("", XdgIconsPath, "/openstarbound.png");
+        auto icon = String::join_with("", XdgIconsPath, "/openstarbound.png");
         if (!icon)
           return std::unexpected(std::move(icon.error()));
         const String XdgIcon = std::move(*icon);
@@ -1340,7 +1340,7 @@ private:
 
     bool setClipboard(String text) override {
       return parent.m_dispatcher.invoke([&]() -> bool {
-        return SDL_SetClipboardText(text.utf8Ptr());
+        return SDL_SetClipboardText(text.utf8_data());
       });
     }
 
@@ -1386,7 +1386,7 @@ private:
       parent.m_dispatcher.invoke([&]() {
         parent.m_windowTitle = std::move(title);
         if (parent.m_sdlWindow)
-          SDL_SetWindowTitle(parent.m_sdlWindow.get(), parent.m_windowTitle.utf8Ptr());
+          SDL_SetWindowTitle(parent.m_sdlWindow.get(), parent.m_windowTitle.utf8_data());
       });
     }
 
@@ -2036,7 +2036,7 @@ private:
     auto heldData = std::make_unique<StringMap<ByteArray>>(std::move(data));
     std::vector<const char*> types;
     for (auto&& entry : *heldData)
-      types.push_back(entry.first.utf8Ptr());
+      types.push_back(entry.first.utf8_data());
     auto request = [](void* userdata, const char* mime_type, std::size_t* size) -> const void* {
       if (auto entry = static_cast<StringMap<ByteArray>*>(userdata)->find_ref(String(std::string_view(mime_type)))) {
         *size = entry->get().size();

@@ -435,7 +435,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!colorResult)
         return std::unexpected(std::move(colorResult.error()));
       auto color = std::move(*colorResult);
-      imageKeys.set("color", color.takeUtf8());
+      imageKeys.set("color", color.take_utf8());
       auto keysConfigResult = jsonMergeQueryDef("imageKeys", JsonObject(), baseConfig, orientation->config);
       if (!keysConfigResult)
         return std::unexpected(std::move(keysConfigResult.error()));
@@ -453,7 +453,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       }
       for (auto const& layer : orientation->imageLayers) {
         if (layer.isImage()) {
-          auto image = AssetPath::join(layer.imagePart().image).replaceTags(imageKeys, true, "default");
+          auto image = AssetPath::join(layer.imagePart().image).replace_tags(imageKeys, true, "default");
           auto thresholdResult = orientationSettings.getDouble("spaceScan");
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
@@ -1444,7 +1444,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!colorResult)
       return std::unexpected(std::move(colorResult.error()));
     auto color = std::move(*colorResult);
-    imageKeys.set("color", color.takeUtf8());
+    imageKeys.set("color", color.take_utf8());
     auto keysConfigResult = jsonMergeQueryDef("imageKeys", JsonObject(), config->config, orientation->config, parameters);
     if (!keysConfigResult)
       return std::unexpected(std::move(keysConfigResult.error()));
@@ -1463,7 +1463,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
       auto& image = drawable.imagePart().image;
-      auto taggedImage = AssetPath::join(image).replaceTags(imageKeys, true, "default");
+      auto taggedImage = AssetPath::join(image).replace_tags(imageKeys, true, "default");
       image = std::move(taggedImage);
       if (orientation->flipImages) {
         auto boundsResult = drawable.boundBox(*imageMetadata, false);

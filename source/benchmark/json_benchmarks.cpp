@@ -46,7 +46,7 @@ void label(benchmark::State& state, String const& input, std::size_t batch) {
     fingerprint *= 1099511628211ull;
   }
   state.SetLabel(std::format("fixture-fnv1a={:016x}; bytes={}; batch={}; includes destruction", fingerprint,
-                             input.utf8Size(), batch));
+                             input.utf8_size(), batch));
 }
 
 struct Fixture {
@@ -113,7 +113,7 @@ template <ParseKind Kind> void BM_ParseDestroy(benchmark::State& state) {
     }
   }
   state.SetItemsProcessed(state.iterations() * Batch);
-  state.SetBytesProcessed(state.iterations() * Batch * fixture.text.utf8Size());
+  state.SetBytesProcessed(state.iterations() * Batch * fixture.text.utf8_size());
 }
 
 // Padded keys make independently generated compact object text lexically sorted.

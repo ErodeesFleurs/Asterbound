@@ -670,7 +670,7 @@ TEST(IdMapTest, HashDecodeAcceptsAnOccupiedCursorAndKeepsFraming) {
 
 namespace {
 std::filesystem::path native_test_path(String const& path) {
-  return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8Ptr()), path.utf8Size()));
+  return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8_data()), path.utf8_size()));
 }
 
 struct NativePathCleanup {
@@ -805,14 +805,14 @@ TEST_F(FileNativeTest, FailedReplacementDoesNotFallBackToDirectWrite) {
 #ifndef STAR_SYSTEM_FAMILY_WINDOWS
 TEST_F(FileNativeTest, StatusReportsSymlinkLoopsButRecognizesBrokenSymlinks) {
   auto loop = child("loop");
-  ASSERT_EQ(::symlink("loop", loop.utf8Ptr()), 0);
+  ASSERT_EQ(::symlink("loop", loop.utf8_data()), 0);
   EXPECT_FALSE(File::exists(loop));
   EXPECT_FALSE(File::is_regular_file(loop));
   EXPECT_FALSE(File::is_directory(loop));
   EXPECT_FALSE(File::file_size(loop));
   EXPECT_EQ(File::is_symlink(loop), true);
   auto broken = child("broken");
-  ASSERT_EQ(::symlink("absent", broken.utf8Ptr()), 0);
+  ASSERT_EQ(::symlink("absent", broken.utf8_data()), 0);
   EXPECT_EQ(File::exists(broken), false);
   EXPECT_EQ(File::is_regular_file(broken), false);
   EXPECT_EQ(File::is_directory(broken), false);
@@ -824,7 +824,8 @@ TEST_F(FileNativeTest, ExclusiveStagingNeverFollowsSymlinks) {
   auto unrelated = child("unrelated");
   ASSERT_TRUE(File::write_file(String("original"), target));
   ASSERT_TRUE(File::write_file(String("untouched"), unrelated));
-  ASSERT_EQ(::symlink(unrelated.utf8Ptr(), (target + ".new").utf8Ptr()), 0);
+  auto staging_path = target + ".new";
+  ASSERT_EQ(::symlink(unrelated.utf8_data(), staging_path.utf8_data()), 0);
   EXPECT_FALSE(File::overwrite_file_with_rename(String("replacement"), target));
   EXPECT_EQ(File::read_file_string(target), String("original"));
   EXPECT_EQ(File::read_file_string(unrelated), String("untouched"));
@@ -845,7 +846,7 @@ TEST_F(FileNativeTest, NativeSizeDoesNotMoveCursorAndRejectsNonregularDevices) {
   char byte;
   EXPECT_EQ((*device)->read(std::span<char>(&byte, 1)), 0u);
   auto fifo = child("fifo");
-  ASSERT_EQ(::mkfifo(fifo.utf8Ptr(), 0600), 0);
+  ASSERT_EQ(::mkfifo(fifo.utf8_data(), 0600), 0);
   EXPECT_FALSE(File::open(fifo, IOMode::ReadWrite | IOMode::Append));
   EXPECT_FALSE(File::file_size(fifo));
 }
@@ -854,7 +855,7 @@ TEST_F(FileNativeTest, NativeSizeDoesNotMoveCursorAndRejectsNonregularDevices) {
 #ifdef STAR_SYSTEM_LINUX
 TEST_F(FileNativeTest, NonblockingReadFailureIsNotReportedAsEndOfFile) {
   auto fifo = child("fifo");
-  ASSERT_EQ(::mkfifo(fifo.utf8Ptr(), 0600), 0);
+  ASSERT_EQ(::mkfifo(fifo.utf8_data(), 0600), 0);
   auto file = File::open(fifo, IOMode::ReadWrite);
   ASSERT_TRUE(file);
   // Locate the actual owned descriptor without adding a public native-handle

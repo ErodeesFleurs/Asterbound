@@ -35,7 +35,7 @@ struct ThreadImpl {
     auto& state = *static_cast<ThreadImpl*>(data);
 #ifdef STAR_SYSTEM_MACOS
     char tname[MaxThreadNameLength];
-    std::snprintf(tname, sizeof(tname), "%s", state.name.utf8Ptr());
+    std::snprintf(tname, sizeof(tname), "%s", state.name.utf8_data());
     pthread_setname_np(tname);
 #endif
     auto result = state.function();
@@ -64,7 +64,7 @@ struct ThreadImpl {
 
     // ensure the name is under the max allowed
     char tname[MaxThreadNameLength];
-    std::snprintf(tname, sizeof(tname), "%s", name.utf8Ptr());
+    std::snprintf(tname, sizeof(tname), "%s", name.utf8_data());
 
 #ifdef STAR_SYSTEM_FREEBSD
     pthread_set_name_np(pthread, tname);

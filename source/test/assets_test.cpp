@@ -69,7 +69,7 @@ struct AssetWorkerTestAccess {
     Sha256Hasher digest;
     StringList paths;
     for (auto const& entry : assets.m_files) {
-      auto lower = entry.first.string().toLower();
+      auto lower = entry.first.string().to_lower();
       if (!lower)
         return std::unexpected(std::move(lower.error()));
       paths.push_back(std::move(*lower));
@@ -78,7 +78,7 @@ struct AssetWorkerTestAccess {
     for (auto const& path : paths) {
       bool ignored = false;
       for (auto const& pattern : assets.m_settings.digestIgnore) {
-        auto matches = path.regexMatch(pattern, false, false);
+        auto matches = path.regex_match(pattern, false, false);
         if (!matches)
           return std::unexpected(std::move(matches.error()));
         if (*matches) {
@@ -379,7 +379,7 @@ const GameTestRegistration
     (*assets)->hotReload();
     size = (*source)->file_size("/mutable.json");
     ASSERT_TRUE(size);
-    EXPECT_EQ(*size, static_cast<StreamOffset>(replacement.utf8Size()));
+    EXPECT_EQ(*size, static_cast<StreamOffset>(replacement.utf8_size()));
     expect_batch_matches_scalar(**source, requests);
     auto recovered = (*assets)->json("/mutable.json");
     ASSERT_TRUE(recovered);

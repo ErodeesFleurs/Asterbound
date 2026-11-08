@@ -366,7 +366,7 @@ treeVariant.foliageDropConfig = std::move(*result240);
   auto result241 = stemConfig.settings.iterateObject();
 if (!result241) return std::unexpected(std::move(result241.error()));
 for (auto const& entry : std::move(*result241)) {
-    auto result242 = entry.first.endsWith("Description");
+    auto result242 = entry.first.ends_with("Description");
 if (!result242) return std::unexpected(std::move(result242.error()));
 if (std::move(*result242))
       descriptions[entry.first] = entry.second;
@@ -423,7 +423,7 @@ treeVariant.stemDropConfig = std::move(*result227);
   auto result228 = stemConfig.settings.iterateObject();
 if (!result228) return std::unexpected(std::move(result228.error()));
 for (auto const& entry : std::move(*result228)) {
-    auto result229 = entry.first.endsWith("Description");
+    auto result229 = entry.first.ends_with("Description");
 if (!result229) return std::unexpected(std::move(result229.error()));
 if (std::move(*result229))
       descriptions[entry.first] = entry.second;
@@ -488,7 +488,7 @@ grassVariant.ceiling = std::move(*result215);
   auto result216 = config.settings.iterateObject();
 if (!result216) return std::unexpected(std::move(result216.error()));
 for (auto const& entry : std::move(*result216)) {
-    auto result217 = entry.first.endsWith("Description");
+    auto result217 = entry.first.ends_with("Description");
 if (!result217) return std::unexpected(std::move(result217.error()));
 if (std::move(*result217))
       descriptions[entry.first] = entry.second;
@@ -589,7 +589,7 @@ bushVariant.ceiling = std::move(*result202);
   auto result203 = config.settings.iterateObject();
 if (!result203) return std::unexpected(std::move(result203.error()));
 for (auto const& entry : std::move(*result203)) {
-    auto result204 = entry.first.endsWith("Description");
+    auto result204 = entry.first.ends_with("Description");
 if (!result204) return std::unexpected(std::move(result204.error()));
 if (std::move(*result204))
       descriptions[entry.first] = entry.second;

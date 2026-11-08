@@ -61,7 +61,7 @@ TEST(FileTest, FullReadRejectsImpossibleLengths) {
 
 namespace {
   std::filesystem::path fsPath(String const& path) {
-    return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8().data()), path.utf8Size()));
+    return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8().data()), path.utf8_size()));
   }
 
   // Never follows symlinks, so it is safe even when the removal under test
@@ -365,7 +365,7 @@ TEST(FileTest, CopyErrorsDoNotTruncateSourceOrExistingTarget) {
 
 #ifdef STAR_SYSTEM_LINUX
   auto alias = File::relative_to(*directory, "alias");
-  ASSERT_EQ(::link(source.utf8Ptr(), alias.utf8Ptr()), 0);
+  ASSERT_EQ(::link(source.utf8_data(), alias.utf8_data()), 0);
   EXPECT_FALSE(File::copy(source, alias));
   EXPECT_EQ(File::read_file_string(source), "source bytes");
 #endif
@@ -640,7 +640,7 @@ TEST(FileTest, WholeReadsConsumeStreamsWhoseMetadataSizeIsZero) {
   ASSERT_TRUE(directory);
   auto cleanup = finally([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "whole-read-pipe");
-  ASSERT_EQ(::mkfifo(path.utf8Ptr(), 0600), 0);
+  ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
   std::string bytes(4096, '\0');
   for (std::size_t i = 0; i < bytes.size(); ++i)
     bytes[i] = static_cast<char>(i % 251);
@@ -700,7 +700,7 @@ TEST(FileTest, AppendSeekFailureReleasesDescriptor) {
   auto dir = std::move(*dirResult);
   auto cleanup = finally([&]() { removeTree(dir); });
   auto path = File::relative_to(dir, "pipe");
-  ASSERT_EQ(::mkfifo(path.utf8Ptr(), 0600), 0);
+  ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
   // Exception symbolization may cache ELF descriptors; only this FIFO is owned here.
   for (unsigned i = 0; i < 8; ++i) {
     auto opened = File::open(path, IOMode::ReadWrite | IOMode::Append);

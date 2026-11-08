@@ -318,10 +318,10 @@ ParallaxLayers const& Parallax::layers() const {
 }
 
 std::expected<void, StarException> Parallax::buildLayer(Json const& layerSettings, String const& kind) {
-  auto isFoliage = kind.beginsWith("foliage/");
+  auto isFoliage = kind.starts_with("foliage/");
   if (!isFoliage)
     return std::unexpected(std::move(isFoliage.error()));
-  auto isStem = kind.beginsWith("stem/");
+  auto isStem = kind.starts_with("stem/");
   if (!isStem)
     return std::unexpected(std::move(isStem.error()));
 

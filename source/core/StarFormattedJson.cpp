@@ -210,7 +210,7 @@ std::expected<FormattedJson, StarException> FormattedJson::create(Json const& js
         auto text = value.stringPtr();
         if (!text)
           return std::unexpected(std::move(text.error()));
-        auto valid = utf8Length((*text)->utf8().data(), (*text)->utf8().size());
+        auto valid = utf8_length((*text)->utf8().data(), (*text)->utf8().size());
         if (!valid)
           return std::unexpected(std::move(valid.error()));
       }
@@ -257,7 +257,7 @@ std::expected<FormattedJson, StarException> FormattedJson::create(Json const& js
           if (!comma)
             return std::unexpected(std::move(comma.error()));
         }
-        auto valid = utf8Length(key.utf8().data(), key.utf8().size());
+        auto valid = utf8_length(key.utf8().data(), key.utf8().size());
         if (!valid)
           return std::unexpected(std::move(valid.error()));
         auto added = builder.append(ObjectKeyElement{key});
@@ -691,7 +691,7 @@ std::expected<void, StarException> FormattedJsonBuilderStream::objectKey(std::sp
 }
 
 std::expected<void, StarException> FormattedJsonBuilderStream::objectKeyUtf8(std::string_view s) {
-  auto valid = utf8Length(s.data(), s.size());
+  auto valid = utf8_length(s.data(), s.size());
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   auto container = current();
@@ -727,7 +727,7 @@ std::expected<void, StarException> FormattedJsonBuilderStream::putString(std::sp
 }
 
 std::expected<void, StarException> FormattedJsonBuilderStream::putStringUtf8(std::string_view s) {
-  auto valid = utf8Length(s.data(), s.size());
+  auto valid = utf8_length(s.data(), s.size());
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   return putValue(Json(String(s)));
@@ -765,7 +765,7 @@ std::expected<void, StarException> FormattedJsonBuilderStream::putWhitespace(std
 }
 
 std::expected<void, StarException> FormattedJsonBuilderStream::putWhitespaceUtf8(std::string_view s) {
-  auto valid = utf8Length(s.data(), s.size());
+  auto valid = utf8_length(s.data(), s.size());
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   if (m_stack.empty())

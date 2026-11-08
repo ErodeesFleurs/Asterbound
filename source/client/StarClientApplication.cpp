@@ -1107,7 +1107,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
       auto shader = entry.second.toString();
       if (!shader)
         return std::unexpected(std::move(shader.error()));
-      auto multiline = shader->hasChar('\n');
+      auto multiline = shader->has_char('\n');
       if (!multiline)
         return std::unexpected(std::move(multiline.error()));
       if (!*multiline) {
@@ -1514,7 +1514,7 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
     if (!intro)
       return std::unexpected(std::move(intro.error()));
     if (auto pending =
-          m_player->setPendingCinematic(Json(intro->replaceTags(StringMap<String>{{"species", m_player->species()}})));
+          m_player->setPendingCinematic(Json(intro->replace_tags(StringMap<String>{{"species", m_player->species()}})));
         !pending)
       return pending;
   } else if (auto pending = m_player->setPendingCinematic(Json()); !pending) {
@@ -2069,7 +2069,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         auto text = activityDetails->toString();
         if (!text)
           return std::unexpected(std::move(text.error()));
-        auto details = text->lookupTags(getActivityDetail);
+        auto details = text->lookup_tags(getActivityDetail);
         if (!details)
           return std::unexpected(std::move(details.error()));
         finalDetails = std::move(*details);
@@ -2242,7 +2242,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       auto& broadcastCallback = worldClient->broadcastCallback();
       if (!broadcastCallback) {
         broadcastCallback = [&](std::shared_ptr<Player> player, StringView broadcast) -> std::expected<bool, StarException> {
-          auto& view = broadcast.utf8();
+          auto view = broadcast.utf8();
           if (view.rfind(VoiceBroadcastPrefix.utf8(), 0) != NPos) {
             auto entityId = player->entityId();
             auto speaker = m_voice->speaker(connectionForEntity(entityId));
@@ -2257,7 +2257,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
             if (!mouth)
               return std::unexpected(std::move(mouth.error()));
             (*speaker)->position = *mouth;
-            auto received = m_voice->receive(*speaker, view.substr(VoiceBroadcastPrefix.utf8Size()));
+            auto received = m_voice->receive(*speaker, view.substr(VoiceBroadcastPrefix.utf8_size()));
             if (!received)
               return std::unexpected(std::move(received.error()));
           }

@@ -3418,6 +3418,7 @@ struct std::formatter<Star::LinkedList<Element, Allocator>> : Star::StreamFormat
 
 export namespace Star {
   using ::Star::sequence_container;
+  using ::Star::sequence_source;
   using ::Star::ListHasher;
   using ::Star::List;
   using ::Star::StaticList;

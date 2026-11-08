@@ -475,7 +475,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));
   auto database = std::move(*databaseResult);
-  auto matches0Result = message.equalsIgnoreCase("startCrafting");
+  auto matches0Result = message.equals_ignore_case("startCrafting");
   if (!matches0Result)
     return std::unexpected(std::move(matches0Result.error()));
   auto matches0 = std::move(*matches0Result);
@@ -485,7 +485,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation1.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches1Result = message.equalsIgnoreCase("stopCrafting");
+  auto matches1Result = message.equals_ignore_case("stopCrafting");
   if (!matches1Result)
     return std::unexpected(std::move(matches1Result.error()));
   auto matches1 = std::move(*matches1Result);
@@ -495,7 +495,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation2.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches2Result = message.equalsIgnoreCase("burnContainerContents");
+  auto matches2Result = message.equals_ignore_case("burnContainerContents");
   if (!matches2Result)
     return std::unexpected(std::move(matches2Result.error()));
   auto matches2 = std::move(*matches2Result);
@@ -505,7 +505,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation3.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches3Result = message.equalsIgnoreCase("addItems");
+  auto matches3Result = message.equals_ignore_case("addItems");
   if (!matches3Result)
     return std::unexpected(std::move(matches3Result.error()));
   auto matches3 = std::move(*matches3Result);
@@ -524,7 +524,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches4Result = message.equalsIgnoreCase("putItems");
+  auto matches4Result = message.equals_ignore_case("putItems");
   if (!matches4Result)
     return std::unexpected(std::move(matches4Result.error()));
   auto matches4 = std::move(*matches4Result);
@@ -551,7 +551,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches5Result = message.equalsIgnoreCase("takeItems");
+  auto matches5Result = message.equals_ignore_case("takeItems");
   if (!matches5Result)
     return std::unexpected(std::move(matches5Result.error()));
   auto matches5 = std::move(*matches5Result);
@@ -578,7 +578,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches6Result = message.equalsIgnoreCase("swapItems");
+  auto matches6Result = message.equals_ignore_case("swapItems");
   if (!matches6Result)
     return std::unexpected(std::move(matches6Result.error()));
   auto matches6 = std::move(*matches6Result);
@@ -610,7 +610,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches7Result = message.equalsIgnoreCase("applyAugment");
+  auto matches7Result = message.equals_ignore_case("applyAugment");
   if (!matches7Result)
     return std::unexpected(std::move(matches7Result.error()));
   auto matches7 = std::move(*matches7Result);
@@ -637,7 +637,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches8Result = message.equalsIgnoreCase("consumeItems");
+  auto matches8Result = message.equals_ignore_case("consumeItems");
   if (!matches8Result)
     return std::unexpected(std::move(matches8Result.error()));
   auto matches8 = std::move(*matches8Result);
@@ -656,7 +656,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(Json(result));
   }
-  auto matches9Result = message.equalsIgnoreCase("consumeItemsAt");
+  auto matches9Result = message.equals_ignore_case("consumeItemsAt");
   if (!matches9Result)
     return std::unexpected(std::move(matches9Result.error()));
   auto matches9 = std::move(*matches9Result);
@@ -683,7 +683,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(Json(result));
   }
-  auto matches10Result = message.equalsIgnoreCase("clearContainer");
+  auto matches10Result = message.equals_ignore_case("clearContainer");
   if (!matches10Result)
     return std::unexpected(std::move(matches10Result.error()));
   auto matches10 = std::move(*matches10Result);

@@ -75,10 +75,10 @@ std::expected<NodeParameterValue, StarException> replaceBehaviorTag(NodeParamete
     text = *string;
   }
   if (text) {
-    auto begins = text->beginsWith('<');
+    auto begins = text->starts_with('<');
     if (!begins) return std::unexpected(std::move(begins.error()));
     if (*begins) {
-      auto ends = text->endsWith('>');
+      auto ends = text->ends_with('>');
       if (!ends) return std::unexpected(std::move(ends.error()));
       if (*ends) {
         auto size = text->size();

@@ -1860,13 +1860,13 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         // this is actually a secret broadcast!!
         if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.sourceEntityId)) {
           if (auto publicKey = player->getSecretPropertyView(SECRET_BROADCAST_PUBLIC_KEY)) {
-            if (publicKey->utf8Size() == Curve25519::PublicKeySize) {
+            if (publicKey->utf8_size() == Curve25519::PublicKeySize) {
               auto signature = view.substr(SECRET_BROADCAST_PREFIX.size(), Curve25519::SignatureSize);
               
               auto rawBroadcast = view.substr(FULL_SIZE);
               if (Curve25519::verify(
                       std::span<std::uint8_t const, Curve25519::SignatureSize>(reinterpret_cast<std::uint8_t const*>(signature.data()), Curve25519::SignatureSize),
-                      std::span<std::uint8_t const, Curve25519::PublicKeySize>(reinterpret_cast<std::uint8_t const*>(publicKey->utf8Ptr()), Curve25519::PublicKeySize),
+                      std::span<std::uint8_t const, Curve25519::PublicKeySize>(reinterpret_cast<std::uint8_t const*>(publicKey->utf8_data()), Curve25519::PublicKeySize),
                       std::span<char const>(rawBroadcast.data(), rawBroadcast.size()))) {
                 auto result130 = handleSecretBroadcast(player, rawBroadcast);
                 if (!result130)
@@ -4142,7 +4142,8 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
   dmg.damageDealt = dmg.healthLost = 0.0f;
   dmg.hitType = HitType::Hit;
   dmg.damageSourceKind = "nodamage";
-  dmg.targetMaterialKind = raw ? broadcast : strf("{}{}{}", SECRET_BROADCAST_PREFIX, StringView(std::string_view(reinterpret_cast<char const*>(signature.data()), signature.size())), broadcast);
+  dmg.targetMaterialKind = raw ? String(broadcast) : String(strf("{}{}{}", SECRET_BROADCAST_PREFIX,
+      StringView(std::string_view(reinterpret_cast<char const*>(signature.data()), signature.size())), broadcast));
   dmg.position = m_mainPlayer->position();
 
   if (!compress)

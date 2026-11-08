@@ -36,7 +36,7 @@ std::expected<std::optional<String>, StarException> matchTile(SearchParameters c
     if (!tileName)
       return std::unexpected(std::move(tileName.error()));
     if (*tileName) {
-      auto matches = (**tileName).regexMatch(namePattern);
+      auto matches = (**tileName).regex_match(namePattern);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)
@@ -48,7 +48,7 @@ std::expected<std::optional<String>, StarException> matchTile(SearchParameters c
     if (!value)
       return std::unexpected(std::move(value.error()));
     if (*value) {
-      auto matches = (**value).regexMatch(property.second);
+      auto matches = (**value).regex_match(property.second);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches) {
@@ -141,7 +141,7 @@ std::expected<void, StarException> grepDirectory(Root& root, SearchParameters co
       if (!searched)
         return std::unexpected(std::move(searched.error()));
     } else {
-      auto matches = entry.first.endsWith(MapFilenameSuffix);
+      auto matches = entry.first.ends_with(MapFilenameSuffix);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches) {

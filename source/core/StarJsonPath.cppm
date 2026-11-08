@@ -156,9 +156,9 @@ namespace JsonPath {
     if (!parser)
       return std::unexpected(ParsingException("Cannot invoke an empty Json path parser"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     Utf8Cursor cursor(path.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto parsed = parser(buffer, path, cursor);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
@@ -210,9 +210,9 @@ namespace JsonPath {
     if (!parser)
       return std::unexpected(ParsingException("Cannot invoke an empty Json path parser"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     Utf8Cursor cursor(path.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto parsed = parser(buffer, path, cursor);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
@@ -252,14 +252,14 @@ namespace JsonPath {
   std::expected<Jsonlike, StarException> pathApply(String& buffer, Jsonlike const& value, PathParser const& parser,
                                                    String const& path, Utf8Cursor const current,
                                                    JsonOp<Jsonlike> const& op) {
-    if (current.atEnd())
+    if (current.at_end())
       return op(value, {});
     auto cursor = current;
     auto parsed = parser(buffer, path, cursor);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     if (value.type() == Json::Type::Array) {
-      if (cursor.atEnd())
+      if (cursor.at_end())
         return op(value, buffer);
       auto i = maybeLexicalCast<std::size_t>(buffer);
       if (!i)
@@ -291,7 +291,7 @@ namespace JsonPath {
         return value.set(*i, std::move(*changed));
       }
     } else if (value.type() == Json::Type::Object) {
-      if (cursor.atEnd())
+      if (cursor.at_end())
         return op(value, buffer);
       if constexpr (std::same_as<Jsonlike, Json>) {
         auto child = value.find(buffer);
@@ -330,7 +330,7 @@ namespace JsonPath {
     if (!op)
       return std::unexpected(TraversalException("Cannot invoke an empty Json path operation"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     return pathApply(buffer, base, parser, path, Utf8Cursor(path.utf8()), op);
   }
 

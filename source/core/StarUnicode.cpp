@@ -8,9 +8,9 @@ import star.string;
 
 namespace Star {
 std::expected<void, StarException> Utf8Cursor::decode() const {
-  if (atEnd()) return std::unexpected(UnicodeException("Cannot read past end of UTF-8 range"));
+  if (at_end()) return std::unexpected(UnicodeException("Cannot read past end of UTF-8 range"));
   if (m_width != 0) return {};
-  auto width = utf8DecodeChar(m_bytes.data() + m_offset, &m_point, m_bytes.size() - m_offset);
+  auto width = utf8_decode_char(m_bytes.data() + m_offset, &m_point, m_bytes.size() - m_offset);
   if (!width) return std::unexpected(std::move(width.error()));
   m_width = *width;
   return {};
@@ -32,7 +32,7 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
   auto offset = m_offset - 1;
   while (offset != 0 && (static_cast<unsigned char>(m_bytes[offset]) & 0xc0) == 0x80) --offset;
   Utf32Type point;
-  auto width = utf8DecodeChar(m_bytes.data() + offset, &point, m_offset - offset);
+  auto width = utf8_decode_char(m_bytes.data() + offset, &point, m_offset - offset);
   if (!width) return std::unexpected(std::move(width.error()));
   if (*width != m_offset - offset) return std::unexpected(UnicodeException("Invalid UTF-8 boundary"));
   m_offset = offset;
@@ -41,7 +41,7 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
   return {};
 }
 
-std::expected<std::size_t, StarException> utf8DecodeChar(Utf8Type const* bytes, Utf32Type* output, std::size_t remain) {
+std::expected<std::size_t, StarException> utf8_decode_char(Utf8Type const* bytes, Utf32Type* output, std::size_t remain) {
   if (remain == 0 || (remain == NPos && *bytes == 0)) return 0;
   auto first = static_cast<unsigned char>(bytes[0]);
   unsigned count;
@@ -68,11 +68,11 @@ std::expected<std::size_t, StarException> utf8DecodeChar(Utf8Type const* bytes, 
   return count;
 }
 
-std::expected<std::size_t, StarException> utf8Length(Utf8Type const* bytes, std::size_t remain) {
+std::expected<std::size_t, StarException> utf8_length(Utf8Type const* bytes, std::size_t remain) {
   std::size_t length = 0;
   while (remain != 0) {
     Utf32Type point;
-    auto decoded = utf8DecodeChar(bytes, &point, remain);
+    auto decoded = utf8_decode_char(bytes, &point, remain);
     if (!decoded) return std::unexpected(std::move(decoded.error()));
     if (*decoded == 0) break;
     bytes += *decoded;
@@ -82,7 +82,7 @@ std::expected<std::size_t, StarException> utf8Length(Utf8Type const* bytes, std:
   return length;
 }
 
-std::expected<std::size_t, StarException> utf8EncodeChar(Utf8Type* bytes, Utf32Type point, std::size_t capacity) {
+std::expected<std::size_t, StarException> utf8_encode_char(Utf8Type* bytes, Utf32Type point, std::size_t capacity) {
   if (point > 0x10ffff)
     return std::unexpected(UnicodeException::format("Invalid UTF-32 code point {} encountered while trying to encode UTF-8", static_cast<std::uint32_t>(point)));
   unsigned count = point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
@@ -96,20 +96,20 @@ std::expected<std::size_t, StarException> utf8EncodeChar(Utf8Type* bytes, Utf32T
   return count;
 }
 
-bool isUtf16LeadSurrogate(Utf32Type point) { return point >= 0xd800 && point <= 0xdbff; }
-bool isUtf16TrailSurrogate(Utf32Type point) { return point >= 0xdc00 && point <= 0xdfff; }
-std::expected<Utf32Type, StarException> utf32FromUtf16SurrogatePair(Utf32Type lead, Utf32Type trail) {
-  if (!isUtf16LeadSurrogate(lead)) return std::unexpected(UnicodeException("Invalid lead surrogate passed to utf32FromUtf16SurrogatePair"));
-  if (!isUtf16TrailSurrogate(trail)) return std::unexpected(UnicodeException("Invalid trail surrogate passed to utf32FromUtf16SurrogatePair"));
+bool is_utf16_lead_surrogate(Utf32Type point) { return point >= 0xd800 && point <= 0xdbff; }
+bool is_utf16_trail_surrogate(Utf32Type point) { return point >= 0xdc00 && point <= 0xdfff; }
+std::expected<Utf32Type, StarException> utf32_from_utf16_surrogate_pair(Utf32Type lead, Utf32Type trail) {
+  if (!is_utf16_lead_surrogate(lead)) return std::unexpected(UnicodeException("Invalid lead surrogate passed to utf32FromUtf16SurrogatePair"));
+  if (!is_utf16_trail_surrogate(trail)) return std::unexpected(UnicodeException("Invalid trail surrogate passed to utf32FromUtf16SurrogatePair"));
   return static_cast<Utf32Type>(((lead - 0xd800) << 10) + (trail - 0xdc00) + 0x10000);
 }
-std::expected<std::pair<Utf32Type, std::optional<Utf32Type>>, StarException> utf32ToUtf16SurrogatePair(Utf32Type point) {
+std::expected<std::pair<Utf32Type, std::optional<Utf32Type>>, StarException> utf32_to_utf16_surrogate_pair(Utf32Type point) {
   if (point > 0x10ffff) return std::unexpected(UnicodeException("Invalid codepoint passed to utf32ToUtf16SurrogatePair"));
   if (point < 0x10000) return std::pair<Utf32Type, std::optional<Utf32Type>>{point, {}};
   point -= 0x10000;
   return std::pair<Utf32Type, std::optional<Utf32Type>>{static_cast<Utf32Type>((point >> 10) + 0xd800), static_cast<Utf32Type>((point & 0x3ff) + 0xdc00)};
 }
-std::expected<Utf32Type, StarException> hexStringToUtf32(std::string const& hex, std::optional<Utf32Type> previous) {
+std::expected<Utf32Type, StarException> hex_string_to_utf32(std::string const& hex, std::optional<Utf32Type> previous) {
   auto bytes = hexDecode(hex);
   if (!bytes) return std::unexpected(std::move(bytes.error()));
   if (bytes->size() > sizeof(Utf32Type))
@@ -117,11 +117,11 @@ std::expected<Utf32Type, StarException> hexStringToUtf32(std::string const& hex,
   std::uint32_t point = 0;
   for (std::size_t i = 0; i != bytes->size(); ++i)
     point = (point << 8) | static_cast<unsigned char>(bytes->span()[i]);
-  if (previous && isUtf16LeadSurrogate(*previous)) return utf32FromUtf16SurrogatePair(*previous, static_cast<Utf32Type>(point));
+  if (previous && is_utf16_lead_surrogate(*previous)) return utf32_from_utf16_surrogate_pair(*previous, static_cast<Utf32Type>(point));
   return static_cast<Utf32Type>(point);
 }
-std::expected<std::string, StarException> hexStringFromUtf32(Utf32Type point) {
-  auto pair = utf32ToUtf16SurrogatePair(point);
+std::expected<std::string, StarException> hex_string_from_utf32(Utf32Type point) {
+  auto pair = utf32_to_utf16_surrogate_pair(point);
   if (!pair) return std::unexpected(std::move(pair.error()));
   constexpr char digits[] = "0123456789abcdef";
   std::string result;

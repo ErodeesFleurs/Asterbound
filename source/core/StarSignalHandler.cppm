@@ -166,7 +166,7 @@ struct SignalHandlerImpl {
       for (DWORD i = 0; i < exception.NumberParameters; i++)
         message = strf("{} [{}]", message, (PVOID)exception.ExceptionInformation[i]);
     }
-    fatalError(message.utf8Ptr(), true);
+    fatalError(message.utf8_data(), true);
     TerminateProcess(GetCurrentProcess(), EXIT_FAILURE);
   }
 

@@ -171,13 +171,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeFireableItemCallback
 std::expected<void, StarException> LuaBindings::FireableItemCallbacks::fire(FireableItem& fireableItem, std::optional<String> const& mode) {
   auto fireMode = FireMode::Primary;
   if (mode) {
-    auto alt = mode->equalsIgnoreCase("Alt");
+    auto alt = mode->equals_ignore_case("Alt");
     if (!alt)
       return std::unexpected(std::move(alt.error()));
     if (*alt) {
       fireMode = FireMode::Alt;
     } else {
-      auto primary = mode->equalsIgnoreCase("Primary");
+      auto primary = mode->equals_ignore_case("Primary");
       if (!primary)
         return std::unexpected(std::move(primary.error()));
       if (!*primary)

@@ -509,7 +509,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
   auto serverFidelityMode = fidelityConfig->toString();
   if (!serverFidelityMode)
     return std::unexpected(std::move(serverFidelityMode.error()));
-  auto automatic = serverFidelityMode->equalsIgnoreCase("automatic");
+  auto automatic = serverFidelityMode->equals_ignore_case("automatic");
   if (!automatic)
     return std::unexpected(std::move(automatic.error()));
   if (!WorldServerFidelityNames)

@@ -50,7 +50,7 @@ std::expected<bool, StarException> LockFile::lock(std::int64_t timeout) {
   if (m_handle)
     return true;
   auto acquire = [this](bool block) -> std::expected<bool, StarException> {
-    int fd = ::open(m_filename.utf8Ptr(), O_RDONLY | O_CREAT, 0644);
+    int fd = ::open(m_filename.utf8_data(), O_RDONLY | O_CREAT, 0644);
     if (fd < 0)
       return std::unexpected(StarException::format("Could not open lock file {}, {}", m_filename, std::strerror(errno)));
     if (::flock(fd, LOCK_EX | (block ? 0 : LOCK_NB)) != 0) {
@@ -89,7 +89,7 @@ std::expected<void, StarException> LockFile::unlock() {
   if (!handle)
     return {};
   int fd = *static_cast<int*>(handle.get());
-  int unlinkError = ::unlink(m_filename.utf8Ptr()) < 0 ? errno : 0;
+  int unlinkError = ::unlink(m_filename.utf8_data()) < 0 ? errno : 0;
   int closeError = ::close(fd) < 0 ? errno : 0;
   if (unlinkError) {
     if (closeError)

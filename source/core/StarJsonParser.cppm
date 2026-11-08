@@ -47,7 +47,7 @@ private:
     std::u32string text;
     while (!bytes.empty()) {
       char32_t point;
-      auto width = utf8DecodeChar(bytes.data(), &point, bytes.size());
+      auto width = utf8_decode_char(bytes.data(), &point, bytes.size());
       if (!width) return std::unexpected(std::move(width.error()));
       text.push_back(point);
       bytes.remove_prefix(*width);
@@ -271,7 +271,7 @@ private:
     if (!begun)
       return std::unexpected(std::move(begun.error()));
     while (m_char != 0) {
-      if (isSpace(m_char)) {
+      if (is_space(m_char)) {
         auto advanced = next();
         if (!advanced)
           return std::unexpected(std::move(advanced.error()));
@@ -309,7 +309,7 @@ private:
             auto advanced = next();
             if (!advanced)
               return std::unexpected(std::move(advanced.error()));
-          } while (m_char != 0 && !isSpace(m_char));
+          } while (m_char != 0 && !is_space(m_char));
           auto written = m_stream.putString(text);
           if (!written)
             return std::unexpected(std::move(written.error()));
@@ -384,7 +384,7 @@ private:
         }
       }
     }
-    if (seq && m_char != 0 && !isSpace(m_char))
+    if (seq && m_char != 0 && !is_space(m_char))
       return error("unexpected character after number");
     std::string_view token = buffer;
     if constexpr (requires { m_current.utf8Position(); })
@@ -411,7 +411,7 @@ private:
       if (!checked)
         return std::unexpected(std::move(checked.error()));
     }
-    if (seq && m_char != 0 && !isSpace(m_char))
+    if (seq && m_char != 0 && !is_space(m_char))
       return error("unexpected character after word");
     return first == 'n' ? m_stream.putNull() : m_stream.putBoolean(first == 't');
   }
@@ -442,7 +442,7 @@ private:
       }
       while (begin != end) {
         char32_t point;
-        auto width = utf8DecodeChar(begin, &point, static_cast<std::size_t>(end - begin));
+        auto width = utf8_decode_char(begin, &point, static_cast<std::size_t>(end - begin));
         if (!width)
           return std::unexpected(std::move(width.error()));
         text += point;
@@ -458,10 +458,10 @@ private:
           auto hex = readHexEscape();
           if (!hex)
             return std::unexpected(std::move(hex.error()));
-          auto codepoint = hexStringToUtf32(*hex);
+          auto codepoint = hex_string_to_utf32(*hex);
           if (!codepoint)
             return std::unexpected(std::move(codepoint.error()));
-          if (isUtf16LeadSurrogate(*codepoint)) {
+          if (is_utf16_lead_surrogate(*codepoint)) {
             auto checked = check('\\');
             if (!checked)
               return std::unexpected(std::move(checked.error()));
@@ -471,7 +471,7 @@ private:
             hex = readHexDigits();
             if (!hex)
               return std::unexpected(std::move(hex.error()));
-            codepoint = hexStringToUtf32(*hex, *codepoint);
+            codepoint = hex_string_to_utf32(*hex, *codepoint);
             if (!codepoint)
               return std::unexpected(std::move(codepoint.error()));
           }
@@ -578,7 +578,7 @@ private:
         } else {
           return error("/ character in whitespace is not followed by '/' or '*', invalid comment");
         }
-      } else if (isSpace(m_char)) {
+      } else if (is_space(m_char)) {
         auto consumed = consume();
         if (!consumed)
           return std::unexpected(std::move(consumed.error()));
@@ -598,7 +598,7 @@ private:
     return {};
   }
 
-  static bool isSpace(char32_t c) {
+  static bool is_space(char32_t c) {
     return c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d || c == 0xfeff;
   }
 
@@ -636,7 +636,7 @@ public:
     return m_pretty ? write(' ') : std::expected<void, StarException>{};
   }
   std::expected<void, StarException> objectKeyUtf8(std::string_view bytes) override {
-    auto valid = utf8Length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes.data(), bytes.size());
     if (!valid) return std::unexpected(std::move(valid.error()));
     if (state() != ObjectElement) m_state.push_back(ObjectElement);
     auto r = indent();
@@ -674,9 +674,9 @@ public:
     return quoted(s);
   }
   std::expected<void, StarException> putStringUtf8(std::string_view bytes) override {
-    // Preserve wideString's all-or-nothing validation before startValue or any
+    // Preserve wide_string's all-or-nothing validation before startValue or any
     // output, but do not inspect later JSON values before earlier output.
-    auto valid = utf8Length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes.data(), bytes.size());
     if (!valid) return std::unexpected(std::move(valid.error()));
     auto r = startValue();
     if (!r) return std::unexpected(std::move(r.error()));
@@ -710,7 +710,7 @@ public:
   std::expected<void, StarException> putNull() override { return putDouble("null"); }
   std::expected<void, StarException> putWhitespace(std::span<char32_t const> s) override { return text(s); }
   std::expected<void, StarException> putWhitespaceUtf8(std::string_view bytes) override {
-    auto valid = utf8Length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes.data(), bytes.size());
     if (!valid)
       return std::unexpected(std::move(valid.error()));
     return utf8Text(bytes);
@@ -752,7 +752,7 @@ private:
       return text(encoded);
     }
     if (c > 0x10ffff) {
-      auto hex = hexStringFromUtf32(c);
+      auto hex = hex_string_from_utf32(c);
       if (!hex) return std::unexpected(std::move(hex.error()));
       if (hex->size() != 4 && hex->size() != 8)
         return std::unexpected(UnicodeException("Internal Error: Received invalid unicode hex from hexStringFromUtf32."));
@@ -800,7 +800,7 @@ private:
     } else {
       while (!bytes.empty()) {
         char32_t point;
-        auto width = utf8DecodeChar(bytes.data(), &point, bytes.size());
+        auto width = utf8_decode_char(bytes.data(), &point, bytes.size());
         if (!width) return std::unexpected(std::move(width.error()));
         auto r = write(point);
         if (!r) return std::unexpected(std::move(r.error()));
@@ -838,7 +838,7 @@ private:
     if constexpr (Utf8) {
       if (c < 0x80) return writeByte(static_cast<char>(c));
       char bytes[4];
-      auto width = utf8EncodeChar(bytes, c, sizeof(bytes));
+      auto width = utf8_encode_char(bytes, c, sizeof(bytes));
       if (!width) return std::unexpected(std::move(width.error()));
       return utf8Text(std::string_view(bytes, *width));
     } else {

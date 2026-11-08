@@ -48,7 +48,7 @@ private:
   std::expected<Char, StarException> parseBackslash();
   std::expected<Char, StarException> parseUnicodeEscapeSequence(std::optional<Char> previousCodepoint = {});
 
-  bool isSpace(Char letter) const;
+  bool is_space(Char letter) const;
   bool isQuote(Char letter) const;
 
   bool inQuotedString() const;

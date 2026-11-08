@@ -367,7 +367,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     if (!worldType)
       return std::unexpected(std::move(worldType.error()));
     std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> worldParameters;
-    if (auto terrestrialMatch = worldType->equalsIgnoreCase("Terrestrial"); !terrestrialMatch) {
+    if (auto terrestrialMatch = worldType->equals_ignore_case("Terrestrial"); !terrestrialMatch) {
       return std::unexpected(std::move(terrestrialMatch.error()));
     } else if (*terrestrialMatch) {
       auto planetType = worldConfig.getString("planetType");
@@ -377,11 +377,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
       if (!planetSize)
         return std::unexpected(std::move(planetSize.error()));
       worldParameters = generateTerrestrialWorldParameters(root, *planetType, *planetSize, worldSeed);
-    } else if (auto asteroidMatch = worldType->equalsIgnoreCase("Asteroids"); !asteroidMatch) {
+    } else if (auto asteroidMatch = worldType->equals_ignore_case("Asteroids"); !asteroidMatch) {
       return std::unexpected(std::move(asteroidMatch.error()));
     } else if (*asteroidMatch) {
       worldParameters = generateAsteroidsWorldParameters(root, worldSeed);
-    } else if (auto dungeonMatch = worldType->equalsIgnoreCase("FloatingDungeon"); !dungeonMatch) {
+    } else if (auto dungeonMatch = worldType->equals_ignore_case("FloatingDungeon"); !dungeonMatch) {
       return std::unexpected(std::move(dungeonMatch.error()));
     } else if (*dungeonMatch) {
       auto dungeonWorld = worldConfig.getString("dungeonWorld");

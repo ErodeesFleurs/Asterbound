@@ -219,15 +219,15 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
       if (!inverse) return std::unexpected(std::move(inverse.error()));
       auto type = entryConfig.getString("type");
       if (!type) return std::unexpected(std::move(type.error()));
-      if (auto match0 = type->equalsIgnoreCase("Connects"); !match0) return std::unexpected(std::move(match0.error()));
+      if (auto match0 = type->equals_ignore_case("Connects"); !match0) return std::unexpected(std::move(match0.error()));
       else if (*match0) {
         rule->entries.push_back({MaterialRule::RuleConnects(), *inverse});
       }
-      else if (auto match1 = type->equalsIgnoreCase("Shadows"); !match1) return std::unexpected(std::move(match1.error()));
+      else if (auto match1 = type->equals_ignore_case("Shadows"); !match1) return std::unexpected(std::move(match1.error()));
       else if (*match1) {
         rule->entries.push_back({MaterialRule::RuleShadows(), *inverse});
       }
-      else if (auto match2 = type->equalsIgnoreCase("EqualsSelf"); !match2) return std::unexpected(std::move(match2.error()));
+      else if (auto match2 = type->equals_ignore_case("EqualsSelf"); !match2) return std::unexpected(std::move(match2.error()));
       else if (*match2) {
         auto matchHue = entryConfig.getBool("matchHue", false);
         if (!matchHue) return std::unexpected(std::move(matchHue.error()));
@@ -235,13 +235,13 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
         entry.rule.emplace<4>(MaterialRule::RuleEqualsSelf{*matchHue});
         rule->entries.push_back(std::move(entry));
       }
-      else if (auto match3 = type->equalsIgnoreCase("EqualsId"); !match3) return std::unexpected(std::move(match3.error()));
+      else if (auto match3 = type->equals_ignore_case("EqualsId"); !match3) return std::unexpected(std::move(match3.error()));
       else if (*match3) {
         auto id = entryConfig.getUInt("id");
         if (!id) return std::unexpected(std::move(id.error()));
         rule->entries.push_back({MaterialRule::RuleEqualsId{static_cast<std::uint16_t>(*id)}, *inverse});
       }
-      else if (auto match4 = type->equalsIgnoreCase("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
+      else if (auto match4 = type->equals_ignore_case("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
       else if (*match4) {
         auto name = entryConfig.getString("propertyName");
         if (!name) return std::unexpected(std::move(name.error()));

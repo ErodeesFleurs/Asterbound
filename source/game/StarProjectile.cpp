@@ -917,13 +917,13 @@ std::expected<void, StarException> Projectile::processAction(Json const& action)
     parameters = action;
     auto result729 = parameters.getString("action");
 if (!result729) return std::unexpected(std::move(result729.error()));
-auto result730 = std::move(*result729).toLower();
+auto result730 = std::move(*result729).to_lower();
 if (!result730) return std::unexpected(std::move(result730.error()));
 command = std::move(*result730);
   } else {
     auto result731 = action.toString();
 if (!result731) return std::unexpected(std::move(result731.error()));
-auto result732 = std::move(*result731).toLower();
+auto result732 = std::move(*result731).to_lower();
 if (!result732) return std::unexpected(std::move(result732.error()));
 command = std::move(*result732);
   }
@@ -1649,7 +1649,7 @@ if (!result687) return std::unexpected(std::move(result687.error()));
 m_damageKind = std::move(*result687);
   auto result688 = m_parameters.getString("damageType", m_config->damageType);
 if (!result688) return std::unexpected(std::move(result688.error()));
-auto result689 = enumValue<DamageTypeNames>(std::move(*result688));
+auto result689 = enumValue<DamageTypeNames>(*result688);
 if (!result689) return std::unexpected(std::move(result689.error()));
 m_damageType = *result689;
 auto result690 = m_parameters.getBool("rayCheckToSource", m_config->rayCheckToSource);

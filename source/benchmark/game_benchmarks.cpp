@@ -437,7 +437,7 @@ std::expected<void, StarException> consumeProfiles(String const& directory, bool
   for (auto const& [name, isDirectory] : *entries) {
     // The directory was empty before this owned run. Never recurse or delete
     // unrelated files, even if another process unexpectedly writes here.
-    if (isDirectory || !name.endsWith(".luaprofile")) {
+    if (isDirectory || !name.ends_with(".luaprofile")) {
       if (!error)
         error = StarException("Unexpected entry in private benchmark Lua directory");
       continue;

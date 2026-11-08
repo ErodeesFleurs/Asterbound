@@ -34,7 +34,7 @@ std::expected<std::optional<struct stat>, StarException> path_status(String cons
   struct stat status;
   int result;
   do {
-    result = follow_links ? ::stat(path.utf8Ptr(), &status) : ::lstat(path.utf8Ptr(), &status);
+    result = follow_links ? ::stat(path.utf8_data(), &status) : ::lstat(path.utf8_data(), &status);
   } while (result < 0 && errno == EINTR);
   if (result == 0)
     return status;
@@ -60,7 +60,7 @@ String File::convert_dir_separators(String const& path) {
 std::expected<List<std::pair<String, bool>>, StarException> File::directory_entries(String const& dirName,
                                                                                     bool skipDots) {
   std::error_code error;
-  std::filesystem::directory_iterator entry(std::filesystem::path(dirName.utf8Ptr()), error);
+  std::filesystem::directory_iterator entry(std::filesystem::path(dirName.utf8_data()), error);
   if (error)
     return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dirName, error.message()));
   List<std::pair<String, bool>> files;
@@ -96,7 +96,7 @@ String File::dir_name(String const& fileName) {
 }
 
 String File::relative_to(String const& relativeTo, String const& path) {
-  if (path.utf8Size() && path.utf8Ptr()[0] == '/')
+  if (path.utf8_size() && path.utf8_data()[0] == '/')
     return path;
   auto bytes = relativeTo.utf8();
   while (!bytes.empty() && bytes.back() == '/')
@@ -108,7 +108,7 @@ String File::relative_to(String const& relativeTo, String const& path) {
 
 std::expected<String, StarException> File::full_path(String const& fileName) {
   std::error_code error;
-  auto path = std::filesystem::canonical(std::filesystem::path(fileName.utf8Ptr()), error);
+  auto path = std::filesystem::canonical(std::filesystem::path(fileName.utf8_data()), error);
   if (error)
     return std::unexpected(IOException::format("could not resolve file '{}': {}", fileName, error.message()));
   return String(path.native());
@@ -125,7 +125,7 @@ std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomS
       return std::unexpected(std::move(path.error()));
     int fd;
     do {
-      fd = ::open(path->utf8Ptr(), O_RDWR | O_CREAT | O_EXCL, 0666);
+      fd = ::open(path->utf8_data(), O_RDWR | O_CREAT | O_EXCL, 0666);
     } while (fd < 0 && errno == EINTR);
     if (fd < 0) {
       auto error = errno;
@@ -143,7 +143,8 @@ std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomS
 
 std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomService&) {
   auto file = std::make_shared<File>();
-  auto path = ByteArray::fromCStringWithNull(relative_to(P_tmpdir, "starbound.tmpfile.XXXXXXXX").utf8Ptr());
+  auto filename_template = relative_to(P_tmpdir, "starbound.tmpfile.XXXXXXXX");
+  auto path = ByteArray::fromCStringWithNull(filename_template.utf8_data());
   auto fd = ::mkstemp(path.ptr());
   if (fd < 0)
     return std::unexpected(IOException::format("tmpfile error: {}", std::strerror(errno)));
@@ -162,7 +163,7 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
     auto directory = relative_to(P_tmpdir, strf("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
     int result;
     do {
-      result = ::mkdir(directory.utf8Ptr(), 0777);
+      result = ::mkdir(directory.utf8_data(), 0777);
     } while (result < 0 && errno == EINTR);
     if (result == 0)
       return directory;
@@ -204,7 +205,7 @@ std::expected<bool, StarException> File::is_symlink(String const& path) {
 std::expected<StreamOffset, StarException> File::file_size(String const& path) {
   int fd;
   do {
-    fd = ::open(path.utf8Ptr(), O_RDONLY | O_NONBLOCK);
+    fd = ::open(path.utf8_data(), O_RDONLY | O_NONBLOCK);
   } while (fd < 0 && errno == EINTR);
   if (fd < 0)
     return std::unexpected(
@@ -214,7 +215,7 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
   auto closed = fclose(handle);
   if (!size) {
     if (!closed)
-      std::fprintf(stderr, "Error closing file '%s' after failed metadata query: %s\n", path.utf8Ptr(),
+      std::fprintf(stderr, "Error closing file '%s' after failed metadata query: %s\n", path.utf8_data(),
                    closed.error().what());
     return std::unexpected(std::move(size.error()));
   }
@@ -224,7 +225,7 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
 }
 
 std::expected<void, StarException> File::rename(String const& source, String const& target) {
-  if (std::rename(source.utf8Ptr(), target.utf8Ptr()) < 0)
+  if (std::rename(source.utf8_data(), target.utf8_data()) < 0)
     return std::unexpected(IOException::format("rename error: {}", std::strerror(errno)));
   return {};
 }
@@ -232,7 +233,7 @@ std::expected<void, StarException> File::rename(String const& source, String con
 std::expected<void, StarException> File::sync_directory(String const& directory) {
   int fd;
   do {
-    fd = ::open(directory.utf8Ptr(), O_RDONLY | O_DIRECTORY);
+    fd = ::open(directory.utf8_data(), O_RDONLY | O_DIRECTORY);
   } while (fd < 0 && errno == EINTR);
   if (fd < 0)
     return std::unexpected(

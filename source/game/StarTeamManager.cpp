@@ -457,7 +457,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
 
   JsonArray invited;
   for (auto&& entry : m_connectedPlayers) {
-    auto matches = Text::stripEscapeCodes(entry.first).beginsWith(inviteeName, String::CaseInsensitive);
+    auto matches = Text::stripEscapeCodes(entry.first).starts_with(inviteeName, String::CaseInsensitive);
     if (!matches) return std::unexpected(std::move(matches.error()));
     if (!*matches) continue;
 

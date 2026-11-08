@@ -134,7 +134,7 @@ std::expected<void, StarException> scanMaterials(Root& root, TilesetUpdater& upd
       return std::unexpected(std::move(description.error()));
     Json properties = JsonObject{{"material", materialName}, {"//name", materialName},
         {"//shortdescription", *shortDescription}, {"//description", *description}};
-    auto category = tileset->toLower();
+    auto category = tileset->to_lower();
     if (!category)
       return std::unexpected(std::move(category.error()));
     updater.defineTile(std::make_shared<Tile>(Tile{*source, "materials", *category, materialName, *image, properties}));
@@ -197,7 +197,7 @@ std::expected<StringSet, StarException> categorizeObject(Root& root, String cons
     categories.insert("objects-uncategorized");
   StringSet result;
   for (auto const& entry : categories) {
-    auto lowered = entry.toLower();
+    auto lowered = entry.to_lower();
     if (!lowered)
       return std::unexpected(std::move(lowered.error()));
     result.insert(std::move(*lowered));
@@ -245,7 +245,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   unsigned width = 0, height = 0;
   for (auto const& imageLayer : orientation->imageLayers) {
     auto path = AssetPath::join(imageLayer.imagePart().image);
-    String imageName = path.replaceTags(StringMap<String>{}, true, "default");
+    String imageName = path.replace_tags(StringMap<String>{}, true, "default");
     auto loaded = assets->image(imageName);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));

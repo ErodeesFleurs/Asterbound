@@ -611,7 +611,7 @@ std::expected<bool, StarException> TextBoxWidget::innerSendEvent(InputEvent cons
     }
     auto calculateSteps = [&](bool right) -> std::expected<int, StarException> {
       if ((keyDown.mods & (KeyMod::LCtrl | KeyMod::RCtrl | KeyMod::LAlt | KeyMod::RAlt)) != KeyMod::NoMod) {
-        auto boundary = m_text.findNextBoundary(m_cursorOffset, !right);
+        auto boundary = m_text.find_next_boundary(m_cursorOffset, !right);
         if (!boundary)
           return std::unexpected(std::move(boundary.error()));
         int steps = right ? static_cast<int>(*boundary) - m_cursorOffset : m_cursorOffset - static_cast<int>(*boundary);
@@ -765,7 +765,7 @@ std::expected<bool, StarException> TextBoxWidget::modText(String const& text) {
 }
 
 std::expected<bool, StarException> TextBoxWidget::newTextValid(String const& text) const {
-  auto matched = text.regexMatch(m_regex);
+  auto matched = text.regex_match(m_regex);
   if (!matched)
     return std::unexpected(std::move(matched.error()));
   if (!*matched)

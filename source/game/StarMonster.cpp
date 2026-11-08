@@ -1226,7 +1226,7 @@ if (!result198) return std::unexpected(std::move(result198.error()));
 
   auto result200 = callbacks.registerCallback("say", [this](String line, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
       if (tags)
-        line = line.replaceTags(*tags, false);
+        line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
         auto result199 = addChatMessage(line);
@@ -1241,7 +1241,7 @@ if (!result200) return std::unexpected(std::move(result200.error()));
 
   auto result202 = callbacks.registerCallback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
       if (tags)
-        line = line.replaceTags(*tags, false);
+        line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
         auto result201 = addChatMessage(line, portrait);

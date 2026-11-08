@@ -289,17 +289,17 @@ std::expected<std::shared_ptr<StoredConfigFunction>, StarException> FunctionData
 namespace {
 
 [[nodiscard]] std::expected<InterpolationMode, StarException> storedInterpolationMode(String const& name) {
-  auto halfStep = name.equalsIgnoreCase("HalfStep");
+  auto halfStep = name.equals_ignore_case("HalfStep");
   if (!halfStep)
     return std::unexpected(std::move(halfStep.error()));
   if (*halfStep)
     return InterpolationMode::HalfStep;
-  auto linear = name.equalsIgnoreCase("Linear");
+  auto linear = name.equals_ignore_case("Linear");
   if (!linear)
     return std::unexpected(std::move(linear.error()));
   if (*linear)
     return InterpolationMode::Linear;
-  auto cubic = name.equalsIgnoreCase("Cubic");
+  auto cubic = name.equals_ignore_case("Cubic");
   if (!cubic)
     return std::unexpected(std::move(cubic.error()));
   if (*cubic)
@@ -308,17 +308,17 @@ namespace {
 }
 
 [[nodiscard]] std::expected<BoundMode, StarException> storedBoundMode(String const& name) {
-  auto clamp = name.equalsIgnoreCase("Clamp");
+  auto clamp = name.equals_ignore_case("Clamp");
   if (!clamp)
     return std::unexpected(std::move(clamp.error()));
   if (*clamp)
     return BoundMode::Clamp;
-  auto extrapolate = name.equalsIgnoreCase("Extrapolate");
+  auto extrapolate = name.equals_ignore_case("Extrapolate");
   if (!extrapolate)
     return std::unexpected(std::move(extrapolate.error()));
   if (*extrapolate)
     return BoundMode::Extrapolate;
-  auto wrap = name.equalsIgnoreCase("Wrap");
+  auto wrap = name.equals_ignore_case("Wrap");
   if (!wrap)
     return std::unexpected(std::move(wrap.error()));
   if (*wrap)

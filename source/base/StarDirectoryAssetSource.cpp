@@ -102,7 +102,7 @@ std::expected<ByteArray, StarException> DirectoryAssetSource::read(String const&
 }
 
 std::expected<String, StarException> DirectoryAssetSource::toFilesystem(String const& path) const {
-  auto absolute = path.beginsWith("/");
+  auto absolute = path.starts_with("/");
   if (!absolute)
     return std::unexpected(std::move(absolute.error()));
   if (!*absolute)
@@ -141,7 +141,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
     List<String> const& ancestorDirectories) const {
   auto shouldIgnore = [this](String const& assetPath) -> std::expected<bool, StarException> {
     for (auto const& pattern : m_ignorePatterns) {
-      auto matches = assetPath.regexMatch(pattern, false, false);
+      auto matches = assetPath.regex_match(pattern, false, false);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)

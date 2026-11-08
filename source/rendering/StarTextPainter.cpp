@@ -216,7 +216,7 @@ std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigne
   int width = 0;
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
@@ -247,7 +247,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
     return std::unexpected(std::move(switched.error()));
   Utf8Cursor cursor(text.utf8());
   std::size_t cursorBase = 0;
-  std::size_t iterator = 0, end = text.utf8Size();
+  std::size_t iterator = 0, end = text.utf8_size();
 
   unsigned lines = 0;
   auto lineStartIterator = iterator, splitIterator = end;
@@ -285,7 +285,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
             !changed)
           return std::unexpected(std::move(changed.error()));
         iterator = cursorBase = commandEnd + 1;
-        cursor = Utf8Cursor(text.utf8().substr(cursorBase));
+        cursor = Utf8Cursor(std::string_view(text.utf8()).substr(cursorBase));
         commandStart = commandEnd = NPos;
         continue;
       }
@@ -643,7 +643,7 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
   RectF bounds = RectF::withSize(pos.pos, Vec2F());
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));

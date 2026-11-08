@@ -149,7 +149,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
         {"ClientShipWorld", Kind::Ship}, {"CustomWorld", Kind::Custom},
         {"ClientCustomWorld", Kind::ClientCustom}, {"Nowhere", Kind::Nowhere}};
     for (auto const& [name, value] : names) {
-      auto matches = type.equalsIgnoreCase(name);
+      auto matches = type.equals_ignore_case(name);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)
@@ -318,22 +318,22 @@ std::expected<Json, StarException> WarpToWorld::toJson() const {
 }
 
 std::expected<WarpAction, StarException> parseWarpAction(String const& warpString) {
-  auto isReturn = warpString.equalsIgnoreCase("Return");
+  auto isReturn = warpString.equals_ignore_case("Return");
   if (!isReturn)
     return std::unexpected(std::move(isReturn.error()));
   if (*isReturn)
     return WarpAlias::Return;
-  auto isOrbited = warpString.equalsIgnoreCase("OrbitedWorld");
+  auto isOrbited = warpString.equals_ignore_case("OrbitedWorld");
   if (!isOrbited)
     return std::unexpected(std::move(isOrbited.error()));
   if (*isOrbited)
     return WarpAlias::OrbitedWorld;
-  auto isShip = warpString.equalsIgnoreCase("OwnShip");
+  auto isShip = warpString.equals_ignore_case("OwnShip");
   if (!isShip)
     return std::unexpected(std::move(isShip.error()));
   if (*isShip)
     return WarpAlias::OwnShip;
-  auto isPlayer = warpString.beginsWith("Player:", String::CaseSensitivity::CaseInsensitive);
+  auto isPlayer = warpString.starts_with("Player:", String::CaseSensitivity::CaseInsensitive);
   if (!isPlayer)
     return std::unexpected(std::move(isPlayer.error()));
   if (*isPlayer) {
@@ -356,7 +356,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
   SpawnTarget target;
   if (parts->size() == 2) {
     auto const& targetPart = (*parts)[1];
-    auto positionMatch = targetPart.regexMatch("\\d+.\\d+");
+    auto positionMatch = targetPart.regex_match("\\d+.\\d+");
     if (!positionMatch)
       return std::unexpected(std::move(positionMatch.error()));
     if (*positionMatch) {
@@ -373,7 +373,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
         return std::unexpected(std::move(y.error()));
       target = SpawnTargetPosition(Vec2F(*x, *y));
     } else {
-      auto xMatch = targetPart.regexMatch("\\d+");
+      auto xMatch = targetPart.regex_match("\\d+");
       if (!xMatch)
         return std::unexpected(std::move(xMatch.error()));
       if (*xMatch) {

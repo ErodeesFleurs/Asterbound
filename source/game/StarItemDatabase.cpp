@@ -198,10 +198,10 @@ HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std:
 }
 
 std::expected<String, StarException> ItemDatabase::guiFilterString(std::shared_ptr<Item> const& item) {
-  auto lowered = (item->name() + item->friendlyName() + item->description()).toLower();
+  auto lowered = (item->name() + item->friendlyName() + item->description()).to_lower();
   if (!lowered)
     return std::unexpected(std::move(lowered.error()));
-  auto split = lowered->splitAny(" ,.?*\\+/|\t");
+  auto split = lowered->split_any(" ,.?*\\+/|\t");
   if (!split)
     return std::unexpected(std::move(split.error()));
   return split->join("");

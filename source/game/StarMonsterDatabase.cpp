@@ -351,7 +351,7 @@ auto paletteName = std::move(*result44);
     if (!result47) return std::unexpected(std::move(result47.error()));
     auto result48 = swap.second.toString();
     if (!result48) return std::unexpected(std::move(result48.error()));
-    auto result49 = Color::fromHex(std::move(*result48));
+    auto result49 = Color::fromHex(*result48);
     if (!result49) return std::unexpected(std::move(result49.error()));
     colorSwaps[std::move(*result47).toRgba()] = std::move(*result49).toRgba();
             }
@@ -385,7 +385,7 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::randomMonster(Stri
       if (seedConfig->type() == Json::Type::String) {
         auto result51 = seedConfig->toString();
   if (!result51) return std::unexpected(std::move(result51.error()));
-  auto result52 = lexicalCast<std::uint64_t>(std::move(*result51));
+  auto result52 = lexicalCast<std::uint64_t>(*result51);
   if (!result52) return std::unexpected(std::move(result52.error()));
   seed = std::move(*result52);
       } else {
@@ -606,7 +606,7 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
   Json value = result86->get();
 
         {
-    auto result87 = mergeMethod.equalsIgnoreCase("add");
+    auto result87 = mergeMethod.equals_ignore_case("add");
     if (!result87) return std::unexpected(std::move(result87.error()));
     if (std::move(*result87)) {
             auto result88 = value.toDouble();
@@ -615,7 +615,7 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
     if (!result89) return std::unexpected(std::move(result89.error()));
     value = std::move(*result88) + std::move(*result89);
           } else {
-      auto result90 = mergeMethod.equalsIgnoreCase("multiply");
+      auto result90 = mergeMethod.equals_ignore_case("multiply");
       if (!result90) return std::unexpected(std::move(result90.error()));
       if (std::move(*result90)) {
               auto result91 = value.toDouble();
@@ -624,7 +624,7 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
       if (!result92) return std::unexpected(std::move(result92.error()));
       value = std::move(*result91) * std::move(*result92);
             } else {
-        auto result93 = mergeMethod.equalsIgnoreCase("merge");
+        auto result93 = mergeMethod.equals_ignore_case("merge");
         if (!result93) return std::unexpected(std::move(result93.error()));
         if (std::move(*result93)) {
                 // "merge" means to either merge maps, or *append* lists together
@@ -654,7 +654,7 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
                   }
                 }
               } else {
-          auto result98 = mergeMethod.equalsIgnoreCase("override");
+          auto result98 = mergeMethod.equals_ignore_case("override");
           if (!result98) return std::unexpected(std::move(result98.error()));
           if (std::move(*result98) && !pair.second.isNull()) {
                   value = pair.second;

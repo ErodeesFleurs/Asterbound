@@ -471,7 +471,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.getString("uniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectParameter parameter;
-    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8Ptr());
+    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8_data());
     if (parameter.parameterUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' in effect '{}' has no associated uniform, skipping", entry.first, name);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -535,7 +535,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.getString("textureUniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectTexture texture;
-    texture.textureUniform = glGetUniformLocation(program, uniform->utf8Ptr());
+    texture.textureUniform = glGetUniformLocation(program, uniform->utf8_data());
     if (texture.textureUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has no associated uniform, skipping", entry.first);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -555,7 +555,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto sizeUniform = entry.second.optString("textureSizeUniform");
     if (!sizeUniform) return std::unexpected(std::move(sizeUniform.error()));
     if (*sizeUniform) {
-      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8Ptr());
+      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8_data());
       if (texture.textureSizeUniform == -1) {
         auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has textureSizeUniform '{}' with no associated uniform", entry.first, **sizeUniform);
         if (!logged) return std::unexpected(std::move(logged.error()));
@@ -1774,7 +1774,7 @@ std::expected<void, StarException> OpenGlRenderer::switchGlFrameBuffer(RefPtr<Gl
 GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
   auto find = attributes.find(name);
   if (find == attributes.end()) {
-    GLuint attrib = glGetAttribLocation(program, name.utf8Ptr());
+    GLuint attrib = glGetAttribLocation(program, name.utf8_data());
     attributes[name] = attrib;
     return attrib;
   }
@@ -1784,7 +1784,7 @@ GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
 GLuint OpenGlRenderer::Effect::getUniform(String const& name) {
   auto find = uniforms.find(name);
   if (find == uniforms.end()) {
-    GLuint uniform = glGetUniformLocation(program, name.utf8Ptr());
+    GLuint uniform = glGetUniformLocation(program, name.utf8_data());
     uniforms[name] = uniform;
     return uniform;
   }

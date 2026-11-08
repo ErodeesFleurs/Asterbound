@@ -1804,7 +1804,7 @@ if (!result382) return std::unexpected(std::move(result382.error()));
 
   auto result384 = callbacks.registerCallback("say", [this](String line, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
       if (tags)
-        line = line.replaceTags(*tags, false);
+        line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
         auto result383 = addChatMessage(line, config);
@@ -1819,7 +1819,7 @@ if (!result384) return std::unexpected(std::move(result384.error()));
 
   auto result386 = callbacks.registerCallback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
       if (tags)
-        line = line.replaceTags(*tags, false);
+        line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
         auto result385 = addChatMessage(line, config, portrait);
@@ -1929,12 +1929,12 @@ if (!result407) return std::unexpected(std::move(result407.error()));
   if (auto equipmentSlot = std::move(*result408)) {
     return m_armor->itemDescriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
         } else {
-    auto result409 = entry.equalsIgnoreCase("primary");
+    auto result409 = entry.equals_ignore_case("primary");
     if (!result409) return std::unexpected(std::move(result409.error()));
     if (std::move(*result409))
             return m_tools->primaryHandItemDescriptor().toJson();
           else {
-      auto result410 = entry.equalsIgnoreCase("alt");
+      auto result410 = entry.equals_ignore_case("alt");
       if (!result410) return std::unexpected(std::move(result410.error()));
       if (std::move(*result410))
               return m_tools->altHandItemDescriptor().toJson();
@@ -2347,7 +2347,7 @@ auto item = std::move(*result491);
   if (auto equipmentSlot = std::move(*result492)) {
     m_armor->setItem(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
     } else {
-    auto result493 = slot.equalsIgnoreCase("primary");
+    auto result493 = slot.equals_ignore_case("primary");
     if (!result493) return std::unexpected(std::move(result493.error()));
     if (std::move(*result493))
         {
@@ -2356,7 +2356,7 @@ auto item = std::move(*result491);
 
     }
       else {
-      auto result495 = slot.equalsIgnoreCase("alt");
+      auto result495 = slot.equals_ignore_case("alt");
       if (!result495) return std::unexpected(std::move(result495.error()));
       if (std::move(*result495))
           {

@@ -1181,7 +1181,7 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
   }
 
 
-  auto applied = apply.maybeLookupTagsView([&](StringView tag) -> StringView {
+  auto applied = apply.maybe_lookup_tags_view([&](StringView tag) -> StringView {
     if (tag == "frame") {
       if (frame)
         return frameStr;
@@ -1666,7 +1666,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     if (!partDirectives) return std::unexpected(std::move(partDirectives.error()));
     if (auto directives = *partDirectives) {
       if (version() > 0){
-        directives = directives->maybeLookupTagsView([&](StringView tag) -> StringView {
+        directives = directives->maybe_lookup_tags_view([&](StringView tag) -> StringView {
           if (auto p = animationTags.find_ref(tag)) {
             return StringView(p->get());
           } else if (auto p = partTags.find_ref(tag)) {
@@ -1694,7 +1694,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       if (!stateDirectives) return std::unexpected(std::move(stateDirectives.error()));
       if (auto directives = *stateDirectives) {
         if (version() > 0){
-          directives = directives->maybeLookupTagsView([&](StringView tag) -> StringView {
+          directives = directives->maybe_lookup_tags_view([&](StringView tag) -> StringView {
             if (auto p = animationTags.find_ref(tag)) {
               return StringView(p->get());
             } else if (auto p = partTags.find_ref(tag)) {
@@ -1710,7 +1710,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       }
     }
 
-    std::optional<String> processedImage = image.maybeLookupTagsView([&](StringView tag) -> StringView {
+    std::optional<String> processedImage = image.maybe_lookup_tags_view([&](StringView tag) -> StringView {
       if (tag == "frame") {
         if (frame)
           return frameStr;

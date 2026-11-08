@@ -470,7 +470,7 @@ TEST(FlatHashMap, TryEmplaceKeepsOwnershipOnDuplicate) {
 TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {
   String key(std::string_view("x\0中", 5));
   std::string bytes = "!" + key.utf8() + "?";
-  StringView query(std::string_view(bytes).substr(1, key.utf8Size()));
+  StringView query(std::string_view(bytes).substr(1, key.utf8_size()));
   StringMap<int> values{{key, 7}};
   StableStringMap<int> stable{{key, 8}};
   EXPECT_EQ(hash<String>{}(key), hash<String>{}(query));

@@ -336,12 +336,12 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
   };
   auto meter = [&]() -> std::expected<Vec2I, StarException> {
     auto text = fields.value("M", "C");
-    auto common = text.equalsIgnoreCase("C");
+    auto common = text.equals_ignore_case("C");
     if (!common)
       return std::unexpected(std::move(common.error()));
     if (*common)
       text = "4/4";
-    auto cut = text.equalsIgnoreCase("C|");
+    auto cut = text.equals_ignore_case("C|");
     if (!cut)
       return std::unexpected(std::move(cut.error()));
     if (*cut)
@@ -350,7 +350,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
   };
   auto noteLength = [&]() -> std::expected<Vec2I, StarException> {
     auto text = fields.value("L", "C");
-    auto common = text.equalsIgnoreCase("C");
+    auto common = text.equals_ignore_case("C");
     if (!common)
       return std::unexpected(std::move(common.error()));
     if (*common) {
@@ -382,11 +382,12 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
     return (*duration)[1] * seconds / (*duration)[0];
   };
   auto transpose = [&]() -> std::expected<int, StarException> {
-    return lexicalCast<int>(fields.value("Transpose", "0"));
+    auto value = fields.value("Transpose", "0");
+    return lexicalCast<int>(value);
   };
   auto fetchKeySignatureMapping = [&]() -> std::expected<List<int>, StarException> {
     auto cleanupKey = [](String const& key) -> std::expected<String, StarException> {
-      auto result = key.toLower();
+      auto result = key.to_lower();
       if (!result)
         return std::unexpected(std::move(result.error()));
       for (auto const& replacement : std::initializer_list<std::pair<String, String>>{
@@ -470,7 +471,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
   auto normalized = abc.replace("\t", " ");
   if (!normalized)
     return std::unexpected(std::move(normalized.error()));
-  auto lines = normalized->splitLines();
+  auto lines = normalized->split_lines();
   if (!lines)
     return std::unexpected(std::move(lines.error()));
   auto setField = [&](std::basic_string_view<String::Char> text) -> std::expected<void, StarException> {
@@ -563,9 +564,9 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
       };
       auto readDuration = [&]() -> std::expected<double, StarException> {
         double duration = 1;
-        if (String::isAsciiNumber(peek())) {
+        if (String::is_ascii_number(peek())) {
           std::string digits;
-          while (String::isAsciiNumber(peek()))
+          while (String::is_ascii_number(peek()))
             digits += static_cast<char>(readChar());
           auto multiplier = lexicalCast<int>(std::string_view(digits));
           if (!multiplier)
@@ -575,9 +576,9 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
         if (peek() == '/') {
           readChar();
           double divisor = 2;
-          if (String::isAsciiNumber(peek())) {
+          if (String::is_ascii_number(peek())) {
             std::string digits;
-            while (String::isAsciiNumber(peek()))
+            while (String::is_ascii_number(peek()))
               digits += static_cast<char>(readChar());
             auto parsed = lexicalCast<int>(std::string_view(digits));
             if (!parsed)
@@ -593,7 +594,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
 
       while (cursor != line.size()) {
         auto head = readChar();
-        if (String::isSpace(head))
+        if (String::is_space(head))
           continue;
 
         if (head == '|') {
@@ -607,7 +608,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           else {
             if (peek() == '[')
               readChar();
-            while (String::isAsciiNumber(peek()))
+            while (String::is_ascii_number(peek()))
               readChar();
           }
           accidentals = 0;
@@ -666,18 +667,18 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           continue;
         }
         if (head == '(') {
-          if (String::isAsciiNumber(peek())) {
+          if (String::is_ascii_number(peek())) {
             int p = 0;
             int q = 0;
             int r = 0;
             p = static_cast<int>(readChar()) - static_cast<int>('0');
             if (peek() == ':') {
               readChar();
-              if (String::isAsciiNumber(peek()))
+              if (String::is_ascii_number(peek()))
                 q = static_cast<int>(readChar()) - static_cast<int>('0');
               if (peek() == ':') {
                 readChar();
-                if (String::isAsciiNumber(peek()))
+                if (String::is_ascii_number(peek()))
                   r = static_cast<int>(readChar()) - static_cast<int>('0');
               }
             }
@@ -715,8 +716,8 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           continue;
         }
 
-        if (String::isAsciiLetter(head)) {
-          int note = (String::toLower(head) != head) ? 60 : 72;
+        if (String::is_ascii_letter(head)) {
+          int note = (String::to_lower(head) != head) ? 60 : 72;
           while (peek() == ',') {
             readChar();
             note -= 12;
@@ -725,7 +726,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
             readChar();
             note += 12;
           }
-          switch (String::toLower(head)) {
+          switch (String::to_lower(head)) {
             case 'c': {
               note += 0;
               break;
@@ -779,7 +780,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
             // int base = note;
 
             if (!accidentalActive) {
-              switch (String::toLower(head)) {
+              switch (String::to_lower(head)) {
                 case 'c': {
                   note += keySignatureMapping[0];
                   break;

@@ -61,7 +61,7 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
         return std::unexpected(std::move(config.error()));
       if (result->m_sourceConfigs.contains((*config)->kind()))
         return std::unexpected(StarException(strf("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
-      auto key = (*config)->kind().toLower();
+      auto key = (*config)->kind().to_lower();
       if (!key)
         return std::unexpected(std::move(key.error()));
       result->m_sourceConfigs[*key] = std::move(*config);
@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
 }
 
 std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceDatabase::effectSourceConfig(String const& kind) const {
-  auto key = kind.toLower();
+  auto key = kind.to_lower();
   if (!key)
     return std::unexpected(std::move(key.error()));
   if (auto config = m_sourceConfigs.find_ref(*key))

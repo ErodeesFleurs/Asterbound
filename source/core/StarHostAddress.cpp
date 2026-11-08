@@ -159,7 +159,7 @@ std::expected<void, StarException> HostAddress::set(String const& address) {
     // Request only usable addresses e.g. IPv6 only if IPv6 is available
     hints.ai_flags = AI_ADDRCONFIG;
 
-    int status = ::getaddrinfo(address.utf8Ptr(), NULL, &hints, &result);
+    int status = ::getaddrinfo(address.utf8_data(), NULL, &hints, &result);
     if (status != 0)
       return std::unexpected(NetworkException::format("Failed to determine address for '{}' (getaddrinfo status {})", address, status));
 

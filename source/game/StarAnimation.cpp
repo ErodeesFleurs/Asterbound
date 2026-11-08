@@ -152,7 +152,7 @@ void Animation::clearTags() {
 std::expected<Drawable, StarException> Animation::drawable(float pixelSize) const {
   if (m_base.empty() || m_frame < 0)
     return Drawable();
-  String baseFrame = AssetPath::relative_to(m_directory, m_base).replaceTags(m_tagValues);
+  String baseFrame = AssetPath::relative_to(m_directory, m_base).replace_tags(m_tagValues);
   if (m_appendFrame)
     baseFrame += ":" + toString(m_frame);
   auto imageMetadata = m_root.get().imageMetadataDatabase();

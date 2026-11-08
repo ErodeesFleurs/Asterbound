@@ -127,12 +127,12 @@ std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack st
 std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
     auto string = v.toString();
-    auto swap = string.equalsIgnoreCase("swap");
+    auto swap = string.equals_ignore_case("swap");
     if (!swap)
       return std::unexpected(std::move(swap.error()));
     if (*swap)
       return InventorySlot(SwapSlot());
-    auto trash = string.equalsIgnoreCase("trash");
+    auto trash = string.equals_ignore_case("trash");
     if (!trash)
       return std::unexpected(std::move(trash.error()));
     if (*trash)
@@ -163,8 +163,10 @@ std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack st
 }
 
 std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
-  if (v.is<LuaString>())
-    return maybeEnumValue<CollisionKindNames>(v.toString());
+  if (v.is<LuaString>()) {
+    auto name = v.toString();
+    return maybeEnumValue<CollisionKindNames>(name);
+  }
   return std::nullopt;
 }
 

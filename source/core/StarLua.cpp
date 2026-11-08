@@ -1250,7 +1250,7 @@ ExceptionSummary LuaEngine::captureDiagnostic(lua_State* from, lua_State* state,
           return location.source == source && location.line == frame.currentline;
         }))
       continue;
-    auto provider = existing != summary.locations.end() ? existing->provider : sourceDiagnostic(String(source)).takeUtf8();
+    auto provider = existing != summary.locations.end() ? existing->provider : sourceDiagnostic(String(source)).take_utf8();
     summary.locations.push_back({std::move(source), frame.currentline, std::move(provider)});
   }
   return summary;
@@ -1316,8 +1316,8 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
       : strf("Error code {}, <unknown error>", res);
   lua_pop(state, 1);
   if (error.utf8().ends_with("<eof>"))
-    return std::unexpected(LuaIncompleteStatementException(error.takeUtf8()).withSummary(std::move(summary)));
-  return std::unexpected(LuaException(error.takeUtf8()).withSummary(std::move(summary)));
+    return std::unexpected(LuaIncompleteStatementException(error.take_utf8()).withSummary(std::move(summary)));
+  return std::unexpected(LuaException(error.take_utf8()).withSummary(std::move(summary)));
 }
 
 std::expected<void, StarException> LuaEngine::handleSourceError(lua_State* state, int res, String const& source) {
@@ -1577,10 +1577,11 @@ std::expected<int, StarException> LuaEngine::contextEval(int handleIndex, String
   int top = lua_gettop(m_state);
   if (!lua_checkstack(m_state, nresults == LUA_MULTRET ? 2 : std::max(2, nresults + 1)))
     return std::unexpected(LuaException("Exhausted the Lua stack while evaluating a script"));
-  int loadRes = luaL_loadstring(m_state, ("return " + lua).utf8Ptr());
+  auto expression = "return " + lua;
+  int loadRes = luaL_loadstring(m_state, expression.utf8_data());
   if (loadRes == LUA_ERRSYNTAX) {
     lua_pop(m_state, 1);
-    loadRes = luaL_loadstring(m_state, lua.utf8Ptr());
+    loadRes = luaL_loadstring(m_state, lua.utf8_data());
   }
   if (auto loaded = handleError(m_state, loadRes); !loaded)
     return std::unexpected(std::move(loaded.error()));
@@ -1638,7 +1639,7 @@ std::expected<void, StarException> LuaEngine::contextSetPath(int handleIndex, St
   LuaStackRestore stack(m_state);
   if (!lua_checkstack(m_state, 5))
     return std::unexpected(LuaException("Exhausted the Lua stack while setting a context path"));
-  auto utf8Path = path.takeUtf8();
+  auto utf8Path = path.take_utf8();
   std::span<char> pathData(utf8Path);
   lua_pushcfunction(m_state, [](lua_State* state) {
     auto& path = *static_cast<std::span<char>*>(lua_touserdata(state, 2));

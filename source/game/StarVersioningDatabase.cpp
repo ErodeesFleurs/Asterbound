@@ -242,12 +242,12 @@ std::expected<void, StarException> VersioningDatabase::init() {
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   for (auto const& script : *scripts) {
     auto parse = [&]() -> std::expected<void, StarException> {
-      auto parts = File::base_name(script).splitAny("_.");
+      auto parts = File::base_name(script).split_any("_.");
       if (!parts)
         return std::unexpected(std::move(parts.error()));
       if (parts->size() != 4 && parts->size() != 6)
         return std::unexpected(VersioningDatabaseException::format("Script file '{}' filename not of the form <identifier>_<fromversion>_<toversion>.lua or <identifier>_<atVersion>_<subIdentifier>_<fromSubVersion>_<toSubVersion>.lua", script));
-      auto identifier = (*parts)[0].toLower();
+      auto identifier = (*parts)[0].to_lower();
       if (!identifier)
         return std::unexpected(std::move(identifier.error()));
       auto firstVersion = lexicalCast<VersionNumber>((*parts)[1]);
@@ -259,7 +259,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
           return std::unexpected(std::move(toVersion.error()));
         m_versionUpdateScripts[*identifier].push_back({script, *firstVersion, *toVersion});
       } else {
-        auto subIdentifier = (*parts)[2].toLower();
+        auto subIdentifier = (*parts)[2].to_lower();
         if (!subIdentifier)
           return std::unexpected(std::move(subIdentifier.error()));
         auto fromVersion = lexicalCast<VersionNumber>((*parts)[3]);
@@ -368,7 +368,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
     return invoked;
   };
   auto updated = [&]() -> std::expected<void, StarException> {
-    auto identifier = versionedJson.identifier.toLower();
+    auto identifier = versionedJson.identifier.to_lower();
     if (!identifier) return std::unexpected(std::move(identifier.error()));
     for (auto const& script : m_versionUpdateScripts.value(*identifier)) {
       for (auto const& subScripts : m_subVersionUpdateScripts.value(*identifier).value(result.version)) {
@@ -434,7 +434,7 @@ std::expected<LuaCallbacks, StarException> VersioningDatabase::makeVersioningCal
         auto basePath = File::full_path(database.m_root.toStoragePath("."));
         if (!basePath)
           return std::unexpected(std::move(basePath.error()));
-        auto withinStorage = filePath->beginsWith(*basePath);
+        auto withinStorage = filePath->starts_with(*basePath);
         if (!withinStorage)
           return std::unexpected(std::move(withinStorage.error()));
         if (!*withinStorage)

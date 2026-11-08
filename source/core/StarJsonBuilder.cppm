@@ -107,7 +107,7 @@ public:
     if (m_width != 0)
       return m_point;
     if constexpr (std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>) {
-      auto decoded = utf8DecodeChar(std::to_address(m_current), &m_point, static_cast<std::size_t>(m_end - m_current));
+      auto decoded = utf8_decode_char(std::to_address(m_current), &m_point, static_cast<std::size_t>(m_end - m_current));
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       m_width = *decoded;
@@ -127,7 +127,7 @@ public:
     std::size_t available = 1;
     while (available < wanted && lookahead != m_end)
       bytes[available++] = *lookahead++;
-    auto decoded = utf8DecodeChar(bytes, &m_point, available);
+    auto decoded = utf8_decode_char(bytes, &m_point, available);
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     m_width = *decoded;

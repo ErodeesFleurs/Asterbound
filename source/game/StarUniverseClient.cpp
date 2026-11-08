@@ -393,7 +393,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       auto operation11 = m_root.logger().info("UniverseClient: Sending Handshake Response");
       if (!operation11)
         return std::unexpected(std::move(operation11.error()));
-      ByteArray passAccountSalt = (password + account).utf8Bytes();
+      ByteArray passAccountSalt = (password + account).utf8_bytes();
       passAccountSalt.append(challenge->passwordSalt);
       ByteArray passHash = Star::sha256(passAccountSalt);
       auto operation12 = connection.pushSingle(std::make_shared<HandshakeResponsePacket>(passHash));
@@ -612,7 +612,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       if (!cinematicPathResult)
         return std::unexpected(std::move(cinematicPathResult.error()));
       auto cinematicPath = std::move(*cinematicPathResult);
-      cinematicPath = cinematicPath.replaceTags(StringMap<String>{{"species", m_mainPlayer->species()}});
+      cinematicPath = cinematicPath.replace_tags(StringMap<String>{{"species", m_mainPlayer->species()}});
       auto baseResult = assets->json(path + "Base");
       if (!baseResult)
         return std::unexpected(std::move(baseResult.error()));
@@ -902,7 +902,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
           if (!modeResult)
             return std::unexpected(std::move(modeResult.error()));
           auto mode = std::move(*modeResult);
-          cinematic = cinematic.replaceTags(StringMap<String>{{"species", m_mainPlayer->species()}, {"mode", mode.get()}});
+          cinematic = cinematic.replace_tags(StringMap<String>{{"species", m_mainPlayer->species()}, {"mode", mode.get()}});
           auto operation70 = m_mainPlayer->setPendingCinematic(Json(std::move(cinematic)));
           if (!operation70)
             return std::unexpected(std::move(operation70.error()));
@@ -1102,7 +1102,7 @@ bool UniverseClient::flying() const {
 }
 
 std::expected<void, StarException> UniverseClient::sendChat(String const& text, ChatSendMode sendMode, std::optional<bool> speak, std::optional<JsonObject> data) {
-  auto commandResult = text.beginsWith("/");
+  auto commandResult = text.starts_with("/");
   if (!commandResult)
     return std::unexpected(std::move(commandResult.error()));
   auto command = std::move(*commandResult);
@@ -1403,7 +1403,7 @@ std::expected<bool, StarException> UniverseClient::switchPlayer(String const& na
   auto uuid = std::move(*uuidResult);
   if (uuid)
     return switchPlayer(*uuid);
-  if (name.utf8Size() == UuidSize * 2) {
+  if (name.utf8_size() == UuidSize * 2) {
     auto parsedResult = Uuid::create(name);
     if (!parsedResult)
       return std::unexpected(std::move(parsedResult.error()));

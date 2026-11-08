@@ -98,7 +98,7 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
     if (!definition) return std::unexpected(std::move(definition.error()));
     if (result->m_species.contains((*definition)->kind()))
       return std::unexpected(StarException::format("Duplicate species asset with kind {}. configfile {}", (*definition)->kind(), file.string()));
-    auto kind = (*definition)->kind().toLower();
+    auto kind = (*definition)->kind().to_lower();
     if (!kind) return std::unexpected(std::move(kind.error()));
     result->m_species[*kind] = std::move(*definition);
     return {};
@@ -110,7 +110,7 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
 }
 
 std::expected<std::shared_ptr<SpeciesDefinition>, StarException> SpeciesDatabase::species(String const& kind) const {
-  auto key = kind.toLower();
+  auto key = kind.to_lower();
   if (!key) return std::unexpected(std::move(key.error()));
   auto found = m_species.find(*key);
   if (found == m_species.end())

@@ -11,7 +11,7 @@ namespace Star::JsonPath {
 
 std::expected<TypeHint, StarException> parsePointer(String& buffer, String const& path, Utf8Cursor& cursor) {
   buffer.clear();
-  if (cursor.atEnd())
+  if (cursor.at_end())
     return std::unexpected(ParsingException::format("Missing leading '/' in Json pointer \"{}\"", path));
   auto character = cursor.read();
   if (!character)
@@ -21,7 +21,7 @@ std::expected<TypeHint, StarException> parsePointer(String& buffer, String const
   auto advanced = cursor.advance();
   if (!advanced)
     return std::unexpected(std::move(advanced.error()));
-  while (!cursor.atEnd()) {
+  while (!cursor.at_end()) {
     character = cursor.read();
     if (!character)
       return std::unexpected(std::move(character.error()));
@@ -31,7 +31,7 @@ std::expected<TypeHint, StarException> parsePointer(String& buffer, String const
       advanced = cursor.advance();
       if (!advanced)
         return std::unexpected(std::move(advanced.error()));
-      if (cursor.atEnd())
+      if (cursor.at_end())
         return std::unexpected(ParsingException::format("Incomplete escape sequence in Json pointer \"{}\"", path));
       character = cursor.read();
       if (!character)
@@ -51,14 +51,14 @@ std::expected<TypeHint, StarException> parsePointer(String& buffer, String const
       return std::unexpected(std::move(advanced.error()));
   }
   auto index = maybeLexicalCast<std::size_t>(buffer);
-  if (index || (buffer == "-" && cursor.atEnd()))
+  if (index || (buffer == "-" && cursor.at_end()))
     return TypeHint::Array;
   return TypeHint::Object;
 }
 
 std::expected<TypeHint, StarException> parseQueryPath(String& buffer, String const& path, Utf8Cursor& cursor) {
   buffer.clear();
-  if (cursor.atEnd())
+  if (cursor.at_end())
     return TypeHint::Object;
   auto character = cursor.read();
   if (!character)
@@ -72,7 +72,7 @@ std::expected<TypeHint, StarException> parseQueryPath(String& buffer, String con
     auto advanced = cursor.advance();
     if (!advanced)
       return std::unexpected(std::move(advanced.error()));
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
@@ -85,13 +85,13 @@ std::expected<TypeHint, StarException> parseQueryPath(String& buffer, String con
       if (!advanced)
         return std::unexpected(std::move(advanced.error()));
     }
-    if (cursor.atEnd() || *character != ']')
+    if (cursor.at_end() || *character != ']')
       return std::unexpected(ParsingException::format("Array has no trailing ']' or has invalid character in query path \"{}\"", path));
     advanced = cursor.advance();
     if (!advanced)
       return std::unexpected(std::move(advanced.error()));
   } else {
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
@@ -106,7 +106,7 @@ std::expected<TypeHint, StarException> parseQueryPath(String& buffer, String con
     }
   }
   // Consume a single trailing dot without inspecting the following component.
-  if (!cursor.atEnd()) {
+  if (!cursor.at_end()) {
     character = cursor.read();
     if (!character)
       return std::unexpected(std::move(character.error()));
@@ -127,10 +127,10 @@ findPath(Json const& base, PathParser const& parser, String const& path) {
   if (!parser)
     return std::unexpected(ParsingException("Cannot invoke an empty Json path parser"));
   String buffer;
-  buffer.reserve(path.utf8Size());
+  buffer.reserve(path.utf8_size());
   Utf8Cursor cursor(path.utf8());
   auto value = std::cref(base);
-  while (!cursor.atEnd()) {
+  while (!cursor.at_end()) {
     auto parsed = parser(buffer, path, cursor);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));

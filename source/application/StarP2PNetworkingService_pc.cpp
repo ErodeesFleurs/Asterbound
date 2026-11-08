@@ -191,8 +191,8 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
       activity.SetName("Starbound");
       String activityTitle(title);
       String activityDetails(details);
-      activity.SetState(activityTitle.utf8Ptr());
-      activity.SetDetails(activityDetails.utf8Ptr());
+      activity.SetState(activityTitle.utf8_data());
+      activity.SetDetails(activityDetails.utf8_data());
       activity.GetTimestamps().SetStart(startTime);
       if (party) {
         auto& size = activity.GetParty().GetSize();
@@ -208,16 +208,16 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
           String joinSecret = strf("connect:discord_{}_{}_{}", m_state->discordCurrentUser->GetId(), lobby->first, lobby->second);
           if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
             return std::unexpected(std::move(logged.error()));
-          activity.GetSecrets().SetJoin(joinSecret.utf8Ptr());
+          activity.GetSecrets().SetJoin(joinSecret.utf8_data());
         }
       } else if (std::holds_alternative<JoinRemote>(m_joinLocation)) {
         String address = toString((HostAddressWithPort)std::get<JoinRemote>(m_joinLocation));
         String joinSecret = strf("connect:address_{}", address);
         if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
           return std::unexpected(std::move(logged.error()));
-        activity.GetSecrets().SetJoin(joinSecret.utf8Ptr());
+        activity.GetSecrets().SetJoin(joinSecret.utf8_data());
       
-        activity.GetParty().SetId(address.utf8Ptr());
+        activity.GetParty().SetId(address.utf8_data());
       }
     
       m_discordForceUpdateActivity = false;
@@ -625,7 +625,7 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
   socket->lobbyId = lobbyId;
   m_discordOpenSockets.insert_or_assign(remoteUserId, std::ref(*socket));
 
-  m_state->discordCore->LobbyManager().ConnectLobby(lobbyId, lobbySecret.utf8Ptr(),
+  m_state->discordCore->LobbyManager().ConnectLobby(lobbyId, lobbySecret.utf8_data(),
     [lifetime = m_discordLifetime, &state = *m_state, remoteUserId, lobbyId,
      generation = socket->connectionGeneration](discord::Result res, discord::Lobby const&) {
       if (res != discord::Result::Ok)

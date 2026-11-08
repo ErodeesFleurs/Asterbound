@@ -620,22 +620,22 @@ Vec4B Color::hueShiftVec4B(Vec4B color, float hue) {
 std::expected<Vec4B, StarException> Color::hexToVec4B(StringView s) {
   Array<std::uint8_t, 4> cbytes{};
   std::expected<std::size_t, StarException> decoded;
-  if (s.utf8Size() == 3 || s.utf8Size() == 4) {
-    decoded = nibbleDecode({s.utf8Ptr(), s.utf8Size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
+  if (s.utf8_size() == 3 || s.utf8_size() == 4) {
+    decoded = nibbleDecode({s.utf8_data(), s.utf8_size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
-    for (std::size_t i = 0; i < s.utf8Size(); ++i)
+    for (std::size_t i = 0; i < s.utf8_size(); ++i)
       cbytes[i] = (cbytes[i] << 4) | cbytes[i];
-    if (s.utf8Size() == 3)
+    if (s.utf8_size() == 3)
       cbytes[3] = 255;
-  } else if (s.utf8Size() == 6 || s.utf8Size() == 8) {
-    decoded = hexDecode({s.utf8Ptr(), s.utf8Size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
+  } else if (s.utf8_size() == 6 || s.utf8_size() == 8) {
+    decoded = hexDecode({s.utf8_data(), s.utf8_size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
-    if (s.utf8Size() == 6)
+    if (s.utf8_size() == 6)
       cbytes[3] = 255;
   } else {
-    return std::unexpected(ColorException(strf("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8Size(), s), false));
+    return std::unexpected(ColorException(strf("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8_size(), s), false));
   }
   return Vec4B(std::move(cbytes));
 }

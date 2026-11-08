@@ -196,7 +196,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("interpolateSinEase", UtilityCallbacks::interpolateSinEase); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("replaceTags", UtilityCallbacks::replaceTags); !result)
+  if (auto result = callbacks.registerCallback("replaceTags", UtilityCallbacks::replace_tags); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("formatTags", [](String const& text, StringMap<String> const& tags) -> std::expected<String, StarException> {
         std::vector<std::pair<std::string_view, std::string_view>> bindings;
@@ -379,8 +379,8 @@ std::expected<LuaValue, StarException> LuaBindings::UtilityCallbacks::interpolat
   return engine.luaFrom<Vec2F>(sinEase(offset, *vectorValue1, *vectorValue2));
 }
 
-String LuaBindings::UtilityCallbacks::replaceTags(String const& str, StringMap<String> const& tags) {
-  return str.replaceTags(tags);
+String LuaBindings::UtilityCallbacks::replace_tags(String const& str, StringMap<String> const& tags) {
+  return str.replace_tags(tags);
 }
 
 }

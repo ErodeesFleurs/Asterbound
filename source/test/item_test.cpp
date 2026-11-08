@@ -878,7 +878,7 @@ const GameTestRegistration
     auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(directory)); });
     auto overlay = File::relative_to(directory, "assets");
     auto writeAsset = [&](String const& path, String const& contents) -> std::expected<void, StarException> {
-      auto absolute = path.beginsWith("/");
+      auto absolute = path.starts_with("/");
       if (!absolute)
         return std::unexpected(std::move(absolute.error()));
       String relative = path;

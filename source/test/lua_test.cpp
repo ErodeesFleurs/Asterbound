@@ -886,9 +886,10 @@ TEST(LuaTest, SourceProvidersUseFullLiveStackAndDeduplicate) {
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
   ASSERT_TRUE((context.setRequireFunction([&](LuaStackValue environment, StringView) {
-    return environment.stack().load(environment, std::span(
-      String("function helper(n) if n == 0 then error('original-provider-marker') end "
-             "local result = helper(n - 1); return result end").utf8()), helperPath);
+    constexpr std::string_view helper_source =
+      "function helper(n) if n == 0 then error('original-provider-marker') end "
+      "local result = helper(n - 1); return result end";
+    return environment.stack().load(environment, std::span(helper_source), helperPath);
   })));
   ASSERT_TRUE((context.load(
     "require '/helper.lua'; function entry() local result = helper(2); return result end; "

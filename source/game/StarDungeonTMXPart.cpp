@@ -308,7 +308,7 @@ std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> TMXTileL
 [[nodiscard]] std::expected<String, StarException> tilesetAssetPath(String const& relativePath) {
   // Tiled can reference another package via parent paths; retain the suffix
   // beginning at the last known /tilesets/ segment.
-  auto i = relativePath.findLast("/tilesets/", String::CaseInsensitive);
+  auto i = relativePath.find_last("/tilesets/", String::CaseInsensitive);
   if (!i) return std::unexpected(std::move(i.error()));
   if (*i == NPos) return relativePath;
   return relativePath.slice(*i);

@@ -1662,10 +1662,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
   }
 
   if (!filterText.empty()) {
-    auto toLowerResult556 = filterText.toLower();
+    auto toLowerResult556 = filterText.to_lower();
     if (!toLowerResult556)
       return std::unexpected(std::move(toLowerResult556.error()));
-    auto splitAnyResult557 = std::move(*toLowerResult556).splitAny(" ,.?*\\+/|\t");
+    auto splitAnyResult557 = std::move(*toLowerResult556).split_any(" ,.?*\\+/|\t");
     if (!splitAnyResult557)
       return std::unexpected(std::move(splitAnyResult557.error()));
     auto bits = std::move(*splitAnyResult557);
@@ -1700,7 +1700,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
       auto trimResult561 = std::move(*itemFriendlyNameResult560).trim();
       if (!trimResult561)
         return std::unexpected(std::move(trimResult561.error()));
-      auto toLowerResult562 = std::move(*trimResult561).toLower();
+      auto toLowerResult562 = std::move(*trimResult561).to_lower();
       if (!toLowerResult562)
         return std::unexpected(std::move(toLowerResult562.error()));
       return std::make_tuple(std::move(*toLowerResult562), recipe.output.name());

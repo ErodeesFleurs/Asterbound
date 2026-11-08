@@ -277,10 +277,10 @@ String ChatProcessor::makeNickUnique(String nick) {
 }
 
 std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMessage& message) {
-  auto isCommand = message.text.beginsWith("/");
+  auto isCommand = message.text.starts_with("/");
   if (!isCommand) return std::unexpected(std::move(isCommand.error()));
   if (!*isCommand) return false;
-  auto escaped = message.text.beginsWith("//");
+  auto escaped = message.text.starts_with("//");
   if (!escaped) return std::unexpected(std::move(escaped.error()));
   auto line = message.text.substr(1);
   if (!line) return std::unexpected(std::move(line.error()));

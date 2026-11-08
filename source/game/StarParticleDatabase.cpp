@@ -96,7 +96,7 @@ std::expected<std::shared_ptr<ParticleDatabase>, StarException> ParticleDatabase
 }
 
 std::expected<std::shared_ptr<ParticleConfig>, StarException> ParticleDatabase::config(String const& kind) const {
-  auto key = kind.toLower();
+  auto key = kind.to_lower();
   if (!key)
     return std::unexpected(std::move(key.error()));
   if (auto config = m_configs.find_ref(*key))

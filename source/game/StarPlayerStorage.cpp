@@ -181,7 +181,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
     for (auto const& file : *files) {
       if (file.second)
         continue;
-      auto playerSuffix = file.first.endsWith(".player");
+      auto playerSuffix = file.first.ends_with(".player");
       if (!playerSuffix)
         return std::unexpected(std::move(playerSuffix.error()));
       if (!*playerSuffix)
@@ -332,7 +332,7 @@ std::optional<Uuid> PlayerStorage::playerUuidAt(std::size_t index) {
 }
 
 std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByName(String const& name, std::optional<Uuid> except) {
-  auto cleanMatch = Text::stripEscapeCodes(name).toLower();
+  auto cleanMatch = Text::stripEscapeCodes(name).to_lower();
   if (!cleanMatch)
     return std::unexpected(std::move(cleanMatch.error()));
   std::optional<Uuid> uuid;
@@ -347,7 +347,7 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
       continue;
-    auto cleanName = Text::stripEscapeCodes(**playerName).toLower();
+    auto cleanName = Text::stripEscapeCodes(**playerName).to_lower();
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
     auto len = cleanName->size();
@@ -362,7 +362,7 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
 }
 
 std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(String const& name, std::optional<Uuid> except) {
-  auto cleanMatch = Text::stripEscapeCodes(name).toLower();
+  auto cleanMatch = Text::stripEscapeCodes(name).to_lower();
   if (!cleanMatch)
     return std::unexpected(std::move(cleanMatch.error()));
   List<Uuid> list;
@@ -376,7 +376,7 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
       continue;
-    auto cleanName = Text::stripEscapeCodes(**playerName).toLower();
+    auto cleanName = Text::stripEscapeCodes(**playerName).to_lower();
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
     if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != NPos)

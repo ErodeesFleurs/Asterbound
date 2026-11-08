@@ -2850,7 +2850,7 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
   for (auto const& file : *files) {
     if (file.second)
       continue;
-    auto temporary = file.first.endsWith(".tempworld");
+    auto temporary = file.first.ends_with(".tempworld");
     if (!temporary)
       return std::unexpected(std::move(temporary.error()));
     if (*temporary) {
@@ -3529,7 +3529,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           auto password = account->getString("password");
           if (!password)
             return std::unexpected(std::move(password.error()));
-          ByteArray salted = (*password + connect->account).utf8Bytes();
+          ByteArray salted = (*password + connect->account).utf8_bytes();
           salted.append(*salt);
           success = sha256(salted) == handshake->passHash;
         }
@@ -4371,7 +4371,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     if (!type)
       return std::unexpected(std::move(type.error()));
     std::shared_ptr<VisitableWorldParameters> parameters;
-    auto terrestrial = type->equalsIgnoreCase("Terrestrial");
+    auto terrestrial = type->equals_ignore_case("Terrestrial");
     if (!terrestrial)
       return std::unexpected(std::move(terrestrial.error()));
     if (*terrestrial) {
@@ -4386,7 +4386,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         return std::unexpected(std::move(generated.error()));
       parameters = std::move(*generated);
     } else {
-      auto asteroids = type->equalsIgnoreCase("Asteroids");
+      auto asteroids = type->equals_ignore_case("Asteroids");
       if (!asteroids)
         return std::unexpected(std::move(asteroids.error()));
       if (*asteroids) {
@@ -4395,7 +4395,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
           return std::unexpected(std::move(generated.error()));
         parameters = std::move(*generated);
       } else {
-        auto floating = type->equalsIgnoreCase("FloatingDungeon");
+        auto floating = type->equals_ignore_case("FloatingDungeon");
         if (!floating)
           return std::unexpected(std::move(floating.error()));
         if (!*floating)

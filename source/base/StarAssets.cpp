@@ -479,7 +479,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       if (!str)
         return std::unexpected(std::move(str.error()));
       if (*str) {
-        newFiles->set(path, (*str)->utf8Bytes());
+        newFiles->set(path, (*str)->utf8_bytes());
         return {};
       }
       auto image = engine.luaMaybeTo<Image>(data);
@@ -495,7 +495,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       auto text = json->repr();
       if (!text)
         return std::unexpected(std::move(text.error()));
-      newFiles->set(path, text->utf8Bytes());
+      newFiles->set(path, text->utf8_bytes());
       return {};
     });
     if (!registered)
@@ -536,7 +536,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           auto text = patched->repr();
           if (!text)
             return std::unexpected(std::move(text.error()));
-          newFiles->set(path, text->utf8Bytes());
+          newFiles->set(path, text->utf8_bytes());
         }
         return true;
       }
@@ -727,7 +727,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       if (!containsPatch)
         return std::unexpected(std::move(containsPatch.error()));
       if (*containsPatch) {
-        auto endsPatch = filename.endsWith(AssetsPatchSuffix, String::CaseInsensitive);
+        auto endsPatch = filename.ends_with(AssetsPatchSuffix, String::CaseInsensitive);
         if (!endsPatch)
           return std::unexpected(std::move(endsPatch.error()));
         if (*endsPatch) {
@@ -735,7 +735,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           if (!indexed)
             return std::unexpected(std::move(indexed.error()));
         } else {
-          auto endsLuaPatch = filename.endsWith(AssetsLuaPatchSuffix, String::CaseInsensitive);
+          auto endsLuaPatch = filename.ends_with(AssetsLuaPatchSuffix, String::CaseInsensitive);
           if (!endsLuaPatch)
             return std::unexpected(std::move(endsLuaPatch.error()));
           if (*endsLuaPatch) {
@@ -743,7 +743,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             if (!indexed)
               return std::unexpected(std::move(indexed.error()));
           } else {
-            auto endsPatchList = filename.endsWith(AssetsPatchListSuffix, String::CaseInsensitive);
+            auto endsPatchList = filename.ends_with(AssetsPatchListSuffix, String::CaseInsensitive);
             if (!endsPatchList)
               return std::unexpected(std::move(endsPatchList.error()));
             if (*endsPatchList) {
@@ -789,7 +789,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
               }
             } else {
               for (int i = 0; i < 10; ++i) {
-                auto endsNumberedPatch = filename.endsWith(String(AssetsPatchSuffix) + toString(i), String::CaseInsensitive);
+                auto endsNumberedPatch = filename.ends_with(String(AssetsPatchSuffix) + toString(i), String::CaseInsensitive);
                 if (!endsNumberedPatch)
                   return std::unexpected(std::move(endsNumberedPatch.error()));
                 if (*endsNumberedPatch) {
@@ -807,7 +807,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       auto& descriptor = m_files[*filenameKey];
       descriptor.sourceName = filename;
       descriptor.source = source;
-      auto extension = AssetPath::extension(filename).toLower();
+      auto extension = AssetPath::extension(filename).to_lower();
       if (!extension)
         return std::unexpected(std::move(extension.error()));
       auto extensionKey = CaseInsensitiveString::create(std::move(*extension));
@@ -949,7 +949,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   StringList digestPaths;
   digestPaths.reserve(m_files.size());
   for (auto const& entry : m_files) {
-    auto lower = entry.first.string().toLower();
+    auto lower = entry.first.string().to_lower();
     if (!lower)
       return std::unexpected(std::move(lower.error()));
     digestPaths.push_back(std::move(*lower));
@@ -986,7 +986,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     for (auto const& assetPath : digestPaths) {
       bool digestFile = true;
       for (auto const& pattern : m_settings.digestIgnore) {
-        auto matches = assetPath.regexMatch(pattern, false, false);
+        auto matches = assetPath.regex_match(pattern, false, false);
         if (!matches)
           return std::unexpected(std::move(matches.error()));
         if (*matches) {
@@ -1063,7 +1063,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto typeName = script.getString("type");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
-    auto lowerTypeName = typeName->toLower();
+    auto lowerTypeName = typeName->to_lower();
     if (!lowerTypeName)
       return std::unexpected(std::move(lowerTypeName.error()));
     std::optional<AssetType> type;
@@ -1198,7 +1198,7 @@ std::expected<StringList, StarException> Assets::scan(String const& suffix) cons
       result.push_back(path);
       continue;
     }
-    auto match = path.endsWith(suffix, String::CaseInsensitive);
+    auto match = path.ends_with(suffix, String::CaseInsensitive);
     if (!match)
       return std::unexpected(std::move(match.error()));
     if (*match)
@@ -1213,7 +1213,7 @@ std::expected<StringList, StarException> Assets::scan(String const& prefix, Stri
     return std::unexpected(std::move(candidates.error()));
   StringList result;
   for (auto const& file : *candidates) {
-    auto match = file.beginsWith(prefix, String::CaseInsensitive);
+    auto match = file.starts_with(prefix, String::CaseInsensitive);
     if (!match)
       return std::unexpected(std::move(match.error()));
     if (*match)
@@ -1873,7 +1873,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
       return std::unexpected(std::move(patchStream.error()));
     if (!*patchStream)
       continue;
-    auto isLua = patchPath.endsWith(".lua");
+    auto isLua = patchPath.ends_with(".lua");
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
     if (*isLua) {
@@ -2015,7 +2015,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       return std::unexpected(std::move(patchStream.error()));
     if (!*patchStream)
       continue;
-    auto isLua = patchBasePath.endsWith(".lua");
+    auto isLua = patchBasePath.ends_with(".lua");
     if (!isLua)
       return std::unexpected(std::move(isLua.error()));
     if (*isLua) {

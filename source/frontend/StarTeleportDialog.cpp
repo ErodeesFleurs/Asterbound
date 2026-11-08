@@ -348,7 +348,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   if (*includeBookmarks) {
     auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
-    auto sorted = sortByComputedValue(*bookmarks, [](TeleportBookmark const& bookmark) { return bookmark.bookmarkName.toLower(); });
+    auto sorted = sortByComputedValue(*bookmarks, [](TeleportBookmark const& bookmark) { return bookmark.bookmarkName.to_lower(); });
     if (!sorted) return std::unexpected(std::move(sorted.error()));
     for (auto const& bookmark : *bookmarks) {
       auto entry = (*destList)->addItem();

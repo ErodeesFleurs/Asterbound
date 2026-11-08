@@ -33,10 +33,10 @@ std::expected<String, StarException> createRelativePath(String fromFile, String 
   auto toPath = File::full_path(toFile);
   if (!toPath)
     return std::unexpected(std::move(toPath.error()));
-  auto fromParts = fromPath->splitAny("/\\");
+  auto fromParts = fromPath->split_any("/\\");
   if (!fromParts)
     return std::unexpected(std::move(fromParts.error()));
-  auto toParts = toPath->splitAny("/\\");
+  auto toParts = toPath->split_any("/\\");
   if (!toParts)
     return std::unexpected(std::move(toParts.error()));
   removeCommonPrefix(*fromParts, *toParts);
@@ -119,7 +119,7 @@ std::expected<void, StarException> forEachRecursiveFileMatch(Logger& logger, Str
       if (!visited)
         return std::unexpected(std::move(visited.error()));
     } else {
-      auto matches = entry.first.endsWith(filenameSuffix);
+      auto matches = entry.first.ends_with(filenameSuffix);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches) {

@@ -109,7 +109,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& pair : *members) {
-        auto description = pair.first.endsWith("Description");
+        auto description = pair.first.ends_with("Description");
         if (!description)
           return std::unexpected(std::move(description.error()));
         if (*description)

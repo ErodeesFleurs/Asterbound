@@ -60,7 +60,7 @@ public:
   }
 
   [[nodiscard]] std::expected<void*, StarException> funcPtr(String const& name) override {
-    auto symbol = GetProcAddress(m_handle, name.utf8Ptr());
+    auto symbol = GetProcAddress(m_handle, name.utf8_data());
     if (!symbol) {
       auto status = GetLastError();
       return std::unexpected(DynamicLibException::format("Cannot find dynamic library symbol '{}' (Windows error {})", name, status));
@@ -116,7 +116,7 @@ public:
     // A symbol may legally have a null address. Only dlerror distinguishes it
     // from a failed lookup, and stale loader diagnostics must be cleared first.
     dlerror();
-    auto symbol = dlsym(m_handle, name.utf8Ptr());
+    auto symbol = dlsym(m_handle, name.utf8_data());
     if (auto detail = dlerror())
       return std::unexpected(DynamicLibException::format("Cannot find dynamic library symbol '{}': {}", name, detail));
     return symbol;
@@ -135,7 +135,7 @@ String DynamicLib::libraryExtension() {
 }
 
 std::expected<std::unique_ptr<DynamicLib>, StarException> DynamicLib::loadLibrary(String const& libraryName) {
-  auto handle = dlopen(libraryName.utf8Ptr(), RTLD_NOW);
+  auto handle = dlopen(libraryName.utf8_data(), RTLD_NOW);
   if (!handle) {
     auto detail = dlerror();
     return std::unexpected(DynamicLibException::format("Cannot load dynamic library '{}': {}", libraryName, detail ? detail : "no loader diagnostic"));

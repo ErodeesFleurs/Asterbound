@@ -65,7 +65,7 @@ std::expected<int, StarException> countOnlyStrings(Json const& json) {
     auto text = json.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto assetPath = text->beginsWith("/");
+    auto assetPath = text->starts_with("/");
     if (!assetPath)
       return std::unexpected(std::move(assetPath.error()));
     if (!*assetPath)
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
     });
     if (!counted)
       return std::unexpected(std::move(counted.error()));
-    FilterFunction dialogFilter = [](String const& path) { return path.beginsWith("/dialog/"); };
+    FilterFunction dialogFilter = [](String const& path) { return path.starts_with("/dialog/"); };
     counted = countWordsInType("config", countOnlyStrings, dialogFilter, String("NPC dialog (.config files)"));
     if (!counted)
       return std::unexpected(std::move(counted.error()));

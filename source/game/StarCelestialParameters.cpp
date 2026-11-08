@@ -63,13 +63,13 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
   if (!worldType)
     return std::unexpected(std::move(worldType.error()));
   if (*worldType) {
-    auto terrestrial = (**worldType).equalsIgnoreCase("Terrestrial");
+    auto terrestrial = (**worldType).equals_ignore_case("Terrestrial");
     if (!terrestrial)
       return std::unexpected(std::move(terrestrial.error()));
-    auto asteroids = *terrestrial ? std::expected<bool, StarException>(false) : (**worldType).equalsIgnoreCase("Asteroids");
+    auto asteroids = *terrestrial ? std::expected<bool, StarException>(false) : (**worldType).equals_ignore_case("Asteroids");
     if (!asteroids)
       return std::unexpected(std::move(asteroids.error()));
-    auto dungeon = (*terrestrial || *asteroids) ? std::expected<bool, StarException>(false) : (**worldType).equalsIgnoreCase("FloatingDungeon");
+    auto dungeon = (*terrestrial || *asteroids) ? std::expected<bool, StarException>(false) : (**worldType).equals_ignore_case("FloatingDungeon");
     if (!dungeon)
       return std::unexpected(std::move(dungeon.error()));
     if (*terrestrial) {

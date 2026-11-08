@@ -346,7 +346,7 @@ std::expected<void, StarException> CompressedFile::open(IOMode mode) {
   else
     return std::unexpected(IOException("CompressedFile requires Read or Write mode"));
   modeString += String(std::to_string(m_compression));
-  m_file = zng_gzopen(m_filename.utf8Ptr(), modeString.utf8Ptr());
+  m_file = zng_gzopen(m_filename.utf8_data(), modeString.utf8_data());
   if (!m_file) {
     int status = errno;
     return std::unexpected(IOException::format("Cannot open filename '{}' (errno {}): {}", m_filename, status, strerror(status)));

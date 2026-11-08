@@ -854,10 +854,10 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
   auto processEntry = [&](String const& sourcePath, bool isDirectory) -> std::expected<bool, StarException> {
     std::shared_ptr<Star::AssetSource> source;
     auto name = File::base_name(sourcePath);
-    auto hidden = name.beginsWith(".");
+    auto hidden = name.starts_with(".");
     if (!hidden) return std::unexpected(std::move(hidden.error()));
     if (!*hidden) {
-      hidden = name.beginsWith("_");
+      hidden = name.starts_with("_");
       if (!hidden) return std::unexpected(std::move(hidden.error()));
     }
     if (*hidden) {
@@ -868,7 +868,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
       if (!created) return std::unexpected(std::move(created.error()));
       source = std::move(*created);
     } else {
-      auto packed = sourcePath.endsWith(".pak");
+      auto packed = sourcePath.ends_with(".pak");
       if (!packed) return std::unexpected(std::move(packed.error()));
       if (*packed) {
         auto created = PackedAssetSource::create(sourcePath);

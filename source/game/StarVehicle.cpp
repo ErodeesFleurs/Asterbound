@@ -863,7 +863,7 @@ if (!result1181) return std::unexpected(std::move(result1181.error()));
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Vehicle::receiveMessage(ConnectionId connectionId, String const& message, JsonArray const& args) {
   m_aliveMasterConnections[connectionId] = GameTimer(m_slaveControlTimeout);
-  auto result1145 = message.equalsIgnoreCase("control_on");
+  auto result1145 = message.equals_ignore_case("control_on");
 if (!result1145) return std::unexpected(std::move(result1145.error()));
 if (std::move(*result1145)) {
     auto result1146 = args.at(0);
@@ -883,7 +883,7 @@ if (!result1151) return std::unexpected(std::move(result1151.error()));
 loungePosition.masterControlState[result1151->get()].slavesHeld.add(connectionId);
     return ChainableJsonMessageResponse(Json());
   } else {
-auto result1152 = message.equalsIgnoreCase("control_off");
+auto result1152 = message.equals_ignore_case("control_off");
 if (!result1152) return std::unexpected(std::move(result1152.error()));
 if (std::move(*result1152)) {
     auto result1153 = args.at(0);
@@ -903,7 +903,7 @@ if (!result1158) return std::unexpected(std::move(result1158.error()));
 loungePosition.masterControlState[result1158->get()].slavesHeld.remove(connectionId);
     return ChainableJsonMessageResponse(Json());
   } else {
-auto result1159 = message.equalsIgnoreCase("control_all");
+auto result1159 = message.equals_ignore_case("control_all");
 if (!result1159) return std::unexpected(std::move(result1159.error()));
 if (std::move(*result1159)) {
     auto result1160 = args.at(0);
@@ -935,7 +935,7 @@ allControlsHeld.add(result1166->get());
     }
     return ChainableJsonMessageResponse(Json());
   } else {
-auto result1167 = message.equalsIgnoreCase("aim");
+auto result1167 = message.equals_ignore_case("aim");
 if (!result1167) return std::unexpected(std::move(result1167.error()));
 if (std::move(*result1167)) {
     auto result1168 = args.at(0);

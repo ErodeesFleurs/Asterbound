@@ -86,17 +86,17 @@ TEST(StringTest, split_join) {
   EXPECT_EQ(String("baabaabaab").split('b').transform([](auto const& parts) { return parts.join("_"); }), "_aa_aa_aa_");
   EXPECT_EQ(String("a").split("bcd"), StringList{"a"});
   EXPECT_EQ(String("").split("bcd"), StringList{""});
-  EXPECT_EQ(String("\n\raa\n\raa\r\n\r\naa\r\n\r\n\r\n").splitAny("\r\n"), StringList(3, "aa"));
-  EXPECT_EQ(String("\n\r\n\r\r\n\r\n\r\n\r\n\r\n").splitAny("\r\n"), StringList());
-  EXPECT_EQ(String("").splitAny("\r\n"), StringList());
-  EXPECT_EQ(String("xyxFoo").splitAny("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "y_Foo");
-  EXPECT_EQ(String("xyxFoo").rsplitAny("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "xy_Foo");
-  EXPECT_EQ(String("xyxFooxFoox").rsplitAny("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "xyxFoo_Foo");
-  EXPECT_EQ(String("x").rsplitAny("x"), StringList());
-  EXPECT_EQ(String("x").splitAny("x", 1), StringList());
-  EXPECT_EQ(String("").splitAny("x", 1), StringList());
-  EXPECT_EQ(String(std::string_view("asdf\0asdf", 9)).splitAny(String(std::string_view("\0", 1))), StringList(2, "asdf"));
-  EXPECT_EQ(String(std::string_view("asdf\0asdf", 9)).splitAny("a"), StringList({String(std::string_view("sdf\0", 4)), String("sdf")}));
+  EXPECT_EQ(String("\n\raa\n\raa\r\n\r\naa\r\n\r\n\r\n").split_any("\r\n"), StringList(3, "aa"));
+  EXPECT_EQ(String("\n\r\n\r\r\n\r\n\r\n\r\n\r\n").split_any("\r\n"), StringList());
+  EXPECT_EQ(String("").split_any("\r\n"), StringList());
+  EXPECT_EQ(String("xyxFoo").split_any("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "y_Foo");
+  EXPECT_EQ(String("xyxFoo").rsplit_any("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "xy_Foo");
+  EXPECT_EQ(String("xyxFooxFoox").rsplit_any("x", 1).transform([](auto const& parts) { return parts.join("_"); }), "xyxFoo_Foo");
+  EXPECT_EQ(String("x").rsplit_any("x"), StringList());
+  EXPECT_EQ(String("x").split_any("x", 1), StringList());
+  EXPECT_EQ(String("").split_any("x", 1), StringList());
+  EXPECT_EQ(String(std::string_view("asdf\0asdf", 9)).split_any(String(std::string_view("\0", 1))), StringList(2, "asdf"));
+  EXPECT_EQ(String(std::string_view("asdf\0asdf", 9)).split_any("a"), StringList({String(std::string_view("sdf\0", 4)), String("sdf")}));
 }
 
 TEST(StringTest, replace) {
@@ -108,28 +108,48 @@ TEST(StringTest, replace) {
   EXPECT_EQ(String(std::string_view("/bin/bash\0aaa:123123:123", 24)).replace(String(), ""), String(std::string_view("/bin/bash\0aaa:123123:123", 24)));
 }
 
-TEST(StringTest, endsWith) {
-  EXPECT_EQ(String("something.com").endsWith(".com"), true);
-  EXPECT_EQ(String("something.com").endsWith("fsomething.com"), false);
-  EXPECT_EQ(String("something.com").endsWith(""), true);
-  EXPECT_EQ(String("something.com").endsWith("SOMETHING.COMF", String::CaseInsensitive), false);
-  EXPECT_EQ(String("something.com").endsWith('M', String::CaseInsensitive), true);
-  EXPECT_EQ(String("something.com").endsWith('F', String::CaseInsensitive), false);
-  EXPECT_EQ(String("").endsWith('f'), false);
-  EXPECT_EQ(String(std::string_view("something.com\0", 14)).endsWith("m"), false);
-  EXPECT_EQ(String(std::string_view("s\0omething.com", 14)).endsWith("m"), true);
-  EXPECT_EQ(String(std::string_view("s\0omething.com", 14)).endsWith("s"), false);
+TEST(StringTest, ends_with) {
+  EXPECT_EQ(String("something.com").ends_with(".com"), true);
+  EXPECT_EQ(String("something.com").ends_with("fsomething.com"), false);
+  EXPECT_EQ(String("something.com").ends_with(""), true);
+  EXPECT_EQ(String("something.com").ends_with("SOMETHING.COMF", String::CaseInsensitive), false);
+  EXPECT_EQ(String("something.com").ends_with('M', String::CaseInsensitive), true);
+  EXPECT_EQ(String("something.com").ends_with('F', String::CaseInsensitive), false);
+  EXPECT_EQ(String("").ends_with('f'), false);
+  EXPECT_EQ(String(std::string_view("something.com\0", 14)).ends_with("m"), false);
+  EXPECT_EQ(String(std::string_view("s\0omething.com", 14)).ends_with("m"), true);
+  EXPECT_EQ(String(std::string_view("s\0omething.com", 14)).ends_with("s"), false);
 }
 
-TEST(StringTest, beginsWith) {
-  EXPECT_EQ(String("something.com").beginsWith("something"), true);
-  EXPECT_EQ(String("something.com").beginsWith("something.comf"), false);
-  EXPECT_EQ(String("something.com").beginsWith(""), true);
-  EXPECT_EQ(String("something.com").beginsWith("FSOMETHING.COM", String::CaseInsensitive), false);
-  EXPECT_EQ(String("something.com").beginsWith('S', String::CaseInsensitive), true);
-  EXPECT_EQ(String("something.com").beginsWith('F', String::CaseInsensitive), false);
-  EXPECT_EQ(String("").beginsWith('s'), false);
-  EXPECT_EQ(String(std::string_view("\0something.com", 14)).beginsWith(String(std::string_view("\0", 1))), true);
+TEST(StringTest, SuffixByteComparisonRetainsCodepointsAndEagerErrors) {
+  EXPECT_EQ(String("a🙂").ends_with("🙂"), true);
+  EXPECT_EQ(String("abc").ends_with("🙂"), false);
+  EXPECT_EQ(String("éA").ends_with("éa", String::CaseInsensitive), true);
+  EXPECT_EQ(String("éA").ends_with("Éa", String::CaseInsensitive), false);
+  EXPECT_EQ(String(std::string_view("x\0a", 3)).ends_with(
+      String(std::string_view("\0A", 2)), String::CaseInsensitive), true);
+  String invalid_source(std::string("a\xff", 2));
+  EXPECT_EQ(invalid_source.ends_with(""), true);
+  auto invalid = invalid_source.ends_with("z");
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<UnicodeException>());
+  String invalid_suffix(std::string("z\xc2", 2));
+  auto expected = invalid_suffix.size();
+  auto suffix_first = invalid_source.ends_with(invalid_suffix);
+  ASSERT_FALSE(expected);
+  ASSERT_FALSE(suffix_first);
+  EXPECT_STREQ(suffix_first.error().what(), expected.error().what());
+}
+
+TEST(StringTest, starts_with) {
+  EXPECT_EQ(String("something.com").starts_with("something"), true);
+  EXPECT_EQ(String("something.com").starts_with("something.comf"), false);
+  EXPECT_EQ(String("something.com").starts_with(""), true);
+  EXPECT_EQ(String("something.com").starts_with("FSOMETHING.COM", String::CaseInsensitive), false);
+  EXPECT_EQ(String("something.com").starts_with('S', String::CaseInsensitive), true);
+  EXPECT_EQ(String("something.com").starts_with('F', String::CaseInsensitive), false);
+  EXPECT_EQ(String("").starts_with('s'), false);
+  EXPECT_EQ(String(std::string_view("\0something.com", 14)).starts_with(String(std::string_view("\0", 1))), true);
 }
 
 TEST(StringTest, trim) {
@@ -167,8 +187,8 @@ TEST(StringTest, contains) {
   EXPECT_EQ(String("Foo Bar Foo").contains("foo", String::CaseInsensitive), true);
   EXPECT_EQ(String("Foo Bar Foo").contains("bar foo", String::CaseInsensitive), true);
   EXPECT_EQ(String("Foo Bar Foo").contains("foo"), false);
-  EXPECT_EQ(String("Foo Bar Foo").toLower(), String("foo bar foo"));
-  EXPECT_EQ(String("Foo Bar Foo").toUpper(), String("FOO BAR FOO"));
+  EXPECT_EQ(String("Foo Bar Foo").to_lower(), String("foo bar foo"));
+  EXPECT_EQ(String("Foo Bar Foo").to_upper(), String("FOO BAR FOO"));
 }
 
 TEST(StringTest, format) {
@@ -306,7 +326,7 @@ TEST(StringTest, prepend) {
 
 TEST(StringTest, utf8) {
   std::string_view utf8String = "This is a [日本語] Unicode String. (日本語)";
-  EXPECT_EQ(utf8Length(utf8String.data(), utf8String.size()), 37u);
+  EXPECT_EQ(utf8_length(utf8String.data(), utf8String.size()), 37u);
 
   String s1 = utf8String;
   EXPECT_EQ(s1.utf8(), std::string(utf8String));
@@ -315,7 +335,7 @@ TEST(StringTest, utf8) {
   EXPECT_EQ("This is a [日本語] Unicode String. (日本語)", s1);
   EXPECT_EQ(s1.size(), 37u);
   EXPECT_EQ(s1.utf8().size(), 49u);
-  EXPECT_EQ(String(std::string_view(s1.utf8Ptr())), String(utf8String));
+  EXPECT_EQ(String(std::string_view(s1.utf8_data())), String(utf8String));
 
   EXPECT_EQ(String("abcdefghijkl").slice(1, 6, 2), String("bdf"));
   auto shorter = String("aa").compare("aaaa");
@@ -340,14 +360,14 @@ TEST(StringTest, utf8) {
   EXPECT_EQ(s2, String("日本語日本語日本語"));
   EXPECT_EQ(String("日本語日本語日本語").reverse(), String("語本日語本日語本日"));
 
-  EXPECT_EQ(String("foo_bar_baz_baf").regexMatch("foo.*baf"), true);
-  EXPECT_EQ(String("日本語日本語日本語").regexMatch("日.*本語"), true);
-  EXPECT_EQ(String("12345678").regexMatch("[[:digit:]]{1,8}"), true);
-  EXPECT_EQ(String("81234567").regexMatch("[[:digit:]]{1,7}"), false);
-  EXPECT_EQ(String("12345678").regexMatch("[[:digit:]]{1,7}"), false);
-  EXPECT_EQ(String("12345678").regexMatch("[[:digit:]]{1,8}", false), true);
-  EXPECT_EQ(String("81234567").regexMatch("[[:digit:]]{1,7}", false), true);
-  EXPECT_EQ(String("12345678").regexMatch("[[:digit:]]{1,7}", false), true);
+  EXPECT_EQ(String("foo_bar_baz_baf").regex_match("foo.*baf"), true);
+  EXPECT_EQ(String("日本語日本語日本語").regex_match("日.*本語"), true);
+  EXPECT_EQ(String("12345678").regex_match("[[:digit:]]{1,8}"), true);
+  EXPECT_EQ(String("81234567").regex_match("[[:digit:]]{1,7}"), false);
+  EXPECT_EQ(String("12345678").regex_match("[[:digit:]]{1,7}"), false);
+  EXPECT_EQ(String("12345678").regex_match("[[:digit:]]{1,8}", false), true);
+  EXPECT_EQ(String("81234567").regex_match("[[:digit:]]{1,7}", false), true);
+  EXPECT_EQ(String("12345678").regex_match("[[:digit:]]{1,7}", false), true);
 
   EXPECT_EQ(String("𠜎𠜱𠝹𠱓𠱸𠲖𠳏𠳕𠴕𠵼𠵿𠸎𠸏𠹷𠺝𠺢𠻗𠻹𠻺𠼭𠼮𠽌𠾴𠾼𠿪𡁜𡁯𡁵𡁶𡁻𡃁𡃉𡇙𢃇𢞵𢫕𢭃𢯊𢱑𢱕𢳂𢴈𢵌𢵧𢺳𣲷𤓓𤶸𤷪"
                    "𥄫𦉘𦟌𦧲𦧺𧨾𨅝𨈇𨋢𨳊𨳍𨳒𩶘")
@@ -359,7 +379,7 @@ TEST(StringTest, tags) {
   String testString = "<foo>:<bar>";
   StringMap<String> tags = {{"foo", "hello"}, {"bar", "there"}};
 
-  EXPECT_EQ(testString.replaceTags(tags), "hello:there");
+  EXPECT_EQ(testString.replace_tags(tags), "hello:there");
 }
 
 TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
@@ -367,7 +387,7 @@ TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
   constexpr char outputBytes[] = "前\0x\0y後\0<unfinished";
   String source(std::string_view(inputBytes, sizeof(inputBytes) - 1));
   StringList visited;
-  auto result = source.lookupTags([&](String const& key) -> std::expected<String, StarException> {
+  auto result = source.lookup_tags([&](String const& key) -> std::expected<String, StarException> {
     visited.push_back(key);
     if (key == "one")
       return String(std::string_view("x\0y", 3));
@@ -380,7 +400,7 @@ TEST(StringTest, OwningTagLookupPreservesBinaryFragmentsAndFirstFailure) {
   EXPECT_EQ(visited, (StringList{"one", "two"}));
 
   visited.clear();
-  auto failed = String("<one><bad><later>").lookupTags([&](String const& key) -> std::expected<String, StarException> {
+  auto failed = String("<one><bad><later>").lookup_tags([&](String const& key) -> std::expected<String, StarException> {
     visited.push_back(key);
     if (key == "bad")
       return std::unexpected(OutOfRangeException("Tag lookup failure", false));
@@ -395,14 +415,14 @@ TEST(StringTest, TagViewsPreserveOwningAndBorrowedReplacementBytes) {
   String source("a<x>b<x>");
   String replacement(std::string(4096, 'R') + std::string("\0中", 4));
   String expected = String("a") + replacement + "b" + replacement;
-  auto owning = source.maybeLookupTagsView([&](StringView) { return replacement; });
-  auto borrowed = source.maybeLookupTagsView([&](StringView) { return StringView(replacement); });
+  auto owning = source.maybe_lookup_tags_view([&](StringView) { return replacement; });
+  auto borrowed = source.maybe_lookup_tags_view([&](StringView) { return StringView(replacement); });
   ASSERT_TRUE(owning);
   ASSERT_TRUE(borrowed);
   EXPECT_EQ(*owning, expected);
   EXPECT_EQ(*borrowed, expected);
-  EXPECT_FALSE(String("plain").maybeLookupTagsView([](StringView) { return String("unused"); }));
-  auto unmatched = String("a<x").maybeLookupTagsView([](StringView) { return String("unused"); });
+  EXPECT_FALSE(String("plain").maybe_lookup_tags_view([](StringView) { return String("unused"); }));
+  auto unmatched = String("a<x").maybe_lookup_tags_view([](StringView) { return String("unused"); });
   ASSERT_TRUE(unmatched);
   EXPECT_EQ(*unmatched, "a<x");
 }
@@ -469,7 +489,7 @@ TEST(StringTest, CaseInsensitive) {
 TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {
   auto roundTrip = []<auto const& Names>() {
     for (auto const& [value, spelling] : Names) {
-      auto lower = String(spelling).toLower();
+      auto lower = String(spelling).to_lower();
       ASSERT_TRUE(lower);
       auto parsed = enumValue<Names>(*lower);
       ASSERT_TRUE(parsed);
@@ -547,14 +567,14 @@ TEST(StringTest, FixedEnumNamesPreserveEnumSortedIterationAndText) {
 }
 
 TEST(StringTest, RegexSearch) {
-  EXPECT_EQ(String("foo").regexMatch("foo", true, true), true);
-  EXPECT_EQ(String("foo bar").regexMatch("foo", true, true), false);
-  EXPECT_EQ(String("foo bar").regexMatch("foo", false, true), true);
-  EXPECT_EQ(String("foo bar").regexMatch("FOO", false, false), true);
-  EXPECT_EQ(String("foo bar").regexMatch("FOO", false, true), false);
-  EXPECT_EQ(String("foo bar").regexMatch("^fo*", false, true), true);
-  EXPECT_EQ(String("foo bar").regexMatch("^fo*", true, true), false);
-  EXPECT_EQ(String("0123456").regexMatch("\\d{0,9}", true, true), true);
+  EXPECT_EQ(String("foo").regex_match("foo", true, true), true);
+  EXPECT_EQ(String("foo bar").regex_match("foo", true, true), false);
+  EXPECT_EQ(String("foo bar").regex_match("foo", false, true), true);
+  EXPECT_EQ(String("foo bar").regex_match("FOO", false, false), true);
+  EXPECT_EQ(String("foo bar").regex_match("FOO", false, true), false);
+  EXPECT_EQ(String("foo bar").regex_match("^fo*", false, true), true);
+  EXPECT_EQ(String("foo bar").regex_match("^fo*", true, true), false);
+  EXPECT_EQ(String("0123456").regex_match("\\d{0,9}", true, true), true);
 }
 
 TEST(StringTest, InvalidUnicodeIsRecoverableAndDoesNotModifyTheSource) {
@@ -573,6 +593,267 @@ TEST(StringTest, InvalidUnicodeIsRecoverableAndDoesNotModifyTheSource) {
   EXPECT_TRUE(invalidView.error().is<UnicodeException>());
   EXPECT_EQ(malformed.utf8(), std::string("\xff", 1));
   EXPECT_EQ(String("日本語").size(), 3u);
+}
+
+TEST(StringTest, OwningUtf8ExtractionRetainsBinaryBytesAndOwnership) {
+  static_assert(std::same_as<decltype(std::declval<String const&>().utf8()), std::string const&>);
+  static_assert(std::same_as<decltype(std::declval<String&&>().utf8()), std::string>);
+  static_assert(std::same_as<decltype(std::declval<String const&&>().utf8()), std::string>);
+  static_assert(noexcept(std::declval<String&&>().utf8()));
+  static_assert(std::is_nothrow_move_constructible_v<StringList>);
+  static_assert(std::is_nothrow_move_assignable_v<StringList>);
+
+  std::string bytes(256, 'x');
+  bytes[3] = '\0';
+  bytes.append("日本語");
+  String source(bytes);
+  auto storage = source.utf8().data();
+  std::string moved = std::move(source).utf8();
+  EXPECT_EQ(moved, bytes);
+  EXPECT_EQ(moved.data(), storage);
+  source = "new owner";
+  EXPECT_EQ(moved, bytes);
+
+  String const constant(bytes);
+  std::string copied = std::move(constant).utf8();
+  EXPECT_EQ(copied, bytes);
+  EXPECT_NE(copied.data(), constant.utf8().data());
+  copied[0] = 'y';
+  EXPECT_EQ(constant.utf8(), bytes);
+
+  String taken(bytes);
+  EXPECT_EQ(taken.take_utf8(), bytes);
+  EXPECT_TRUE(taken.empty());
+}
+
+TEST(StringTest, EagerOwnerBoundariesRejectMalformedSuffixBeforeRangeErrors) {
+  String source(std::string_view("a\xff", 2));
+  auto expectUnicode = [](auto result) {
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().template is<UnicodeException>());
+  };
+  expectUnicode(source.at(0));
+  expectUnicode(source.at(NPos));
+  expectUnicode(source.substr(0, 0));
+  expectUnicode(source.substr(NPos, 1));
+  expectUnicode(source.erase(0, 0));
+  expectUnicode(source.erase(NPos, 1));
+  expectUnicode(source.begin());
+  expectUnicode(source.starts_with("a"));
+  expectUnicode(source.starts_with('a'));
+  expectUnicode(source.to_upper());
+  expectUnicode(source.to_lower());
+  expectUnicode(source.rot13());
+  EXPECT_EQ(source.utf8(), std::string("a\xff", 2));
+
+  // These checked views/searches intentionally stop before the invalid suffix.
+  EXPECT_EQ(source[0], U'a');
+  EXPECT_EQ(StringView(source).at(0), U'a');
+  EXPECT_EQ(StringView(source).substr(0, 1), StringView("a"));
+  EXPECT_EQ(source.find('a'), 0u);
+  EXPECT_EQ(source.starts_with(""), true);
+  EXPECT_EQ(StringView(source).starts_with('a'), true);
+}
+
+TEST(StringTest, ValidatingBoundariesKeepCodepointsBinaryBytesAndClamping) {
+  String source(std::string_view("a日\0🙂z", 10));
+  EXPECT_EQ(source.at(2), U'\0');
+  EXPECT_EQ(source.at(3), U'🙂');
+  EXPECT_EQ(source.substr(1, 3), String(std::string_view("日\0🙂", 8)));
+  EXPECT_EQ(source.substr(2, NPos), String(std::string_view("\0🙂z", 6)));
+  EXPECT_EQ(source.substr(5, NPos), String());
+  EXPECT_EQ(source.substr(1, 0), String());
+  auto outside = source.at(5);
+  ASSERT_FALSE(outside);
+  EXPECT_TRUE(outside.error().is<OutOfRangeException>());
+  String erased = source;
+  ASSERT_TRUE(erased.erase(1, 3));
+  EXPECT_EQ(erased, "az");
+  ASSERT_TRUE(erased.erase(2, NPos));
+  EXPECT_EQ(erased, "az");
+  ASSERT_TRUE(source.erase(1, NPos));
+  EXPECT_EQ(source, "a");
+}
+
+TEST(StringTest, ForwardSplitSpansKeepLimitsAndLazyDelimiterErrors) {
+  String source(",,a,,,b,,");
+  EXPECT_EQ(source.split_any(",", 0), (StringList{"a,,,b,,"}));
+  EXPECT_EQ(source.split_any(",", 1), (StringList{"a", "b,,"}));
+  EXPECT_EQ(source.split_any(",", 2), (StringList{"a", "b"}));
+  EXPECT_EQ(String("日,,語,").split_any(",", 1), (StringList{"日", "語,"}));
+  EXPECT_EQ(String(std::string_view("\0a\0\0b\0", 6)).split_any(String(std::string_view("\0", 1)), 1),
+      (StringList{"a", String(std::string_view("b\0", 2))}));
+  String invalid_pattern(std::string(",\xff", 2));
+  EXPECT_EQ(String(",,,").split_any(invalid_pattern), StringList());
+  EXPECT_FALSE(String("a").split_any(invalid_pattern, 0));
+  auto invalid_remainder = String(std::string("a,\xff", 3)).split_any(",", 1);
+  ASSERT_FALSE(invalid_remainder);
+  EXPECT_TRUE(invalid_remainder.error().is<UnicodeException>());
+}
+
+TEST(StringTest, ReplaceDenseMultibyteBinaryPatternsWithoutRescanningReplacement) {
+  String source;
+  std::string expected;
+  String raw(std::string_view("\xff\0", 2));
+  for (unsigned i = 0; i != 128; ++i) {
+    source.append(std::string_view("日a\0", 5));
+    expected.append("\xff\0", 2);
+  }
+  String sensitivePattern(std::string_view("日a\0", 5));
+  String insensitivePattern(std::string_view("日A\0", 5));
+  auto sensitive = source.replace(sensitivePattern, raw);
+  ASSERT_TRUE(sensitive);
+  EXPECT_EQ(sensitive->utf8(), expected);
+  auto insensitive = source.replace(insensitivePattern, raw, String::CaseInsensitive);
+  ASSERT_TRUE(insensitive);
+  EXPECT_EQ(insensitive->utf8(), expected);
+  EXPECT_EQ(source.utf8_size(), 640u);
+  EXPECT_EQ(source.replace(insensitivePattern, raw), source);
+  EXPECT_EQ(String("日日日日日").replace("日日", "x"), "xx日");
+  EXPECT_EQ(String("AaAaA").replace("aa", "aaa", String::CaseInsensitive), "aaaaaaA");
+  EXPECT_EQ(String("Ää").replace("ä", "x", String::CaseInsensitive), "Äx");
+}
+
+TEST(StringTest, ReplaceValidatesSourceThenPatternButKeepsReplacementRaw) {
+  String source(std::string_view("a\xff", 2));
+  String pattern(std::string_view("a\xc3", 2));
+  auto sourceError = source.size();
+  auto patternError = pattern.size();
+  ASSERT_FALSE(sourceError);
+  ASSERT_FALSE(patternError);
+  for (auto sensitivity : {String::CaseSensitive, String::CaseInsensitive}) {
+    auto emptyPattern = source.replace("", "x", sensitivity);
+    ASSERT_FALSE(emptyPattern);
+    EXPECT_STREQ(emptyPattern.error().what(), sourceError.error().what());
+    auto bothInvalid = source.replace(pattern, "x", sensitivity);
+    ASSERT_FALSE(bothInvalid);
+    EXPECT_STREQ(bothInvalid.error().what(), sourceError.error().what());
+    auto invalidPattern = String("z").replace(pattern, "x", sensitivity);
+    ASSERT_FALSE(invalidPattern);
+    EXPECT_STREQ(invalidPattern.error().what(), patternError.error().what());
+    EXPECT_EQ(String("valid").replace("", source, sensitivity), "valid");
+    EXPECT_EQ(String("aaa").replace("a", source, sensitivity),
+        String(std::string_view("a\xff" "a\xff" "a\xff", 6)));
+  }
+}
+
+TEST(StringTest, BeginsWithValidatesNonemptyPatternBeforeTheCompleteSource) {
+  String source(std::string_view("a\xff", 2));
+  String prefix(std::string_view("a\xc3", 2));
+  auto prefixError = prefix.size();
+  ASSERT_FALSE(prefixError);
+  for (auto sensitivity : {String::CaseSensitive, String::CaseInsensitive}) {
+    auto result = source.starts_with(prefix, sensitivity);
+    ASSERT_FALSE(result);
+    EXPECT_STREQ(result.error().what(), prefixError.error().what());
+    EXPECT_EQ(source.starts_with("", sensitivity), true);
+    EXPECT_FALSE(source.starts_with("a", sensitivity));
+    EXPECT_EQ(String(std::string_view("日A\0z", 6)).starts_with("日a", sensitivity),
+        sensitivity == String::CaseInsensitive);
+  }
+}
+
+TEST(StringTest, RightSplitCharRetainsEmptyFieldsLikeStringPattern) {
+  EXPECT_EQ(String("a,,b").rsplit(','), (StringList{"a", "", "b"}));
+  EXPECT_EQ(String(",a,,b,").rsplit(','), (StringList{"", "a", "", "b", ""}));
+  EXPECT_EQ(String(",a,,b,").rsplit(',', 0), (StringList{",a,,b,"}));
+  EXPECT_EQ(String(",a,,b,").rsplit(',', 1), (StringList{",a,,b", ""}));
+  EXPECT_EQ(String(",a,,b,").rsplit(',', 2), (StringList{",a,", "b", ""}));
+  EXPECT_EQ(String("").rsplit(','), (StringList{""}));
+  EXPECT_EQ(String(",,,").rsplit(','), (StringList{"", "", "", ""}));
+  EXPECT_EQ(String("日日日日日").rsplit("日日"), (StringList{"日", "", ""}));
+  EXPECT_EQ(String("a").rsplit("long"), (StringList{"a"}));
+  EXPECT_EQ(String("a").rsplit(""), (StringList{"a"}));
+  String binary(std::string_view("a\0日\0", 6));
+  EXPECT_EQ(binary.rsplit(U'\0'), (StringList{"a", "日", ""}));
+}
+
+TEST(StringTest, RightSplitAnyCompressesOnlyBeforeTheLimitIsReached) {
+  String source(",,a,,,b,,");
+  EXPECT_EQ(source.rsplit_any(","), (StringList{"a", "b"}));
+  EXPECT_EQ(source.rsplit_any(",", 0), (StringList{",,a,,,b"}));
+  EXPECT_EQ(source.rsplit_any(",", 1), (StringList{",,a", "b"}));
+  EXPECT_EQ(source.rsplit_any(",", 2), (StringList{"a", "b"}));
+  EXPECT_EQ(String(",,,").rsplit_any(",", 0), StringList());
+  EXPECT_EQ(String("").rsplit_any(","), StringList());
+  EXPECT_EQ(String(" \t日 語 \r\n").rsplit_any("", 1), (StringList{" \t日", "語"}));
+  EXPECT_EQ(String("日🙂🙂語🙂").rsplit_any("🙂", 1), (StringList{"日", "語"}));
+  EXPECT_EQ(String(std::string_view("\0a\0\0b\0", 6)).rsplit_any(String(std::string_view("\0", 1)), 1),
+      (StringList{String(std::string_view("\0a", 2)), "b"}));
+}
+
+TEST(StringTest, RightSplitPreservesValidationDirectionAndLazyDelimiterErrors) {
+  String badSource(std::string_view("\xff\xc3", 2));
+  String badPattern(std::string_view(",\xff", 2));
+  auto sourceError = badSource.reverse();
+  auto patternError = badPattern.reverse();
+  ASSERT_FALSE(sourceError);
+  ASSERT_FALSE(patternError);
+  for (auto limit : {std::size_t(0), std::size_t(1), NPos}) {
+    auto sourceFirst = badSource.rsplit(badPattern, limit);
+    ASSERT_FALSE(sourceFirst);
+    EXPECT_STREQ(sourceFirst.error().what(), sourceError.error().what());
+    auto patternSecond = String("").rsplit(badPattern, limit);
+    ASSERT_FALSE(patternSecond);
+    EXPECT_STREQ(patternSecond.error().what(), patternError.error().what());
+    auto anySourceFirst = badSource.rsplit_any(badPattern, limit);
+    ASSERT_FALSE(anySourceFirst);
+    EXPECT_STREQ(anySourceFirst.error().what(), sourceError.error().what());
+  }
+  // Empty input never queries the delimiter set; successful membership also
+  // avoids observing the set's malformed suffix.
+  EXPECT_EQ(String("").rsplit_any(badPattern), StringList());
+  EXPECT_EQ(String(",,,").rsplit_any(badPattern), StringList());
+  EXPECT_FALSE(String("a").rsplit_any(badPattern, 0));
+  EXPECT_FALSE(String("a\xff").rsplit("", 0));
+}
+
+TEST(StringTest, AsciiTransformsPreserveMultibyteSurrogatesAndEmbeddedNulls) {
+  String source(std::string_view("aZ\0日\xc3\xa4\xed\xa0\x80", 11));
+  EXPECT_EQ(source.to_upper(), String(std::string_view("AZ\0日\xc3\xa4\xed\xa0\x80", 11)));
+  EXPECT_EQ(source.to_lower(), String(std::string_view("az\0日\xc3\xa4\xed\xa0\x80", 11)));
+  EXPECT_EQ(source.rot13(), String(std::string_view("nM\0日\xc3\xa4\xed\xa0\x80", 11)));
+  auto rotated = source.rot13();
+  ASSERT_TRUE(rotated);
+  EXPECT_EQ(rotated->rot13(), source);
+}
+
+TEST(StringTest, JoinAndKnownCountListsRetainOwnedBinaryOutput) {
+  std::array<std::string_view, 3> views{std::string_view("a\0", 2), "日", ""};
+  StringList strings{std::span<std::string_view const>(views)};
+  String separator(std::string_view("\0:", 2));
+  String joined = strings.join(separator);
+  EXPECT_EQ(joined.utf8(), std::string("a\0\0:日\0:", 9));
+  strings[0] = "changed";
+  EXPECT_EQ(joined.utf8(), std::string("a\0\0:日\0:", 9));
+  std::array<std::u32string_view, 2> wide{U" a ", U" 日 "};
+  auto created = StringList::create(std::span<std::u32string_view const>(wide));
+  ASSERT_TRUE(created);
+  auto trimmed = created->trim_all();
+  ASSERT_TRUE(trimmed);
+  EXPECT_EQ(*trimmed, (StringList{"a", "日"}));
+  EXPECT_EQ(*created, (StringList{" a ", " 日 "}));
+  StringList moved(std::move(*trimmed));
+  EXPECT_EQ(moved, (StringList{"a", "日"}));
+  StringList assigned;
+  assigned = std::move(moved);
+  EXPECT_EQ(assigned, (StringList{"a", "日"}));
+  EXPECT_EQ(StringList{}.join(separator), "");
+  EXPECT_EQ(StringList{String(std::string_view("\xff", 1))}.join(separator),
+      String(std::string_view("\xff", 1)));
+  EXPECT_EQ(String::join_with("/", "a/", "/b", "", "c"), "a/b/c");
+  EXPECT_EQ(String::join_with(String(std::string_view("\0", 1)), "a", "b", "c"),
+      String(std::string_view("a\0b\0c", 5)));
+}
+
+TEST(StringTest, JoinedAccumulatorRetainsExistingEmptyAndInvalidByteBoundaries) {
+  String malformed(std::string_view("a\xff", 2));
+  EXPECT_EQ(String::join_with("/", "", malformed), malformed);
+  EXPECT_EQ(String::join_with("/", malformed, ""), malformed);
+  EXPECT_EQ(String::join_with("", malformed, "b"), String(std::string_view("a\xff" "b", 3)));
+  EXPECT_FALSE(String::join_with("", "b", malformed));
+  EXPECT_FALSE(String::join_with("/", malformed, "b"));
+  EXPECT_FALSE(String::join_with("/", "b", malformed));
 }
 
 TEST(StringTest, EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError) {

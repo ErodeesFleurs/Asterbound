@@ -77,8 +77,8 @@ std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String 
     if (!begin) return std::unexpected(std::move(begin.error()));
     for (auto it = *begin; it != text.end(); ++it) {
       auto c = *it;
-      if (String::toUpper(c) != String::toLower(c)) {
-        if (String::toUpper(c) == c)
+      if (String::to_upper(c) != String::to_lower(c)) {
+        if (String::to_upper(c) == c)
           caps++;
         else
           noCaps++;

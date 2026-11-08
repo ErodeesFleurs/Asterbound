@@ -231,7 +231,7 @@ identity.species = std::move(*checked14);
   {
 auto checked15 = config.getString("gender", "male");
 if (!checked15) return std::unexpected(std::move(checked15.error()));
-auto checked16 = enumValue<GenderNames>(std::move(*checked15));
+auto checked16 = enumValue<GenderNames>(*checked15);
 if (!checked16) return std::unexpected(std::move(checked16.error()));
 identity.gender = *checked16;
 }
@@ -3196,7 +3196,7 @@ auto checked567 = assets->json("/humanoid/any/dummy.config:direction");
 if (!checked567) return std::unexpected(std::move(checked567.error()));
 auto checked551 = std::move(*checked567).toString();
 if (!checked551) return std::unexpected(std::move(checked551.error()));
-auto checked552 = enumValue<DirectionNames>(std::move(*checked551));
+auto checked552 = enumValue<DirectionNames>(*checked551);
 if (!checked552) return std::unexpected(std::move(checked552.error()));
 humanoid->setFacingDirection(*checked552);
 
@@ -3991,7 +3991,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
 
   for (auto const& entry : shared->get().entries) {
     auto string = entry.string(shared->get());
-    auto scaleNearest = string.beginsWith("scalenearest");
+    auto scaleNearest = string.starts_with("scalenearest");
     if (!scaleNearest) return std::unexpected(std::move(scaleNearest.error()));
     if (*scaleNearest && string.utf8().find("skip") == NPos) {
       auto const& operation = entry.loadOperation(shared->get());
@@ -4002,7 +4002,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
       }
     }
     entries.emplace_back(std::cref(entry));
-    toReserve += string.utf8Size() + 1;
+    toReserve += string.utf8_size() + 1;
   }
 
   if (!scale)

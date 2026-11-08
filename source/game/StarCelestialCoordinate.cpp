@@ -48,12 +48,12 @@ std::expected<CelestialCoordinate, StarException> CelestialCoordinate::create(Js
     auto text = variant.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto nullName = text->equalsIgnoreCase("null");
+    auto nullName = text->equals_ignore_case("null");
     if (!nullName)
       return std::unexpected(std::move(nullName.error()));
     if (!text->empty() && !*nullName) {
       auto parse = [&]() -> std::expected<void, StarException> {
-        auto parts = text->splitAny(" _:");
+        auto parts = text->split_any(" _:");
         if (!parts)
           return std::unexpected(std::move(parts.error()));
         if (parts->size() < 3)

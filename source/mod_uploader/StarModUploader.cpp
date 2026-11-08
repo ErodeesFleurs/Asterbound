@@ -448,15 +448,18 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
         SteamAPI_ISteamUtils_GetAppID(SteamAPI_SteamUtils()), *modId);
     if (updateHandle == k_UGCUpdateHandleInvalid)
       return std::unexpected(StarException("Could not start Steam UGC item update"));
-    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, toSString(m_titleEditor->text()).utf8Ptr()))
+    auto title = toSString(m_titleEditor->text());
+    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, title.utf8_data()))
       return std::unexpected(StarException("Steam rejected the item title"));
-    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, toSString(m_descriptionEditor->toPlainText()).utf8Ptr()))
+    auto description = toSString(m_descriptionEditor->toPlainText());
+    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, description.utf8_data()))
       return std::unexpected(StarException("Steam rejected the item description"));
-    if (!m_modPreview.isNull()
-        && !SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle,
-                                              File::relative_to(*m_modDirectory, "_previewimage").utf8Ptr()))
-      return std::unexpected(StarException("Steam rejected the preview image"));
-    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8Ptr()))
+    if (!m_modPreview.isNull()) {
+      auto preview_path = File::relative_to(*m_modDirectory, "_previewimage");
+      if (!SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle, preview_path.utf8_data()))
+        return std::unexpected(StarException("Steam rejected the preview image"));
+    }
+    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8_data()))
       return std::unexpected(StarException("Steam rejected the packed mod content"));
 
     StringList tags;
@@ -466,7 +469,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     }
     List<char const*> tagStrings(tags.size(), nullptr);
     for (std::size_t i = 0; i < tags.size(); ++i)
-      tagStrings[i] = tags[i].utf8Ptr();
+      tagStrings[i] = tags[i].utf8_data();
     SteamParamStringArray_t itemTags = {tagStrings.data(), static_cast<std::int32_t>(tags.size())};
     if (!SteamAPI_ISteamUGC_SetItemTags(SteamAPI_SteamUGC(), updateHandle, &itemTags, false))
       return std::unexpected(StarException("Steam rejected the item tags"));

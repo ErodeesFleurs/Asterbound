@@ -36,7 +36,7 @@ SizeResults scalar_size_query(Star::AssetSource& source, SizeRequests paths) {
 std::expected<Star::ByteArray, Star::StarException> whole_metadata_digest(Star::AssetSource& source, bool batch) {
   auto paths = source.assetPaths();
   for (auto& path : paths) {
-    auto lower = path.toLower();
+    auto lower = path.to_lower();
     if (!lower)
       return std::unexpected(std::move(lower.error()));
     path = std::move(*lower);

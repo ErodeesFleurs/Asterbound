@@ -72,7 +72,7 @@ std::expected<String, StarException> ShellParser::word() {
     }
 
     if (!escapedLetter) {
-      if (isSpace(letter) && !inQuotedString()) {
+      if (is_space(letter) && !inQuotedString()) {
         next();
         if (!res.empty()) {
           return res;
@@ -104,8 +104,8 @@ std::expected<String, StarException> ShellParser::word() {
   return res;
 }
 
-bool ShellParser::isSpace(Char letter) const {
-  return String::isSpace(letter);
+bool ShellParser::is_space(Char letter) const {
+  return String::is_space(letter);
 }
 
 bool ShellParser::isQuote(Char letter) const {
@@ -177,7 +177,7 @@ auto ShellParser::parseBackslash() -> std::expected<Char, StarException> {
       if (!parsedLetter)
         return std::unexpected(std::move(parsedLetter.error()));
       auto letter = *parsedLetter;
-      if (isUtf16LeadSurrogate(letter)) {
+      if (is_utf16_lead_surrogate(letter)) {
         auto shouldBeSlash = next();
         if (shouldBeSlash && shouldBeSlash == '\\') {
           auto shouldBeU = next();
@@ -203,7 +203,7 @@ auto ShellParser::parseUnicodeEscapeSequence(std::optional<Char> previousCodepoi
 
   auto letter = current();
 
-  while (!isSpace(*letter) && codepoint.utf8Size() < 4) {
+  while (!is_space(*letter) && codepoint.utf8_size() < 4) {
     auto letter = next();
     if (!letter) {
       break;
@@ -222,10 +222,10 @@ auto ShellParser::parseUnicodeEscapeSequence(std::optional<Char> previousCodepoi
     return 'u';
   }
 
-  if (codepoint.utf8Size() != 4) // exactly 4 digits are required by \u
+  if (codepoint.utf8_size() != 4) // exactly 4 digits are required by \u
     return STAR_UTF32_REPLACEMENT_CHAR;
 
-  auto converted = hexStringToUtf32(codepoint.utf8(), previousCodepoint);
+  auto converted = hex_string_to_utf32(codepoint.utf8(), previousCodepoint);
   if (!converted)
     return STAR_UTF32_REPLACEMENT_CHAR;
   return *converted;

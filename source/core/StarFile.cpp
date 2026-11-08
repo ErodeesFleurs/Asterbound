@@ -21,7 +21,7 @@ std::expected<std::filesystem::path, StarException> filesystem_path(String const
       return std::unexpected(std::move(native.error()));
     return std::filesystem::path(native->get());
 #else
-    return std::filesystem::path(path.utf8Ptr());
+    return std::filesystem::path(path.utf8_data());
 #endif
 }
 
@@ -115,7 +115,7 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
   auto closed = file.close();
   if (!contents) {
     if (!closed)
-      std::fprintf(stderr, "Error closing file '%s' after failed read: %s\n", filename.utf8Ptr(),
+      std::fprintf(stderr, "Error closing file '%s' after failed read: %s\n", filename.utf8_data(),
                    closed.error().what());
     return std::unexpected(std::move(contents.error()));
   }
@@ -273,7 +273,7 @@ std::expected<void, StarException> File::write_file(String const& data, String c
 std::expected<void, StarException> File::overwrite_file_with_rename(std::span<char const> data, String const& filename,
                                                                     String const& new_suffix) {
   auto new_file = filename + new_suffix;
-  auto acquired = fopen(new_file.utf8Ptr(), IOMode::Write, true, true);
+  auto acquired = fopen(new_file.utf8_data(), IOMode::Write, true, true);
   if (!acquired)
     return std::unexpected(std::move(acquired.error()));
   File staging(new_file);
@@ -285,10 +285,10 @@ std::expected<void, StarException> File::overwrite_file_with_rename(std::span<ch
       return;
     auto closed = staging.close();
     if (!closed)
-      std::fprintf(stderr, "Error closing staging file '%s': %s\n", new_file.utf8Ptr(), closed.error().what());
+      std::fprintf(stderr, "Error closing staging file '%s': %s\n", new_file.utf8_data(), closed.error().what());
     auto removed = remove(new_file);
     if (!removed)
-      std::fprintf(stderr, "Error removing staging file '%s': %s\n", new_file.utf8Ptr(), removed.error().what());
+      std::fprintf(stderr, "Error removing staging file '%s': %s\n", new_file.utf8_data(), removed.error().what());
   });
   auto written = staging.write_full(data);
   if (!written)
@@ -354,7 +354,7 @@ File::File(String filename)
 File::~File() noexcept {
   auto result = close();
   if (!result)
-    std::fprintf(stderr, "Error closing file '%s' during destruction: %s\n", m_filename.utf8Ptr(), result.error().what());
+    std::fprintf(stderr, "Error closing file '%s' during destruction: %s\n", m_filename.utf8_data(), result.error().what());
 }
 
 std::expected<StreamOffset, StarException> File::pos() {
@@ -484,7 +484,7 @@ std::expected<void, StarException> File::open(IOMode mode) {
     return std::unexpected(std::move(closed.error()));
   if (m_filename.empty())
     return std::unexpected(IOException("Cannot open file, no filename set"));
-  auto opened = fopen(m_filename.utf8Ptr(), mode);
+  auto opened = fopen(m_filename.utf8_data(), mode);
   if (!opened)
     return std::unexpected(std::move(opened.error()));
   m_file = *opened;
@@ -518,7 +518,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> File::clone() {
   if (is_open()) {
     auto clone_mode = static_cast<IOMode>(static_cast<std::uint8_t>(mode())
                                           & ~static_cast<std::uint8_t>(IOMode::Truncate | IOMode::Append));
-    auto opened = fopen(m_filename.utf8Ptr(), clone_mode, false);
+    auto opened = fopen(m_filename.utf8_data(), clone_mode, false);
     if (!opened)
       return std::unexpected(std::move(opened.error()));
     cloned->m_file = *opened;

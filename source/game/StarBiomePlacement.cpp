@@ -152,7 +152,7 @@ bool BiomeItemPlacement::operator<(BiomeItemPlacement const& rhs) const {
 std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::createItem(Root& root, Json const& config, RandomSource& rand, float biomeHueShift) {
   auto type = config.getString("type");
   if (!type) return std::unexpected(std::move(type.error()));
-  if (auto match = type->equalsIgnoreCase("grass"); !match) return std::unexpected(std::move(match.error()));
+  if (auto match = type->equals_ignore_case("grass"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto grassConfig = config.get("grasses");
     if (!grassConfig) return std::unexpected(std::move(grassConfig.error()));
@@ -165,7 +165,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     auto variant = (*plants)->buildGrassVariant(grass->get(), biomeHueShift);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
-  } else if (auto match = type->equalsIgnoreCase("bush"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("bush"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto bushes = config.getArray("bushes", {});
     if (!bushes) return std::unexpected(std::move(bushes.error()));
@@ -190,7 +190,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     auto variant = (*plants)->buildBushVariant(*name, baseHue, mod, modHue);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
-  } else if (auto match = type->equalsIgnoreCase("tree"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("tree"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto stemConfig = config.get("treeStemList", JsonArray());
     if (!stemConfig) return std::unexpected(std::move(stemConfig.error()));
@@ -267,7 +267,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       }
       return BiomeItem{TreePair{std::move(primary), std::move(alternate)}};
     }
-  } else if (auto match = type->equalsIgnoreCase("object"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("object"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto sets = config.getArray("objectSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
@@ -288,14 +288,14 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       pool.add(*weight, {std::move(*name), *parameters});
     }
     return BiomeItem{std::move(pool)};
-  } else if (auto match = type->equalsIgnoreCase("treasureBox"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("treasureBox"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto sets = config.getArray("treasureBoxSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
     auto name = rand.randValueFrom(*sets).toString();
     if (!name) return std::unexpected(std::move(name.error()));
     return BiomeItem{TreasureBoxSet(std::move(*name))};
-  } else if (auto match = type->equalsIgnoreCase("microdungeon"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("microdungeon"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto namesConfig = config.get("microdungeons", JsonArray());
     if (!namesConfig) return std::unexpected(std::move(namesConfig.error()));

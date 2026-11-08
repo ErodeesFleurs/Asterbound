@@ -1010,7 +1010,7 @@ struct LuaConverter<std::string> {
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
       return std::nullopt;
-    return std::move(**converted).takeUtf8();
+    return std::move(**converted).take_utf8();
   }
 };
 

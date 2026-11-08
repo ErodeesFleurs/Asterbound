@@ -57,7 +57,7 @@ std::expected<void, StarException> Configuration::set(String const& key, Json co
 
 std::expected<void, StarException> Configuration::setPath(String const& path, Json const& value) {
   std::lock_guard locker(m_mutex);
-  auto components = path.splitAny("[].");
+  auto components = path.split_any("[].");
   if (!components)
     return std::unexpected(std::move(components.error()));
   if (!components->empty() && (*components)[0] == "configurationVersion")

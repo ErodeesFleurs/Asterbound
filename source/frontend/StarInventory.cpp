@@ -1337,7 +1337,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
         auto nameResult182 = pet->name();
         if (!nameResult182)
           return std::unexpected(std::move(nameResult182.error()));
-        auto toUpperResult183 = std::move(*nameResult182)->toUpper();
+        auto toUpperResult183 = std::move(*nameResult182)->to_upper();
         if (!toUpperResult183)
           return std::unexpected(std::move(toUpperResult183.error()));
         auto setTextResult184 = nameLabel->setText(std::move(*toUpperResult183));
@@ -1546,7 +1546,7 @@ std::expected<void, StarException> InventoryPane::selectTab(String const& select
       auto toStringResult223 = button.get().data().toString();
       if (!toStringResult223)
         return std::unexpected(std::move(toStringResult223.error()));
-      auto equalsIgnoreCaseResult224 = std::move(*toStringResult223).equalsIgnoreCase(m_tabButtonData[selected]);
+      auto equalsIgnoreCaseResult224 = std::move(*toStringResult223).equals_ignore_case(m_tabButtonData[selected]);
       if (!equalsIgnoreCaseResult224)
         return std::unexpected(std::move(equalsIgnoreCaseResult224.error()));
       if (std::move(*equalsIgnoreCaseResult224))

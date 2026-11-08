@@ -1619,14 +1619,14 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
   constexpr std::string_view UsernamePrefix = "@";
   constexpr std::string_view CidPrefix = "$";
   constexpr std::string_view UUIDPrefix = "$$";
-  auto username = player.beginsWith(UsernamePrefix);
+  auto username = player.starts_with(UsernamePrefix);
   if (!username) return std::unexpected(std::move(username.error()));
   if (*username) {
     auto name = player.substr(UsernamePrefix.size());
     if (!name) return std::unexpected(std::move(name.error()));
     return universe.findNick(*name);
   }
-  auto uuidPrefix = player.beginsWith(UUIDPrefix);
+  auto uuidPrefix = player.starts_with(UUIDPrefix);
   if (!uuidPrefix) return std::unexpected(std::move(uuidPrefix.error()));
   if (*uuidPrefix) {
     auto text = player.substr(UUIDPrefix.size());
@@ -1635,7 +1635,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
     if (uuid) return universe.clientForUuid(*uuid);
     if (!uuid.error().is<UuidException>()) return std::unexpected(std::move(uuid.error()));
   } else {
-    auto cidPrefix = player.beginsWith(CidPrefix);
+    auto cidPrefix = player.starts_with(CidPrefix);
     if (!cidPrefix) return std::unexpected(std::move(cidPrefix.error()));
     if (*cidPrefix) {
       auto text = player.substr(CidPrefix.size());

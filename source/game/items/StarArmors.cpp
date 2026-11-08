@@ -168,7 +168,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
     if (!flipDirectives)
       return std::unexpected(std::move(flipDirectives.error()));
     auto directivesStr = m_directives.maybeString();
-    auto append = flipDirectives->beginsWith('+');
+    auto append = flipDirectives->starts_with('+');
     if (!append)
       return std::unexpected(std::move(append.error()));
     if (*append && directivesStr) {

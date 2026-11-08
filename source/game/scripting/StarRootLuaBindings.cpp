@@ -720,7 +720,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
 
   if (auto r = callbacks.registerCallback("getConfigurationPath", [&root](String const& path) -> std::expected<Json, StarException> {
     if (path.empty()) return std::unexpected(ConfigurationException(strf("cannot get {}", path)));
-    auto title = path.beginsWith("title");
+    auto title = path.starts_with("title");
     if (!title) return std::unexpected(std::move(title.error()));
     if (*title) return std::unexpected(ConfigurationException(strf("cannot get {}", path)));
     auto configuration = root.configuration();
@@ -730,10 +730,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
 
   if (auto r = callbacks.registerCallback("setConfigurationPath", [&root](String const& path, Json const& value) -> std::expected<void, StarException> {
     if (path.empty()) return std::unexpected(ConfigurationException(strf("cannot set {}", path)));
-    auto safeScripts = path.beginsWith("safeScripts");
+    auto safeScripts = path.starts_with("safeScripts");
     if (!safeScripts) return std::unexpected(std::move(safeScripts.error()));
     if (*safeScripts) return std::unexpected(ConfigurationException(strf("cannot set {}", path)));
-    auto parts = path.splitAny("[].");
+    auto parts = path.split_any("[].");
     if (!parts) return std::unexpected(std::move(parts.error()));
     if (!parts->empty() && (*parts)[0] == "safe")
       return std::unexpected(ConfigurationException(strf("cannot set {}", path)));

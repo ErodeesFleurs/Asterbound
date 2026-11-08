@@ -141,7 +141,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {
-        auto description = entry.first.endsWith("Description");
+        auto description = entry.first.ends_with("Description");
         if (!description)
           return std::unexpected(std::move(description.error()));
         if (*description)
@@ -358,7 +358,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {
-        auto description = entry.first.endsWith("Description");
+        auto description = entry.first.ends_with("Description");
         if (!description)
           return std::unexpected(std::move(description.error()));
         if (*description)

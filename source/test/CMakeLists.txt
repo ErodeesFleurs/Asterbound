@@ -54,6 +54,8 @@ set (star_core_tests_SOURCES
       sha_test.cpp
       shell_parse.cpp
       string_test.cpp
+      string_view_storage_test.cpp
+      string_contract_test.cpp
       strong_typedef_test.cpp
       thread_test.cpp
       worker_pool_test.cpp

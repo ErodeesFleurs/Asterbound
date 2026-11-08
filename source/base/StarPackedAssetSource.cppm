@@ -69,7 +69,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
   StringMap<std::pair<std::uint64_t, std::uint64_t>> index;
   OrderedHashSet<String> extensionOrdering;
   for (auto const& str : extensionSorting) {
-    auto folded = str.toLower();
+    auto folded = str.to_lower();
     if (!folded)
       return std::unexpected(std::move(folded.error()));
     extensionOrdering.add(std::move(*folded));
@@ -85,7 +85,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
   entries.reserve(assetPaths.size());
   for (auto const& path : assetPaths) {
     String extension;
-    auto lastDot = path.findLast(".");
+    auto lastDot = path.find_last(".");
     if (!lastDot)
       return std::unexpected(std::move(lastDot.error()));
     if (*lastDot != NPos) {
@@ -94,11 +94,11 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
         return std::unexpected(std::move(suffix.error()));
       extension = std::move(*suffix);
     }
-    auto foldedExtension = extension.toLower();
+    auto foldedExtension = extension.to_lower();
     if (!foldedExtension)
       return std::unexpected(std::move(foldedExtension.error()));
     auto order = extensionOrdering.index_of(*foldedExtension);
-    auto foldedPath = path.toLower();
+    auto foldedPath = path.to_lower();
     if (!foldedPath)
       return std::unexpected(std::move(foldedPath.error()));
     entries.push_back({.path = path,

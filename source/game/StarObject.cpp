@@ -279,7 +279,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!colorResult)
     return std::unexpected(std::move(colorResult.error()));
   auto color = std::move(*colorResult);
-  m_imageKeys.set("color", color.takeUtf8());
+  m_imageKeys.set("color", color.take_utf8());
   auto keysConfigResult = configValue("imageKeys", JsonObject());
   if (!keysConfigResult)
     return std::unexpected(std::move(keysConfigResult.error()));
@@ -459,7 +459,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!colorResult)
       return std::unexpected(std::move(colorResult.error()));
     auto color = std::move(*colorResult);
-    auto colorName = color.takeUtf8();
+    auto colorName = color.take_utf8();
     auto colorEnd = colorName.find('?');
     if (colorEnd != NPos) {
       std::size_t suffixBegin = colorName.rfind('?');
@@ -1939,7 +1939,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(operation22.error()));
   auto operation23 = callbacks.registerCallback("say", [this](String line, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
   if (tags)
-    line = line.replaceTags(*tags, false);
+    line = line.replace_tags(*tags, false);
   if (!line.empty()) {
     auto operation1 = addChatMessage(line, config);
     if (!operation1)
@@ -1952,7 +1952,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(operation23.error()));
   auto operation24 = callbacks.registerCallback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
   if (tags)
-    line = line.replaceTags(*tags, false);
+    line = line.replace_tags(*tags, false);
   if (!line.empty()) {
     auto operation1 = addChatMessage(line, config, portrait);
     if (!operation1)
@@ -2397,9 +2397,9 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
         auto const& image = imagePath.utf8();
         std::size_t suffix = NPos;
         if (!m_colorSuffix.empty() && (suffix = image.rfind("<color>")) != NPos)
-          imagePart.image = String(image.substr(0, (suffix += 7))).replaceTags(m_imageKeys, true, "default");
+          imagePart.image = String(image.substr(0, (suffix += 7))).replace_tags(m_imageKeys, true, "default");
         else
-          imagePart.image = imagePath.replaceTags(m_imageKeys, true, "default");
+          imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
         color = std::move(backup);
         imagePart.image.directives = layer.imagePart().image.directives;
         if (m_colorDirectives) {
@@ -2408,12 +2408,12 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
             return std::unexpected(std::move(operation1.error()));
         }
         if (suffix != NPos) {
-          auto operation2 = imagePart.addDirectives(*metadata, m_colorSuffix + String(image.substr(suffix)).replaceTags(m_imageKeys, true, "default"));
+          auto operation2 = imagePart.addDirectives(*metadata, m_colorSuffix + String(image.substr(suffix)).replace_tags(m_imageKeys, true, "default"));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
         }
       } else {
-        imagePart.image = imagePath.replaceTags(m_imageKeys, true, "default");
+        imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
         imagePart.image.directives = layer.imagePart().image.directives;
       }
       auto operation3 = imagePart.addDirectives(*metadata, m_directives);

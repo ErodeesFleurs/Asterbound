@@ -1137,15 +1137,15 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   auto parameters = questParamsFromJson(paramJson);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   QuestDescriptor descriptor{"preview", templateId, std::move(*parameters), root.random().randu64()};
-  auto next = position.equalsIgnoreCase("next");
+  auto next = position.equals_ignore_case("next");
   if (!next) return std::unexpected(std::move(next.error()));
   bool isLast = false, isFirst = false;
   if (!*next) {
-    auto last = position.equalsIgnoreCase("last");
+    auto last = position.equals_ignore_case("last");
     if (!last) return std::unexpected(std::move(last.error()));
     isLast = *last;
     if (!isLast) {
-      auto first = position.equalsIgnoreCase("first");
+      auto first = position.equals_ignore_case("first");
       if (!first) return std::unexpected(std::move(first.error()));
       isFirst = *first;
     }

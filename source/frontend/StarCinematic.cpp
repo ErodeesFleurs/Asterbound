@@ -537,7 +537,7 @@ std::expected<void, StarException> Cinematic::render() {
         auto image = d.getString("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
-        auto definition = d.set("image", image->replaceTags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));
+        auto definition = d.set("image", image->replace_tags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));
         if (!definition)
           return std::unexpected(std::move(definition.error()));
         auto drawable = Drawable::create(**metadata, *definition);
