@@ -54,6 +54,67 @@ struct move_only_byte_sink {
   void operator=(char byte) { ++*writes; output.push_back(byte); }
 };
 
+struct codepoint_record {
+  char32_t point;
+  std::size_t offset;
+  std::size_t width;
+  bool operator==(codepoint_record const&) const = default;
+};
+
+struct move_only_codepoint_visitor {
+  std::unique_ptr<int> calls = std::make_unique<int>(0);
+  std::vector<codepoint_record>& records;
+  explicit move_only_codepoint_visitor(std::vector<codepoint_record>& output) : records(output) {}
+  move_only_codepoint_visitor(move_only_codepoint_visitor&&) = default;
+  move_only_codepoint_visitor(move_only_codepoint_visitor const&) = delete;
+  explicit operator bool() const { return false; }
+  void operator()(char32_t&& point, std::size_t&& offset, std::size_t&& width) & {
+    ++*calls;
+    records.push_back({point, offset, width});
+    point = U'X';
+    offset = width = 99;
+  }
+};
+
+// Deliberately not regular or a standard iterator: decoding needs only copies,
+// contextual comparisons, byte conversion and bidirectional stepping.
+struct observed_byte_iterator {
+  struct proxy { char value; operator char() const { return value; } };
+  char const* position;
+  std::size_t* reads;
+  observed_byte_iterator(char const* bytes, std::size_t& count) : position(bytes), reads(&count) {}
+  proxy operator*() { ++*reads; return {*position}; }
+  void operator++() { ++position; }
+  void operator--() { --position; }
+  bool operator==(observed_byte_iterator const& other) const { return position == other.position; }
+};
+
+static_assert(codepoint_visitor<move_only_codepoint_visitor>);
+static_assert(codepoint_visitor<decltype([](char32_t, std::size_t, std::size_t) {})>);
+static_assert(codepoint_visitor<decltype([](char32_t, std::size_t, std::size_t)
+    -> std::expected<void, StarException> { return {}; })>);
+static_assert(!codepoint_visitor<decltype([](char32_t&, std::size_t, std::size_t) {})>);
+static_assert(!codepoint_visitor<decltype([](char32_t, std::size_t&, std::size_t) {})>);
+static_assert(!codepoint_visitor<decltype([](char32_t, std::size_t, std::size_t) { return true; })>);
+static_assert(!codepoint_visitor<decltype([](char32_t, std::size_t, std::size_t)
+    -> std::expected<int, StarException> { return 1; })>);
+static_assert(!codepoint_visitor<decltype([](char32_t, std::size_t, std::size_t)
+    -> std::expected<void, StarException>& {
+      static std::expected<void, StarException> result;
+      return result;
+    })>);
+static_assert(has_utf8_decoder<observed_byte_iterator>);
+static_assert(has_utf8_decoder<char8_t const*>);
+static_assert(has_utf8_decoder<signed char const*>);
+static_assert(has_utf8_decoder<unsigned char const*>);
+static_assert(has_utf8_decoder<volatile char*>);
+static_assert(is_utf16_lead_surrogate(Utf32Type(0xd800)));
+static_assert(!is_utf16_lead_surrogate(Utf32Type(0xdc00)));
+static_assert(is_utf16_trail_surrogate(Utf32Type(0xdfff)));
+static_assert(!is_utf16_trail_surrogate(Utf32Type(0xe000)));
+static_assert(noexcept(is_utf16_lead_surrogate(Utf32Type{})));
+static_assert(noexcept(is_utf16_trail_surrogate(Utf32Type{})));
+
 static_assert(std::same_as<std::iter_reference_t<StringView::const_iterator>, Utf32Type>);
 static_assert(std::bidirectional_iterator<StringView::const_iterator>);
 static_assert(std::same_as<std::iterator_traits<StringView::const_iterator>::iterator_category, std::input_iterator_tag>);
@@ -174,6 +235,102 @@ TEST(StringViewStorageTest, CheckedWriterAcceptsMoveOnlyOutputAndStopsBeforeInva
   EXPECT_EQ(bytes, before);
   ASSERT_TRUE(writer.push(U'日'));
   EXPECT_EQ(bytes, before + "日");
+}
+
+TEST(StringViewStorageTest, BulkCodepointVisitorBorrowsLvalueAndPassesIndependentValues) {
+  std::vector<codepoint_record> records;
+  move_only_codepoint_visitor visitor(records);
+  auto bytes = std::string_view("A\0é日\xed\xa0\x80", 10);
+  ASSERT_TRUE(for_each_codepoint(bytes, visitor));
+  EXPECT_EQ(*visitor.calls, 5);
+  EXPECT_EQ(records, (std::vector<codepoint_record>{
+      {U'A', 0, 1}, {U'\0', 1, 1}, {U'é', 2, 2}, {U'日', 4, 3}, {char32_t(0xd800), 7, 3}}));
+  records.clear();
+  ASSERT_TRUE(for_each_codepoint("é", move_only_codepoint_visitor(records)));
+  EXPECT_EQ(records, (std::vector<codepoint_record>{{U'é', 0, 2}}));
+  ASSERT_TRUE(for_each_codepoint(std::string_view(nullptr, 0), visitor));
+  EXPECT_EQ(*visitor.calls, 5);
+}
+
+TEST(StringViewStorageTest, BulkCodepointVisitorStopsAtFirstCallbackOrDecodeFailure) {
+  std::vector<codepoint_record> records;
+  auto callback_error = for_each_codepoint(std::string_view("Aé\xff", 4),
+      [state = std::make_unique<int>(0), &records](char32_t point, std::size_t offset, std::size_t width) mutable
+          -> std::expected<void, StarException> {
+        ++*state;
+        records.push_back({point, offset, width});
+        return std::unexpected(OutOfRangeException("visitor failure", false));
+      });
+  ASSERT_FALSE(callback_error);
+  EXPECT_TRUE(callback_error.error().is<OutOfRangeException>());
+  EXPECT_EQ(records, (std::vector<codepoint_record>{{U'A', 0, 1}}));
+  records.clear();
+  auto decode_error = for_each_codepoint(std::string_view("Aé\xff", 4),
+      [&](char32_t point, std::size_t offset, std::size_t width) -> std::expected<void, StarException> {
+        records.push_back({point, offset, width});
+        return {};
+      });
+  ASSERT_FALSE(decode_error);
+  EXPECT_TRUE(decode_error.error().is<UnicodeException>());
+  EXPECT_EQ(records, (std::vector<codepoint_record>{{U'A', 0, 1}, {U'é', 1, 2}}));
+  records.clear();
+  auto first_error = for_each_codepoint(std::string_view("\xff" "A", 2), move_only_codepoint_visitor(records));
+  ASSERT_FALSE(first_error);
+  EXPECT_TRUE(first_error.error().is<UnicodeException>());
+  EXPECT_TRUE(records.empty());
+}
+
+TEST(StringViewStorageTest, GenericDecoderReadsOnlyTheWantedSequenceWidth) {
+  using decoder = U8ToU32Iterator<observed_byte_iterator>;
+  for (std::string_view bytes : {"ABC", "Aé日", "\xed\xa0\x80"}) {
+    std::size_t reads = 0;
+    auto first = decoder::create({bytes.data(), reads}, {bytes.data() + bytes.size(), reads});
+    ASSERT_TRUE(first);
+    EXPECT_EQ(reads, bytes.size());
+  }
+  for (std::string_view bytes : {"\xff" "ABC", "\xc0\x80" "ABC", "\xe0" "A"}) {
+    std::size_t reads = 0;
+    auto first = decoder::create({bytes.data(), reads}, {bytes.data() + bytes.size(), reads});
+    ASSERT_FALSE(first);
+    EXPECT_TRUE(first.error().is<UnicodeException>());
+    EXPECT_EQ(reads, bytes[0] == '\xff' ? 1u : 2u);
+  }
+}
+
+TEST(StringViewStorageTest, ByteSourceKindsPreserveCodepointAndConversionSemantics) {
+  auto check = []<class Byte>(Byte const* first, Byte const* last) {
+    using decoder = U8ToU32Iterator<Byte const*>;
+    auto position = decoder::create(first, last);
+    ASSERT_TRUE(position);
+    EXPECT_EQ(**position, U'A');
+    ++*position;
+    EXPECT_EQ(**position, U'é');
+    ++*position;
+    EXPECT_EQ(*position, decoder::end(last));
+  };
+  char bytes[]{'A', char(0xc3), char(0xa9)};
+  signed char signed_bytes[]{'A', static_cast<signed char>(0xc3), static_cast<signed char>(0xa9)};
+  unsigned char unsigned_bytes[]{'A', 0xc3, 0xa9};
+  char8_t utf8_bytes[]{u8'A', char8_t(0xc3), char8_t(0xa9)};
+  check(bytes, bytes + 3);
+  check(signed_bytes, signed_bytes + 3);
+  check(unsigned_bytes, unsigned_bytes + 3);
+  check(utf8_bytes, utf8_bytes + 3);
+  // Wider integral sources retain conversion-to-char validation rather than
+  // treating their object representation as a contiguous byte sequence.
+  unsigned wide[]{0x141, 0x1c3, 0x1a9};
+  check(wide, wide + 3);
+  volatile char volatile_bytes[]{'A', char(0xc3), char(0xa9)};
+  using volatile_decoder = U8ToU32Iterator<volatile char*>;
+  auto position = volatile_decoder::create(volatile_bytes, volatile_bytes + 3);
+  ASSERT_TRUE(position);
+  EXPECT_EQ(**position, U'A');
+  ++*position;
+  EXPECT_EQ(**position, U'é');
+  using empty_decoder = U8ToU32Iterator<unsigned char const*>;
+  auto empty = empty_decoder::create(nullptr, nullptr);
+  ASSERT_TRUE(empty);
+  EXPECT_EQ(*empty, empty_decoder::end(nullptr));
 }
 
 TEST(StringViewStorageTest, SplitBorrowsMoveOnlyCallbacksAndPreservesByteOffsets) {

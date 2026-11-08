@@ -265,7 +265,7 @@ void register_checked(char const* name, std::string input, Operation operation,
 }
 
 void register_checked_paths() {
-  auto length = [](std::string_view bytes) { return Star::utf8_length(bytes.data(), bytes.size()); };
+  auto length = [](std::string_view bytes) { return Star::utf8_length(bytes); };
   for (unsigned repeats : {8u, 256u}) {
     std::string ascii;
     std::string mixed;

@@ -862,6 +862,24 @@ TEST(FormattedJsonTest, DuplicateTokensKeepLastSemanticValueAndRebuildIndex) {
   EXPECT_EQ(*originalText, original);
 }
 
+TEST(FormattedJsonTest, UnicodeEscapesRejectInvalidDigitsInKeysAndValues) {
+  for (std::string_view text : {R"({"key":"\uGGGG"})", R"({"key":"\u12g4"})",
+           R"({"\uG123":17})", R"({"\u1G23":17})", R"({"\u12G3":17})", R"({"\u123G":17})",
+           R"({"key":"\uD83D\uDE0g"})", R"({"key":"\u123"})"}) {
+    auto parsed = FormattedJson::parse(String(text));
+    EXPECT_FALSE(parsed) << text;
+  }
+  auto valid = FormattedJson::parse(R"({ "\u006bey": ["\u0000", "\uD83D\uDE00", "\u00aF"] })");
+  ASSERT_TRUE(valid);
+  EXPECT_EQ(valid->toJson(),
+      (Json(JsonObject{{"key", JsonArray{String(std::string_view("\0", 1)), "😀", "¯"}}})));
+  auto output = valid->repr();
+  ASSERT_TRUE(output);
+  auto reparsed = FormattedJson::parse(*output);
+  ASSERT_TRUE(reparsed);
+  EXPECT_EQ(reparsed->toJson(), valid->toJson());
+}
+
 TEST(FormattedJsonTest, NestedUnicodeTriviaAndNumberSpellingSurviveRebuild) {
   String original = "{ /* 日本語 🌟 */ \"値\": [ -0.00e+0, \"café🚀\" ] // end\n}";
   auto parsed = FormattedJson::parse(original);

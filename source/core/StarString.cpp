@@ -32,16 +32,12 @@ struct StringByteBounds {
 
 std::expected<StringByteBounds, StarException> string_byte_bounds(std::string_view bytes, std::size_t position, std::size_t count) {
   StringByteBounds bounds{0, bytes.size(), bytes.size()};
-  std::size_t offset = 0;
-  while (offset != bytes.size()) {
+  auto scanned = for_each_codepoint(bytes, [&](Utf32Type, std::size_t offset, std::size_t) {
     if (bounds.length == position) bounds.start = offset;
     if (bounds.length >= position && bounds.length - position == count) bounds.stop = offset;
-    Utf32Type point;
-    auto width = utf8_decode_char(bytes.data() + offset, &point, bytes.size() - offset);
-    if (!width) return std::unexpected(std::move(width.error()));
-    offset += *width;
     ++bounds.length;
-  }
+  });
+  if (!scanned) return std::unexpected(std::move(scanned.error()));
   return bounds;
 }
 
@@ -108,7 +104,7 @@ std::expected<String, StarException> String::create(std::u32string_view text) {
 std::expected<String, StarException> String::create(Char point, std::size_t count) {
   if (count == 0) return String();
   char bytes[4];
-  auto length = utf8_encode_char(bytes, point, sizeof(bytes));
+  auto length = utf8_encode_char(bytes, point);
   if (!length) return std::unexpected(std::move(length.error()));
   String result;
   result.reserve(count);
@@ -140,7 +136,7 @@ std::expected<String::WideString, StarException> String::wide_string() const {
 }
 std::expected<String::const_iterator, StarException> String::begin() const & { return const_iterator::create(m_string.begin(), m_string.end()); }
 String::const_iterator String::end() const & { return const_iterator::end(m_string.end()); }
-std::expected<std::size_t, StarException> String::size() const { return utf8_length(m_string.data(), m_string.size()); }
+std::expected<std::size_t, StarException> String::size() const { return utf8_length(std::string_view(m_string)); }
 std::expected<std::size_t, StarException> String::length() const { return size(); }
 void String::clear() { m_string.clear(); }
 void String::reserve(std::size_t n) { m_string.reserve(n); }
@@ -149,15 +145,11 @@ std::expected<String::Char, StarException> String::operator[](std::size_t index)
 std::expected<String::Char, StarException> String::at(std::size_t index) const {
   Char result{};
   std::size_t position = 0;
-  std::size_t offset = 0;
-  while (offset != m_string.size()) {
-    Char point;
-    auto width = utf8_decode_char(m_string.data() + offset, &point, m_string.size() - offset);
-    if (!width) return std::unexpected(std::move(width.error()));
+  auto scanned = for_each_codepoint(std::string_view(m_string), [&](Char point, std::size_t, std::size_t) {
     if (position == index) result = point;
-    offset += *width;
     ++position;
-  }
+  });
+  if (!scanned) return std::unexpected(std::move(scanned.error()));
   if (index >= position) return std::unexpected(OutOfRangeException(Star::format("Out of range in String::at({})", index)));
   return result;
 }
@@ -166,15 +158,11 @@ std::expected<CaseInsensitiveStringView, StarException> CaseInsensitiveStringVie
   return create(std::string_view(string.utf8()));
 }
 std::expected<CaseInsensitiveStringView, StarException> CaseInsensitiveStringView::create(std::string_view bytes) {
-  Utf8Cursor cursor(bytes);
   PLHasher hash;
-  while (!cursor.at_end()) {
-    auto point = cursor.read();
-    if (!point) return std::unexpected(std::move(point.error()));
-    hash.put(String::to_lower(*point));
-    auto moved = cursor.advance();
-    if (!moved) return std::unexpected(std::move(moved.error()));
-  }
+  auto scanned = for_each_codepoint(bytes, [&](Utf32Type point, std::size_t, std::size_t) {
+    hash.put(String::to_lower(point));
+  });
+  if (!scanned) return std::unexpected(std::move(scanned.error()));
   return CaseInsensitiveStringView(bytes, hash.hash());
 }
 std::expected<CaseInsensitiveString, StarException> CaseInsensitiveString::create(String string) {
@@ -481,7 +469,7 @@ std::expected<void, StarException> String::append(std::u32string_view s) {
 void String::append(std::string_view s) { m_string.append(s); }
 std::expected<void, StarException> String::append(Char point) {
   char bytes[4];
-  auto count = utf8_encode_char(bytes, point, sizeof(bytes));
+  auto count = utf8_encode_char(bytes, point);
   if (!count) return std::unexpected(std::move(count.error()));
   m_string.append(bytes, *count);
   return {};
@@ -496,7 +484,7 @@ std::expected<void, StarException> String::prepend(std::u32string_view s) {
 }
 std::expected<void, StarException> String::prepend(Char point) {
   char bytes[4];
-  auto count = utf8_encode_char(bytes, point, sizeof(bytes));
+  auto count = utf8_encode_char(bytes, point);
   if (!count) return std::unexpected(std::move(count.error()));
   m_string.insert(0, bytes, *count);
   return {};

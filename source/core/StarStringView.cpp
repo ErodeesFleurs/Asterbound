@@ -67,7 +67,7 @@ char const* StringView::utf8_data() const { return m_view.data(); }
 std::size_t StringView::utf8_size() const { return m_view.size(); }
 std::expected<StringView::const_iterator, StarException> StringView::begin() const { return const_iterator::create(m_view.begin(), m_view.end()); }
 StringView::const_iterator StringView::end() const { return const_iterator::end(m_view.end()); }
-std::expected<std::size_t, StarException> StringView::size() const { return utf8_length(m_view.data(), m_view.size()); }
+std::expected<std::size_t, StarException> StringView::size() const { return utf8_length(m_view); }
 std::expected<std::size_t, StarException> StringView::length() const { return size(); }
 bool StringView::empty() const { return m_view.empty(); }
 std::expected<StringView::Char, StarException> StringView::operator[](std::size_t index) const { return at(index); }

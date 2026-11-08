@@ -134,6 +134,117 @@ TEST(JsonTest, Unicode) {
   EXPECT_EQ((*result26), 1u);
 }
 
+TEST(JsonTest, UnicodeEscapesValidateEveryAsciiHexDigit) {
+  for (char digit : std::string_view("0123456789abcdefABCDEF")) {
+    unsigned value = digit <= '9' ? digit - '0' : (digit <= 'F' ? digit - 'A' : digit - 'a') + 10;
+    for (std::size_t position = 0; position < 4; ++position) {
+      std::string text = R"("\u0000")";
+      text[3 + position] = digit;
+      auto parsed = Json::parse(String(text));
+      ASSERT_TRUE(parsed) << text;
+      char32_t expected = static_cast<char32_t>(value << (4 * (3 - position)));
+      char bytes[4];
+      auto width = utf8_encode_char(std::span<char>(bytes), expected);
+      ASSERT_TRUE(width);
+      EXPECT_EQ(*parsed, Json(String(std::string_view(bytes, *width))));
+      std::u32string wide(text.begin(), text.end());
+      auto generic = inputUtf32Json(wide.begin(), wide.end(), JsonParseType::Value);
+      ASSERT_TRUE(generic);
+      EXPECT_EQ(*generic, *parsed);
+    }
+  }
+  for (char invalid : std::string_view("gGzZ/:@`+-_ ")) {
+    for (std::size_t position = 0; position < 4; ++position) {
+      std::string text = R"("\u1234")";
+      text[3 + position] = invalid;
+      auto parsed = Json::parse(String(text));
+      ASSERT_FALSE(parsed) << text;
+      EXPECT_TRUE(parsed.error().is<JsonParsingException>());
+      std::list<char> bytes(text.begin(), text.end());
+      auto generic = inputUtf8Json(bytes.begin(), bytes.end(), JsonParseType::Value);
+      EXPECT_FALSE(generic) << text;
+    }
+  }
+  auto allInvalid = Json::parse(R"("\uGGGG")");
+  EXPECT_FALSE(allInvalid);
+  auto interiorInvalid = Json::parse(R"("\u12g4")");
+  EXPECT_FALSE(interiorInvalid);
+}
+
+TEST(JsonTest, UnicodeEscapeTruncationAndSurrogateContracts) {
+  for (std::string_view text : {R"("\u)", R"("\u0)", R"("\u00)", R"("\u000)",
+           R"("\u")", R"("\u1")", R"("\u12")", R"("\u123")",
+           R"("\uD83D")", R"("\uD83D\u)", R"("\uD83D\uDE0")", R"("\uD83D\u0041")",
+           R"("\uD83D\uDE0g")", R"("\u１２３４")"}) {
+    auto parsed = Json::parse(String(text));
+    EXPECT_FALSE(parsed) << text;
+    std::u32string wide;
+    ASSERT_TRUE(for_each_codepoint(text, [&](char32_t point, std::size_t, std::size_t) { wide += point; }));
+    auto generic = inputUtf32Json(wide.begin(), wide.end(), JsonParseType::Value);
+    EXPECT_FALSE(generic) << text;
+  }
+  for (std::string_view text : {R"("\uD83D\uDE00")", R"("\ud83d\ude00")"}) {
+    auto parsed = Json::parse(String(text));
+    ASSERT_TRUE(parsed);
+    EXPECT_EQ(*parsed, Json("😀"));
+  }
+  // Isolated trail surrogates remain accepted by the permissive project codec.
+  auto trail = Json::parse(R"("\uDC00")");
+  ASSERT_TRUE(trail);
+  EXPECT_EQ(*trail, Json(String(std::string_view("\xed\xb0\x80", 3))));
+}
+
+TEST(JsonTest, UnicodeEscapeErrorsStopBeforeSuffixOrStringCallbacks) {
+  struct RejectStrings : JsonBuilderStream {
+    unsigned calls = 0;
+    std::expected<void, StarException> putString(std::span<char32_t const>) override {
+      ++calls;
+      return std::unexpected(JsonException("rejected string"));
+    }
+  };
+  for (auto text : {std::u32string_view(U"[\"\\uGGGG\",\"later\"]"),
+           std::u32string_view(U"[\"\\u12g4\",\"later\"]")}) {
+    RejectStrings stream;
+    JsonParser<std::u32string_view::const_iterator> parser(stream);
+    auto parsed = parser.parse(text.begin(), text.end());
+    ASSERT_FALSE(parsed);
+    EXPECT_TRUE(parsed.error().is<JsonParserException>());
+    EXPECT_FALSE(parsed.error().is<JsonException>());
+    EXPECT_EQ(stream.calls, 0u);
+  }
+  std::u32string_view text = U"[\"\\u0061\",\"\\uGGGG\"]";
+  RejectStrings stream;
+  JsonParser<std::u32string_view::const_iterator> parser(stream);
+  auto parsed = parser.parse(text.begin(), text.end());
+  ASSERT_FALSE(parsed);
+  EXPECT_TRUE(parsed.error().is<JsonException>());
+  EXPECT_FALSE(parsed.error().is<JsonParserException>());
+  EXPECT_EQ(stream.calls, 1u);
+
+  for (std::string_view invalid : {"\"\\uG\xff\"", "\"\\u12g4 \xff\"", "\"\\uD83D\\uDE0g\xff\""}) {
+    auto rejected = Json::parse(String(invalid));
+    ASSERT_FALSE(rejected);
+    EXPECT_TRUE(rejected.error().is<JsonParsingException>());
+    EXPECT_FALSE(rejected.error().is<UnicodeException>());
+  }
+}
+
+TEST(JsonTest, WriterRejectsInvalidCodepointWithoutFallbackEscape) {
+  std::u32string output;
+  JsonWriter<std::back_insert_iterator<std::u32string>> writer(std::back_inserter(output));
+  std::array<char32_t, 2> invalid{0x110000, U'x'};
+  auto written = writer.putString(invalid);
+  ASSERT_FALSE(written);
+  EXPECT_TRUE(written.error().is<UnicodeException>());
+  EXPECT_EQ(output, U"\"");
+  std::string utf8Output;
+  JsonWriter<std::back_insert_iterator<std::string>, true> utf8Writer(std::back_inserter(utf8Output));
+  auto utf8Written = utf8Writer.putString(invalid);
+  ASSERT_FALSE(utf8Written);
+  EXPECT_TRUE(utf8Written.error().is<UnicodeException>());
+  EXPECT_EQ(utf8Output, "\"");
+}
+
 TEST(JsonTest, UnicodeFile) {
   auto result27 = Json::parse("{ \"first\" : \"日本語\", \"second\" : \"foobar\\u0019\" }");
   ASSERT_TRUE(result27);

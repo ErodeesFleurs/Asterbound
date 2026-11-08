@@ -45,7 +45,7 @@ std::expected<void, StarException> JsonBuilderStream::putString(std::span<char32
   return {};
 }
 std::expected<void, StarException> JsonBuilderStream::putStringUtf8(std::string_view s) {
-  auto valid = utf8_length(s.data(), s.size());
+  auto valid = utf8_length(s);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   push(Json(String(s)));

@@ -161,6 +161,7 @@ let
     "string_benchmarks"
     "format_benchmarks"
     "error_benchmarks"
+    "unicode_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

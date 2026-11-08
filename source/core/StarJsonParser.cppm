@@ -45,13 +45,11 @@ struct JsonStream {
 private:
   static std::expected<std::u32string, StarException> decodeUtf8(std::string_view bytes) {
     std::u32string text;
-    while (!bytes.empty()) {
-      char32_t point;
-      auto width = utf8_decode_char(bytes.data(), &point, bytes.size());
-      if (!width) return std::unexpected(std::move(width.error()));
+    auto decoded = for_each_codepoint(bytes, [&](char32_t point, std::size_t, std::size_t) {
       text.push_back(point);
-      bytes.remove_prefix(*width);
-    }
+    });
+    if (!decoded)
+      return std::unexpected(std::move(decoded.error()));
     return text;
   }
 };
@@ -440,14 +438,10 @@ private:
         std::string_view bytes(begin, static_cast<std::size_t>(end - begin));
         return key ? m_stream.objectKeyUtf8(bytes) : m_stream.putStringUtf8(bytes);
       }
-      while (begin != end) {
-        char32_t point;
-        auto width = utf8_decode_char(begin, &point, static_cast<std::size_t>(end - begin));
-        if (!width)
-          return std::unexpected(std::move(width.error()));
-        text += point;
-        begin += *width;
-      }
+      auto decoded = for_each_codepoint(std::string_view(begin, static_cast<std::size_t>(end - begin)),
+          [&](char32_t point, std::size_t, std::size_t) { text += point; });
+      if (!decoded)
+        return std::unexpected(std::move(decoded.error()));
     }
     while (true) {
       if (m_char == '\\') {
@@ -455,10 +449,7 @@ private:
         if (!advanced)
           return std::unexpected(std::move(advanced.error()));
         if (m_char == 'u') {
-          auto hex = readHexEscape();
-          if (!hex)
-            return std::unexpected(std::move(hex.error()));
-          auto codepoint = hex_string_to_utf32(*hex);
+          auto codepoint = read_hex_escape();
           if (!codepoint)
             return std::unexpected(std::move(codepoint.error()));
           if (is_utf16_lead_surrogate(*codepoint)) {
@@ -468,10 +459,10 @@ private:
             checked = check('u');
             if (!checked)
               return std::unexpected(std::move(checked.error()));
-            hex = readHexDigits();
-            if (!hex)
-              return std::unexpected(std::move(hex.error()));
-            codepoint = hex_string_to_utf32(*hex, *codepoint);
+            auto trail = read_hex_digits();
+            if (!trail)
+              return std::unexpected(std::move(trail.error()));
+            codepoint = utf32_from_utf16_surrogate_pair(*codepoint, *trail);
             if (!codepoint)
               return std::unexpected(std::move(codepoint.error()));
           }
@@ -508,24 +499,31 @@ private:
     }
   }
 
-  std::expected<std::string, StarException> readHexEscape() {
+  std::expected<char32_t, StarException> read_hex_escape() {
     auto advanced = next();
     if (!advanced)
       return std::unexpected(std::move(advanced.error()));
-    return readHexDigits();
+    return read_hex_digits();
   }
 
-  std::expected<std::string, StarException> readHexDigits() {
-    std::string hex;
+  std::expected<char32_t, StarException> read_hex_digits() {
+    char32_t codeunit = 0;
     for (unsigned i = 0; i < 4; ++i) {
-      if (m_char > 127)
-        return std::unexpected(UnicodeException("Invalid unicode escape"));
-      hex.push_back(static_cast<char>(m_char));
+      unsigned digit;
+      if (m_char >= U'0' && m_char <= U'9')
+        digit = m_char - U'0';
+      else if (m_char >= U'a' && m_char <= U'f')
+        digit = m_char - U'a' + 10;
+      else if (m_char >= U'A' && m_char <= U'F')
+        digit = m_char - U'A' + 10;
+      else
+        return std::unexpected(JsonParserException("expected hexadecimal digit in unicode escape"));
+      codeunit = (codeunit << 4) | digit;
       auto advanced = next();
       if (!advanced)
         return std::unexpected(std::move(advanced.error()));
     }
-    return hex;
+    return codeunit;
   }
 
   std::expected<void, StarException> check(char32_t c) {
@@ -636,7 +634,7 @@ public:
     return m_pretty ? write(' ') : std::expected<void, StarException>{};
   }
   std::expected<void, StarException> objectKeyUtf8(std::string_view bytes) override {
-    auto valid = utf8_length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes);
     if (!valid) return std::unexpected(std::move(valid.error()));
     if (state() != ObjectElement) m_state.push_back(ObjectElement);
     auto r = indent();
@@ -676,7 +674,7 @@ public:
   std::expected<void, StarException> putStringUtf8(std::string_view bytes) override {
     // Preserve wide_string's all-or-nothing validation before startValue or any
     // output, but do not inspect later JSON values before earlier output.
-    auto valid = utf8_length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes);
     if (!valid) return std::unexpected(std::move(valid.error()));
     auto r = startValue();
     if (!r) return std::unexpected(std::move(r.error()));
@@ -710,7 +708,7 @@ public:
   std::expected<void, StarException> putNull() override { return putDouble("null"); }
   std::expected<void, StarException> putWhitespace(std::span<char32_t const> s) override { return text(s); }
   std::expected<void, StarException> putWhitespaceUtf8(std::string_view bytes) override {
-    auto valid = utf8_length(bytes.data(), bytes.size());
+    auto valid = utf8_length(bytes);
     if (!valid)
       return std::unexpected(std::move(valid.error()));
     return utf8Text(bytes);
@@ -751,21 +749,8 @@ private:
       char32_t encoded[] = {U'\\', U'u', U'0', U'0', digits[c >> 4], digits[c & 0xf]};
       return text(encoded);
     }
-    if (c > 0x10ffff) {
-      auto hex = hex_string_from_utf32(c);
-      if (!hex) return std::unexpected(std::move(hex.error()));
-      if (hex->size() != 4 && hex->size() != 8)
-        return std::unexpected(UnicodeException("Internal Error: Received invalid unicode hex from hexStringFromUtf32."));
-      for (std::size_t j = 0; j < hex->size(); j += 4) {
-        auto r = text(std::span<char32_t const>(U"\\u", 2));
-        if (!r) return std::unexpected(std::move(r.error()));
-        for (std::size_t k = j; k < j + 4; ++k) {
-          r = write(static_cast<unsigned char>((*hex)[k]));
-          if (!r) return std::unexpected(std::move(r.error()));
-        }
-      }
-      return {};
-    }
+    if (c > 0x10ffff)
+      return std::unexpected(UnicodeException("Invalid codepoint passed to utf32ToUtf16SurrogatePair"));
     return write(c);
   }
   std::expected<void, StarException> text(std::span<char32_t const> s) {
@@ -798,14 +783,9 @@ private:
         }
       }
     } else {
-      while (!bytes.empty()) {
-        char32_t point;
-        auto width = utf8_decode_char(bytes.data(), &point, bytes.size());
-        if (!width) return std::unexpected(std::move(width.error()));
-        auto r = write(point);
-        if (!r) return std::unexpected(std::move(r.error()));
-        bytes.remove_prefix(*width);
-      }
+      return for_each_codepoint(bytes, [&](char32_t point, std::size_t, std::size_t) {
+        return write(point);
+      });
     }
     return {};
   }
@@ -838,7 +818,7 @@ private:
     if constexpr (Utf8) {
       if (c < 0x80) return writeByte(static_cast<char>(c));
       char bytes[4];
-      auto width = utf8_encode_char(bytes, c, sizeof(bytes));
+      auto width = utf8_encode_char(std::span<char>(bytes), c);
       if (!width) return std::unexpected(std::move(width.error()));
       return utf8Text(std::string_view(bytes, *width));
     } else {

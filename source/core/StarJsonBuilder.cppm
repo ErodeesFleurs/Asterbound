@@ -95,7 +95,8 @@ std::expected<Jsonlike, StarException> inputUtf32Json(InputIterator begin, Input
 // Decode only the current codepoint. Unlike a validated Unicode range, this
 // adapter must not inspect an unvisited suffix before an earlier parser or
 // stream callback has had a chance to report its error.
-template <typename InputIterator>
+template <std::forward_iterator InputIterator>
+  requires std::convertible_to<std::iter_reference_t<InputIterator>, char>
 class JsonUtf8InputIterator {
 public:
   JsonUtf8InputIterator() = default;
@@ -107,7 +108,8 @@ public:
     if (m_width != 0)
       return m_point;
     if constexpr (std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>) {
-      auto decoded = utf8_decode_char(std::to_address(m_current), &m_point, static_cast<std::size_t>(m_end - m_current));
+      auto decoded = utf8_decode_char(
+          std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current)), m_point);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       m_width = *decoded;
@@ -127,7 +129,7 @@ public:
     std::size_t available = 1;
     while (available < wanted && lookahead != m_end)
       bytes[available++] = *lookahead++;
-    auto decoded = utf8_decode_char(bytes, &m_point, available);
+    auto decoded = utf8_decode_char(std::string_view(bytes, available), m_point);
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     m_width = *decoded;
@@ -160,7 +162,8 @@ private:
   mutable std::size_t m_width = 0;
 };
 
-template <typename InputIterator, typename Stream = JsonBuilderStream, typename Jsonlike = Json>
+template <std::forward_iterator InputIterator, typename Stream = JsonBuilderStream, typename Jsonlike = Json>
+  requires std::convertible_to<std::iter_reference_t<InputIterator>, char>
 std::expected<Jsonlike, StarException> inputUtf8Json(InputIterator begin, InputIterator end, JsonParseType parseType) {
   using Utf32Input = JsonUtf8InputIterator<InputIterator>;
   return inputUtf32Json<Utf32Input, Stream, Jsonlike>(Utf32Input(begin, end), Utf32Input(end, end), parseType);
