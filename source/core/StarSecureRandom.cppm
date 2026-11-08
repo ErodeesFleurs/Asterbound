@@ -32,7 +32,7 @@ std::expected<ByteArray, StarException> secureRandomBytes(std::size_t size) {
   if (!CryptAcquireContext(&context, 0, MS_DEF_PROV, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
     return std::unexpected(StarException("Could not acquire secure random source."));
   auto res = ByteArray(size, '\0');
-  auto success = CryptGenRandom(context, size, (PBYTE)res.ptr());
+  auto success = CryptGenRandom(context, size, (PBYTE)res.data());
   CryptReleaseContext(context, 0);
 
   if (!success)

@@ -145,11 +145,11 @@ std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomS
 std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomService&) {
   auto file = std::make_shared<File>();
   auto filename_template = relative_to(P_tmpdir, "starbound.tmpfile.XXXXXXXX");
-  auto path = ByteArray::fromCStringWithNull(filename_template.utf8_data());
-  auto fd = ::mkstemp(path.ptr());
+  auto path = ByteArray::from_string_with_null(filename_template.utf8_data());
+  auto fd = ::mkstemp(path.data());
   if (fd < 0)
     return std::unexpected(IOException::format("tmpfile error: {}", std::strerror(errno)));
-  if (::unlink(path.ptr()) < 0) {
+  if (::unlink(path.data()) < 0) {
     auto error = errno;
     close_after_failure(fd);
     return std::unexpected(IOException::format("Could not remove mkstemp file when creating ephemeralFile: {}", std::strerror(error)));

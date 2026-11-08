@@ -891,7 +891,7 @@ std::expected<void, StarException> WorldLayoutUpdatePacket::write(DataStream& ds
 
 WorldParametersUpdatePacket::WorldParametersUpdatePacket() = default;
 
-WorldParametersUpdatePacket::WorldParametersUpdatePacket(ByteArray const& parametersData) : parametersData(parametersData) {}
+WorldParametersUpdatePacket::WorldParametersUpdatePacket(ByteArray parametersData) : parametersData(std::move(parametersData)) {}
 
 std::expected<void, StarException> WorldParametersUpdatePacket::read(DataStream& ds) {
   return ds.read(parametersData);
@@ -1363,8 +1363,8 @@ std::expected<void, StarException> DisconnectAllWiresPacket::write(DataStream& d
 
 WorldClientStateUpdatePacket::WorldClientStateUpdatePacket() = default;
 
-WorldClientStateUpdatePacket::WorldClientStateUpdatePacket(ByteArray const& worldClientStateDelta)
-  : worldClientStateDelta(worldClientStateDelta) {}
+WorldClientStateUpdatePacket::WorldClientStateUpdatePacket(ByteArray worldClientStateDelta)
+  : worldClientStateDelta(std::move(worldClientStateDelta)) {}
 
 std::expected<void, StarException> WorldClientStateUpdatePacket::read(DataStream& ds) {
   return ds.read(worldClientStateDelta);

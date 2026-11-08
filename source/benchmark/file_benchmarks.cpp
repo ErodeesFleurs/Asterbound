@@ -161,7 +161,7 @@ void file_read_bytes(benchmark::State& state) {
     }
     if (!require(state, read->size() == length, "read_file returned incorrect length"))
       break;
-    benchmark::DoNotOptimize(read->ptr());
+    benchmark::DoNotOptimize(read->data());
     benchmark::DoNotOptimize(read->size());
     benchmark::ClobberMemory();
   }
@@ -203,7 +203,7 @@ void file_read_bytes_evict_advised(benchmark::State& state) {
     }
     if (!require(state, read->size() == length, "Evict-advised read returned incorrect length"))
       break;
-    benchmark::DoNotOptimize(read->ptr());
+    benchmark::DoNotOptimize(read->data());
     benchmark::DoNotOptimize(read->size());
     benchmark::ClobberMemory();
   }

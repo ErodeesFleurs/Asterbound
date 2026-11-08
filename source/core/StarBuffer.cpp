@@ -128,11 +128,11 @@ ByteArray Buffer::takeData() {
 }
 
 char* Buffer::ptr() {
-  return data().ptr();
+  return data().data();
 }
 
 char const* Buffer::ptr() const {
-  return m_bytes.ptr();
+  return m_bytes.data();
 }
 
 std::size_t Buffer::dataSize() const {
@@ -187,7 +187,7 @@ Buffer& Buffer::operator=(Buffer&& buffer) {
     return 0;
 
   std::size_t l = std::min(m_bytes.size() - pos, len);
-  std::memcpy(data.data(), m_bytes.ptr() + pos, l);
+  std::memcpy(data.data(), m_bytes.data() + pos, l);
   return l;
 }
 
@@ -202,10 +202,7 @@ Buffer& Buffer::operator=(Buffer&& buffer) {
   if (len > static_cast<std::size_t>(std::numeric_limits<StreamOffset>::max()) || pos > static_cast<std::size_t>(std::numeric_limits<StreamOffset>::max()) - len)
     return std::unexpected(IOException("Error, write position out of range"));
 
-  if (pos + len > m_bytes.size())
-    m_bytes.resize(pos + len);
-
-  std::memcpy(m_bytes.ptr() + pos, data.data(), len);
+  m_bytes.write_from(data, pos);
   return len;
 }
 

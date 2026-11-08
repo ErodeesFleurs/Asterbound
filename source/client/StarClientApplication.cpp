@@ -584,7 +584,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     ImFontConfig config{};
     config.FontDataOwnedByAtlas = false;
     config.FontLoaderFlags = ImGuiFreeTypeLoaderFlags_ForceAutoHint;
-    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.ptr(), m_immediateFont.size(),
+    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.data(), m_immediateFont.size(),
       16, &config, io.Fonts->GetGlyphRangesDefault());
   }
   auto minScale = assets->json("/interface.config:minInterfaceScale").and_then([](Json j) { return j.toFloat(); });

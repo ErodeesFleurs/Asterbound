@@ -102,7 +102,7 @@ TEST(FileTest, ClonePreservesTruncatedFileAndIndependentPosition) {
   auto opened = File::open(path, IOMode::ReadWrite | IOMode::Truncate | IOMode::Append);
   ASSERT_TRUE(opened);
   auto& file = **opened;
-  auto payload = ByteArray::fromCString("0123456789abcdef");
+  auto payload = ByteArray::from_string("0123456789abcdef");
   ASSERT_TRUE(file.write_full(payload.span()));
   ASSERT_TRUE(file.seek(5));
   auto cloned = file.clone();
@@ -114,7 +114,7 @@ TEST(FileTest, ClonePreservesTruncatedFileAndIndependentPosition) {
   EXPECT_FALSE((*cloned)->mode() & IOMode::Append);
   char bytes[4]{};
   ASSERT_TRUE((*cloned)->read_full(bytes));
-  EXPECT_EQ(ByteArray(bytes), ByteArray::fromCString("5678"));
+  EXPECT_EQ(ByteArray(bytes), ByteArray::from_string("5678"));
   EXPECT_EQ(file.pos(), 5);
   EXPECT_EQ((*cloned)->pos(), 9);
   ASSERT_TRUE(file.seek(2));
@@ -141,7 +141,7 @@ TEST(FileTest, CloneDoesNotRecreateAnUnlinkedOriginal) {
   EXPECT_EQ((*opened)->pos(), 4);
   char bytes[4]{};
   ASSERT_TRUE((*opened)->read_full_absolute(0, bytes));
-  EXPECT_EQ(ByteArray(bytes), ByteArray::fromCString("kept"));
+  EXPECT_EQ(ByteArray(bytes), ByteArray::from_string("kept"));
   EXPECT_TRUE((*opened)->close());
   // Windows keeps a delete-pending directory entry until the last handle closes.
   EXPECT_EQ(File::exists(path), false);
@@ -575,7 +575,7 @@ TEST(FileTest, RemoveDirectoryRecursiveHandlesSymlinkLoops) {
 }
 
 TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
-  Buffer device(ByteArray::fromCString("abcdef"));
+  Buffer device(ByteArray::from_string("abcdef"));
   auto adapterResult = IODeviceCallbacks::create(device);
   ASSERT_TRUE(adapterResult);
   auto adapter = std::move(*adapterResult);
@@ -585,7 +585,7 @@ TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
   char output[4]{};
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 2u);
   EXPECT_FALSE(adapter.takeError());
-  EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::fromCString("abcd"));
+  EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::from_string("abcd"));
   EXPECT_EQ(callbacks.tell_func(&adapter), 4);
   EXPECT_FALSE(adapter.takeError());
 
@@ -595,7 +595,7 @@ TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
   EXPECT_FALSE(adapter.takeError());
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 2u);
   EXPECT_FALSE(adapter.takeError());
-  EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::fromCString("cdef"));
+  EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::from_string("cdef"));
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 0u);
   EXPECT_FALSE(adapter.takeError());
 }

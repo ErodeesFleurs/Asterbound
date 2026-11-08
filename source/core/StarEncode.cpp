@@ -221,10 +221,12 @@ String hexEncode(ByteArray const& data) {
 }
 
 std::expected<ByteArray, StarException> hexDecode(String const& encodedData) {
-  ByteArray res(encodedData.utf8_size() / 2, 0);
+  ByteArray res;
+  res.resize(encodedData.utf8_size() / 2);
   auto decoded = hexDecode(encodedData.utf8(), res.span());
   if (!decoded)
     return std::unexpected(std::move(decoded.error()));
+  res.resize(*decoded);
   return res;
 }
 
@@ -233,7 +235,9 @@ String base64Encode(ByteArray const& data) {
 }
 
 std::expected<ByteArray, StarException> base64Decode(String const& encodedData) {
-  ByteArray res((encodedData.utf8_size() + 3) / 4 * 3, 0);
+  ByteArray res;
+  auto encodedSize = encodedData.utf8_size();
+  res.resize((encodedSize / 4 + (encodedSize % 4 != 0)) * 3);
   auto decoded = base64Decode(encodedData.utf8(), res.span());
   if (!decoded)
     return std::unexpected(std::move(decoded.error()));

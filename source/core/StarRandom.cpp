@@ -180,7 +180,7 @@ std::expected<std::uint64_t, StarException> produceRandomSeed() {
   if (!entropy)
     return std::unexpected(std::move(entropy.error()));
   std::uint64_t random;
-  std::memcpy(&random, entropy->ptr(), sizeof(random));
+  std::memcpy(&random, entropy->data(), sizeof(random));
   return static_cast<std::uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count())
       * 1099511628211ULL ^ random;
 }

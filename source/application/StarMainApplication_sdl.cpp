@@ -2040,7 +2040,7 @@ private:
     auto request = [](void* userdata, const char* mime_type, std::size_t* size) -> const void* {
       if (auto entry = static_cast<StringMap<ByteArray>*>(userdata)->find_ref(String(std::string_view(mime_type)))) {
         *size = entry->get().size();
-        return entry->get().ptr();
+        return entry->get().data();
       }
       *size = 0;
       return NULL;

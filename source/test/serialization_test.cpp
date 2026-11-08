@@ -205,6 +205,64 @@ TEST(BufferTest, SpanTransfersRespectSlicesShortReadsAndAbsolutePositions) {
   EXPECT_EQ(buffer.pos(), 3);
 }
 
+TEST(BufferTest, SelfSpanWritesHandleBothOverlapDirectionsAndMovingGrowth) {
+  Buffer buffer(ByteArray::from_string("abcdef"));
+  auto forward = buffer.write_absolute(1, buffer.data().span().first(5));
+  ASSERT_TRUE(forward) << forward.error().what();
+  EXPECT_EQ(*forward, 5u);
+  EXPECT_EQ(buffer.data(), ByteArray::from_string("aabcde"));
+  EXPECT_EQ(buffer.pos(), 0);
+
+  buffer.reset(ByteArray::from_string("abcdef"));
+  auto backward = buffer.write_absolute(0, buffer.data().span().subspan(1));
+  ASSERT_TRUE(backward) << backward.error().what();
+  EXPECT_EQ(*backward, 5u);
+  EXPECT_EQ(buffer.data(), ByteArray::from_string("bcdeff"));
+
+  buffer.reset(ByteArray::from_string("abcdef"));
+  ASSERT_TRUE(buffer.seek(3));
+  auto overlappingGrowth = buffer.write(buffer.data().span().first(5));
+  ASSERT_TRUE(overlappingGrowth) << overlappingGrowth.error().what();
+  EXPECT_EQ(*overlappingGrowth, 5u);
+  EXPECT_EQ(buffer.data(), ByteArray::from_string("abcabcde"));
+  EXPECT_EQ(buffer.pos(), 8);
+
+  auto retained = buffer.data();
+  auto destination = buffer.data().capacity() + 17;
+  auto growing = buffer.write_absolute(destination, buffer.data().span().subspan(2, 4));
+  ASSERT_TRUE(growing) << growing.error().what();
+  EXPECT_EQ(*growing, 4u);
+  EXPECT_EQ(buffer.data().size(), destination + 4);
+  EXPECT_EQ(ByteArray(buffer.data().span().first(retained.size())), retained);
+  EXPECT_EQ(ByteArray(buffer.data().span().last(4)), ByteArray::from_string("cabc"));
+  EXPECT_EQ(buffer.pos(), 8);
+}
+
+TEST(BufferTest, SelfSpanWriteKeepsZeroLengthModeAndArithmeticPrecedence) {
+  Buffer buffer(ByteArray::from_string("abcdef"));
+  auto original = buffer.data();
+  ASSERT_TRUE(buffer.open(IOMode::Read));
+  auto empty = buffer.write_absolute(std::numeric_limits<StreamOffset>::max(), {});
+  ASSERT_TRUE(empty);
+  EXPECT_EQ(*empty, 0u);
+  auto modeFailure = buffer.write_absolute(std::numeric_limits<StreamOffset>::max(), buffer.data().span());
+  ASSERT_FALSE(modeFailure);
+  EXPECT_TRUE(modeFailure.error().is<EofException>());
+  EXPECT_EQ(buffer.data(), original);
+  EXPECT_EQ(buffer.pos(), 0);
+
+  ASSERT_TRUE(buffer.open(IOMode::ReadWrite));
+  auto rangeFailure = buffer.write_absolute(std::numeric_limits<StreamOffset>::max(), buffer.data().span());
+  ASSERT_FALSE(rangeFailure);
+  EXPECT_TRUE(rangeFailure.error().is<IOException>());
+  EXPECT_FALSE(rangeFailure.error().is<EofException>());
+  EXPECT_EQ(buffer.data(), original);
+  EXPECT_EQ(buffer.pos(), 0);
+  auto negativeEmpty = buffer.write_absolute(-1, {});
+  ASSERT_FALSE(negativeEmpty);
+  EXPECT_TRUE(negativeEmpty.error().is<IOException>());
+}
+
 TEST(DataStreamTest, ExternalSpanBorrowsSlicesAndResetRewinds) {
   std::array<char, 4> bytes{0x10, 0x20, 0x30, 0x40};
   DataStreamExternalBuffer stream{std::span<char const>(bytes).subspan(1, 2)};

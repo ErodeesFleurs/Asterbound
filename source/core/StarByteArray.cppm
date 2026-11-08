@@ -7,6 +7,13 @@ import star.format;
 
 namespace Star {
 
+// The callback is borrowed and invoked as an lvalue; byte assignment permits
+// normal integral promotions without requiring a copyable or pure callback.
+template <class Combiner>
+concept byte_combiner = requires(Combiner& combine, char& output) {
+  output = combine(char{}, char{});
+};
+
 // Class to hold an array of bytes.  Contains an internal buffer that may be
 // larger than what is reported by size(), to avoid repeated allocations when a
 // ByteArray grows.
@@ -17,9 +24,9 @@ public:
   using const_iterator = char const*;
 
   // Constructs bytes from text without or with a trailing NUL byte.
-  static ByteArray fromCString(std::string_view str);
-  static ByteArray fromCStringWithNull(std::string_view str);
-  static ByteArray withReserve(std::size_t capacity);
+  static ByteArray from_string(std::string_view str);
+  static ByteArray from_string_with_null(std::string_view str);
+  static ByteArray with_reserve(std::size_t capacity);
 
   ByteArray();
   ByteArray(std::size_t dataSize, char c);
@@ -31,14 +38,19 @@ public:
   ByteArray& operator=(ByteArray const& b);
   ByteArray& operator=(ByteArray&& b) noexcept;
 
-  char const* ptr() const;
-  char* ptr();
-  std::span<char const> span() const { return {m_data, m_size}; }
-  std::span<char> span() { return {m_data, m_size}; }
+  char const* data() const & noexcept;
+  char* data() & noexcept;
+  char const* data() const && = delete;
+  std::span<char const> span() const & noexcept { return {m_data, m_size}; }
+  std::span<char> span() & noexcept { return {m_data, m_size}; }
+  std::span<char const> span() const && = delete;
 
   std::size_t size() const;
   // Maximum size before realloc
   std::size_t capacity() const;
+  static constexpr std::size_t max_size() noexcept {
+    return static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
+  }
   // Is zero size
   bool empty() const;
 
@@ -48,6 +60,7 @@ public:
   void reset();
 
   void reserve(std::size_t capacity);
+  void shrink_to_fit();
 
   void resize(std::size_t size);
   // resize, filling new space with given byte if it exists.
@@ -60,54 +73,60 @@ public:
 
   void append(ByteArray const& b);
   void append(std::span<char const> data);
-  void appendByte(char b);
+  void push_back(char byte);
 
-  void copyTo(std::span<char> data) const;
+  void copy_to(std::span<char> data) const;
 
   // Copy from ByteArray starting at pos, clamped to the destination range.
-  void copyTo(std::span<char> data, std::size_t pos) const;
-  // Copy the range to ByteArray at pos, resizing if needed.
-  void writeFrom(std::span<char const> data, std::size_t pos);
+  void copy_to(std::span<char> data, std::size_t pos) const;
+  // Aliased sources retain their offset across growth; overlapping writes work.
+  void write_from(std::span<char const> data, std::size_t pos);
 
-  ByteArray sub(std::size_t b, std::size_t s) const;
-  ByteArray left(std::size_t s) const;
-  ByteArray right(std::size_t s) const;
+  ByteArray substr(std::size_t pos, std::size_t count) const;
 
-  void trimLeft(std::size_t s);
-  void trimRight(std::size_t s);
+  void remove_prefix(std::size_t count);
+  void remove_suffix(std::size_t count);
 
   // returns location of first character that is different than the given
   // ByteArray.
-  std::size_t diffChar(ByteArray const& b) const;
+  std::size_t mismatch_index(ByteArray const& b) const;
   // returns -1 if this < b, 0 if this == b, 1 if this > b
   int compare(ByteArray const& b) const;
 
-  template <typename Combiner>
-  ByteArray combineWith(Combiner&& combine, ByteArray const& rhs, bool extend = false);
+  template <byte_combiner Combiner>
+  ByteArray combine(Combiner&& combine, ByteArray const& rhs, bool extend = false) const;
 
-  ByteArray andWith(ByteArray const& rhs, bool extend = false);
-  ByteArray orWith(ByteArray const& rhs, bool extend = false);
-  ByteArray xorWith(ByteArray const& rhs, bool extend = false);
+  ByteArray bit_and(ByteArray const& rhs, bool extend = false) const;
+  ByteArray bit_or(ByteArray const& rhs, bool extend = false) const;
+  ByteArray bit_xor(ByteArray const& rhs, bool extend = false) const;
 
-  iterator begin();
-  iterator end();
-
-  const_iterator begin() const;
-  const_iterator end() const;
+  iterator begin() & noexcept;
+  iterator end() & noexcept;
+  const_iterator begin() const & noexcept;
+  const_iterator end() const & noexcept;
+  const_iterator begin() const && = delete;
+  const_iterator end() const && = delete;
 
   void insert(std::size_t pos, char byte);
-  iterator insert(const_iterator pos, char byte);
-  void push_back(char byte);
+  iterator insert(const_iterator pos, char byte) &;
+  iterator insert(const_iterator pos, char byte) && = delete;
 
   char& operator[](std::size_t i);
   char operator[](std::size_t i) const;
-  [[nodiscard]] std::expected<std::reference_wrapper<char const>, StarException> at(std::size_t i) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<char const>, StarException> at(std::size_t i) const &;
+  std::expected<std::reference_wrapper<char const>, StarException> at(std::size_t) const && = delete;
 
   bool operator<(ByteArray const& b) const;
   bool operator==(ByteArray const& b) const;
   bool operator!=(ByteArray const& b) const;
 
 private:
+  static std::size_t checked_size_sum(std::size_t pos, std::size_t count) {
+    if (pos > max_size() || count > max_size() - pos)
+      Star::fatal_error("ByteArray size exceeds max_size", false);
+    return pos + count;
+  }
+
   char* m_data;
   std::size_t m_capacity;
   std::size_t m_size;
@@ -125,7 +144,8 @@ inline void ByteArray::clear() {
 }
 
 inline void ByteArray::resize(std::size_t size) {
-  reserve(size);
+  if (size > m_capacity)
+    reserve(size);
   m_size = size;
 }
 
@@ -134,30 +154,24 @@ inline void ByteArray::append(ByteArray const& b) {
 }
 
 inline void ByteArray::append(std::span<char const> data) {
-  auto len = data.size();
-  // memcpy with a null pointer (an empty ByteArray) and a length of 0 is still
-  // undefined behaviour, and both sides can be null here.
-  if (len == 0)
-    return;
-
-  resize(m_size + len);
-  std::memcpy(m_data + m_size - len, data.data(), len);
+  write_from(data, m_size);
 }
 
-inline void ByteArray::appendByte(char b) {
-  resize(m_size + 1);
-  m_data[m_size - 1] = b;
+inline void ByteArray::push_back(char byte) {
+  if (m_size == m_capacity)
+    reserve(checked_size_sum(m_size, 1));
+  m_data[m_size++] = byte;
 }
 
 inline bool ByteArray::empty() const {
   return m_size == 0;
 }
 
-inline char const* ByteArray::ptr() const {
+inline char const* ByteArray::data() const & noexcept {
   return m_data;
 }
 
-inline char* ByteArray::ptr() {
+inline char* ByteArray::data() & noexcept {
   return m_data;
 }
 
@@ -169,71 +183,73 @@ inline std::size_t ByteArray::capacity() const {
   return m_capacity;
 }
 
-inline void ByteArray::copyTo(std::span<char> data) const {
+inline void ByteArray::copy_to(std::span<char> data) const {
   auto len = std::min(m_size, data.size());
   if (len == 0)
     return;
 
-  std::memcpy(data.data(), m_data, len);
+  std::memmove(data.data(), m_data, len);
 }
 
-inline void ByteArray::copyTo(std::span<char> data, std::size_t pos) const {
+inline void ByteArray::copy_to(std::span<char> data, std::size_t pos) const {
   auto len = data.size();
   if (len == 0 || pos >= m_size)
     return;
 
   len = std::min(m_size - pos, len);
-  std::memcpy(data.data(), m_data + pos, len);
+  std::memmove(data.data(), m_data + pos, len);
 }
 
-inline void ByteArray::writeFrom(std::span<char const> data, std::size_t pos) {
-  auto len = data.size();
-  // Also avoids computing 'm_data + pos' for an empty array.
-  if (len == 0)
+inline void ByteArray::write_from(std::span<char const> data, std::size_t pos) {
+  auto count = data.size();
+  if (count == 0)
     return;
-
-  if (pos + len > m_size)
-    resize(pos + len);
-
-  std::memcpy(m_data + pos, data.data(), len);
-}
-
-template <typename Combiner>
-ByteArray ByteArray::combineWith(Combiner&& combine, ByteArray const& rhs, bool extend) {
-  auto smallerArray = std::cref(rhs);
-  auto largerArray = std::cref(*this);
-
-  if (m_size < rhs.size())
-    std::swap(smallerArray, largerArray);
-
-  ByteArray res;
-  res.resize(smallerArray.get().size());
-
-  for (std::size_t i = 0; i < smallerArray.get().size(); ++i)
-    res[i] = combine(smallerArray.get()[i], largerArray.get()[i]);
-
-  if (extend) {
-    res.resize(largerArray.get().size());
-    for (std::size_t i = smallerArray.get().size(); i < largerArray.get().size(); ++i)
-      res[i] = largerArray.get()[i];
+  auto stop = checked_size_sum(pos, count);
+  auto source = data.data();
+  if (stop > m_capacity) {
+    // Address arithmetic avoids subtracting pointers from unrelated objects.
+    // Sources may also refer to initialized bytes in our reserved tail.
+    auto address = reinterpret_cast<std::uintptr_t>(source);
+    auto base = reinterpret_cast<std::uintptr_t>(m_data);
+    auto offset = address - base;
+    bool internal = m_data && address >= base && offset < m_capacity;
+    resize(stop);
+    if (internal)
+      source = m_data + offset;
+  } else if (stop > m_size) {
+    m_size = stop;
   }
-
-  return res;
+  std::memmove(m_data + pos, source, count);
 }
 
-inline ByteArray::iterator ByteArray::begin() {
+template <byte_combiner Combiner>
+ByteArray ByteArray::combine(Combiner&& combine, ByteArray const& rhs, bool extend) const {
+  auto smaller = rhs.span();
+  auto larger = span();
+  if (larger.size() < smaller.size())
+    std::swap(smaller, larger);
+  ByteArray result;
+  result.resize(extend ? larger.size() : smaller.size());
+  for (std::size_t i = 0; i < smaller.size(); ++i)
+    result[i] = combine(char(smaller[i]), char(larger[i]));
+  if (extend && larger.size() != smaller.size())
+    std::memcpy(result.m_data + smaller.size(), larger.data() + smaller.size(), larger.size() - smaller.size());
+  return result;
+}
+
+inline ByteArray::iterator ByteArray::begin() & noexcept {
   return m_data;
 }
 
-inline ByteArray::iterator ByteArray::end() {
+inline ByteArray::iterator ByteArray::end() & noexcept {
   return m_data + m_size;
 }
 
-inline ByteArray::const_iterator ByteArray::begin() const {
+inline ByteArray::const_iterator ByteArray::begin() const & noexcept {
   return m_data;
 }
 
-inline ByteArray::const_iterator ByteArray::end() const {
+inline ByteArray::const_iterator ByteArray::end() const & noexcept {
   return m_data + m_size;
 }
 
@@ -251,7 +267,7 @@ inline char ByteArray::operator[](std::size_t i) const {
   return m_data[i];
 }
 
-[[nodiscard]] inline std::expected<std::reference_wrapper<char const>, StarException> ByteArray::at(std::size_t i) const {
+[[nodiscard]] inline std::expected<std::reference_wrapper<char const>, StarException> ByteArray::at(std::size_t i) const & {
   if (i >= m_size)
     return std::unexpected(OutOfRangeException(Star::format("Out of range in ByteArray::at({})", i)));
 
@@ -273,6 +289,7 @@ export template <> struct std::formatter<Star::ByteArray> : Star::TextFormatter 
 
 export namespace Star {
   using ::Star::ByteArray;
+  using ::Star::byte_combiner;
   using ::Star::hash;
   using ::Star::write_text;
 }

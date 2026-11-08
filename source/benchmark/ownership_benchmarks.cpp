@@ -287,7 +287,7 @@ ByteArray makeWave(std::size_t frames) {
   auto text = [&](std::string_view value) { bytes.append(std::span(value).first(4)); };
   auto le = [&](std::uint32_t value, unsigned width) {
     for (unsigned i = 0; i != width; ++i)
-      bytes.appendByte(static_cast<char>((value >> (8 * i)) & 255));
+      bytes.push_back(static_cast<char>((value >> (8 * i)) & 255));
   };
   text("RIFF"); le(static_cast<std::uint32_t>(36 + frames * 2), 4);
   text("WAVE"); text("fmt "); le(16, 4); le(1, 2); le(1, 2);

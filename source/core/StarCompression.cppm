@@ -73,7 +73,6 @@ std::expected<void, StarException> inflateData(std::span<char const> in, ByteArr
   if (!inLen)
     return {};
   constexpr std::size_t BufferSize = 32 * 1024;
-  auto buffer = std::make_unique<std::uint8_t[]>(BufferSize);
   zng_stream stream{};
   int status = zng_inflateInit2(&stream, windowBits);
   if (status != Z_OK)
@@ -94,16 +93,21 @@ std::expected<void, StarException> inflateData(std::span<char const> in, ByteArr
       stream.avail_in = chunk;
       consumed += chunk;
     }
-    stream.next_out = buffer.get();
+    auto committed = out.size();
+    if (BufferSize > std::numeric_limits<std::size_t>::max() - committed)
+      return std::unexpected(IOException("Decompressed output size overflow"));
+    out.reserve(committed + BufferSize);
+    stream.next_out = reinterpret_cast<std::uint8_t*>(out.data() + committed);
     stream.avail_out = BufferSize;
     auto previousInput = stream.avail_in;
     status = zng_inflate(&stream, Z_NO_FLUSH);
     if (status != Z_OK && status != Z_STREAM_END && status != Z_BUF_ERROR)
       return std::unexpected(IOException::format("Decompression error ({}): {}", status, stream.msg ? stream.msg : "no detail"));
     auto produced = BufferSize - stream.avail_out;
+    // Neither codec failures nor limit failures publish this call's writable tail.
     if (limit && produced > limit - out.size())
       return std::unexpected(IOException::format("Decompression exceeds limit of {} bytes", limit));
-    out.append(std::span{reinterpret_cast<char const*>(buffer.get()), produced});
+    out.resize(committed + produced);
     if (status != Z_STREAM_END && !produced && previousInput == stream.avail_in)
       return std::unexpected(IOException::format("Incomplete compressed data ({})", status));
   } while (status != Z_STREAM_END);
@@ -127,7 +131,6 @@ std::expected<void, StarException> compressData(ByteArray const& in, ByteArray& 
   if (in.empty())
     return {};
   constexpr std::size_t BufferSize = 32 * 1024;
-  auto buffer = std::make_unique<std::uint8_t[]>(BufferSize);
   zng_stream stream{};
   int status = zng_deflateInit(&stream, compression);
   if (status != Z_OK)
@@ -144,16 +147,20 @@ std::expected<void, StarException> compressData(ByteArray const& in, ByteArray& 
   do {
     if (!stream.avail_in && consumed < in.size()) {
       auto chunk = std::min(in.size() - consumed, std::size_t(std::numeric_limits<decltype(stream.avail_in)>::max()));
-      stream.next_in = reinterpret_cast<std::uint8_t const*>(in.ptr() + consumed);
+      stream.next_in = reinterpret_cast<std::uint8_t const*>(in.data() + consumed);
       stream.avail_in = chunk;
       consumed += chunk;
     }
-    stream.next_out = buffer.get();
+    auto committed = out.size();
+    if (BufferSize > std::numeric_limits<std::size_t>::max() - committed)
+      return std::unexpected(IOException("Compressed output size overflow"));
+    out.reserve(committed + BufferSize);
+    stream.next_out = reinterpret_cast<std::uint8_t*>(out.data() + committed);
     stream.avail_out = BufferSize;
     status = zng_deflate(&stream, consumed == in.size() ? Z_FINISH : Z_NO_FLUSH);
     if (status != Z_OK && status != Z_STREAM_END)
       return std::unexpected(IOException::format("Compression error ({}): {}", status, stream.msg ? stream.msg : "no detail"));
-    out.append(std::span{reinterpret_cast<char const*>(buffer.get()), BufferSize - stream.avail_out});
+    out.resize(committed + BufferSize - stream.avail_out);
   } while (status != Z_STREAM_END);
   owner.release();
   status = zng_deflateEnd(&stream);
@@ -163,10 +170,15 @@ std::expected<void, StarException> compressData(ByteArray const& in, ByteArray& 
 }
 
 std::expected<ByteArray, StarException> compressData(ByteArray const& in, CompressionLevel compression) {
-  ByteArray out = ByteArray::withReserve(in.size());
+  ByteArray out = ByteArray::with_reserve(in.size());
   auto result = compressData(in, out, compression);
   if (!result)
     return std::unexpected(std::move(result.error()));
+  // Judge scratch slack relative to both input reservation and actual output.
+  // Reusable caller-supplied outputs are never compacted.
+  auto retained = std::max(out.size(), in.size());
+  if (out.capacity() - retained > retained)
+    out.shrink_to_fit();
   return out;
 }
 
@@ -179,6 +191,8 @@ std::expected<ByteArray, StarException> uncompressData(std::span<char const> in,
   auto result = uncompressData(in, out, limit);
   if (!result)
     return std::unexpected(std::move(result.error()));
+  if (out.capacity() - out.size() > out.size())
+    out.shrink_to_fit();
   return out;
 }
 
@@ -199,6 +213,8 @@ std::expected<ByteArray, StarException> uncompressDataGzip(std::span<char const>
   auto result = uncompressDataGzip(in, out, limit);
   if (!result)
     return std::unexpected(std::move(result.error()));
+  if (out.capacity() - out.size() > out.size())
+    out.shrink_to_fit();
   return out;
 }
 

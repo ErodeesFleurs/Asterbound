@@ -1206,7 +1206,7 @@ namespace Star {
     }
 
     if (auto buffer = m_uncommittedWrites.find_ref(blockIndex)) {
-      buffer->get().copyTo(block, blockOffset);
+      buffer->get().copy_to(block, blockOffset);
     } else {
       return m_device->read_full_absolute(
         HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize) + blockOffset, block);
@@ -1243,7 +1243,7 @@ namespace Star {
       buffer = m_uncommittedWrites.emplace(blockIndex, std::move(*result214)).first;
     }
 
-    buffer->second.writeFrom(block, blockOffset);
+    buffer->second.write_from(block, blockOffset);
     return {};
   }
 

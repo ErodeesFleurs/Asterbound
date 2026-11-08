@@ -348,7 +348,10 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
         return std::unexpected(std::move(bodyWritten.error()));
       m_outgoingStats.mix(packetType, packetBuffer.size(), false);
     }
-    m_outputBuffer.append(outBuffer.span());
+    if (m_outputBuffer.empty())
+      m_outputBuffer = outBuffer.takeData();
+    else
+      m_outputBuffer.append(outBuffer.span());
   } else {
     while (it != packets.end()) {
       PacketType currentType = (*it)->type();
@@ -403,7 +406,10 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
           return std::unexpected(std::move(bodyWritten.error()));
         m_outgoingStats.mix(currentType, packetBuffer.size(), true);
       }
-      m_outputBuffer.append(outBuffer.takeData());
+      if (m_outputBuffer.empty())
+        m_outputBuffer = outBuffer.takeData();
+      else
+        m_outputBuffer.append(outBuffer.span());
     }
   }
   return {};
@@ -503,7 +509,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       } while (true);
     }
     if (trimPos)
-      m_inputBuffer.trimLeft(trimPos);
+      m_inputBuffer.remove_prefix(trimPos);
     return {};
   };
   auto parsed = parse();
@@ -527,6 +533,8 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
   if (!isOpen())
     return false;
   bool dataSent = false;
+  std::size_t compressedConsumed = 0;
+  std::size_t plainConsumed = 0;
   auto write = [&]() -> std::expected<void, StarException> {
     if (compressionStreamEnabled() && !m_outputBuffer.empty()) {
       auto compressed = m_compressionStream->compress(m_outputBuffer, m_compressedOutputBuffer);
@@ -535,28 +543,34 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
       m_outputBuffer.clear();
     }
     // Drain any previously compressed tail even after a mode change.
-    while (!m_compressedOutputBuffer.empty()) {
-      auto written = m_socket->send(m_compressedOutputBuffer.span());
+    while (compressedConsumed < m_compressedOutputBuffer.size()) {
+      auto written = m_socket->send(m_compressedOutputBuffer.span().subspan(compressedConsumed));
       if (!written)
         return std::unexpected(std::move(written.error()));
       if (*written == 0)
         return {};
       dataSent = true;
-      m_compressedOutputBuffer.trimLeft(*written);
+      compressedConsumed += *written;
       m_outgoingStats.mix(*written);
     }
-    while (!m_outputBuffer.empty()) {
-      auto written = m_socket->send(m_outputBuffer.span());
+    while (plainConsumed < m_outputBuffer.size()) {
+      auto written = m_socket->send(m_outputBuffer.span().subspan(plainConsumed));
       if (!written)
         return std::unexpected(std::move(written.error()));
       if (*written == 0)
         break;
       dataSent = true;
-      m_outputBuffer.trimLeft(*written);
+      plainConsumed += *written;
     }
     return {};
   };
   auto written = write();
+  // Commit successful sends even when a later send stops or fails. Compact
+  // each queue only once per drain, never after every partial native write.
+  if (compressedConsumed)
+    m_compressedOutputBuffer.remove_prefix(compressedConsumed);
+  if (plainConsumed)
+    m_outputBuffer.remove_prefix(plainConsumed);
   if (!written) {
     if (written.error().is<SocketClosedException>()) {
       auto logged = m_logger.debug("TcpPacketSocket socket closed: {}", Star::output_exception(written.error(), false));
@@ -758,18 +772,19 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
       if (!position)
         return std::unexpected(std::move(position.error()));
       std::size_t packetSize = ds.size() - *position;
-      auto readBytes = ds.read_bytes(packetSize);
-      if (!readBytes)
-        return std::unexpected(std::move(readBytes.error()));
-      ByteArray packetBytes = std::move(*readBytes);
+      if (packetSize > std::size_t(std::numeric_limits<std::ptrdiff_t>::max()))
+        return std::unexpected(DataStreamException("Byte stream request exceeds addressable size"));
+      auto packetBytes = ds.span().subspan(*position);
+      ByteArray uncompressed;
       if (*compressed) {
         auto decoded = uncompressData(packetBytes);
         if (!decoded)
           return std::unexpected(std::move(decoded.error()));
-        packetBytes = std::move(*decoded);
+        uncompressed = std::move(*decoded);
+        packetBytes = uncompressed.span();
       }
       m_incomingStats.mix(*type, packetSize, !compressionStreamEnabled());
-      DataStreamExternalBuffer packetStream{std::span<char const>(packetBytes)};
+      DataStreamExternalBuffer packetStream{packetBytes};
       packetStream.setStreamCompatibilityVersion(netRules());
       do {
         auto created = createPacket(*type);

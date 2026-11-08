@@ -615,7 +615,7 @@ struct WorldParametersUpdatePacket : PacketBase<PacketType::WorldParametersUpdat
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<WorldParametersUpdatePacket>(); }
 
   WorldParametersUpdatePacket();
-  WorldParametersUpdatePacket(ByteArray const& parametersData);
+  WorldParametersUpdatePacket(ByteArray parametersData);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -952,7 +952,7 @@ struct WorldClientStateUpdatePacket : PacketBase<PacketType::WorldClientStateUpd
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<WorldClientStateUpdatePacket>(); }
 
   WorldClientStateUpdatePacket();
-  WorldClientStateUpdatePacket(ByteArray const& worldClientStateDelta);
+  WorldClientStateUpdatePacket(ByteArray worldClientStateDelta);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;

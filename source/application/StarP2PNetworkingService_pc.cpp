@@ -419,7 +419,7 @@ std::expected<bool, StarException> PcP2PNetworkingService::SteamP2PSocket::sendM
     return false;
 
   if (!SteamAPI_ISteamNetworking_SendP2PPacket(SteamAPI_SteamNetworking(), steamId.ConvertToUint64(),
-      message.ptr(), message.size(), k_EP2PSendReliable, 0))
+      message.data(), message.size(), k_EP2PSendReliable, 0))
     return std::unexpected(ApplicationException("SteamNetworking::SendP2PPacket unexpectedly returned false"));
   return true;
 }
@@ -525,7 +525,7 @@ std::expected<void, StarException> PcP2PNetworkingService::steamReceiveAll() {
   CSteamID messageRemoteUser;
   while (SteamAPI_ISteamNetworking_IsP2PPacketAvailable(SteamAPI_SteamNetworking(), &messageSize, 0)) {
     ByteArray data(messageSize, 0);
-    if (!SteamAPI_ISteamNetworking_ReadP2PPacket(SteamAPI_SteamNetworking(), data.ptr(), messageSize,
+    if (!SteamAPI_ISteamNetworking_ReadP2PPacket(SteamAPI_SteamNetworking(), data.data(), messageSize,
         &messageSize, &messageRemoteUser, 0))
       return std::unexpected(ApplicationException("SteamNetworking::ReadP2PPacket returned false"));
     data.resize(messageSize);
@@ -563,7 +563,7 @@ std::expected<bool, StarException> PcP2PNetworkingService::DiscordP2PSocket::sen
   if (!lifetime->service || mode != DiscordSocketMode::Connected)
     return false;
 
-  discord::Result res = state->discordCore->LobbyManager().SendNetworkMessage(lobbyId, remoteUserId, DiscordMainNetworkChannel, (std::uint8_t*)message.ptr(), message.size());
+  discord::Result res = state->discordCore->LobbyManager().SendNetworkMessage(lobbyId, remoteUserId, DiscordMainNetworkChannel, (std::uint8_t*)message.data(), message.size());
   if (res != discord::Result::Ok)
     return std::unexpected(ApplicationException::format("discord::Network::Send returned error (err {})", (int)res));
 

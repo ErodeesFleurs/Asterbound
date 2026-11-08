@@ -9,17 +9,20 @@ import star.encode;
 import star.algorithm;
 namespace Star {
 
-ByteArray ByteArray::fromCString(std::string_view str) {
+ByteArray ByteArray::from_string(std::string_view str) {
   return ByteArray(std::span<char const>(str));
 }
 
-ByteArray ByteArray::fromCStringWithNull(std::string_view str) {
-  ByteArray ba{std::span<char const>(str)};
-  ba.appendByte(0);
+ByteArray ByteArray::from_string_with_null(std::string_view str) {
+  ByteArray ba;
+  ba.resize(checked_size_sum(str.size(), 1));
+  if (!str.empty())
+    std::memcpy(ba.m_data, str.data(), str.size());
+  ba.m_data[str.size()] = 0;
   return ba;
 }
 
-ByteArray ByteArray::withReserve(std::size_t capacity) {
+ByteArray ByteArray::with_reserve(std::size_t capacity) {
   ByteArray bytes;
   bytes.reserve(capacity);
   return bytes;
@@ -38,12 +41,13 @@ ByteArray::ByteArray(std::size_t dataSize, char c)
 
 ByteArray::ByteArray(std::span<char const> data)
   : ByteArray() {
-  append(data);
+  resize(data.size());
+  if (!data.empty())
+    std::memcpy(m_data, data.data(), data.size());
 }
 
 ByteArray::ByteArray(ByteArray const& b)
-  : ByteArray() {
-  operator=(b);
+  : ByteArray(b.span()) {
 }
 
 ByteArray::ByteArray(ByteArray&& b) noexcept
@@ -57,8 +61,9 @@ ByteArray::~ByteArray() {
 
 ByteArray& ByteArray::operator=(ByteArray const& b) {
   if (&b != this) {
-    clear();
-    append(b);
+    resize(b.m_size);
+    if (m_size != 0)
+      std::memcpy(m_data, b.m_data, m_size);
   }
 
   return *this;
@@ -86,6 +91,8 @@ void ByteArray::reset() {
 }
 
 void ByteArray::reserve(std::size_t newCapacity) {
+  if (newCapacity > max_size())
+    Star::fatal_error("ByteArray capacity exceeds max_size", false);
   if (newCapacity > m_capacity) {
     if (!m_data) {
       auto newMem = static_cast<char*>(Star::malloc(newCapacity));
@@ -94,13 +101,26 @@ void ByteArray::reserve(std::size_t newCapacity) {
       m_data = newMem;
       m_capacity = newCapacity;
     } else {
-      newCapacity = std::max({m_capacity * 2, newCapacity, static_cast<std::size_t>(8)});
+      auto grown = m_capacity > max_size() / 2 ? max_size() : m_capacity * 2;
+      newCapacity = std::max({grown, newCapacity, static_cast<std::size_t>(8)});
       auto newMem = static_cast<char*>(Star::realloc(m_data, newCapacity));
       if (!newMem)
         Star::fatal_error("Could not allocate ByteArray capacity", false);
       m_data = newMem;
       m_capacity = newCapacity;
     }
+  }
+}
+
+void ByteArray::shrink_to_fit() {
+  if (m_size == 0) {
+    reset();
+  } else if (m_capacity != m_size) {
+    auto memory = static_cast<char*>(Star::realloc(m_data, m_size));
+    if (!memory)
+      Star::fatal_error("Could not shrink ByteArray capacity", false);
+    m_data = memory;
+    m_capacity = m_size;
   }
 }
 
@@ -128,7 +148,7 @@ void ByteArray::fill(char c) {
   fill(NPos, c);
 }
 
-ByteArray ByteArray::sub(std::size_t b, std::size_t s) const {
+ByteArray ByteArray::substr(std::size_t b, std::size_t s) const {
   if (b == 0 && s >= m_size) {
     return ByteArray(*this);
   } else if (b >= m_size) {
@@ -140,20 +160,8 @@ ByteArray ByteArray::sub(std::size_t b, std::size_t s) const {
   }
 }
 
-ByteArray ByteArray::left(std::size_t s) const {
-  return sub(0, s);
-}
 
-ByteArray ByteArray::right(std::size_t s) const {
-  if (s > m_size)
-    s = 0;
-  else
-    s = m_size - s;
-
-  return sub(s, m_size);
-}
-
-void ByteArray::trimLeft(std::size_t s) {
+void ByteArray::remove_prefix(std::size_t s) {
   if (s >= m_size) {
     clear();
   } else {
@@ -162,14 +170,14 @@ void ByteArray::trimLeft(std::size_t s) {
   }
 }
 
-void ByteArray::trimRight(std::size_t s) {
+void ByteArray::remove_suffix(std::size_t s) {
   if (s >= m_size)
     clear();
   else
     resize(m_size - s);
 }
 
-std::size_t ByteArray::diffChar(const ByteArray& b) const {
+std::size_t ByteArray::mismatch_index(const ByteArray& b) const {
   auto size = std::min(m_size, b.size());
   if (size == 0)
     return 0;
@@ -187,49 +195,45 @@ int ByteArray::compare(const ByteArray& b) const {
   return (m_size > b.m_size) - (m_size < b.m_size);
 }
 
-ByteArray ByteArray::andWith(ByteArray const& rhs, bool extend) {
-  return combineWith([](char a, char b) { return a & b; }, rhs, extend);
+ByteArray ByteArray::bit_and(ByteArray const& rhs, bool extend) const {
+  return combine([](char a, char b) { return a & b; }, rhs, extend);
 }
 
-ByteArray ByteArray::orWith(ByteArray const& rhs, bool extend) {
-  return combineWith([](char a, char b) { return a | b; }, rhs, extend);
+ByteArray ByteArray::bit_or(ByteArray const& rhs, bool extend) const {
+  return combine([](char a, char b) { return a | b; }, rhs, extend);
 }
 
-ByteArray ByteArray::xorWith(ByteArray const& rhs, bool extend) {
-  return combineWith([](char a, char b) { return a ^ b; }, rhs, extend);
+ByteArray ByteArray::bit_xor(ByteArray const& rhs, bool extend) const {
+  return combine([](char a, char b) { return a ^ b; }, rhs, extend);
 }
 
 void ByteArray::insert(std::size_t pos, char byte) {
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((pos <= m_size));
   }
-  resize(m_size + 1);
-  for (std::size_t i = m_size - 1; i > pos; --i)
-    m_data[i] = m_data[i - 1];
+  auto old_size = m_size;
+  resize(checked_size_sum(old_size, 1));
+  std::memmove(m_data + pos + 1, m_data + pos, old_size - pos);
   m_data[pos] = byte;
 }
 
-ByteArray::iterator ByteArray::insert(const_iterator pos, char byte) {
+ByteArray::iterator ByteArray::insert(const_iterator pos, char byte) & {
   std::size_t d = pos - begin();
   insert(d, byte);
-  return begin() + d + 1;
+  return begin() + d;
 }
 
-void ByteArray::push_back(char byte) {
-  resize(m_size + 1);
-  m_data[m_size - 1] = byte;
-}
 
 bool ByteArray::operator<(const ByteArray& b) const {
   return compare(b) < 0;
 }
 
 bool ByteArray::operator==(const ByteArray& b) const {
-  return compare(b) == 0;
+  return m_size == b.m_size && (m_size == 0 || std::memcmp(m_data, b.m_data, m_size) == 0);
 }
 
 bool ByteArray::operator!=(const ByteArray& b) const {
-  return compare(b) != 0;
+  return !(*this == b);
 }
 
 void write_text(TextBuffer& buffer, ByteArray const& b) {

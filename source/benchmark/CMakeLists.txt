@@ -29,6 +29,10 @@ star_add_core_benchmark(string_benchmarks)
 star_add_core_benchmark(format_benchmarks)
 star_add_core_benchmark(error_benchmarks)
 star_add_core_benchmark(unicode_benchmarks)
+star_add_core_benchmark(byte_array_benchmarks)
+target_link_libraries(byte_array_benchmarks PRIVATE
+  zlib-ng::zlib
+  $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)
 target_sources(file_benchmarks PRIVATE
   file_asset_benchmarks.cpp file_asset_batch_benchmarks.cpp file_commit_benchmarks.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)

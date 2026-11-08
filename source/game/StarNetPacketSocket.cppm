@@ -186,6 +186,7 @@ public:
   std::optional<PacketStats> incomingStats() const override;
   std::optional<PacketStats> outgoingStats() const override;
 private:
+  friend struct SocketTestAccess;
   TcpPacketSocket(Logger& logger, std::shared_ptr<TcpSocket> socket);
 
   Logger& m_logger;
