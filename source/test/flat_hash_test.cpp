@@ -149,7 +149,7 @@ struct FlatMutablePairKey {
 };
 
 template <typename Table, typename Query>
-concept FlatLookupAvailable = requires(Table& table, Query const& query) { table.find(query); };
+concept flat_lookup_available = requires(Table& table, Query const& query) { table.find(query); };
 }// namespace
 
 TEST(FlatHashMap, ProxyReferencesPreserveStructuredBindingsAndSnapshots) {
@@ -397,10 +397,10 @@ TEST(FlatHashTable, InsertWithDoesNotConsumeFactoryOnDuplicate) {
 TEST(FlatHashTable, LookupConstraintsMatchMutableCallsAndContextualEquality) {
   using Value = std::pair<int, int>;
   using Table = FlatHashTable<Value, int, FlatMutablePairKey, FlatMutableHash, FlatMutableEqual, std::allocator<Value>>;
-  static_assert(FlatLookupAvailable<Table, int>);
-  static_assert(FlatLookupAvailable<Table const, int>);
-  static_assert(!FlatLookupAvailable<Table, std::monostate>);
-  static_assert(!FlatLookupAvailable<Table const, std::monostate>);
+  static_assert(flat_lookup_available<Table, int>);
+  static_assert(flat_lookup_available<Table const, int>);
+  static_assert(!flat_lookup_available<Table, std::monostate>);
+  static_assert(!flat_lookup_available<Table const, std::monostate>);
   Table values(0, {}, {}, {}, {});
   ASSERT_TRUE(values.insert_with(7, [] { return Value{7, 70}; }).second);
   auto found = values.find(7);
@@ -828,18 +828,18 @@ TEST(FlatHashMap, NonDefaultAlignedValueLifetime) {
 
 namespace {
 
-static_assert(MapContainer<Map<int, int>>);
-static_assert(MapContainer<HashMap<int, int>>);
-static_assert(MapContainer<StableHashMap<int, int>>);
-static_assert(!MapContainer<std::map<int, int>>);
-static_assert(!MapContainer<OrderedMap<int, int>>);
-static_assert(!MapContainer<OrderedHashMap<int, int>>);
-static_assert(SetContainer<Set<int>>);
-static_assert(SetContainer<HashSet<int>>);
-static_assert(SetContainer<StableHashSet<int>>);
-static_assert(!SetContainer<std::set<int>>);
-static_assert(!SetContainer<OrderedSet<int>>);
-static_assert(!SetContainer<OrderedHashSet<int>>);
+static_assert(map_container<Map<int, int>>);
+static_assert(map_container<HashMap<int, int>>);
+static_assert(map_container<StableHashMap<int, int>>);
+static_assert(!map_container<std::map<int, int>>);
+static_assert(!map_container<OrderedMap<int, int>>);
+static_assert(!map_container<OrderedHashMap<int, int>>);
+static_assert(set_container<Set<int>>);
+static_assert(set_container<HashSet<int>>);
+static_assert(set_container<StableHashSet<int>>);
+static_assert(!set_container<std::set<int>>);
+static_assert(!set_container<OrderedSet<int>>);
+static_assert(!set_container<OrderedHashSet<int>>);
 static_assert(std::same_as<HashMap<int, int>::Storage,
     FlatHashMap<int, int, hash<int>, std::equal_to<>, std::allocator<std::pair<int const, int>>>>);
 static_assert(std::same_as<StableHashMap<int, int>::Storage,

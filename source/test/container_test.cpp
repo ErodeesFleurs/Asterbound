@@ -218,13 +218,13 @@ TEST(ListTest, StringCopiesRetainConcreteTypeAndSourceValues) {
 }
 
 TEST(ListTest, OwningSequencesOptInWithoutStandardContainerInheritance) {
-  static_assert(SequenceContainer<List<int>>);
-  static_assert(SequenceContainer<StaticList<int, 4>>);
-  static_assert(SequenceContainer<SmallList<int, 2>>);
-  static_assert(SequenceContainer<Deque<int>>);
-  static_assert(SequenceContainer<LinkedList<int>>);
-  static_assert(SequenceContainer<StringList>);
-  static_assert(!SequenceContainer<std::vector<int>>);
+  static_assert(sequence_container<List<int>>);
+  static_assert(sequence_container<StaticList<int, 4>>);
+  static_assert(sequence_container<SmallList<int, 2>>);
+  static_assert(sequence_container<Deque<int>>);
+  static_assert(sequence_container<LinkedList<int>>);
+  static_assert(sequence_container<StringList>);
+  static_assert(!sequence_container<std::vector<int>>);
   static_assert(!std::is_base_of_v<std::vector<int>, List<int>>);
   static_assert(!std::is_base_of_v<std::deque<int>, Deque<int>>);
   static_assert(!std::is_base_of_v<std::list<int>, LinkedList<int>>);

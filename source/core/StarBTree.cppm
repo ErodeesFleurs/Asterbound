@@ -10,7 +10,7 @@ namespace Star {
   // index deletion is deliberately infallible.  Next-leaf hooks may return no
   // pointer and do nothing, leaving traversal to the index.
   template <typename Storage>
-  concept BTreeStorage = requires(Storage& storage,
+  concept btree_storage = requires(Storage& storage,
       typename Storage::Pointer pointer, typename Storage::Key key,
       typename Storage::Data data, typename Storage::Index& index,
       typename Storage::Index const& constIndex, typename Storage::Leaf& leaf,
@@ -67,7 +67,7 @@ namespace Star {
       && (!std::same_as<typename Storage::Index, typename Storage::Leaf>);
 
   // B+ tree algorithms with an owned storage policy, not a public storage API.
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   class BTree {
     public:
     using Key = typename Storage::Key;
@@ -232,7 +232,7 @@ namespace Star {
     Storage m_storage;
   };
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Key const& k) {
     if (m_storage.rootIsLeaf()) {
       auto leaf = m_storage.loadLeaf(m_storage.rootPointer());
@@ -245,7 +245,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Key const& k) -> std::expected<std::optional<Data>, StarException> {
     if (m_storage.rootIsLeaf()) {
       auto leaf = m_storage.loadLeaf(m_storage.rootPointer());
@@ -258,7 +258,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Key const& lower, Key const& upper) -> std::expected<List<std::pair<Key, Data>>, StarException> {
     DataCollector collector;
     auto result94 = forEach(lower, upper, collector);
@@ -267,7 +267,7 @@ namespace Star {
     return std::move(collector.list);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forEach(Key const& lower, Key const& upper, Visitor&& visitor) {
     if (m_storage.rootIsLeaf()) {
@@ -286,7 +286,7 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAll(Visitor&& visitor) {
     if (m_storage.rootIsLeaf()) {
@@ -305,7 +305,7 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Visitor&& visitor, ErrorHandler&& error) {
     if (m_storage.rootIsLeaf()) {
@@ -318,7 +318,7 @@ namespace Star {
     return recoverAll(*node, visitor, error);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAllNodes(Visitor&& visitor) {
     if (m_storage.rootIsLeaf()) {
@@ -334,17 +334,17 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::insert(Key k, Data data) {
     return modify(DataElement{std::move(k), std::move(data)}, InsertAction);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::remove(Key k) {
     return modify(DataElement{std::move(k), Data()}, RemoveAction);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::remove(Key const& lower, Key const& upper) -> std::expected<List<std::pair<Key, Data>>, StarException> {
     DataCollector collector;
     auto result78 = forEach(lower, upper, collector);
@@ -359,7 +359,7 @@ namespace Star {
     return std::move(collector.list);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::indexCount() {
     IndexCounter counter = {*this, 0};
     auto result77 = forAllNodes(counter);
@@ -368,7 +368,7 @@ namespace Star {
     return counter.count;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::leafCount() {
     LeafCounter counter = {*this, 0};
     auto result76 = forAllNodes(counter);
@@ -377,7 +377,7 @@ namespace Star {
     return counter.count;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::recordCount() {
     RecordCounter counter = {*this, 0};
     auto result75 = forAllNodes(counter);
@@ -386,7 +386,7 @@ namespace Star {
     return counter.count;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<std::uint32_t, StarException> BTree<Storage>::indexLevels() {
     if (m_storage.rootIsLeaf()) {
       return 0;
@@ -397,31 +397,31 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::createNewRoot() {
     auto rootPointer = m_storage.storeLeaf(m_storage.createLeaf());
     if (!rootPointer) return std::unexpected(std::move(rootPointer.error()));
     return m_storage.setNewRoot(*rootPointer, true);
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::DataCollector::operator()(Key const& k, Data const& d) {
     list.push_back({k, d});
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::RecordCounter::operator()(Index const&) {
     return true;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::RecordCounter::operator()(Leaf const& leaf) {
     count += parent.m_storage.leafElementCount(leaf);
     return true;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::IndexCounter::operator()(Index const& index) {
     ++count;
     if (parent.m_storage.indexLevel(index) == 0) {
@@ -431,12 +431,12 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::IndexCounter::operator()(Leaf const&) {
     return false;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::LeafCounter::operator()(Index const& index) {
     if (parent.m_storage.indexLevel(index) == 0) {
 
@@ -448,19 +448,19 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::LeafCounter::operator()(Leaf const&) {
     return false;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   BTree<Storage>::ModifyInfo::ModifyInfo(ModifyAction a, DataElement e)
   : targetElement(std::move(e)), action(a) {
     found = false;
     state = Done;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Index const& index, Key const& k) {
     std::size_t i = indexFind(index, k);
     if (m_storage.indexLevel(index) == 0) {
@@ -474,12 +474,12 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Leaf const& leaf, Key const& k) {
     return leafFind(leaf, k).second;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Index const& index, Key const& k) -> std::expected<std::optional<Data>, StarException> {
     std::size_t i = indexFind(index, k);
     if (m_storage.indexLevel(index) == 0) {
@@ -493,7 +493,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Leaf const& leaf, Key const& k) -> std::expected<std::optional<Data>, StarException> {
     std::pair<std::size_t, bool> res = leafFind(leaf, k);
     if (res.second) {
@@ -503,7 +503,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] auto BTree<Storage>::forEach(Index const& index, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
     std::size_t i = indexFind(index, lower);
@@ -560,7 +560,7 @@ namespace Star {
     return lastKey;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] auto BTree<Storage>::forEach(Leaf const& leaf, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
     if (m_storage.leafElementCount(leaf) == 0) {
@@ -592,7 +592,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] auto BTree<Storage>::forAll(Index const& index, Visitor&& o) -> std::expected<Key, StarException> {
     Key lastKey;
@@ -623,7 +623,7 @@ namespace Star {
     return lastKey;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] auto BTree<Storage>::forAll(Leaf const& leaf, Visitor&& o) -> std::expected<Key, StarException> {
     if (m_storage.leafElementCount(leaf) == 0) {
@@ -646,7 +646,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Index const& index, Visitor&& visitor, ErrorHandler&& error) {
     for (std::size_t i = 0; i < m_storage.indexPointerCount(index); ++i) {
@@ -674,7 +674,7 @@ namespace Star {
 
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Leaf const& leaf, Visitor&& visitor, ErrorHandler&& error) {
     for (std::size_t i = 0; i != m_storage.leafElementCount(leaf); ++i) {
@@ -685,7 +685,7 @@ namespace Star {
 
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::modify(Leaf& leafNode, ModifyInfo& info) {
     info.state = Done;
 
@@ -729,7 +729,7 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::modify(Index& indexNode, ModifyInfo& info) {
     std::size_t i = indexFind(indexNode, info.targetElement.key);
     Pointer nextPointer = m_storage.indexPointer(indexNode, i);
@@ -984,7 +984,7 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::modify(DataElement e, ModifyAction action) {
     ModifyInfo info(action, std::move(e));
 
@@ -1087,7 +1087,7 @@ namespace Star {
     return info.found;
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::getLeftKey(Index const& index) -> std::expected<Key, StarException> {
     if (m_storage.indexLevel(index) == 0) {
 
@@ -1102,7 +1102,7 @@ namespace Star {
     }
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   template <typename Visitor>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAllNodes(Index const& index, Visitor&& visitor) {
     auto result1 = visitor(index);
@@ -1134,7 +1134,7 @@ namespace Star {
     return {};
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   std::pair<std::size_t, bool> BTree<Storage>::leafFind(Leaf const& leaf, Key const& key) {
     // Return lower bound binary search result.
     std::size_t size = m_storage.leafElementCount(leaf);
@@ -1158,7 +1158,7 @@ namespace Star {
     return std::make_pair(first, first < size && !(key < m_storage.leafKey(leaf, first)));
   }
 
-  template <BTreeStorage Storage>
+  template <btree_storage Storage>
   std::size_t BTree<Storage>::indexFind(Index const& index, Key const& key) {
     // Return upper bound binary search result of range [1, size];
     std::size_t size = m_storage.indexPointerCount(index);
@@ -1188,5 +1188,5 @@ export module star.btree;
 
 export namespace Star {
   using ::Star::BTree;
-  using ::Star::BTreeStorage;
+  using ::Star::btree_storage;
 }

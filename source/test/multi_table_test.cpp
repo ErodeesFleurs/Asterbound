@@ -47,16 +47,16 @@ TEST(MultiArrayTest, All) {
 }
 
 template <typename Array>
-concept HasMutableArrayView = requires(Array& array) { array.view(); };
+concept has_mutable_array_view = requires(Array& array) { array.view(); };
 
 template <typename Array>
-concept HasTemporaryArrayView = requires(Array&& array) { std::move(array).view(); };
+concept has_temporary_array_view = requires(Array&& array) { std::move(array).view(); };
 
 TEST(MultiArrayTest, ViewsPreserveLayoutConstnessAndCheckedOwnerAccess) {
-  static_assert(HasMutableArrayView<MultiArray<int, 3>>);
-  static_assert(!HasMutableArrayView<MultiArray<bool, 3>>);
-  static_assert(!HasTemporaryArrayView<MultiArray<int, 3>>);
-  static_assert(!HasTemporaryArrayView<MultiArray<int, 3> const>);
+  static_assert(has_mutable_array_view<MultiArray<int, 3>>);
+  static_assert(!has_mutable_array_view<MultiArray<bool, 3>>);
+  static_assert(!has_temporary_array_view<MultiArray<int, 3>>);
+  static_assert(!has_temporary_array_view<MultiArray<int, 3> const>);
 
   MultiArray<int, 3> array(2, 3, 4);
   {

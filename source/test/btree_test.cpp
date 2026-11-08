@@ -538,7 +538,7 @@ struct SimpleBTreeStorage {
   List<int> deletedIndexes;
 };
 
-static_assert(BTreeStorage<SimpleBTreeStorage>);
+static_assert(btree_storage<SimpleBTreeStorage>);
 static_assert(!std::is_base_of_v<SimpleBTreeStorage, BTree<SimpleBTreeStorage>>);
 
 struct SimpleBTree : public BTree<SimpleBTreeStorage> {

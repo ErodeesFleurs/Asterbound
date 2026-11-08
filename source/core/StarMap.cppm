@@ -18,7 +18,7 @@ struct MapExceptionTag {
 using MapException = StarError<MapExceptionTag, StarException>;
 
 template <typename T>
-concept MapContainer = requires { typename std::remove_cvref_t<T>::StarMapContainerTag; }
+concept map_container = requires { typename std::remove_cvref_t<T>::StarMapContainerTag; }
     && std::same_as<typename std::remove_cvref_t<T>::StarMapContainerTag, void>;
 
 template <typename Storage, typename Key>
@@ -456,11 +456,11 @@ using MapOutputResult = std::conditional_t<
         && std::same_as<MapElementOutputResult<typename MapType::mapped_type>, std::ostream&>,
     std::ostream&, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
 
-template <MapContainer Container>
+template <map_container Container>
 std::ostream& operator<<(std::ostream& os, Container const& map)
     requires std::same_as<MapOutputResult<Container>, std::ostream&>;
 
-template <MapContainer Container>
+template <map_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& map)
     requires std::same_as<MapOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
 
@@ -490,13 +490,13 @@ template <typename MapType> MapOutputResult<MapType> print_map(std::ostream& os,
     return std::ref(os);
 }
 
-template <MapContainer Container>
+template <map_container Container>
 std::ostream& operator<<(std::ostream& os, Container const& map)
     requires std::same_as<MapOutputResult<Container>, std::ostream&> {
   return print_map(os, map);
 }
 
-template <MapContainer Container>
+template <map_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& map)
     requires std::same_as<MapOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
   return print_map(os, map);
@@ -518,7 +518,7 @@ using ::Star::HashMap;
 using ::Star::Map;
 using ::Star::map_diagnostic_error;
 using ::Star::map_diagnostic_value;
-using ::Star::MapContainer;
+using ::Star::map_container;
 using ::Star::MapException;
 using ::Star::MapExceptionTag;
 using ::Star::print_map;

@@ -16,7 +16,7 @@ struct SetExceptionTag {
 using SetException = StarError<SetExceptionTag, StarException>;
 
 template <typename T>
-concept SetContainer = requires { typename std::remove_cvref_t<T>::StarSetContainerTag; }
+concept set_container = requires { typename std::remove_cvref_t<T>::StarSetContainerTag; }
     && std::same_as<typename std::remove_cvref_t<T>::StarSetContainerTag, void>;
 
 template <typename Value, typename Compare = std::less<Value>, typename Allocator = std::allocator<Value>>
@@ -572,15 +572,15 @@ decltype(auto) setOutputValue(T const& value) {
 template <typename Container>
 using SetOutputResult = decltype(std::declval<std::ostream&>() << setOutputValue(std::declval<typename Container::value_type const&>()));
 
-template <SetContainer Container>
+template <set_container Container>
 std::ostream& operator<<(std::ostream& os, Container const& set)
     requires std::same_as<SetOutputResult<Container>, std::ostream&>;
 
-template <SetContainer Container>
+template <set_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& set)
     requires std::same_as<SetOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
 
-template <SetContainer Container>
+template <set_container Container>
 std::ostream& operator<<(std::ostream& os, Container const& set)
     requires std::same_as<SetOutputResult<Container>, std::ostream&> {
   os << "(";
@@ -591,7 +591,7 @@ std::ostream& operator<<(std::ostream& os, Container const& set)
   return os << ")";
 }
 
-template <SetContainer Container>
+template <set_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Container const& set)
     requires std::same_as<SetOutputResult<Container>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
   os << "(";
@@ -623,7 +623,7 @@ struct std::formatter<Star::StableHashSet<Value, Hash, Equals, Allocator>> : Sta
 export namespace Star {
   using ::Star::SetExceptionTag;
   using ::Star::SetException;
-  using ::Star::SetContainer;
+  using ::Star::set_container;
   using ::Star::Set;
   using ::Star::HashSet;
   using ::Star::StableHashSet;

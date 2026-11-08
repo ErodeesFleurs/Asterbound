@@ -148,32 +148,32 @@ template <typename Element>
   return ds.pread(ptr).transform([&ds] { return std::ref(ds); });
 }
 
-template <SequenceContainer Container>
+template <sequence_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Container const& list) {
   return ds.writeContainer(list).transform([&ds] { return std::ref(ds); });
 }
 
-template <SequenceContainer Container>
+template <sequence_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Container& list) {
   return ds.readContainer(list).transform([&ds] { return std::ref(ds); });
 }
 
-template <SetContainer Container>
+template <set_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Container const& set) {
   return ds.writeContainer(set).transform([&ds] { return std::ref(ds); });
 }
 
-template <SetContainer Container>
+template <set_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Container& set) {
   return ds.readContainer(set).transform([&ds] { return std::ref(ds); });
 }
 
-template <MapContainer Container>
+template <map_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Container const& map) {
   return ds.writeMapContainer(map).transform([&ds] { return std::ref(ds); });
 }
 
-template <MapContainer Container>
+template <map_container Container>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Container& map) {
   return ds.readMapContainer(map).transform([&ds] { return std::ref(ds); });
 }

@@ -16,7 +16,7 @@ namespace Star {
 
 // Only explicitly opted-in owning sequences participate in generic codecs.
 template <typename T>
-concept SequenceContainer = requires { typename std::remove_cvref_t<T>::SequenceContainerTag; }
+concept sequence_container = requires { typename std::remove_cvref_t<T>::SequenceContainerTag; }
     && std::ranges::range<T>;
 
 template <typename Left, typename Right>
@@ -75,7 +75,7 @@ template <typename Result>
 concept sequence_status = std::same_as<Result, void> || std::same_as<Result, std::expected<void, StarException>>;
 
 template <typename Sequence>
-concept sequence_alias_target = SequenceContainer<Sequence> && std::ranges::forward_range<Sequence>
+concept sequence_alias_target = sequence_container<Sequence> && std::ranges::forward_range<Sequence>
   && std::ranges::common_range<Sequence> && std::ranges::sized_range<Sequence> && requires(Sequence& sequence) {
        typename Sequence::value_type;
        typename Sequence::reference;
@@ -94,7 +94,7 @@ concept sequence_append_target = sequence_alias_target<Sequence> && requires(Seq
 
 template <typename Sequence>
 concept sequence_set_target =
-  SequenceContainer<Sequence> && requires(Sequence& sequence, std::size_t position, typename Sequence::value_type&& value) {
+  sequence_container<Sequence> && requires(Sequence& sequence, std::size_t position, typename Sequence::value_type&& value) {
     { sequence.size() } -> std::convertible_to<std::size_t>;
     requires sequence_status<decltype(sequence.resize(position))>;
     sequence[position] = std::move(value);
@@ -457,7 +457,7 @@ auto all(Range& list, Function&& function) {
 }
 
 template <typename List>
-  requires SequenceContainer<List const>
+  requires sequence_container<List const>
 class ListHasher {
 public:
   std::size_t operator()(List const& l) const
@@ -3332,16 +3332,16 @@ decltype(auto) listDiagnosticValue(T const& value) {
 template <typename Sequence>
 using ListDiagnosticResult = decltype(std::declval<std::ostream&>() << listDiagnosticValue(std::declval<typename Sequence::value_type const&>()));
 
-template <SequenceContainer Sequence>
+template <sequence_container Sequence>
 std::ostream& operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::ostream&>;
 
-template <SequenceContainer Sequence>
+template <sequence_container Sequence>
 [[nodiscard]]
 std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::expected<std::reference_wrapper<std::ostream>, StarException>>;
 
-template <SequenceContainer Sequence>
+template <sequence_container Sequence>
 std::ostream& operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::ostream&> {
   os << "(";
@@ -3353,7 +3353,7 @@ std::ostream& operator<<(std::ostream& os, Sequence const& list)
   return os << ")";
 }
 
-template <SequenceContainer Sequence>
+template <sequence_container Sequence>
 [[nodiscard]]
 std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Sequence const& list)
     requires std::same_as<ListDiagnosticResult<Sequence>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
@@ -3370,7 +3370,7 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 }
 
 template <typename List>
-  requires SequenceContainer<List const>
+  requires sequence_container<List const>
 std::size_t ListHasher<List>::operator()(List const& l) const
   requires hash_invocable<hash<typename List::value_type> const&, std::ranges::range_reference_t<List const>>
 {
@@ -3417,7 +3417,7 @@ export template <typename Element, typename Allocator>
 struct std::formatter<Star::LinkedList<Element, Allocator>> : Star::StreamFormatter {};
 
 export namespace Star {
-  using ::Star::SequenceContainer;
+  using ::Star::sequence_container;
   using ::Star::ListHasher;
   using ::Star::List;
   using ::Star::StaticList;

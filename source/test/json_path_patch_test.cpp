@@ -10,12 +10,12 @@ using namespace Star;
 
 namespace {
 template <typename T>
-concept CanBorrowJsonPath =
+concept can_borrow_json_path =
   requires(T&& value) { JsonPath::pathGetRef(std::forward<T>(value), JsonPath::parsePointer, String("/v")); };
-static_assert(CanBorrowJsonPath<Json&>);
-static_assert(CanBorrowJsonPath<Json const&>);
-static_assert(!CanBorrowJsonPath<Json>);
-static_assert(!CanBorrowJsonPath<Json const>);
+static_assert(can_borrow_json_path<Json&>);
+static_assert(can_borrow_json_path<Json const&>);
+static_assert(!can_borrow_json_path<Json>);
+static_assert(!can_borrow_json_path<Json const>);
 }// namespace
 
 TEST(JsonPathPatchTest, SearchMutationsKeepFirstMatchAndSnapshots) {

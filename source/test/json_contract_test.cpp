@@ -12,9 +12,9 @@ using namespace Star;
 
 namespace {
 template <typename Owner>
-concept BorrowsTemporaryJson = requires(Owner&& owner) { std::move(owner).find(std::size_t{0}); };
-static_assert(!BorrowsTemporaryJson<Json>);
-static_assert(!BorrowsTemporaryJson<Json const>);
+concept borrows_temporary_json = requires(Owner&& owner) { std::move(owner).find(std::size_t{0}); };
+static_assert(!borrows_temporary_json<Json>);
+static_assert(!borrows_temporary_json<Json const>);
 }// namespace
 
 TEST(JsonContractTest, EqualNumericKeysShareHashesRecursively) {

@@ -1198,7 +1198,7 @@ struct LuaConverter<SmallList<T, MaxStackSize>> : LuaContainerConverter<SmallLis
 template <>
 struct LuaConverter<StringList> : LuaContainerConverter<StringList> {};
 
-template <SetContainer Container>
+template <set_container Container>
 struct LuaConverter<Container> : LuaContainerConverter<Container> {};
 
 template <typename Key, typename Value, typename Compare, typename Allocator>
@@ -2719,7 +2719,7 @@ export namespace Star {
   template <>
   struct LuaConverter<StringList>;
 
-  template <SetContainer Container>
+  template <set_container Container>
   struct LuaConverter<Container>;
 
   template <typename Key, typename Value, typename Compare, typename Allocator>
