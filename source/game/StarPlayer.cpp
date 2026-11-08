@@ -1180,7 +1180,7 @@ std::expected<void, StarException> Player::updateHumanoidDirectives() {
       auto extracted = Humanoid::extractScaleFromDirectives(entry);
       if (!extracted)
         return std::unexpected(std::move(extracted.error()));
-      scale = scale.piecewiseMultiply(extracted->first);
+      scale = scale.piecewise_multiply(extracted->first);
       directives.append(extracted->second);
     }
   }
@@ -2289,7 +2289,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   humanoid()->setFacingDirection(facingDirection);
   Direction movingDirection = m_movementController->movingDirection();
   if (m_movementAnimationState) {
-    auto tangent = Vec2F::withAngle(m_movementController->rotation());
+    auto tangent = Vec2F::with_angle(m_movementController->rotation());
     auto velocity = m_movementController->velocity();
     float tangentVelocity = velocity.x() * tangent.x() + velocity.y() * tangent.y();
     movingDirection = tangentVelocity == 0.f ? facingDirection : tangentVelocity < 0.f ? Direction::Left : Direction::Right;
@@ -2455,7 +2455,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
             return std::unexpected(std::move(mouthResult.error()));
           auto mouth = std::move(*mouthResult);
           auto diff = currentWorld.geometry().diff(m_aimPosition, mouth);
-          diff.setX(std::fabsf(diff.x()));
+          diff.set_x(std::fabsf(diff.x()));
           headRotation = diff.angle() * .25f * numericalDirection(humanoid()->facingDirection());
         }
       }
@@ -4811,7 +4811,7 @@ std::expected<void, StarException> Player::dropSelectedItems(std::function<std::
       return std::unexpected(std::move(angleResult.error()));
     auto angle = std::move(*angleResult);
     auto dropResult =
-      ItemDrop::throwDrop(root(), std::exchange(item, {}), position(), velocity(), Vec2F::withAngle(angle), true);
+      ItemDrop::throwDrop(root(), std::exchange(item, {}), position(), velocity(), Vec2F::with_angle(angle), true);
     if (!dropResult)
       return std::unexpected(std::move(dropResult.error()));
     auto drop = std::move(*dropResult);

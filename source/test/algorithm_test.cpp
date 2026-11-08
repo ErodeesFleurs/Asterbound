@@ -409,7 +409,7 @@ TEST(FixedContainerCopy, PreservesSinglePassInputPosition) {
   EXPECT_EQ(next, 4);
 
   std::istringstream vectorInput("1 2 3 4 5");
-  auto vector = Vector<int, 2>::copyFrom(std::istream_iterator<int>(vectorInput));
+  auto vector = Vector<int, 2>::copy_from(std::istream_iterator<int>(vectorInput));
   EXPECT_EQ(vector, (Vector<int, 2>{1, 2}));
   vectorInput >> next;
   EXPECT_EQ(next, 4);

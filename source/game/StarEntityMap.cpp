@@ -253,7 +253,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entitiesA
   auto entityList = entityQuery(RectF::withCenter(pos, {0, 0}), filter);
   if (!entityList) return std::unexpected(std::move(entityList.error()));
   sortByComputedValue(*entityList, [&](std::shared_ptr<Entity> const& entity) -> float {
-    return vmagSquared(entity->position() - pos);
+    return vmag_squared(entity->position() - pos);
   });
   return std::move(*entityList);
 }
@@ -409,7 +409,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityMap::closestEntity(V
   RectF boundBox(center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius);
   auto result = forEachEntity(boundBox, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     Vec2F pos = entity->position();
-    float thisDistSquared = m_geometry.diff(center, pos).magnitudeSquared();
+    float thisDistSquared = m_geometry.diff(center, pos).magnitude_squared();
     if (distSquared > thisDistSquared) {
       if (filter) {
         auto accepted = filter(entity);

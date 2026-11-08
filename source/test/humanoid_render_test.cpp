@@ -242,7 +242,7 @@ const GameTestRegistration transientMovementAnimation(
     auto nativeDirection = movement.movingDirection();
     for (float rotation : {0.f, std::numbers::pi_v<float> / 2, std::numbers::pi_v<float>, -std::numbers::pi_v<float> / 2}) {
       movement.setRotation(rotation);
-      auto tangent = Vec2F::withAngle(rotation);
+      auto tangent = Vec2F::with_angle(rotation);
       for (std::size_t i = 0; i != states.size(); ++i) {
         player.setGenericProperty("poseFixture", Json(String(names[i])));
         for (auto facing : {Direction::Left, Direction::Right}) {

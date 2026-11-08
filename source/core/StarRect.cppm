@@ -364,8 +364,8 @@ bool Box<T, N>::isEmpty() const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::combine(Box const& box) {
-  m_min = box.m_min.piecewiseMin(m_min);
-  m_max = box.m_max.piecewiseMax(m_max);
+  m_min = box.m_min.piecewise_min(m_min);
+  m_max = box.m_max.piecewise_max(m_max);
 }
 
 template <typename T, std::size_t N>
@@ -377,8 +377,8 @@ Box<T, N> Box<T, N>::combined(Box const& box) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::combine(Coord const& point) {
-  m_min = m_min.piecewiseMin(point);
-  m_max = m_max.piecewiseMax(point);
+  m_min = m_min.piecewise_min(point);
+  m_max = m_max.piecewise_max(point);
 }
 
 template <typename T, std::size_t N>
@@ -390,8 +390,8 @@ Box<T, N> Box<T, N>::combined(Coord const& point) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::limit(Box const& box) {
-  m_min = m_min.piecewiseMax(box.m_min);
-  m_max = m_max.piecewiseMin(box.m_max);
+  m_min = m_min.piecewise_max(box.m_min);
+  m_max = m_max.piecewise_min(box.m_max);
 }
 
 template <typename T, std::size_t N>
@@ -434,7 +434,7 @@ T Box<T, N>::size(std::size_t dim) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::setAspect(Coord as, bool shrink) {
-  Coord nBox = (m_max - m_min).piecewiseDivide(as);
+  Coord nBox = (m_max - m_min).piecewise_divide(as);
   Coord extent;
   if (shrink)
     extent = Coord::filled(nBox.min());
@@ -632,12 +632,12 @@ Box<T, N> Box<T, N>::flipped(std::size_t dimension) const {
 
 template <typename T, std::size_t N>
 auto Box<T, N>::normal(Coord const& coord) const -> Coord {
-  return (coord - m_min).piecewiseDivide(m_max - m_min);
+  return (coord - m_min).piecewise_divide(m_max - m_min);
 }
 
 template <typename T, std::size_t N>
 auto Box<T, N>::eval(Coord const& normalizedCoord) const -> Coord {
-  return normalizedCoord.piecewiseMultiply(m_max - m_min) + m_min;
+  return normalizedCoord.piecewise_multiply(m_max - m_min) + m_min;
 }
 
 template <typename T, std::size_t N>

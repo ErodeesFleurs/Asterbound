@@ -308,7 +308,7 @@ Vector<T2, 2> Matrix3<T>::transformVec2(Vector<T2, 2> const& point) const {
 
 template <typename T>
 float Matrix3<T>::transformAngle(float angle) const {
-  Vec2 a = Vec2::withAngle(angle, 1.0f);
+  Vec2 a = Vec2::with_angle(angle, 1.0f);
   Matrix3 m = *this;
   m[0][2] = 0;
   m[1][2] = 0;

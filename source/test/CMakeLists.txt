@@ -57,6 +57,7 @@ set (star_core_tests_SOURCES
       worker_pool_test.cpp
       variant_test.cpp
       vlq_test.cpp
+      vector_test.cpp
     )
 add_executable (core_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>

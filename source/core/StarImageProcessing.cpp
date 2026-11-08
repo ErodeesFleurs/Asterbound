@@ -511,9 +511,9 @@ static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation co
       if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
         Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
         if (op.mode == BlendImageOperation::Multiply)
-          fpixel = fpixel.piecewiseMultiply(other);
+          fpixel = fpixel.piecewise_multiply(other);
         else if (op.mode == BlendImageOperation::Screen)
-          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - other);
+          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewise_multiply(Vec4F::filled(1.0f) - other);
       }
     }
     pixel = Color::v4fToByte(fpixel);
@@ -710,7 +710,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     auto scale = op->get().scale;
     if (scale[0] < 0.0f || scale[1] < 0.0f) {
       EmergencyLog::warn("Negative scale in ScaleImageOperation ({})", scale);
-      scale = scale.piecewiseMax(Vec2F::filled(0.f));
+      scale = scale.piecewise_max(Vec2F::filled(0.f));
     }
     auto scaled = op->get().mode == ScaleImageOperation::Nearest ? scaleNearest(image, scale)
       : op->get().mode == ScaleImageOperation::Bicubic ? scaleBicubic(image, scale) : scaleBilinear(image, scale);

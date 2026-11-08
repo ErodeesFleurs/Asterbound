@@ -43,7 +43,7 @@ struct PresentationPosition {
   void reset(Vec2F position) { previous = current = position; }
   void advance(Vec2F position) { previous = current; current = position; }
   bool finish(Vec2F position, WorldGeometry const& geometry, float maximumContinuousDistance) {
-    if (geometry.diff(position, previous).magnitudeSquared() > maximumContinuousDistance * maximumContinuousDistance) {
+    if (geometry.diff(position, previous).magnitude_squared() > maximumContinuousDistance * maximumContinuousDistance) {
       reset(position);
       return false;
     }

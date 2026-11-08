@@ -222,7 +222,7 @@ public:
     requires (P == 2 && N == P)
   T lineProjection(VectorType const& l2) const {
     VectorType d = diff();
-    return ((l2[0] - min()[0]) * d[0] + (l2[1] - min()[1]) * d[1]) / d.magnitudeSquared();
+    return ((l2[0] - min()[0]) * d[0] + (l2[1] - min()[1]) * d[1]) / d.magnitude_squared();
   }
 
   template <std::size_t P = N>

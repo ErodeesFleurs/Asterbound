@@ -91,12 +91,12 @@ std::expected<std::shared_ptr<ItemGridWidget>, StarException> ItemGridWidget::cr
   if (!anchorJson) return std::unexpected(std::move(anchorJson.error()));
   auto anchor = jsonToVec2I(*anchorJson);
   if (!anchor) return std::unexpected(std::move(anchor.error()));
-  widget->m_scissorExtra = (*durabilityOffset * -1).piecewiseMax(*anchor * -1).piecewiseMax(Vec2I());
+  widget->m_scissorExtra = (*durabilityOffset * -1).piecewise_max(*anchor * -1).piecewise_max(Vec2I());
   Vec2I calculatedSize = {
     dimensions[0] * rowSpacing[0] + dimensions[1] * columnSpacing[0],
     dimensions[0] * rowSpacing[1] + dimensions[1] * columnSpacing[1]
   };
-  widget->setSize(calculatedSize.piecewiseMax(area->size()));
+  widget->setSize(calculatedSize.piecewise_max(area->size()));
   auto result = widget->setItemBag(std::move(bag));
   if (!result) return std::unexpected(std::move(result.error()));
   return widget;

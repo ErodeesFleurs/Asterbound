@@ -1031,7 +1031,8 @@ auto selectedAnchor = std::move(*result1144);
       if (!selectedAnchor) return std::unexpected(VehicleException(strf("Missing lounge anchor '{}' on part '{}'",selectedLounge.partAnchor,selectedLounge.part)));
       Vec2F selectedLoungePosition = *selectedAnchor + position();
 
-      if (vmagSquared(thisLoungePosition - request.interactPosition) < vmagSquared(selectedLoungePosition - request.interactPosition))
+      if (vmag_squared(thisLoungePosition - request.interactPosition)
+          < vmag_squared(selectedLoungePosition - request.interactPosition))
         index = i;
     }
   }

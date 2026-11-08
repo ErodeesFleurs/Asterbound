@@ -701,7 +701,7 @@ std::expected<Vec2F, StarException> SystemWorldServer::randomObjectSpawnPosition
   if (!selected)
     return std::unexpected(std::move(selected.error()));
   auto const& range = selected->get();
-  return Vec2F::withAngle(random.randf() * std::numbers::pi * 2.0, range[0] + random.randf() * (range[1] - range[0]));
+  return Vec2F::with_angle(random.randf() * std::numbers::pi * 2.0, range[0] + random.randf() * (range[1] - range[0]));
 }
 
 std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParameters(SystemLocation const& location) const {

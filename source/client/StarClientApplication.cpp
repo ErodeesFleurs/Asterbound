@@ -2191,7 +2191,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         return std::unexpected(std::move(saved.error()));
     }
 
-    if (m_controllerInput && m_controllerLeftStick.magnitudeSquared() > 0.01f)
+    if (m_controllerInput && m_controllerLeftStick.magnitude_squared() > 0.01f)
       m_player->setMoveVector(m_controllerLeftStick);
     else
       m_player->setMoveVector(Vec2F());
@@ -2449,8 +2449,8 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   }
   Vec2F newCameraPosition;
 
-  newCameraPosition.setX(playerCameraPosition.x());
-  newCameraPosition.setY(playerCameraPosition.y());
+  newCameraPosition.set_x(playerCameraPosition.x());
+  newCameraPosition.set_y(playerCameraPosition.y());
 
   auto baseCamera = newCameraPosition;
 
@@ -2478,8 +2478,8 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
     newCameraPosition = newCameraPosition + cameraDelta * (cameraSmoothFactor - 1.0) / cameraSmoothFactor;
   m_cameraPositionSmoother = newCameraPosition;
 
-  newCameraPosition.setX(newCameraPosition.x() + m_cameraXOffset / camera.pixelRatio());
-  newCameraPosition.setY(newCameraPosition.y() + m_cameraYOffset / camera.pixelRatio());
+  newCameraPosition.set_x(newCameraPosition.x() + m_cameraXOffset / camera.pixelRatio());
+  newCameraPosition.set_y(newCameraPosition.y() + m_cameraYOffset / camera.pixelRatio());
 
   auto smoothDelta = newCameraPosition - baseCamera;
 

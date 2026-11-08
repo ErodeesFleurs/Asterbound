@@ -275,7 +275,7 @@ void Drawable::scale(Vec2F const& scaling, Vec2F const& scaleCenter) {
   else if (std::holds_alternative<ImagePart>(part))
     std::get<ImagePart>(part).transformation.scale(scaling);
 
-  position = (position - scaleCenter).piecewiseMultiply(scaling) + scaleCenter;
+  position = (position - scaleCenter).piecewise_multiply(scaling) + scaleCenter;
 }
 
 void Drawable::transform(Mat3F const& transformation) {

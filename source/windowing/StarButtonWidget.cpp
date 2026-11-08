@@ -564,7 +564,7 @@ std::expected<void, StarException> ButtonWidget::updateSize() {
       auto imageSize = context().textureSize(image.get());
       if (!imageSize)
         return std::unexpected(std::move(imageSize.error()));
-      bounds = bounds.piecewiseMax(*imageSize);
+      bounds = bounds.piecewise_max(*imageSize);
     }
   }
   m_buttonBoundSize = bounds;

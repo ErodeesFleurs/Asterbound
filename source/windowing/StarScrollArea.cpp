@@ -587,14 +587,12 @@ std::expected<void, StarException> ScrollArea::update(float dt) {
   if (m_verticalScroll && maxScroll != m_lastMaxScroll)
     m_scrollOffset += (maxScroll - m_lastMaxScroll);
 
-  m_scrollOffset = m_scrollOffset.piecewiseClamp(Vec2I(), maxScroll);
+  m_scrollOffset = m_scrollOffset.piecewise_clamp(Vec2I(), maxScroll);
   m_lastMaxScroll = maxScroll;
   return {};
 }
 
-Vec2I ScrollArea::maxScrollPosition() const {
-  return Vec2I().piecewiseMax(contentSize() - size());
-}
+Vec2I ScrollArea::maxScrollPosition() const { return Vec2I().piecewise_max(contentSize() - size()); }
 
 std::expected<void, StarException> ScrollArea::drawChildren() {
   RectI innerDrawingArea = m_drawingArea;

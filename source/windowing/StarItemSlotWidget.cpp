@@ -173,7 +173,7 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
     if (!size) return std::unexpected(std::move(size.error()));
     backingSize = Vec2I(*size);
   }
-  widget->setSize(area->max().piecewiseMax(backingSize));
+  widget->setSize(area->max().piecewise_max(backingSize));
   auto slotConfig = (*assets)->json("/interface/itemSlot.config");
   if (!slotConfig) return std::unexpected(std::move(slotConfig.error()));
   auto children = slotConfig->get("config");

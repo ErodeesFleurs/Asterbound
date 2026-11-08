@@ -195,7 +195,7 @@ std::expected<void, StarException> PaneManager::bringPaneAdjacent(std::shared_pt
   if (!size)
     return std::unexpected(std::move(size.error()));
   Vec2I centerAdjacent = anchor->position() + (anchor->size() / 2) - (adjacent->size() / 2);
-  centerAdjacent = centerAdjacent.piecewiseClamp(Vec2I(), *size - adjacent->size()); // keeps pane inside window
+  centerAdjacent = centerAdjacent.piecewise_clamp(Vec2I(), *size - adjacent->size());// keeps pane inside window
 
   if (anchor->position()[0] + anchor->size()[0] + gap + adjacent->size()[0] <= (*size)[0])
     adjacent->setPosition(Vec2I(anchor->position()[0] + anchor->size()[0] + gap, centerAdjacent[1])); // place to the right
@@ -545,7 +545,8 @@ std::expected<void, StarException> PaneManager::update(float dt) {
     else
       offsetAdjust[1] = -m_activeTooltip->size()[1];
 
-    m_activeTooltip->setPosition(m_tooltipLastMousePos + (offsetAdjust + m_tooltipMouseOffset.piecewiseMultiply(offsetDirection)));
+    m_activeTooltip->setPosition(m_tooltipLastMousePos
+                                 + (offsetAdjust + m_tooltipMouseOffset.piecewise_multiply(offsetDirection)));
   }
 
   for (auto const& layerPair : m_displayedPanes) {

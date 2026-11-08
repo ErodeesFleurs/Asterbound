@@ -193,7 +193,8 @@ std::expected<void, StarException> TilePainter::adjustLighting(WorldRenderData& 
       if (!liquid)
         return std::unexpected(std::move(liquid.error()));
       float darknessLevel = (1.f - (lightValue->sum() / 3.0f)) * drawLevel;
-      auto adjusted = lightValue->piecewiseMultiply(Vec3F::filled(1.f - darknessLevel) + liquid->get().bottomLightMix * darknessLevel);
+      auto adjusted = lightValue->piecewise_multiply(Vec3F::filled(1.f - darknessLevel)
+                                                     + liquid->get().bottomLightMix * darknessLevel);
 
       return renderData.lightMap.set(lightIndex.x(), lightIndex.y(), adjusted);
     });

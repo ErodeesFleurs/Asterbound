@@ -3997,7 +3997,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
       auto const& operation = entry.loadOperation(shared->get());
       if (std::holds_alternative<ScaleImageOperation>(operation)) {
         auto const& op = std::get<ScaleImageOperation>(operation);
-        scale = scale.value_or(Vec2F::filled(1.f)).piecewiseMultiply(op.scale);
+        scale = scale.value_or(Vec2F::filled(1.f)).piecewise_multiply(op.scale);
         continue;
       }
     }

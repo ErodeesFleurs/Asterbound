@@ -2326,8 +2326,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         return std::unexpected(std::move(result169.error()));
       auto dropList = (std::move(*result169));
       for (auto const& itemDrop : dropList) {
-        auto distSquared = m_geometry.diff(itemDrop->position(), playerPos).magnitudeSquared();
-        
+        auto distSquared = m_geometry.diff(itemDrop->position(), playerPos).magnitude_squared();
+
         // If the drop is within DropDist and not owned, request it.
         {
           auto result173 = itemDrop->canTake();

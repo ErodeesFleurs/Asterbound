@@ -1364,8 +1364,8 @@ std::expected<String, StarException> CommandProcessor::entityEval(ConnectionId c
         std::shared_ptr<ScriptedEntity> targetEntity;
         for (auto const& entity : entities) {
           if (!targetEntity
-              || vmagSquared(entity->position() - (*aimPosition))
-                  < vmagSquared(targetEntity->position() - (*aimPosition)))
+              || vmag_squared(entity->position() - (*aimPosition))
+                < vmag_squared(targetEntity->position() - (*aimPosition)))
             targetEntity = entity;
         }
 

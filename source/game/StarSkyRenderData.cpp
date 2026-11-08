@@ -69,7 +69,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::backOrbiters(Vec2F
   for (auto const& object : orbitingCelestialObjects) {
     auto const& layers = std::get<0>(object);
     Vec2F pos = std::get<1>(object);
-    pos = pos.piecewiseMultiply(satelliteArea);
+    pos = pos.piecewise_multiply(satelliteArea);
     pos -= worldOffset;
     pos = rotMatrix.transformVec2(pos);
     for (auto const& l : layers)
@@ -161,12 +161,12 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
     auto radius = settings.queryFloat("sun.radius");
     if (!radius) return std::unexpected(std::move(radius.error()));
     orbiters.push_back(
-      {SkyOrbiterType::Sun, *scale, 0.0f, image, Vec2F::withAngle(orbitAngle, *radius) + viewSize / 2});
+      {SkyOrbiterType::Sun, *scale, 0.0f, image, Vec2F::with_angle(orbitAngle, *radius) + viewSize / 2});
   } else if (type == SkyType::Orbital) {
     auto yCenter = settings.queryFloat("planetHorizon.yCenter");
     if (!yCenter) return std::unexpected(std::move(yCenter.error()));
-    auto planetCenter = Vec2F(viewSize[0] / 2, 0)
-        - Vec2F::withAngle(worldRotation - std::numbers::pi / 2, *yCenter) - worldOffset;
+    auto planetCenter =
+      Vec2F(viewSize[0] / 2, 0) - Vec2F::with_angle(worldRotation - std::numbers::pi / 2, *yCenter) - worldOffset;
     auto scaleResult = settings.queryFloat("planetHorizon.scale");
     if (!scaleResult) return std::unexpected(std::move(scaleResult.error()));
     float scale = *scaleResult;
@@ -175,7 +175,9 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
 
     if (skyParameters.horizonClouds) {
       for (auto const& horizonCloud : horizonClouds) {
-        Vec2F position = Vec2F::withAngle(horizonCloud.startAngle + orbitAngle * horizonCloud.speed, horizonCloud.radius) + planetCenter;
+        Vec2F position =
+          Vec2F::with_angle(horizonCloud.startAngle + orbitAngle * horizonCloud.speed, horizonCloud.radius)
+          + planetCenter;
         position = rotMatrix.transformVec2(position);
         orbiters.push_back({SkyOrbiterType::HorizonCloud, scale, worldRotation, horizonCloud.image, position});
       }

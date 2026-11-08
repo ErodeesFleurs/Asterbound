@@ -501,7 +501,7 @@ std::expected<Image, StarException> Image::subImage(Vec2U const& pos, Vec2U cons
 }
 
 std::expected<void, StarException> Image::copyInto(Vec2U const& min, Image const& image) {
-  Vec2U max = (min + image.size()).piecewiseMin(size());
+  Vec2U max = (min + image.size()).piecewise_min(size());
 
   for (unsigned y = min[1]; y < max[1]; ++y) {
     for (unsigned x = min[0]; x < max[0]; ++x) {
@@ -517,7 +517,7 @@ std::expected<void, StarException> Image::copyInto(Vec2U const& min, Image const
 }
 
 std::expected<void, StarException> Image::drawInto(Vec2U const& min, Image const& image) {
-  Vec2U max = (min + image.size()).piecewiseMin(size());
+  Vec2U max = (min + image.size()).piecewise_min(size());
 
   for (unsigned y = min[1]; y < max[1]; ++y) {
     for (unsigned x = min[0]; x < max[0]; ++x) {

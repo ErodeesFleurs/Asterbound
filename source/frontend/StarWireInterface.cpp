@@ -440,7 +440,7 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
           if (!connections) return std::unexpected(std::move(connections.error()));
           if (connections->empty()) continue;
         }
-        float distance = geometry.diff(center, pos).magnitudeSquared();
+        float distance = geometry.diff(center, pos).magnitude_squared();
         if (!matchNode || distance < bestDist) {
           matchNode = WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i};
           matchDirection = direction;

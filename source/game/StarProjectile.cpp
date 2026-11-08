@@ -455,7 +455,7 @@ float knockbackMagnitude = std::move(*result923);
   auto result924 = m_parameters.getBool("knockbackDirectional", m_config->knockbackDirectional);
 if (!result924) return std::unexpected(std::move(result924.error()));
 if (std::move(*result924))
-    knockback = Vec2F::withAngle(m_movementController->rotation()) * knockbackMagnitude;
+  knockback = Vec2F::with_angle(m_movementController->rotation()) * knockbackMagnitude;
   else
     knockback = knockbackMagnitude;
 
@@ -470,7 +470,7 @@ if (std::move(*result924))
 if (!result925) return std::unexpected(std::move(result925.error()));
   Vec2F positionDelta = result925->get().geometry().diff(m_travelLine.min(), m_travelLine.max());
   static float const MinimumDamageLineDelta = 0.1f;
-  bool useDamageLine = positionDelta.magnitudeSquared() >= square(MinimumDamageLineDelta);
+  bool useDamageLine = positionDelta.magnitude_squared() >= square(MinimumDamageLineDelta);
   if (useDamageLine)
     addDamageSource(Line2F(positionDelta, Vec2F()));
 
@@ -1245,8 +1245,8 @@ if (!result812) return std::unexpected(std::move(result812.error()));
 condition813 = static_cast<bool>(std::move(*result812));
 }
 if (condition813) {
-        if (Vec2F::withAngle(m_movementController->rotation())[0] < 0)
-          angleAdjust = -angleAdjust;
+  if (Vec2F::with_angle(m_movementController->rotation())[0] < 0)
+    angleAdjust = -angleAdjust;
       }
       auto result814 = parameters.contains("autoFlipAngle");
 if (!result814) return std::unexpected(std::move(result814.error()));
@@ -1257,11 +1257,11 @@ if (!result815) return std::unexpected(std::move(result815.error()));
 condition816 = static_cast<bool>(std::move(*result815));
 }
 if (condition816) {
-        if (Vec2F::withAngle(m_movementController->rotation())[0] < 0)
-          angle = -angle;
+  if (Vec2F::with_angle(m_movementController->rotation())[0] < 0)
+    angle = -angle;
       }
       angle += angleAdjust;
-      projectile->setInitialDirection(Vec2F::withAngle(angle, 1.0f));
+      projectile->setInitialDirection(Vec2F::with_angle(angle, 1.0f));
     }
     projectile->setSourceEntity(m_sourceEntity, false);
     projectile->setPowerMultiplier(m_powerMultiplier);

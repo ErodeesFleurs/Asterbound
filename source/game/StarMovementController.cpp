@@ -588,7 +588,7 @@ void MovementController::approachVelocityAlongAngle(float angle, float targetVel
   // difference is the difference between the targetVelocity and this
   // projection.
 
-  Vec2F axis = Vec2F::withAngle(angle, 1.0f);
+  Vec2F axis = Vec2F::with_angle(angle, 1.0f);
 
   float velocityAlongAxis = velocity() * axis;
   float diff = targetVelocity - velocityAlongAxis;
@@ -1084,7 +1084,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
   // The center and candidate positions stay fixed through all separation passes.
   // Cache their distances, but not an unstable sort's permutation of equal keys.
   for (auto& cp : collisionPolys)
-    cp.sortDistance = vmagSquared(cp.sortPosition - sortCenter);
+    cp.sortDistance = vmag_squared(cp.sortPosition - sortCenter);
 
   PolyF translatedBody = body;
   translatedBody.translate(movement);
@@ -1128,8 +1128,8 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
     Vec2F upwardResult = movement + separation.correction;
     float upMag = upwardResult.magnitude();
     // Angle off of horizontal (minimum of either direction)
-    float angleHoriz = std::min(Vec2F(1, 0).angleBetweenNormalized(upwardResult / upMag),
-        Vec2F(-1, 0).angleBetweenNormalized(upwardResult / upMag));
+    float angleHoriz = std::min(Vec2F(1, 0).angle_between_normalized(upwardResult / upMag),
+                                Vec2F(-1, 0).angle_between_normalized(upwardResult / upMag));
 
     // We need to make sure that even if we found a solution with the sliding
     // cheat, we are not beyond the angle and correction limits for the ground
@@ -1217,7 +1217,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
               float t = std::clamp(side.lineProjection(bodyVertex), 0.0f, 1.0f);
               Vec2F nearPoint = side.eval(t);
               if (nearPoint[1] > cp.sortPosition[1]) {
-                if (vmagSquared(bodyVertex - nearPoint) <= square(separationTolerance)) {
+                if (vmag_squared(bodyVertex - nearPoint) <= square(separationTolerance)) {
                   maxSideHorizontalOverlap = thisSideHorizontalOverlap;
                   result.groundSlope = side.diff().normalized();
                   if (result.groundSlope[0] < 0)
@@ -1283,7 +1283,7 @@ MovementController::CollisionSeparation MovementController::collisionSeparate(Li
         continue;
 
       intersectResult = correctedPoly.satIntersection(cp.poly);
-      if (intersectResult.intersects && intersectResult.overlap.magnitudeSquared() > separationToleranceSquared) {
+      if (intersectResult.intersects && intersectResult.overlap.magnitude_squared() > separationToleranceSquared) {
         separation.collisionKind = maxOrNullCollision(separation.collisionKind, cp.collisionKind);
         separation.solutionFound = false;
         break;

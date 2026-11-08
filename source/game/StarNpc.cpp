@@ -1224,7 +1224,7 @@ std::expected<void, StarException> Npc::updateHumanoidDirectives() {
     auto extracted = Humanoid::extractScaleFromDirectives(entry);
     if (!extracted)
       return std::unexpected(std::move(extracted.error()));
-    scale = scale.piecewiseMultiply(extracted->first);
+    scale = scale.piecewise_multiply(extracted->first);
     directives.append(extracted->second);
   }
   auto pose = humanoid();

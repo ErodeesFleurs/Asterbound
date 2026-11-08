@@ -222,14 +222,14 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
   else
     m_beamCurve.dest() = itemWorld->get().geometry().diff(centerOfTile(*aimPosition), itemOwner->get().position());
 
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared())
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
     m_beamCurve[2] = m_beamCurve.dest();
   else
     m_beamCurve[2] = m_beamCurve[2] + (m_beamCurve.dest() - m_beamCurve[2]) * m_farControlPointElasticity;
 
   Vec2F desiredNearControlPoint = (m_beamCurve.dest() - m_beamCurve.origin()) * m_nearControlPointDistance;
 
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared())
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
     m_beamCurve[1] = m_beamCurve.origin();
   else if (itemOwner->get().facingDirection() != getAngleSide(m_beamCurve[1].angle()).second)
     m_beamCurve[1] = desiredNearControlPoint;
@@ -319,7 +319,7 @@ std::expected<List<Drawable>, StarException> BeamItem::nonRotatedDrawables() con
 }
 
 std::expected<float, StarException> BeamItem::getAngle(float angle) {
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared()
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared()
       || m_beamCurve.origin() == m_beamCurve[1])
     return angle;
   return getAngleSide(m_beamCurve[1].angle()).first;

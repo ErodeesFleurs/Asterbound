@@ -279,15 +279,57 @@ Use `--benchmark_filter='Lua/'` for invocation, callback, return-arity, context 
 
 `list_benchmarks` covers copy/move append, repeated 16-element batches, full/strided slices, filtering and sorting for 64/1,024 scalar or owning-String elements. Run `./dist/list_benchmarks --benchmark_filter='^List/' --benchmark_repetitions=7 --benchmark_out=list.json --benchmark_out_format=json`. Fixtures and complete value/order checks are untimed; each sample includes result construction and destruction. `SourceCopyMoveAppend` also times copying its source before moving elements. Times describe the named batch, not one element; relocation-count probes are separate from uninstrumented throughput.
 
+`vector_benchmarks` covers float/double 2D, 3D and 4D arithmetic, dot products, magnitude, normalization, projection, transformation and absolute values, plus 2D rotation and repeated/cached flying-direction arithmetic. Run `./dist/vector_benchmarks --benchmark_filter='^Vector/' --benchmark_repetitions=7 --benchmark_out=vector.json --benchmark_out_format=json`. Each timed batch performs 64 public Vector operations and result writes; fixtures and independent scalar checks are untimed. The flying cases compare mathematical expressions, not complete movement-controller updates or game FPS; caching a normalized direction is not assumed to be faster.
+
 ## Development
 
 - C++ uses named modules, `import std;` and `std::expected`, without RTTI or exceptions. Use fresh build trees after compiler, ABI or sanitizer changes.
-- Configure clangd with `nix develop -c bash scripts/ide/configure-clangd.sh` and its generated compilation database; enable clangd 23's `--experimental-modules-support`.
+- Configure clangd with the [configure-only IDE workflow](#clangd-and-zed); C++23 module support and the Nix driver/header configuration are required.
 - Check changed C++/module lines with the pinned formatter; use `--apply` to format or `--base <commit>` for a branch comparison:
 
 ```sh
 nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/format-source.sh --check
 ```
+
+### clangd and Zed
+
+Generate the local compilation database from the project root:
+
+```sh
+nix develop -c bash scripts/ide/configure-clangd.sh
+```
+
+This configures `build/clangd` without building game targets. The first invocation may download or build development dependencies. Regenerate after changing CMake source lists or the Nix toolchain; a database copied from another machine is not portable.
+
+Use clangd 23 with `--experimental-modules-support`. For Zed, merge the following into the local, Git-ignored `.zed/settings.json`, replacing the database path with this checkout's absolute path. If needed, set `lsp.clangd.binary.path` to an installed clangd 23 executable.
+
+```json
+{
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "arguments": [
+          "--experimental-modules-support",
+          "--compile-commands-dir=/absolute/path/to/OpenStarbound/build/clangd",
+          "--query-driver=/nix/store/*-xclang-wrapper-*/bin/clang++,/nix/store/*-xclang-wrapper-*/bin/clang"
+        ],
+        "env": {
+          "LC_ALL": "C",
+          "LANGUAGE": "C"
+        }
+      }
+    }
+  },
+  "file_types": {
+    "C++": ["cppm", "ixx"]
+  }
+}
+```
+
+Explicit database selection also covers the toolchain's external `std.cppm`. The configure script preserves Nix wrapper header flags, and the driver allowlist permits system-header discovery outside `nix develop`. clangd builds its own module cache; do not point it at compiler-generated BMIs.
+
+Restart the language server after configuration or toolchain changes. If logs report `clangd fallback`, check that `build/clangd/compile_commands.json` exists and is selected before addressing cascaded `import` or missing-type errors.
+
 
 ### C++ implementation boundaries
 
@@ -315,6 +357,9 @@ nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/
 - List-family `index_of`/`last_index_of` and Array `indexOf`/`lastIndexOf` retain element-type conversion and return `NPos` for out-of-range starts before forming an iterator. Keep the last-index query's exclusive prefix bound and original comparison order.
 - Ordered-map `key_of` uses the first match in the current iteration order. Render checked missing-value diagnostics only after search fails; a successful match must not serialize its value.
 - `Array` owns a `std::array` rather than inheriting from it; use its standard range/storage interface and explicit range copies at `std::array` boundaries. Default construction value-initializes every element. Argument and cross-type constructors retain default construction followed by ordered assignment, including the original first-argument conversion and assignment-compatible narrowing. Generic requirements describe the operations actually used, including contextual comparisons; empty arrays do not require unused element operations. Use `copy_from`, `to_size` and `data()`; resizing preserves the prefix and value-initializes any expanded suffix. Checked `at()` returns an expected reference, not a throwing standard-container access.
+- `Vector` is a value-type derivative of the custom owning `Array`, not of `std::array`; retain its coordinate layout, fixed-array wire encoding and ordered Array hash. Use `copy_from`, `to_size`, `magnitude_squared`, `piecewise_multiply`, `angle_between` and other snake_case extensions. Dimension-specific methods use `requires`, while element and callback constraints describe the actual operations instead of restricting every vector to floating-point elements.
+- Vector storage/arithmetic operations support applicable `constexpr` and conditional `noexcept`; inherited standard-library operations retain their real exception guarantees. Lvalue `x`/`y`/`z`/`w` access borrows a const coordinate reference, while rvalues return an owning coordinate through supported copy/move construction. Noncopyable const temporaries and immobile temporaries cannot fall back to borrowing. `transformed` invokes the callback as an lvalue with const element references and materializes owning result elements; in-place `transform` retains ordered mutable-slot invocation.
+- Vector polar coordinates are `(angle, magnitude)`, and Cartesian conversion uses `(r*cos(angle), r*sin(angle))`. NED/ENU angle factories preserve the element type and signed poles. Keep raw `angle_between_2` differences across the branch cut, zero-vector normalization/projection behavior, original clamp evaluation order and whole-result-before-assignment compound arithmetic. Integer `abs` does not round through floating point; unsigned coordinates are unchanged, and signed absolute values retain the standard representable-result precondition.
 - List, SmallList, StaticList, Deque and LinkedList own their storage rather than inheriting standard containers. Use `push_back`, `emplace_back`, `append_range`, `size` and contiguous `data` where supported; extension names use snake_case. StringList and LuaVariadic remain derivatives of the custom value wrapper, not polymorphic ownership interfaces. Checked `first`/`last`/`at`/`wrap` borrow only from lvalues; bool proxies do not masquerade as element references. Indexed `set` returns an expected result, checks overflow before resizing, value-initializes gaps and retains bounded capacity error categories.
 - Sequence range construction supports distinct sentinels and `std::from_range`; retain direct standard-storage construction for common iterators. Sized appends grow geometrically, single-pass inputs are not pre-counted, and bounded failures retain the successful prefix without consuming rejected emplacement arguments. Rvalue source ranges retain element-moving behavior, including temporary mutable borrowed views. Supported overlapping ranges are snapshotted; opaque custom borrowing must not overlap destination storage. Alias detection must not evaluate projection callbacks. Bulk append is limited to same-type contiguous trivial values with the standard allocator; other elements/allocators retain ordered per-element construction.
 - Slice traversal supports negative strides and full-width sizes without signed negation overflow. Preserve the existing bound clamping, zero-stride successful-empty result, copy order and bounded insertion errors; reserve the known result size only for nonfallible storage. Do not replace alias-observing immediate removal with a single erase-remove compaction.

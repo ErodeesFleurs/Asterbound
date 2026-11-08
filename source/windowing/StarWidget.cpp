@@ -188,7 +188,7 @@ void Widget::determineSizeFromChildren() {
 
   for (auto& child : m_members) {
     Vec2I childMax = child->position() + child->size();
-    max = max.piecewiseMax(childMax);
+    max = max.piecewise_max(childMax);
   }
 
   setSize(max);

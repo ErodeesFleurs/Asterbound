@@ -222,7 +222,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
       if (!image) return std::unexpected(std::move(image.error()));
       auto texture = m_textureGroup->loadTexture(*image);
       if (!texture) return std::unexpected(std::move(texture.error()));
-      biggest = biggest.piecewiseMax((*texture)->size());
+      biggest = biggest.piecewise_max((*texture)->size());
     }
     float screenBuffer = std::ceil((float)biggest.max() * (float)std::numbers::sqrt2);
     PolyD field = PolyD(RectD::withSize(viewMin + velocityOffset, Vec2D(viewSize)).padded(screenBuffer));
@@ -397,7 +397,7 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
     float parallaxScreenBottom = parallaxCameraCenter[1] - parallaxScreenHeight / 2.0;
 
     // screen boundary world positions in *parallax space*
-    Vec2F parallaxScreenOffset = parallaxOffset.piecewiseDivide(parallaxPixels);
+    Vec2F parallaxScreenOffset = parallaxOffset.piecewise_divide(parallaxPixels);
     int left = std::floor(parallaxScreenLeft + parallaxScreenOffset[0]);
     int bottom = std::floor(parallaxScreenBottom + parallaxScreenOffset[1]);
     int right = std::ceil(parallaxScreenLeft + parallaxScreenWidth + parallaxScreenOffset[0]);

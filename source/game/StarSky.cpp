@@ -161,8 +161,9 @@ std::expected<void, StarException> Sky::stateUpdate() {
       }
 
       float maxVelocity = m_numericSettings.flyMaxVelocity;
-      m_worldMoveOffset = Vec2F::withAngle(m_pathRotation, maxVelocity / 2.0 * speedupTime());
-      m_starMoveOffset = Vec2F::withAngle(0, (maxVelocity * m_numericSettings.starVelocityFactor) / 2.0 * speedupTime());
+      m_worldMoveOffset = Vec2F::with_angle(m_pathRotation, maxVelocity / 2.0 * speedupTime());
+      m_starMoveOffset =
+        Vec2F::with_angle(0, (maxVelocity * m_numericSettings.starVelocityFactor) / 2.0 * speedupTime());
     } else if (m_flyingType == FlyingType::Arriving) {
       m_sentSFX = false;
 
@@ -247,7 +248,8 @@ std::expected<void, StarException> Sky::update(double dt) {
         m_starOffset = (dir * m_starMoveOffset * percentage).rotate(-getStarRotation());
         m_worldOffset = (dir * m_worldMoveOffset * percentage).rotate(-getWorldRotation());
       } else {
-        m_starOffset += Vec2F::withAngle(-getStarRotation(), m_numericSettings.flyMaxVelocity * dt * m_numericSettings.starVelocityFactor);
+        m_starOffset += Vec2F::with_angle(-getStarRotation(),
+                                          m_numericSettings.flyMaxVelocity * dt * m_numericSettings.starVelocityFactor);
         m_worldOffset = m_worldMoveOffset;
       }
 
@@ -697,11 +699,11 @@ std::expected<void, StarException> Sky::exitHyperspace() {
 
   float maxVelocity = m_numericSettings.flyMaxVelocity;
   float exitDistance = maxVelocity / 2.0 * slowdownTime();
-  m_worldMoveOffset = Vec2F::withAngle(0, exitDistance);
+  m_worldMoveOffset = Vec2F::with_angle(0, exitDistance);
   m_worldOffset = m_worldMoveOffset;
 
   exitDistance = (maxVelocity * m_numericSettings.starVelocityFactor) / 2.0 * slowdownTime();
-  m_starMoveOffset = Vec2F::withAngle(0, exitDistance);
+  m_starMoveOffset = Vec2F::with_angle(0, exitDistance);
   m_starOffset = m_starMoveOffset;
 
   m_worldRotation = m_starRotation = 0;

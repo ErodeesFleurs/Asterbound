@@ -2013,7 +2013,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
 
         float speed = particle.velocity.magnitude();
-        particle.velocity = Vec2F::withAngle(transformation.transformAngle(particle.velocity.angle())) * speed;
+        particle.velocity = Vec2F::with_angle(transformation.transformAngle(particle.velocity.angle())) * speed;
         particle.position = transformation.transformVec2(particle.position);
         particle.rotation = transformation.transformAngle(particle.rotation);
 

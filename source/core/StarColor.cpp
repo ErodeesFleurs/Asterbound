@@ -512,9 +512,7 @@ Color Color::operator+(Color const& c) const {
   return Color::rgbaf(m_data + c.toRgbaF());
 }
 
-Color Color::operator*(Color const& c) const {
-  return Color::rgbaf(m_data.piecewiseMultiply(c.toRgbaF()));
-}
+Color Color::operator*(Color const& c) const { return Color::rgbaf(m_data.piecewise_multiply(c.toRgbaF())); }
 
 Color& Color::operator+=(Color const& c) {
   return * this = *this + c;

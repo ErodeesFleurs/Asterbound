@@ -164,7 +164,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto height = lexicalCast<unsigned>(heightText->get());
       if (!height)
         return std::unexpected(std::move(height.error()));
-      size = Vec2U(*width, *height).piecewiseClamp(Vec2U(0, 0), size);
+      size = Vec2U(*width, *height).piecewise_clamp(Vec2U(0, 0), size);
     } else if (size[0] > 1000) {
       size[0] = 1000;
     }

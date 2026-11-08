@@ -1957,7 +1957,7 @@ private:
 
   inline static const std::size_t MaxCursorSize = 128;
   [[nodiscard]] std::expected<bool, StarException> setCursorImage(const String& id, const std::shared_ptr<Image const>& image, unsigned scale, const Vec2I& offset) {
-    auto imageSize = image->size().piecewiseMultiply(Vec2U::filled(scale));
+    auto imageSize = image->size().piecewise_multiply(Vec2U::filled(scale));
     if (!m_cursorHardware || !scale || imageSize.max() > MaxCursorSize || imageSize.product() > square(MaxCursorSize)) {
       if (auto defaultCursor = SDL_GetDefaultCursor()) {
         if (SDL_GetCursor() != defaultCursor && !SDL_SetCursor(defaultCursor))

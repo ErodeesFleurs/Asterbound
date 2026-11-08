@@ -708,9 +708,9 @@ knockback = std::move(*result106).transformVec2(knockback);
                 ds = DamageSource(ds);
                 Vec2F dir = worldLine.direction();
                 Vec2F normal = Vec2F((*collision).second);
-                Vec2F reflection = dir - (2 * dir.piecewiseMultiply(normal).sum() * normal);
+                Vec2F reflection = dir - (2 * dir.piecewise_multiply(normal).sum() * normal);
                 if (std::holds_alternative<Vec2F>(ds.knockback))
-                  ds.knockback = std::get<Vec2F>(ds.knockback).rotate(reflection.angleBetween(worldLine.direction()));
+                  ds.knockback = std::get<Vec2F>(ds.knockback).rotate(reflection.angle_between(worldLine.direction()));
 
                 worldLine.min() = (*collision).first;
                 worldLine.max() = worldLine.min() + (reflection * length);

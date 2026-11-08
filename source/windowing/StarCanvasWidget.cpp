@@ -93,7 +93,7 @@ void CanvasWidget::pushClipRect(RectF const& rect) {
   auto clipped = rect;
   if (m_clipHead)
     clipped.limit(std::get<PushClipOp>(m_renderOps[*m_clipHead]).rect);
-  clipped = RectF(clipped.min(), clipped.max().piecewiseMax(clipped.min()));
+  clipped = RectF(clipped.min(), clipped.max().piecewise_max(clipped.min()));
   auto index = m_renderOps.size();
   m_renderOps.push_back(PushClipOp{.rect = clipped, .parent = m_clipHead});
   m_clipHead = index;
@@ -261,7 +261,7 @@ std::expected<void, StarException> CanvasWidget::renderImpl() {
       RectI pixels(physical);
       if (priorClip)
         pixels.limit(*priorClip);
-      clip = RectI(pixels.min(), pixels.max().piecewiseMax(pixels.min()));
+      clip = RectI(pixels.min(), pixels.max().piecewise_max(pixels.min()));
     }
     changedClip = true;
     return target.setScissorRect(clip);
@@ -348,13 +348,13 @@ std::expected<void, StarException> CanvasWidget::renderTiledImage(Vec2F const& r
   if (!textureSize) return std::unexpected(std::move(textureSize.error()));
   Vec2F texSize(*textureSize);
   Vec2F texScaledSize = texSize * textureScale;
-  Vec2I textureCount = Vec2I::ceil(screenCoords.size().piecewiseDivide(texScaledSize)) + Vec2I(2, 2);
+  Vec2I textureCount = Vec2I::ceil(screenCoords.size().piecewise_divide(texScaledSize)) + Vec2I(2, 2);
   Vec2F screenLowerLeft = screenCoords.min() - Vec2F(pfmod<double>(texScaledSize[0] - offset[0], texScaledSize[0]), pfmod<double>(texScaledSize[1] - offset[1], texScaledSize[1]));
 
   for (int x = 0; x < textureCount[0]; ++x) {
     for (int y = 0; y < textureCount[1]; ++y) {
       Vec2F screenPos =
-        screenLowerLeft + texScaledSize.piecewiseMultiply({static_cast<float>(x), static_cast<float>(y)});
+        screenLowerLeft + texScaledSize.piecewise_multiply({static_cast<float>(x), static_cast<float>(y)});
       RectF screenRect = RectF::withSize(screenPos, texScaledSize);
 
       RectF limitedScreenRect;

@@ -300,11 +300,11 @@ void Polygon<DataType>::deduplicateVertexes(float maxDistance) {
   float distSquared = square(maxDistance);
   VertexList newVertexes = {m_vertexes[0]};
   for (std::size_t i = 1; i < m_vertexes.size(); ++i) {
-    if (vmagSquared(m_vertexes[i] - newVertexes[newVertexes.size() - 1]) > distSquared)
+    if (vmag_squared(m_vertexes[i] - newVertexes[newVertexes.size() - 1]) > distSquared)
       newVertexes.push_back(m_vertexes[i]);
   }
 
-  if (vmagSquared(newVertexes[0] - newVertexes[newVertexes.size() - 1]) <= distSquared)
+  if (vmag_squared(newVertexes[0] - newVertexes[newVertexes.size() - 1]) <= distSquared)
     newVertexes.erase(newVertexes.end() - 1);
 
   m_vertexes = std::move(newVertexes);

@@ -929,7 +929,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     Vec2U frameSize = frames.begin()->second.first.size();
     if (frameSize.min() == 0)
       return std::unexpected(StarException("Sprite sheet frame size is empty"));
-    Vec2U imageSize = frames.begin()->second.second->size().piecewiseMin(Vec2U{256, 256});
+    Vec2U imageSize = frames.begin()->second.second->size().piecewise_min(Vec2U{256, 256});
     if (imageSize.min() == 0)
       return "^red;Resulting image is empty^reset;";
 

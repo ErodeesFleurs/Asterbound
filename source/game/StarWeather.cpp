@@ -550,7 +550,7 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
         m_worldGeometry.nearestTo(newClientRegion.max(), m_lastParticleVisibleRegion.max()));
 
     Vec2F targetVelocity = particleConfig.particle.velocity + Vec2F(wind(), 0);
-    float angleChange = Vec2F::angleBetween2(Vec2F(0, 1), targetVelocity);
+    float angleChange = Vec2F::angle_between_2(Vec2F(0, 1), targetVelocity);
     visibleRegion.translate(targetVelocity * dt);
 
     for (auto const& renderZone : newClientRegion.subtract(visibleRegion)) {

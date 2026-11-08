@@ -402,7 +402,7 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
     // Preserve background dimensions while including its declarative children.
     auto backgroundSize = size();
     determineSizeFromChildren();
-    setSize(size().piecewiseMax(backgroundSize));
+    setSize(size().piecewise_max(backgroundSize));
   }
   auto clicks = m_config.getObject("canvasClickCallbacks", {});
   if (!clicks)

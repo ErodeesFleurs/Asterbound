@@ -289,8 +289,8 @@ std::expected<void, StarException> MainMixer::update(float dt, bool muteSfx, boo
     Mixer::PositionalAttenuationFunction attenuationFunction = [&](unsigned channel, Vec2F pos, float rangeMultiplier) -> std::expected<float, StarException> {
       Vec2F playerDiff = worldGeometry.diff(pos, playerPos);
       Vec2F cameraDiff = worldGeometry.diff(pos, cameraPos);
-      float playerMagSq = playerDiff.magnitudeSquared();
-      float cameraMagSq = cameraDiff.magnitudeSquared();
+      float playerMagSq = playerDiff.magnitude_squared();
+      float cameraMagSq = cameraDiff.magnitude_squared();
 
       Vec2F diff;
       float diffMagnitude;

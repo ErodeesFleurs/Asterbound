@@ -1157,7 +1157,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
 
     if (m_controlFly) {
       Vec2F flyVelocity = *m_controlFly;
-      if (flyVelocity.magnitudeSquared() != 0)
+      if (flyVelocity.magnitude_squared() != 0)
         flyVelocity = flyVelocity.normalized() * (*activeParameters.flySpeed);
 
       if (m_liquidMovement.get())

@@ -4536,7 +4536,8 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerSpaceStart(float targ
 
   CollisionSet collideWithAnything{CollisionKind::Null, CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery};
   for (int t = 0; t < maximumTries; ++t) {
-    Vec2F testPos = m_geometry.limit(basePos + Vec2F::withAngle(this->root().random().randf() * 2 * std::numbers::pi, t * distanceIncrement));
+    Vec2F testPos = m_geometry.limit(
+      basePos + Vec2F::with_angle(this->root().random().randf() * 2 * std::numbers::pi, t * distanceIncrement));
     RectF testRect = RectF::withCenter(testPos, testRectSize);
     auto result481 = generateRegion(RectI::integral(testRect));
     if (!result481)

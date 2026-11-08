@@ -195,7 +195,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
       // move the worm, slowing down a bit as we reach the ends to reduce
       // stutter
       float thisSpeed = std::max(0.75f, wormSpeed * taperFactor);
-      worm.pos += Vec2F::withAngle(worm.angle) * thisSpeed;
+      worm.pos += Vec2F::with_angle(worm.angle) * thisSpeed;
       worm.length += thisSpeed;
 
       // maybe set new goal angle
