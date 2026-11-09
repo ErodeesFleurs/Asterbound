@@ -121,7 +121,8 @@ private:
 
 // Stateless diagnostics for process/bootstrap code without a business owner.
 // This path has no registry, sink configuration, or shared mutable cache.
-// Failed emergency output terminates with failure rather than recursively logging.
+// Best-effort stderr output falls back to native system diagnostics on failure;
+// reporting never terminates the caller or prevents its native error dialog.
 class EmergencyLog {
 public:
   static void log(LogLevel level, std::string_view message);

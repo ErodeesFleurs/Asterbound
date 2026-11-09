@@ -38,6 +38,7 @@ set (star_core_tests_SOURCES
       math_test.cpp
       memory_test.cpp
       multi_table_test.cpp
+      native_runtime_stdio_test.cpp
       net_states_test.cpp
       ordered_map_test.cpp
       ordered_set_test.cpp

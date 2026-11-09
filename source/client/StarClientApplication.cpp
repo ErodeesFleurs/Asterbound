@@ -1,7 +1,9 @@
 #ifdef STAR_SYSTEM_WINDOWS
-#include <windows.h>
+#include <io.h>
 #include <stdio.h>
+#include <windows.h>
 #endif
+#include "SDL3/SDL_messagebox.h"
 
 #include "imgui.h"
 #include "imgui_freetype.h"
@@ -2517,7 +2519,14 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     }
     MessageBoxW(nullptr, escaped.c_str(), L"OpenStarbound startup error", MB_OK | MB_ICONERROR);
   };
-  auto nativeRuntime = Star::NativeRuntime::create();
+  if (IsDebuggerPresent() && AllocConsole()) {
+    if ((::_fileno(stdout) < 0 && !std::freopen("CONOUT$", "w", stdout))
+        || (::_fileno(stderr) < 0 && !std::freopen("CONOUT$", "w", stderr))) {
+      reportStartupFailure("Could not attach the debugger console output");
+      return 1;
+    }
+  }
+  auto nativeRuntime = Star::NativeRuntime::create(Star::NativeRuntime::StandardStreams::Optional);
   if (!nativeRuntime) {
     reportStartupFailure(Star::format("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true)));
     return 1;
@@ -2539,19 +2548,18 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     }
     args.push_back(std::move(*arg));
   }
-  if (IsDebuggerPresent() && AllocConsole()) {
-    std::freopen("CONOUT$", "w", stdout);
-    std::freopen("CONOUT$", "w", stderr);
-  }
   unsigned long exceptionStackSize = 131072;
   SetThreadStackGuarantee(&exceptionStackSize);
   return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), args);
 }
 #else
 int main(int argc, char** argv) {
-  auto nativeRuntime = Star::NativeRuntime::create();
+  auto nativeRuntime = Star::NativeRuntime::create(Star::NativeRuntime::StandardStreams::Optional);
   if (!nativeRuntime) {
-    Star::EmergencyLog::error("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true));
+    auto diagnostic = Star::format("Client native initialization failed: {}",
+                                   Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true));
+    Star::EmergencyLog::error("{}", diagnostic);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenStarbound startup error", diagnostic.c_str(), nullptr);
     return 1;
   }
   Star::StringList args;

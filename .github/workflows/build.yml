@@ -112,6 +112,9 @@ jobs:
       - name: Audit Windows imports and runtime
         run: cmake -P scripts/ci/windows/audit-runtime.cmake
 
+      - name: Smoke test client startup streams
+        run: python scripts/ci/smoke-client-startup.py dist/starbound.exe
+
       - name: Run Tests
         working-directory: source
         run: ctest --preset windows-release --verbose --output-junit test-results.xml
@@ -264,6 +267,7 @@ jobs:
         run: |
           ./dist/asset_packer -version
           ./dist/starbound_server -version
+          python3 scripts/ci/smoke-client-startup.py dist/starbound
 
       - name: Prepare Artifacts
         run: tarlz -c9vf ${{ matrix.artifact }}.tar.lz dist
@@ -354,6 +358,9 @@ jobs:
 
       - name: Copy Libraries
         run: cp lib/osx/arm64/*.dylib lib/osx/libsteam_api.dylib dist/
+
+      - name: Smoke test client startup streams
+        run: python3 scripts/ci/smoke-client-startup.py dist/starbound
 
       - name: Run Tests
         uses: lukka/run-cmake@v10

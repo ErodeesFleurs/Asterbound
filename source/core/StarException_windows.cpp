@@ -31,7 +31,12 @@ static constinit DbgHelpLock g_dbgHelpLock;
 // Protected by g_dbgHelpLock; overlapping explicit owners share one session.
 static constinit std::size_t g_diagnosticsOwners = 0;
 
-std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::create() {
+std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::create(StandardStreams streams) {
+  if (streams == StandardStreams::Optional) {
+    auto prepared = prepare_standard_streams();
+    if (!prepared)
+      return std::unexpected(std::move(prepared.error()));
+  }
   auto runtime = std::unique_ptr<NativeRuntime>(new NativeRuntime());
   WSADATA wsaData;
   auto status = WSAStartup(MAKEWORD(2, 2), &wsaData);

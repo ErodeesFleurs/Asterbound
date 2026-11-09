@@ -1,6 +1,13 @@
 #include <stdio.h>
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+#include "StarWindowsCrt.hpp"
+#include <windows.h>
+#else
+#include <syslog.h>
+#endif
 import std;
 import star.logging;
+import star.text_formatter;
 import star.string;
 import star.set;
 import star.map;
@@ -19,16 +26,13 @@ import star.poly;
 import star.algorithm;
 namespace Star {
 
-LogSink::LogSink()
-  : m_level(LogLevel::Info) {}
+LogSink::LogSink() : m_level(LogLevel::Info) {}
 
 LogSink::~LogSink() = default;
 
 void LogSink::set_level(LogLevel level) { m_level = level; }
 
-LogLevel LogSink::level() {
-  return m_level;
-}
+LogLevel LogSink::level() { return m_level; }
 
 std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogLevel level) {
   std::lock_guard locker(m_logMutex);
@@ -38,8 +42,8 @@ std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogL
   return Star::print("[{}] {}\n", *name, msg);
 }
 
-std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
-    String const& filename, LogLevel level, bool truncate) {
+std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(String const& filename, LogLevel level,
+                                                                               bool truncate) {
   auto sink = std::shared_ptr<FileLogSink>(new FileLogSink(filename));
   auto opened =
     sink->m_output.open(truncate ? IOMode::Write | IOMode::Append | IOMode::Truncate : IOMode::Write | IOMode::Append);
@@ -161,8 +165,42 @@ bool Logger::loggable(LogLevel level) {
 }
 
 void EmergencyLog::log(LogLevel, std::string_view message) {
-  if (!Star::println(stderr, "{}", message))
-    std::_Exit(1);
+  auto emitted = [&] {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+    // An invalid descriptor must reach the fallback, not the CRT's default
+    // invalid-parameter termination. Leave the caller's thread policy intact.
+    auto previous = ::_set_thread_local_invalid_parameter_handler(
+      [](wchar_t const*, wchar_t const*, wchar_t const*, unsigned, std::uintptr_t) {});
+    auto restore = finally([previous] { ::_set_thread_local_invalid_parameter_handler(previous); });
+#endif
+    return Star::println(stderr, "{}", message);
+  }();
+  if (emitted)
+    return;
+
+  // Diagnostics cannot decide the caller's control flow or prevent its error
+  // dialog. Keep the write failure and original message on a stdio-independent
+  // system channel; ordinary Logger sinks still propagate their I/O errors.
+  auto diagnostic =
+    Star::format("OpenStarbound emergency output failed: {}\n{}", Star::exception_summary(emitted.error()), message);
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  String text(std::move(diagnostic));
+  auto wide = text.wstring();
+  if (wide) {
+    OutputDebugStringW(wide->c_str());
+    return;
+  }
+  TextBuffer escaped;
+  for (unsigned char byte : text.utf8()) {
+    if ((byte >= 0x20 && byte < 0x7f) || byte == '\n' || byte == '\r' || byte == '\t')
+      escaped.push_back(static_cast<char>(byte));
+    else
+      std::format_to(std::back_inserter(escaped), "\\x{:02X}", byte);
+  }
+  OutputDebugStringA(std::move(escaped).str().c_str());
+#else
+  ::syslog(LOG_ERR, "%s", diagnostic.c_str());
+#endif
 }
 
 String LogMap::get_value(String const& key) {
@@ -184,7 +222,6 @@ void LogMap::clear() {
   std::lock_guard locker(s_logMapMutex);
   s_logMap.clear();
 }
-
 
 std::size_t const SpatialLogger::MaximumLines;
 std::size_t const SpatialLogger::MaximumPoints;
@@ -214,7 +251,8 @@ Deque<T> query_spatial(StringMap<Deque<T>>& spaces, std::string_view space, bool
 }// namespace
 
 void SpatialLogger::log_poly(std::string_view space, PolyF const& poly, Vec4B const& color) {
-  if (!observed()) return;
+  if (!observed())
+    return;
 
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
@@ -234,7 +272,8 @@ void SpatialLogger::log_line(std::string_view space, Line2F const& line, Vec4B c
 }
 
 void SpatialLogger::log_line(std::string_view space, Vec2F const& begin, Vec2F const& end, Vec4B const& color) {
-  if (!observed()) return;
+  if (!observed())
+    return;
 
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
@@ -243,7 +282,8 @@ void SpatialLogger::log_line(std::string_view space, Vec2F const& begin, Vec2F c
 }
 
 void SpatialLogger::log_point(std::string_view space, Vec2F const& position, Vec4B const& color) {
-  if (!observed()) return;
+  if (!observed())
+    return;
 
   std::lock_guard locker(s_mutex);
   auto& points = s_points[space];
@@ -252,7 +292,8 @@ void SpatialLogger::log_point(std::string_view space, Vec2F const& position, Vec
 }
 
 void SpatialLogger::log_text(std::string_view space, String text, Vec2F const& position, Vec4B const& color) {
-  if (!observed()) return;
+  if (!observed())
+    return;
 
   std::lock_guard locker(s_mutex);
   auto& texts = s_logText[space];
@@ -284,12 +325,10 @@ void SpatialLogger::clear() {
     lines = std::move(s_lines);
     points = std::move(s_points);
     logText = std::move(s_logText);
-  } // Move while locked to deallocate contents while unlocked.
+  }// Move while locked to deallocate contents while unlocked.
 }
 
-bool SpatialLogger::observed() {
-  return s_observed;
-}
+bool SpatialLogger::observed() { return s_observed; }
 
 void SpatialLogger::set_observed(bool observed) { s_observed = observed; }
-}
+}// namespace Star
