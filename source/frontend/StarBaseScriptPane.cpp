@@ -140,7 +140,7 @@ std::expected<void, StarException> BaseScriptPane::init(Json config, bool constr
     return std::unexpected(std::move(callbacks.error()));
   for (auto const& callbackName : *callbacks) {
     m_reader->registerCallback(callbackName, [this, callbackName](Widget& widget) -> std::expected<void, StarException> {
-      auto result = m_script.invoke(callbackName, widget.name(), widget.data());
+      auto result = recoverLuaScriptError(m_script.invoke(callbackName, widget.name(), widget.data()));
       if (!result)
         return std::unexpected(std::move(result.error()));
       return {};
@@ -189,22 +189,22 @@ std::expected<void, StarException> BaseScriptPane::displayed() {
       return std::unexpected(std::move(configAdded.error()));
     m_callbacksAdded = true;
   }
-  auto initialized = m_script.init();
+  auto initialized = recoverLuaScriptError(m_script.init());
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto invoked = m_script.invoke("displayed");
+  auto invoked = recoverLuaScriptError(m_script.invoke("displayed"));
   if (!invoked)
     return std::unexpected(std::move(invoked.error()));
   return {};
 }
 
 std::expected<void, StarException> BaseScriptPane::stopScripts() {
-  return m_script.uninit();
+  return recoverLuaScriptError(m_script.uninit());
 }
 
 std::expected<void, StarException> BaseScriptPane::resumeScripts() {
   if (!m_script.initialized()) {
-    auto initialized = m_script.init();
+    auto initialized = recoverLuaScriptError(m_script.init());
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
   }
@@ -213,7 +213,7 @@ std::expected<void, StarException> BaseScriptPane::resumeScripts() {
 
 std::expected<void, StarException> BaseScriptPane::dismissed() {
   auto dismissed = Pane::dismissed();
-  auto uninitialized = m_script.uninit("dismissed");
+  auto uninitialized = recoverLuaScriptError(m_script.uninit("dismissed"));
   if (!dismissed)
     return std::unexpected(std::move(dismissed.error()));
   return uninitialized;
@@ -225,8 +225,8 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
     return std::unexpected(std::move(ticked.error()));
   for (auto const& p : m_canvasClickCallbacks) {
     for (auto const& clickEvent : p.first->pullClickEvents()) {
-      auto result = m_script.invoke(p.second, jsonFromVec2I(clickEvent.position),
-                                    static_cast<std::uint8_t>(clickEvent.button), clickEvent.buttonDown);
+      auto result = recoverLuaScriptError(m_script.invoke(p.second, jsonFromVec2I(clickEvent.position),
+                                    static_cast<std::uint8_t>(clickEvent.button), clickEvent.buttonDown));
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -237,12 +237,12 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
       if (!keyName)
         return std::unexpected(std::move(keyName.error()));
       // KeyNames borrows whole static string literals; Lua copies their bytes.
-      auto result = m_script.invoke(p.second, static_cast<int>(keyEvent.key), keyEvent.keyDown, *keyName);
+      auto result = recoverLuaScriptError(m_script.invoke(p.second, static_cast<int>(keyEvent.key), keyEvent.keyDown, *keyName));
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
   }
-  auto updated = m_script.update(m_script.updateDt(dt));
+  auto updated = recoverLuaScriptError(m_script.update(m_script.updateDt(dt)));
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   return {};
@@ -251,14 +251,14 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
 std::expected<bool, StarException> BaseScriptPane::sendEvent(InputEvent const& event) {
   if (!visibility() || !interactive())
     return false;
-  auto handlesInput = m_script.hasMethod("onInput");
+  auto handlesInput = recoverLuaScriptError(m_script.hasMethod("onInput"));
   if (!handlesInput)
     return std::unexpected(std::move(handlesInput.error()));
   if (*handlesInput) {
     auto data = inputJson(event);
     if (!data)
       return std::unexpected(std::move(data.error()));
-    auto consumed = m_script.invoke<bool>("onInput", *data);
+    auto consumed = recoverLuaScriptError(m_script.invoke<bool>("onInput", *data));
     if (!consumed)
       return std::unexpected(std::move(consumed.error()));
     if (consumed->value_or(false))
@@ -283,7 +283,7 @@ Json const& BaseScriptPane::rawConfig() const { return m_rawConfig; }
 bool BaseScriptPane::interactive() const { return m_interactive; }
 
 std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createTooltip(Vec2I const& screenPosition) {
-  auto result = m_script.invoke<Json>("createTooltip", screenPosition);
+  auto result = recoverLuaScriptError(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result && !(**result).isNull()) {
@@ -303,7 +303,7 @@ std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createToolti
     return std::move(*tooltip);
   }
   std::shared_ptr<Item> item;
-  auto authoredItem = m_script.invoke<LuaValue>("tooltipItem", screenPosition);
+  auto authoredItem = recoverLuaScriptError(m_script.invoke<LuaValue>("tooltipItem", screenPosition));
   if (!authoredItem)
     return std::unexpected(std::move(authoredItem.error()));
   if (*authoredItem) {
@@ -327,14 +327,14 @@ std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createToolti
     }
   }
   if (item) {
-    auto available = m_script.hasMethod("interface.itemTooltip");
+    auto available = recoverLuaScriptError(m_script.hasMethod("interface.itemTooltip"));
     if (!available) return std::unexpected(std::move(available.error()));
     if (*available) {
       auto handle = m_script.context()->createUserData(std::move(item));
       if (!handle) return std::unexpected(std::move(handle.error()));
-      auto tooltip = m_script.invoke<LuaUserData>("interface.itemTooltip", *handle);
+      auto tooltip = recoverLuaScriptError(m_script.invoke<LuaUserData>("interface.itemTooltip", *handle));
       if (!tooltip) return std::unexpected(std::move(tooltip.error()));
-      if (!*tooltip) return std::unexpected(GuiException("Item tooltip service became unavailable"));
+      if (!*tooltip) return std::shared_ptr<Pane>{};
       auto pane = (**tooltip).get<std::shared_ptr<Pane>>();
       if (!pane) return std::unexpected(std::move(pane.error()));
       return pane->get();
@@ -345,7 +345,7 @@ std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createToolti
 }
 
 std::expected<std::optional<String>, StarException> BaseScriptPane::cursorOverride(Vec2I const& screenPosition) {
-  auto result = m_script.invoke<std::optional<String>>("cursorOverride", screenPosition);
+  auto result = recoverLuaScriptError(m_script.invoke<std::optional<String>>("cursorOverride", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
@@ -354,7 +354,7 @@ std::expected<std::optional<String>, StarException> BaseScriptPane::cursorOverri
 }
 
 std::expected<std::optional<std::shared_ptr<Item>>, StarException> BaseScriptPane::shiftItemFromInventory(std::shared_ptr<Item> const& input) {
-  auto result = m_script.invoke<Json>("shiftItemFromInventory", input->descriptor().toJson());
+  auto result = recoverLuaScriptError(m_script.invoke<Json>("shiftItemFromInventory", input->descriptor().toJson()));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (!*result || (**result).isNull())
@@ -462,11 +462,11 @@ std::expected<void, StarException> BaseScriptPane::setLuaRoot(std::shared_ptr<Lu
 }
 
 std::expected<std::optional<Json>, StarException> BaseScriptPane::call(String const& method, JsonArray const& args) {
-  return m_script.invoke<Json>(method, luaUnpack(args));
+  return recoverLuaScriptError(m_script.invoke<Json>(method, luaUnpack(args)));
 }
 
 std::expected<bool, StarException> BaseScriptPane::hasMethod(String const& method) {
-  return m_script.hasMethod(method);
+  return recoverLuaScriptError(m_script.hasMethod(method));
 }
 
 

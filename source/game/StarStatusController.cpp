@@ -345,7 +345,7 @@ std::expected<bool, StarException> StatusController::consumeResource(String cons
   if (!consumed) return std::unexpected(std::move(consumed.error()));
   if (*consumed) {
     auto notified = m_primaryScript.invoke("notifyResourceConsumed", resourceName, amount);
-    if (!notified && !notified.error().is<LuaException>()) return std::unexpected(std::move(notified.error()));
+    if (!notified && !notified.error().is<LuaScriptError>()) return std::unexpected(std::move(notified.error()));
   }
   return *consumed;
 }
@@ -355,7 +355,7 @@ std::expected<bool, StarException> StatusController::overConsumeResource(String 
   if (!consumed) return std::unexpected(std::move(consumed.error()));
   if (*consumed) {
     auto notified = m_primaryScript.invoke("notifyResourceConsumed", resourceName, amount);
-    if (!notified && !notified.error().is<LuaException>()) return std::unexpected(std::move(notified.error()));
+    if (!notified && !notified.error().is<LuaScriptError>()) return std::unexpected(std::move(notified.error()));
   }
   return *consumed;
 }
@@ -541,7 +541,7 @@ void StatusController::setPrimaryDirectives(Directives const& directives) {
 std::expected<List<DamageNotification>, StarException> StatusController::applyDamageRequest(DamageRequest const& damageRequest) {
   auto notifications = m_primaryScript.invoke<List<DamageNotification>>("applyDamageRequest", damageRequest);
   if (!notifications) {
-    if (notifications.error().is<LuaException>()) return List<DamageNotification>{};
+    if (notifications.error().is<LuaScriptError>()) return List<DamageNotification>{};
     return std::unexpected(std::move(notifications.error()));
   }
   if (*notifications) {
@@ -724,11 +724,11 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
     }
   }
   auto primary = m_primaryScript.update(m_primaryScript.updateDt(dt));
-  if (!primary && !primary.error().is<LuaException>()) return std::unexpected(std::move(primary.error()));
+  if (!primary && !primary.error().is<LuaScriptError>()) return std::unexpected(std::move(primary.error()));
   for (auto& entry : m_uniqueEffects) {
     auto updated = entry.second.script.update(entry.second.script.updateDt(dt));
     // Each failing effect has already been logged and disabled by its script component.
-    if (!updated && !updated.error().is<LuaException>()) return std::unexpected(std::move(updated.error()));
+    if (!updated && !updated.error().is<LuaScriptError>()) return std::unexpected(std::move(updated.error()));
     auto metadata = m_uniqueEffectMetadata.getNetElement(entry.second.metadataId);
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     if ((*metadata)->duration) *(*metadata)->duration -= dt;
@@ -785,7 +785,7 @@ std::expected<List<LightSource>, StarException> StatusController::lightSources(f
 std::expected<List<OverheadBar>, StarException> StatusController::overheadBars() {
   auto json = m_primaryScript.invoke<JsonArray>("overheadBars");
   if (!json) {
-    if (json.error().is<LuaException>()) return List<OverheadBar>{};
+    if (json.error().is<LuaScriptError>()) return List<OverheadBar>{};
     return std::unexpected(std::move(json.error()));
   }
   List<OverheadBar> bars;
@@ -820,13 +820,13 @@ List<Particle> StatusController::pullNewParticles() {
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> StatusController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   auto result = m_primaryScript.handleMessage(message, localMessage, args);
   if (!result) {
-    if (!result.error().is<LuaException>()) return std::unexpected(std::move(result.error()));
+    if (!result.error().is<LuaScriptError>()) return std::unexpected(std::move(result.error()));
     result = std::optional<ChainableJsonMessageResponse>{};
   }
   for (auto& entry : m_uniqueEffects) {
     auto response = entry.second.script.handleMessage(message, localMessage, args);
     if (!response) {
-      if (!response.error().is<LuaException>()) return std::unexpected(std::move(response.error()));
+      if (!response.error().is<LuaScriptError>()) return std::unexpected(std::move(response.error()));
       continue;
     }
     if (!*result) *result = std::move(*response);
@@ -1040,7 +1040,7 @@ std::expected<void, StarException> StatusController::removeUniqueEffect(UniqueSt
   if (instance->get().animatorId != EffectAnimatorGroup::NullElementId)
     m_effectAnimators.removeNetElement(instance->get().animatorId);
   m_uniqueEffects.remove(effect);
-  if (!expired && !expired.error().is<LuaException>()) return std::unexpected(std::move(expired.error()));
+  if (!expired && !expired.error().is<LuaScriptError>()) return std::unexpected(std::move(expired.error()));
   if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
   return {};
 }
@@ -1063,14 +1063,14 @@ std::expected<void, StarException> StatusController::initPrimaryScript() {
   auto world = m_parentEntity->get().world();
   if (!world) return std::unexpected(std::move(world.error()));
   auto initialized = m_primaryScript.init(world->get());
-  if (!initialized && !initialized.error().is<LuaException>()) return std::unexpected(std::move(initialized.error()));
+  if (!initialized && !initialized.error().is<LuaScriptError>()) return std::unexpected(std::move(initialized.error()));
   return {};
 }
 
 std::expected<void, StarException> StatusController::uninitPrimaryScript() {
   auto uninitialized = m_primaryScript.uninit();
   std::optional<StarException> error;
-  if (!uninitialized && !uninitialized.error().is<LuaException>()) error = std::move(uninitialized.error());
+  if (!uninitialized && !uninitialized.error().is<LuaScriptError>()) error = std::move(uninitialized.error());
   if (auto result = m_primaryScript.removeCallbacks("status"); !result && !error) error = std::move(result.error());
   if (auto result = m_primaryScript.removeCallbacks("entity"); !result && !error) error = std::move(result.error());
   if (auto result = m_primaryScript.removeCallbacks("animator"); !result && !error) error = std::move(result.error());
@@ -1105,14 +1105,14 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
   auto world = m_parentEntity->get().world();
   if (!world) return std::unexpected(std::move(world.error()));
   auto initialized = uniqueEffect.script.init(world->get());
-  if (!initialized && !initialized.error().is<LuaException>()) return std::unexpected(std::move(initialized.error()));
+  if (!initialized && !initialized.error().is<LuaScriptError>()) return std::unexpected(std::move(initialized.error()));
   return {};
 }
 
 std::expected<void, StarException> StatusController::uninitUniqueEffectScript(UniqueEffectInstance& uniqueEffect) {
   auto uninitialized = uniqueEffect.script.uninit();
   std::optional<StarException> error;
-  if (!uninitialized && !uninitialized.error().is<LuaException>()) error = std::move(uninitialized.error());
+  if (!uninitialized && !uninitialized.error().is<LuaScriptError>()) error = std::move(uninitialized.error());
   if (auto result = uniqueEffect.script.removeCallbacks("effect"); !result && !error) error = std::move(result.error());
   if (auto result = uniqueEffect.script.removeCallbacks("status"); !result && !error) error = std::move(result.error());
   if (auto result = uniqueEffect.script.removeCallbacks("config"); !result && !error) error = std::move(result.error());

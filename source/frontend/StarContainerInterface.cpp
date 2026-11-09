@@ -456,7 +456,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
       return std::unexpected(std::move(jsonToStringListResult259.error()));
     for (auto const& callbackName : std::move(*jsonToStringListResult259)) {
       m_reader.registerCallback(callbackName, [this, callbackName](Widget& widget)  -> std::expected<void, StarException> {
-        auto invokeResult260 = m_script->invoke(callbackName, widget.name(), widget.data());
+        auto invokeResult260 = recoverLuaScriptError(m_script->invoke(callbackName, widget.name(), widget.data()));
         if (!invokeResult260)
           return std::unexpected(std::move(invokeResult260.error()));
       
@@ -597,13 +597,13 @@ std::expected<void, StarException> ContainerPane::displayed() {
   if (m_script) {
     if (m_worldClient && m_worldClient->inWorld())
       {
-        auto initResult287 = m_script->init(*m_worldClient);
+        auto initResult287 = recoverLuaScriptError(m_script->init(*m_worldClient));
         if (!initResult287)
           return std::unexpected(std::move(initResult287.error()));
         
       }
 
-    auto invokeResult288 = m_script->invoke("displayed");
+    auto invokeResult288 = recoverLuaScriptError(m_script->invoke("displayed"));
     if (!invokeResult288)
       return std::unexpected(std::move(invokeResult288.error()));
   }
@@ -616,10 +616,10 @@ std::expected<void, StarException> ContainerPane::dismissed() {
     return std::unexpected(std::move(dismissedResult289.error()));
 
   if (m_script) {
-    auto invokeResult290 = m_script->invoke("dismissed");
+    auto invokeResult290 = recoverLuaScriptError(m_script->invoke("dismissed"));
     if (!invokeResult290)
       return std::unexpected(std::move(invokeResult290.error()));
-    auto uninitResult291 = m_script->uninit();
+    auto uninitResult291 = recoverLuaScriptError(m_script->uninit());
     if (!uninitResult291)
       return std::unexpected(std::move(uninitResult291.error()));
   }
@@ -792,7 +792,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
 
   if (m_script)
     {
-      auto updateResult315 = m_script->update(m_script->updateDt(dt));
+      auto updateResult315 = recoverLuaScriptError(m_script->update(m_script->updateDt(dt)));
       if (!updateResult315)
         return std::unexpected(std::move(updateResult315.error()));
       

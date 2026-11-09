@@ -322,21 +322,30 @@ std::expected<void, StarException> LuaBindings::UtilityCallbacks::logInfo(Logger
   auto text = formatLua(str, args);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return logger.log(LogLevel::Info, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  auto logged = logger.log(LogLevel::Info, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  if (!logged)
+    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
+  return {};
 }
 
 std::expected<void, StarException> LuaBindings::UtilityCallbacks::logWarn(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args) {
   auto text = formatLua(str, args);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return logger.log(LogLevel::Warn, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  auto logged = logger.log(LogLevel::Warn, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  if (!logged)
+    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
+  return {};
 }
 
 std::expected<void, StarException> LuaBindings::UtilityCallbacks::logError(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args) {
   auto text = formatLua(str, args);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return logger.log(LogLevel::Error, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  auto logged = logger.log(LogLevel::Error, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  if (!logged)
+    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
+  return {};
 }
 
 std::expected<void, StarException> LuaBindings::UtilityCallbacks::setLogMap(LogMap& logMap, String const& key, String const& value, LuaVariadic<LuaValue> const& args) {

@@ -2071,7 +2071,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldC
   }
   std::optional<ChainableJsonMessageResponse> result;
   for (auto&& p : m_scriptContexts) {
-    auto result152 = p.second->handleMessage(message, fromConnection == ServerConnectionId, args);
+    auto result152 = recoverLuaScriptError(p.second->handleMessage(message, fromConnection == ServerConnectionId, args));
     if (!result152)
       return std::unexpected(std::move(result152.error()));
     result = (std::move(*result152));
@@ -2265,7 +2265,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   m_clientState->setClientPresenceEntities(std::move(clientPresenceEntities));
 
   for (auto&& pair : m_scriptContexts) {
-    auto result163 = pair.second->update(pair.second->updateDt(dt));
+    auto result163 = recoverLuaScriptError(pair.second->update(pair.second->updateDt(dt)));
     if (!result163)
       return std::unexpected(std::move(result163.error()));
   }
@@ -3538,7 +3538,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
           return std::unexpected(std::move(result282.error()));
         
         m_scriptContexts.set(p.first, scriptComponent);
-        auto result283 = scriptComponent->init(*this);
+        auto result283 = recoverLuaScriptError(scriptComponent->init(*this));
         if (!result283)
           return std::unexpected(std::move(result283.error()));
       }
@@ -3566,7 +3566,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
           return std::unexpected(std::move(result288.error()));
         
         m_scriptContexts.set(p.first, scriptComponent);
-        auto result289 = scriptComponent->init(*this);
+        auto result289 = recoverLuaScriptError(scriptComponent->init(*this));
         if (!result289)
           return std::unexpected(std::move(result289.error()));
       }
@@ -3597,7 +3597,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     }
   };
   for (auto&& p : m_scriptContexts)
-    remember(p.second->invoke("preUninit"));
+    remember(recoverLuaScriptError(p.second->invoke("preUninit")));
   if (m_entityMap) {
     for (auto entityId : m_entityMap->entityIds()) {
       auto entity = m_entityMap->entity(entityId);
@@ -3610,7 +3610,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     }
   }
   for (auto&& p : m_scriptContexts)
-    remember(p.second->uninit());
+    remember(recoverLuaScriptError(p.second->uninit()));
   m_scriptContexts.clear();
   remember(waitForLighting(std::nullopt));
 

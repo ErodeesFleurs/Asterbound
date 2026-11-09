@@ -239,7 +239,7 @@ std::expected<void, StarException> TitleScreen::close() {
   m_optionsMenu.reset();
   std::optional<StarException> error;
   if (m_scriptComponent) {
-    if (auto r = m_scriptComponent->uninit(); !r)
+    if (auto r = recoverLuaScriptError(m_scriptComponent->uninit()); !r)
       error = std::move(r.error());
     m_scriptComponent.reset();
   }
@@ -382,7 +382,7 @@ std::expected<void, StarException> TitleScreen::render() {
     (*canvas)->setPosition(Vec2I());
     (*canvas)->setSize(Vec2I(*interfaceSize));
   }
-  if (auto r = m_scriptComponent->invoke("render", JsonObject{{"interfaceScale", interfaceScale()}}); !r)
+  if (auto r = recoverLuaScriptError(m_scriptComponent->invoke("render", JsonObject{{"interfaceScale", interfaceScale()}})); !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = m_renderer->flush(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_backgroundMenu->render(RectI(Vec2I(), Vec2I(*interfaceSize))); !r) return std::unexpected(std::move(r.error()));
@@ -414,7 +414,7 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
   m_environmentPainter->update(dt);
   if (auto r = m_backgroundMenu->update(dt); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_paneManager->update(dt); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = m_scriptComponent->update(dt); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = recoverLuaScriptError(m_scriptComponent->update(dt)); !r) return std::unexpected(std::move(r.error()));
   if (!finishedState()) {
     auto audioSample = m_musicTrackManager.updateAmbient(m_musicTrack, m_skyBackdrop->isDayTime());
     if (!audioSample)
@@ -610,10 +610,8 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   auto scripts = jsonToStringList(*scriptConfig);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   if (auto r = m_scriptComponent->setScripts(std::move(*scripts)); !r) return std::unexpected(std::move(r.error()));
-  auto initialized = m_scriptComponent->init();
+  auto initialized = recoverLuaScriptError(m_scriptComponent->init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
-  if (!*initialized)
-    return std::unexpected(StarException("Title script could not initialize its Lua context"));
   return {};
 }
 

@@ -367,7 +367,7 @@ std::expected<void, StarException> TechController::tickMaster(float dt) {
       {"special3", m_moveSpecial3}
     };
 
-    auto updated = module.scriptComponent.update(JsonObject{{"moves", moves}, {"dt", module.scriptComponent.updateDt(dt)}});
+    auto updated = recoverLuaScriptError(module.scriptComponent.update(JsonObject{{"moves", moves}, {"dt", module.scriptComponent.updateDt(dt)}}));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
   }
@@ -483,7 +483,7 @@ List<Particle> TechController::pullNewParticles() {
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> TechController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   for (auto& module : m_techModules) {
-    auto response = module.scriptComponent.handleMessage(message, localMessage, args);
+    auto response = recoverLuaScriptError(module.scriptComponent.handleMessage(message, localMessage, args));
     if (!response)
       return std::unexpected(std::move(response.error()));
     if (*response)
@@ -644,7 +644,7 @@ std::expected<void, StarException> TechController::unloadModule(TechModule& modu
         error = std::move(result.error());
     }
   };
-  remember(module.scriptComponent.uninit());
+  remember(recoverLuaScriptError(module.scriptComponent.uninit()));
   for (auto const& name : std::initializer_list<std::string_view>{"tech", "config", "entity", "animator", "status", "player"})
     remember(module.scriptComponent.removeCallbacks(name));
   remember(module.scriptComponent.removeActorMovementCallbacks());
@@ -684,7 +684,7 @@ std::expected<void, StarException> TechController::initializeModules() {
       auto world = m_parentEntity->get().world();
       if (!world)
         return std::unexpected(std::move(world.error()));
-      if (auto result = module.scriptComponent.init(world->get()); !result)
+      if (auto result = recoverLuaScriptError(module.scriptComponent.init(world->get())); !result)
         return std::unexpected(std::move(result.error()));
     }
     return {};

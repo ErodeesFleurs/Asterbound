@@ -275,7 +275,7 @@ if (!result967) return std::unexpected(std::move(result967.error()));
 if (!result968) return std::unexpected(std::move(result968.error()));
 auto result969 = m_scriptComponent.addCallbacks("mcontroller", std::move(*result968));
 if (!result969) return std::unexpected(std::move(result969.error()));
-      auto result970 = m_scriptComponent.init(world);
+      auto result970 = recoverLuaScriptError(m_scriptComponent.init(world));
 if (!result970) return std::unexpected(std::move(result970.error()));
     }
   }
@@ -316,7 +316,7 @@ auto result941 = jsonToOptional<StringList>(std::move(*result940), jsonToStringL
 if (!result941) return std::unexpected(std::move(result941.error()));
 auto scripts = std::move(*result941);
     if (scripts && !(*scripts).empty()) {
-      auto result942 = m_scriptComponent.uninit();
+      auto result942 = recoverLuaScriptError(m_scriptComponent.uninit());
 if (!result942) return std::unexpected(std::move(result942.error()));
       auto result943 = m_scriptComponent.removeCallbacks("projectile");
 if (!result943) return std::unexpected(std::move(result943.error()));
@@ -382,7 +382,7 @@ if (!result936) return std::unexpected(std::move(result936.error()));
 }
 
 std::expected<bool, StarException> Projectile::shouldDestroy() const {
-  auto result935 = m_scriptComponent.invoke<bool>("shouldDestroy");
+  auto result935 = recoverLuaScriptError(m_scriptComponent.invoke<bool>("shouldDestroy"));
 if (!result935) return std::unexpected(std::move(result935.error()));
 if (auto res = std::move(*result935))
     return *res;
@@ -422,7 +422,7 @@ auto result933 = collectPendingRenderEvents(renderCallback->get());
 if (!result933) return std::unexpected(std::move(result933.error()));
 }
 
-  auto result934 = m_scriptComponent.invoke("destroy");
+  auto result934 = recoverLuaScriptError(m_scriptComponent.invoke("destroy"));
 if (!result934) return std::unexpected(std::move(result934.error()));
   return {};
 }
@@ -518,7 +518,7 @@ auto geometry = result919->get().geometry();
       m_timeToLive = 0.0f;
     }
   }
-  auto result920 = m_scriptComponent.invoke("hit", entity);
+  auto result920 = recoverLuaScriptError(m_scriptComponent.invoke("hit", entity));
 if (!result920) return std::unexpected(std::move(result920.error()));
   return {};
 }
@@ -539,7 +539,7 @@ std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
     if (m_referenceVelocity)
       m_movementController->setVelocity(m_movementController->velocity() - *m_referenceVelocity);
 
-    auto result905 = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+    auto result905 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
 if (!result905) return std::unexpected(std::move(result905.error()));
     m_movementController->accelerate(m_movementController->velocity().normalized() * m_acceleration);
 
@@ -583,7 +583,7 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
         // null block.
         m_timeToLive = 0.0f;
       } else if (m_bounces != 0) {
-        auto result909 = m_scriptComponent.invoke("bounce");
+        auto result909 = recoverLuaScriptError(m_scriptComponent.invoke("bounce"));
 if (!result909) return std::unexpected(std::move(result909.error()));
         if (m_bounces > 0)
           --m_bounces;
@@ -703,19 +703,19 @@ if (!result899) return std::unexpected(std::move(result899.error()));
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Projectile::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result896 = world();
 if (!result896) return std::unexpected(std::move(result896.error()));
-auto result897 = m_scriptComponent.handleMessage(message, sendingConnection == result896->get().connection(), args);
+auto result897 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, sendingConnection == result896->get().connection(), args));
 if (!result897) return std::unexpected(std::move(result897.error()));
 return std::move(*result897);
 }
 
 std::expected<std::optional<LuaValue>, StarException> Projectile::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  auto result895 = m_scriptComponent.invoke(func, args);
+  auto result895 = recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 if (!result895) return std::unexpected(std::move(result895.error()));
 return std::move(*result895);
 }
 
 std::expected<std::optional<LuaValue>, StarException> Projectile::evalScript(String const& code) {
-  auto result894 = m_scriptComponent.eval(code);
+  auto result894 = recoverLuaScriptError(m_scriptComponent.eval(code));
 if (!result894) return std::unexpected(std::move(result894.error()));
 return std::move(*result894);
 }

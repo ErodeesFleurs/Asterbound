@@ -58,6 +58,7 @@ import star.damage_types;
 import star.light_source;
 
 import star.beam_item;
+import star.active_item;
 import star.casting;
 import star.client_context;
 import star.entity_rendering;
@@ -1273,6 +1274,135 @@ const GameTestRegistration
       ASSERT_TRUE(player.collectRenderEvents(revealed));
       EXPECT_TRUE(revealed.particles.empty());
     }
+  });
+
+const GameTestRegistration activeItemScriptRecovery(
+  "ItemTest", "ActiveItemScriptErrorsStayLocalAndAllowCleanReequip", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
+    ASSERT_TRUE(File::write_file(String(R"(
+local function visit(hook)
+  activeItem.setInstanceValue("lastHook", hook)
+  storage.lastHook = hook
+  if root.getConfiguration("recoveryItemFailure") == hook then
+    error("active-item-recovery:" .. hook)
+  end
+end
+function init()
+  message.setHandler("recoveryProbe", function()
+    visit("message")
+    return true
+  end)
+  visit("init")
+end
+function activate() visit("activate") end
+function update() visit("update") end
+function uninit() visit("uninit") end
+)"), File::relative_to(overlay, "active-item-recovery.lua")));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.logLevel = LogLevel::Error;
+    settings.includeUGC = false;
+    auto createdRoot = Root::create(std::move(settings));
+    ASSERT_TRUE(createdRoot);
+    auto& root = **createdRoot;
+    auto storage = File::ephemeral_file(root.random());
+    ASSERT_TRUE(storage);
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world) << world.error().what();
+    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    (*world)->setSpawningEnabled(false);
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto made = (*factory)->create();
+    ASSERT_TRUE(made);
+    auto& player = **made;
+    ASSERT_TRUE(player.finalizeCreation());
+    auto uuid = player.uuid();
+    ASSERT_TRUE(uuid);
+    auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
+    ASSERT_TRUE(context);
+    player.setClientContext(*context);
+    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
+    auto uninitPlayer = finally([&] { EXPECT_TRUE(player.uninit()); });
+    ASSERT_TRUE(player.refreshHumanoid());
+    ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
+
+    class RecoveryLogSink final : public LogSink {
+    public:
+      std::vector<std::string> records;
+      std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+        records.emplace_back(message);
+        return {};
+      }
+    };
+    auto sink = std::make_shared<RecoveryLogSink>();
+    sink->setLevel(LogLevel::Error);
+    root.logger().addSink(sink);
+    Json config = JsonObject{
+      {"itemName", "activeitemrecovery"}, {"rarity", "common"}, {"animation", JsonObject{}},
+      {"scripts", JsonArray{"/active-item-recovery.lua"}}, {"retainScriptStorageInItem", true}
+    };
+    constexpr float dt = 1.f / 60;
+    for (String failure : {String("init"), String("activate"), String("update"), String("message"), String("uninit")}) {
+      SCOPED_TRACE(failure.utf8());
+      auto configuration = root.configuration();
+      ASSERT_TRUE(configuration);
+      ASSERT_TRUE((*configuration)->set("recoveryItemFailure", failure));
+      auto item = ActiveItem::create(root, config, "/", JsonObject{});
+      ASSERT_TRUE(item);
+      ASSERT_TRUE((*item)->init(player, ToolHand::Primary));
+      auto uninitItem = finally([&] {
+        if ((*item)->initialized())
+          EXPECT_TRUE((*item)->uninit());
+      });
+      if (failure == "message") {
+        auto response = (*item)->receiveMessage("recoveryProbe", true, {});
+        ASSERT_TRUE(response);
+        EXPECT_FALSE(*response);
+      }
+      ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
+      ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
+      String expectedHook = failure == "uninit" ? "update" : failure;
+      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.toString(); }), expectedHook);
+      // Storage retention is host work after activate/update. A failed script
+      // must not prevent it, and the second tick must not re-enter that script.
+      auto retained = (*item)->instanceValue("scriptStorage");
+      ASSERT_TRUE(retained);
+      EXPECT_EQ(retained->getString("lastHook"), expectedHook);
+      ASSERT_TRUE((*item)->uninit());
+      EXPECT_FALSE((*item)->initialized());
+      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.toString(); }), failure);
+      std::string marker = "active-item-recovery:" + failure.utf8();
+      EXPECT_EQ(std::ranges::count_if(sink->records, [&](std::string const& record) {
+        return record.find(marker) != std::string::npos;
+      }), 1);
+      sink->records.clear();
+
+      // Reusing the same item proves uninit removed every callback group even
+      // after a failed hook; duplicate registration remains a real error.
+      ASSERT_TRUE((*configuration)->set("recoveryItemFailure", "none"));
+      ASSERT_TRUE((*item)->init(player, ToolHand::Primary));
+      ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
+      auto response = (*item)->receiveMessage("recoveryProbe", true, {});
+      ASSERT_TRUE(response);
+      EXPECT_TRUE(*response);
+      ASSERT_TRUE((*item)->uninit());
+      EXPECT_FALSE((*item)->initialized());
+    }
+
+    auto invalid = ActiveItem::create(root, config, "/", JsonObject{{"scriptDelta", "invalid"}});
+    ASSERT_TRUE(invalid);
+    EXPECT_FALSE((*invalid)->init(player, ToolHand::Primary));
+    EXPECT_TRUE((*invalid)->uninit());
+    EXPECT_FALSE((*invalid)->initialized());
   });
 
 const GameTestRegistration blueprintLearning(

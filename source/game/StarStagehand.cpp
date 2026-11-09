@@ -135,7 +135,7 @@ std::expected<void, StarException> Stagehand::init(World& world, EntityId entity
         return std::unexpected(std::move(behaviorCallbacks.error()));
       if (auto result = self.m_scriptComponent.addCallbacks("behavior", std::move(*behaviorCallbacks)); !result)
         return result;
-      return self.m_scriptComponent.init(world);
+      return recoverLuaScriptError(self.m_scriptComponent.init(world));
     }
     return {};
   }();
@@ -155,7 +155,7 @@ std::expected<void, StarException> Stagehand::uninit() {
   };
   remember(Entity::uninit());
   if (m_scripted) {
-    remember(m_scriptComponent.uninit());
+    remember(recoverLuaScriptError(m_scriptComponent.uninit()));
     remember(m_scriptComponent.removeCallbacks("stagehand"));
     remember(m_scriptComponent.removeCallbacks("config"));
     remember(m_scriptComponent.removeCallbacks("entity"));
@@ -199,7 +199,7 @@ std::expected<void, StarException> Stagehand::update(float dt, std::uint64_t) {
     return {};
 
   if (isMaster() && m_scripted) {
-    auto result = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+    auto result = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -221,11 +221,11 @@ std::expected<bool, StarException> Stagehand::shouldDestroy() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Stagehand::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Stagehand::evalScript(String const& code) {
-  return m_scriptComponent.eval(code);
+  return recoverLuaScriptError(m_scriptComponent.eval(code));
 }
 
 std::expected<Json, StarException> Stagehand::configValue(String const& name, Json const& def) const {
@@ -341,7 +341,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Stageh
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
-  return m_scriptComponent.handleMessage(message, sendingConnection == currentWorld->get().connection(), args);
+  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, sendingConnection == currentWorld->get().connection(), args));
 }
 
 }

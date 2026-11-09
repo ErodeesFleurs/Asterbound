@@ -552,7 +552,7 @@ if (!result102) return std::unexpected(std::move(result102.error()));
     auto result103 = m_scriptComponent.addActorMovementCallbacks(*m_movementController);
 if (!result103) return std::unexpected(std::move(result103.error()));
 
-    auto result104 = m_scriptComponent.init(world);
+    auto result104 = recoverLuaScriptError(m_scriptComponent.init(world));
 if (!result104) return std::unexpected(std::move(result104.error()));
 
   }
@@ -585,7 +585,7 @@ if (!result112) return std::unexpected(std::move(result112.error()));
 auto result113 = m_scriptedAnimator.addCallbacks("entity", std::move(*result112));
 if (!result113) return std::unexpected(std::move(result113.error()));
 
-    auto result114 = m_scriptedAnimator.init(world);
+    auto result114 = recoverLuaScriptError(m_scriptedAnimator.init(world));
 if (!result114) return std::unexpected(std::move(result114.error()));
 
   }
@@ -603,7 +603,7 @@ std::expected<void, StarException> Npc::uninit() {
     auto result115 = m_movementController->resetAnchorState();
 if (!result115) return std::unexpected(std::move(result115.error()));
 
-    auto result116 = m_scriptComponent.uninit();
+    auto result116 = recoverLuaScriptError(m_scriptComponent.uninit());
 if (!result116) return std::unexpected(std::move(result116.error()));
 
     auto result117 = m_scriptComponent.removeCallbacks("npc");
@@ -635,7 +635,7 @@ if (!result124) return std::unexpected(std::move(result124.error()));
   auto result125 = world();
   if (!result125) return std::unexpected(std::move(result125.error()));
   if (result125->get().isClient()) {
-      auto result126 = m_scriptedAnimator.uninit();
+      auto result126 = recoverLuaScriptError(m_scriptedAnimator.uninit());
   if (!result126) return std::unexpected(std::move(result126.error()));
 
       auto result127 = m_scriptedAnimator.removeCallbacks("animationConfig");
@@ -866,12 +866,12 @@ auto notifications = std::move(*result171);
     totalDamage += notification.healthLost;
 
   if (totalDamage > 0 && m_hitDamageNotificationLimiter < m_hitDamageNotificationLimit) {
-    auto result172 = m_scriptComponent.invoke("damage", JsonObject{
+    auto result172 = recoverLuaScriptError(m_scriptComponent.invoke("damage", JsonObject{
         {"sourceId", damage.sourceEntityId},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
         {"sourceKind", damage.damageSourceKind}
-      });
+      }));
 if (!result172) return std::unexpected(std::move(result172.error()));
 
     m_hitDamageNotificationLimiter++;
@@ -885,7 +885,7 @@ std::expected<List<DamageNotification>, StarException> Npc::selfDamageNotificati
 }
 
 std::expected<bool, StarException> Npc::shouldDestroy() const {
-  auto result = m_scriptComponent.invoke<bool>("shouldDie");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("shouldDie"));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
@@ -894,7 +894,7 @@ std::expected<bool, StarException> Npc::shouldDestroy() const {
 }
 
 std::expected<void, StarException> Npc::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto result174 = m_scriptComponent.invoke("die");
+  auto result174 = recoverLuaScriptError(m_scriptComponent.invoke("die"));
 if (!result174) return std::unexpected(std::move(result174.error()));
 
 
@@ -959,7 +959,7 @@ std::expected<void, StarException> Npc::update(float dt, std::uint64_t) {
   m_movementController->setTimestep(dt);
 
   if (isMaster()) {
-    auto result185 = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+    auto result185 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
 if (!result185) return std::unexpected(std::move(result185.error()));
 
 
@@ -1357,11 +1357,11 @@ bool Npc::aggressive() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Npc::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Npc::evalScript(String const& code) {
-  return m_scriptComponent.eval(code);
+  return recoverLuaScriptError(m_scriptComponent.eval(code));
 }
 
 std::expected<Vec2F, StarException> Npc::getAbsolutePosition(Vec2F relativePosition) const {
@@ -1488,7 +1488,7 @@ if (!result284) return std::unexpected(std::move(result284.error()));
 
     }
 }
-  auto result293 = m_scriptedAnimator.update();
+  auto result293 = recoverLuaScriptError(m_scriptedAnimator.update());
 if (!result293) return std::unexpected(std::move(result293.error()));
 
   return {};
@@ -2287,8 +2287,8 @@ bool Npc::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Npc::interact(InteractRequest const& request) {
-  auto result486 = m_scriptComponent.invoke<Json>("interact",
-      JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}});
+  auto result486 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact",
+      JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}}));
 if (!result486) return std::unexpected(std::move(result486.error()));
 auto result = std::move(*result486).value_or(Json{});
 
@@ -2417,7 +2417,7 @@ return lights;
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result502 = world();
 if (!result502) return std::unexpected(std::move(result502.error()));
-auto result503 = m_scriptComponent.handleMessage(message, result502->get().connection() == sendingConnection, args);
+auto result503 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, result502->get().connection() == sendingConnection, args));
 if (!result503) return std::unexpected(std::move(result503.error()));
 std::optional<ChainableJsonMessageResponse> result = std::move(*result503);
   if (!result)
@@ -2939,7 +2939,7 @@ if (!result565) return std::unexpected(std::move(result565.error()));
 auto result566 = m_scriptComponent.addCallbacks("animator", std::move(*result565));
 if (!result566) return std::unexpected(std::move(result566.error()));
 
-        auto result567 = m_scriptComponent.invoke("refreshHumanoidParameters");
+        auto result567 = recoverLuaScriptError(m_scriptComponent.invoke("refreshHumanoidParameters"));
 if (!result567) return std::unexpected(std::move(result567.error()));
 
       }
@@ -2948,7 +2948,7 @@ if (!result567) return std::unexpected(std::move(result567.error()));
   auto result568 = world();
   if (!result568) return std::unexpected(std::move(result568.error()));
   if (result568->get().isClient() && m_scriptedAnimator.initialized()) {
-        auto result569 = m_scriptedAnimator.uninit();
+        auto result569 = recoverLuaScriptError(m_scriptedAnimator.uninit());
   if (!result569) return std::unexpected(std::move(result569.error()));
 
         auto result570 = m_scriptedAnimator.removeCallbacks("animationConfig");
@@ -2991,7 +2991,7 @@ if (!result567) return std::unexpected(std::move(result567.error()));
 
         auto result582 = world();
   if (!result582) return std::unexpected(std::move(result582.error()));
-  auto result583 = m_scriptedAnimator.init(result582->get());
+  auto result583 = recoverLuaScriptError(m_scriptedAnimator.init(result582->get()));
   if (!result583) return std::unexpected(std::move(result583.error()));
 
       }

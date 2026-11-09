@@ -242,14 +242,14 @@ std::expected<std::shared_ptr<CommandProcessor>, StarException> CommandProcessor
   if (!scriptsSet) return std::unexpected(std::move(scriptsSet.error()));
   auto rootSet = processor->m_scriptComponent.setLuaRoot(processor->m_luaRoot);
   if (!rootSet) return std::unexpected(std::move(rootSet.error()));
-  auto initialized = processor->m_scriptComponent.init();
+  auto initialized = recoverLuaScriptError(processor->m_scriptComponent.init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   return processor;
 }
 
 std::expected<void, StarException> CommandProcessor::close() {
   std::lock_guard locker(m_mutex);
-  return m_scriptComponent.uninit();
+  return recoverLuaScriptError(m_scriptComponent.uninit());
 }
 
 std::expected<ServerCommandResult, StarException> CommandProcessor::adminCommand(String const& command, String const& argumentString) {
@@ -1717,7 +1717,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
   }
   auto arguments = m_parser.tokenizeToStringList(argumentString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
-  auto invoked = m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, jsonFromStringList(*arguments));
+  auto invoked = recoverLuaScriptError(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, jsonFromStringList(*arguments)));
   if (!invoked) return std::unexpected(std::move(invoked.error()));
   if (*invoked) {
     auto& result = **invoked;

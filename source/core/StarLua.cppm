@@ -47,6 +47,12 @@ struct LuaExceptionTag {
 };
 using LuaException = StarError<LuaExceptionTag, StarException>;
 
+// Explicit host infrastructure failures keep their native identity across Lua.
+struct LuaHostErrorTag {
+  static constexpr std::string_view name() { return "LuaHostError"; }
+};
+using LuaHostError = StarError<LuaHostErrorTag, StarException>;
+
 // Incomplete statement diagnostics let REPL callers request more input.
 // Lua uses the trailing '<eof>' marker for this category.
 struct LuaIncompleteStatementExceptionTag {
@@ -754,8 +760,11 @@ private:
   [[nodiscard]] std::expected<void, StarException> handleError(lua_State* state, int res);
   [[nodiscard]] std::expected<void, StarException> handleSourceError(lua_State* state, int res, String const& source);
   void pushCallbackError(lua_State* state, StarException const& error);
+  struct DiagnosticTransport;
+  DiagnosticTransport const* findDiagnosticEntry(lua_State* state, int index) const;
   std::shared_ptr<ExceptionSummary const> findDiagnostic(lua_State* state, int index) const;
-  void rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary);
+  void rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary,
+      std::optional<StarException> nonRecoverableError);
   ExceptionSummary captureDiagnostic(lua_State* from, lua_State* state, int index,
       ExceptionSummaryKind kind) const;
   void beginDiagnosticScope();
@@ -852,6 +861,7 @@ private:
     int type = LUA_TNONE;
     std::size_t length = 0;
     std::shared_ptr<ExceptionSummary const> summary;
+    std::optional<StarException> nonRecoverableError;
   };
   std::array<DiagnosticTransport, 64> m_diagnosticTransport;
   std::size_t m_diagnosticCount = 0;
@@ -2749,6 +2759,8 @@ export namespace Star {
   using ::Star::LuaExceptionTag;
   using ::Star::LuaFloat;
   using ::Star::LuaFunction;
+  using ::Star::LuaHostError;
+  using ::Star::LuaHostErrorTag;
   using ::Star::LuaIncompleteStatementException;
   using ::Star::LuaIncompleteStatementExceptionTag;
   using ::Star::LuaInstructionLimitReached;

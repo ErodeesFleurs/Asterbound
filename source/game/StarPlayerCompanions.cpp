@@ -243,7 +243,7 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
     if (auto result = add("config", LuaBindings::makeConfigCallbacks(
         [this](String const& name, Json const& def) { return m_config.query(name, def); })); !result)
       return std::unexpected(std::move(result.error()));
-    return m_scriptComponent.init(world);
+    return recoverLuaScriptError(m_scriptComponent.init(world));
   }();
   if (!setup) {
     auto cleanup = uninit();
@@ -263,7 +263,7 @@ std::expected<void, StarException> PlayerCompanions::uninit() {
         error = std::move(result.error());
     }
   };
-  remember(m_scriptComponent.uninit());
+  remember(recoverLuaScriptError(m_scriptComponent.uninit()));
   for (auto const& name : std::initializer_list<std::string_view>{"entity", "player", "status", "playerCompanions", "config"})
     remember(m_scriptComponent.removeCallbacks(name));
   if (error)
@@ -272,18 +272,18 @@ std::expected<void, StarException> PlayerCompanions::uninit() {
 }
 
 std::expected<void, StarException> PlayerCompanions::dismissCompanion(String const& category, Uuid const& podUuid) {
-  auto result = m_scriptComponent.invoke("dismissCompanion", category, podUuid.hex());
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("dismissCompanion", category, podUuid.hex()));
   if (!result)
     return std::unexpected(std::move(result.error()));
   return {};
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> PlayerCompanions::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return m_scriptComponent.handleMessage(message, localMessage, args);
+  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, localMessage, args));
 }
 
 std::expected<void, StarException> PlayerCompanions::update(float dt) {
-  auto updated = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+  auto updated = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   return {};

@@ -160,23 +160,30 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
     auto itemWorld = world();
     if (!itemWorld)
       return std::unexpected(std::move(itemWorld.error()));
-    return m_scriptComponent->init(itemWorld->get());
+    return recoverLuaScriptError(m_scriptComponent->init(itemWorld->get()));
   }
   return {};
 }
 
 std::expected<void, StarException> FireableItem::uninit() {
-  if (m_scriptComponent) {
-    auto uninitialized = m_scriptComponent->uninit();
-    if (!uninitialized)
-      return std::unexpected(std::move(uninitialized.error()));
-    for (auto const& name : std::initializer_list<std::string_view>{"config", "fireableItem", "item"}) {
-      auto removed = m_scriptComponent->removeCallbacks(name);
-      if (!removed)
-        return std::unexpected(std::move(removed.error()));
+  std::optional<StarException> error;
+  auto remember = [&](auto result) {
+    if (!result) {
+      if (error)
+        *error = error->with_context(result.error().what());
+      else
+        error = std::move(result.error());
     }
+  };
+  if (m_scriptComponent) {
+    remember(recoverLuaScriptError(m_scriptComponent->uninit()));
+    for (auto const& name : std::initializer_list<std::string_view>{"config", "fireableItem", "item"})
+      remember(m_scriptComponent->removeCallbacks(name));
   }
-  return ToolUserItem::uninit();
+  remember(ToolUserItem::uninit());
+  if (error)
+    return std::unexpected(std::move(*error));
+  return {};
 }
 
 std::expected<void, StarException> FireableItem::fire(FireMode mode, bool, bool edgeTriggered) {
@@ -195,7 +202,7 @@ std::expected<void, StarException> FireableItem::fire(FireMode mode, bool, bool 
   }
 
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("attemptedFire");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("attemptedFire"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -204,7 +211,7 @@ std::expected<void, StarException> FireableItem::fire(FireMode mode, bool, bool 
 
 std::expected<void, StarException> FireableItem::endFire(FireMode mode, bool) {
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("endFire");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("endFire"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -264,7 +271,7 @@ std::expected<bool, StarException> FireableItem::windup() const {
     return false;
 
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("triggerWindup");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("triggerWindup"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -277,7 +284,7 @@ std::expected<void, StarException> FireableItem::update(float dt, FireMode fireM
     auto modeName = enumName<FireModeNames>(fireMode);
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
-    auto invoked = m_scriptComponent->invoke("update", dt, *modeName, shifting);
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("update", dt, *modeName, shifting));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -286,7 +293,7 @@ std::expected<void, StarException> FireableItem::update(float dt, FireMode fireM
     if (m_startTimingFire) {
       m_timeFiring += dt;
       if (m_scriptComponent) {
-        auto invoked = m_scriptComponent->invoke("continueFire", dt);
+        auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("continueFire", dt));
         if (!invoked)
           return std::unexpected(std::move(invoked.error()));
       }
@@ -333,7 +340,7 @@ std::expected<void, StarException> FireableItem::triggerCooldown() {
   setFireTimer(cooldownTime());
   m_cooldown = true;
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("triggerCooldown");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("triggerCooldown"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -429,7 +436,7 @@ std::expected<void, StarException> FireableItem::setFireableParam(String const& 
 
 std::expected<void, StarException> FireableItem::startTriggered() {
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("startTriggered");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("startTriggered"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }
@@ -438,7 +445,7 @@ std::expected<void, StarException> FireableItem::startTriggered() {
 
 std::expected<void, StarException> FireableItem::fireTriggered() {
   if (m_scriptComponent) {
-    auto invoked = m_scriptComponent->invoke("fireTriggered");
+    auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("fireTriggered"));
     if (!invoked)
       return std::unexpected(std::move(invoked.error()));
   }

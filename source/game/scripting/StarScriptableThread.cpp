@@ -237,7 +237,7 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (auto initialized = component->init(); !initialized) {
         // The component already logged and disabled a failed script. Preserve
         // the old per-context isolation; infrastructure failures stop the thread.
-        if (!initialized.error().is<LuaException>())
+        if (!initialized.error().is<LuaScriptError>())
           return std::unexpected(std::move(initialized.error()));
       }
     }
@@ -264,7 +264,7 @@ std::expected<void, StarException> ScriptableThread::run() {
     m_errorOccurred = true;
   // Always tear down all contexts and settle messages, including failed startup.
   for (auto const& p : m_scriptContexts) {
-    if (auto uninitialized = p.second->uninit(); !uninitialized) {
+    if (auto uninitialized = recoverLuaScriptError(p.second->uninit()); !uninitialized) {
       if (result)
         result = std::unexpected(std::move(uninitialized.error()));
       else
@@ -308,7 +308,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Script
   for (auto const& p : m_scriptContexts) {
     auto result = p.second->handleMessage(message, true, args);
     if (!result) {
-      if (result.error().is<LuaException>())
+      if (result.error().is<LuaScriptError>())
         continue; // The failed component logged/reset itself; try the next one.
       return std::unexpected(std::move(result.error()));
     }
@@ -323,7 +323,7 @@ std::expected<void, StarException> ScriptableThread::update() {
   if (m_timestep > 0.0f && !m_pause) {
     for (auto const& p : m_scriptContexts) {
       if (auto updated = p.second->update(p.second->updateDt(m_timestep)); !updated) {
-        if (updated.error().is<LuaException>())
+        if (updated.error().is<LuaScriptError>())
           continue; // Retain the existing logged per-context recovery boundary.
         if (!error)
           error = std::move(updated.error());

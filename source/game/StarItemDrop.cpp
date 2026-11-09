@@ -389,7 +389,7 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
       return std::unexpected(std::move(added.error()));
     if (auto added = add("mcontroller", LuaBindings::makeMovementControllerCallbacks(*m_movementController)); !added)
       return std::unexpected(std::move(added.error()));
-    return m_scriptComponent.init(world);
+    return recoverLuaScriptError(m_scriptComponent.init(world));
   }();
   if (!setup) {
     auto cleaned = uninit();
@@ -414,7 +414,7 @@ std::expected<void, StarException> ItemDrop::uninit() {
     }
   };
   if (isMaster()) {
-    remember(m_scriptComponent.uninit());
+    remember(recoverLuaScriptError(m_scriptComponent.uninit()));
     remember(m_scriptComponent.removeCallbacks("itemDrop"));
     remember(m_scriptComponent.removeCallbacks("item"));
     remember(m_scriptComponent.removeCallbacks("config"));
@@ -481,7 +481,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
   auto& world = currentWorld->get();
   m_dropAge.update(world.epochTime());
   if (isMaster()) {
-    auto updated = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+    auto updated = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (m_owningEntity.get() != NullEntityId) {
@@ -700,7 +700,7 @@ std::expected<bool, StarException> ItemDrop::canTake() const {
   if (m_mode.get() != Mode::Available || m_owningEntity.get() != NullEntityId || m_item->empty())
     return false;
   if (isMaster()) {
-    auto result = m_scriptComponent.invoke<bool>("canTake");
+    auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("canTake"));
     if (!result)
       return std::unexpected(std::move(result.error()));
     if (*result)
@@ -880,11 +880,11 @@ std::expected<void, StarException> ItemDrop::updateTaken(bool master) {
 }
 
 std::expected<std::optional<LuaValue>, StarException> ItemDrop::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> ItemDrop::evalScript(String const& code) {
-  return m_scriptComponent.eval(code);
+  return recoverLuaScriptError(m_scriptComponent.eval(code));
 }
 
 std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {

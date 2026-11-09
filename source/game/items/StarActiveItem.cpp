@@ -234,7 +234,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto itemWorld = world();
     if (!itemWorld)
       return std::unexpected(std::move(itemWorld.error()));
-    auto scriptInitialized = m_script.init(itemWorld->get());
+    auto scriptInitialized = recoverLuaScriptError(m_script.init(itemWorld->get()));
     if (!scriptInitialized)
       return std::unexpected(std::move(scriptInitialized.error()));
     m_currentFireMode = FireMode::None;
@@ -275,7 +275,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
         });
       if (!configCallbacks)
         return std::unexpected(std::move(configCallbacks.error()));
-      auto animationInitialized = m_scriptedAnimator.init(itemWorld->get());
+      auto animationInitialized = recoverLuaScriptError(m_scriptedAnimator.init(itemWorld->get()));
       if (!animationInitialized)
         return std::unexpected(std::move(animationInitialized.error()));
     }
@@ -284,50 +284,44 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
 }
 
 std::expected<void, StarException> ActiveItem::uninit() {
+  std::optional<StarException> error;
+  auto remember = [&](auto result) {
+    if (!result) {
+      if (error)
+        *error = error->with_context(result.error().what());
+      else
+        error = std::move(result.error());
+    }
+  };
   auto mode = entityMode();
-  if (!mode)
-    return std::unexpected(std::move(mode.error()));
-  if (*mode == EntityMode::Master) {
-    auto uninitialized = m_script.uninit();
-    if (!uninitialized)
-      return std::unexpected(std::move(uninitialized.error()));
-    for (auto const& name : std::initializer_list<std::string_view>{"activeItem", "item", "config", "animator", "status"}) {
-      auto removed = m_script.removeCallbacks(name);
-      if (!removed)
-        return std::unexpected(std::move(removed.error()));
-    }
-    auto movementRemoved = m_script.removeActorMovementCallbacks();
-    if (!movementRemoved)
-      return std::unexpected(std::move(movementRemoved.error()));
-    for (auto const& name : std::initializer_list<std::string_view>{"player", "entity"}) {
-      auto removed = m_script.removeCallbacks(name);
-      if (!removed)
-        return std::unexpected(std::move(removed.error()));
-    }
+  if (!mode) {
+    remember(std::move(mode));
+  } else if (*mode == EntityMode::Master) {
+    remember(recoverLuaScriptError(m_script.uninit()));
+    for (auto const& name : std::initializer_list<std::string_view>{"activeItem", "item", "config", "animator", "status"})
+      remember(m_script.removeCallbacks(name));
+    remember(m_script.removeActorMovementCallbacks());
+    for (auto const& name : std::initializer_list<std::string_view>{"player", "entity"})
+      remember(m_script.removeCallbacks(name));
   }
   auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  if (itemWorld->get().isClient()) {
+  if (!itemWorld) {
+    remember(std::move(itemWorld));
+  } else if (itemWorld->get().isClient()) {
     auto animationScripts = instanceValue("animationScripts");
-    if (!animationScripts)
-      return std::unexpected(std::move(animationScripts.error()));
-    if (*animationScripts) {
-      auto uninitialized = m_scriptedAnimator.uninit();
-      if (!uninitialized)
-        return std::unexpected(std::move(uninitialized.error()));
-      for (auto const& name : std::initializer_list<std::string_view>{"animationConfig", "activeItemAnimation", "config"}) {
-        auto removed = m_scriptedAnimator.removeCallbacks(name);
-        if (!removed)
-          return std::unexpected(std::move(removed.error()));
-      }
+    if (!animationScripts) {
+      remember(std::move(animationScripts));
+    } else if (*animationScripts) {
+      remember(recoverLuaScriptError(m_scriptedAnimator.uninit()));
+      for (auto const& name : std::initializer_list<std::string_view>{"animationConfig", "activeItemAnimation", "config"})
+        remember(m_scriptedAnimator.removeCallbacks(name));
     }
   }
   m_itemAnimatorDynamicTarget.stopAudio();
-  auto uninitialized = ToolUserItem::uninit();
-  if (!uninitialized)
-    return std::unexpected(std::move(uninitialized.error()));
+  remember(ToolUserItem::uninit());
   m_activeAudio.clear();
+  if (error)
+    return std::unexpected(std::move(*error));
   return {};
 }
 
@@ -349,12 +343,12 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     if (fireMode != m_currentFireMode) {
       m_currentFireMode = fireMode;
       if (fireMode != FireMode::None) {
-        auto activated = m_script.invoke("activate", *fireModeName, shifting, moveMap);
+        auto activated = recoverLuaScriptError(m_script.invoke("activate", *fireModeName, shifting, moveMap));
         if (!activated)
           return std::unexpected(std::move(activated.error()));
       }
     }
-    auto updated = m_script.update(m_script.updateDt(dt), *fireModeName, shifting, moveMap);
+    auto updated = recoverLuaScriptError(m_script.update(m_script.updateDt(dt), *fireModeName, shifting, moveMap));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.toBool(); });
@@ -377,7 +371,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
   if (!animated)
     return std::unexpected(std::move(animated.error()));
   if (isClient) {
-    auto updated = m_scriptedAnimator.update(m_scriptedAnimator.updateDt(dt));
+    auto updated = recoverLuaScriptError(m_scriptedAnimator.update(m_scriptedAnimator.updateDt(dt)));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
   }
@@ -631,7 +625,7 @@ std::optional<String> ActiveItem::cursor() const {
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ActiveItem::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return m_script.handleMessage(message, localMessage, args);
+  return recoverLuaScriptError(m_script.handleMessage(message, localMessage, args));
 }
 
 std::expected<float, StarException> ActiveItem::durabilityStatus() {
@@ -907,7 +901,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(itemHand.error()));
       if (auto otherHandItem = itemOwner->get().handItem(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
         if (auto otherActiveItem = as<ActiveItem>(otherHandItem))
-          return otherActiveItem->m_script.invoke(function, args).transform([](std::optional<LuaValue> value) {
+          return recoverLuaScriptError(otherActiveItem->m_script.invoke(function, args)).transform([](std::optional<LuaValue> value) {
             return std::move(value).value_or(LuaValue{});
           });
       }

@@ -313,7 +313,7 @@ std::expected<void, StarException> WorldServer::close() {
       error = std::move(next);
   };
   for (auto&& p : m_scriptContexts) {
-    if (auto result = p.second->uninit(); !result)
+    if (auto result = recoverLuaScriptError(p.second->uninit()); !result)
       recordError(std::move(result.error()));
   }
   m_scriptContexts.clear();
@@ -465,7 +465,7 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
       return std::unexpected(std::move(result12.error()));
 
     m_scriptContexts.set(p.first, scriptComponent);
-    auto result13 = scriptComponent->init(*this);
+    auto result13 = recoverLuaScriptError(scriptComponent->init(*this));
     if (!result13)
       return std::unexpected(std::move(result13.error()));
   }
@@ -779,7 +779,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   clientInfo->outgoingPackets.push_back(std::make_shared<CentralStructureUpdatePacket>(std::move(*result61)));
 
   for (auto&& p : m_scriptContexts) {
-    auto result62 = p.second->invoke("addClient", clientId, isLocal);
+    auto result62 = recoverLuaScriptError(p.second->invoke("addClient", clientId, isLocal));
     if (!result62)
       return std::unexpected(std::move(result62.error()));
   }
@@ -794,7 +794,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
   auto const& info = result63->get();
 
   for (auto&& p : m_scriptContexts) {
-    auto result64 = p.second->invoke("removeClient", clientId);
+    auto result64 = recoverLuaScriptError(p.second->invoke("removeClient", clientId));
     if (!result64)
       return std::unexpected(std::move(result64.error()));
   }
@@ -1519,7 +1519,7 @@ bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> cons
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto&& p : m_scriptContexts) {
-    auto result149 = p.second->handleMessage(message, fromConnection == ServerConnectionId, args);
+    auto result149 = recoverLuaScriptError(p.second->handleMessage(message, fromConnection == ServerConnectionId, args));
     if (!result149)
       return std::unexpected(std::move(result149.error()));
     result = std::move(*result149);
@@ -1657,7 +1657,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     return std::unexpected(std::move(result162.error()));
 
   for (auto&& pair : m_scriptContexts) {
-    auto result163 = pair.second->update(pair.second->updateDt(dt));
+    auto result163 = recoverLuaScriptError(pair.second->update(pair.second->updateDt(dt)));
     if (!result163)
       return std::unexpected(std::move(result163.error()));
   }

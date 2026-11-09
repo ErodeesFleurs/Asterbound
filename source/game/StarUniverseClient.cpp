@@ -674,7 +674,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     if (!operation50)
       return std::unexpected(std::move(operation50.error()));
     for (auto&& p : m_scriptContexts) {
-      auto operation51 = p.second->update();
+      auto operation51 = recoverLuaScriptError(p.second->update());
       if (!operation51)
         return std::unexpected(std::move(operation51.error()));
     }
@@ -1212,7 +1212,7 @@ std::expected<void, StarException> UniverseClient::startLuaScripts() {
       if (!operation27)
         return std::unexpected(std::move(operation27.error()));
       m_scriptContexts.set(p.first, script);
-      auto operation28 = script->init();
+      auto operation28 = recoverLuaScriptError(script->init());
       if (!operation28)
         return std::unexpected(std::move(operation28.error()));
     }
@@ -1237,7 +1237,7 @@ std::expected<void, StarException> UniverseClient::stopLua() {
     }
   };
   for (auto&& p : m_scriptContexts)
-    remember(p.second->uninit());
+    remember(recoverLuaScriptError(p.second->uninit()));
   m_scriptContexts.clear();
   if (error)
     return std::unexpected(std::move(*error));
@@ -1848,7 +1848,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
           auto const& custom = std::get<ClientCustomWorldId>(loaded->worldId);
           if (custom.uuid == m_clientContext->playerUuid()) {
             for (auto&& p : m_scriptContexts) {
-              auto operation88 = p.second->invoke("clientCustomWorldLoaded", custom.name, world);
+              auto operation88 = recoverLuaScriptError(p.second->invoke("clientCustomWorldLoaded", custom.name, world));
               if (!operation88)
                 return std::unexpected(std::move(operation88.error()));
             }
@@ -1856,14 +1856,14 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         } else if (std::holds_alternative<ClientShipWorldId>(loaded->worldId)) {
           if (std::get<ClientShipWorldId>(loaded->worldId) == m_clientContext->playerUuid()) {
             for (auto&& p : m_scriptContexts) {
-              auto operation89 = p.second->invoke("shipWorldLoaded", world);
+              auto operation89 = recoverLuaScriptError(p.second->invoke("shipWorldLoaded", world));
               if (!operation89)
                 return std::unexpected(std::move(operation89.error()));
             }
           }
         }
         for (auto&& p : m_scriptContexts) {
-          auto operation90 = p.second->invoke("serverWorldLoaded", world);
+          auto operation90 = recoverLuaScriptError(p.second->invoke("serverWorldLoaded", world));
           if (!operation90)
             return std::unexpected(std::move(operation90.error()));
         }
@@ -1883,7 +1883,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
             return std::unexpected(std::move(operation92.error()));
         }
         for (auto&& p : m_scriptContexts) {
-          auto operation93 = p.second->invoke("subWorldRejected", rejected->subWorldId);
+          auto operation93 = recoverLuaScriptError(p.second->invoke("subWorldRejected", rejected->subWorldId));
           if (!operation93)
             return std::unexpected(std::move(operation93.error()));
         }
@@ -2079,7 +2079,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendUniverseMessa
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> UniverseClient::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
   for (auto&& p : m_scriptContexts) {
-    auto responseResult = p.second->handleMessage(message, local, args);
+    auto responseResult = recoverLuaScriptError(p.second->handleMessage(message, local, args));
     if (!responseResult)
       return std::unexpected(std::move(responseResult.error()));
     auto response = std::move(*responseResult);

@@ -578,7 +578,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation8 = m_scriptComponent.addCallbacks("animator", std::move(animatorCallbacks));
       if (!operation8)
         return std::unexpected(std::move(operation8.error()));
-      auto operation9 = m_scriptComponent.init(world);
+      auto operation9 = recoverLuaScriptError(m_scriptComponent.init(world));
       if (!operation9)
         return std::unexpected(std::move(operation9.error()));
     }
@@ -615,7 +615,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation14 = m_scriptedAnimator.addCallbacks("entity", std::move(entityCallbacks));
       if (!operation14)
         return std::unexpected(std::move(operation14.error()));
-      auto operation15 = m_scriptedAnimator.init(world);
+      auto operation15 = recoverLuaScriptError(m_scriptedAnimator.init(world));
       if (!operation15)
         return std::unexpected(std::move(operation15.error()));
     }
@@ -692,14 +692,14 @@ std::expected<void, StarException> Object::uninit() {
   std::optional<StarException> error;
   auto remember = [&](auto result) { if (!result && !error) error = std::move(result.error()); };
   if (isMaster()) {
-    remember(m_scriptComponent.uninit());
+    remember(recoverLuaScriptError(m_scriptComponent.uninit()));
     remember(m_scriptComponent.removeCallbacks("object"));
     remember(m_scriptComponent.removeCallbacks("config"));
     remember(m_scriptComponent.removeCallbacks("entity"));
     remember(m_scriptComponent.removeCallbacks("animator"));
   }
   if (auto attachedWorld = maybeWorld(); attachedWorld && attachedWorld->get().isClient()) {
-    remember(m_scriptedAnimator.uninit());
+    remember(recoverLuaScriptError(m_scriptedAnimator.uninit()));
     remember(m_scriptedAnimator.removeCallbacks("animationConfig"));
     remember(m_scriptedAnimator.removeCallbacks("objectAnimator"));
     remember(m_scriptedAnimator.removeCallbacks("config"));
@@ -868,7 +868,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
     m_networkedAnimator->setFlipped(direction() == Direction::Left, m_animationCenterLine);
-    auto operation3 = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+    auto operation3 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
     if (!operation3)
       return std::unexpected(std::move(operation3.error()));
   } else {
@@ -882,7 +882,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   for (auto& timer : m_emissionTimers)
     timer.tick(dt);
   if (currentWorld.isClient()) {
-    auto operation5 = m_scriptedAnimator.update();
+    auto operation5 = recoverLuaScriptError(m_scriptedAnimator.update());
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
   }
@@ -1013,7 +1013,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
     doSmash = smash;
   }
   if (isMaster()) {
-    auto operation1 = m_scriptComponent.invoke("die", m_health.get() <= 0);
+    auto operation1 = recoverLuaScriptError(m_scriptComponent.invoke("die", m_health.get() <= 0));
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
     auto dropped = [&]() -> std::expected<void, StarException> {
@@ -1412,7 +1412,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Object
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  return m_scriptComponent.handleMessage(message, sendingConnection == currentWorld.connection(), args);
+  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, sendingConnection == currentWorld.connection(), args));
 }
 
 std::expected<Json, StarException> Object::configValue(String const& name, Json const& def) const {
@@ -1711,7 +1711,7 @@ std::expected<void, StarException> Object::addNodeConnection(WireNode wireNode, 
       return true;
     });
   }
-  auto operation3 = m_scriptComponent.invoke("onNodeConnectionChange");
+  auto operation3 = recoverLuaScriptError(m_scriptComponent.invoke("onNodeConnectionChange"));
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
   return {};
@@ -1735,7 +1735,7 @@ std::expected<void, StarException> Object::removeNodeConnection(WireNode wireNod
       return list.remove(nodeConnection);
     });
   }
-  auto operation1 = m_scriptComponent.invoke("onNodeConnectionChange");
+  auto operation1 = recoverLuaScriptError(m_scriptComponent.invoke("onNodeConnectionChange"));
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   return {};
@@ -1754,7 +1754,7 @@ std::expected<void, StarException> Object::evaluate(WireCoordinator& coordinator
     }
     if (node.state.get() != nextState) {
       node.state.set(nextState);
-      auto operation1 = m_scriptComponent.invoke("onInputNodeChange", JsonObject{{"node", i}, {"level", nextState}});
+      auto operation1 = recoverLuaScriptError(m_scriptComponent.invoke("onInputNodeChange", JsonObject{{"node", i}, {"level", nextState}}));
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
     }
@@ -2221,7 +2221,7 @@ std::expected<std::optional<PolyF>, StarException> Object::hitPoly() const {
 std::expected<List<DamageNotification>, StarException> Object::applyDamage(DamageRequest const& damage) {
   if (!m_config->smashable || !inWorld() || m_health.get() <= 0.0f)
     return List<DamageNotification>();
-  auto notificationsResult = m_scriptComponent.invoke<List<DamageNotification>>("applyDamageRequest", damage);
+  auto notificationsResult = recoverLuaScriptError(m_scriptComponent.invoke<List<DamageNotification>>("applyDamageRequest", damage));
   if (!notificationsResult)
     return std::unexpected(std::move(notificationsResult.error()));
   auto notifications = std::move(*notificationsResult);
@@ -2258,7 +2258,7 @@ std::expected<InteractAction, StarException> Object::interact(InteractRequest co
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
   Vec2F diff = currentWorld.geometry().diff(request.sourcePosition, position());
-  auto resultResult = m_scriptComponent.invoke<Json>("onInteraction", JsonObject{{"source", JsonArray{diff[0], diff[1]}}, {"sourceId", request.sourceId}});
+  auto resultResult = recoverLuaScriptError(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{{"source", JsonArray{diff[0], diff[1]}}, {"sourceId", request.sourceId}}));
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
@@ -2309,11 +2309,11 @@ List<Vec2I> Object::interactiveSpaces() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Object::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Object::evalScript(String const& code) {
-  return m_scriptComponent.eval(code);
+  return recoverLuaScriptError(m_scriptComponent.eval(code));
 }
 
 std::expected<Vec2F, StarException> Object::mouthPosition() const {

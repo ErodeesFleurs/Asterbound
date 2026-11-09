@@ -8,6 +8,7 @@ import star.actor_movement_controller;
 import star.behavior_database;
 import star.chat_types;
 import star.collection_database;
+import star.casting;
 import star.collision_block;
 import star.file;
 import star.game_test;
@@ -24,6 +25,7 @@ import star.lua_converters;
 import star.lua_game_converters;
 import star.lua_root;
 import star.npc;
+import star.net_packets;
 import star.npc_database;
 import star.root;
 import star.rpc_promise;
@@ -31,6 +33,8 @@ import star.scriptable_thread;
 import star.string;
 import star.vector;
 import star.thread;
+import star.uuid;
+import star.warping;
 import star.world_server;
 import star.world_lua_bindings;
 import star.logging;
@@ -486,6 +490,172 @@ const GameTestRegistration
     EXPECT_TRUE(component.error());
   });
 
+class RecoveryBoundaryScript : public LuaBaseComponent {
+public:
+  explicit RecoveryBoundaryScript(Root& root) : LuaBaseComponent(root) {}
+  bool failSetup = false;
+  bool failCleanup = false;
+protected:
+  std::expected<void, StarException> contextSetup() override {
+    if (failSetup)
+      return std::unexpected(LuaException("host setup failure"));
+    return LuaBaseComponent::contextSetup();
+  }
+  std::expected<void, StarException> contextShutdown() override {
+    if (failCleanup)
+      return std::unexpected(LuaException("host cleanup failure"));
+    return LuaBaseComponent::contextShutdown();
+  }
+};
+
+const GameTestRegistration scriptRecoveryCategories(
+  "LuaComponentLifecycle", "HostRecoveryKeepsSetupAndCleanupFailuresFatal", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    for (bool failCleanup : {false, true}) {
+      RecoveryBoundaryScript script(fixture.root());
+      ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+      ASSERT_TRUE(script.init());
+      script.failCleanup = failCleanup;
+      ASSERT_TRUE(script.eval<LuaValue>("function fail() error('isolated script fault', 0) end"));
+      auto result = expectLoggedFailure(
+        [&] { return recoverLuaScriptError(script.invoke<Json>("fail")); }, "isolated script fault");
+      EXPECT_FALSE(script.initialized());
+      EXPECT_TRUE(script.error());
+      if (failCleanup) {
+        ASSERT_FALSE(result);
+        EXPECT_NE(std::string_view(result.error().what()).find("host cleanup failure"), std::string_view::npos);
+        EXPECT_NE(std::string_view(result.error().what()).find("isolated script fault"), std::string_view::npos);
+      } else {
+        ASSERT_TRUE(result);
+        EXPECT_FALSE(*result);
+      }
+    }
+    RecoveryBoundaryScript script(fixture.root());
+    ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+    script.failSetup = true;
+    auto initialized = expectLoggedFailure(
+      [&] { return recoverLuaScriptError(script.init()); }, "host setup failure");
+    ASSERT_FALSE(initialized);
+    EXPECT_FALSE(script.initialized());
+  });
+
+const GameTestRegistration nestedHostFailure(
+  "LuaComponentLifecycle", "HostFailuresRemainFatalAcrossNestedLuaCallbacks", [](GameTest& fixture) {
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    for (bool cleanupFailure : {false, true}) {
+      RecoveryBoundaryScript inner(fixture.root());
+      ASSERT_TRUE(inner.setLuaRoot(*luaRoot));
+      if (cleanupFailure) {
+        ASSERT_TRUE(inner.init());
+        ASSERT_TRUE(inner.eval<LuaValue>("function fail() error('nested script fault', 0) end"));
+        inner.failCleanup = true;
+      } else {
+        inner.failSetup = true;
+      }
+      LuaBaseComponent outer(fixture.root());
+      ASSERT_TRUE(outer.setLuaRoot(*luaRoot));
+      LuaCallbacks host;
+      ASSERT_TRUE(host.registerCallback("fail", [&]() -> std::expected<void, StarException> {
+        if (!cleanupFailure)
+          return inner.init().transform([](bool) {});
+        return inner.invoke("fail").transform([](std::optional<LuaValue>) {});
+      }));
+      ASSERT_TRUE(outer.addCallbacks("host", std::move(host)));
+      ASSERT_TRUE(outer.init());
+      ASSERT_TRUE(outer.eval<LuaValue>("function fail() host.fail() end"));
+      testing::TestPartResultArray errors;
+      auto result = [&] {
+        testing::ScopedFakeTestPartResultReporter capture(
+          testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
+        return recoverLuaScriptError(outer.invoke<Json>("fail"));
+      }();
+      ASSERT_FALSE(result);
+      EXPECT_TRUE(result.error().is<LuaHostError>());
+      EXPECT_FALSE(outer.initialized());
+      EXPECT_FALSE(inner.initialized());
+      EXPECT_NE(std::string_view(result.error().what()).find(
+        cleanupFailure ? "host cleanup failure" : "host setup failure"), std::string_view::npos);
+    }
+  });
+
+struct NpcRecoveryWorld {
+  std::shared_ptr<WorldServer> world;
+  std::shared_ptr<Npc> npc;
+};
+
+std::expected<NpcRecoveryWorld, StarException> npcRecoveryWorld(Root& root) {
+  auto storage = File::ephemeral_file(root.random());
+  if (!storage)
+    return std::unexpected(std::move(storage.error()));
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!world)
+    return std::unexpected(std::move(world.error()));
+  auto database = root.npcDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto variant = (*database)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject{});
+  if (!variant)
+    return std::unexpected(std::move(variant.error()));
+  variant->scripts.clear();
+  variant->initialScriptDelta = 1;
+  variant->dropPools.clear();
+  auto npc = (*database)->createNpc(*variant);
+  if (!npc)
+    return std::unexpected(std::move(npc.error()));
+  (*npc)->setPosition(Vec2F(1024, 1024));
+  if (auto added = (*world)->addEntity(*npc); !added)
+    return std::unexpected(std::move(added.error()));
+  return NpcRecoveryWorld{std::move(*world), std::move(*npc)};
+}
+
+const GameTestRegistration npcUpdateRecovery(
+  "LuaHostRecovery", "NpcUpdateFailureRemovesNpcWithoutFailingWorld", [](GameTest& fixture) {
+    auto setup = npcRecoveryWorld(fixture.root());
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto closed = finally([&] { EXPECT_TRUE(setup->world->close()); });
+    auto id = setup->npc->entityId();
+    ASSERT_TRUE(setup->npc->evalScript(
+      "function update(dt) error('npc update recovery fault', 0) end"));
+    auto updated = expectLoggedFailure(
+      [&] { return setup->world->update(fixture.root().timing().serverTimestep); }, "npc update recovery fault");
+    ASSERT_TRUE(updated) << updated.error().what();
+    EXPECT_FALSE(setup->world->entity(id));
+    ASSERT_TRUE(setup->world->update(fixture.root().timing().serverTimestep));
+  });
+
+const GameTestRegistration npcMessageRecovery(
+  "LuaHostRecovery", "NpcMessageFailureRepliesWithoutRemovingClient", [](GameTest& fixture) {
+    auto setup = npcRecoveryWorld(fixture.root());
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto closed = finally([&] { EXPECT_TRUE(setup->world->close()); });
+    auto client = MinClientConnectionId;
+    auto added = setup->world->addClient(client, SpawnTargetPosition(Vec2F(1024, 1024)), true);
+    ASSERT_TRUE(added) << added.error().what();
+    ASSERT_TRUE(*added);
+    ASSERT_TRUE(setup->world->handleIncomingPackets(client, {std::make_shared<WorldStartAcknowledgePacket>()}));
+    ASSERT_TRUE(setup->npc->evalScript(
+      "message.setHandler('recoveryProbe', function() error('npc message recovery fault', 0) end)"));
+    Uuid uuid(fixture.root().random());
+    auto packet = std::make_shared<EntityMessagePacket>(
+      setup->npc->entityId(), "recoveryProbe", JsonArray{}, uuid, client);
+    auto handled = expectLoggedFailure(
+      [&] { return setup->world->handleIncomingPackets(client, {packet}); }, "npc message recovery fault");
+    ASSERT_TRUE(handled) << handled.error().what();
+    EXPECT_TRUE(setup->world->hasClient(client));
+    auto packets = setup->world->getOutgoingPackets(client);
+    ASSERT_TRUE(packets) << packets.error().what();
+    std::shared_ptr<EntityMessageResponsePacket> reply;
+    for (auto const& outgoing : *packets) {
+      if (auto candidate = as<EntityMessageResponsePacket>(outgoing); candidate && candidate->uuid == uuid)
+        reply = candidate;
+    }
+    ASSERT_TRUE(reply);
+    ASSERT_FALSE(reply->response);
+    EXPECT_EQ(reply->response.error(), "Message not handled by entity");
+  });
+
 const GameTestRegistration
   chainedMessageResult("LuaComponentLifecycle", "AsyncMessageResultsDistinguishPendingFailureAndSuccess",
                        [](GameTest& fixture) {
@@ -669,6 +839,37 @@ const GameTestRegistration
     EXPECT_TRUE(result.error().is<FailingLuaLog>());
     EXPECT_FALSE(result.error().is<LuaException>());
     EXPECT_FALSE(component.initialized());
+  });
+
+const GameTestRegistration nativeLoggingFailure(
+  "LuaComponentLifecycle", "InfoSinkFailureIsNotRecoveredAsScriptError", [](GameTest& fixture) {
+    class InfoFailingSink final : public LogSink {
+    public:
+      InfoFailingSink() { setLevel(LogLevel::Info); }
+      unsigned writes = 0;
+      std::expected<void, StarException> log(std::string_view, LogLevel level) override {
+        if (level == LogLevel::Info) {
+          ++writes;
+          return std::unexpected(FailingLuaLog("info sink unavailable"));
+        }
+        return {};
+      }
+    };
+    auto luaRoot = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(luaRoot);
+    LuaBaseComponent script(fixture.root());
+    ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(script.init());
+    ASSERT_TRUE(script.eval<LuaValue>("function write() sb.logInfo('native info write') end"));
+    auto sink = std::make_shared<InfoFailingSink>();
+    fixture.root().logger().addSink(sink);
+    auto removed = finally([&] { fixture.root().logger().removeSink(sink); });
+    auto result = expectLoggedFailure(
+      [&] { return recoverLuaScriptError(script.invoke<Json>("write")); }, "info sink unavailable");
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<LuaHostError>());
+    EXPECT_EQ(sink->writes, 1u);
+    EXPECT_FALSE(script.initialized());
   });
 
 const GameTestRegistration
@@ -1242,7 +1443,7 @@ const GameTestRegistration
       testing::TestPartResultArray errors;
       testing::ScopedFakeTestPartResultReporter capture(
         testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
-      return component.init();
+      return recoverLuaScriptError(component.init());
     }();
     ASSERT_FALSE(failed);
     EXPECT_TRUE(failed.error().is<LuaException>());

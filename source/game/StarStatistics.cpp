@@ -344,15 +344,15 @@ template <typename Result, typename... V>
   auto initialized = script.init();
   if (!initialized) {
     auto cleanup = script.uninit();
-    if (!cleanup && !cleanup.error().is<LuaException>()) return std::unexpected(std::move(cleanup.error()));
-    if (initialized.error().is<LuaException>()) return std::optional<Result>{};
+    if (!cleanup && !cleanup.error().is<LuaScriptError>()) return std::unexpected(std::move(cleanup.error()));
+    if (initialized.error().is<LuaScriptError>()) return std::optional<Result>{};
     return std::unexpected(std::move(initialized.error()));
   }
   auto result = script.invoke<Result>(functionName, std::forward<V>(args)...);
   auto uninitialized = script.uninit();
-  if (!uninitialized && !uninitialized.error().is<LuaException>()) return std::unexpected(std::move(uninitialized.error()));
+  if (!uninitialized && !uninitialized.error().is<LuaScriptError>()) return std::unexpected(std::move(uninitialized.error()));
   if (!result) {
-    if (result.error().template is<LuaException>()) return std::optional<Result>{};
+    if (result.error().template is<LuaScriptError>()) return std::optional<Result>{};
     return std::unexpected(std::move(result.error()));
   }
   return result;

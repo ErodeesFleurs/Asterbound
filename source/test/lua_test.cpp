@@ -1160,6 +1160,83 @@ TEST(LuaTest, SummaryPreservesTypedNativeCauseThroughNestedCaughtStringErrors) {
   }
 }
 
+TEST(LuaTest, HostErrorsPreserveTypeThroughNestedCallbacksAndIdentityRethrows) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine->createFunction([](bool host) -> std::expected<void, StarException> {
+    if (host)
+      return std::unexpected(LuaHostError("explicit-host-marker", false));
+    return std::unexpected(LuaConversionException("ordinary-native-marker", false));
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("nativeFailure", *native));
+  auto nested = engine->createFunction([&](bool host, bool identity) -> std::expected<void, StarException> {
+    auto result = context.invokePath("inner", host, identity);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+    return {};
+  });
+  ASSERT_TRUE(nested);
+  ASSERT_TRUE(context.set("nativeNested", *nested));
+  ASSERT_TRUE(context.load(
+      "function inner(host, identity)\n"
+      "  local ok, message = pcall(nativeFailure, host)\n"
+      "  assert(not ok and type(message) == 'string')\n"
+      "  if identity then error(message, 0) else error(message) end\n"
+      "end\n"
+      "function entry(host, identity)\n"
+      "  local ok, message = pcall(nativeNested, host, identity)\n"
+      "  assert(not ok and type(message) == 'string')\n"
+      "  if identity then error(message, 0) else error(message) end\n"
+      "end\n"
+      "function caughtSuccess() local ok, message = pcall(nativeFailure, true); "
+      "return not ok and type(message) == 'string' end\n"
+      "function unrelated() error('unrelated-host-marker') end\n"
+      "function caughtThenUnrelated() pcall(nativeFailure, true); unrelated() end\n"
+      "function transformed() local ok, message = pcall(nativeFailure, true); "
+      "assert(not ok); error('rewritten:' .. message, 0) end",
+      "/host-identity.lua"));
+  EXPECT_EQ(context.invokePath<bool>("caughtSuccess"), true);
+  for (bool identity : {false, true}) {
+    auto failure = context.invokePath("entry", true, identity);
+    ASSERT_FALSE(failure);
+    EXPECT_TRUE(failure.error().is<LuaHostError>());
+    EXPECT_FALSE(failure.error().is<LuaException>());
+    auto const& summary = failure.error().diagnostic_summary();
+    ASSERT_TRUE(summary);
+    EXPECT_EQ(summary->kind, ExceptionSummaryKind::Native);
+    EXPECT_EQ(summary->reason, "explicit-host-marker");
+    EXPECT_TRUE(std::ranges::any_of(summary->locations, [](auto const& location) {
+      return location.source == "/host-identity.lua" && location.line > 0;
+    }));
+    EXPECT_NE(std::string(failure.error().what()).find("explicit-host-marker"), std::string::npos);
+  }
+  auto ordinary = context.invokePath("entry", false, false);
+  ASSERT_FALSE(ordinary);
+  EXPECT_TRUE(ordinary.error().is<LuaException>());
+  EXPECT_FALSE(ordinary.error().is<LuaHostError>());
+  ASSERT_TRUE(ordinary.error().diagnostic_summary());
+  EXPECT_EQ(ordinary.error().diagnostic_summary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(ordinary.error().diagnostic_summary()->reason, "ordinary-native-marker");
+  for (String const& entry : {String("caughtThenUnrelated"), String("transformed"), String("unrelated")}) {
+    auto failure = context.invokePath(entry);
+    ASSERT_FALSE(failure);
+    EXPECT_TRUE(failure.error().is<LuaException>());
+    EXPECT_FALSE(failure.error().is<LuaHostError>());
+    ASSERT_TRUE(failure.error().diagnostic_summary());
+    EXPECT_EQ(failure.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+    if (entry == "transformed")
+      EXPECT_TRUE(failure.error().diagnostic_summary()->reason.starts_with("rewritten:"));
+    else
+      EXPECT_EQ(std::string(failure.error().what()).find("explicit-host-marker"), std::string::npos);
+  }
+  EXPECT_EQ(context.invokePath<bool>("caughtSuccess"), true);
+}
+
 TEST(LuaTest, CaughtNativeSummariesDoNotLeakToOtherErrorsOrLaterCalls) {
   auto created = LuaEngine::create();
   ASSERT_TRUE(created);
@@ -1254,6 +1331,62 @@ TEST(LuaTest, CoroutineNativeSummariesRemainIdentityBoundAcrossResumeAndYield) {
   EXPECT_EQ(afterYield.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
   EXPECT_NE(afterYield.error().diagnostic_summary()->reason.find("after-yield-unrelated-marker"), std::string::npos);
   EXPECT_EQ(afterYield.error().diagnostic_summary()->reason.find("coroutine-native-marker"), std::string::npos);
+}
+
+TEST(LuaTest, CoroutineHostErrorsPreserveTypeWithoutLeakingAcrossYield) {
+  auto created = LuaEngine::create();
+  ASSERT_TRUE(created);
+  auto engine = *created;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+  auto native = engine->createFunction([]() -> std::expected<void, StarException> {
+    return std::unexpected(LuaHostError("coroutine-host-marker", false));
+  });
+  ASSERT_TRUE(native);
+  ASSERT_TRUE(context.set("nativeFailure", *native));
+  ASSERT_TRUE(context.load(
+      "function coEntry() nativeFailure() end\n"
+      "function rethrow() local ok, message = coroutine.resume(coroutine.create(coEntry)); "
+      "assert(not ok and type(message) == 'string'); error(message, 0) end\n"
+      "co = coroutine.create(coEntry)\n"
+      "yielding = coroutine.create(function() local ok, message = pcall(nativeFailure); "
+      "assert(not ok and type(message) == 'string'); coroutine.yield('caught'); "
+      "error('after-host-yield-marker') end)",
+      "/coroutine-host.lua"));
+  auto luaFailure = context.invokePath("rethrow");
+  ASSERT_FALSE(luaFailure);
+  EXPECT_TRUE(luaFailure.error().is<LuaHostError>());
+  EXPECT_FALSE(luaFailure.error().is<LuaException>());
+  ASSERT_TRUE(luaFailure.error().diagnostic_summary());
+  EXPECT_EQ(luaFailure.error().diagnostic_summary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(luaFailure.error().diagnostic_summary()->reason, "coroutine-host-marker");
+  auto thread = context.get<LuaThread>("co");
+  ASSERT_TRUE(thread);
+  auto hostFailure = thread->resume<LuaValue>();
+  ASSERT_FALSE(hostFailure);
+  EXPECT_TRUE(hostFailure.error().is<LuaHostError>());
+  EXPECT_FALSE(hostFailure.error().is<LuaException>());
+  ASSERT_TRUE(hostFailure.error().diagnostic_summary());
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->kind, ExceptionSummaryKind::Native);
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->reason, "coroutine-host-marker");
+  ASSERT_FALSE(hostFailure.error().diagnostic_summary()->locations.empty());
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->locations.front().source, "/coroutine-host.lua");
+  EXPECT_EQ(hostFailure.error().diagnostic_summary()->locations.front().line, 1);
+  auto yielding = context.get<LuaThread>("yielding");
+  ASSERT_TRUE(yielding);
+  auto yielded = yielding->resume<String>();
+  ASSERT_TRUE(yielded);
+  ASSERT_TRUE(*yielded);
+  EXPECT_EQ(**yielded, "caught");
+  auto afterYield = yielding->resume<LuaValue>();
+  ASSERT_FALSE(afterYield);
+  EXPECT_TRUE(afterYield.error().is<LuaException>());
+  EXPECT_FALSE(afterYield.error().is<LuaHostError>());
+  ASSERT_TRUE(afterYield.error().diagnostic_summary());
+  EXPECT_EQ(afterYield.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+  EXPECT_NE(afterYield.error().diagnostic_summary()->reason.find("after-host-yield-marker"), std::string::npos);
+  EXPECT_EQ(std::string(afterYield.error().what()).find("coroutine-host-marker"), std::string::npos);
 }
 
 TEST(LuaTest, CoroutineNumericErrorsKeepTheirOriginalReason) {

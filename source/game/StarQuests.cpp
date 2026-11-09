@@ -500,15 +500,15 @@ void Quest::detachPlayer() {
 }
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Quest::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   if (!m_inited) return std::optional<ChainableJsonMessageResponse>();
-  return m_scriptComponent.handleMessage(message, localMessage, args);
+  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, localMessage, args));
 }
 std::expected<std::optional<LuaValue>, StarException> Quest::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
   if (!m_inited) return std::optional<LuaValue>();
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 std::expected<void, StarException> Quest::update(float dt) {
   if (!m_inited) return {};
-  auto result = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+  auto result = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -517,19 +517,19 @@ std::expected<void, StarException> Quest::offer() {
   setState(QuestState::Offer);
   auto initialized = initScript();
   if (!initialized) return std::unexpected(std::move(initialized.error()));
-  auto result = m_scriptComponent.invoke("questOffer");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questOffer"));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
 std::expected<void, StarException> Quest::declineOffer() {
   setState(QuestState::New);
-  auto result = m_scriptComponent.invoke("questDecline");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questDecline"));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<void, StarException> Quest::cancelOffer() {
   setState(QuestState::New);
-  auto result = m_scriptComponent.invoke("questCancel");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questCancel"));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
@@ -541,7 +541,7 @@ std::expected<void, StarException> Quest::start() {
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   auto current = m_player->get().questManager()->trackedQuest();
   if (mainQuest() || !current) m_player->get().questManager()->setAsTracked(questId());
-  auto result = m_scriptComponent.invoke("questStart");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questStart"));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -550,7 +550,7 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
     return std::unexpected(StarException("Cannot complete a quest without an attached player world"));
   setState(QuestState::Complete);
   m_showDialog = showCompleteDialog();
-  auto result = m_scriptComponent.invoke("questComplete");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questComplete"));
   if (!result) return std::unexpected(std::move(result.error()));
   auto uninitialized = uninitScript();
   if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
@@ -582,19 +582,19 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
 std::expected<void, StarException> Quest::fail() {
   setState(QuestState::Failed);
   m_showDialog = showFailDialog();
-  auto result = m_scriptComponent.invoke("questFail", false);
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questFail", false));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<void, StarException> Quest::abandon() {
   setState(QuestState::Failed);
   m_showDialog = false;
-  auto result = m_scriptComponent.invoke("questFail", true);
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questFail", true));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<bool, StarException> Quest::interactWithEntity(EntityId entity) {
-  auto result = m_scriptComponent.invoke<bool>("questInteract", entity);
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("questInteract", entity));
   if (!result) return std::unexpected(std::move(result.error()));
   return result->value_or(false);
 }
@@ -909,11 +909,11 @@ std::expected<void, StarException> Quest::initScriptBindings() {
   auto movement = m_scriptComponent.addActorMovementCallbacks(m_player->get().movementController());
   if (!movement) return std::unexpected(std::move(movement.error()));
   m_inited = true;
-  return m_scriptComponent.init(m_world->get());
+  return recoverLuaScriptError(m_scriptComponent.init(m_world->get()));
 }
 std::expected<void, StarException> Quest::uninitScript() {
   std::optional<StarException> error;
-  auto uninitialized = m_scriptComponent.uninit();
+  auto uninitialized = recoverLuaScriptError(m_scriptComponent.uninit());
   if (!uninitialized) error = std::move(uninitialized.error());
   for (String const& group : {String("quest"), String("celestial"), String("player"), String("config"), String("entity"), String("status")}) {
     auto removed = m_scriptComponent.removeCallbacks(group);

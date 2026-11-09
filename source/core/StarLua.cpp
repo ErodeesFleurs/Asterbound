@@ -550,9 +550,11 @@ std::expected<LuaEnginePtr, StarException> LuaEngine::create(bool safe) {
         lua_replace(state, 1);
       }
       {
+        auto entry = self.findDiagnosticEntry(state, 1);
+        auto nonRecoverableError = entry ? entry->nonRecoverableError : std::nullopt;
         auto summary = std::make_shared<ExceptionSummary const>(
             self.captureDiagnostic(state, state, 1, ExceptionSummaryKind::ScriptRuntime));
-        self.rememberDiagnostic(state, 1, std::move(summary));
+        self.rememberDiagnostic(state, 1, std::move(summary), std::move(nonRecoverableError));
       }
       // Keep limit sentinels untouched, including their native error types.
       if (lua_islightuserdata(state, 1)) {
@@ -563,10 +565,12 @@ std::expected<LuaEnginePtr, StarException> LuaEngine::create(bool safe) {
 
       luaL_traceback(state, state, lua_tostring(state, 1), 0);
       {
-        auto summary = self.findDiagnostic(state, 1);
-        if (summary) {
-          self.appendSourceDiagnostics(state, state, *summary);
-          self.rememberDiagnostic(state, -1, std::move(summary));
+        if (auto entry = self.findDiagnosticEntry(state, 1)) {
+          auto summary = entry->summary;
+          auto nonRecoverableError = entry->nonRecoverableError;
+          if (summary)
+            self.appendSourceDiagnostics(state, state, *summary);
+          self.rememberDiagnostic(state, -1, std::move(summary), std::move(nonRecoverableError));
         }
       }
       lua_remove(state, 1);
@@ -1142,10 +1146,11 @@ void LuaEngine::pushCallbackError(lua_State* state, StarException const& error) 
     if (lua_pcall(state, 1, 1, 0) != LUA_OK)
       return;
   }
-  rememberDiagnostic(state, -1, error.diagnostic_summary());
+  rememberDiagnostic(state, -1, error.diagnostic_summary(),
+      error.is<LuaHostError>() ? std::optional<StarException>(error) : std::nullopt);
 }
 
-std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* state, int index) const {
+LuaEngine::DiagnosticTransport const* LuaEngine::findDiagnosticEntry(lua_State* state, int index) const {
   int type = lua_type(state, index);
   std::size_t length = 0;
   void const* identity = type == LUA_TSTRING ? lua_tolstring(state, index, &length)
@@ -1156,7 +1161,7 @@ std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* sta
     auto const& entry = m_diagnosticTransport[(m_nextDiagnostic + m_diagnosticTransport.size() - i - 1)
         % m_diagnosticTransport.size()];
     if (entry.type == type && entry.identity == identity)
-      return entry.summary;
+      return &entry;
   }
   if (type != LUA_TSTRING)
     return {};
@@ -1177,14 +1182,20 @@ std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* sta
           % m_diagnosticTransport.size()];
       if (entry.type == LUA_TSTRING && entry.length == payload.size()
           && payload == std::string_view(static_cast<char const*>(entry.identity), entry.length))
-        return entry.summary;
+        return &entry;
     }
   }
   return {};
 }
 
-void LuaEngine::rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary) {
-  if (!summary || m_diagnosticStringsRegistryId == LUA_NOREF || !lua_checkstack(state, 4))
+std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* state, int index) const {
+  auto entry = findDiagnosticEntry(state, index);
+  return entry ? entry->summary : nullptr;
+}
+
+void LuaEngine::rememberDiagnostic(lua_State* state, int index, std::shared_ptr<ExceptionSummary const> summary,
+    std::optional<StarException> nonRecoverableError) {
+  if ((!summary && !nonRecoverableError) || m_diagnosticStringsRegistryId == LUA_NOREF || !lua_checkstack(state, 4))
     return;
   int type = lua_type(state, index);
   std::size_t length = 0;
@@ -1211,7 +1222,7 @@ void LuaEngine::rememberDiagnostic(lua_State* state, int index, std::shared_ptr<
     lua_pop(state, 1);
     return;
   }
-  m_diagnosticTransport[m_nextDiagnostic] = {identity, type, length, std::move(summary)};
+  m_diagnosticTransport[m_nextDiagnostic] = {identity, type, length, std::move(summary), std::move(nonRecoverableError)};
   m_nextDiagnostic = (m_nextDiagnostic + 1) % m_diagnosticTransport.size();
   m_diagnosticCount = std::min(m_diagnosticCount + 1, m_diagnosticTransport.size());
 }
@@ -1289,8 +1300,14 @@ void LuaEngine::endDiagnosticScope() {
 std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int res) {
   if (res == LUA_OK)
     return {};
+  auto entry = findDiagnosticEntry(state, -1);
+  auto nonRecoverableError = entry ? entry->nonRecoverableError : std::nullopt;
   auto summary = captureDiagnostic(state, state, -1, res == LUA_ERRSYNTAX
       ? ExceptionSummaryKind::ScriptSyntax : ExceptionSummaryKind::ScriptRuntime);
+  if (nonRecoverableError) {
+    lua_pop(state, 1);
+    return std::unexpected(std::move(*nonRecoverableError).with_summary(std::move(summary)));
+  }
   if (lua_islightuserdata(state, -1)) {
     void* error = lua_touserdata(state, -1);
     if (error == &s_luaInstructionLimitExceptionKey) {
@@ -1450,16 +1467,20 @@ void LuaEngine::propagateErrorWithTraceback(lua_State* from, lua_State* to) {
     if (lua_type(state, 1) == LUA_TNUMBER)
       lua_tolstring(state, 1, nullptr);
     {
+      auto entry = self.findDiagnosticEntry(state, 1);
+      auto nonRecoverableError = entry ? entry->nonRecoverableError : std::nullopt;
       auto summary = std::make_shared<ExceptionSummary const>(
           self.captureDiagnostic(from, state, 1, ExceptionSummaryKind::ScriptRuntime));
-      self.rememberDiagnostic(state, 1, std::move(summary));
+      self.rememberDiagnostic(state, 1, std::move(summary), std::move(nonRecoverableError));
     }
     if (auto error = lua_tostring(state, 1)) {
       luaL_traceback(state, from, error, 0);
-      auto summary = self.findDiagnostic(state, 1);
-      if (summary) {
-        self.appendSourceDiagnostics(from, state, *summary);
-        self.rememberDiagnostic(state, -1, std::move(summary));
+      if (auto entry = self.findDiagnosticEntry(state, 1)) {
+        auto summary = entry->summary;
+        auto nonRecoverableError = entry->nonRecoverableError;
+        if (summary)
+          self.appendSourceDiagnostics(from, state, *summary);
+        self.rememberDiagnostic(state, -1, std::move(summary), std::move(nonRecoverableError));
       }
     } else {
       lua_pushvalue(state, 1);

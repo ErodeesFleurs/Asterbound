@@ -333,7 +333,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       m_ageItemsTimer.setElapsedTime(0.0);
     }
     if (std::exchange(m_runUpdatedCallback, false)) {
-      auto operation4 = m_scriptComponent.invoke("containerCallback");
+      auto operation4 = recoverLuaScriptError(m_scriptComponent.invoke("containerCallback"));
       if (!operation4)
         return std::unexpected(std::move(operation4.error()));
     }
@@ -1264,7 +1264,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
   JsonArray materials;
   materials.reserve(inputItems.size());
   std::ranges::copy(descriptors, std::back_inserter(materials));
-  auto resultResult = m_scriptComponent.invoke<Json>("craftingRecipe", materials);
+  auto resultResult = recoverLuaScriptError(m_scriptComponent.invoke<Json>("craftingRecipe", materials));
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);

@@ -28,6 +28,20 @@ struct LuaComponentExceptionTag {
 };
 using LuaComponentException = StarError<LuaComponentExceptionTag, LuaException>;
 
+// Only failures from executing/loading Lua are recoverable by script hosts.
+// Callback setup, persistence, thread cleanup and logging keep their own category.
+struct LuaScriptErrorTag {
+  static constexpr std::string_view name() { return "LuaScriptError"; }
+};
+using LuaScriptError = StarError<LuaScriptErrorTag, LuaException>;
+
+template <typename T>
+[[nodiscard]] std::expected<T, StarException> recoverLuaScriptError(std::expected<T, StarException> result) {
+  if (!result && result.error().template is<LuaScriptError>())
+    return {};
+  return result;
+}
+
 class ScriptableThread;
 class LuaScriptWorld;
 
@@ -38,6 +52,8 @@ class LuaBaseComponent {
 public:
   explicit LuaBaseComponent(Root& root);
   Root& root() const;
+  // Native callbacks capture the issuing session, not the target widget's owner.
+  static std::optional<std::reference_wrapper<LuaBaseComponent>> activeComponent() { return s_activeComponent; }
   // Call uninit explicitly while callbacks are still valid. Destruction does
   // not invoke script entry points.
   virtual ~LuaBaseComponent();
@@ -67,6 +83,8 @@ public:
 
   template <typename Ret = LuaValue, typename... V>
   [[nodiscard]] std::expected<std::optional<Ret>, StarException> invoke(String const& name, V&&... args);
+  template <typename Ret = LuaValue, typename... V>
+  [[nodiscard]] std::expected<std::optional<Ret>, StarException> invokeCallback(LuaFunction const& function, V&&... args);
   template <typename Ret = LuaValue>
   [[nodiscard]] std::expected<std::optional<Ret>, StarException> eval(String const& code);
 
@@ -93,12 +111,26 @@ protected:
   [[nodiscard]] std::expected<void, StarException> cleanThreads();
   [[nodiscard]] std::expected<void, StarException> stopThreads();
 
+  template <typename T>
+  static std::expected<T, StarException> scriptResult(std::expected<T, StarException> result) {
+    if (!result && result.error().template is<LuaException>()
+        && !result.error().template is<LuaScriptError>())
+      return std::unexpected(LuaScriptError(ExceptionDiagnostic(result.error())));
+    return result;
+  }
+  static StarException combineErrors(StarException primary, StarException secondary, std::string context) {
+    if (primary.is<LuaScriptError>() && !secondary.is<LuaScriptError>())
+      return secondary.with_related(primary, std::move(context));
+    return primary.with_related(secondary, std::move(context));
+  }
+
 private:
   friend class LuaScriptStorage;
   friend class LuaScriptUpdate;
   friend class LuaScriptMessages;
   friend class LuaScriptAnimation;
   friend class LuaScriptWorld;
+  static thread_local std::optional<std::reference_wrapper<LuaBaseComponent>> s_activeComponent;
 
   Root& m_root;
   StringList m_scripts;
@@ -235,6 +267,15 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
       engine->setPromiseLifetime(previousLifetime);
   });
   ++m_activeCalls;
+  auto previousComponent = std::exchange(s_activeComponent, std::ref(*this));
+  auto restoreComponent = finally([&] { s_activeComponent = previousComponent; });
+  auto propagateFailure = [&](StarException error) {
+    // Nested host failures can cross a native callback before reaching the
+    // caller. Preserve their non-recoverable identity through that Lua hop.
+    if (previousComponent && !error.is<LuaScriptError>() && !error.is<LuaHostError>())
+      error = LuaHostError(ExceptionDiagnostic(error));
+    return std::unexpected(std::move(error));
+  };
   auto result = std::forward<Function>(function)();
   if (!result) {
     if (result.error().diagnostic_summary()->operation.empty()) {
@@ -254,12 +295,13 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
     if (auto finished = finishExecution(); !finished) {
       auto error = std::move(finished.error());
       if (!result) {
-        error = std::move(error).with_summary(*result.error().diagnostic_summary()).with_related(
-            result.error(), "Original Lua failure");
+        error = combineErrors(std::move(error), std::move(result.error()), "Original Lua failure");
       }
-      return std::unexpected(std::move(error));
+      return propagateFailure(std::move(error));
     }
   }
+  if (!result)
+    return propagateFailure(std::move(result.error()));
   return result;
 }
 
@@ -267,14 +309,30 @@ template <typename Ret, typename... V>
 [[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaBaseComponent::invoke(String const& name,
                                                                                         V&&... args) {
   return execute<Ret>(name, "Exception while invoking Lua function", ErrorPolicy::DisableContext,
-                      [&] { return m_context->template invokePathIfPresent<Ret>(name, std::forward<V>(args)...); });
+                      [&] { return scriptResult(m_context->template invokePathIfPresent<Ret>(name, std::forward<V>(args)...)); });
+}
+
+template <typename Ret, typename... V>
+[[nodiscard]] std::expected<std::optional<Ret>, StarException>
+LuaBaseComponent::invokeCallback(LuaFunction const& function, V&&... args) {
+  auto lifetime = m_callbackScope.get_token();
+  return execute<Ret>("callback", "Exception while invoking Lua callback", ErrorPolicy::DisableContext,
+    [&]() -> std::expected<std::optional<Ret>, StarException> {
+      // Automatic reload can retire the callback's session during entry.
+      if (lifetime.stop_requested())
+        return std::optional<Ret>{};
+      auto result = scriptResult(function.template invoke<Ret>(std::forward<V>(args)...));
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return std::optional<Ret>(std::move(*result));
+    });
 }
 
 template <typename Ret>
 [[nodiscard]] std::expected<std::optional<Ret>, StarException> LuaBaseComponent::eval(String const& code) {
   return execute<Ret>({}, "Exception while evaluating Lua", ErrorPolicy::KeepContext,
                       [&]() -> std::expected<std::optional<Ret>, StarException> {
-                        auto result = m_context->template eval<Ret>(code);
+                        auto result = scriptResult(m_context->template eval<Ret>(code));
                         if (!result)
                           return std::unexpected(std::move(result.error()));
                         return std::optional<Ret>(std::move(*result));
@@ -310,7 +368,7 @@ template <typename Ret, typename... V>
         if (!settled) {
           if (error)
             error =
-              error->with_related(settled.error(), "Error settling Lua thread message");
+              LuaBaseComponent::combineErrors(std::move(*error), std::move(settled.error()), "Error settling Lua thread message");
           else
             error = std::move(settled.error());
         }
@@ -598,6 +656,9 @@ export module star.lua_components;
 export namespace Star {
   using ::Star::LuaComponentExceptionTag;
   using ::Star::LuaComponentException;
+  using ::Star::LuaScriptErrorTag;
+  using ::Star::LuaScriptError;
+  using ::Star::recoverLuaScriptError;
   using ::Star::LuaBaseComponent;
   using ::Star::LuaScriptStorage;
   using ::Star::LuaScriptUpdate;

@@ -723,7 +723,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
       {"playerGeneration", m_uiPlayerGeneration + (playerChanged ? 1 : 0)},
       {"worldGeneration", m_uiWorldGeneration + (worldChanged ? 1 : 0)}};
   if (m_uiController->initialized()) {
-    auto suspended = m_uiController->invoke<Json>("suspend", next);
+    auto suspended = recoverLuaScriptError(m_uiController->invoke<Json>("suspend", next));
     if (!suspended) return std::unexpected(std::move(suspended.error()));
   }
   // Uninit every borrowing context while the old targets are still retained.
@@ -732,7 +732,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
     if (auto stopped = instance.first->stopScripts(); !stopped)
       return std::unexpected(std::move(stopped.error()));
   }
-  if (auto stopped = m_uiController->uninit(); !stopped)
+  if (auto stopped = recoverLuaScriptError(m_uiController->uninit()); !stopped)
     return std::unexpected(std::move(stopped.error()));
   m_uiCapabilities.clear();
   m_uiPlayer = std::move(player);
@@ -798,7 +798,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
   }
   if (auto bound = bindUiCapabilities(*m_uiController, m_uiRoot, m_uiCapabilities); !bound)
     return std::unexpected(std::move(bound.error()));
-  auto initialized = m_uiController->init();
+  auto initialized = recoverLuaScriptError(m_uiController->init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   for (auto const& instance : m_paneInstances.values()) {
     if (m_paneManager.isDisplayed(instance.first)) {
@@ -889,7 +889,7 @@ std::expected<void, StarException> MainInterface::displayRegisteredPane(String c
   auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) {
     if (!m_uiController) return std::unexpected(std::move(type.error()));
-    auto opened = m_uiController->invoke<Json>("open", id);
+    auto opened = recoverLuaScriptError(m_uiController->invoke<Json>("open", id));
     if (!opened) return std::unexpected(std::move(opened.error()));
     return {};
   }
@@ -906,7 +906,7 @@ std::expected<void, StarException> MainInterface::togglePane(String const& id) {
     auto toggled = m_paneManager.toggleRegisteredPane(*type);
     if (!toggled) return std::unexpected(std::move(toggled.error()));
   } else {
-    auto toggled = m_uiController->invoke<Json>("toggle", id);
+    auto toggled = recoverLuaScriptError(m_uiController->invoke<Json>("toggle", id));
     if (!toggled) return std::unexpected(std::move(toggled.error()));
   }
   return {};
@@ -923,12 +923,12 @@ std::expected<std::optional<Json>, StarException> MainInterface::callPane(String
 
 std::expected<std::optional<Json>, StarException> MainInterface::callUi(String const& id, String const& method, JsonArray const& arguments) {
   if (!m_uiController) return std::unexpected(GuiException("UI controller is not initialized"));
-  return m_uiController->invoke<Json>("dispatch", id, method, arguments);
+  return recoverLuaScriptError(m_uiController->invoke<Json>("dispatch", id, method, arguments));
 }
 
 std::expected<void, StarException> MainInterface::sendPaneEvent(String const& id, String const& event, Json payload) {
   if (!m_uiController) return std::unexpected(GuiException("UI controller is not initialized"));
-  auto queued = m_uiController->invoke<Json>("enqueue", id, event, std::move(payload));
+  auto queued = recoverLuaScriptError(m_uiController->invoke<Json>("enqueue", id, event, std::move(payload)));
   if (!queued) return std::unexpected(std::move(queued.error()));
   return {};
 }
@@ -956,7 +956,7 @@ MainInterface::~MainInterface() {
 }
 
 std::expected<void, StarException> MainInterface::close() {
-  auto stopped = m_uiController ? m_uiController->uninit("shutdown") : std::expected<void, StarException>{};
+  auto stopped = m_uiController ? recoverLuaScriptError(m_uiController->uninit("shutdown")) : std::expected<void, StarException>{};
   auto dismissed = m_paneManager.dismissAllPanes();
   (void)m_callbackStopSource.request_stop();
   if (auto player = m_client->mainPlayer())
@@ -995,7 +995,7 @@ std::stop_token MainInterface::callbackStopToken() const {
 }
 
 std::expected<bool, StarException> MainInterface::pauseRequested() const {
-  auto paused = m_uiController->invoke<bool>("pauseRequested");
+  auto paused = recoverLuaScriptError(m_uiController->invoke<bool>("pauseRequested"));
   if (!paused)
     return std::unexpected(std::move(paused.error()));
   return paused->value_or(false);
@@ -1164,7 +1164,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
   if (auto synchronized = synchronizeUiSession(); !synchronized)
     return std::unexpected(std::move(synchronized.error()));
   auto dispatchUiInput = [&](Json const& data, std::shared_ptr<Pane> const& submitTarget) -> std::expected<bool, StarException> {
-    auto before = m_uiController->invoke<Json>("flush");
+    auto before = recoverLuaScriptError(m_uiController->invoke<Json>("flush"));
     if (!before) return std::unexpected(std::move(before.error()));
     bool userSubmit = false;
     if (submitTarget) {
@@ -1187,10 +1187,10 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
         if (!input) return std::unexpected(std::move(input.error()));
         clipboardUnlock.emplace(input->get().unlockClipboard());
       }
-      consumed = m_uiController->invoke<bool>("input", data);
+      consumed = recoverLuaScriptError(m_uiController->invoke<bool>("input", data));
     }
     if (!consumed) return std::unexpected(std::move(consumed.error()));
-    auto after = m_uiController->invoke<Json>("flush");
+    auto after = recoverLuaScriptError(m_uiController->invoke<Json>("flush"));
     if (!after) return std::unexpected(std::move(after.error()));
     return consumed->value_or(false);
   };
@@ -1579,7 +1579,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
     if (!queued)
       return std::unexpected(std::move(queued.error()));
   }
-  auto controlled = m_uiController->update<Json>(dt);
+  auto controlled = recoverLuaScriptError(m_uiController->update<Json>(dt));
   if (!controlled) return std::unexpected(std::move(controlled.error()));
   auto panesUpdated = m_paneManager.update(dt);
   if (!panesUpdated)
@@ -2162,7 +2162,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
 }
 
 std::expected<void, StarException> MainInterface::updateCursor() {
-  auto actionOverride = m_uiController->invoke<std::optional<String>>("cursorOverride", m_cursorScreenIPos / interfaceScale());
+  auto actionOverride = recoverLuaScriptError(m_uiController->invoke<std::optional<String>>("cursorOverride", m_cursorScreenIPos / interfaceScale()));
   if (!actionOverride) return std::unexpected(std::move(actionOverride.error()));
   std::optional<String> cursorOverride = actionOverride->value_or(std::optional<String>{});
 

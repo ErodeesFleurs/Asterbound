@@ -42,6 +42,8 @@ import star.algorithm;
 
 namespace Star {
 
+thread_local std::optional<std::reference_wrapper<LuaBaseComponent>> LuaBaseComponent::s_activeComponent;
+
 LuaBaseComponent::LuaBaseComponent(Root& root) : m_root(root) {
   setAutoReInit(true);
 }
@@ -198,8 +200,10 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
         return std::unexpected(std::move(stopped.error()));
       if (!m_luaRoot)
         return std::optional<bool>(false);
+      if (!m_luaRoot->available())
+        return std::unexpected(LuaException("Cannot create a context from a shut down Lua root"));
       m_callbackScope = std::stop_source{};
-      auto context = m_luaRoot->createContext(m_scripts, m_callbackScope.get_token());
+      auto context = scriptResult(m_luaRoot->createContext(m_scripts, m_callbackScope.get_token()));
       if (!context)
         return std::unexpected(context.error().with_context(Star::format("Creating Lua context for scripts '{}'", m_scripts)));
       m_context = std::move(*context);
@@ -252,13 +256,13 @@ std::expected<void, StarException> LuaBaseComponent::shutdownContext(String cons
       if (!error)
         error = std::move(result.error());
       else
-        error = error->with_related(result.error(), "Additional Lua shutdown failure");
+        error = combineErrors(std::move(*error), std::move(result.error()), "Additional Lua shutdown failure");
     }
   };
   auto invokeHook = [&](String const& name) {
     auto result = execute<LuaValue>(
       name, "Exception while calling Lua shutdown hook", ErrorPolicy::KeepContext,
-      [&] { return m_context->invokePathIfPresent<LuaValue>(name); }, Entry::Lifecycle);
+      [&] { return scriptResult(m_context->invokePathIfPresent<LuaValue>(name)); }, Entry::Lifecycle);
     if (!result)
       remember(std::unexpected(std::move(result.error())));
   };
@@ -278,7 +282,7 @@ std::expected<void, StarException> LuaBaseComponent::shutdownContext(String cons
 std::expected<bool, StarException> LuaBaseComponent::hasMethod(String const& name) {
   auto result = execute<bool>(name, "Exception while finding Lua method", ErrorPolicy::KeepContext,
                               [&]() -> std::expected<std::optional<bool>, StarException> {
-                                auto value = m_context->getPath(name);
+                                auto value = scriptResult(m_context->getPath(name));
                                 if (!value)
                                   return std::unexpected(std::move(value.error()));
                                 return std::optional<bool>(std::holds_alternative<LuaFunction>(*value));
@@ -375,12 +379,16 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
     auto detached = world.finishShutdown();
     if (!detached)
       cleanup = cleanup ? std::move(detached)
-                        : std::unexpected(detached.error().with_related(cleanup.error(), "Earlier Lua shutdown failure"));
+                        : std::unexpected(combineErrors(std::move(detached.error()), std::move(cleanup.error()), "Earlier Lua shutdown failure"));
   }
   for (auto const& group : m_pendingCallbackRemovals) {
     auto removed = removeCallbacks(group);
-    if (!removed && cleanup)
-      cleanup = std::unexpected(std::move(removed.error()));
+    if (!removed) {
+      if (cleanup)
+        cleanup = std::unexpected(std::move(removed.error()));
+      else
+        cleanup = std::unexpected(combineErrors(std::move(cleanup.error()), std::move(removed.error()), "Additional Lua callback cleanup failure"));
+    }
   }
   m_pendingCallbackRemovals.clear();
   if (!cleanup && !m_boundaryError)
@@ -424,7 +432,7 @@ std::expected<void, StarException> LuaBaseComponent::cleanThreads() {
       if (!error)
         error = std::move(stopped.error());
       else
-        error = error->with_related(stopped.error(), "Additional Lua thread reclamation failure");
+        error = combineErrors(std::move(*error), std::move(stopped.error()), "Additional Lua thread reclamation failure");
     }
   }
   if (error)
@@ -439,7 +447,7 @@ std::expected<void, StarException> LuaBaseComponent::stopThreads() {
       if (!error)
         error = std::move(stopped.error());
       else
-        error = stopped.error().with_related(*error, "Earlier Lua thread shutdown failure");
+        error = combineErrors(std::move(stopped.error()), std::move(*error), "Earlier Lua thread shutdown failure");
     }
   }
   if (error)
@@ -621,8 +629,8 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
       if (!handler || !handler->get().function)
         return std::optional<ChainableJsonMessageResponse>{};
       auto function = *handler->get().function;
-      auto result =
-        function.invoke<ChainableJsonMessageResponse>(message.originThread, message.message, luaUnpack(message.args));
+      auto result = m_host.scriptResult(
+        function.invoke<ChainableJsonMessageResponse>(message.originThread, message.message, luaUnpack(message.args)));
       if (!result)
         return std::unexpected(std::move(result.error()));
       return std::optional<ChainableJsonMessageResponse>(std::move(*result));
@@ -662,7 +670,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
       if (!error)
         error = std::move(result.error());
       else
-        error = result.error().with_related(*error, "Earlier Lua shutdown failure");
+        error = LuaBaseComponent::combineErrors(std::move(result.error()), std::move(*error), "Earlier Lua shutdown failure");
     }
   }
   m_threadMessageHandlers.clear();
@@ -674,7 +682,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
 std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected<void, StarException> stopped, std::expected<void, StarException> shutdown) {
   if (!stopped) {
     if (!shutdown)
-      return std::unexpected(stopped.error().with_related(shutdown.error(), "Error shutting down Lua component"));
+      return std::unexpected(LuaBaseComponent::combineErrors(std::move(stopped.error()), std::move(shutdown.error()), "Error shutting down Lua component"));
     return std::unexpected(std::move(stopped.error()));
   }
   return shutdown;
@@ -713,7 +721,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
   }();
   if (!result) {
     if (auto rollback = uninit(); !rollback)
-      return std::unexpected(result.error().with_related(rollback.error(), "Error rolling back Lua world component"));
+      return std::unexpected(LuaBaseComponent::combineErrors(std::move(result.error()), std::move(rollback.error()), "Error rolling back Lua world component"));
   }
   return result;
 }
@@ -730,7 +738,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
       if (!error)
         error = std::move(result.error());
       else
-        error = result.error().with_related(*error, "Earlier Lua world shutdown failure");
+        error = LuaBaseComponent::combineErrors(std::move(result.error()), std::move(*error), "Earlier Lua world shutdown failure");
     }
   };
   remember(m_host.removeCallbacks("world"));
@@ -790,7 +798,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
       auto function = *handler->get().function;
       bool localOnly = handler->get().localOnly;
       bool passName = handler->get().passName;
-      auto result = [&]() -> std::expected<ChainableJsonMessageResponse, StarException> {
+      auto result = m_host.scriptResult([&]() -> std::expected<ChainableJsonMessageResponse, StarException> {
         if (localOnly) {
           if (passName)
             return function.invoke<ChainableJsonMessageResponse>(message, luaUnpack(args));
@@ -799,7 +807,7 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
         if (passName)
           return function.invoke<ChainableJsonMessageResponse>(message, local, luaUnpack(args));
         return function.invoke<ChainableJsonMessageResponse>(local, luaUnpack(args));
-      }();
+      }());
       if (!result)
         return std::unexpected(std::move(result.error()));
       return std::optional<ChainableJsonMessageResponse>(std::move(*result));

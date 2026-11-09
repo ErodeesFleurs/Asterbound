@@ -43,6 +43,7 @@ import star.format;
 import star.version;
 
 import star.lua_root;
+import star.lua_components;
 
 import star.damage_types;
 import star.world_geometry;
@@ -157,15 +158,19 @@ std::expected<TextStyle, StarException> canvasTextStyle(Json const& sizeOrStyle,
 }
 
 struct RetireMemberCallback {
-  std::optional<LuaFunction>* callback;
-  void operator()() const { callback->reset(); }
+  std::reference_wrapper<std::optional<LuaFunction>> callback;
+  void operator()() const { callback.get().reset(); }
 };
 
 struct ScopedMemberCallback {
-  ScopedMemberCallback(LuaFunction function, std::stop_token lifetime)
-      : callback(std::move(function)), retirement(lifetime, RetireMemberCallback{&callback}) {}
+  ScopedMemberCallback(LuaFunction function, std::stop_token lifetime,
+      std::optional<std::reference_wrapper<LuaBaseComponent>> issuer)
+      : callback(std::move(function)), lifetime(lifetime), issuer(issuer),
+        retirement(lifetime, RetireMemberCallback{std::ref(callback)}) {}
 
   std::optional<LuaFunction> callback;
+  std::stop_token lifetime;
+  std::optional<std::reference_wrapper<LuaBaseComponent>> issuer;
   std::stop_callback<RetireMemberCallback> retirement;
 };
 }
@@ -880,13 +885,21 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
                        LuaFunction callback) -> std::expected<void, StarException> {
           return withWidget<ListWidget>(
             parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
-              auto scoped = std::make_shared<ScopedMemberCallback>(std::move(callback), engine.promiseLifetime());
+              auto scoped = std::make_shared<ScopedMemberCallback>(
+                std::move(callback), engine.promiseLifetime(), LuaBaseComponent::activeComponent());
               widget->registerMemberCallback(
                 name, [scoped = std::move(scoped)](Widget& member) -> std::expected<void, StarException> {
-                  if (!scoped->callback)
+                  if (scoped->lifetime.stop_requested() || !scoped->callback)
                     return {};
                   // The call may retire its own group and release the stored reference.
                   auto callback = *scoped->callback;
+                  if (scoped->issuer) {
+                    auto result = recoverLuaScriptError(
+                      scoped->issuer->get().invokeCallback<LuaValue>(callback, member.name(), member.data()));
+                    if (!result)
+                      return std::unexpected(std::move(result.error()));
+                    return {};
+                  }
                   return callback.invoke<void>(member.name(), member.data());
                 });
               return {};

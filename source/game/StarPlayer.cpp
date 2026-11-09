@@ -1116,7 +1116,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     auto entityCallbacks = std::move(*entityCallbacksResult);
     if (auto result = m_scriptedAnimator.addCallbacks("entity", std::move(entityCallbacks)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_scriptedAnimator.init(world); !result)
+    if (auto result = recoverLuaScriptError(m_scriptedAnimator.init(world)); !result)
       return std::unexpected(std::move(result.error()));
   }
   m_xAimPositionNetState.setInterpolator(world.geometry().xLerpFunction());
@@ -1159,7 +1159,7 @@ std::expected<void, StarException> Player::uninit() {
     }
   }
   if (auto world = maybeWorld(); world && world->get().isClient()) {
-    remember(m_scriptedAnimator.uninit());
+    remember(recoverLuaScriptError(m_scriptedAnimator.uninit()));
     remember(m_scriptedAnimator.removeCallbacks("animationConfig"));
     remember(m_scriptedAnimator.removeCallbacks("entity"));
   }
@@ -3705,7 +3705,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
         return std::unexpected(std::move(result.error()));
     }
   }
-  if (auto result = m_scriptedAnimator.update(); !result)
+  if (auto result = recoverLuaScriptError(m_scriptedAnimator.update()); !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto techState = m_techController->parentState()) {
@@ -5180,7 +5180,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
       return std::unexpected(std::move(currentWorldResult.error()));
     auto& currentWorld = currentWorldResult->get();
     if (currentWorld.isClient() && m_scriptedAnimator.initialized()) {
-      if (auto result = m_scriptedAnimator.uninit(); !result)
+      if (auto result = recoverLuaScriptError(m_scriptedAnimator.uninit()); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = m_scriptedAnimator.removeCallbacks("animationConfig"); !result)
         return std::unexpected(std::move(result.error()));
@@ -5203,7 +5203,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
       auto entityCallbacks = std::move(*entityCallbacksResult);
       if (auto result = m_scriptedAnimator.addCallbacks("entity", std::move(entityCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_scriptedAnimator.init(currentWorld); !result)
+      if (auto result = recoverLuaScriptError(m_scriptedAnimator.init(currentWorld)); !result)
         return std::unexpected(std::move(result.error()));
     }
   }

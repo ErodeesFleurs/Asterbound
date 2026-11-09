@@ -411,7 +411,7 @@ if (!result62) return std::unexpected(std::move(result62.error()));
     auto result63 = m_scriptComponent.addActorMovementCallbacks(*m_movementController);
 if (!result63) return std::unexpected(std::move(result63.error()));
 
-    auto result64 = m_scriptComponent.init(world);
+    auto result64 = recoverLuaScriptError(m_scriptComponent.init(world));
 if (!result64) return std::unexpected(std::move(result64.error()));
 
   }
@@ -441,7 +441,7 @@ if (!result70) return std::unexpected(std::move(result70.error()));
 auto result71 = m_scriptedAnimator.addCallbacks("entity", std::move(*result70));
 if (!result71) return std::unexpected(std::move(result71.error()));
 
-    auto result72 = m_scriptedAnimator.init(world);
+    auto result72 = recoverLuaScriptError(m_scriptedAnimator.init(world));
 if (!result72) return std::unexpected(std::move(result72.error()));
 
   }
@@ -452,7 +452,7 @@ if (!result72) return std::unexpected(std::move(result72.error()));
 
 std::expected<void, StarException> Monster::uninit() {
   if (isMaster()) {
-    auto result73 = m_scriptComponent.uninit();
+    auto result73 = recoverLuaScriptError(m_scriptComponent.uninit());
 if (!result73) return std::unexpected(std::move(result73.error()));
 
     auto result74 = m_scriptComponent.removeCallbacks("monster");
@@ -600,12 +600,12 @@ auto notifications = std::move(*result93);
     totalDamage += notification.healthLost;
 
   if (totalDamage > 0.0f) {
-    auto result94 = m_scriptComponent.invoke("damage", JsonObject{
+    auto result94 = recoverLuaScriptError(m_scriptComponent.invoke("damage", JsonObject{
         {"sourceId", damage.sourceEntityId},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
         {"sourceKind", damage.damageSourceKind}
-      });
+      }));
 if (!result94) return std::unexpected(std::move(result94.error()));
 
   }
@@ -732,7 +732,7 @@ knockback = std::move(*result106).transformVec2(knockback);
 }
 
 std::expected<bool, StarException> Monster::shouldDie() {
-  auto result = m_scriptComponent.invoke<bool>("shouldDie");
+  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("shouldDie"));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
@@ -775,7 +775,7 @@ std::expected<bool, StarException> Monster::shouldDestroy() const {
 }
 
 std::expected<void, StarException> Monster::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto result119 = m_scriptComponent.invoke("die");
+  auto result119 = recoverLuaScriptError(m_scriptComponent.invoke("die"));
 if (!result119) return std::unexpected(std::move(result119.error()));
 
 
@@ -916,7 +916,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
     } else {
       if (m_scriptComponent.updateReady())
         m_physicsForces.set({});
-      auto result140 = m_scriptComponent.update(m_scriptComponent.updateDt(dt));
+      auto result140 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
 if (!result140) return std::unexpected(std::move(result140.error()));
 
 
@@ -972,7 +972,7 @@ if (!result149) return std::unexpected(std::move(result149.error()));
 
       m_networkedAnimatorDynamicTarget.updatePosition(position());
 
-      auto result153 = m_scriptedAnimator.update();
+      auto result153 = recoverLuaScriptError(m_scriptedAnimator.update());
   if (!result153) return std::unexpected(std::move(result153.error()));
 
 
@@ -1060,7 +1060,7 @@ void Monster::setPosition(Vec2F const& pos) {
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result173 = world();
 if (!result173) return std::unexpected(std::move(result173.error()));
-auto result174 = m_scriptComponent.handleMessage(message, result173->get().connection() == sendingConnection, args);
+auto result174 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, result173->get().connection() == sendingConnection, args));
 if (!result174) return std::unexpected(std::move(result174.error()));
 std::optional<ChainableJsonMessageResponse> result = std::move(*result174);
   if (!result)
@@ -1518,11 +1518,11 @@ bool Monster::aggressive() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return m_scriptComponent.invoke(func, args);
+  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::evalScript(String const& code) {
-  return m_scriptComponent.eval(code);
+  return recoverLuaScriptError(m_scriptComponent.eval(code));
 }
 
 std::expected<Vec2F, StarException> Monster::mouthPosition() const {
@@ -1544,7 +1544,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Monster::forceRegions() c
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {
-  auto result246 = m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}});
+  auto result246 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}}));
 if (!result246) return std::unexpected(std::move(result246.error()));
 auto result = std::move(*result246).value_or(Json{});
 

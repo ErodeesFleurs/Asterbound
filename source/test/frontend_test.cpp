@@ -703,6 +703,9 @@ public:
   std::expected<std::optional<Json>, StarException> evaluate(String const& code) {
     return m_script.eval<Json>(code);
   }
+  bool scriptsInitialized() const {
+    return m_script.initialized();
+  }
 private:
   explicit ScriptTestPane(GuiContext& context) : BaseScriptPane(context) {}
 };
@@ -728,6 +731,185 @@ std::expected<ScriptPaneContext, StarException> scriptPaneContext(GameTest& fixt
     return std::unexpected(std::move(bound.error()));
   return ScriptPaneContext{std::move(*context), std::move(*luaRoot), std::move(*pane)};
 }
+template <typename Function>
+void expectIsolatedPaneError(Function&& operation) {
+  testing::TestPartResultArray errors;
+  {
+    testing::ScopedFakeTestPartResultReporter capture(
+      testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
+    std::forward<Function>(operation)();
+  }
+  ASSERT_EQ(errors.size(), 1);
+  EXPECT_EQ(errors.GetTestPartResult(0).type(), testing::TestPartResult::kNonFatalFailure);
+}
+
+const GameTestRegistration paneErrorIsolation(
+  "ScriptPane", "ManagerIsolatesScriptFailuresAndCompletesLifecycle", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    // This renderer-free script/config pair also serves as a native PaneManager probe fixture.
+    ASSERT_TRUE(File::write_file(String(R"LUA(
+      local function hook(name)
+        probe.reached(name)
+        if probe.fail(name) then error("intentional pane hook failure") end
+      end
+      function init()
+        probe.capture(function() return pane.isDisplayed() end)
+        hook("init")
+      end
+      function displayed() hook("displayed") end
+      function update() hook("update") end
+      function dismissed() hook("dismissed") end
+      function uninit() hook("uninit") end
+    )LUA"), File::relative_to(overlay, "pane-recovery.lua")));
+    auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "pane-recovery.config");
+    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
+    class ErrorSink final : public LogSink {
+    public:
+      ErrorSink() { setLevel(LogLevel::Error); }
+      std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+        ADD_FAILURE() << message;
+        return {};
+      }
+    };
+    (*createdRoot)->logger().addSink(std::make_shared<ErrorSink>());
+    auto configuration = (*createdRoot)->configuration();
+    ASSERT_TRUE(configuration) << configuration.error().what();
+    ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+    auto context = GuiContext::create(**createdRoot, {}, {});
+    ASSERT_TRUE(context) << context.error().what();
+    auto luaRoot = LuaRoot::create(**createdRoot);
+    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
+    PaneManager manager(**context);
+    auto healthy = ScriptTestPane::create(**context);
+    ASSERT_TRUE(healthy) << healthy.error().what();
+    ASSERT_TRUE((*healthy)->setLuaRoot(*luaRoot));
+    (*healthy)->setAnchor(PaneAnchor::BottomLeft);
+    unsigned healthyUpdates = 0;
+    LuaCallbacks healthyProbe;
+    ASSERT_TRUE(healthyProbe.registerCallback("updated", [&] { ++healthyUpdates; }));
+    ASSERT_TRUE((*healthy)->addCallbacks("probe", std::move(healthyProbe)));
+    auto created = ScriptTestPane::create(**context, JsonObject{
+      {"gui", JsonObject{}}, {"scripts", JsonArray{"/pane-recovery.lua"}}});
+    ASSERT_TRUE(created) << created.error().what();
+    auto pane = *created;
+    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    pane->setAnchor(PaneAnchor::BottomLeft);
+    String failingHook;
+    StringList reached;
+    List<LuaFunction> retained;
+    LuaCallbacks probe;
+    ASSERT_TRUE(probe.registerCallback("reached", [&](String const& hook) { reached.push_back(hook); }));
+    ASSERT_TRUE(probe.registerCallback("fail", [&](String const& hook) { return hook == failingHook; }));
+    ASSERT_TRUE(probe.registerCallback("capture", [&](LuaFunction callback) { retained.push_back(std::move(callback)); }));
+    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+    unsigned dismissals = 0;
+    auto display = [&] {
+      return manager.displayPane(PaneLayer::Window, pane, [&](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {
+        ++dismissals;
+        return {};
+      });
+    };
+
+    // The broken pane ticks before the healthy pane in the same real manager.
+    ASSERT_TRUE(display());
+    ASSERT_TRUE(manager.displayPane(PaneLayer::Window, *healthy, {}));
+    ASSERT_TRUE((*healthy)->evaluate("function update() probe.updated() end"));
+    failingHook = "update";
+    expectIsolatedPaneError([&] { EXPECT_TRUE(manager.update(0.01f)); });
+    EXPECT_EQ(healthyUpdates, 1u);
+    EXPECT_FALSE(pane->scriptsInitialized());
+    ASSERT_EQ(retained.size(), 1u);
+    EXPECT_FALSE(retained.back().invoke<bool>());
+    ASSERT_TRUE(manager.update(0.01f));
+    EXPECT_EQ(healthyUpdates, 2u);
+    ASSERT_TRUE(manager.dismissPane(pane));
+    EXPECT_EQ(dismissals, 1u);
+
+    for (std::string_view hook : {"init", "displayed", "dismissed", "uninit"}) {
+      SCOPED_TRACE(hook);
+      failingHook = hook;
+      reached.clear();
+      auto before = dismissals;
+      if (failingHook == "init" || failingHook == "displayed")
+        expectIsolatedPaneError([&] { EXPECT_TRUE(display()); });
+      else
+        ASSERT_TRUE(display());
+      EXPECT_TRUE(manager.isDisplayed(pane));
+      ASSERT_FALSE(retained.empty());
+      auto callback = retained.back();
+      pane->dismiss();
+      if (failingHook == "dismissed" || failingHook == "uninit")
+        expectIsolatedPaneError([&] { EXPECT_TRUE(manager.update(0.01f)); });
+      else
+        ASSERT_TRUE(manager.update(0.01f));
+      EXPECT_FALSE(manager.isDisplayed(pane));
+      EXPECT_FALSE(pane->scriptsInitialized());
+      EXPECT_FALSE(callback.invoke<bool>());
+      EXPECT_EQ(dismissals, before + 1);
+      EXPECT_NE(std::ranges::find(reached, String(hook)), reached.end());
+      failingHook = {};
+      ASSERT_TRUE(display());
+      EXPECT_TRUE(pane->scriptsInitialized());
+      ASSERT_TRUE(pane->call("missing", {}));
+      ASSERT_TRUE(manager.dismissPane(pane));
+      EXPECT_FALSE(retained.back().invoke<bool>());
+    }
+    ASSERT_TRUE(manager.dismissAllPanes());
+  });
+
+const GameTestRegistration paneErrorDefaults(
+  "ScriptPane", "HostDefaultsRecoverButInfrastructureErrorsPropagate", [](GameTest& fixture) {
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& pane = *setup->pane;
+    ASSERT_TRUE(pane.displayed());
+    auto prepare = [&](String const& method) {
+      EXPECT_TRUE(pane.resumeScripts());
+      EXPECT_TRUE(pane.evaluate("function " + method + "() error('intentional pane call failure') end"));
+    };
+    prepare("invokeFailure");
+    expectIsolatedPaneError([&] {
+      auto result = pane.call("invokeFailure", {});
+      ASSERT_TRUE(result);
+      EXPECT_FALSE(*result);
+    });
+    EXPECT_FALSE(pane.scriptsInitialized());
+    prepare("cursorOverride");
+    expectIsolatedPaneError([&] {
+      auto result = pane.cursorOverride({});
+      ASSERT_TRUE(result);
+      EXPECT_FALSE(*result);
+    });
+    prepare("createTooltip");
+    expectIsolatedPaneError([&] {
+      auto result = pane.createTooltip({});
+      ASSERT_TRUE(result);
+      EXPECT_FALSE(*result);
+    });
+    prepare("onInput");
+    expectIsolatedPaneError([&] {
+      auto result = pane.sendEvent(TextInputEvent{"ignored"});
+      ASSERT_TRUE(result);
+      EXPECT_FALSE(*result);
+    });
+    EXPECT_FALSE(pane.scriptsInitialized());
+    ASSERT_TRUE(pane.resumeScripts());
+    auto duplicate = pane.addCallbacks("pane", LuaCallbacks{});
+    EXPECT_FALSE(duplicate);
+    auto malformed = ScriptTestPane::create(*setup->context, JsonObject{
+      {"gui", JsonObject{{"broken", JsonObject{{"type", "missingWidgetType"}}}}}});
+    EXPECT_FALSE(malformed);
+    ASSERT_TRUE(pane.evaluate("function createTooltip() return {broken = {type = 'missingWidgetType'}} end"));
+    auto tooltip = pane.createTooltip({});
+    EXPECT_FALSE(tooltip);
+    EXPECT_TRUE(pane.scriptsInitialized());
+    ASSERT_TRUE(pane.dismissed());
+  });
+
 
 const GameTestRegistration
   scriptStorage("ScriptPane", "StorageSurvivesLifecycleReloadAndEngineReplacement", [](GameTest& fixture) {
@@ -945,6 +1127,46 @@ const GameTestRegistration widgetMemberLifetime(
     ASSERT_TRUE((*luaRoot)->collectGarbage());
     EXPECT_TRUE(sentinel.expired());
     ASSERT_TRUE(pane->dismissed());
+  });
+
+const GameTestRegistration memberCallbackErrorIsolation(
+  "ScriptPane", "MemberCallbackFailureRetiresIssuerNotTargetPane", [](GameTest& fixture) {
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto target = ScriptTestPane::create(*setup->context);
+    ASSERT_TRUE(target) << target.error().what();
+    ASSERT_TRUE((*target)->setLuaRoot(setup->luaRoot));
+    auto schema = Json::parseJson(R"JSON({
+      "spacing":[0,0], "memberSize":[80,12],
+      "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
+    })JSON");
+    ASSERT_TRUE(schema) << schema.error().what();
+    auto list = ListWidget::create(*setup->context, *schema);
+    ASSERT_TRUE(list) << list.error().what();
+    ASSERT_TRUE((*target)->addChild("list", *list));
+    LuaCallbacks probe;
+    ASSERT_TRUE(probe.registerCallback("target", [&] { return (*target)->makePaneCallbacks(); }));
+    ASSERT_TRUE(setup->pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE((*target)->displayed());
+    ASSERT_TRUE(setup->pane->displayed());
+    ASSERT_TRUE(setup->pane->evaluate(R"LUA(
+      local target = probe.target()
+      target.toWidget().registerMemberCallback("list", "edit", function()
+        error("intentional cross-pane member callback failure")
+      end)
+    )LUA"));
+    auto row = (*list)->addItem();
+    ASSERT_TRUE(row) << row.error().what();
+    auto editor = (*row)->fetchChild<TextBoxWidget>("edit");
+    ASSERT_TRUE(editor) << editor.error().what();
+    ASSERT_TRUE(*editor);
+    expectIsolatedPaneError([&] { EXPECT_TRUE((*editor)->setText("failure")); });
+    EXPECT_FALSE(setup->pane->scriptsInitialized());
+    EXPECT_TRUE((*target)->scriptsInitialized());
+    ASSERT_TRUE((*editor)->setText("retired"));
+    setup->pane.reset();
+    ASSERT_TRUE((*editor)->setText("destroyed issuer"));
+    ASSERT_TRUE((*target)->dismissed());
   });
 
 const GameTestRegistration componentCallbackOwnership("ScriptPane", "ComponentCallbacksReplaceInheritedTargetsWithoutRevivingRetiredOnes", [](GameTest& fixture) {
@@ -3576,10 +3798,7 @@ const GameTestRegistration questLogPresentation(
       ASSERT_TRUE((*failingQuest)->init(**player, **world, {}));
       auto uninitFailingQuest = finally([&] { EXPECT_TRUE((*failingQuest)->uninit()); });
       ASSERT_TRUE((*failingQuest)->callScript("enableAbandonError", {}));
-      auto rejected = probe->eval<Json>("local ok,err=pcall(player.abandonQuest,'zzlog-side'); return "
-                                        "{ok,tostring(err):find('questlog abandon regression',1,true)~=nil}");
-      ASSERT_TRUE(rejected) << rejected.error().what();
-      EXPECT_EQ(*rejected, (Json(JsonArray{false, true})));
+      ASSERT_TRUE(probe->eval<LuaValue>("player.abandonQuest('zzlog-side')"));
       EXPECT_EQ((*failingQuest)->state(), QuestState::Failed);
       ASSERT_EQ(errors->messages.size(), 1u);
       EXPECT_NE(errors->messages.front().find("questlog abandon regression"), std::string::npos);
@@ -4202,13 +4421,9 @@ const GameTestRegistration
     auto errorToken = errorView->getUInt("token");
     ASSERT_TRUE(errorToken);
     ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', true)"));
-    // Invoke through Lua pcall so the intentional domain exception is observed,
-    // not converted to a component error/log or silently suppressed.
-    auto thrown = controller->eval<Json>(Star::format("local ok,err=pcall(player.finishQuestDialog,{},'cancel'); return "
-                                              "{{ok,tostring(err):find('quest decision regression',1,true)~=nil}}",
-                                              *errorToken));
-    ASSERT_TRUE(thrown);
-    EXPECT_EQ(*thrown, (Json(JsonArray{false, true})));
+    // A failed quest hook is isolated; the dialog decision and cleanup complete.
+    ASSERT_TRUE(controller->eval<LuaValue>(
+      Star::format("player.finishQuestDialog({},'cancel')", *errorToken)));
     EXPECT_FALSE(domain->dialogValid(*errorToken));
     ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', false)"));
     ASSERT_TRUE(controller->eval<LuaValue>("manager:shutdown()"));

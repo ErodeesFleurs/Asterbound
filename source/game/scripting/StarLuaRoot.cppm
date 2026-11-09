@@ -41,6 +41,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> restart();
   [[nodiscard]] std::expected<void, StarException> shutdown();
+  bool available() const { return bool(m_luaEngine); }
 
   // A script context can be created from the combination of several scripts,
   // the functions / data in each script will be loaded in order, so that later

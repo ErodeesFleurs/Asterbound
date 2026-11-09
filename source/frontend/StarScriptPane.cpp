@@ -270,7 +270,7 @@ std::expected<void, StarException> ScriptPane::tick(float dt) {
 }
 
 std::expected<std::shared_ptr<Pane>, StarException> ScriptPane::createTooltip(Vec2I const& screenPosition) {
-  auto result = m_script.invoke<Json>("createTooltip", screenPosition);
+  auto result = recoverLuaScriptError(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result && !(**result).isNull()) {
