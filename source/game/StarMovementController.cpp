@@ -1214,7 +1214,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
 
           if (thisSideHorizontalOverlap > maxSideHorizontalOverlap) {
             for (auto const& bodyVertex : checkBody) {
-              float t = std::clamp(side.lineProjection(bodyVertex), 0.0f, 1.0f);
+              float t = std::clamp(side.line_projection(bodyVertex), 0.0f, 1.0f);
               Vec2F nearPoint = side.eval(t);
               if (nearPoint[1] > cp.sortPosition[1]) {
                 if (vmag_squared(bodyVertex - nearPoint) <= square(separationTolerance)) {

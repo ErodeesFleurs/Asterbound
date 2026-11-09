@@ -1132,15 +1132,15 @@ std::expected<List<CelestialConstellation>, StarException> CelestialMasterDataba
         }
 
         if (proposedLine.min() != constellationLine.min() && proposedLine.min() != constellationLine.max()
-            && constellationLineD.distanceTo(proposedLineD.min())
-                < m_generationInformation.minimumConstellationLineCloseness) {
+            && constellationLineD.distance_to(proposedLineD.min())
+              < m_generationInformation.minimumConstellationLineCloseness) {
           valid = false;
           break;
         }
 
         if (proposedLine.max() != constellationLine.min() && proposedLine.max() != constellationLine.max()
-            && constellationLineD.distanceTo(proposedLineD.max())
-                < m_generationInformation.minimumConstellationLineCloseness) {
+            && constellationLineD.distance_to(proposedLineD.max())
+              < m_generationInformation.minimumConstellationLineCloseness) {
           valid = false;
           break;
         }

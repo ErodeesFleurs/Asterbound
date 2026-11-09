@@ -355,7 +355,7 @@ DataType Polygon<DataType>::distance(Vertex const& c) const {
 
   DataType dist = std::numeric_limits<DataType>::max();
   for (std::size_t i = 0; i < m_vertexes.size(); ++i)
-    dist = std::min(dist, sideAt(i).distanceTo(c));
+    dist = std::min(dist, sideAt(i).distance_to(c));
 
   return dist;
 }

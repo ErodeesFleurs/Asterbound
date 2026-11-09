@@ -113,7 +113,7 @@ std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::splitLine(Lin
   if (m_size[0] == 0)
     return StaticList<Line2F, 2>::create({line});
 
-  bool swapDirection = line.makePositive() && preserveDirection;
+  bool swapDirection = line.make_positive() && preserveDirection;
   Vec2F minWrap = xwrap(line.min());
 
   // diff is safe because we're looking for the line gnostic diff
@@ -366,7 +366,7 @@ std::expected<bool, StarException> WorldGeometry::lineIntersectsCircle(Line2F co
   auto lines = splitLine(line, false);
   if (!lines) return std::unexpected(std::move(lines.error()));
   for (auto const& sline : *lines) {
-    if (sline.distanceTo(nearestTo(sline.center(), center)) <= radius)
+    if (sline.distance_to(nearestTo(sline.center(), center)) <= radius)
       return true;
   }
   return false;

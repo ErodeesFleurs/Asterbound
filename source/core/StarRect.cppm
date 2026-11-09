@@ -955,7 +955,7 @@ auto Box<T, N>::intersectsCircle(Coord const& position, T radius) const -> Enabl
   if (contains(position))
     return true;
   for (auto const& e : edges()) {
-    if (e.distanceTo(position) <= radius)
+    if (e.distance_to(position) <= radius)
       return true;
   }
   return false;

@@ -435,7 +435,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
       if (itemOwner->get().facingDirection() == Direction::Left)
-        line.flipHorizontal(0.0f);
+        line.flip_horizontal(0.0f);
       auto position = handPosition(Vec2F());
       if (!position)
         return std::unexpected(std::move(position.error()));
