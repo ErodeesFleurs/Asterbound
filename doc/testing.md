@@ -17,6 +17,10 @@ Use your configured build directory; `-L '^Frontend$'` selects only the frontend
 
 Each native asset-backed CTest invocation runs one process per executable with a fresh boot configuration, storage and logs under `<build>/test/runtime/<executable>/<run-id>/`. `results.json` and the runtime are retained for diagnosis. These tests do not read your normal boot configuration or saves. The packaged Nix runner below instead isolates every case when invoked without arguments.
 
+Each asset-free CTest preset limits an entire test executable to 900 seconds, not each GoogleTest case. Windows CI runs CTest verbosely so individual cases remain visible while the process is running, writes `build/windows-release/test-results.xml`, and uploads that report plus `Testing/Temporary/` as `Windows-Test-Failure-Logs` on failure.
+
+Windows engine fatal errors write their emergency diagnostic and abort without opening an application error dialog. This keeps command-line tools and death-test subprocesses from waiting for interactive acknowledgement. `ByteArrayTest.OversizedGrowthTerminatesBeforeWriting` retains both oversized-capacity and write-offset termination checks; `MemoryTest.ImpossibleThrowingAllocationsTerminate` separately exercises allocator termination.
+
 `ImageProcessingTest.*` covers byte-preserving neutral directives, cached color conversions, replacement thresholds and ordered four-channel blends. Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState` cover catalog errors, sleeve lighting and blueprint state/error boundaries.
 
 Core timing tests use a short real-clock smoke and explicit worker synchronization rather than long per-task sleeps. Lua limit tests retain all three execution entry points and post-error recovery at reduced instruction/recursion scales. Exception tests retain synchronized cold-cache contention while limiting repeated hot-cache reads; FlatHash randomized tests use bounded samples and retain insert, erase, reinsert and lifetime checks.

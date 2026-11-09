@@ -120,6 +120,7 @@
       "name": "base",
       "hidden": true,
       "output": { "outputOnFailure": true },
+      "execution": { "timeout": 900 },
       "filter": { "include": { "label": "NoAssets" } }
     },
     { "inherits": "base", "name": "windows-release", "configurePreset": "windows-release" },

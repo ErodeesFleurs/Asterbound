@@ -113,10 +113,18 @@ jobs:
         run: cmake -P scripts/ci/windows/audit-runtime.cmake
 
       - name: Run Tests
-        uses: lukka/run-cmake@v10
+        working-directory: source
+        run: ctest --preset windows-release --verbose --output-junit test-results.xml
+
+      - name: Upload Windows test failure logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7.0.1
         with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          testPreset: 'windows-release'
+          name: Windows-Test-Failure-Logs
+          path: |
+            build/windows-release/Testing/Temporary/
+            build/windows-release/test-results.xml
+          if-no-files-found: warn
 
       - name: Assemble Files
         shell: cmd

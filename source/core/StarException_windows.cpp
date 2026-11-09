@@ -7,7 +7,6 @@ import star.format;
 import star.output_proxy;
 import star.text_formatter;
 import star.logging;
-import star.string_windows;
 import star.version;
 import star.native_runtime;
 
@@ -255,10 +254,7 @@ void fatal_error(std::string_view message, bool showStackTrace) {
 
   auto diagnostic = std::move(buffer).str();
   EmergencyLog::log(LogLevel::Error, diagnostic);
-  auto text = stringToUtf16(diagnostic);
-  MessageBoxW(NULL, text ? text->get() : L"Fatal error; diagnostic text could not be converted. See the log.",
-      L"Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-
+  // Fatal paths must terminate without waiting for interactive acknowledgement.
   std::abort();
 }
 
