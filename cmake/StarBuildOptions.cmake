@@ -26,6 +26,18 @@ function(star_default_compile_options config kind)
   endforeach()
 endfunction()
 
+if(STAR_ENABLE_THINLTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(LANGUAGES C CXX)
+  # CMake selects -flto=thin and the matching LLVM archive tools for xclang.
+  # Initialize targets before their creation, including std modules and Lua.
+  foreach(config Release RelWithDebInfo RelWithAsserts MinSizeRel)
+    string(TOUPPER "${config}" config_upper)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_${config_upper} ON)
+  endforeach()
+endif()
+message(STATUS "ThinLTO for optimized configurations: ${STAR_ENABLE_THINLTO}")
+
 target_compile_definitions(star_build_config INTERFACE
   "$<$<CONFIG:Release,RelWithDebInfo>:NDEBUG>")
 

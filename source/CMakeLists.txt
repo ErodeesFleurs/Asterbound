@@ -135,6 +135,8 @@ option(STAR_BUILD_DEV_TOOLS "Build the maintenance utilities (map_grep, tileset 
 
 option(STAR_LUA_APICHECK "Use lua api checks" OFF)
 
+option(STAR_ENABLE_THINLTO "Enable ThinLTO for optimized configurations" ON)
+
 # "default" preserves Clang's line-table-only RelWithDebInfo behavior; "full"
 # requests full symbols and "minimal" is useful for sanitizer/assert packages.
 set(STAR_DEBUG_SYMBOL_LEVEL "default" CACHE STRING "Debug symbols: default, minimal, or full")

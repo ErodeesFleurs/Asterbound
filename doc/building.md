@@ -10,6 +10,12 @@ All configurations use static mimalloc with `MI_OVERRIDE=OFF`; dependencies must
 
 Lua is fetched with a [version/hash lock](../cmake/dependencies/lua.json) and [project patch](../cmake/patches/lua-openstarbound.patch); Git is required unless using Nix or prepatched sources.
 
+## ThinLTO
+
+ThinLTO is enabled by default for `Release`, `RelWithDebInfo`, `RelWithAsserts` and `MinSizeRel`, including Nix packages and native presets. Debug is unchanged. CMake checks C/C++ IPO support and uses xclang's `-flto=thin` with matching LLVM archive tools for project targets, including `std` modules and Lua; prebuilt dependencies are not rebuilt with LTO.
+
+Pass `-DSTAR_ENABLE_THINLTO=OFF` when configuring to disable the project default. Changing this option rebuilds affected objects and libraries. ThinLTO adds link-time work and memory use; reduce build parallelism on memory-constrained machines. Runtime performance gains depend on the workload.
+
 ## Nix on Linux
 
 Supports x86_64 and ARM64. From the repository root:
