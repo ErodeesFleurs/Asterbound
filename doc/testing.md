@@ -58,3 +58,9 @@ Native presets need `STAR_BUILD_BENCHMARKS=ON` and `VCPKG_MANIFEST_FEATURES="qt-
 Use `--benchmark_filter='Lua/'` for invocation, callback, return-arity, context and coroutine cases. Asset workers share one Lua VM; additional workers do not parallelize Lua execution.
 
 `json_benchmarks` covers parsing, format-preserving construction, path updates and patches. Reported times include destruction; labels give the batch size, so divide batch CPU times by that count for per-document results. Path/patch cases also include sorted serialization. Use identical fixtures and repeated CPU medians rather than attributing the whole batch to one stage.
+
+`bytes_benchmarks --benchmark_filter='Bytes/' --benchmark_repetitions=7 --benchmark_out=bytes.json --benchmark_out_format=json` measures scalar integer/float endian conversion (fixed and mixed orders), misaligned raw in-place/copy reversal, and mixed raw conversion. Its 35 cases measure the shared encode/decode implementation once rather than repeating To/From variants.
+
+Each iteration is a 64-operation batch; divide CPU time by 64 for amortized per-operation cost, not single-call latency. Labels contain deterministic input and complete-result fingerprints. Untimed independent byte-oracle checks cover signed zeros, NaN payloads, raw guards and post-loop results. Allocation and validation are untimed; in-place buffers alternate orientation across iterations.
+
+Compare original and current module builds with identical compiler, flags, dependencies, filters and repeated CPU medians. A private baseline benchmark TU may adapt API spellings but must not copy or replace the measured implementation. Match fixture/result fingerprints before comparing timings; raw byte throughput counts payload once, not combined reads and writes.

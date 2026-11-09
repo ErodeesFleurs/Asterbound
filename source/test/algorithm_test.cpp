@@ -388,16 +388,119 @@ TEST(ContainerTransform, UnsizedSinglePassInputIsNotPretraversed) {
   EXPECT_EQ(result, (std::vector<int>{6, 2, 8, 4}));
 }
 
+TEST(ByteOrder, ValueConstraintsAndConstantEvaluation) {
+  struct Aggregate {
+    std::uint32_t value;
+  };
+  struct Nontrivial {
+    virtual ~Nontrivial() = default;
+  };
+  auto accepts = []<typename T>() {
+    return byte_order_value<T>&&
+      requires(T value)
+    {
+      to_byte_order(ByteOrder::BigEndian, value);
+      from_byte_order(ByteOrder::LittleEndian, value);
+      to_big_endian(value);
+      to_little_endian(value);
+    };
+  };
+  static_assert(accepts.operator()<char>());
+  static_assert(accepts.operator()<std::uint8_t>());
+  static_assert(accepts.operator()<std::int16_t>());
+  static_assert(accepts.operator()<std::uint32_t>());
+  static_assert(accepts.operator()<std::int64_t>());
+  static_assert(accepts.operator()<float>());
+  static_assert(accepts.operator()<double>());
+  static_assert(!accepts.operator()<Aggregate>());
+  static_assert(!accepts.operator()<Nontrivial>());
+  static_assert(!accepts.operator()<int*>());
+  static_assert(accepts.operator()<long double>() == (sizeof(long double) == 4 || sizeof(long double) == 8));
+  static_assert(native_byte_order() == ByteOrder::BigEndian || native_byte_order() == ByteOrder::LittleEndian);
+  static_assert(to_byte_order(ByteOrder::NoConversion, std::uint32_t{0x12345678}) == 0x12345678);
+  static_assert(noexcept(to_byte_order(ByteOrder::BigEndian, std::uint64_t{})));
+  static_assert(noexcept(from_byte_order(ByteOrder::LittleEndian, double{})));
+}
+
 TEST(ByteOrder, FloatingPayloadAndIntegerRepresentations) {
-  auto opposite = platformByteOrder() == ByteOrder::LittleEndian ? ByteOrder::BigEndian : ByteOrder::LittleEndian;
-  for (auto bits : {std::uint32_t{0}, std::uint32_t{0x80000000}, std::uint32_t{0x7fc12345}, std::uint32_t{0x3f800000}}) {
-    auto value = std::bit_cast<float>(bits);
-    EXPECT_EQ(std::bit_cast<std::uint32_t>(toByteOrder(opposite, value)), std::byteswap(bits));
-    EXPECT_EQ(std::bit_cast<std::uint32_t>(fromByteOrder(opposite, toByteOrder(opposite, value))), bits);
+  auto check = []<byte_order_value T, std::unsigned_integral U>(U bits)
+    requires(sizeof(T) == sizeof(U))
+  {
+    auto value = std::bit_cast<T>(bits);
+    for (auto order : {ByteOrder::NoConversion, ByteOrder::LittleEndian, ByteOrder::BigEndian}) {
+      auto encoded = to_byte_order(order, value);
+      auto bytes = std::bit_cast<std::array<unsigned char, sizeof(T)>>(encoded);
+      auto effectiveOrder = order == ByteOrder::NoConversion ? native_byte_order() : order;
+      for (size_t i = 0; i != sizeof(T); ++i) {
+        auto shift = 8 * (effectiveOrder == ByteOrder::LittleEndian ? i : sizeof(T) - i - 1);
+        EXPECT_EQ(bytes[i], static_cast<unsigned char>(bits >> shift));
+      }
+      EXPECT_EQ(std::bit_cast<U>(from_byte_order(order, encoded)), bits);
+    }
+  };
+  for (auto bits : {0u, 0x80000000u, 0x7fc12345u, 0xffc54321u, 0x7f800000u, 0x3f800000u})
+    check.operator()<float>(bits);
+  for (auto bits :
+       {std::uint64_t{0}, std::uint64_t{0x8000000000000000}, std::uint64_t{0x7ff8123456789abc},
+        std::uint64_t{0xfff8abcdef123456}, std::uint64_t{0x7ff0000000000000}, std::uint64_t{0x3ff0000000000000}})
+    check.operator()<double>(bits);
+  check.operator()<std::uint8_t>(std::uint8_t{0xa5});
+  check.operator()<std::int16_t>(std::uint16_t{0x80fe});
+  check.operator()<std::int32_t>(std::uint32_t{0xfffffffe});
+  check.operator()<std::uint64_t>(std::uint64_t{0x0123456789abcdef});
+}
+
+TEST(ByteOrder, RawUnalignedBoundariesAndExactAlias) {
+  for (size_t length : {0u, 1u, 2u, 3u, 4u, 8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u, 16u, 17u, 255u, 256u, 257u}) {
+    SCOPED_TRACE(length);
+    alignas(8) std::array<unsigned char, 272> source;
+    source.fill(0xa5);
+    for (size_t i = 0; i != length; ++i)
+      source[i + 1] = static_cast<unsigned char>(i * 37 + 11);
+    auto reversed = source;
+    for (size_t i = 0; i != length; ++i)
+      reversed[i + 1] = source[length - i];
+    alignas(8) auto inPlace = source;
+    reverse_bytes(inPlace.data() + 1, length);
+    EXPECT_EQ(inPlace, reversed);
+    alignas(8) auto aliased = source;
+    reverse_bytes_copy(aliased.data() + 1, aliased.data() + 1, length);
+    EXPECT_EQ(aliased, reversed);
+    alignas(8) std::array<unsigned char, 272> copied;
+    copied.fill(0x5a);
+    auto expected = copied;
+    for (size_t i = 0; i != length; ++i)
+      expected[i + 3] = source[length - i];
+    reverse_bytes_copy(copied.data() + 3, source.data() + 1, length);
+    EXPECT_EQ(copied, expected);
+    for (auto order : {ByteOrder::NoConversion, ByteOrder::LittleEndian, ByteOrder::BigEndian}) {
+      SCOPED_TRACE(static_cast<int>(order));
+      auto const& converted = order == ByteOrder::NoConversion || order == native_byte_order() ? source : reversed;
+      alignas(8) auto actual = source;
+      alignas(8) auto exactAlias = source;
+      copied.fill(0x5a);
+      expected = copied;
+      for (size_t i = 0; i != length; ++i)
+        expected[i + 3] = converted[i + 1];
+      to_byte_order(order, actual.data() + 1, length);
+      to_byte_order(order, exactAlias.data() + 1, exactAlias.data() + 1, length);
+      to_byte_order(order, copied.data() + 3, source.data() + 1, length);
+      EXPECT_EQ(actual, converted);
+      EXPECT_EQ(exactAlias, converted);
+      EXPECT_EQ(copied, expected);
+    }
+    for (size_t i = 0; i != length; ++i)
+      EXPECT_EQ(source[i + 1], static_cast<unsigned char>(i * 37 + 11));
+    EXPECT_EQ(source.front(), 0xa5);
+    for (size_t i = length + 1; i != source.size(); ++i)
+      EXPECT_EQ(source[i], 0xa5);
   }
-  EXPECT_EQ(toByteOrder(opposite, std::uint16_t{0x1234}), 0x3412u);
-  EXPECT_EQ(toByteOrder(opposite, std::int32_t{-2}), std::byteswap(std::int32_t{-2}));
-  EXPECT_EQ(toByteOrder(ByteOrder::NoConversion, std::uint64_t{0x12345678}), 0x12345678u);
+  reverse_bytes(nullptr, 0);
+  reverse_bytes_copy(nullptr, nullptr, 0);
+  for (auto order : {ByteOrder::NoConversion, ByteOrder::LittleEndian, ByteOrder::BigEndian}) {
+    to_byte_order(order, nullptr, 0);
+    to_byte_order(order, nullptr, nullptr, 0);
+  }
 }
 
 TEST(FixedContainerCopy, PreservesSinglePassInputPosition) {

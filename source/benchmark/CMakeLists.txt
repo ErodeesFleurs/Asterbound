@@ -30,6 +30,7 @@ star_add_core_benchmark(format_benchmarks)
 star_add_core_benchmark(error_benchmarks)
 star_add_core_benchmark(unicode_benchmarks)
 star_add_core_benchmark(byte_array_benchmarks)
+star_add_core_benchmark(bytes_benchmarks)
 target_link_libraries(byte_array_benchmarks PRIVATE
   zlib-ng::zlib
   $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)

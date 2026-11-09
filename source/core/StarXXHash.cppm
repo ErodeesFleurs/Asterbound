@@ -80,7 +80,7 @@ template <hash_append_primitive_value Value> inline auto hash_encode_primitive(V
                                                                || std::same_as<Value, unsigned long long>,
                                                              std::uint64_t, Value>>>>;
   static_assert(hash_append_representation<Representation>);
-  return toLittleEndian(static_cast<Representation>(value));
+  return to_little_endian(static_cast<Representation>(value));
 }
 
 template <xx_hash_hasher Hasher, hash_append_primitive_value Value>

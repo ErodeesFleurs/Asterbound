@@ -163,6 +163,7 @@ let
     "error_benchmarks"
     "unicode_benchmarks"
     "byte_array_benchmarks"
+    "bytes_benchmarks"
     "game_benchmarks"
     "ownership_benchmarks"
     "performance_benchmarks"

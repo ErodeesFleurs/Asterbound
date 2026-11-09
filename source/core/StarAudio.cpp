@@ -60,13 +60,12 @@ namespace {
     }
   };
 
-  template <typename T>
-  [[nodiscard]] std::expected<T, StarException> readLEType(IODevice& device) {
+  template <byte_order_value T> [[nodiscard]] std::expected<T, StarException> read_le_type(IODevice& device) {
     T value;
     auto read = device.read_full({reinterpret_cast<char*>(&value), sizeof(value)});
     if (!read)
       return std::unexpected(std::move(read.error()));
-    fromByteOrder(ByteOrder::LittleEndian, reinterpret_cast<char*>(&value), sizeof(value));
+    from_byte_order(ByteOrder::LittleEndian, reinterpret_cast<char*>(&value), sizeof(value));
     return value;
   }
 
@@ -98,7 +97,7 @@ namespace {
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "RIFF", 4) != 0)
       return std::unexpected(AudioException("Wav file has invalid RIFF magic bytes"));
-    auto fileSize = readLEType<std::uint32_t>(*device);
+    auto fileSize = read_le_type<std::uint32_t>(*device);
     if (!fileSize)
       return std::unexpected(std::move(fileSize.error()));
     auto actualSize = device->size();
@@ -116,29 +115,29 @@ namespace {
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "fmt ", 4) != 0)
       return std::unexpected(AudioException("Wav file fmt subchunk has invalid magic bytes"));
-    auto fmtSize = readLEType<std::uint32_t>(*device);
+    auto fmtSize = read_le_type<std::uint32_t>(*device);
     if (!fmtSize)
       return std::unexpected(std::move(fmtSize.error()));
     if (*fmtSize < 16)
       return std::unexpected(AudioException::format("fmt subchunk is sized wrong, expected at least 16 got {}", *fmtSize));
-    auto audioFormat = readLEType<std::uint16_t>(*device);
+    auto audioFormat = read_le_type<std::uint16_t>(*device);
     if (!audioFormat)
       return std::unexpected(std::move(audioFormat.error()));
     if (*audioFormat != 1)
       return std::unexpected(AudioException("Only PCM wav format is supported"));
-    auto channels = readLEType<std::uint16_t>(*device);
+    auto channels = read_le_type<std::uint16_t>(*device);
     if (!channels)
       return std::unexpected(std::move(channels.error()));
-    auto rate = readLEType<std::uint32_t>(*device);
+    auto rate = read_le_type<std::uint32_t>(*device);
     if (!rate)
       return std::unexpected(std::move(rate.error()));
-    auto byteRate = readLEType<std::uint32_t>(*device);
+    auto byteRate = read_le_type<std::uint32_t>(*device);
     if (!byteRate)
       return std::unexpected(std::move(byteRate.error()));
-    auto alignment = readLEType<std::uint16_t>(*device);
+    auto alignment = read_le_type<std::uint16_t>(*device);
     if (!alignment)
       return std::unexpected(std::move(alignment.error()));
-    auto bits = readLEType<std::uint16_t>(*device);
+    auto bits = read_le_type<std::uint16_t>(*device);
     if (!bits)
       return std::unexpected(std::move(bits.error()));
     if (*bits != 16)
@@ -157,7 +156,7 @@ namespace {
       return std::unexpected(std::move(read.error()));
     if (std::memcmp(signature.data(), "data", 4) != 0)
       return std::unexpected(AudioException("Wav file data subchunk has invalid magic bytes"));
-    auto dataSize = readLEType<std::uint32_t>(*device);
+    auto dataSize = read_le_type<std::uint32_t>(*device);
     if (!dataSize)
       return std::unexpected(std::move(dataSize.error()));
     auto dataStart = device->pos();
@@ -174,7 +173,7 @@ namespace {
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
     for (std::size_t i = 0; i < bytes->size() / 2; ++i)
-      fromByteOrder(ByteOrder::LittleEndian, bytes->span().data() + i * 2, 2);
+      from_byte_order(ByteOrder::LittleEndian, bytes->span().data() + i * 2, 2);
     auto shared = std::make_shared<ByteArray>(std::move(*bytes));
     ExternalBuffer memory(shared->span());
     return WaveData{std::move(memory), std::move(shared), *channels, *rate, *dataSize, 0};
@@ -470,7 +469,7 @@ public:
     }
     if (!m_data.bytes) {
       for (std::size_t i = 0; i < *read / 2; ++i)
-        fromByteOrder(ByteOrder::LittleEndian, reinterpret_cast<char*>(buffer.data()) + i * 2, 2);
+        from_byte_order(ByteOrder::LittleEndian, reinterpret_cast<char*>(buffer.data()) + i * 2, 2);
     }
     return *read / 2;
   }

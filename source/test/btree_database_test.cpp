@@ -124,7 +124,7 @@ namespace {
   std::uint32_t const MaxKey = 100000;
 
   ByteArray toByteArray(std::uint32_t k) {
-    k = toBigEndian(k);
+    k = to_big_endian(k);
     return ByteArray({reinterpret_cast<char const*>(std::addressof(k)), sizeof(k)});
   }
 

@@ -28,6 +28,7 @@ Worker cancellation uses `std::stop_source`/`std::stop_token`, with stable token
 - Use `auto(expr)` for owning traversal snapshots and `std::views::zip` for synchronous read-only iteration over retained ranges. Pane dismissal callbacks may modify the original collection, so these snapshots must not become borrowed views.
 - Typed sequence `contains` converts its argument to the element type before `std::ranges::contains`; replacing the member call with an untyped range query can change mixed-type membership.
 - Use `std::clamp` only with proven ordered bounds and value consumption. Legacy `Star::clamp` deliberately returns the upper bound for reversed ranges. Preserve vector interpolation, integer rounding, wrapped coordinates and fast-math-safe finite classification rather than replacing their arithmetic wholesale.
+- Byte-order scalars use the `byte_order_value` concept and `to_byte_order` / `from_byte_order`; `to_big_endian` and `to_little_endian` are encoding conveniences, while decoding uses `from_byte_order`. Only padding-free integrals and 32/64-bit floating representations are accepted; aggregates and pointers are not serialized by reversing their object representation. Raw `reverse_bytes` / `reverse_bytes_copy` support unaligned storage and null zero-length ranges; copy/conversion ranges must be disjoint or identical, never partially overlapping.
 
 ## JSON values and formatting
 

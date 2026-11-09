@@ -1,127 +1,129 @@
 module;
 
 import std;
-import star.memory;
 
 namespace Star {
 
-enum class ByteOrder {
-  BigEndian,
-  LittleEndian,
-  NoConversion
-};
+enum class ByteOrder { BigEndian, LittleEndian, NoConversion };
 
-ByteOrder platformByteOrder();
-
-void swapByteOrder(void* ptr, std::size_t len);
-void swapByteOrder(void* dest, void const* src, std::size_t len);
-
-void toByteOrder(ByteOrder order, void* ptr, std::size_t len);
-void toByteOrder(ByteOrder order, void* dest, void const* src, std::size_t len);
-void fromByteOrder(ByteOrder order, void* ptr, std::size_t len);
-void fromByteOrder(ByteOrder order, void* dest, void const* src, std::size_t len);
+// A mixed-endian object representation has no whole-value byte-order conversion.
+static_assert(std::endian::native == std::endian::little || std::endian::native == std::endian::big);
 
 template <typename T>
-T toByteOrder(ByteOrder order, T const& t) {
-  if constexpr ((std::integral<T> && std::has_unique_object_representations_v<T>)
-      || (std::floating_point<T> && (sizeof(T) == sizeof(std::uint32_t) || sizeof(T) == sizeof(std::uint64_t)))) {
-    if (order == ByteOrder::NoConversion || platformByteOrder() == order)
-      return t;
-    if constexpr (std::integral<T>) {
-      if constexpr (sizeof(T) == 1)
-        return t;
-      else
-        return std::byteswap(t);
-    } else if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
-      return std::bit_cast<T>(std::byteswap(std::bit_cast<std::uint32_t>(t)));
-    } else {
-      return std::bit_cast<T>(std::byteswap(std::bit_cast<std::uint64_t>(t)));
-    }
-  } else {
-    T ret;
-    toByteOrder(order, &ret, &t, sizeof(t));
-    return ret;
-  }
-}
+concept byte_order_value = (std::integral<T> && std::has_unique_object_representations_v<T>)
+  || (std::floating_point<T> && (sizeof(T) == sizeof(std::uint32_t) || sizeof(T) == sizeof(std::uint64_t)));
 
-template <typename T>
-T fromByteOrder(ByteOrder order, T const& t) {
-  return toByteOrder(order, t);
-}
-
-template <typename T>
-T toBigEndian(T const& t) {
-  return toByteOrder(ByteOrder::BigEndian, t);
-}
-
-template <typename T>
-T fromBigEndian(T const& t) {
-  return fromByteOrder(ByteOrder::BigEndian, t);
-}
-
-template <typename T>
-T toLittleEndian(T const& t) {
-  return toByteOrder(ByteOrder::LittleEndian, t);
-}
-
-template <typename T>
-T fromLittleEndian(T const& t) {
-  return fromByteOrder(ByteOrder::LittleEndian, t);
-}
-
-inline ByteOrder platformByteOrder() {
+constexpr ByteOrder native_byte_order() noexcept {
   return std::endian::native == std::endian::little ? ByteOrder::LittleEndian : ByteOrder::BigEndian;
 }
 
-inline void swapByteOrder(void* ptr, std::size_t len) {
-  if (len < 2)
+template <byte_order_value T> constexpr T to_byte_order(ByteOrder order, T value) noexcept {
+  if constexpr (sizeof(T) == 1) {
+    return value;
+  } else {
+    if (order == ByteOrder::NoConversion || native_byte_order() == order)
+      return value;
+    if constexpr (std::integral<T>)
+      return std::byteswap(value);
+    else if constexpr (sizeof(T) == sizeof(std::uint32_t))
+      return std::bit_cast<T>(std::byteswap(std::bit_cast<std::uint32_t>(value)));
+    else
+      return std::bit_cast<T>(std::byteswap(std::bit_cast<std::uint64_t>(value)));
+  }
+}
+
+template <byte_order_value T> constexpr T from_byte_order(ByteOrder order, T value) noexcept {
+  return to_byte_order(order, value);
+}
+
+template <byte_order_value T> constexpr T to_big_endian(T value) noexcept {
+  return to_byte_order(ByteOrder::BigEndian, value);
+}
+
+template <byte_order_value T> constexpr T to_little_endian(T value) noexcept {
+  return to_byte_order(ByteOrder::LittleEndian, value);
+}
+
+namespace Detail {
+template <std::unsigned_integral T>
+  requires std::has_unique_object_representations_v<T>
+inline void reverse_bytes_copy_fixed(void* dest, void const* src) noexcept {
+  T value;
+  std::memcpy(&value, src, sizeof(value));
+  value = std::byteswap(value);
+  auto bytes = std::bit_cast<std::array<unsigned char, sizeof(T)>>(value);
+  std::ranges::copy(bytes, static_cast<unsigned char*>(dest));
+}
+}// namespace Detail
+
+inline void reverse_bytes(void* ptr, std::size_t len) noexcept {
+  switch (len) {
+  case 0:
+  case 1: return;
+  case 2: return Detail::reverse_bytes_copy_fixed<std::uint16_t>(ptr, ptr);
+  case 4: return Detail::reverse_bytes_copy_fixed<std::uint32_t>(ptr, ptr);
+  case 8: return Detail::reverse_bytes_copy_fixed<std::uint64_t>(ptr, ptr);
+  default: std::ranges::reverse(std::span{static_cast<unsigned char*>(ptr), len});
+  }
+}
+
+// Source and destination must be disjoint or identical. Both may be unaligned.
+inline void reverse_bytes_copy(void* dest, void const* src, std::size_t len) noexcept {
+  switch (len) {
+  case 0: return;
+  case 2: return Detail::reverse_bytes_copy_fixed<std::uint16_t>(dest, src);
+  case 4: return Detail::reverse_bytes_copy_fixed<std::uint32_t>(dest, src);
+  case 8: return Detail::reverse_bytes_copy_fixed<std::uint64_t>(dest, src);
+  default:
+    if (dest == src) {
+      std::ranges::reverse(std::span{static_cast<unsigned char*>(dest), len});
+      return;
+    }
+    auto const* source = static_cast<unsigned char const*>(src);
+    auto* destination = static_cast<unsigned char*>(dest);
+    while (len >= sizeof(std::uint64_t)) {
+      len -= sizeof(std::uint64_t);
+      Detail::reverse_bytes_copy_fixed<std::uint64_t>(destination, source + len);
+      destination += sizeof(std::uint64_t);
+    }
+    for (std::size_t i = 0; i < len; ++i)
+      destination[len - 1 - i] = source[i];
+  }
+}
+
+inline void to_byte_order(ByteOrder order, void* ptr, std::size_t len) noexcept {
+  if (order != ByteOrder::NoConversion && native_byte_order() != order)
+    reverse_bytes(ptr, len);
+}
+
+// As with reverse_bytes_copy, only disjoint or identical ranges are supported.
+inline void to_byte_order(ByteOrder order, void* dest, void const* src, std::size_t len) noexcept {
+  if (len == 0)
     return;
-  std::ranges::reverse(std::span{static_cast<std::uint8_t*>(ptr), len});
-}
-
-inline void swapByteOrder(void* dest, const void* src, std::size_t len) {
-  const std::uint8_t* srcdata = static_cast<const std::uint8_t*>(src);
-  std::uint8_t* destdata = static_cast<std::uint8_t*>(dest);
-  for (std::size_t i = 0; i < len; ++i)
-    destdata[len - 1 - i] = srcdata[i];
-}
-
-inline void toByteOrder(ByteOrder order, void* ptr, std::size_t len) {
-  if (order != ByteOrder::NoConversion && platformByteOrder() != order)
-    swapByteOrder(ptr, len);
-}
-
-inline void toByteOrder(ByteOrder order, void* dest, void const* src, std::size_t len) {
-  if (order != ByteOrder::NoConversion && platformByteOrder() != order)
-    swapByteOrder(dest, src, len);
-  else
+  if (order != ByteOrder::NoConversion && native_byte_order() != order)
+    reverse_bytes_copy(dest, src, len);
+  else if (dest != src)
     std::memcpy(dest, src, len);
 }
 
-inline void fromByteOrder(ByteOrder order, void* ptr, std::size_t len) {
-  if (order != ByteOrder::NoConversion && platformByteOrder() != order)
-    swapByteOrder(ptr, len);
+inline void from_byte_order(ByteOrder order, void* ptr, std::size_t len) noexcept { to_byte_order(order, ptr, len); }
+
+inline void from_byte_order(ByteOrder order, void* dest, void const* src, std::size_t len) noexcept {
+  to_byte_order(order, dest, src, len);
 }
 
-inline void fromByteOrder(ByteOrder order, void* dest, void const* src, std::size_t len) {
-  if (order != ByteOrder::NoConversion && platformByteOrder() != order)
-    swapByteOrder(dest, src, len);
-  else
-    std::memcpy(dest, src, len);
-}
-
-}
+}// namespace Star
 
 export module star.bytes;
 
 export namespace Star {
-  using ::Star::ByteOrder;
-  using ::Star::platformByteOrder;
-  using ::Star::swapByteOrder;
-  using ::Star::toByteOrder;
-  using ::Star::fromByteOrder;
-  using ::Star::toBigEndian;
-  using ::Star::fromBigEndian;
-  using ::Star::toLittleEndian;
-  using ::Star::fromLittleEndian;
-}
+using ::Star::byte_order_value;
+using ::Star::ByteOrder;
+using ::Star::from_byte_order;
+using ::Star::native_byte_order;
+using ::Star::reverse_bytes;
+using ::Star::reverse_bytes_copy;
+using ::Star::to_big_endian;
+using ::Star::to_byte_order;
+using ::Star::to_little_endian;
+}// namespace Star
