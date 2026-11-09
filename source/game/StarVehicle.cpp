@@ -772,7 +772,7 @@ if (!result1224) return std::unexpected(std::move(result1224.error()));
   auto result1225 = world();
 if (!result1225) return std::unexpected(std::move(result1225.error()));
 if (result1225->get().isClient())
-    this->root().spatialLogger().logPoly("world", m_movementController->collisionBody(), {255, 255, 0, 255});
+  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {255, 255, 0, 255});
   return {};
 }
 

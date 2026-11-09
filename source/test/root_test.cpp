@@ -78,7 +78,7 @@ namespace {
 
 class RootIsolationErrorSink : public LogSink {
 public:
-  RootIsolationErrorSink() { setLevel(LogLevel::Error); }
+  RootIsolationErrorSink() { set_level(LogLevel::Error); }
   [[nodiscard]] std::expected<void, StarException> log(std::string_view message, LogLevel) override {
     ADD_FAILURE() << "Error was logged: " << message;
     return {};
@@ -650,7 +650,7 @@ const GameTestRegistration
     )LUA"}}));
     auto root = Root::create(std::move(*settings));
     ASSERT_TRUE(root) << root.error().what();
-    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
     StringList scripts{"/p5-top.lua", "/p5-entry.lua", "/p5-top.lua", "/p5-dependency.lua", "/p5-entry.lua"};
@@ -718,7 +718,7 @@ const GameTestRegistration
     )LUA"}}));
     auto root = Root::create(std::move(*settings));
     ASSERT_TRUE(root) << root.error().what();
-    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
     auto context = (*lua)->createContext(StringList{});
@@ -812,7 +812,7 @@ const GameTestRegistration
        {"p5-after-restart.lua", "function afterRestart() return 1 end"}}));
     auto root = Root::create(std::move(*settings));
     ASSERT_TRUE(root) << root.error().what();
-    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
     auto original = (*lua)->createContext("/p5-version.lua");
@@ -886,7 +886,7 @@ const GameTestRegistration
     )LUA"}}));
     auto root = Root::create(std::move(*settings));
     ASSERT_TRUE(root) << root.error().what();
-    (*root)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+    (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
     for (bool restart : {false, true}) {
@@ -948,19 +948,19 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
   auto createdA = Root::create(settingsA);
   ASSERT_TRUE(createdA) << createdA.error().what();
   auto rootA = std::move(*createdA);
-  rootA->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+  rootA->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
   auto createdB = Root::create(settingsB);
   ASSERT_TRUE(createdB) << createdB.error().what();
   auto rootB = std::move(*createdB);
-  rootB->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+  rootB->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
   auto logPathA = File::relative_to(*directoryA, "isolation.log");
   auto logPathB = File::relative_to(*directoryB, "isolation.log");
   auto sinkA = FileLogSink::create(logPathA, LogLevel::Info, true);
   ASSERT_TRUE(sinkA) << sinkA.error().what();
   auto sinkB = FileLogSink::create(logPathB, LogLevel::Info, true);
   ASSERT_TRUE(sinkB) << sinkB.error().what();
-  rootA->logger().addSink(*sinkA);
-  rootB->logger().addSink(*sinkB);
+  rootA->logger().add_sink(*sinkA);
+  rootB->logger().add_sink(*sinkB);
 
   EXPECT_NE(rootA->toStoragePath("root-isolation.config"), rootB->toStoragePath("root-isolation.config"));
   {
@@ -985,11 +985,11 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-written"));
     ASSERT_TRUE(contextA->eval("sb.logInfo('root-isolation-log-A'); sb.setLogMap('root-isolation', 'A')"));
     ASSERT_TRUE(contextB->eval("sb.logInfo('root-isolation-log-B'); sb.setLogMap('root-isolation', 'B')"));
-    EXPECT_EQ(rootA->logMap().getValue("root-isolation"), "A");
-    EXPECT_EQ(rootB->logMap().getValue("root-isolation"), "B");
+    EXPECT_EQ(rootA->logMap().get_value("root-isolation"), "A");
+    EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B");
     rootA->logMap().clear();
-    EXPECT_TRUE(rootA->logMap().getValues().empty());
-    EXPECT_EQ(rootB->logMap().getValue("root-isolation"), "B");
+    EXPECT_TRUE(rootA->logMap().get_values().empty());
+    EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B");
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-A"), true);
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-B"), false);
     EXPECT_EQ(isolationLogContains(logPathB, "root-isolation-log-B"), true);
@@ -1007,7 +1007,7 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     {
       auto recovered = Root::create(recoveredSettings);
       ASSERT_TRUE(recovered) << recovered.error().what();
-      (*recovered)->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+      (*recovered)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
       auto recoveredLua = isolationLua(**recovered);
       ASSERT_TRUE(recoveredLua) << recoveredLua.error().what();
       auto recoveredContext = (*recoveredLua)->createContext("/root-isolation.lua");
@@ -1074,9 +1074,9 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-written"));
     ASSERT_TRUE(contextB->eval("root.setConfiguration('rootIsolationOwner', 'B-survives')"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-survives"));
-    EXPECT_EQ(rootB->logMap().getValue("root-isolation"), "B");
+    EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B");
     ASSERT_TRUE(contextB->eval("sb.logInfo('root-isolation-log-B-survives'); sb.setLogMap('root-isolation', 'B-survives')"));
-    EXPECT_EQ(rootB->logMap().getValue("root-isolation"), "B-survives");
+    EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B-survives");
     EXPECT_EQ(isolationLogContains(logPathB, "root-isolation-log-B-survives"), true);
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-B-survives"), false);
 
@@ -1161,11 +1161,11 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   auto createdA = Root::create(*settingsA);
   ASSERT_TRUE(createdA) << createdA.error().what();
   auto rootA = std::move(*createdA);
-  rootA->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+  rootA->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
   auto createdB = Root::create(*settingsB);
   ASSERT_TRUE(createdB) << createdB.error().what();
   auto rootB = std::move(*createdB);
-  rootB->logger().addSink(std::make_shared<RootIsolationErrorSink>());
+  rootB->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
   auto storageA = File::ephemeral_file(rootA->random());
   ASSERT_TRUE(storageA) << storageA.error().what();
   auto createdWorldA = WorldServer::create(*rootA, Vec2U(2048, 2048), *storageA);

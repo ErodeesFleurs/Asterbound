@@ -912,7 +912,8 @@ public:
       if (!nativeReleased && result)
         result = std::unexpected(std::move(nativeReleased.error()));
       if (!result && m_logger) {
-        if (auto logged = m_logger->errorException("Application: failed", ExceptionDiagnostic(result.error())); !logged) {
+        if (auto logged = m_logger->error_exception("Application: failed", ExceptionDiagnostic(result.error()));
+            !logged) {
           EmergencyLog::error("{}", Star::exception_report(result.error()));
           EmergencyLog::error("Application: failure logging failed: {}", Star::exception_report(logged.error()));
         }
@@ -1242,11 +1243,14 @@ private:
     std::lock_guard lock(m_audioErrorMutex);
     if (!m_audioError)
       m_audioError.emplace(std::move(error));
-    else
-      if (auto logged = (*m_logger).errorException("Application: audio callback failed", ExceptionDiagnostic(error)); !logged) {
-        EmergencyLog::error("Application: audio callback failed: {}", Star::output_exception(ExceptionDiagnostic(error), true));
-        EmergencyLog::error("Application: audio failure logging failed: {}", Star::output_exception(ExceptionDiagnostic(logged.error()), true));
-      }
+    else if (auto logged =
+               (*m_logger).error_exception("Application: audio callback failed", ExceptionDiagnostic(error));
+             !logged) {
+      EmergencyLog::error("Application: audio callback failed: {}",
+                          Star::output_exception(ExceptionDiagnostic(error), true));
+      EmergencyLog::error("Application: audio failure logging failed: {}",
+                          Star::output_exception(ExceptionDiagnostic(logged.error()), true));
+    }
   }
 
   std::optional<StarException> takeAudioError() {

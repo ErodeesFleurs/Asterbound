@@ -37,7 +37,7 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> log(std::string_view msg, LogLevel level) = 0;
 
-  void setLevel(LogLevel level);
+  void set_level(LogLevel level);
   LogLevel level();
 
 private:
@@ -60,19 +60,25 @@ public:
   [[nodiscard]] std::expected<void, StarException> log(std::string_view msg, LogLevel level) override;
 
 private:
-  FileLogSink() = default;
-  std::shared_ptr<File> m_output;
+  explicit FileLogSink(String filename) : m_output(std::move(filename)) {}
+  File m_output;
   std::mutex m_logMutex;
 };
 
 // A fixed-address log domain. Its sinks never affect another owner.
+// Accepted calls retain one immutable registry snapshot. Mutations from callbacks
+// affect later calls; removed sinks live until their in-flight snapshots retire.
+// Dispatch through one Logger is serialized across all its sinks, preserving
+// their message order. Custom sinks shared across Loggers must synchronize
+// themselves; the built-in sinks already do. Same-thread recursive dispatch is
+// supported; callbacks must not wait on another thread dispatching to this Logger.
 class Logger {
 public:
   Logger();
-  void addSink(std::shared_ptr<LogSink> s);
-  void removeSink(std::shared_ptr<LogSink> s);
-  std::shared_ptr<LogSink> stdoutSink();
-  void removeStdoutSink();
+  void add_sink(std::shared_ptr<LogSink> s);
+  void remove_sink(std::shared_ptr<LogSink> s);
+  std::shared_ptr<LogSink> stdout_sink();
+  void remove_stdout_sink();
   [[nodiscard]] std::expected<void, StarException> log(LogLevel level, std::string_view msg);
 
   template <typename... Args>
@@ -92,18 +98,25 @@ public:
   [[nodiscard]] std::expected<void, StarException> error(std::format_string<Args...> msg, Args const&... args);
 
   // Summary at the requested severity; complete diagnostics only for Debug sinks.
-  [[nodiscard]] std::expected<void, StarException> logException(
-      LogLevel level, std::string_view operation, ExceptionDiagnostic const& error);
-  [[nodiscard]] std::expected<void, StarException> errorException(
-      std::string_view operation, ExceptionDiagnostic const& error);
-  [[nodiscard]] std::expected<void, StarException> warnException(
-      std::string_view operation, ExceptionDiagnostic const& error);
+  [[nodiscard]] std::expected<void, StarException> log_exception(LogLevel level, std::string_view operation,
+                                                                 ExceptionDiagnostic const& error);
+  [[nodiscard]] std::expected<void, StarException> error_exception(std::string_view operation,
+                                                                   ExceptionDiagnostic const& error);
+  [[nodiscard]] std::expected<void, StarException> warn_exception(std::string_view operation,
+                                                                  ExceptionDiagnostic const& error);
   bool loggable(LogLevel level);
 
 private:
+  using SinkRegistry = HashSet<std::shared_ptr<LogSink>>;
+  std::shared_ptr<SinkRegistry const> sink_snapshot(std::optional<LogLevel> level);
+  static SinkRegistry::const_iterator first_loggable(SinkRegistry const& sinks, LogLevel level);
+  [[nodiscard]] std::expected<void, StarException> dispatch(SinkRegistry const& sinks, LogLevel level,
+                                                            std::string_view message);
+
   std::shared_ptr<StdoutLogSink> s_stdoutSink;
-  HashSet<std::shared_ptr<LogSink>> s_sinks;
+  std::shared_ptr<SinkRegistry const> s_sinks;
   std::mutex s_mutex;
+  std::recursive_mutex s_dispatchMutex;
 };
 
 // Stateless diagnostics for process/bootstrap code without a business owner.
@@ -142,14 +155,14 @@ public:
 // be displayed every frame, or in a debug output window, etc.
 class LogMap {
 public:
-  String getValue(String const& key);
-  void setValue(String const& key, String const& value);
+  String get_value(String const& key);
+  void set_value(String const& key, String const& value);
 
   template <typename T>
     requires format_argument<T>
   void set(String const& key, T const& t);
 
-  Map<String, String> getValues();
+  Map<String, String> get_values();
   void clear();
 
 private:
@@ -182,18 +195,18 @@ public:
     Vec4B color;
   };
 
-  void logPoly(std::string_view space, PolyF const& poly, Vec4B const& color);
-  void logLine(std::string_view space, Line2F const& line, Vec4B const& color);
-  void logLine(std::string_view space, Vec2F const& begin, Vec2F const& end, Vec4B const& color);
-  void logPoint(std::string_view space, Vec2F const& position, Vec4B const& color);
-  void logText(std::string_view space, String text, Vec2F const& position, Vec4B const& color);
+  void log_poly(std::string_view space, PolyF const& poly, Vec4B const& color);
+  void log_line(std::string_view space, Line2F const& line, Vec4B const& color);
+  void log_line(std::string_view space, Vec2F const& begin, Vec2F const& end, Vec4B const& color);
+  void log_point(std::string_view space, Vec2F const& position, Vec4B const& color);
+  void log_text(std::string_view space, String text, Vec2F const& position, Vec4B const& color);
 
-  Deque<Line> getLines(std::string_view space, bool andClear);
-  Deque<Point> getPoints(std::string_view space, bool andClear);
-  Deque<LogText> getText(std::string_view space, bool andClear);
+  Deque<Line> get_lines(std::string_view space, bool andClear);
+  Deque<Point> get_points(std::string_view space, bool andClear);
+  Deque<LogText> get_text(std::string_view space, bool andClear);
   void clear();
   bool observed();
-  void setObserved(bool observed);
+  void set_observed(bool observed);
 
 private:
   std::mutex s_mutex;
@@ -206,11 +219,11 @@ private:
 template <typename... Args>
   requires (format_argument<Args> && ...)
 [[nodiscard]] std::expected<void, StarException> Logger::logf(LogLevel level, std::format_string<Args...> msg, Args const&... args) {
-  if (loggable(level)) {
-    std::string output = Star::format_checked(msg, args...);
-    return log(level, output);
-  }
-  return {};
+  auto sinks = sink_snapshot(level);
+  if (!sinks)
+    return {};
+  auto output = Star::format_checked(msg, args...);
+  return dispatch(*sinks, level, output);
 }
 
 template <typename... Args>
@@ -240,7 +253,7 @@ template <typename... Args>
 template <typename T>
   requires format_argument<T>
 void LogMap::set(String const& key, T const& t) {
-  setValue(key, Star::to_string(t));
+  set_value(key, Star::to_string(t));
 }
 
 }

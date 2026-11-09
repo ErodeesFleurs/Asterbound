@@ -174,15 +174,15 @@ const GameTestRegistration itemFallbackDiagnostics(
       auto database = (*root)->itemDatabase();
       ASSERT_TRUE(database);
       auto sink = std::make_shared<DiagnosticSink>();
-      sink->setLevel(LogLevel::Error);
-      (*root)->logger().addSink(sink);
+      sink->set_level(LogLevel::Error);
+      (*root)->logger().add_sink(sink);
       auto descriptor = ItemDescriptor::create("missing-item-diagnostics-probe", 37,
           JsonObject{{"scriptStorage", JsonObject{{"savedState", "private-saved-state-marker"}}}});
       ASSERT_TRUE(descriptor);
       auto storedDescriptor = descriptor->toJson().eraseKey("count");
       ASSERT_TRUE(storedDescriptor);
       for (auto level : {LogLevel::Error, LogLevel::Debug}) {
-        sink->setLevel(level);
+        sink->set_level(level);
         sink->records.clear();
         auto item = (*database)->item(*descriptor);
         ASSERT_TRUE(item);
@@ -866,7 +866,7 @@ namespace {
 
 class ReadyCatalogErrorSink : public LogSink {
 public:
-  ReadyCatalogErrorSink() { setLevel(LogLevel::Error); }
+  ReadyCatalogErrorSink() { set_level(LogLevel::Error); }
   [[nodiscard]] std::expected<void, StarException> log(std::string_view message, LogLevel) override {
     ADD_FAILURE() << "Ready-catalog fixture logged an error: " << message;
     return {};
@@ -1093,7 +1093,7 @@ end
     auto createdRoot = Root::create(settings);
     ASSERT_TRUE(createdRoot);
     auto& root = **createdRoot;
-    root.logger().addSink(std::make_shared<ReadyCatalogErrorSink>());
+    root.logger().add_sink(std::make_shared<ReadyCatalogErrorSink>());
 
     // These strings are recorded by the INITIAL recipe scan while the Root has
     // not published ItemDatabase. A later db.item() alone could hide a fallback.
@@ -1344,8 +1344,8 @@ function uninit() visit("uninit") end
       }
     };
     auto sink = std::make_shared<RecoveryLogSink>();
-    sink->setLevel(LogLevel::Error);
-    root.logger().addSink(sink);
+    sink->set_level(LogLevel::Error);
+    root.logger().add_sink(sink);
     Json config = JsonObject{
       {"itemName", "activeitemrecovery"}, {"rarity", "common"}, {"animation", JsonObject{}},
       {"scripts", JsonArray{"/active-item-recovery.lua"}}, {"retainScriptStorageInItem", true}

@@ -248,7 +248,7 @@ protected:
   void SetUp() override {
     ASSERT_EQ(DiscordApi::active, nullptr);
     DiscordApi::active = &api;
-    logger.removeStdoutSink();
+    logger.remove_stdout_sink();
     auto created = Star::PcPlatformServices::create(logger, "test-starbound", {});
     ASSERT_TRUE(created) << created.error().what();
     platform = std::move(*created);

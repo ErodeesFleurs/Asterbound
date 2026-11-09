@@ -396,7 +396,7 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
   auto error = std::move(m_boundaryError);
   m_boundaryError.reset();
   if (error) {
-    if (auto logged = m_root.logger().errorException("Lua session failure", ExceptionDiagnostic(*error)); !logged) {
+    if (auto logged = m_root.logger().error_exception("Lua session failure", ExceptionDiagnostic(*error)); !logged) {
       auto failure =
         logged.error().with_related(*error, "Original Lua session failure");
       if (!cleanup)

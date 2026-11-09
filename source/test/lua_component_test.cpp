@@ -813,7 +813,7 @@ const GameTestRegistration
   loggingFailureCategory("LuaComponentLifecycle", "LoggingFailureRemainsInfrastructureFailure", [](GameTest& fixture) {
     class FailingSink final : public LogSink {
     public:
-      FailingSink() { setLevel(LogLevel::Error); }
+      FailingSink() { set_level(LogLevel::Error); }
       std::expected<void, StarException> log(std::string_view, LogLevel) override {
         return std::unexpected(FailingLuaLog("log sink unavailable"));
       }
@@ -826,8 +826,8 @@ const GameTestRegistration
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>("function fail() error('original script failure') end"));
     auto sink = std::make_shared<FailingSink>();
-    fixture.root().logger().addSink(sink);
-    auto removeSink = finally([&] { fixture.root().logger().removeSink(sink); });
+    fixture.root().logger().add_sink(sink);
+    auto removeSink = finally([&] { fixture.root().logger().remove_sink(sink); });
     auto result = [&] {
       // Sink iteration may fail before the test reporter receives the log.
       testing::TestPartResultArray errors;
@@ -845,7 +845,7 @@ const GameTestRegistration nativeLoggingFailure(
   "LuaComponentLifecycle", "InfoSinkFailureIsNotRecoveredAsScriptError", [](GameTest& fixture) {
     class InfoFailingSink final : public LogSink {
     public:
-      InfoFailingSink() { setLevel(LogLevel::Info); }
+      InfoFailingSink() { set_level(LogLevel::Info); }
       unsigned writes = 0;
       std::expected<void, StarException> log(std::string_view, LogLevel level) override {
         if (level == LogLevel::Info) {
@@ -862,8 +862,8 @@ const GameTestRegistration nativeLoggingFailure(
     ASSERT_TRUE(script.init());
     ASSERT_TRUE(script.eval<LuaValue>("function write() sb.logInfo('native info write') end"));
     auto sink = std::make_shared<InfoFailingSink>();
-    fixture.root().logger().addSink(sink);
-    auto removed = finally([&] { fixture.root().logger().removeSink(sink); });
+    fixture.root().logger().add_sink(sink);
+    auto removed = finally([&] { fixture.root().logger().remove_sink(sink); });
     auto result = expectLoggedFailure(
       [&] { return recoverLuaScriptError(script.invoke<Json>("write")); }, "info sink unavailable");
     ASSERT_FALSE(result);

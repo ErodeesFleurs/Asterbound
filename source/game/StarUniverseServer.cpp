@@ -992,7 +992,9 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
           }
           m_tcpServer.reset();
         }
-        if (auto logged = m_root.logger().errorException("UniverseServer: Error setting up TCP, cannot accept connections", ExceptionDiagnostic(setup.error())); !logged)
+        if (auto logged = m_root.logger().error_exception(
+              "UniverseServer: Error setting up TCP, cannot accept connections", ExceptionDiagnostic(setup.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
       }
     } else if (m_tcpState == TcpState::No && m_tcpServer) {
@@ -1001,7 +1003,9 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
       if (auto stopped = m_tcpServer->stop(); !stopped) {
         if (!m_tcpServer->isClosed())
           return std::unexpected(std::move(stopped.error()));
-        if (auto logged = m_root.logger().errorException("UniverseServer: Error stopping TCP server", ExceptionDiagnostic(stopped.error())); !logged)
+        if (auto logged = m_root.logger().error_exception("UniverseServer: Error stopping TCP server",
+                                                          ExceptionDiagnostic(stopped.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
       }
       m_tcpServer.reset();
@@ -1054,7 +1058,9 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
       return {};
     }();
     if (!update) {
-      if (auto logged = m_root.logger().errorException("UniverseServer: exception caught", ExceptionDiagnostic(update.error())); !logged)
+      if (auto logged =
+            m_root.logger().error_exception("UniverseServer: exception caught", ExceptionDiagnostic(update.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<unsigned>(*interval)));
@@ -1533,7 +1539,9 @@ std::expected<void, StarException> UniverseServer::sendClientContextUpdates() {
       contextUpdates[p.first] = std::move(*clientContextData);
 
     if (p.second->serverDebug() && p.second->netRules().version() >= 17) {
-      if (auto sent = m_connectionServer->sendPackets(p.first, {std::make_shared<LogMapUpdate>(m_root.logMap().getValues())}); !sent)
+      if (auto sent =
+            m_connectionServer->sendPackets(p.first, {std::make_shared<LogMapUpdate>(m_root.logMap().get_values())});
+          !sent)
         return std::unexpected(std::move(sent.error()));
     }
   }
@@ -1582,7 +1590,9 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
     for (auto it = m_connectionAcceptThreads.begin(); it != m_connectionAcceptThreads.end();) {
       if (!it->isRunning()) {
         if (auto finished = it->finish(); !finished) {
-          if (auto logged = m_root.logger().errorException("UniverseServer: Exception caught accepting new connection", ExceptionDiagnostic(finished.error())); !logged)
+          if (auto logged = m_root.logger().error_exception("UniverseServer: Exception caught accepting new connection",
+                                                            ExceptionDiagnostic(finished.error()));
+              !logged)
             return std::unexpected(std::move(logged.error()));
         }
       }
@@ -2332,7 +2342,9 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
         if (auto logged = m_root.logger().error("UniverseServer: World {} has stopped due to an error", *name); !logged)
           return std::unexpected(std::move(logged.error()));
         if (!stopped) {
-          if (auto logged = m_root.logger().errorException("UniverseServer: World shutdown error", ExceptionDiagnostic(stopped.error())); !logged)
+          if (auto logged = m_root.logger().error_exception("UniverseServer: World shutdown error",
+                                                            ExceptionDiagnostic(stopped.error()));
+              !logged)
             return std::unexpected(std::move(logged.error()));
         }
         if (auto died = worldDiedWithError(world->worldId()); !died)
@@ -2644,7 +2656,10 @@ std::expected<void, StarException> UniverseServer::loadSettings() {
       return {};
     }();
     if (!loaded) {
-      if (auto logged = m_root.logger().errorException("UniverseServer: Could not load universe settings file, loading defaults", ExceptionDiagnostic(loaded.error())); !logged)
+      if (auto logged =
+            m_root.logger().error_exception("UniverseServer: Could not load universe settings file, loading defaults",
+                                            ExceptionDiagnostic(loaded.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       if (auto renamed = File::rename(file, Star::format("{}.{}.fail", file, Time::millisecondsSinceEpoch())); !renamed)
         return std::unexpected(std::move(renamed.error()));
@@ -2833,7 +2848,9 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
       return {};
     }();
     if (!loaded) {
-      if (auto logged = m_root.logger().errorException("UniverseServer: Could not load temp world index file", ExceptionDiagnostic(loaded.error())); !logged)
+      if (auto logged = m_root.logger().error_exception("UniverseServer: Could not load temp world index file",
+                                                        ExceptionDiagnostic(loaded.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       if (auto renamed = File::rename(storageFile, Star::format("{}.{}.fail", storageFile, Time::millisecondsSinceEpoch())); !renamed)
         return std::unexpected(std::move(renamed.error()));
@@ -3626,7 +3643,11 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return client->loadServerData(*store);
       }();
       if (!loaded) {
-        if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Could not load client context file for <User: {}>, ignoring", connect->playerName), ExceptionDiagnostic(loaded.error())); !logged)
+        if (auto logged = m_root.logger().error_exception(
+              Star::format("UniverseServer: Could not load client context file for <User: {}>, ignoring",
+                           connect->playerName),
+              ExceptionDiagnostic(loaded.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
         if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));
@@ -3665,7 +3686,10 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return {};
       }();
       if (!placed) {
-        if (auto logged = m_root.logger().errorException(Star::format("Failed to place client ship at {}, resetting coordinate", client->shipCoordinate()), ExceptionDiagnostic(placed.error())); !logged)
+        if (auto logged = m_root.logger().error_exception(
+              Star::format("Failed to place client ship at {}, resetting coordinate", client->shipCoordinate()),
+              ExceptionDiagnostic(placed.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
         client->setShipCoordinate({});
       }
@@ -4144,7 +4168,9 @@ std::expected<std::optional<std::shared_ptr<WorldServerThread>>, StarException> 
 std::expected<void, StarException> UniverseServer::retireFailedWorldCreation(
     WorldId const& worldId, std::optional<WorldServerPromise>& promise, StarException const& error) {
   promise.reset();
-  if (auto logged = m_root.logger().errorException("UniverseServer: error during world create", ExceptionDiagnostic(error)); !logged)
+  if (auto logged =
+        m_root.logger().error_exception("UniverseServer: error during world create", ExceptionDiagnostic(error));
+      !logged)
     return std::unexpected(logged.error().with_related(error, "Original world creation failure"));
   if (auto died = worldDiedWithError(worldId); !died)
     return std::unexpected(died.error().with_related(error, "Original world creation failure"));
@@ -4185,7 +4211,10 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       }();
       if (loaded)
         ship = std::move(*loaded);
-      else if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Could not load client ship {}, resetting ship to default state", id), ExceptionDiagnostic(loaded.error())); !logged)
+      else if (auto logged = m_root.logger().error_exception(
+                 Star::format("UniverseServer: Could not load client ship {}, resetting ship to default state", id),
+                 ExceptionDiagnostic(loaded.error()));
+               !logged)
         return std::unexpected(std::move(logged.error()));
     }
     if (!ship) {
@@ -4310,7 +4339,10 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       if (loaded)
         world = std::move(*loaded);
       else {
-        if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Could not load celestial world {}, removing", id), ExceptionDiagnostic(loaded.error())); !logged)
+        if (auto logged = m_root.logger().error_exception(
+              Star::format("UniverseServer: Could not load celestial world {}, removing", id),
+              ExceptionDiagnostic(loaded.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
         if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));
@@ -4476,7 +4508,11 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
           world = std::move(*loaded);
           existed = true;
         } else {
-          if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Could not load persistent unique instance world {}, removing", id.instance), ExceptionDiagnostic(loaded.error())); !logged)
+          if (auto logged = m_root.logger().error_exception(
+                Star::format("UniverseServer: Could not load persistent unique instance world {}, removing",
+                             id.instance),
+                ExceptionDiagnostic(loaded.error()));
+              !logged)
             return std::unexpected(std::move(logged.error()));
           if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
             return std::unexpected(std::move(renamed.error()));
@@ -4520,7 +4556,11 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
             if (loaded) {
               world = std::move(*loaded);
               existed = true;
-            } else if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Could not load temporary instance world '{}', re-creating", *worldName), ExceptionDiagnostic(loaded.error())); !logged) {
+            } else if (auto logged = m_root.logger().error_exception(
+                         Star::format("UniverseServer: Could not load temporary instance world '{}', re-creating",
+                                      *worldName),
+                         ExceptionDiagnostic(loaded.error()));
+                       !logged) {
               return std::unexpected(std::move(logged.error()));
             }
           }
@@ -4807,7 +4847,10 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
       if (loaded)
         world = std::move(*loaded);
       else {
-        if (auto logged = m_root.logger().errorException(Star::format("UniverseServer: Failed to load system {} from disk storage, re-creating", location), ExceptionDiagnostic(loaded.error())); !logged)
+        if (auto logged = m_root.logger().error_exception(
+              Star::format("UniverseServer: Failed to load system {} from disk storage, re-creating", location),
+              ExceptionDiagnostic(loaded.error()));
+            !logged)
           return std::unexpected(std::move(logged.error()));
         if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));

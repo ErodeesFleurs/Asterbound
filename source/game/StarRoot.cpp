@@ -222,12 +222,12 @@ std::expected<void, StarException> Root::initialize() {
     auto sink = FileLogSink::create(logFile, m_settings.logLevel, true);
     if (!sink)
       return std::unexpected(std::move(sink.error()));
-    m_logger.addSink(std::move(*sink));
+    m_logger.add_sink(std::move(*sink));
   }
-  m_logger.stdoutSink()->setLevel(m_settings.logLevel);
+  m_logger.stdout_sink()->set_level(m_settings.logLevel);
 
   if (m_settings.quiet)
-    m_logger.removeStdoutSink();
+    m_logger.remove_stdout_sink();
 
   auto preparing = m_logger.info("Root: Preparing...");
   if (!preparing)
@@ -629,7 +629,10 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
           if (loaded) {
             currentConfig = std::move(*loaded);
           } else {
-            auto logged = m_logger.warnException(Star::format("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
+            auto logged = m_logger.warn_exception(
+              Star::format("Root: Failed to load user configuration file {}, resetting user config",
+                           *m_runtimeConfigFile),
+              ExceptionDiagnostic(loaded.error()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             auto backup = File::rename(*m_runtimeConfigFile, *m_runtimeConfigFile + ".old");

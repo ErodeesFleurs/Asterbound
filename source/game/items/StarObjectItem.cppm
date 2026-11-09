@@ -286,7 +286,8 @@ std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shift
   auto name = objectName();
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto logged = root().logger().errorException(Star::format("Failed to instantiate object '{}' for placement", *name), ExceptionDiagnostic(attempted.error()));
+  auto logged = root().logger().error_exception(Star::format("Failed to instantiate object '{}' for placement", *name),
+                                                ExceptionDiagnostic(attempted.error()));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   if (root().logger().loggable(LogLevel::Debug)) {

@@ -11,7 +11,7 @@ namespace {
 
 class ErrorLogSink : public LogSink {
 public:
-  ErrorLogSink() { setLevel(LogLevel::Error); }
+  ErrorLogSink() { set_level(LogLevel::Error); }
   [[nodiscard]] std::expected<void, StarException> log(std::string_view message, LogLevel) override {
     ADD_FAILURE() << "Error was logged: " << message;
     return {};
@@ -32,7 +32,7 @@ void GameTestEnvironment::SetUp() {
   auto root = Root::create(m_settings);
   ASSERT_TRUE(root) << root.error().what();
   m_root = std::move(*root);
-  m_root->logger().addSink(std::make_shared<ErrorLogSink>());
+  m_root->logger().add_sink(std::make_shared<ErrorLogSink>());
   auto configuration = m_root->configuration();
   ASSERT_TRUE(configuration) << configuration.error().what();
   auto clearUniverse = (*configuration)->set("clearUniverseFiles", true);

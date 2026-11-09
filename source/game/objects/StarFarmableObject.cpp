@@ -320,7 +320,9 @@ std::expected<bool, StarException> FarmableObject::harvest() {
     if (!objectNameResult)
       return std::unexpected(std::move(objectNameResult.error()));
     auto objectName = std::move(*objectNameResult);
-    auto operation9 = root().logger().warnException(Star::format("Failed to create treasure for farmable object '{}'", objectName), ExceptionDiagnostic(dropped.error()));
+    auto operation9 =
+      root().logger().warn_exception(Star::format("Failed to create treasure for farmable object '{}'", objectName),
+                                     ExceptionDiagnostic(dropped.error()));
     if (!operation9)
       return std::unexpected(std::move(operation9.error()));
   }

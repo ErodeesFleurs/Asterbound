@@ -2131,7 +2131,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
     auto poly = PolyF(RectF::withCenter(center, size));
-    self.root().spatialLogger().logPoly("world", poly, Color::Cyan.mix(Color::Red, expiry).toRgba());
+    self.root().spatialLogger().log_poly("world", poly, Color::Cyan.mix(Color::Red, expiry).toRgba());
     if (expiry >= 1.0f) {
       self.dirtyCollision(RectI::withSize(pair.first, { 1, 1 }));
       return true;
@@ -4337,16 +4337,17 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
   if (clientWindow.isEmpty()) {
     return {};
   }
-  
-  auto logPoly = [&self = *this](PolyF poly, Vec2F position, float r, float g, float b) {
+
+  auto log_poly = [&self = *this](PolyF poly, Vec2F position, float r, float g, float b) {
     poly.translate(position);
-    self.root().spatialLogger().logPoly("world", poly, {floatToByte(r, true), floatToByte(g, true), floatToByte(b, true), 255});
+    self.root().spatialLogger().log_poly("world", poly,
+                                         {floatToByte(r, true), floatToByte(g, true), floatToByte(b, true), 255});
   };
-  
-  auto result311 = forEachCollisionBlock(clientWindow, [&](auto const& block)  -> std::expected<void, StarException> {
-      logPoly(block.poly, Vec2F{}, 1.0f, 0.0f, 0.0f);
-      return {};
-    });
+
+  auto result311 = forEachCollisionBlock(clientWindow, [&](auto const& block) -> std::expected<void, StarException> {
+    log_poly(block.poly, Vec2F{}, 1.0f, 0.0f, 0.0f);
+    return {};
+  });
   if (!result311)
     return std::unexpected(std::move(result311.error()));
   
@@ -4355,7 +4356,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
     return std::unexpected(std::move(objects.error()));
   for (auto const& object : *objects) {
     for (auto const& space : object->spaces()) {
-      logPoly(PolyF(RectF(Vec2F(space), Vec2F(space) + Vec2F(1, 1))), Vec2F(object->tilePosition()), 0., 1., 0.);
+      log_poly(PolyF(RectF(Vec2F(space), Vec2F(space) + Vec2F(1, 1))), Vec2F(object->tilePosition()), 0., 1., 0.);
     }
   }
   
@@ -4369,9 +4370,9 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
         return std::unexpected(std::move(result312.error()));
       for (auto const& forceRegion : (std::move(*result312))) {
         if (std::holds_alternative<DirectionalForceRegion>(forceRegion)) {
-          logPoly(std::get<DirectionalForceRegion>(forceRegion).region, {}, 1.0f, 1.0f, 0.0f);
+          log_poly(std::get<DirectionalForceRegion>(forceRegion).region, {}, 1.0f, 1.0f, 0.0f);
         } else if (std::holds_alternative<RadialForceRegion>(forceRegion)) {
-          logPoly(PolyF(std::get<RadialForceRegion>(forceRegion).boundBox()), {}, 0.0f, 1.0f, 1.0f);
+          log_poly(PolyF(std::get<RadialForceRegion>(forceRegion).boundBox()), {}, 0.0f, 1.0f, 1.0f);
         }
       }
     }
@@ -4382,7 +4383,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
         if (!result313)
           return std::unexpected(std::move(result313.error()));
         if (auto pmc = (std::move(*result313))) {
-          logPoly(pmc->collision, pmc->position, 1.0f, 1.0f, 1.0f);
+          log_poly(pmc->collision, pmc->position, 1.0f, 1.0f, 1.0f);
         }
       }
     }

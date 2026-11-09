@@ -769,13 +769,13 @@ const GameTestRegistration paneErrorIsolation(
     ASSERT_TRUE(createdRoot) << createdRoot.error().what();
     class ErrorSink final : public LogSink {
     public:
-      ErrorSink() { setLevel(LogLevel::Error); }
+      ErrorSink() { set_level(LogLevel::Error); }
       std::expected<void, StarException> log(std::string_view message, LogLevel) override {
         ADD_FAILURE() << message;
         return {};
       }
     };
-    (*createdRoot)->logger().addSink(std::make_shared<ErrorSink>());
+    (*createdRoot)->logger().add_sink(std::make_shared<ErrorSink>());
     auto configuration = (*createdRoot)->configuration();
     ASSERT_TRUE(configuration) << configuration.error().what();
     ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
@@ -3595,7 +3595,7 @@ const GameTestRegistration questLogPresentation(
     auto& root = **createdRoot;
     class Errors : public LogSink {
     public:
-      Errors() { setLevel(LogLevel::Error); }
+      Errors() { set_level(LogLevel::Error); }
       std::expected<void, StarException> log(std::string_view message, LogLevel) override {
         messages.emplace_back(message);
         return {};
@@ -3603,7 +3603,7 @@ const GameTestRegistration questLogPresentation(
       std::vector<std::string> messages;
     };
     auto errors = std::make_shared<Errors>();
-    root.logger().addSink(errors);
+    root.logger().add_sink(errors);
     auto configuration = root.configuration();
     ASSERT_TRUE(configuration);
     ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));

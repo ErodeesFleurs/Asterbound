@@ -530,7 +530,7 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
     auto isVisible = visible(region);
     if (!isVisible) return std::unexpected(std::move(isVisible.error()));
     if (*isVisible) {
-      root().spatialLogger().logPoly("world", PolyF(region), {128, 0, 0, 255});
+      root().spatialLogger().log_poly("world", PolyF(region), {128, 0, 0, 255});
       StringList areas;
       if (!SpawnParameters::AreaNames) return std::unexpected(SpawnParameters::AreaNames.error());
       for (auto area : info.second.spawnParameters.areas) {
@@ -540,17 +540,23 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
         if (!shortName) return std::unexpected(std::move(shortName.error()));
         areas.push_back(std::move(*shortName));
       }
-      root().spatialLogger().logText("world", Star::format("Areas: {}", areas.join(", ")), region.min() + Vec2F(0.5, 2.5), {255, 255, 255, 255});
+      root().spatialLogger().log_text("world", Star::format("Areas: {}", areas.join(", ")),
+                                      region.min() + Vec2F(0.5, 2.5), {255, 255, 255, 255});
       if (!SpawnParameters::RegionNames) return std::unexpected(SpawnParameters::RegionNames.error());
       auto regionName = SpawnParameters::RegionNames->get_right(info.second.spawnParameters.region);
       if (!regionName) return std::unexpected(std::move(regionName.error()));
-      root().spatialLogger().logText("world", Star::format("Region: {}", regionName->get()), region.min() + Vec2F(0.5, 1.5), {255, 255, 255, 255});
+      root().spatialLogger().log_text("world", Star::format("Region: {}", regionName->get()),
+                                      region.min() + Vec2F(0.5, 1.5), {255, 255, 255, 255});
       if (!SpawnParameters::TimeNames) return std::unexpected(SpawnParameters::TimeNames.error());
       auto timeName = SpawnParameters::TimeNames->get_right(info.second.spawnParameters.time);
       if (!timeName) return std::unexpected(std::move(timeName.error()));
-      root().spatialLogger().logText("world", Star::format("Time: {}", timeName->get()), region.min() + Vec2F(0.5, 0.5), {255, 255, 255, 255});
+      root().spatialLogger().log_text("world", Star::format("Time: {}", timeName->get()),
+                                      region.min() + Vec2F(0.5, 0.5), {255, 255, 255, 255});
       if (info.second.spawnAttempts > 0)
-        root().spatialLogger().logText("world", Star::format("Spawns: {} / {}", info.second.spawns, info.second.spawnAttempts), region.min() + Vec2F(0.5, 3.5), (info.second.spawnAttempts > info.second.spawns) ? Color::Red.toRgba() : Color::Green.toRgba());
+        root().spatialLogger().log_text(
+          "world", Star::format("Spawns: {} / {}", info.second.spawns, info.second.spawnAttempts),
+          region.min() + Vec2F(0.5, 3.5),
+          (info.second.spawnAttempts > info.second.spawns) ? Color::Red.toRgba() : Color::Green.toRgba());
     }
   }
   return {};

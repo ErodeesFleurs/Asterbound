@@ -266,14 +266,16 @@ std::expected<void, StarException> WorldClientThread::clearMessages() {
 std::expected<void, StarException> WorldClientThread::run() {
   auto result = runLoop(m_stopSource.get_token());
   if (!result) {
-    auto logged = m_worldClient->root().logger().errorException("WorldClientThread error", ExceptionDiagnostic(result.error()));
+    auto logged =
+      m_worldClient->root().logger().error_exception("WorldClientThread error", ExceptionDiagnostic(result.error()));
     if (!logged)
       result = std::unexpected(result.error().with_related(logged.error(), "World error logging also failed"));
     m_errorOccurred = true;
   }
   auto cleared = clearMessages();
   if (!cleared) {
-    auto logged = m_worldClient->root().logger().errorException("WorldClientThread message drain failed", ExceptionDiagnostic(cleared.error()));
+    auto logged = m_worldClient->root().logger().error_exception("WorldClientThread message drain failed",
+                                                                 ExceptionDiagnostic(cleared.error()));
     if (!logged)
       cleared = std::unexpected(cleared.error().with_related(logged.error(), "World message drain logging also failed"));
     m_errorOccurred = true;
@@ -319,7 +321,8 @@ std::expected<void, StarException> WorldClientThread::update() {
   queueLocker.unlock();
   auto incoming = m_worldClient->handleIncomingPackets(std::move(incomingPackets));
   if (!incoming) {
-    auto logged = m_worldClient->root().logger().errorException("WorldClientThread error handling incoming packets", ExceptionDiagnostic(incoming.error()));
+    auto logged = m_worldClient->root().logger().error_exception("WorldClientThread error handling incoming packets",
+                                                                 ExceptionDiagnostic(incoming.error()));
     lockWithDiagnostics(queueLocker);
     m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
     queueLocker.unlock();

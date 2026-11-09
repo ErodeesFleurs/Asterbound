@@ -2082,16 +2082,16 @@ std::expected<void, StarException> MainInterface::renderDebug() {
     context().root().spatialLogger().clear();
     m_debugTextRect = RectF::null();
     context().root().logMap().clear();
-    context().root().spatialLogger().setObserved(false);
+    context().root().spatialLogger().set_observed(false);
     return {};
   }
-  context().root().spatialLogger().setObserved(true);
+  context().root().spatialLogger().set_observed(true);
   auto drawDebug = [&]() -> std::expected<void, StarException> {
     if (m_clientCommandProcessor->debugHudEnabled()) {
       if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().setLineSpacing(0.5f); !r) return std::unexpected(std::move(r.error()));
       bool clearMap = std::exchange(m_debugMapClearDue, false);
-      auto logMapValues = context().root().logMap().getValues();
+      auto logMapValues = context().root().logMap().get_values();
       if (clearMap) context().root().logMap().clear();
       auto height = windowHeight();
       if (!height) return std::unexpected(std::move(height.error()));
@@ -2120,12 +2120,12 @@ std::expected<void, StarException> MainInterface::renderDebug() {
     }
     auto const& camera = m_worldPainter.get().camera();
     bool clearSpatial = std::exchange(m_debugSpatialClearDue, false);
-    for (auto const& line : context().root().spatialLogger().getLines("world", clearSpatial)) {
+    for (auto const& line : context().root().spatialLogger().get_lines("world", clearSpatial)) {
       Vec2F begin = camera.worldToScreen(line.begin);
       Vec2F end = camera.worldGeometry().diff(line.end, line.begin) * camera.pixelRatio() * TilePixels + begin;
       if (auto r = context().drawLine(begin, end, line.color, 1); !r) return std::unexpected(std::move(r.error()));
     }
-    for (auto const& line : context().root().spatialLogger().getLines("screen", clearSpatial)) {
+    for (auto const& line : context().root().spatialLogger().get_lines("screen", clearSpatial)) {
       if (auto r = context().drawLine(Vec2F(line.begin), Vec2F(line.end), line.color, 1); !r) return std::unexpected(std::move(r.error()));
     }
     auto drawPoint = [&](Vec2F position, Vec4B const& color) -> std::expected<void, StarException> {
@@ -2134,19 +2134,19 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       if (auto r = context().drawLine(position + Vec2F(2, 2), position + Vec2F(2, -2), color, 1); !r) return std::unexpected(std::move(r.error()));
       return context().drawLine(position + Vec2F(2, -2), position + Vec2F(-2, -2), color, 1);
     };
-    for (auto const& point : context().root().spatialLogger().getPoints("world", clearSpatial)) {
+    for (auto const& point : context().root().spatialLogger().get_points("world", clearSpatial)) {
       if (auto r = drawPoint(camera.worldToScreen(point.position), point.color); !r) return std::unexpected(std::move(r.error()));
     }
-    for (auto const& point : context().root().spatialLogger().getPoints("screen", clearSpatial)) {
+    for (auto const& point : context().root().spatialLogger().get_points("screen", clearSpatial)) {
       if (auto r = drawPoint(point.position, point.color); !r) return std::unexpected(std::move(r.error()));
     }
     if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
-    for (auto const& logText : context().root().spatialLogger().getText("world", clearSpatial)) {
+    for (auto const& logText : context().root().spatialLogger().get_text("world", clearSpatial)) {
       if (auto r = context().setFontColor(logText.color); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().renderText(logText.text, camera.worldToScreen(logText.position)); !r)
         return std::unexpected(std::move(r.error()));
     }
-    for (auto const& logText : context().root().spatialLogger().getText("screen", clearSpatial)) {
+    for (auto const& logText : context().root().spatialLogger().get_text("screen", clearSpatial)) {
       if (auto r = context().setFontColor(logText.color); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().renderText(logText.text, logText.position); !r)
         return std::unexpected(std::move(r.error()));

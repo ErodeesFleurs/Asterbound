@@ -154,6 +154,7 @@ let
     "json_benchmarks"
     "file_benchmarks"
     "io_benchmarks"
+    "logging_benchmarks"
     "array_benchmarks"
     "hash_benchmarks"
     "list_benchmarks"

@@ -36,7 +36,8 @@ std::expected<std::shared_ptr<DanceDatabase>, StarException> DanceDatabase::crea
   for (auto const& file : files->get()) {
     auto dance = readDance(*assets, file.string());
     if (!dance) {
-      auto logged = logger.errorException(Star::format("Error loading dance file {}", file.string()), ExceptionDiagnostic(dance.error()));
+      auto logged = logger.error_exception(Star::format("Error loading dance file {}", file.string()),
+                                           ExceptionDiagnostic(dance.error()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;

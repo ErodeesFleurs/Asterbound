@@ -2478,7 +2478,8 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   m_pendingMoves.clear();
 
   if (isClient)
-    root().spatialLogger().logPoly("world", m_movementController->collisionBody(), isMaster() ? Color::Orange.toRgba() : Color::Yellow.toRgba());
+    root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
+                                    isMaster() ? Color::Orange.toRgba() : Color::Yellow.toRgba());
   return {};
 }
 
@@ -4904,7 +4905,9 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     if (!descriptionResult)
       return std::unexpected(std::move(descriptionResult.error()));
     auto description = std::move(*descriptionResult);
-    if (auto result = root().logger().errorException(Star::format("Couldn't queue radio message '{}'", description), ExceptionDiagnostic(decoded.error())); !result)
+    if (auto result = root().logger().error_exception(Star::format("Couldn't queue radio message '{}'", description),
+                                                      ExceptionDiagnostic(decoded.error()));
+        !result)
       return std::unexpected(std::move(result.error()));
     return {};
   }
@@ -5104,7 +5107,9 @@ std::expected<Json, StarException> Player::getSecretProperty(String const& name,
     auto value = buffer.read<Json>();
     if (value)
       return std::move(*value);
-    if (auto result = root().logger().errorException(Star::format("Exception reading secret player property '{}'", name), ExceptionDiagnostic(value.error())); !result)
+    if (auto result = root().logger().error_exception(
+          Star::format("Exception reading secret player property '{}'", name), ExceptionDiagnostic(value.error()));
+        !result)
       return std::unexpected(std::move(result.error()));
   }
   return defaultValue;

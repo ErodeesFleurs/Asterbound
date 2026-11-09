@@ -926,9 +926,10 @@ auto treasureDatabase = std::move(*result175);
     }();
     if (!dropped) {
       auto const& e = dropped.error();
-      auto result181 = this->root().logger().warnException(Star::format("Failed to create treasure for NPC '{}'", npcType()), ExceptionDiagnostic(e));
-if (!result181) return std::unexpected(std::move(result181.error()));
-    
+      auto result181 = this->root().logger().warn_exception(
+        Star::format("Failed to create treasure for NPC '{}'", npcType()), ExceptionDiagnostic(e));
+      if (!result181)
+        return std::unexpected(std::move(result181.error()));
     }
   }
 
@@ -1184,7 +1185,7 @@ if (!result235) return std::unexpected(std::move(result235.error()));
   auto result236 = world();
   if (!result236) return std::unexpected(std::move(result236.error()));
   if (result236->get().isClient())
-      this->root().spatialLogger().logPoly("world", m_movementController->collisionBody(), {0, 255, 0, 255});
+    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {0, 255, 0, 255});
 }
   return {};
 }

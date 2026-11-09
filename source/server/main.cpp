@@ -216,7 +216,9 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     if (!started) {
       auto closed = server->close();
       if (!closed) {
-        if (auto logged = root->logger().errorException("Server cleanup after failed start also failed", ExceptionDiagnostic(closed.error())); !logged) {
+        if (auto logged = root->logger().error_exception("Server cleanup after failed start also failed",
+                                                         ExceptionDiagnostic(closed.error()));
+            !logged) {
           EmergencyLog::error("Server cleanup after failed start also failed: {}", Star::exception_report(closed.error()));
           EmergencyLog::error("Server cleanup logging failed: {}", Star::exception_report(logged.error()));
         }
@@ -301,7 +303,9 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
       if (!result) {
         if (!shutdownError)
           shutdownError = std::move(result.error());
-        else if (auto logged = root->logger().errorException("Additional server shutdown error", ExceptionDiagnostic(result.error())); !logged) {
+        else if (auto logged = root->logger().error_exception("Additional server shutdown error",
+                                                              ExceptionDiagnostic(result.error()));
+                 !logged) {
           EmergencyLog::error("Additional server shutdown error: {}", Star::exception_report(result.error()));
           EmergencyLog::error("Server shutdown logging failed: {}", Star::exception_report(logged.error()));
         }
@@ -327,7 +331,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
   return root->logger().info("Server shutdown gracefully");
   }();
   if (!result) {
-    auto logged = root->logger().errorException("Fatal server error", ExceptionDiagnostic(result.error()));
+    auto logged = root->logger().error_exception("Fatal server error", ExceptionDiagnostic(result.error()));
     if (!logged) {
       EmergencyLog::error("{}", Star::exception_report(result.error()));
       EmergencyLog::error("Fatal server error logging failed: {}", Star::exception_report(logged.error()));

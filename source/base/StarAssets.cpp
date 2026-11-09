@@ -885,9 +885,9 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           if (summary.operation.empty())
             summary.operation = Star::format("Running {} scripts", groupName);
           ran.error() = std::move(ran.error()).with_summary(std::move(summary));
-          logged = m_logger.errorException(
-              Star::format("Exception while running {} scripts from {}", groupName, sourceDiagnostic(*source, std::cref(sourcePath))),
-              ExceptionDiagnostic(ran.error()));
+          logged = m_logger.error_exception(Star::format("Exception while running {} scripts from {}", groupName,
+                                                         sourceDiagnostic(*source, std::cref(sourcePath))),
+                                            ExceptionDiagnostic(ran.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
@@ -1092,7 +1092,9 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
 
 Assets::~Assets() {
   if (auto result = stopWorkers(); !result) {
-    if (auto logged = m_logger.errorException("Asset worker failed during shutdown", ExceptionDiagnostic(result.error())); !logged) {
+    if (auto logged =
+          m_logger.error_exception("Asset worker failed during shutdown", ExceptionDiagnostic(result.error()));
+        !logged) {
       EmergencyLog::error("Asset worker failed during shutdown: {}", Star::exception_report(result.error()));
       EmergencyLog::error("Asset worker shutdown logging failed: {}", Star::exception_report(logged.error()));
     }
@@ -1930,10 +1932,11 @@ std::expected<void, StarException> Assets::reportPatchRejection(String const& pa
     std::shared_ptr<AssetSource> const& source, StarException const& error) const {
   auto provider = sourceDiagnostic(*source, m_assetSourcePaths.find_left_ref(source));
   if (error.is<JsonPatchTestFail>())
-    return m_logger.logException(LogLevel::Debug, Star::format("Patch test failure from file {} in {}", path, provider),
-        ExceptionDiagnostic(error));
-  return m_logger.errorException(Star::format("Could not apply patch from file {} in {}", path, provider),
-      ExceptionDiagnostic(error));
+    return m_logger.log_exception(LogLevel::Debug,
+                                  Star::format("Patch test failure from file {} in {}", path, provider),
+                                  ExceptionDiagnostic(error));
+  return m_logger.error_exception(Star::format("Could not apply patch from file {} in {}", path, provider),
+                                  ExceptionDiagnostic(error));
 }
 
 std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
@@ -2088,7 +2091,8 @@ std::expected<bool, StarException> Assets::doLoad(AssetId const& id) const {
   auto loaded = loadAsset(id);
   if (loaded)
     return static_cast<bool>(*loaded);
-  auto logged = m_logger.errorException(Star::format("Error loading asset: {}", id.path), ExceptionDiagnostic(loaded.error()));
+  auto logged =
+    m_logger.error_exception(Star::format("Error loading asset: {}", id.path), ExceptionDiagnostic(loaded.error()));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return true;
@@ -2103,8 +2107,9 @@ std::expected<bool, StarException> Assets::doPost(AssetId const& id) const {
       asset = std::move(*processed);
     } else {
       processed.error() = resourceFailure(std::move(processed.error()), id.path.basePath);
-      if (auto logged = m_logger.errorException(Star::format("Error post-processing asset: {}", id.path),
-            ExceptionDiagnostic(processed.error())); !logged)
+      if (auto logged = m_logger.error_exception(Star::format("Error post-processing asset: {}", id.path),
+                                                 ExceptionDiagnostic(processed.error()));
+          !logged)
         logError = std::move(logged.error());
     }
   }
@@ -2154,8 +2159,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
   if (!loaded) {
     loaded.error() = resourceFailure(std::move(loaded.error()), id.path.basePath);
     if (id.type == AssetType::Image && m_settings.missingImage) {
-      auto logged = m_logger.errorException(Star::format("Could not load image asset '{}', using placeholder default.", id.path),
-          ExceptionDiagnostic(loaded.error()));
+      auto logged =
+        m_logger.error_exception(Star::format("Could not load image asset '{}', using placeholder default.", id.path),
+                                 ExceptionDiagnostic(loaded.error()));
       if (logged) {
         loaded = loadImage({*m_settings.missingImage, {}, {}});
         if (!loaded)
@@ -2164,8 +2170,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAss
         loaded = std::unexpected(std::move(logged.error()));
       }
     } else if (id.type == AssetType::Audio && m_settings.missingAudio) {
-      auto logged = m_logger.errorException(Star::format("Could not load audio asset '{}', using placeholder default.", id.path),
-          ExceptionDiagnostic(loaded.error()));
+      auto logged =
+        m_logger.error_exception(Star::format("Could not load audio asset '{}', using placeholder default.", id.path),
+                                 ExceptionDiagnostic(loaded.error()));
       if (logged) {
         loaded = loadAudio({*m_settings.missingAudio, {}, {}});
         if (!loaded)

@@ -1,8 +1,17 @@
+#ifdef STAR_SYSTEM_LINUX
+#include <unistd.h>
+#endif
+
 import std;
 import star.format;
 import star.output_proxy;
 import star.logging;
 import star.text_formatter;
+import star.list;
+import star.vector;
+import star.line;
+import star.poly;
+import star.string;
 
 #include "gtest/gtest.h"
 
@@ -13,6 +22,28 @@ static_assert(!std::is_constructible_v<ExceptionDiagnostic, std::exception const
 static_assert(!std::is_constructible_v<StarException, std::string, std::exception const&>);
 static_assert(sizeof(StarException) == sizeof(std::shared_ptr<void const>));
 static_assert(sizeof(ExceptionDiagnostic) == sizeof(std::shared_ptr<void const>));
+
+struct LogFormattingProbe {
+  unsigned* calls;
+  std::function<void()> const* on_format = nullptr;
+};
+
+template <typename Context>
+concept log_probe_format_context = requires(std::formatter<std::string_view> const& formatter, Context& context) {
+  { formatter.format(std::string_view{}, context) } -> std::same_as<typename Context::iterator>;
+};
+
+template <> struct std::formatter<LogFormattingProbe> : std::formatter<std::string_view> {
+  template <log_probe_format_context Context>
+  auto format(LogFormattingProbe const& value, Context& context) const -> typename Context::iterator {
+    ++*value.calls;
+    if (value.on_format)
+      (*value.on_format)();
+    return std::formatter<std::string_view>::format("probe", context);
+  }
+};
+
+static_assert(format_argument<LogFormattingProbe>);
 
 namespace {
 template <typename Error>
@@ -181,9 +212,9 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
     std::vector<std::pair<LogLevel, std::string>> records;
   };
   Logger logger;
-  logger.removeStdoutSink();
+  logger.remove_stdout_sink();
   auto sink = std::make_shared<RecordingSink>();
-  logger.addSink(sink);
+  logger.add_sink(sink);
   auto error = OutOfRangeException("diagnostic-reason", false).with_context("full-only-context");
   auto summary = *error.diagnostic_summary();
   summary.locations.push_back({"/scripts/diagnostic.lua", 17, "diagnostic-provider"});
@@ -191,8 +222,8 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
   error = std::move(error).with_summary(std::move(summary));
   auto diagnostic = ExceptionDiagnostic(error);
 
-  ASSERT_TRUE(logger.errorException("error-operation", diagnostic));
-  ASSERT_TRUE(logger.warnException("warning-operation", diagnostic));
+  ASSERT_TRUE(logger.error_exception("error-operation", diagnostic));
+  ASSERT_TRUE(logger.warn_exception("warning-operation", diagnostic));
   ASSERT_EQ(sink->records.size(), 2u);
   EXPECT_EQ(sink->records[0].first, LogLevel::Error);
   EXPECT_EQ(sink->records[1].first, LogLevel::Warn);
@@ -207,8 +238,8 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
   }
 
   sink->records.clear();
-  sink->setLevel(LogLevel::Debug);
-  ASSERT_TRUE(logger.errorException("debug-operation", diagnostic));
+  sink->set_level(LogLevel::Debug);
+  ASSERT_TRUE(logger.error_exception("debug-operation", diagnostic));
   ASSERT_EQ(sink->records.size(), 2u);
   EXPECT_EQ(sink->records[0].first, LogLevel::Error);
   EXPECT_EQ(sink->records[1].first, LogLevel::Debug);
@@ -217,11 +248,365 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
 
   for (auto failLevel : {LogLevel::Error, LogLevel::Debug}) {
     sink->failLevel = failLevel;
-    auto failed = logger.errorException("failing-operation", diagnostic);
+    auto failed = logger.error_exception("failing-operation", diagnostic);
     ASSERT_FALSE(failed);
     EXPECT_TRUE(failed.error().is<IOException>());
     EXPECT_EQ(failed.error().diagnostic_summary()->reason, "diagnostic-sink-failure");
   }
+}
+
+namespace {
+
+class CallbackLogSink : public LogSink {
+public:
+  std::expected<void, StarException> log(std::string_view message, LogLevel level) override {
+    return callback ? callback(message, level) : std::expected<void, StarException>{};
+  }
+  std::function<std::expected<void, StarException>(std::string_view, LogLevel)> callback;
+};
+
+#ifdef STAR_SYSTEM_LINUX
+void exercise_reentrant_logging() {
+  Logger logger;
+  logger.remove_stdout_sink();
+  auto sink = std::make_shared<CallbackLogSink>();
+  auto added = std::make_shared<CallbackLogSink>();
+  unsigned oldCalls = 0;
+  unsigned newCalls = 0;
+  std::weak_ptr<LogSink> oldLifetime = sink;
+  added->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    ++newCalls;
+    return {};
+  };
+  sink->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    ++oldCalls;
+    logger.remove_sink(sink);
+    sink.reset();
+    EXPECT_FALSE(oldLifetime.expired());
+    logger.add_sink(added);
+    logger.add_sink(added);// Duplicate registration is still a set operation.
+    return logger.info("nested");
+  };
+  logger.add_sink(sink);
+  ASSERT_TRUE(logger.info("outer"));
+  EXPECT_EQ(oldCalls, 1u);
+  EXPECT_EQ(newCalls, 1u);// Nested call sees the new registry, outer does not.
+  EXPECT_TRUE(oldLifetime.expired());
+  ASSERT_TRUE(logger.info("future"));
+  EXPECT_EQ(newCalls, 2u);
+
+  // Discover the registry's actual order instead of assuming pointer hashes.
+  Logger retaining;
+  retaining.remove_stdout_sink();
+  auto a = std::make_shared<CallbackLogSink>();
+  auto b = std::make_shared<CallbackLogSink>();
+  std::vector<unsigned> order;
+  a->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    order.push_back(0);
+    return {};
+  };
+  b->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    order.push_back(1);
+    return {};
+  };
+  retaining.add_sink(a);
+  retaining.add_sink(b);
+  ASSERT_TRUE(retaining.info("discover"));
+  ASSERT_EQ(order.size(), 2u);
+  auto first = order.front() == 0 ? a : b;
+  auto& removed = order.front() == 0 ? b : a;
+  std::weak_ptr<LogSink> removedLifetime = removed;
+  unsigned removedCalls = 0;
+  removed->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    ++removedCalls;
+    return {};
+  };
+  first->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    retaining.remove_sink(removed);
+    removed.reset();
+    EXPECT_FALSE(removedLifetime.expired());
+    return {};
+  };
+  ASSERT_TRUE(retaining.info("retained"));
+  EXPECT_EQ(removedCalls, 1u);
+  EXPECT_TRUE(removedLifetime.expired());
+  first->callback = {};
+  ASSERT_TRUE(retaining.info("retired"));
+  EXPECT_EQ(removedCalls, 1u);
+
+  // Recursive dispatch must not deadlock this Logger's serialization lock.
+  bool nested = false;
+  first->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    if (!std::exchange(nested, true))
+      return retaining.info("same sink recursion");
+    return {};
+  };
+  ASSERT_TRUE(retaining.info("same sink outer"));
+
+  std::atomic<bool> active{false};
+  std::atomic<bool> overlap{false};
+  std::atomic<unsigned> concurrentCalls{0};
+  first->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    if (active.exchange(true))
+      overlap = true;
+    for (unsigned i = 0; i != 32; ++i)
+      std::atomic_signal_fence(std::memory_order_seq_cst);
+    ++concurrentCalls;
+    active = false;
+    return {};
+  };
+  std::atomic<bool> start{false};
+  std::atomic<bool> failed{false};
+  auto writer = [&](Logger& owner) {
+    while (!start.load())
+      std::this_thread::yield();
+    for (unsigned i = 0; i != 1000; ++i) {
+      if (!owner.info("shared sink"))
+        failed = true;
+    }
+  };
+  std::thread one(writer, std::ref(retaining));
+  std::thread two(writer, std::ref(retaining));
+  start = true;
+  one.join();
+  two.join();
+  EXPECT_FALSE(failed.load());
+  EXPECT_FALSE(overlap.load());
+  EXPECT_EQ(concurrentCalls.load(), 2000u);
+
+  Logger formatting;
+  formatting.remove_stdout_sink();
+  auto captured = std::make_shared<CallbackLogSink>();
+  auto replacement = std::make_shared<CallbackLogSink>();
+  unsigned capturedCalls = 0;
+  unsigned replacementCalls = 0;
+  unsigned formats = 0;
+  captured->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    ++capturedCalls;
+    return {};
+  };
+  replacement->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    ++replacementCalls;
+    return {};
+  };
+  formatting.add_sink(captured);
+  std::function<void()> mutate = [&] {
+    formatting.remove_sink(captured);
+    formatting.add_sink(replacement);
+    captured->set_level(LogLevel::Error);
+  };
+  ASSERT_TRUE(formatting.info("{}", LogFormattingProbe{&formats, &mutate}));
+  EXPECT_EQ(formats, 1u);
+  EXPECT_EQ(capturedCalls, 0u);// Formatting-time threshold changes still apply.
+  EXPECT_EQ(replacementCalls, 0u);
+  ASSERT_TRUE(formatting.info("next snapshot"));
+  EXPECT_EQ(replacementCalls, 1u);
+
+  Logger waiting;
+  waiting.remove_stdout_sink();
+  auto gated = std::make_shared<CallbackLogSink>();
+  std::latch entered(1);
+  std::latch release(1);
+  std::latch formatted(1);
+  unsigned waitingCalls = 0;
+  gated->callback = [&](std::string_view message, LogLevel) -> std::expected<void, StarException> {
+    ++waitingCalls;
+    if (message == "holding sink") {
+      entered.count_down();
+      release.wait();
+    }
+    return {};
+  };
+  waiting.add_sink(gated);
+  std::atomic<bool> waitingFailed{false};
+  std::thread holder([&] {
+    if (!waiting.info("holding sink"))
+      waitingFailed = true;
+  });
+  entered.wait();
+  std::function<void()> markFormatted = [&] { formatted.count_down(); };
+  unsigned waitingFormats = 0;
+  std::thread waiter([&] {
+    if (!waiting.info("{}", LogFormattingProbe{&waitingFormats, &markFormatted}))
+      waitingFailed = true;
+  });
+  formatted.wait();
+  gated->set_level(LogLevel::Error);
+  release.count_down();
+  holder.join();
+  waiter.join();
+  EXPECT_FALSE(waitingFailed.load());
+  EXPECT_EQ(waitingFormats, 1u);
+  EXPECT_EQ(waitingCalls, 1u);
+}
+#endif
+
+}// namespace
+
+#ifdef STAR_SYSTEM_LINUX
+TEST(LoggingDeathTest, ReentrantRegistryAndSnapshotsRetainRemovedSinks) {
+  EXPECT_EXIT(
+    {
+      ::alarm(5);
+      exercise_reentrant_logging();
+      std::_Exit(::testing::Test::HasFailure() ? 1 : 0);
+    },
+    ::testing::ExitedWithCode(0), "");
+}
+#endif
+
+TEST(LoggingTest, DynamicLevelsFilterBeforeFormattingAndFirstFailureStopsDispatch) {
+  Logger logger;
+  logger.remove_stdout_sink();
+  auto a = std::make_shared<CallbackLogSink>();
+  auto b = std::make_shared<CallbackLogSink>();
+  std::vector<unsigned> order;
+  a->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    order.push_back(0);
+    return {};
+  };
+  b->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    order.push_back(1);
+    return {};
+  };
+  logger.add_sink(a);
+  logger.add_sink(b);
+  unsigned formats = 0;
+  a->set_level(LogLevel::Error);
+  b->set_level(LogLevel::Error);
+  EXPECT_FALSE(logger.loggable(LogLevel::Info));
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  EXPECT_EQ(formats, 0u);
+  EXPECT_TRUE(order.empty());
+  a->set_level(LogLevel::Info);
+  EXPECT_TRUE(logger.loggable(LogLevel::Info));
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  EXPECT_EQ(formats, 1u);
+  EXPECT_EQ(order, (std::vector<unsigned>{0}));
+  a->set_level(LogLevel::Error);
+  EXPECT_FALSE(logger.loggable(LogLevel::Info));
+  b->set_level(LogLevel::Info);
+  EXPECT_TRUE(logger.loggable(LogLevel::Info));
+  order.clear();
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  EXPECT_EQ(formats, 2u);
+  EXPECT_EQ(order, (std::vector<unsigned>{1}));
+
+  a->set_level(LogLevel::Info);
+  order.clear();
+  ASSERT_TRUE(logger.info("discover failure order"));
+  ASSERT_EQ(order.size(), 2u);
+  auto first = order.front() == 0 ? a : b;
+  first->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    order.push_back(2);
+    return std::unexpected(IOException("ordered sink failure", false));
+  };
+  order.clear();
+  auto failed = logger.info("failure-message-marker");
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<IOException>());
+  EXPECT_EQ(order, (std::vector<unsigned>{2}));
+  auto report = Star::exception_report(failed.error());
+  EXPECT_NE(report.find("ordered sink failure"), std::string::npos);
+  EXPECT_NE(report.find("While writing log message: failure-message-marker"), std::string::npos);
+
+  Logger lowering;
+  lowering.remove_stdout_sink();
+  auto x = std::make_shared<CallbackLogSink>();
+  auto y = std::make_shared<CallbackLogSink>();
+  std::vector<unsigned> loweredOrder;
+  x->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    loweredOrder.push_back(0);
+    return {};
+  };
+  y->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
+    loweredOrder.push_back(1);
+    return {};
+  };
+  lowering.add_sink(x);
+  lowering.add_sink(y);
+  ASSERT_TRUE(lowering.info("discover threshold order"));
+  ASSERT_EQ(loweredOrder.size(), 2u);
+  auto initiallyFiltered = loweredOrder.front() == 0 ? x : y;
+  initiallyFiltered->set_level(LogLevel::Error);
+  loweredOrder.clear();
+  std::function<void()> lowerThreshold = [&] { initiallyFiltered->set_level(LogLevel::Info); };
+  unsigned loweringFormats = 0;
+  ASSERT_TRUE(lowering.info("{}", LogFormattingProbe{&loweringFormats, &lowerThreshold}));
+  EXPECT_EQ(loweringFormats, 1u);
+  EXPECT_EQ(loweredOrder.size(), 2u);
+}
+
+TEST(LoggingTest, SpatialCapsKeepSuffixAndQueriesDrainWithoutChangingObservation) {
+  SpatialLogger logger;
+  Vec4B color{1, 2, 3, 4};
+  EXPECT_FALSE(logger.observed());
+  logger.log_point("unobserved", {1, 2}, color);
+  logger.log_line("unobserved", {1, 2}, {3, 4}, color);
+  logger.log_text("unobserved", "ignored", {1, 2}, color);
+  for (unsigned i = 0; i != 64; ++i) {
+    auto unknown = Star::format("unknown-{}", i);
+    EXPECT_TRUE(logger.get_lines(unknown, false).empty());
+    EXPECT_TRUE(logger.get_points(unknown, true).empty());
+    EXPECT_TRUE(logger.get_text(unknown, false).empty());
+  }
+  EXPECT_TRUE(logger.get_points("unobserved", false).empty());
+  EXPECT_TRUE(logger.get_lines("unobserved", false).empty());
+  EXPECT_TRUE(logger.get_text("unobserved", false).empty());
+  logger.set_observed(true);
+  for (std::size_t i = 0; i != SpatialLogger::MaximumPoints + 3; ++i)
+    logger.log_point("points", {static_cast<float>(i), 2}, color);
+  auto copied = logger.get_points("points", false);
+  ASSERT_EQ(copied.size(), SpatialLogger::MaximumPoints);
+  EXPECT_EQ(copied.front().position, Vec2F(3, 2));
+  EXPECT_EQ(copied.back().position, Vec2F(SpatialLogger::MaximumPoints + 2, 2));
+  auto drained = logger.get_points("points", true);
+  EXPECT_EQ(drained.size(), copied.size());
+  EXPECT_TRUE(logger.get_points("points", true).empty());
+  for (std::size_t i = 0; i != SpatialLogger::MaximumText + 2; ++i)
+    logger.log_text("text", Star::format("text-{}", i), {static_cast<float>(i), 0}, color);
+  auto text = logger.get_text("text", true);
+  ASSERT_EQ(text.size(), SpatialLogger::MaximumText);
+  EXPECT_EQ(text.front().text, "text-2");
+  EXPECT_EQ(text.back().text, String(Star::format("text-{}", SpatialLogger::MaximumText + 1)));
+  EXPECT_TRUE(logger.get_text("text", false).empty());
+  for (std::size_t i = 0; i != SpatialLogger::MaximumLines + 2; ++i)
+    logger.log_line("lines", {static_cast<float>(i), 0}, {static_cast<float>(i), 1}, color);
+  auto lines = logger.get_lines("lines", true);
+  ASSERT_EQ(lines.size(), SpatialLogger::MaximumLines);
+  EXPECT_EQ(lines.front().begin, Vec2F(2, 0));
+  EXPECT_EQ(lines.back().begin, Vec2F(SpatialLogger::MaximumLines + 1, 0));
+  EXPECT_TRUE(logger.get_lines("lines", false).empty());
+
+  List<Vec2F> vertices;
+  for (std::size_t i = 0; i != SpatialLogger::MaximumLines + 3; ++i)
+    vertices.push_back({static_cast<float>(i), static_cast<float>(i % 2)});
+  PolyF polygon(std::move(vertices));
+  logger.log_line("polygon", {-1, -1}, {-2, -2}, color);
+  logger.log_poly("polygon", polygon, color);
+  auto polygonLines = logger.get_lines("polygon", true);
+  ASSERT_EQ(polygonLines.size(), SpatialLogger::MaximumLines);
+  auto firstSide = polygon.side(3);
+  auto lastSide = polygon.side(polygon.sides() - 1);
+  EXPECT_EQ(polygonLines.front().begin, firstSide.min());
+  EXPECT_EQ(polygonLines.front().end, firstSide.max());
+  EXPECT_EQ(polygonLines.back().begin, lastSide.min());
+  EXPECT_EQ(polygonLines.back().end, lastSide.max());
+  logger.log_line("line-overload", Line2F({1, 2}, {3, 4}), color);
+  ASSERT_EQ(logger.get_lines("line-overload", false).size(), 1u);
+  logger.set_observed(false);
+  EXPECT_EQ(logger.get_lines("line-overload", true).size(), 1u);
+  logger.clear();
+  EXPECT_FALSE(logger.observed());
+  logger.set_observed(true);
+  logger.log_point("clear", {1, 2}, color);
+  logger.log_text("clear", "clear", {1, 2}, color);
+  logger.log_line("clear", {1, 2}, {3, 4}, color);
+  logger.clear();
+  EXPECT_TRUE(logger.observed());
+  EXPECT_TRUE(logger.get_points("clear", false).empty());
+  EXPECT_TRUE(logger.get_text("clear", false).empty());
+  EXPECT_TRUE(logger.get_lines("clear", false).empty());
 }
 
 TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {

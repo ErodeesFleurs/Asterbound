@@ -729,12 +729,14 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
       return config->getString("objectName");
     }();
     if (!name) {
-      auto logged = root.logger().errorException(Star::format("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
+      auto logged = root.logger().error_exception(
+        Star::format("Error loading object file {}", file),
+        ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (database->m_paths.contains(*name)) {
       auto error = (*assets)->withAssetContext(ObjectException::format("Object {} defined twice, second time from {}", *name, file), file, "Loading object");
-      auto logged = root.logger().errorException("Error loading object", ExceptionDiagnostic(error));
+      auto logged = root.logger().error_exception("Error loading object", ExceptionDiagnostic(error));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else {
@@ -867,12 +869,14 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
       return std::unexpected(std::move(details.error()));
   }
   if (*originalName == "perfectlygenericitem") {
-    auto logged = m_root.logger().errorException(Star::format("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+    auto logged = m_root.logger().error_exception(Star::format("Could not re-instantiate object '{}'", *originalName),
+                                                  ExceptionDiagnostic(originalError));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     return createObject(*originalName, *originalParams);
   }
-  auto logged = m_root.logger().errorException(Star::format("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+  auto logged = m_root.logger().error_exception(Star::format("Could not instantiate object '{}'", *originalName),
+                                                ExceptionDiagnostic(originalError));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return createObject("perfectlygenericitem", JsonObject{

@@ -340,7 +340,9 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
       if (!transmitted) {
         p.second->packetSocket->close();
         connectionLocker.unlock();
-        auto logged = m_logger.errorException(Star::format("Error receiving incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(transmitted.error()));
+        auto logged = m_logger.error_exception(
+          Star::format("Error receiving incoming server packets, disconnecting client '{}'", p.first),
+          ExceptionDiagnostic(transmitted.error()));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         continue;
@@ -354,7 +356,9 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
           if (p.second->packetSocket)
             p.second->packetSocket->close();
           connectionLocker.unlock();
-          auto logged = m_logger.errorException(Star::format("Error handling incoming server packets, disconnecting client '{}'", p.first), ExceptionDiagnostic(received.error()));
+          auto logged = m_logger.error_exception(
+            Star::format("Error handling incoming server packets, disconnecting client '{}'", p.first),
+            ExceptionDiagnostic(received.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }

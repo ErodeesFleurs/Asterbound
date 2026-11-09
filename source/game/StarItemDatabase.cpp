@@ -808,10 +808,11 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
     return std::unexpected(std::move(rebuilt.error()));
   if (*rebuilt)
     return result;
-  auto logged = m_root.logger().errorException(
-      Star::format("Could not {} item '{}' (count {})",
-          descriptor.name() == "perfectlygenericitem" ? "re-instantiate" : "instantiate", descriptor.name(), descriptor.count()),
-      ExceptionDiagnostic(originalError));
+  auto logged = m_root.logger().error_exception(
+    Star::format("Could not {} item '{}' (count {})",
+                 descriptor.name() == "perfectlygenericitem" ? "re-instantiate" : "instantiate", descriptor.name(),
+                 descriptor.count()),
+    ExceptionDiagnostic(originalError));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   if (m_root.logger().loggable(LogLevel::Debug)) {
@@ -1052,7 +1053,9 @@ std::expected<void, StarException> ItemDatabase::scanRecipes() {
     if (recipe) {
       m_recipes.add(std::move(*recipe));
     } else {
-      auto logged = m_root.logger().errorException(Star::format("Could not load recipe {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
+      auto logged = m_root.logger().error_exception(
+        Star::format("Could not load recipe {}", file),
+        ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1127,7 +1130,8 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       auto error = std::move(created.error());
       if (!sourcePath.empty())
         error = (*assets)->withAssetContext(std::move(error), sourcePath, "Creating blueprint item");
-      auto logged = m_root.logger().errorException("Could not create blueprint item from recipe", ExceptionDiagnostic(error));
+      auto logged =
+        m_root.logger().error_exception("Could not create blueprint item from recipe", ExceptionDiagnostic(error));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1177,7 +1181,11 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       return {};
     }();
     if (!created) {
-      auto logged = m_root.logger().errorException(Star::format("Could not create item for codex {}", codexPair.second->id()), ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item")));
+      auto logged = m_root.logger().error_exception(
+        Star::format("Could not create item for codex {}", codexPair.second->id()),
+        ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()),
+                                                        codexPair.second->directory() + codexPair.second->filename(),
+                                                        "Creating codex item")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }

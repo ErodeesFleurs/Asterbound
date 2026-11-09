@@ -276,7 +276,7 @@ std::expected<void, StarException> InspectionTool::update(float, FireMode fireMo
   if (!position)
     return std::unexpected(std::move(position.error()));
   m_currentPosition = itemOwner->get().position() + *position;
-  root().spatialLogger().logPoint("world", m_currentPosition, {0, 0, 255, 255});
+  root().spatialLogger().log_point("world", m_currentPosition, {0, 0, 255, 255});
   if (fireMode != m_lastFireMode && fireMode != FireMode::None) {
     auto inspectionPosition = itemOwner->get().aimPosition();
     if (!inspectionPosition)

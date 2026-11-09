@@ -12,6 +12,7 @@ import star.string;
 import star.buffer;
 import star.format;
 import star.random;
+import star.logging;
 
 import std;
 
@@ -27,6 +28,47 @@ static_assert(!std::is_copy_assignable_v<File>);
 static_assert(!std::is_move_constructible_v<File>);
 static_assert(!std::is_move_assignable_v<File>);
 
+#ifdef STAR_TEST_WRAP_WRITE
+namespace {
+thread_local bool shorten_next_write = false;
+thread_local unsigned shortened_writes = 0;
+}// namespace
+
+extern "C" ssize_t __real_write(int fd, void const* buffer, size_t count);
+extern "C" ssize_t __wrap_write(int fd, void const* buffer, size_t count) {
+  if (shorten_next_write && count > 0) {
+    shorten_next_write = false;
+    ++shortened_writes;
+    return __real_write(fd, buffer, count - 1);
+  }
+  return __real_write(fd, buffer, count);
+}
+
+TEST(FileTest, LogSinkRejectsShortWriteWithoutRetrying) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto path = File::relative_to(*directory, "short-log-write.log");
+  auto sink = FileLogSink::create(path, LogLevel::Info, true);
+  ASSERT_TRUE(sink);
+  shortened_writes = 0;
+  shorten_next_write = true;
+  auto result = (*sink)->log("short-write-marker", LogLevel::Info);
+  shorten_next_write = false;
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<EofException>());
+  EXPECT_EQ(shortened_writes, 1u);
+  auto written = File::read_file_string(path);
+  ASSERT_TRUE(written);
+  EXPECT_TRUE(written->utf8().ends_with("short-write-marker"));
+  ASSERT_TRUE((*sink)->log("next-complete-marker", LogLevel::Info));
+  auto continued = File::read_file_string(path);
+  ASSERT_TRUE(continued);
+  EXPECT_TRUE(continued->utf8().ends_with("next-complete-marker\n"));
+}
+#endif
 namespace {
   // An IODevice that reports more bytes than it was asked for, the way
   // File::pread used to turn a failed read into SIZE_MAX.

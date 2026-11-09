@@ -1196,7 +1196,8 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
           if (entity) {
             addedEntities.push_back(std::move(*entity));
           } else {
-            auto logged = this->root().logger().warnException(Star::format("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
+            auto logged = this->root().logger().warn_exception(
+              Star::format("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
             if (!logged) return std::unexpected(std::move(logged.error()));
             if (this->root().logger().loggable(LogLevel::Debug)) {
               auto stored = entityStore.toJson().repr();

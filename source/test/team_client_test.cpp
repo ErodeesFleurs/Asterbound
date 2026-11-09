@@ -95,7 +95,7 @@ const GameTestRegistration teamStatusSynchronization(
     // ClientContext owns this concrete RPC implementation; transport remains real.
     auto clientRpc = std::static_pointer_cast<JsonRpc>((*context)->rpcInterface());
     Logger logger;
-    logger.removeStdoutSink();
+    logger.remove_stdout_sink();
     JsonRpc server(logger);
     ASSERT_TRUE(server.registerHandlers(ownHandlers));
     TeamClient team(**root, *player, *context);

@@ -333,7 +333,9 @@ std::expected<Input::BindEntry, StarException> Input::BindEntry::create(Input& i
     auto bind = bindFromJson(jBind);
     if (!bind) {
       if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-      auto logged = input.m_root.logger().errorException(Star::format("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id), ExceptionDiagnostic(bind.error()));
+      auto logged = input.m_root.logger().error_exception(
+        Star::format("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id),
+        ExceptionDiagnostic(bind.error()));
       if (!logged) return std::unexpected(std::move(logged.error()));
     } else result.defaultBinds.emplace_back(std::move(*bind));
   }
@@ -409,7 +411,8 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
         auto bind = bindFromJson(jBind);
         if (!bind) {
           if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-          auto logged = owner.m_root.logger().errorException(Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
+          auto logged = owner.m_root.logger().error_exception(
+            Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
           if (!logged) return std::unexpected(std::move(logged.error()));
         } else entry.customBinds.emplace_back(std::move(*bind));
       }

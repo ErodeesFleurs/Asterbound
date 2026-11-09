@@ -87,13 +87,15 @@ std::expected<std::shared_ptr<ProjectileDatabase>, StarException> ProjectileData
     String file = scannedFile.string();
     auto config = database->readConfig(file);
     if (!config) {
-      if (auto logged = root.logger().errorException(Star::format("Could not read projectile '{}'", file), ExceptionDiagnostic(config.error())); !logged)
+      if (auto logged = root.logger().error_exception(Star::format("Could not read projectile '{}'", file),
+                                                      ExceptionDiagnostic(config.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
     if (database->m_configs.contains((*config)->typeName)) {
       auto error = (*assets)->withAssetContext(ProjectileDatabaseException::format("Duplicate projectile asset typeName {}. configfile {}", (*config)->typeName, file), file, "Loading projectile");
-      if (auto logged = root.logger().errorException("Error loading projectile", ExceptionDiagnostic(error)); !logged)
+      if (auto logged = root.logger().error_exception("Error loading projectile", ExceptionDiagnostic(error)); !logged)
         return std::unexpected(std::move(logged.error()));
     } else database->m_configs[(*config)->typeName] = std::move(*config);
   }

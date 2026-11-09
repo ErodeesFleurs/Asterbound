@@ -840,9 +840,10 @@ treasurePool = std::move(*result121);
     }();
     if (!dropped) {
       auto const& e = dropped.error();
-      auto result130 = this->root().logger().warnException(Star::format("Failed to create treasure for monster '{}'", m_monsterVariant.type), ExceptionDiagnostic(e));
-if (!result130) return std::unexpected(std::move(result130.error()));
-    
+      auto result130 = this->root().logger().warn_exception(
+        Star::format("Failed to create treasure for monster '{}'", m_monsterVariant.type), ExceptionDiagnostic(e));
+      if (!result130)
+        return std::unexpected(std::move(result130.error()));
     }
   }
 
@@ -979,8 +980,7 @@ if (!result149) return std::unexpected(std::move(result149.error()));
       auto result153 = recoverLuaScriptError(m_scriptedAnimator.update());
   if (!result153) return std::unexpected(std::move(result153.error()));
 
-
-      this->root().spatialLogger().logPoly("world", m_movementController->collisionBody(), { 255, 0, 0, 255 });
+  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {255, 0, 0, 255});
     }
 }
   return {};

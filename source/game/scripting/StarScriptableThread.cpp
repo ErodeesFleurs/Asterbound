@@ -291,7 +291,8 @@ std::expected<void, StarException> ScriptableThread::run() {
   }
   if (!result) {
     m_errorOccurred = true;
-    if (auto logged = m_luaRoot->root().logger().errorException("ScriptableThread exception caught", ExceptionDiagnostic(result.error()));
+    if (auto logged = m_luaRoot->root().logger().error_exception("ScriptableThread exception caught",
+                                                                 ExceptionDiagnostic(result.error()));
         !logged)
       result.error() = result.error().with_related(logged.error(), "Could not log ScriptableThread failure");
     else

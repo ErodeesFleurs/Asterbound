@@ -2525,7 +2525,10 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(Star::format("Could not create placable object of kind '{}'", objectType), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(
+            Star::format("Could not create placable object of kind '{}'", objectType),
+            ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return false;
     }
@@ -2573,7 +2576,9 @@ namespace LuaBindings {
       if (!itemKindResult)
         return std::unexpected(std::move(itemKindResult.error()));
       auto itemKind = std::move(*itemKindResult);
-      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Item of kind '{}'", itemKind), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(
+            Star::format("Could not spawn Item of kind '{}'", itemKind), ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2604,7 +2609,9 @@ namespace LuaBindings {
       return {};
     };
     if (auto result = spawn(); !result) {
-      if (auto operation = world.root().logger().warnException(Star::format("Could not spawn treasure from pool '{}'", pool), ExceptionDiagnostic(result.error())); !operation)
+      if (auto operation = world.root().logger().warn_exception(
+            Star::format("Could not spawn treasure from pool '{}'", pool), ExceptionDiagnostic(result.error()));
+          !operation)
         return std::unexpected(std::move(operation.error()));
     }
     return entities;
@@ -2648,7 +2655,9 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Monster of type '{}'", arg1), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(Star::format("Could not spawn Monster of type '{}'", arg1),
+                                                             ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2683,7 +2692,10 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn NPC of species '{}' and type '{}'", arg2, arg3), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(
+            Star::format("Could not spawn NPC of species '{}' and type '{}'", arg2, arg3),
+            ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2708,7 +2720,9 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Stagehand of type '{}'", typeName), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(
+            Star::format("Could not spawn Stagehand of type '{}'", typeName), ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2740,7 +2754,10 @@ namespace LuaBindings {
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warnException(Star::format("Could not spawn Projectile of type '{}'", projectileType), ExceptionDiagnostic(result.error())); !logged)
+      if (auto logged = world.root().logger().warn_exception(
+            Star::format("Could not spawn Projectile of type '{}'", projectileType),
+            ExceptionDiagnostic(result.error()));
+          !logged)
         return std::unexpected(std::move(logged.error()));
       return {};
     }
@@ -2991,17 +3008,17 @@ namespace LuaBindings {
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugPoint(Root& root, Vec2F const& arg1, Color const& arg2) {
-    root.spatialLogger().logPoint("world", arg1, arg2.toRgba());
+    root.spatialLogger().log_point("world", arg1, arg2.toRgba());
     return {};
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugLine(Root& root, Vec2F const& arg1, Vec2F const& arg2, Color const& arg3) {
-    root.spatialLogger().logLine("world", arg1, arg2, arg3.toRgba());
+    root.spatialLogger().log_line("world", arg1, arg2, arg3.toRgba());
     return {};
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugPoly(Root& root, PolyF const& poly, Color const& color) {
-    root.spatialLogger().logPoly("world", poly, color.toRgba());
+    root.spatialLogger().log_poly("world", poly, color.toRgba());
     return {};
   }
 
@@ -3024,7 +3041,7 @@ namespace LuaBindings {
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
-    root.spatialLogger().logText("world", text, position, color.toRgba());
+    root.spatialLogger().log_text("world", text, position, color.toRgba());
     return {};
   }
 

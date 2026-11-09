@@ -397,7 +397,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
       return std::unexpected(std::move(itemOwner.error()));
     shieldPoly.translate(itemOwner->get().position());
     if (isClient)
-      root().spatialLogger().logPoly("world", shieldPoly, {255, 255, 0, 255});
+      root().spatialLogger().log_poly("world", shieldPoly, {255, 255, 0, 255});
   }
   if (isClient) {
     auto forces = forceRegions();
@@ -405,9 +405,10 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
       return std::unexpected(std::move(forces.error()));
     for (auto forceRegion : *forces) {
       if (std::holds_alternative<DirectionalForceRegion>(forceRegion))
-        root().spatialLogger().logPoly("world", std::get<DirectionalForceRegion>(forceRegion).region, {155, 0, 255, 255});
+        root().spatialLogger().log_poly("world", std::get<DirectionalForceRegion>(forceRegion).region,
+                                        {155, 0, 255, 255});
       else if (std::holds_alternative<RadialForceRegion>(forceRegion))
-        root().spatialLogger().logPoint("world", std::get<RadialForceRegion>(forceRegion).center, {155, 0, 255, 255});
+        root().spatialLogger().log_point("world", std::get<RadialForceRegion>(forceRegion).center, {155, 0, 255, 255});
     }
   }
   return {};

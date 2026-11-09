@@ -584,7 +584,8 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     auto takeable = canTake();
     if (!takeable)
       return std::unexpected(std::move(takeable.error()));
-    root().spatialLogger().logPoly("world", m_movementController->collisionBody(), (*takeable ? Color::Green : Color::Red).toRgba());
+    root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
+                                    (*takeable ? Color::Green : Color::Red).toRgba());
   }
   return {};
 }

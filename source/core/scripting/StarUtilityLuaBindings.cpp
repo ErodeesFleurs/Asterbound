@@ -352,7 +352,7 @@ std::expected<void, StarException> LuaBindings::UtilityCallbacks::setLogMap(LogM
   auto text = formatLua(value, args);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  logMap.setValue(key, *text);
+  logMap.set_value(key, *text);
   return {};
 }
 

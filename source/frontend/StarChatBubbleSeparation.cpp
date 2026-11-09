@@ -81,8 +81,8 @@ RectF separateBubble(List<RectF> const& sortedLeftEdges, List<RectF> const& sort
     }
     if (!overlapping)
       break;
-    //SpatialLogger::logPoly("screen", PolyF(box), { 255, 0, 0, 255 });
-    //SpatialLogger::logPoly("screen", PolyF(overlapBoundBox), { 0, 0, 255, 255 });
+    //SpatialLogger::log_poly("screen", PolyF(box), { 255, 0, 0, 255 });
+    //SpatialLogger::log_poly("screen", PolyF(overlapBoundBox), { 0, 0, 255, 255 });
     auto height = box.height();
     box.setYMin(overlapBoundBox.yMax());
     box.setYMax(box.yMin() + height);

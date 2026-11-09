@@ -1663,7 +1663,7 @@ const GameTestRegistration recoverableDatabaseProvider(
                        File::relative_to(*directory, "fallback.dance")));
     class Errors : public LogSink {
     public:
-      Errors() { setLevel(LogLevel::Error); }
+      Errors() { set_level(LogLevel::Error); }
       std::expected<void, StarException> log(std::string_view message, LogLevel) override {
         messages.append(message);
         return {};
@@ -1671,9 +1671,9 @@ const GameTestRegistration recoverableDatabaseProvider(
       std::string messages;
     };
     Logger logger;
-    logger.removeStdoutSink();
+    logger.remove_stdout_sink();
     auto errors = std::make_shared<Errors>();
-    logger.addSink(errors);
+    logger.add_sink(errors);
     Assets::Settings settings{};
     settings.workerPoolSize = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
