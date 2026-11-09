@@ -222,7 +222,7 @@ namespace {
     auto written = image->writePng(logger, buffer);
     if (!written)
       return std::unexpected(std::move(written.error()));
-    return buffer->takeData();
+    return buffer->take_data();
   }
 }
 
@@ -364,6 +364,7 @@ const GameTestRegistration
     auto added = File::relative_to(*directory, "unindexed.txt");
     ASSERT_TRUE(File::write_file(String("not enumerated"), added));
     EXPECT_FALSE((*source)->file_size("/unindexed.txt"));
+    EXPECT_EQ((*source)->read("/unindexed.txt"), ByteArray::from_string("not enumerated"));
     std::array<String, 7> requests{"/mutable.json",    "/missing", "/mutable.json", "/MUTABLE.json",
                                    "/../mutable.json", "/",        "/unindexed.txt"};
     expect_batch_matches_scalar(**source, requests);
@@ -472,6 +473,17 @@ const GameTestRegistration packedMetadataLengths(
     auto payload = (*packed)->read("/binary");
     ASSERT_TRUE(payload);
     EXPECT_EQ(*payload, ByteArray(std::span("one\0two", 7)));
+    auto stream = (*packed)->open("/binary");
+    ASSERT_TRUE(stream);
+    ASSERT_TRUE((*stream)->seek(2));
+    auto cloned = (*stream)->clone();
+    ASSERT_TRUE(cloned);
+    EXPECT_EQ((*packed)->read("/binary"), *payload);
+    EXPECT_EQ((*stream)->pos(), 2);
+    EXPECT_EQ((*cloned)->pos(), 2);
+    EXPECT_EQ((*stream)->read_bytes(5), ByteArray(std::span("e\0two", 5)));
+    EXPECT_EQ((*cloned)->pos(), 2);
+    EXPECT_EQ((*cloned)->read_bytes(5), ByteArray(std::span("e\0two", 5)));
     auto writable = File::open(packed_path, IOMode::ReadWrite);
     ASSERT_TRUE(writable);
     ASSERT_TRUE((*writable)->resize(22));// Asset starts at 16 and needs seven bytes.
@@ -509,9 +521,9 @@ const GameTestRegistration packedMetadataLengths(
                     std::pair<std::uint64_t, std::uint64_t>{16, std::numeric_limits<std::uint64_t>::max()}}) {
       auto malformed_path = File::relative_to(*directory, "malformed.pak");
       DataStreamBuffer malformed;
-      ASSERT_TRUE(malformed.writeData(std::span("SBAsset6", 8)));
+      ASSERT_TRUE(malformed.write_data(std::span("SBAsset6", 8)));
       ASSERT_TRUE(malformed.write(std::uint64_t(16)));
-      ASSERT_TRUE(malformed.writeData(std::span("INDEX", 5)));
+      ASSERT_TRUE(malformed.write_data(std::span("INDEX", 5)));
       ASSERT_TRUE(malformed.write(JsonObject{}));
       ASSERT_TRUE(malformed.write(StringMap<std::pair<std::uint64_t, std::uint64_t>>{{"/bad", entry}}));
       ASSERT_TRUE(File::write_file(malformed.data(), malformed_path));
@@ -526,6 +538,61 @@ const GameTestRegistration packedMetadataLengths(
       EXPECT_FALSE((*invalid)->read("/bad"));
     }
   });
+
+const GameTestRegistration
+  packedEmptyReadExtent("AssetsTest", "PackedEmptyReadsValidateFreshExtentBeforeReturning", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto path = File::relative_to(*directory, "empty.pak");
+    DataStreamBuffer bytes;
+    ASSERT_TRUE(bytes.write_data(std::span("SBAsset6", 8)));
+    ASSERT_TRUE(bytes.write(std::uint64_t(16)));
+    ASSERT_TRUE(bytes.write_data(std::span("INDEX", 5)));
+    ASSERT_TRUE(bytes.write(JsonObject{}));
+    ASSERT_TRUE(
+      bytes.write(StringMap<std::pair<std::uint64_t, std::uint64_t>>{{"/empty", {16, 0}}, {"/past", {17, 0}}}));
+    ASSERT_TRUE(File::write_file(bytes.data(), path));
+    auto source = PackedAssetSource::create(path);
+    ASSERT_TRUE(source);
+    auto writable = File::open(path, IOMode::ReadWrite);
+    ASSERT_TRUE(writable);
+    ASSERT_TRUE((*writable)->resize(16));
+    EXPECT_EQ((*source)->read("/empty"), ByteArray{});
+    auto past = (*source)->read("/past");
+    ASSERT_FALSE(past);
+    EXPECT_TRUE(past.error().is<AssetSourceException>());
+    EXPECT_NE(std::string_view(past.error().what()).find("out of range size"), std::string_view::npos);
+    ASSERT_TRUE((*writable)->resize(0));
+    auto empty = (*source)->read("/empty");
+    ASSERT_FALSE(empty);
+    EXPECT_TRUE(empty.error().is<AssetSourceException>());
+    auto missing = (*source)->read("/missing");
+    ASSERT_FALSE(missing);
+    EXPECT_TRUE(missing.error().is<AssetSourceException>());
+    EXPECT_NE(std::string_view(missing.error().what()).find("does not exist"), std::string_view::npos);
+    ASSERT_TRUE((*writable)->close());
+  });
+
+#ifdef STAR_SYSTEM_LINUX
+const GameTestRegistration
+  directoryReadMetadataExtent("AssetsTest", "DirectoryReadsUseMetadataExtentRatherThanReadingToEof",
+                              [](GameTest& fixture) {
+                                auto directory = File::temporary_directory(fixture.root().random());
+                                ASSERT_TRUE(directory);
+                                auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+                                auto path = File::relative_to(*directory, "command-line");
+                                std::error_code ec;
+                                std::filesystem::create_symlink("/proc/self/cmdline", fsPath(path), ec);
+                                ASSERT_FALSE(ec) << ec.message();
+                                auto source = DirectoryAssetSource::create(fixture.root().logger(), *directory);
+                                ASSERT_TRUE(source);
+                                EXPECT_EQ((*source)->read("/command-line"), ByteArray{});
+                                auto whole = File::read_file(path);
+                                ASSERT_TRUE(whole);
+                                EXPECT_FALSE(whole->empty());
+                              });
+#endif
 
 const GameTestRegistration assetMetadataDigest(
   "AssetsTest", "MetadataDigestMatchesFormerReaderBytesForDirectoryAndPackedSources", [](GameTest& fixture) {
@@ -644,13 +711,13 @@ const GameTestRegistration assetBatchDigestErrorOrder(
     using Index = StringMap<std::pair<std::uint64_t, std::uint64_t>>;
     auto write_packed = [](String const& path, Index const& index) -> std::expected<void, StarException> {
       DataStreamBuffer bytes;
-      if (auto result = bytes.writeData(std::span("SBAsset6", 8)); !result)
+      if (auto result = bytes.write_data(std::span("SBAsset6", 8)); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = bytes.write(std::uint64_t(18)); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = bytes.writeData(std::span("[]", 2)); !result)
+      if (auto result = bytes.write_data(std::span("[]", 2)); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = bytes.writeData(std::span("INDEX", 5)); !result)
+      if (auto result = bytes.write_data(std::span("INDEX", 5)); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = bytes.write(JsonObject{}); !result)
         return std::unexpected(std::move(result.error()));

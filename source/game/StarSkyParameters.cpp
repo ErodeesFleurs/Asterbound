@@ -265,7 +265,7 @@ std::expected<void, StarException> SkyParameters::read(DataStream& ds) {
       >> value.horizonImages >> value.horizonClouds >> value.skyType >> value.skyColoring
       >> value.spaceLevel >> value.surfaceLevel >> value.sunType;
   if (!fields) return std::unexpected(std::move(fields.error()));
-  if (ds.streamCompatibilityVersion() >= 3) {
+  if (ds.stream_compatibility_version() >= 3) {
     auto settings = ds >> value.settings;
     if (!settings) return std::unexpected(std::move(settings.error()));
   }
@@ -277,7 +277,7 @@ std::expected<void, StarException> SkyParameters::write(DataStream& ds) const {
   auto fields = ds << seed << dayLength << nearbyPlanet << nearbyMoons << horizonImages << horizonClouds
       << skyType << skyColoring << spaceLevel << surfaceLevel << sunType;
   if (!fields) return std::unexpected(std::move(fields.error()));
-  if (ds.streamCompatibilityVersion() >= 3) {
+  if (ds.stream_compatibility_version() >= 3) {
     auto settingsResult = ds << settings;
     if (!settingsResult) return std::unexpected(std::move(settingsResult.error()));
   }

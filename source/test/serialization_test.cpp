@@ -11,6 +11,7 @@ import star.multi_array;
 import star.bytes;
 import star.io_device;
 import star.data_stream;
+import star.uuid;
 
 #include "gtest/gtest.h"
 
@@ -18,9 +19,9 @@ using namespace Star;
 
 template <typename T>
 void testMap(T const& map) {
-  auto byteArray = DataStreamBuffer::serializeMapContainer(map);
+  auto byteArray = DataStreamBuffer::serialize_map_container(map);
   ASSERT_TRUE(byteArray);
-  auto mapOut = DataStreamBuffer::deserializeMapContainer<T>(std::move(*byteArray));
+  auto mapOut = DataStreamBuffer::deserialize_map_container<T>(byteArray->span());
   ASSERT_TRUE(mapOut);
   EXPECT_EQ(map, *mapOut);
 }
@@ -48,14 +49,14 @@ TEST(DataStreamTest, SequenceWireBytesAndTruncatedPrefix) {
   EXPECT_EQ(*encoded, ByteArray({"\x02\x10\x20", 3}));
 
   List<std::uint8_t> decoded{0x7f};
-  auto read = DataStreamBuffer::deserialize(decoded, ByteArray({"\x03\x10\x20", 3}));
+  auto read = DataStreamBuffer::deserialize(decoded, std::span<char const>("\x03\x10\x20", 3));
   ASSERT_FALSE(read);
   EXPECT_EQ(decoded, values);
 }
 
 TEST(DataStreamTest, BoundedDecodeRetainsAcceptedPrefixOnCapacityError) {
   StaticList<std::uint8_t, 2> decoded;
-  auto read = DataStreamBuffer::deserialize(decoded, ByteArray({"\x03\x10\x20\x30", 4}));
+  auto read = DataStreamBuffer::deserialize(decoded, std::span<char const>("\x03\x10\x20\x30", 4));
   ASSERT_FALSE(read);
   ASSERT_EQ(decoded.size(), 2u);
   EXPECT_EQ(decoded[0], 0x10);
@@ -69,7 +70,7 @@ TEST(DataStreamTest, OrderedMapWireBytesAndDuplicateKeys) {
   EXPECT_EQ(*encoded, ByteArray({"\x02\x01\x11\x02\x22", 5}));
 
   Map<std::uint8_t, std::uint8_t> decoded{{9, 9}};
-  auto read = DataStreamBuffer::deserialize(decoded, ByteArray({"\x02\x07\x0b\x07\x16", 5}));
+  auto read = DataStreamBuffer::deserialize(decoded, std::span<char const>("\x02\x07\x0b\x07\x16", 5));
   ASSERT_TRUE(read);
   ASSERT_EQ(decoded.size(), 1u);
   auto value = decoded.get(7);
@@ -117,30 +118,30 @@ TEST(DataStreamTest, OptionalAndVariantCommitOnlyCompletePayloads) {
 
 TEST(DataStreamTest, OwnedBufferMovePreservesBytesCursorAndWireSettings) {
   DataStreamBuffer source;
-  source.setByteOrder(ByteOrder::LittleEndian);
-  source.setNullTerminatedStrings(true);
-  source.setStreamCompatibilityVersion(17);
+  source.set_byte_order(ByteOrder::LittleEndian);
+  source.set_null_terminated_strings(true);
+  source.set_stream_compatibility_version(17);
   ASSERT_TRUE(source.write<std::uint16_t>(0x1234));
-  ASSERT_TRUE(source.writeData({"ab", 2}));
+  ASSERT_TRUE(source.write_data({"ab", 2}));
   ASSERT_TRUE(source.seek(2));
 
   DataStreamBuffer moved(std::move(source));
   source.reset(ByteArray({"x", 1}));
   EXPECT_EQ(moved.data(), ByteArray({"\x34\x12" "ab", 4}));
   EXPECT_EQ(moved.pos(), 2u);
-  EXPECT_EQ(moved.byteOrder(), ByteOrder::LittleEndian);
-  EXPECT_TRUE(moved.nullTerminatedStrings());
-  EXPECT_EQ(moved.streamCompatibilityVersion(), 17u);
+  EXPECT_EQ(moved.byte_order(), ByteOrder::LittleEndian);
+  EXPECT_TRUE(moved.null_terminated_strings());
+  EXPECT_EQ(moved.stream_compatibility_version(), 17u);
 
   DataStreamBuffer destination(ByteArray({"old", 3}));
   destination = std::move(moved);
   moved.reset(ByteArray({"y", 1}));
   EXPECT_EQ(destination.pos(), 2u);
-  EXPECT_EQ(destination.byteOrder(), ByteOrder::LittleEndian);
-  EXPECT_TRUE(destination.nullTerminatedStrings());
-  EXPECT_EQ(destination.streamCompatibilityVersion(), 17u);
+  EXPECT_EQ(destination.byte_order(), ByteOrder::LittleEndian);
+  EXPECT_TRUE(destination.null_terminated_strings());
+  EXPECT_EQ(destination.stream_compatibility_version(), 17u);
   char output[3]{};
-  auto read = destination.readData(output);
+  auto read = destination.read_data(output);
   ASSERT_FALSE(read);
   EXPECT_TRUE(read.error().is<EofException>());
   EXPECT_EQ(ByteArray(std::span(output).first(2)), ByteArray({"ab", 2}));
@@ -148,7 +149,10 @@ TEST(DataStreamTest, OwnedBufferMovePreservesBytesCursorAndWireSettings) {
   auto atEnd = destination.at_end();
   ASSERT_TRUE(atEnd);
   EXPECT_TRUE(*atEnd);
-  EXPECT_EQ(destination.takeData(), ByteArray({"\x34\x12" "ab", 4}));
+  EXPECT_EQ(destination.take_data(),
+            ByteArray({"\x34\x12"
+                       "ab",
+                       4}));
   EXPECT_TRUE(destination.empty());
   EXPECT_EQ(destination.pos(), 0u);
 }
@@ -160,14 +164,14 @@ TEST(DataStreamTest, IODeviceAdapterSharesCursorWithoutOwningDevice) {
     ASSERT_TRUE(stream.seek(1));
     EXPECT_EQ(device.pos(), 1);
     char output[3]{};
-    auto read = stream.readData(output);
+    auto read = stream.read_data(output);
     ASSERT_FALSE(read);
     EXPECT_TRUE(read.error().is<EofException>());
     EXPECT_EQ(ByteArray(std::span(output).first(2)), ByteArray({"bc", 2}));
     EXPECT_EQ(stream.pos(), 3);
     EXPECT_EQ(device.pos(), 3);
     ASSERT_TRUE(stream.seek(0));
-    ASSERT_TRUE(stream.writeData({"z", 1}));
+    ASSERT_TRUE(stream.write_data({"z", 1}));
   }
   EXPECT_TRUE(device.is_open());
   EXPECT_EQ(device.data(), ByteArray({"zbc", 3}));
@@ -307,7 +311,7 @@ TEST(DataStreamTest, MultiArrayPreservesDimensionsAndLastIndexContiguousWireOrde
   auto encoded = DataStreamBuffer::serialize(array);
   ASSERT_TRUE(encoded);
   EXPECT_EQ(*encoded, ByteArray({"\x02\x03\x10\x11\x12\x20\x21\x22", 8}));
-  auto decoded = DataStreamBuffer::deserialize<MultiArray<std::uint8_t, 2>>(*encoded);
+  auto decoded = DataStreamBuffer::deserialize<MultiArray<std::uint8_t, 2>>(encoded->span());
   ASSERT_TRUE(decoded);
   auto const view = std::as_const(*decoded).view();
   ASSERT_EQ(view.extent(0), 2u);
@@ -315,4 +319,153 @@ TEST(DataStreamTest, MultiArrayPreservesDimensionsAndLastIndexContiguousWireOrde
   EXPECT_EQ((view[0, 2]), 0x12);
   EXPECT_EQ((view[1, 0]), 0x20);
   EXPECT_EQ((view[1, 2]), 0x22);
+}
+
+TEST(DataStreamTest, UuidTruncatedReadsKeepIdentityAndConsumeAvailablePrefix) {
+  std::array<char, 17> bytes;
+  for (std::size_t i = 0; i < bytes.size(); ++i)
+    bytes[i] = static_cast<char>(i + 1);
+  auto identity = Uuid::create(ByteArray(std::span<char const>(bytes).first(16)));
+  ASSERT_TRUE(identity);
+  for (std::size_t length = 0; length < 16; ++length) {
+    SCOPED_TRACE(length);
+    auto retained = *identity;
+    DataStreamReader borrowed(std::span<char const>(bytes).first(length));
+    auto read = borrowed >> retained;
+    ASSERT_FALSE(read);
+    EXPECT_EQ(retained, *identity);
+    EXPECT_EQ(borrowed.pos(), length);
+    DataStreamBuffer owned(ByteArray(std::span<char const>(bytes).first(length)));
+    auto ownedRead = owned >> retained;
+    ASSERT_FALSE(ownedRead);
+    EXPECT_EQ(retained, *identity);
+    EXPECT_EQ(owned.pos(), length);
+  }
+  DataStreamReader stream(bytes);
+  auto decoded = stream.read<Uuid>();
+  ASSERT_TRUE(decoded);
+  EXPECT_EQ(*decoded, *identity);
+  EXPECT_EQ(stream.pos(), 16u);
+  EXPECT_EQ(stream.read<std::uint8_t>(), 17u);
+}
+
+TEST(DataStreamTest, NonDefaultUuidPayloadsDecodeThroughContainersPointersAndOptional) {
+  auto identity = Uuid::create(String("00112233445566778899aabbccddeeff"));
+  ASSERT_TRUE(identity);
+  List<Uuid> sequence{*identity};
+  auto encoded = DataStreamBuffer::serialize(sequence);
+  ASSERT_TRUE(encoded);
+  List<Uuid> decoded;
+  ASSERT_TRUE(DataStreamBuffer::deserialize_container(decoded, encoded->span()));
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded[0], *identity);
+  Map<Uuid, Uuid> map{{*identity, *identity}};
+  auto encodedMap = DataStreamBuffer::serialize_map_container(map);
+  ASSERT_TRUE(encodedMap);
+  auto decodedMap = DataStreamBuffer::deserialize_map_container<Map<Uuid, Uuid>>(encodedMap->span());
+  ASSERT_TRUE(decodedMap);
+  EXPECT_EQ(*decodedMap, map);
+  DataStreamBuffer stream;
+  ASSERT_TRUE(stream.write(std::make_shared<Uuid>(*identity)));
+  ASSERT_TRUE(stream.write(std::optional<Uuid>(*identity)));
+  ASSERT_TRUE(stream.seek(0));
+  auto pointer = stream.read<std::shared_ptr<Uuid>>();
+  ASSERT_TRUE(pointer);
+  ASSERT_TRUE(*pointer);
+  EXPECT_EQ(**pointer, *identity);
+  auto optional = stream.read<std::optional<Uuid>>();
+  ASSERT_TRUE(optional);
+  ASSERT_TRUE(*optional);
+  EXPECT_EQ(**optional, *identity);
+}
+
+TEST(DataStreamTest, CallbackResultsAcceptStreamReferencesAndCommitOnlyCompleteElements) {
+  ByteArray input({"\x02\x11\x22\x33", 4});
+  DataStreamReader stream(input.span());
+  List<std::uint16_t> values{0xffff};
+  auto result = stream.read_container(values, [](DataStream& source, std::uint16_t& value) { return source >> value; });
+  ASSERT_FALSE(result);
+  ASSERT_EQ(values.size(), 1u);
+  EXPECT_EQ(values[0], 0x1122);
+  EXPECT_EQ(stream.pos(), 4u);
+  auto encoded = DataStreamBuffer::serialize_container(
+    values, [](DataStream& destination, std::uint16_t value) { return destination << value; });
+  ASSERT_TRUE(encoded);
+  auto decoded = DataStreamBuffer::deserialize_container<List<std::uint16_t>>(
+    encoded->span(), [](DataStream& source, std::uint16_t& value) { return source >> value; });
+  ASSERT_TRUE(decoded);
+  EXPECT_EQ(*decoded, values);
+}
+
+TEST(DataStreamTest, MissingContainerCallbackFollowsCountAndClearPrecedence) {
+  std::function<std::expected<std::reference_wrapper<DataStream>, StarException>(DataStream&, std::uint8_t&)> absent;
+  List<std::uint8_t> values{0xff};
+  DataStreamReader missingCount;
+  auto missing = missingCount.read_container(values, absent);
+  ASSERT_FALSE(missing);
+  EXPECT_TRUE(missing.error().is<EofException>());
+  EXPECT_TRUE(values.empty());
+  ByteArray emptyBytes({"\x00", 1});
+  DataStreamReader empty(emptyBytes.span());
+  ASSERT_TRUE(empty.read_container(values, absent));
+  ByteArray oneBytes({"\x01U", 2});
+  DataStreamReader one(oneBytes.span());
+  auto oneResult = one.read_container(values, absent);
+  ASSERT_FALSE(oneResult);
+  EXPECT_TRUE(oneResult.error().is<DataStreamException>());
+  EXPECT_EQ(one.pos(), 1u);
+  EXPECT_TRUE(values.empty());
+}
+
+TEST(DataStreamTest, BorrowedConvenienceResultsOwnDecodedFields) {
+  using Value = std::pair<String, ByteArray>;
+  Value original{String("owned"), ByteArray({"payload", 7})};
+  auto encoded = DataStreamBuffer::serialize(original);
+  ASSERT_TRUE(encoded);
+  auto decoded = DataStreamBuffer::deserialize<Value>(encoded->span());
+  ASSERT_TRUE(decoded);
+  std::fill(encoded->span().begin(), encoded->span().end(), '\x00');
+  EXPECT_EQ(*decoded, original);
+}
+
+TEST(DataStreamTest, BorrowedMapCallbacksRetainCompletePrefixAndDuplicateKeyPolicy) {
+  ByteArray bytes({"\x03\x07\x11\x07\x22\x08", 6});
+  Map<std::uint8_t, std::uint8_t> map{{9, 0xff}};
+  auto callback = [](DataStream& stream, std::uint8_t& key, std::uint8_t& value) { return stream >> key >> value; };
+  auto result = DataStreamBuffer::deserialize_map_container(map, bytes.span(), callback);
+  ASSERT_FALSE(result);
+  ASSERT_EQ(map.size(), 1u);
+  auto first = map.get(7);
+  ASSERT_TRUE(first);
+  EXPECT_EQ(first->get(), 0x11);
+  auto encoded = DataStreamBuffer::serialize_map_container(
+    map, [](DataStream& stream, std::uint8_t key, std::uint8_t value) { return stream << key << value; });
+  ASSERT_TRUE(encoded);
+  auto restored =
+    DataStreamBuffer::deserialize_map_container<Map<std::uint8_t, std::uint8_t>>(encoded->span(), callback);
+  ASSERT_TRUE(restored);
+  EXPECT_EQ(*restored, map);
+  List<std::uint8_t> sequence;
+  ASSERT_TRUE(DataStreamBuffer::deserialize_container(
+    sequence, encoded->span(), [](DataStream& stream, std::uint8_t& value) { return stream >> value; }));
+  ASSERT_EQ(sequence.size(), 1u);
+  EXPECT_EQ(sequence[0], 7);
+}
+
+TEST(DataStreamTest, MissingMapCallbackStillClearsBeforeCountAndAcceptsEmptyMap) {
+  std::function<std::expected<void, StarException>(DataStream&, std::uint8_t&, std::uint8_t&)> absent;
+  Map<std::uint8_t, std::uint8_t> map{{1, 2}};
+  DataStreamReader missing;
+  auto failed = missing.read_map_container(map, absent);
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<EofException>());
+  EXPECT_TRUE(map.empty());
+  ByteArray bytes({"\x00\x01\x07\x11", 4});
+  DataStreamReader stream(bytes.span());
+  ASSERT_TRUE(stream.read_map_container(map, absent));
+  auto nonempty = stream.read_map_container(map, absent);
+  ASSERT_FALSE(nonempty);
+  EXPECT_TRUE(nonempty.error().is<DataStreamException>());
+  EXPECT_EQ(stream.pos(), 2u);
+  EXPECT_TRUE(map.empty());
 }

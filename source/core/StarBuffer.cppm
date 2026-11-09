@@ -41,10 +41,9 @@ public:
   ByteArray& data();
   ByteArray const& data() const;
 
-  // If this class holds the underlying data, then this method is cheap, and
-  // will move the data out of this class into the returned array, otherwise,
-  // this will incur a copy.  Afterwards, this Buffer will be left empty.
-  ByteArray takeData();
+  // Moves the owned data into the returned array, leaving this Buffer empty
+  // with its position reset to zero.
+  ByteArray take_data();
 
   // Returns a pointer to the beginning of the Buffer.
   char* ptr();
@@ -53,7 +52,7 @@ public:
   std::span<char const> span() const { return m_bytes.span(); }
 
   // Same thing as size(), just size_t type (since this is in-memory)
-  std::size_t dataSize() const;
+  std::size_t data_size() const;
   void reserve(std::size_t size);
 
   // Clears buffer, moves position to 0.
@@ -110,7 +109,7 @@ public:
   std::span<char const> span() const { return m_bytes; }
 
   // Same thing as size(), just size_t type (since this is in-memory)
-  std::size_t dataSize() const;
+  std::size_t data_size() const;
 
   // Clears buffer, moves position to 0.
   bool empty() const;

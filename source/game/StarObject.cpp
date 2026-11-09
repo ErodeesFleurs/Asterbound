@@ -417,14 +417,14 @@ std::expected<Json, StarException> Object::diskStore() const {
 
 std::expected<ByteArray, StarException> Object::netStore(NetCompatibilityRules rules) {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto operation28 = ds.write(m_config->name);
   if (!operation28)
     return std::unexpected(std::move(operation28.error()));
   auto operation29 = ds.write<Json>(m_parameters.baseMap());
   if (!operation29)
     return std::unexpected(std::move(operation29.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 EntityType Object::entityType() const {

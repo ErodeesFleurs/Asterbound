@@ -37,8 +37,8 @@ ServerRconClient::create(UniverseServer& universe, std::shared_ptr<TcpSocket> so
 ServerRconClient::ServerRconClient(UniverseServer& universe, std::shared_ptr<TcpSocket> socket, String password)
     : Thread("RconClient"), m_universe(universe), m_socket(std::move(socket)), m_packetBuffer(MaxPacketSize),
       m_authed(false), m_rconPassword(std::move(password)) {
-  m_packetBuffer.setByteOrder(ByteOrder::LittleEndian);
-  m_packetBuffer.setNullTerminatedStrings(true);
+  m_packetBuffer.set_byte_order(ByteOrder::LittleEndian);
+  m_packetBuffer.set_null_terminated_strings(true);
 }
 
 ServerRconClient::~ServerRconClient() {
@@ -95,7 +95,7 @@ std::expected<void, StarException> ServerRconClient::send(std::uint32_t requestI
   if (!header)
     return std::unexpected(std::move(header.error()));
   if (!str.empty()) {
-    auto data = m_packetBuffer.writeData(std::span(str));
+    auto data = m_packetBuffer.write_data(std::span(str));
     if (!data)
       return std::unexpected(std::move(data.error()));
   }

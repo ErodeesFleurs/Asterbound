@@ -439,13 +439,13 @@ namespace {
   auto typeWritten = frame.write(PacketType::ProtocolRequest);
   if (!typeWritten)
     return std::unexpected(std::move(typeWritten.error()));
-  auto sizeWritten = frame.writeVlqI(payload.size());
+  auto sizeWritten = frame.write_vlq_i(payload.size());
   if (!sizeWritten)
     return std::unexpected(std::move(sizeWritten.error()));
-  auto dataWritten = frame.writeData(payload.span());
+  auto dataWritten = frame.write_data(payload.span());
   if (!dataWritten)
     return std::unexpected(std::move(dataWritten.error()));
-  return frame.takeData();
+  return frame.take_data();
 }
 
 [[nodiscard]] std::expected<VersionNumber, StarException> connectionTestVersion(UniverseConnection& connection) {
@@ -555,8 +555,8 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   ASSERT_TRUE(parameters->write(payload));
   DataStreamBuffer expected;
   ASSERT_TRUE(expected.write(parameters->type()));
-  ASSERT_TRUE(expected.writeVlqI(payload.size()));
-  ASSERT_TRUE(expected.writeData(payload.span()));
+  ASSERT_TRUE(expected.write_vlq_i(payload.size()));
+  ASSERT_TRUE(expected.write_data(payload.span()));
   ASSERT_TRUE((*transport)->sendPackets({parameters}));
   ASSERT_EQ((*transport)->writeData(), true);
   ASSERT_TRUE((*transport)->sentPacketsPending());
@@ -570,8 +570,8 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   DataStreamBuffer deltaPayload;
   ASSERT_TRUE(delta->write(deltaPayload));
   ASSERT_TRUE(expected.write(delta->type()));
-  ASSERT_TRUE(expected.writeVlqI(deltaPayload.size()));
-  ASSERT_TRUE(expected.writeData(deltaPayload.span()));
+  ASSERT_TRUE(expected.write_vlq_i(deltaPayload.size()));
+  ASSERT_TRUE(expected.write_data(deltaPayload.span()));
   ASSERT_TRUE((*transport)->sendPackets({delta}));
 
   ByteArray wire;
@@ -592,7 +592,7 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   DataStreamExternalBuffer frames(wire.span());
   for (auto const& packet : List<std::shared_ptr<Packet>>{parameters, delta}) {
     ASSERT_EQ(frames.read<PacketType>(), packet->type());
-    auto length = frames.readVlqI();
+    auto length = frames.read_vlq_i();
     ASSERT_TRUE(length) << length.error().what();
     auto position = frames.pos();
     ASSERT_TRUE(position) << position.error().what();

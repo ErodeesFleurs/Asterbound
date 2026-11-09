@@ -287,11 +287,11 @@ TEST(JsonContractTest, BinaryStringPreservesLongEmbeddedNullAndCommitsOnlyComple
   EXPECT_EQ(*encoded, expected.data());
 
   Json decoded;
-  ASSERT_TRUE(DataStreamBuffer::deserialize(decoded, *encoded));
+  ASSERT_TRUE(DataStreamBuffer::deserialize(decoded, encoded->span()));
   EXPECT_EQ(decoded, value);
   encoded->resize(encoded->size() - 1);
   Json retained = JsonObject{{"keep", 17}};
-  auto failed = DataStreamBuffer::deserialize(retained, *encoded);
+  auto failed = DataStreamBuffer::deserialize(retained, encoded->span());
   ASSERT_FALSE(failed);
   EXPECT_EQ(retained, Json(JsonObject{{"keep", 17}}));
 }

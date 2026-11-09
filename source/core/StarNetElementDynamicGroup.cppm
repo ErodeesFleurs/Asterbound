@@ -250,10 +250,18 @@ template <typename Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return {};
   struct ClearBuffer { DataStreamBuffer& buffer; ~ClearBuffer() { buffer.clear(); } } clear{m_buffer};
-  { auto result = ds.writeVlqU(m_idMap.size()); if (!result) return std::unexpected(std::move(result.error())); }
-  m_buffer.setStreamCompatibilityVersion(rules);
+  {
+    auto result = ds.write_vlq_u(m_idMap.size());
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
+  m_buffer.set_stream_compatibility_version(rules);
   for (auto const& pair : m_idMap) {
-    { auto result = ds.writeVlqU(pair.first); if (!result) return std::unexpected(std::move(result.error())); }
+    {
+      auto result = ds.write_vlq_u(pair.first);
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+    }
     { auto result = pair.second->netStore(m_buffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = ds.write(m_buffer.data()); if (!result) return std::unexpected(std::move(result.error())); }
     m_buffer.clear();
@@ -268,10 +276,10 @@ template <typename Element>
   m_changeDataLastVersion = m_netVersion ? m_netVersion->get().current() : 0;
   m_idMap.clear();
   addChangeData(ElementReset());
-  auto count = ds.readVlqU();
+  auto count = ds.read_vlq_u();
   if (!count) return std::unexpected(std::move(count.error()));
   for (std::uint64_t i = 0; i < *count; ++i) {
-    auto id = ds.readVlqU();
+    auto id = ds.read_vlq_u();
     if (!id) return std::unexpected(std::move(id.error()));
     if (*id == NullElementId || *id > std::numeric_limits<ElementId>::max())
       return std::unexpected(IOException("Invalid dynamic net element id"));
@@ -285,7 +293,7 @@ template <typename Element>
     { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = m_idMap.add(static_cast<ElementId>(*id), std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
-    addChangeData(ElementAddition(static_cast<ElementId>(*id), storeBuffer.takeData()));
+    addChangeData(ElementAddition(static_cast<ElementId>(*id), storeBuffer.take_data()));
   }
   return {};
 }
@@ -315,26 +323,42 @@ template <typename Element>
           ElementId id = std::get<ElementAddition>(p.second).first;
           if (auto element = m_idMap.find_ref(id)) {
             { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-            { auto result = ds.writeVlqU(1); if (!result) return std::unexpected(std::move(result.error())); }
+            {
+              auto result = ds.write_vlq_u(1);
+              if (!result)
+                return std::unexpected(std::move(result.error()));
+            }
             DataStreamBuffer storeBuffer;
             { auto result = element->get()->netStore(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
-            { auto result = ds.write((ElementChange)ElementAddition(id, storeBuffer.takeData())); if (!result) return std::unexpected(std::move(result.error())); }
+            {
+              auto result = ds.write((ElementChange)ElementAddition(id, storeBuffer.take_data()));
+              if (!result)
+                return std::unexpected(std::move(result.error()));
+            }
           }
         } else {
           { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-          { auto result = ds.writeVlqU(1); if (!result) return std::unexpected(std::move(result.error())); }
+          {
+            auto result = ds.write_vlq_u(1);
+            if (!result)
+              return std::unexpected(std::move(result.error()));
+          }
           { auto result = ds.write(p.second); if (!result) return std::unexpected(std::move(result.error())); }
         }
       }
     }
 
-    m_buffer.setStreamCompatibilityVersion(rules);
+    m_buffer.set_stream_compatibility_version(rules);
     for (auto& p : m_idMap) {
       auto written = p.second->writeNetDelta(m_buffer, fromVersion, rules);
       if (!written) return std::unexpected(std::move(written.error()));
       if (*written) {
         { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = ds.writeVlqU(p.first + 1); if (!result) return std::unexpected(std::move(result.error())); }
+        {
+          auto result = ds.write_vlq_u(p.first + 1);
+          if (!result)
+            return std::unexpected(std::move(result.error()));
+        }
         {
           auto result = ds.write_bytes(m_buffer.data());
           if (!result)
@@ -344,8 +368,11 @@ template <typename Element>
       }
     }
 
-    if (deltaWritten)
-      { auto result = ds.writeVlqU(0); if (!result) return std::unexpected(std::move(result.error())); }
+    if (deltaWritten) {
+      auto result = ds.write_vlq_u(0);
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+    }
 
     return deltaWritten;
   }
@@ -360,7 +387,7 @@ template <typename Element>
   if (!full) return std::unexpected(std::move(full.error()));
   if (*full) return netLoad(ds, rules);
   while (true) {
-    auto code = ds.readVlqU();
+    auto code = ds.read_vlq_u();
     if (!code) return std::unexpected(std::move(code.error()));
     if (*code == 0) break;
     if (*code == 1) {

@@ -26,7 +26,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto entityId = ds.read(decoded.entityId);
   if (!entityId)
     return std::unexpected(std::move(entityId.error()));
-  auto position = ds.readVlqS(decoded.positionIndex);
+  auto position = ds.read_vlq_s(decoded.positionIndex);
   if (!position)
     return std::unexpected(std::move(position.error()));
   anchorState = decoded;
@@ -37,7 +37,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto entityId = ds.write(anchorState.entityId);
   if (!entityId)
     return std::unexpected(std::move(entityId.error()));
-  auto position = ds.writeVlqS(anchorState.positionIndex);
+  auto position = ds.write_vlq_s(anchorState.positionIndex);
   if (!position)
     return std::unexpected(std::move(position.error()));
   return std::ref(ds);

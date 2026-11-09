@@ -168,7 +168,7 @@ template <typename BaseMap>
     else
       return BaseMap(base.key_comp(), base.get_allocator());
   }();
-  auto entries = ds.readMapContainer(entries_map);
+  auto entries = ds.read_map_container(entries_map);
   if (!entries) return std::unexpected(std::move(entries.error()));
   typename IdMapWrapper<BaseMap>::IdType min_id, max_id, next_id;
   auto min = ds.read(min_id);
@@ -189,7 +189,7 @@ template <typename BaseMap>
 
 template <typename BaseMap>
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, IdMapWrapper<BaseMap> const& map) {
-  auto entries = ds.writeMapContainer((BaseMap const&)map);
+  auto entries = ds.write_map_container((BaseMap const&)map);
   if (!entries) return std::unexpected(std::move(entries.error()));
   auto min = ds.write(map.m_min);
   if (!min) return std::unexpected(std::move(min.error()));

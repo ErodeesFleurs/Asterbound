@@ -60,7 +60,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
     return std::unexpected(std::move(opened.error()));
   auto file = std::move(*opened);
   DataStreamIODevice ds(*file);
-  auto magic = ds.writeData(std::span("SBAsset6", 8));
+  auto magic = ds.write_data(std::span("SBAsset6", 8));
   if (!magic)
     return std::unexpected(std::move(magic.error()));
   auto skipped = ds.seek(8, IOSeek::Relative);
@@ -135,7 +135,7 @@ std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource
   if (!indexPosition)
     return std::unexpected(std::move(indexPosition.error()));
   std::uint64_t indexStart = *indexPosition;
-  auto header = ds.writeData(std::span("INDEX", 5));
+  auto header = ds.write_data(std::span("INDEX", 5));
   if (!header)
     return std::unexpected(std::move(header.error()));
   auto metadata = ds.write(directorySource.metadata());
@@ -296,14 +296,13 @@ std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(
 }
 
 std::expected<ByteArray, StarException> PackedAssetSource::read(String const& path) {
-  auto device = open(path);
-  if (!device)
-    return std::unexpected(std::move(device.error()));
-  auto size = (*device)->size();
+  auto size = file_size(path);
   if (!size)
     return std::unexpected(std::move(size.error()));
   if (static_cast<std::uint64_t>(*size) > std::numeric_limits<std::size_t>::max())
     return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to read", path));
-  return (*device)->read_bytes(static_cast<std::size_t>(*size));
+  auto entry = m_index.find_ref(path);
+  return m_packedFile->read_bytes_absolute(static_cast<StreamOffset>(entry->get().first),
+                                           static_cast<std::size_t>(*size));
 }
 }

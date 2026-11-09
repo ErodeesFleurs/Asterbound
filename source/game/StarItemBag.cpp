@@ -415,12 +415,12 @@ std::expected<void, StarException> ItemBag::read(DataStream& ds) {
   auto itemDatabase = m_root.get().itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
-  auto size = ds.readVlqU();
+  auto size = ds.read_vlq_u();
   if (!size)
     return std::unexpected(std::move(size.error()));
   m_items.clear();
   m_items.resize(*size);
-  auto setItemsSize = ds.readVlqU();
+  auto setItemsSize = ds.read_vlq_u();
   if (!setItemsSize)
     return std::unexpected(std::move(setItemsSize.error()));
   for (std::size_t i = 0; i < *setItemsSize; ++i) {
@@ -438,7 +438,7 @@ std::expected<void, StarException> ItemBag::read(DataStream& ds) {
 }
 
 std::expected<void, StarException> ItemBag::write(DataStream& ds) const {
-  auto size = ds.writeVlqU(m_items.size());
+  auto size = ds.write_vlq_u(m_items.size());
   if (!size)
     return std::unexpected(std::move(size.error()));
   std::size_t setItemsSize = 0;
@@ -446,7 +446,7 @@ std::expected<void, StarException> ItemBag::write(DataStream& ds) const {
     if (m_items[i] && !m_items[i]->empty())
       setItemsSize = i + 1;
   }
-  auto writtenSize = ds.writeVlqU(setItemsSize);
+  auto writtenSize = ds.write_vlq_u(setItemsSize);
   if (!writtenSize)
     return std::unexpected(std::move(writtenSize.error()));
   for (std::size_t i = 0; i < setItemsSize; ++i) {

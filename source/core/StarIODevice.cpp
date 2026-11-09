@@ -148,10 +148,6 @@ std::expected<ByteArray, StarException> IODevice::read_bytes_absolute(StreamOffs
   return bytes;
 }
 
-std::expected<void, StarException> IODevice::write_bytes_absolute(StreamOffset position, ByteArray const& bytes) {
-  return write_full_absolute(position, bytes);
-}
-
 void IODevice::set_mode(IOMode mode) { m_mode = mode; }
 IODevice::IODevice(IODevice const& rhs) : m_mode(rhs.mode()) {}
 IODevice& IODevice::operator=(IODevice const& rhs) {

@@ -59,6 +59,27 @@ TEST(FileTest, FullReadRejectsImpossibleLengths) {
   EXPECT_TRUE(write.error().is<IOException>());
 }
 
+TEST(BufferTest, SeekChecksPreserveMemoryEndConventionAndCursorOnFailure) {
+  Buffer owned(ByteArray::from_string("012345"));
+  ExternalBuffer borrowed(owned.span());
+  for (IODevice* device : std::array<IODevice*, 2>{&owned, &borrowed}) {
+    ASSERT_TRUE(device->seek(2, IOSeek::End));
+    EXPECT_EQ(device->pos(), 4);
+    ASSERT_TRUE(device->seek(-2, IOSeek::End));
+    EXPECT_EQ(device->pos(), 8);
+    EXPECT_FALSE(device->seek(std::numeric_limits<StreamOffset>::min(), IOSeek::End));
+    EXPECT_EQ(device->pos(), 8);
+    EXPECT_FALSE(device->seek(std::numeric_limits<StreamOffset>::max(), IOSeek::Relative));
+    EXPECT_EQ(device->pos(), 8);
+    EXPECT_FALSE(device->seek(-9, IOSeek::Relative));
+    EXPECT_EQ(device->pos(), 8);
+    ASSERT_TRUE(device->seek(-8, IOSeek::Relative));
+    EXPECT_EQ(device->pos(), 0);
+    EXPECT_FALSE(device->seek(-1));
+    EXPECT_EQ(device->pos(), 0);
+  }
+}
+
 namespace {
   std::filesystem::path fsPath(String const& path) {
     return std::filesystem::path(std::u8string_view(reinterpret_cast<char8_t const*>(path.utf8().data()), path.utf8_size()));

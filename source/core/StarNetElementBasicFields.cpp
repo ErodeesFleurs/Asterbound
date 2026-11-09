@@ -9,7 +9,7 @@ import star.net_compatibility;
 namespace Star {
 
 std::expected<void, StarException> NetElementSize::readData(DataStream& ds, std::size_t& v) const {
-  auto result = ds.readVlqU();
+  auto result = ds.read_vlq_u();
   if (!result) return std::unexpected(std::move(result.error()));
   v = *result == 0 ? NPos : *result - 1;
   return {};

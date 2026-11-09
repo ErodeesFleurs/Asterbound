@@ -193,7 +193,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
       >> value.dayLength >> value.timeOfDay >> value.epochTime >> value.starOffset >> value.starRotation
       >> value.worldOffset >> value.worldRotation >> value.orbitAngle;
   if (!first) return std::unexpected(std::move(first.error()));
-  auto frames = ds.readVlqS(value.starFrames);
+  auto frames = ds.read_vlq_s(value.starFrames);
   if (!frames) return std::unexpected(std::move(frames.error()));
   auto last = ds >> value.starList >> value.hyperStarList >> value.environmentLight >> value.mainSkyColor
       >> value.topRectColor >> value.bottomRectColor >> value.flashColor;
@@ -208,7 +208,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       << skyRenderData.epochTime << skyRenderData.starOffset << skyRenderData.starRotation
       << skyRenderData.worldOffset << skyRenderData.worldRotation << skyRenderData.orbitAngle;
   if (!first) return std::unexpected(std::move(first.error()));
-  auto frames = ds.writeVlqS(skyRenderData.starFrames);
+  auto frames = ds.write_vlq_s(skyRenderData.starFrames);
   if (!frames) return std::unexpected(std::move(frames.error()));
   auto last = ds << skyRenderData.starList << skyRenderData.hyperStarList << skyRenderData.environmentLight
       << skyRenderData.mainSkyColor << skyRenderData.topRectColor << skyRenderData.bottomRectColor << skyRenderData.flashColor;

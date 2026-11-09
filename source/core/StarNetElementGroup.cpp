@@ -112,7 +112,7 @@ std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds
   } else {
     bool deltaWritten = false;
     std::uint64_t i = 0;
-    m_buffer.setStreamCompatibilityVersion(rules);
+    m_buffer.set_stream_compatibility_version(rules);
     for (auto& element : m_elements) {
       if (i > expectedSize)
         break;
@@ -127,7 +127,7 @@ std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds
       }
       if (*written) {
         deltaWritten = true;
-        auto indexResult = ds.writeVlqU(i);
+        auto indexResult = ds.write_vlq_u(i);
         if (!indexResult) { m_buffer.clear(); return std::unexpected(std::move(indexResult.error())); }
         auto bytesResult = ds.write_bytes(m_buffer.data());
         m_buffer.clear();
@@ -135,7 +135,7 @@ std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds
       }
     }
     if (deltaWritten) {
-      auto result = ds.writeVlqU(0);
+      auto result = ds.write_vlq_u(0);
       if (!result) return std::unexpected(std::move(result.error()));
     }
     return deltaWritten;
@@ -154,7 +154,7 @@ std::expected<void, StarException> NetElementGroup::readNetDelta(DataStream& ds,
         return element.first.get().readNetDelta(ds, interpolationTime, rules);
     return {};
   }
-  auto indexResult = ds.readVlqU();
+  auto indexResult = ds.read_vlq_u();
   if (!indexResult) return std::unexpected(std::move(indexResult.error()));
   std::uint64_t readIndex = *indexResult;
   std::uint64_t i = 0;
@@ -168,7 +168,7 @@ std::expected<void, StarException> NetElementGroup::readNetDelta(DataStream& ds,
     } else if (readIndex - 1 == i) {
       auto result = element.first.get().readNetDelta(ds, interpolationTime, rules);
       if (!result) return std::unexpected(std::move(result.error()));
-      auto next = ds.readVlqU();
+      auto next = ds.read_vlq_u();
       if (!next) return std::unexpected(std::move(next.error()));
       readIndex = *next;
     } else {

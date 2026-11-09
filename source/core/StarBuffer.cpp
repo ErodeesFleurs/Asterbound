@@ -6,6 +6,29 @@ import star.format;
 
 import star.byte_array;
 namespace Star {
+namespace {
+std::expected<std::size_t, StarException> buffer_seek_position(std::size_t current, std::size_t size,
+                                                               StreamOffset offset, IOSeek mode) {
+  StreamOffset base = 0;
+  if (mode == IOSeek::Relative)
+    base = current;
+  else if (mode == IOSeek::End) {
+    if (!std::in_range<StreamOffset>(size))
+      return std::unexpected(IOException("Error, seek position out of range"));
+    base = size;
+    if (offset == std::numeric_limits<StreamOffset>::min())
+      return std::unexpected(IOException("Error, seek position out of range"));
+    offset = -offset;
+  }
+  if ((offset > 0 && base > std::numeric_limits<StreamOffset>::max() - offset)
+      || (offset < 0 && (offset == std::numeric_limits<StreamOffset>::min() || base < -offset)))
+    return std::unexpected(IOException("Error, seek position out of range"));
+  auto position = base + offset;
+  if (position < 0 || !std::in_range<std::size_t>(position))
+    return std::unexpected(IOException("Error, seek position out of range"));
+  return static_cast<std::size_t>(position);
+}
+}// namespace
 
 Buffer::Buffer() : m_pos(0) { set_mode(IOMode::ReadWrite); }
 
@@ -34,24 +57,10 @@ Buffer::Buffer(Buffer&& buffer)
 }
 
 [[nodiscard]] std::expected<void, StarException> Buffer::seek(StreamOffset pos, IOSeek mode) {
-  StreamOffset base = 0;
-  if (mode == IOSeek::Relative)
-    base = m_pos;
-  else if (mode == IOSeek::End) {
-    if (!std::in_range<StreamOffset>(m_bytes.size()))
-      return std::unexpected(IOException("Error, seek position out of range"));
-    base = m_bytes.size();
-    if (pos == std::numeric_limits<StreamOffset>::min())
-      return std::unexpected(IOException("Error, seek position out of range"));
-    pos = -pos;
-  }
-  if ((pos > 0 && base > std::numeric_limits<StreamOffset>::max() - pos)
-      || (pos < 0 && (pos == std::numeric_limits<StreamOffset>::min() || base < -pos)))
-    return std::unexpected(IOException("Error, seek position out of range"));
-  auto newPos = base + pos;
-  if (newPos < 0 || !std::in_range<std::size_t>(newPos))
-    return std::unexpected(IOException("Error, seek position out of range"));
-  m_pos = static_cast<std::size_t>(newPos);
+  auto position = buffer_seek_position(m_pos, m_bytes.size(), pos, mode);
+  if (!position)
+    return std::unexpected(std::move(position.error()));
+  m_pos = *position;
   return {};
 }
 
@@ -121,7 +130,7 @@ ByteArray const& Buffer::data() const {
   return m_bytes;
 }
 
-ByteArray Buffer::takeData() {
+ByteArray Buffer::take_data() {
   ByteArray ret = std::move(m_bytes);
   reset(0);
   return ret;
@@ -135,9 +144,7 @@ char const* Buffer::ptr() const {
   return m_bytes.data();
 }
 
-std::size_t Buffer::dataSize() const {
-  return m_bytes.size();
-}
+std::size_t Buffer::data_size() const { return m_bytes.size(); }
 
 void Buffer::reserve(std::size_t size) {
   data().reserve(size);
@@ -217,24 +224,10 @@ ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuf
 }
 
 [[nodiscard]] std::expected<void, StarException> ExternalBuffer::seek(StreamOffset pos, IOSeek mode) {
-  StreamOffset base = 0;
-  if (mode == IOSeek::Relative)
-    base = m_pos;
-  else if (mode == IOSeek::End) {
-    if (!std::in_range<StreamOffset>(m_bytes.size()))
-      return std::unexpected(IOException("Error, seek position out of range"));
-    base = m_bytes.size();
-    if (pos == std::numeric_limits<StreamOffset>::min())
-      return std::unexpected(IOException("Error, seek position out of range"));
-    pos = -pos;
-  }
-  if ((pos > 0 && base > std::numeric_limits<StreamOffset>::max() - pos)
-      || (pos < 0 && (pos == std::numeric_limits<StreamOffset>::min() || base < -pos)))
-    return std::unexpected(IOException("Error, seek position out of range"));
-  auto newPos = base + pos;
-  if (newPos < 0 || !std::in_range<std::size_t>(newPos))
-    return std::unexpected(IOException("Error, seek position out of range"));
-  m_pos = static_cast<std::size_t>(newPos);
+  auto position = buffer_seek_position(m_pos, m_bytes.size(), pos, mode);
+  if (!position)
+    return std::unexpected(std::move(position.error()));
+  m_pos = *position;
   return {};
 }
 
@@ -278,9 +271,7 @@ char const* ExternalBuffer::ptr() const {
   return m_bytes.data();
 }
 
-std::size_t ExternalBuffer::dataSize() const {
-  return m_bytes.size();
-}
+std::size_t ExternalBuffer::data_size() const { return m_bytes.size(); }
 
 bool ExternalBuffer::empty() const {
   return m_bytes.empty();

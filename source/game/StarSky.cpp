@@ -643,7 +643,7 @@ std::expected<void, StarException> Sky::writeNetStates() {
 
 std::expected<void, StarException> Sky::readNetStates() {
   if (m_skyParametersNetState.pullUpdated()) {
-    auto json = DataStreamBuffer::deserialize<Json>(m_skyParametersNetState.get());
+    auto json = DataStreamBuffer::deserialize<Json>(m_skyParametersNetState.get().span());
     if (!json) return std::unexpected(std::move(json.error()));
     auto parameters = SkyParameters::create(*json);
     if (!parameters) return std::unexpected(std::move(parameters.error()));

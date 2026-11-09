@@ -513,7 +513,7 @@ variant.splashConfig = std::move(*result89);
 
 std::expected<ByteArray, StarException> NpcDatabase::writeNpcVariant(NpcVariant const& variant, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
 
   auto result90 = ds.write(variant.species);
 if (!result90) return std::unexpected(std::move(result90.error()));
@@ -546,9 +546,9 @@ if (!result98) return std::unexpected(std::move(result98.error()));
 
   }
 
-  auto result99 = ds.writeMapContainer(variant.items);
-if (!result99) return std::unexpected(std::move(result99.error()));
-
+  auto result99 = ds.write_map_container(variant.items);
+  if (!result99)
+    return std::unexpected(std::move(result99.error()));
 
   auto result100 = ds.write(variant.persistent);
 if (!result100) return std::unexpected(std::move(result100.error()));
@@ -562,13 +562,12 @@ if (!result102) return std::unexpected(std::move(result102.error()));
   auto result103 = ds.write(variant.damageTeamType);
 if (!result103) return std::unexpected(std::move(result103.error()));
 
-
-  return ds.takeData();
+return ds.take_data();
 }
 
 std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariant(ByteArray const& data, NetCompatibilityRules rules) const {
-  DataStreamExternalBuffer ds(data.span());
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(data.span());
+  ds.set_stream_compatibility_version(rules);
 
   NpcVariant variant;
 
@@ -697,7 +696,7 @@ auto result139 = config.get("touchDamage", {});
 if (!result139) return std::unexpected(std::move(result139.error()));
 variant.touchDamageConfig = std::move(*result139);
 
-  auto result140 = ds.readMapContainer(variant.items);
+auto result140 = ds.read_map_container(variant.items);
 if (!result140) return std::unexpected(std::move(result140.error()));
 
 

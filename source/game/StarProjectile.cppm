@@ -80,7 +80,9 @@ public:
   }
 
   [[nodiscard]] static std::expected<std::shared_ptr<Projectile>, StarException> create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, Json const& parameters);
-  [[nodiscard]] static std::expected<std::shared_ptr<Projectile>, StarException> create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, DataStreamBuffer& netState, NetCompatibilityRules rules = {});
+  [[nodiscard]] static std::expected<std::shared_ptr<Projectile>, StarException>
+  create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, DataStream& netState,
+         NetCompatibilityRules rules = {});
 
   [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {}) const;
 
@@ -167,7 +169,8 @@ public:
 
 private:
   Projectile(Root& rootContext);
-  [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<ProjectileConfig> const& config, DataStreamBuffer& data, NetCompatibilityRules rules);
+  [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<ProjectileConfig> const& config,
+                                                              DataStream& data, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<ProjectileConfig> const& config, Json const& parameters);
 
   struct PhysicsForceConfig {

@@ -105,7 +105,7 @@ std::expected<void, StarException> streamBatch(std::vector<SmallRecord> const& i
     auto bytes = DataStreamBuffer::serialize(input[i]);
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
-    auto decoded = DataStreamBuffer::deserialize<SmallRecord>(std::move(*bytes));
+    auto decoded = DataStreamBuffer::deserialize<SmallRecord>(bytes->span());
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     output[i] = std::move(*decoded);

@@ -2198,7 +2198,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
 
     m_voice->setInput(m_input->bindHeld("opensb", "pushToTalk"));
     DataStreamBuffer voiceData;
-    voiceData.setByteOrder(ByteOrder::LittleEndian);
+    voiceData.set_byte_order(ByteOrder::LittleEndian);
     auto voice = m_voice->send(voiceData, 5000);
     if (!voice)
       return std::unexpected(std::move(voice.error()));

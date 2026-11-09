@@ -1144,7 +1144,7 @@ std::expected<void, StarException> ContainerObject::getNetStates(bool initial) {
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   if (m_itemsNetState.pullUpdated()) {
-    DataStreamBuffer ds(m_itemsNetState.get());
+    DataStreamReader ds(m_itemsNetState.get().span());
     auto operation2 = m_items->read(ds);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
@@ -1162,7 +1162,7 @@ std::expected<void, StarException> ContainerObject::setNetStates() {
     auto operation2 = m_items->write(ds);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
-    m_itemsNetState.set(ds.takeData());
+    m_itemsNetState.set(ds.take_data());
   }
   return {};
 }

@@ -65,18 +65,18 @@ std::expected<ByteArray, StarException> JsonRpc::send() {
   if (m_pending.empty())
     return ByteArray{};
   DataStreamBuffer buffer;
-  if (auto status = buffer.writeContainer(m_pending); !status)
+  if (auto status = buffer.write_container(m_pending); !status)
     return std::unexpected(std::move(status.error()));
   m_pending.clear();
-  return buffer.takeData();
+  return buffer.take_data();
 }
 
 std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
   if (inbuffer.empty())
     return {};
-  DataStreamExternalBuffer buffer(inbuffer.span());
+  DataStreamReader buffer(inbuffer.span());
   List<Json> inbound;
-  if (auto status = buffer.readContainer(inbound); !status)
+  if (auto status = buffer.read_container(inbound); !status)
     return std::unexpected(std::move(status.error()));
 
   for (auto const& request : inbound) {

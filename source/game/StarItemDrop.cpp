@@ -289,7 +289,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   if (auto initialized = drop->initialize(); !initialized)
     return std::unexpected(std::move(initialized.error()));
   DataStreamBuffer ds(std::move(store));
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto descriptor = ds.read<ItemDescriptor>();
   if (!descriptor)
     return std::unexpected(std::move(descriptor.error()));
@@ -334,7 +334,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
 
 std::expected<ByteArray, StarException> ItemDrop::netStore(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   if (auto written = ds.write(itemSafeDescriptor(m_item)); !written)
     return std::unexpected(std::move(written.error()));
   if (auto written = ds.write(m_eternal); !written)
@@ -343,7 +343,7 @@ std::expected<ByteArray, StarException> ItemDrop::netStore(NetCompatibilityRules
     return std::unexpected(std::move(written.error()));
   if (auto written = ds.write(m_intangibleTimer); !written)
     return std::unexpected(std::move(written.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 EntityType ItemDrop::entityType() const {

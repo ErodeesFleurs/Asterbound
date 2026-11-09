@@ -288,11 +288,11 @@ template <typename T>
   if constexpr (sizeof(T) == 1) {
     return ds.read(v);
   } else if constexpr (std::is_unsigned_v<T>) {
-    auto result = ds.readVlqU();
+    auto result = ds.read_vlq_u();
     if (!result) return std::unexpected(std::move(result.error()));
     v = *result;
   } else {
-    auto result = ds.readVlqI();
+    auto result = ds.read_vlq_i();
     if (!result) return std::unexpected(std::move(result.error()));
     v = *result;
   }
@@ -310,7 +310,7 @@ template <typename Enum>
 [[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::readData(DataStream& ds, Enum& v) const {
   if constexpr (sizeof(Enum) == 1) return ds.read(v);
   else {
-    auto result = ds.readVlqI();
+    auto result = ds.read_vlq_i();
     if (!result) return std::unexpected(std::move(result.error()));
     v = static_cast<Enum>(*result);
     return {};

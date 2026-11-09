@@ -222,7 +222,7 @@ namespace Star {
         auto result113 = ds.seek(0);
         if (!result113) return std::unexpected(std::move(result113.error()));
 
-        auto result114 = ds.writeData(VersionMagic);
+        auto result114 = ds.write_data(VersionMagic);
         if (!result114) return std::unexpected(std::move(result114.error()));
 
         auto result115 = ds.write<std::uint32_t>(m_blockSize);
@@ -230,7 +230,7 @@ namespace Star {
 
         std::array<char, ContentIdentifierStringSize> contentIdentifier{};
         std::ranges::copy(m_contentIdentifier.utf8(), contentIdentifier.begin());
-        auto result116 = ds.writeData(std::span<char const>(contentIdentifier));
+        auto result116 = ds.write_data(std::span<char const>(contentIdentifier));
         if (!result116) return std::unexpected(std::move(result116.error()));
 
         auto result117 = ds.write(m_keySize);
@@ -810,7 +810,7 @@ namespace Star {
     }
 
     DataStreamBuffer buffer(parent.m_blockSize);
-    auto result240 = buffer.writeData(IndexMagic);
+    auto result240 = buffer.write_data(IndexMagic);
     if (!result240) return std::unexpected(std::move(result240.error()));
 
     auto result241 = buffer.write<std::uint8_t>(index->level);
@@ -879,7 +879,7 @@ namespace Star {
         if (!result119) return std::unexpected(std::move(result119.error()));
         if ((*result119) + left < parent.m_blockSize - sizeof(BlockIndex)) {
 
-          auto result120 = leafBuffer.readData(data.subspan(pos, left));
+          auto result120 = leafBuffer.read_data(data.subspan(pos, left));
           if (!result120) return std::unexpected(std::move(result120.error()));
 
           pos += left;
@@ -889,7 +889,7 @@ namespace Star {
           auto result121 = leafBuffer.pos();
           if (!result121) return std::unexpected(std::move(result121.error()));
           std::size_t toRead = parent.m_blockSize - sizeof(BlockIndex) - (*result121);
-          auto result122 = leafBuffer.readData(data.subspan(pos, toRead));
+          auto result122 = leafBuffer.read_data(data.subspan(pos, toRead));
           if (!result122) return std::unexpected(std::move(result122.error()));
 
           pos += toRead;
@@ -1033,7 +1033,7 @@ namespace Star {
     BlockIndex currentLeafBlock = leaf->self;
     DataStreamBuffer leafBuffer;
     leafBuffer.reset(parent.m_blockSize);
-    auto result225 = leafBuffer.writeData(LeafMagic);
+    auto result225 = leafBuffer.write_data(LeafMagic);
     if (!result225) return std::unexpected(std::move(result225.error()));
 
     DataStreamFunctions leafOutput({}, [&](std::span<char const> data) -> std::expected<std::size_t, StarException> {
@@ -1046,7 +1046,7 @@ namespace Star {
         std::size_t toWrite = std::min(left, parent.m_blockSize - *bufferPosition - sizeof(BlockIndex));
 
         if (toWrite != 0) {
-          auto written = leafBuffer.writeData(data.subspan(pos, toWrite));
+          auto written = leafBuffer.write_data(data.subspan(pos, toWrite));
           if (!written) return std::unexpected(std::move(written.error()));
           left -= toWrite;
           pos += toWrite;
@@ -1064,7 +1064,7 @@ namespace Star {
           if (!updated) return std::unexpected(std::move(updated.error()));
           currentLeafBlock = *nextBlock;
           leafBuffer.reset(parent.m_blockSize);
-          auto marked = leafBuffer.writeData(LeafMagic);
+          auto marked = leafBuffer.write_data(LeafMagic);
           if (!marked) return std::unexpected(std::move(marked.error()));
         }
       }
@@ -1463,7 +1463,7 @@ namespace Star {
     if (auto leafFlagWritten = fields.write<bool>(m_rootIsLeaf); !leafFlagWritten)
       return std::unexpected(std::move(leafFlagWritten.error()));
 
-    if (auto rootWritten = ds.writeData(root_info); !rootWritten)
+    if (auto rootWritten = ds.write_data(root_info); !rootWritten)
       return std::unexpected(std::move(rootWritten.error()));
 
     // Barrier 2: the complete inactive root must be durable before selecting it.

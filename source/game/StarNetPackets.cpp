@@ -804,12 +804,11 @@ std::expected<void, StarException> ChatSendPacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.streamCompatibilityVersion() >= 5)
-    {
-      auto result = ds.read(data);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
+  if (ds.stream_compatibility_version() >= 5) {
+    auto result = ds.read(data);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
   return {};
 }
 
@@ -820,12 +819,11 @@ std::expected<void, StarException> ChatSendPacket::write(DataStream& ds) const {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.streamCompatibilityVersion() >= 5)
-    {
-      auto result = ds.write(data);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
+  if (ds.stream_compatibility_version() >= 5) {
+    auto result = ds.write(data);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
   return {};
 }
 
@@ -1067,11 +1065,11 @@ TileModificationFailurePacket::TileModificationFailurePacket(TileModificationLis
     : modifications(std::move(modifications)) {}
 
 std::expected<void, StarException> TileModificationFailurePacket::read(DataStream& ds) {
-  return ds.readContainer(modifications);
+  return ds.read_container(modifications);
 }
 
 std::expected<void, StarException> TileModificationFailurePacket::write(DataStream& ds) const {
-  return ds.writeContainer(modifications);
+  return ds.write_container(modifications);
 }
 
 GiveItemPacket::GiveItemPacket() = default;
@@ -1125,7 +1123,7 @@ ModifyTileListPacket::ModifyTileListPacket(TileModificationList modifications, b
 
 std::expected<void, StarException> ModifyTileListPacket::read(DataStream& ds) {
   {
-    auto result = ds.readContainer(modifications);
+    auto result = ds.read_container(modifications);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1134,7 +1132,7 @@ std::expected<void, StarException> ModifyTileListPacket::read(DataStream& ds) {
 
 std::expected<void, StarException> ModifyTileListPacket::write(DataStream& ds) const {
   {
-    auto result = ds.writeContainer(modifications);
+    auto result = ds.write_container(modifications);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1149,7 +1147,7 @@ ReplaceTileListPacket::ReplaceTileListPacket(TileModificationList modifications,
 
 std::expected<void, StarException> ReplaceTileListPacket::read(DataStream& ds) {
   {
-    auto result = ds.readContainer(modifications);
+    auto result = ds.read_container(modifications);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1158,20 +1156,18 @@ std::expected<void, StarException> ReplaceTileListPacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.streamCompatibilityVersion() >= 7)
-    {
-      auto result = ds.read(applyDamage);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
-  else
+  if (ds.stream_compatibility_version() >= 7) {
+    auto result = ds.read(applyDamage);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  } else
     applyDamage = false;
   return {};
 }
 
 std::expected<void, StarException> ReplaceTileListPacket::write(DataStream& ds) const {
   {
-    auto result = ds.writeContainer(modifications);
+    auto result = ds.write_container(modifications);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1180,12 +1176,11 @@ std::expected<void, StarException> ReplaceTileListPacket::write(DataStream& ds) 
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.streamCompatibilityVersion() >= 7)
-    {
-      auto result = ds.write(applyDamage);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
+  if (ds.stream_compatibility_version() >= 7) {
+    auto result = ds.write(applyDamage);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
   return {};
 }
 
@@ -1197,7 +1192,7 @@ DamageTileGroupPacket::DamageTileGroupPacket(
 
 std::expected<void, StarException> DamageTileGroupPacket::read(DataStream& ds) {
   {
-    auto result = ds.readContainer(tilePositions);
+    auto result = ds.read_container(tilePositions);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1207,7 +1202,7 @@ std::expected<void, StarException> DamageTileGroupPacket::read(DataStream& ds) {
 
 std::expected<void, StarException> DamageTileGroupPacket::write(DataStream& ds) const {
   {
-    auto result = ds.writeContainer(tilePositions);
+    auto result = ds.write_container(tilePositions);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1222,7 +1217,7 @@ CollectLiquidPacket::CollectLiquidPacket(List<Vec2I> tilePositions, LiquidId liq
 
 std::expected<void, StarException> CollectLiquidPacket::read(DataStream& ds) {
   {
-    auto result = ds.readContainer(tilePositions);
+    auto result = ds.read_container(tilePositions);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1231,7 +1226,7 @@ std::expected<void, StarException> CollectLiquidPacket::read(DataStream& ds) {
 
 std::expected<void, StarException> CollectLiquidPacket::write(DataStream& ds) const {
   {
-    auto result = ds.writeContainer(tilePositions);
+    auto result = ds.write_container(tilePositions);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -1418,7 +1413,7 @@ std::expected<void, StarException> PingPacket::read(DataStream& ds, NetCompatibi
     time = 0;
   } else {
     {
-      auto result = ds.readVlqI(time);
+      auto result = ds.read_vlq_i(time);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -1436,7 +1431,7 @@ std::expected<void, StarException> PingPacket::write(DataStream& ds, NetCompatib
     }
   } else {
     {
-      auto result = ds.writeVlqI(time);
+      auto result = ds.write_vlq_i(time);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -1477,13 +1472,13 @@ std::expected<void, StarException> EntityUpdateSetPacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  auto decoded = ds.readMapContainer(deltas,
-      [](DataStream& ds, EntityId& entityId, ByteArray& delta) -> std::expected<void, StarException> {
-        auto id = ds.viread(entityId);
-        if (!id)
-          return std::unexpected(std::move(id.error()));
-        return ds.read(delta);
-      });
+  auto decoded = ds.read_map_container(
+    deltas, [](DataStream& ds, EntityId& entityId, ByteArray& delta) -> std::expected<void, StarException> {
+      auto id = ds.viread(entityId);
+      if (!id)
+        return std::unexpected(std::move(id.error()));
+      return ds.read(delta);
+    });
   if (!decoded)
     return std::unexpected(std::move(decoded.error()));
   return {};
@@ -1495,13 +1490,13 @@ std::expected<void, StarException> EntityUpdateSetPacket::write(DataStream& ds) 
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  auto encoded = ds.writeMapContainer(deltas,
-      [](DataStream& ds, EntityId const& entityId, ByteArray const& delta) -> std::expected<void, StarException> {
-        auto id = ds.viwrite(entityId);
-        if (!id)
-          return std::unexpected(std::move(id.error()));
-        return ds.write(delta);
-      });
+  auto encoded = ds.write_map_container(
+    deltas, [](DataStream& ds, EntityId const& entityId, ByteArray const& delta) -> std::expected<void, StarException> {
+      auto id = ds.viwrite(entityId);
+      if (!id)
+        return std::unexpected(std::move(id.error()));
+      return ds.write(delta);
+    });
   if (!encoded)
     return std::unexpected(std::move(encoded.error()));
   return {};
@@ -1661,11 +1656,11 @@ UpdateWorldPropertiesPacket::UpdateWorldPropertiesPacket(JsonObject const& updat
   : updatedProperties(updatedProperties) {}
 
 std::expected<void, StarException> UpdateWorldPropertiesPacket::read(DataStream& ds) {
-  return ds.readMapContainer(updatedProperties);
+  return ds.read_map_container(updatedProperties);
 }
 
 std::expected<void, StarException> UpdateWorldPropertiesPacket::write(DataStream& ds) const {
-  return ds.writeMapContainer(updatedProperties);
+  return ds.write_map_container(updatedProperties);
 }
 
 
@@ -1867,7 +1862,7 @@ std::expected<void, StarException> PongPacket::read(DataStream& ds, NetCompatibi
     time = 0;
   } else {
     {
-      auto result = ds.readVlqI(time);
+      auto result = ds.read_vlq_i(time);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -1886,7 +1881,7 @@ std::expected<void, StarException> PongPacket::write(DataStream& ds, NetCompatib
     }
   } else {
     {
-      auto result = ds.writeVlqI(time);
+      auto result = ds.write_vlq_i(time);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -1901,7 +1896,7 @@ StepUpdatePacket::StepUpdatePacket(double remoteTime) : remoteTime(remoteTime) {
 
 std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds, NetCompatibilityRules netRules) {
   if (netRules.isLegacy()) {
-    auto steps = ds.readVlqU();
+    auto steps = ds.read_vlq_u();
     if (!steps)
       return std::unexpected(std::move(steps.error()));
     remoteTime = static_cast<double>(*steps) / 60.0;
@@ -1918,7 +1913,7 @@ std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds, NetCom
 std::expected<void, StarException> StepUpdatePacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
   if (netRules.isLegacy()) {
     {
-      auto result = ds.writeVlqU(static_cast<std::uint64_t>(std::round(remoteTime * 60.0)));
+      auto result = ds.write_vlq_u(static_cast<std::uint64_t>(std::round(remoteTime * 60.0)));
       if (!result)
         return std::unexpected(std::move(result.error()));
     }

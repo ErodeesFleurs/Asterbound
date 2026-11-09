@@ -46,7 +46,7 @@ std::expected<void, StarException> writeReferenceCacheAssets(GameTest& fixture, 
     auto written = Image::filled(png.size, png.color).writePng(fixture.root().logger(), buffer);
     if (!written)
       return std::unexpected(std::move(written.error()));
-    auto stored = File::write_file(buffer->takeData(), File::relative_to(directory, png.name));
+    auto stored = File::write_file(buffer->take_data(), File::relative_to(directory, png.name));
     if (!stored)
       return std::unexpected(std::move(stored.error()));
   }

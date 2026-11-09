@@ -213,7 +213,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto name = ds.read(itemDescriptor.m_name);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto count = ds.readVlqU(itemDescriptor.m_count);
+  auto count = ds.read_vlq_u(itemDescriptor.m_count);
   if (!count)
     return std::unexpected(std::move(count.error()));
   auto parameters = ds.read(itemDescriptor.m_parameters);
@@ -227,7 +227,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto name = ds.write(itemDescriptor.m_name);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto count = ds.writeVlqU(itemDescriptor.m_count);
+  auto count = ds.write_vlq_u(itemDescriptor.m_count);
   if (!count)
     return std::unexpected(std::move(count.error()));
   auto parameters = ds.write(itemDescriptor.m_parameters);

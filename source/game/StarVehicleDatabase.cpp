@@ -129,7 +129,7 @@ std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::create(S
 
 std::expected<ByteArray, StarException> VehicleDatabase::netStore(std::shared_ptr<Vehicle> const& vehicle, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto name = vehicle->baseConfig().getString("name");
   if (!name)
     return std::unexpected(std::move(name.error()));
@@ -137,12 +137,12 @@ std::expected<ByteArray, StarException> VehicleDatabase::netStore(std::shared_pt
     return std::unexpected(std::move(result.error()));
   if (auto result = ds.write(vehicle->dynamicConfig()); !result)
     return std::unexpected(std::move(result.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::netLoad(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(netStore.span());
+  ds.set_stream_compatibility_version(rules);
   auto name = ds.read<String>();
   if (!name)
     return std::unexpected(std::move(name.error()));

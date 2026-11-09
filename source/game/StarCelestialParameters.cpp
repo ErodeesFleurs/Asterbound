@@ -179,7 +179,7 @@ std::expected<ByteArray, StarException> CelestialParameters::netStore() const {
   auto written = ds.write(*visitable);
   if (!written)
     return std::unexpected(std::move(written.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 CelestialCoordinate CelestialParameters::coordinate() const {

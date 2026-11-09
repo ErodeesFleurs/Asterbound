@@ -171,7 +171,11 @@ template <typename BaseMap>
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return {};
-  { auto result = ds.writeVlqU(BaseMap::size() + m_pendingChangeData.size()); if (!result) return std::unexpected(std::move(result.error())); }
+  {
+    auto result = ds.write_vlq_u(BaseMap::size() + m_pendingChangeData.size());
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
   for (auto const& pair : *this) {
     auto result = writeSetChange(ds, pair.first, pair.second);
     if (!result)
@@ -193,7 +197,7 @@ template <typename BaseMap>
 
   addChangeData(ClearChange());
 
-  auto countResult = ds.readVlqU();
+  auto countResult = ds.read_vlq_u();
   if (!countResult) return std::unexpected(std::move(countResult.error()));
   std::uint64_t count = *countResult;
   for (std::uint64_t i = 0; i < count; ++i) {
@@ -227,21 +231,32 @@ template <typename BaseMap>
 
   if (fromVersion < m_changeDataLastVersion) {
     deltaWritten = true;
-    { auto result = ds.writeVlqU(1); if (!result) return std::unexpected(std::move(result.error())); }
+    {
+      auto result = ds.write_vlq_u(1);
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+    }
     { auto result = netStore(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
 
   } else {
     for (auto const& p : m_changeData) {
       if (p.first >= fromVersion) {
         deltaWritten = true;
-        { auto result = ds.writeVlqU(2); if (!result) return std::unexpected(std::move(result.error())); }
+        {
+          auto result = ds.write_vlq_u(2);
+          if (!result)
+            return std::unexpected(std::move(result.error()));
+        }
         { auto result = writeChange(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
       }
     }
   }
 
-  if (deltaWritten)
-    { auto result = ds.writeVlqU(0); if (!result) return std::unexpected(std::move(result.error())); }
+  if (deltaWritten) {
+    auto result = ds.write_vlq_u(0);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
 
   return deltaWritten;
 }
@@ -250,7 +265,7 @@ template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
   if (!checkWithRules(rules)) return {};
   while (true) {
-    auto codeResult = ds.readVlqU();
+    auto codeResult = ds.read_vlq_u();
     if (!codeResult) return std::unexpected(std::move(codeResult.error()));
     std::uint64_t code = *codeResult;
     if (code == 0) {

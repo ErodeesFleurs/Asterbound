@@ -717,7 +717,7 @@ std::expected<ByteArray, StarException> WorldStorage::metadataKey() {
     auto operationResult1 = metadata.write(StoreType::Metadata);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  return metadata.takeData();
+  return metadata.take_data();
 }
 
 std::expected<WorldStorage::WorldMetadataStore, StarException> WorldStorage::readWorldMetadata(ByteArray const& data) {
@@ -773,7 +773,7 @@ std::expected<ByteArray, StarException> WorldStorage::entitySectorKey(Sector con
     auto operationResult1 = ds.cwrite<std::uint16_t>(sector[1]);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<WorldStorage::EntitySectorStore, StarException> WorldStorage::readEntitySector(ByteArray const& data) {
@@ -822,7 +822,7 @@ std::expected<ByteArray, StarException> WorldStorage::tileSectorKey(Sector const
     auto operationResult1 = ds.cwrite<std::uint16_t>(sector[1]);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTileSector(ByteArray const& data) {
@@ -919,7 +919,7 @@ std::expected<ByteArray, StarException> WorldStorage::writeTileSector(TileSector
         if (!written) return std::unexpected(std::move(written.error()));
       }
   }
-  return compressData(ds.takeData());
+  return compressData(ds.take_data());
 }
 
 std::expected<ByteArray, StarException> WorldStorage::uniqueIndexKey(String const& uniqueId) {
@@ -933,56 +933,41 @@ std::expected<ByteArray, StarException> WorldStorage::uniqueIndexKey(String cons
     if (!index_written)
       return std::unexpected(std::move(index_written.error()));
   }
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<WorldStorage::UniqueIndexStore, StarException> WorldStorage::readUniqueIndexStore(ByteArray const& data) {
   auto autouncompressedResult1 = uncompressData(data);
   if (!autouncompressedResult1) return std::unexpected(std::move(autouncompressedResult1.error()));
   auto uncompressed = std::move((*autouncompressedResult1));
-  return DataStreamBuffer::deserializeMapContainer<UniqueIndexStore>(uncompressed,
-      [](DataStream& ds, String& key, SectorAndPosition& value) -> std::expected<void, StarException> {
-        {
-          auto operationResult1 = ds.read(key);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.cread<std::uint16_t>(value.first[0]);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.cread<std::uint16_t>(value.first[1]);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.read(value.second);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        return {};
-      });
+  return DataStreamBuffer::deserialize_map_container<UniqueIndexStore>(
+    uncompressed.span(),
+    [](DataStream& ds, String& key, SectorAndPosition& value) -> std::expected<void, StarException> {
+      if (auto key_read = ds.read(key); !key_read)
+        return std::unexpected(std::move(key_read.error()));
+      if (auto x_read = ds.cread<std::uint16_t>(value.first[0]); !x_read)
+        return std::unexpected(std::move(x_read.error()));
+      if (auto y_read = ds.cread<std::uint16_t>(value.first[1]); !y_read)
+        return std::unexpected(std::move(y_read.error()));
+      if (auto position_read = ds.read(value.second); !position_read)
+        return std::unexpected(std::move(position_read.error()));
+      return {};
+    });
 }
 
 std::expected<ByteArray, StarException> WorldStorage::writeUniqueIndexStore(UniqueIndexStore const& store) {
-  auto serialized = DataStreamBuffer::serializeMapContainer(store,
-      [](DataStream& ds, String const& key, SectorAndPosition const& value) -> std::expected<void, StarException> {
-        {
-          auto operationResult1 = ds.write(key);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.cwrite<std::uint16_t>(value.first[0]);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.cwrite<std::uint16_t>(value.first[1]);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        {
-          auto operationResult1 = ds.write(value.second);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-        return {};
-      });
+  auto serialized = DataStreamBuffer::serialize_map_container(
+    store, [](DataStream& ds, String const& key, SectorAndPosition const& value) -> std::expected<void, StarException> {
+      if (auto key_written = ds.write(key); !key_written)
+        return std::unexpected(std::move(key_written.error()));
+      if (auto x_written = ds.cwrite<std::uint16_t>(value.first[0]); !x_written)
+        return std::unexpected(std::move(x_written.error()));
+      if (auto y_written = ds.cwrite<std::uint16_t>(value.first[1]); !y_written)
+        return std::unexpected(std::move(y_written.error()));
+      if (auto position_written = ds.write(value.second); !position_written)
+        return std::unexpected(std::move(position_written.error()));
+      return {};
+    });
   if (!serialized) return std::unexpected(std::move(serialized.error()));
   return compressData(*serialized);
 }
@@ -1001,14 +986,14 @@ std::expected<ByteArray, StarException> WorldStorage::sectorUniqueKey(Sector con
     auto operationResult1 = ds.cwrite<std::uint16_t>(sector[1]);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<WorldStorage::SectorUniqueStore, StarException> WorldStorage::readSectorUniqueStore(ByteArray const& data) {
   auto autouncompressedResult1 = uncompressData(data);
   if (!autouncompressedResult1) return std::unexpected(std::move(autouncompressedResult1.error()));
   auto uncompressed = std::move((*autouncompressedResult1));
-  return DataStreamBuffer::deserialize<SectorUniqueStore>(uncompressed);
+  return DataStreamBuffer::deserialize<SectorUniqueStore>(uncompressed.span());
 }
 
 std::expected<ByteArray, StarException> WorldStorage::writeSectorUniqueStore(SectorUniqueStore const& store) {

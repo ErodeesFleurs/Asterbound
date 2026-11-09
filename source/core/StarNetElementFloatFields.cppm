@@ -265,7 +265,7 @@ template <typename T>
 template <typename T>
 [[nodiscard]] std::expected<T, StarException> NetElementFloating<T>::readValue(DataStream& ds) const {
   if (m_fixedPointBase) {
-    auto result = ds.readVlqI();
+    auto result = ds.read_vlq_i();
     if (!result) return std::unexpected(std::move(result.error()));
     return *result * *m_fixedPointBase;
   }

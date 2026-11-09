@@ -458,7 +458,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
   auto stateWritten = ds.write(netGroupUpdate);
   if (!stateWritten)
     return std::unexpected(std::move(stateWritten.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 void ServerClientContext::setSystemWorld(std::shared_ptr<SystemWorldServerThread> systemWorldThread) {

@@ -780,7 +780,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         bool targetDestroyed = false;
         for (auto const& original : *packets) {
           DataStreamBuffer wire;
-          wire.setStreamCompatibilityVersion(rules);
+          wire.set_stream_compatibility_version(rules);
           ASSERT_TRUE(original->write(wire, rules));
           auto decoded = createPacket(original->type());
           ASSERT_TRUE(decoded) << decoded.error().what();
@@ -790,7 +790,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           ASSERT_TRUE(atEnd);
           EXPECT_TRUE(*atEnd);
           DataStreamBuffer encodedAgain;
-          encodedAgain.setStreamCompatibilityVersion(rules);
+          encodedAgain.set_stream_compatibility_version(rules);
           ASSERT_TRUE((*decoded)->write(encodedAgain, rules));
           if (auto expected = as<WorldStartPacket>(original)) {
             auto actual = as<WorldStartPacket>(*decoded);
@@ -852,10 +852,10 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
                 expected.environmentBiomeIndex = tile.environmentBiomeIndex;
                 expected.dungeonId = tile.dungeonId;
                 DataStreamBuffer expectedWire;
-                expectedWire.setStreamCompatibilityVersion(rules);
+                expectedWire.set_stream_compatibility_version(rules);
                 ASSERT_TRUE(expectedWire.write(expected));
                 DataStreamBuffer actualWire;
-                actualWire.setStreamCompatibilityVersion(rules);
+                actualWire.set_stream_compatibility_version(rules);
                 ASSERT_TRUE(actualWire.write(array->array(x, y)));
                 EXPECT_EQ(expectedWire.data(), actualWire.data());
                 clientTiles[i].set(pos, array->array(x, y));
@@ -910,7 +910,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
       // handed to an asynchronous consumer, including the other wire version.
       for (auto const& retained : retainedSnapshots) {
         DataStreamBuffer wire;
-        wire.setStreamCompatibilityVersion(retained.rules);
+        wire.set_stream_compatibility_version(retained.rules);
         ASSERT_TRUE(static_cast<Packet const&>(*retained.packet).write(wire, retained.rules));
         EXPECT_EQ(wire.data(), retained.wire);
       }

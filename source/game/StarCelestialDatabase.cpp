@@ -900,7 +900,7 @@ std::expected<std::reference_wrapper<CelestialChunk const>, StarException> Celes
         auto decompressed = uncompressData(**data);
         if (!decompressed)
           return std::unexpected(std::move(decompressed.error()));
-        auto versioned = DataStreamBuffer::deserialize<VersionedJson>(*decompressed);
+        auto versioned = DataStreamBuffer::deserialize<VersionedJson>(decompressed->span());
         if (!versioned)
           return std::unexpected(std::move(versioned.error()));
         auto current = (*versioning)->versionedJsonCurrent(*versioned);

@@ -883,8 +883,8 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
 }
 
 std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::netLoadObject(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(netStore.span());
+  ds.set_stream_compatibility_version(rules);
   auto name = ds.read<String>();
   if (!name)
     return std::unexpected(std::move(name.error()));

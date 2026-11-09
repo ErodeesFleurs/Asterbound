@@ -414,7 +414,7 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::monsterVariant(Str
 
 std::expected<ByteArray, StarException> MonsterDatabase::writeMonsterVariant(MonsterVariant const& variant, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
 
   auto result58 = ds.write(variant.type);
 if (!result58) return std::unexpected(std::move(result58.error()));
@@ -425,13 +425,12 @@ if (!result59) return std::unexpected(std::move(result59.error()));
   auto result60 = ds.write(variant.uniqueParameters);
 if (!result60) return std::unexpected(std::move(result60.error()));
 
-
-  return ds.takeData();
+return ds.take_data();
 }
 
 std::expected<MonsterVariant, StarException> MonsterDatabase::readMonsterVariant(ByteArray const& data, NetCompatibilityRules rules) const {
-  DataStreamExternalBuffer ds(data.span());
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(data.span());
+  ds.set_stream_compatibility_version(rules);
 
   auto result61 = ds.read<String>();
 if (!result61) return std::unexpected(std::move(result61.error()));

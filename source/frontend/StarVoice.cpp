@@ -552,7 +552,7 @@ StringList Voice::availableDevices() {
 }
 
 std::expected<int, StarException> Voice::send(DataStreamBuffer& out, std::size_t budget) {
-  out.setByteOrder(ByteOrder::LittleEndian);
+  out.set_byte_order(ByteOrder::LittleEndian);
   if (auto result = out.write<std::uint16_t>(VOICE_VERSION); !result)
     return std::unexpected(std::move(result.error()));
 
@@ -597,79 +597,85 @@ std::expected<bool, StarException> Voice::receive(std::shared_ptr<Speaker> speak
 }
 
 std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const& speaker, std::string_view view) {
-    DataStreamExternalBuffer reader{std::span<char const>(view)};
-    reader.setByteOrder(ByteOrder::LittleEndian);
-    auto version = reader.read<std::uint16_t>();
-    if (!version) return std::unexpected(std::move(version.error()));
-    if (*version > VOICE_VERSION)
-      return false;
-    while (true) {
-      auto atEnd = reader.at_end();
-      if (!atEnd) return std::unexpected(std::move(atEnd.error()));
-      if (*atEnd) break;
-      auto opusLength = reader.read<std::uint32_t>();
-      if (!opusLength) return std::unexpected(std::move(opusLength.error()));
-      auto position = reader.pos();
-      if (!position) return std::unexpected(std::move(position.error()));
-      if (*position > reader.size() || *opusLength > reader.size() - *position)
-        return std::unexpected(VoiceException("Opus packet length goes past end of buffer", false));
-      auto packet = reader.span().subspan(*position, *opusLength);
-      if (auto result = reader.seek(*opusLength, IOSeek::Relative); !result)
-        return std::unexpected(std::move(result.error()));
-      if (!*opusLength)
-        return std::unexpected(VoiceException("Empty Opus packet", false));
-      int channels = opus_packet_get_nb_channels(reinterpret_cast<unsigned char const*>(packet.data()));
-      if (channels == OPUS_INVALID_PACKET)
-        continue;
-      bool mono = channels == 1;
-      OpusDecoder* decoder = mono ? speaker->decoderMono.get() : speaker->decoderStereo.get();
-      int samples = opus_decoder_get_nb_samples(decoder, reinterpret_cast<unsigned char const*>(packet.data()), packet.size());
-      if (samples < 0)
-        return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(samples)));
+  DataStreamReader reader{std::span<char const>(view)};
+  reader.set_byte_order(ByteOrder::LittleEndian);
+  auto version = reader.read<std::uint16_t>();
+  if (!version)
+    return std::unexpected(std::move(version.error()));
+  if (*version > VOICE_VERSION)
+    return false;
+  while (true) {
+    auto atEnd = reader.at_end();
+    if (!atEnd)
+      return std::unexpected(std::move(atEnd.error()));
+    if (*atEnd)
+      break;
+    auto opusLength = reader.read<std::uint32_t>();
+    if (!opusLength)
+      return std::unexpected(std::move(opusLength.error()));
+    auto position = reader.pos();
+    if (!position)
+      return std::unexpected(std::move(position.error()));
+    if (*position > reader.size() || *opusLength > reader.size() - *position)
+      return std::unexpected(VoiceException("Opus packet length goes past end of buffer", false));
+    auto packet = reader.span().subspan(*position, *opusLength);
+    if (auto result = reader.seek(*opusLength, IOSeek::Relative); !result)
+      return std::unexpected(std::move(result.error()));
+    if (!*opusLength)
+      return std::unexpected(VoiceException("Empty Opus packet", false));
+    int channels = opus_packet_get_nb_channels(reinterpret_cast<unsigned char const*>(packet.data()));
+    if (channels == OPUS_INVALID_PACKET)
+      continue;
+    bool mono = channels == 1;
+    OpusDecoder* decoder = mono ? speaker->decoderMono.get() : speaker->decoderStereo.get();
+    int samples =
+      opus_decoder_get_nb_samples(decoder, reinterpret_cast<unsigned char const*>(packet.data()), packet.size());
+    if (samples < 0)
+      return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(samples)));
 
-      m_decodeBuffer.resize(samples * static_cast<std::size_t>(channels));
+    m_decodeBuffer.resize(samples * static_cast<std::size_t>(channels));
 
-      int decodedSamples = opus_decode(decoder, reinterpret_cast<unsigned char const*>(packet.data()), packet.size(), m_decodeBuffer.data(), samples, 0);
-      if (decodedSamples < 0)
-        return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(decodedSamples)));
-      if (!decodedSamples)
-        return true;
-      auto resampled = speaker->audioStream->resample(
-        std::span<std::int16_t const>(m_decodeBuffer).first(static_cast<std::size_t>(decodedSamples) * channels),
-        m_resampleBuffer, mono);
-      if (!resampled)
-        return std::unexpected(std::move(resampled.error()));
+    int decodedSamples = opus_decode(decoder, reinterpret_cast<unsigned char const*>(packet.data()), packet.size(),
+                                     m_decodeBuffer.data(), samples, 0);
+    if (decodedSamples < 0)
+      return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(decodedSamples)));
+    if (!decodedSamples)
+      return true;
+    auto resampled = speaker->audioStream->resample(
+      std::span<std::int16_t const>(m_decodeBuffer).first(static_cast<std::size_t>(decodedSamples) * channels),
+      m_resampleBuffer, mono);
+    if (!resampled)
+      return std::unexpected(std::move(resampled.error()));
 
-      {
-        std::lock_guard lock(speaker->audioStream->mutex);
-        auto& samples = speaker->audioStream->samples;
+    {
+      std::lock_guard lock(speaker->audioStream->mutex);
+      auto& samples = speaker->audioStream->samples;
 
-        auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-        if (now - speaker->lastReceiveTime < std::chrono::milliseconds(1000)) {
-          auto limit = static_cast<std::size_t>(speaker->minimumPlaySamples) + 22050;
-          if (samples.size() > limit) { // skip ahead if we're getting too far
-            for (std::size_t i = samples.size(); i >= limit; --i)
-              samples.pop();
-          }
+      auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
+                                                                         + std::chrono::microseconds(500));
+      if (now - speaker->lastReceiveTime < std::chrono::milliseconds(1000)) {
+        auto limit = static_cast<std::size_t>(speaker->minimumPlaySamples) + 22050;
+        if (samples.size() > limit) {// skip ahead if we're getting too far
+          for (std::size_t i = samples.size(); i >= limit; --i)
+            samples.pop();
         }
-        else
-          samples = std::queue<std::int16_t>();
+      } else
+        samples = std::queue<std::int16_t>();
 
-        speaker->lastReceiveTime = now;
+      speaker->lastReceiveTime = now;
 
-        if (mono) {
-          for (std::int16_t sample : m_resampleBuffer) {
-            samples.push(sample);
-            samples.push(sample);
-          }
+      if (mono) {
+        for (std::int16_t sample : m_resampleBuffer) {
+          samples.push(sample);
+          samples.push(sample);
         }
-        else {
-          for (std::int16_t sample : m_resampleBuffer)
-            samples.push(sample);
-        }
+      } else {
+        for (std::int16_t sample : m_resampleBuffer)
+          samples.push(sample);
       }
-      playSpeaker(speaker, channels);
     }
+    playSpeaker(speaker, channels);
+  }
     return true;
 }
 

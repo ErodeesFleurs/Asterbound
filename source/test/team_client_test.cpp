@@ -124,7 +124,7 @@ const GameTestRegistration teamStatusSynchronization(
       SCOPED_TRACE(phase);
       DataStreamExternalBuffer stream(packet.span());
       List<Json> messages;
-      ASSERT_TRUE(stream.readContainer(messages));
+      ASSERT_TRUE(stream.read_container(messages));
       ASSERT_EQ(messages.size(), 1u);
       EXPECT_EQ(messages.front().getString("handler"), "team.updateStatus");
       auto args = messages.front().get("arguments");
@@ -181,11 +181,11 @@ const GameTestRegistration teamStatusSynchronization(
     checkPacket(*failed, true, "full update to be rejected");
     DataStreamExternalBuffer requestStream(failed->span());
     List<Json> requests;
-    ASSERT_TRUE(requestStream.readContainer(requests));
+    ASSERT_TRUE(requestStream.read_container(requests));
     ASSERT_EQ(requests.size(), 1u);
     auto id = requests.front().get("id");
     ASSERT_TRUE(id);
-    auto failure = DataStreamBuffer::serializeContainer(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}});
+    auto failure = DataStreamBuffer::serialize_container(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}});
     ASSERT_TRUE(failure);
     ASSERT_TRUE(clientRpc->receive(*failure));
     ASSERT_TRUE(team.update());

@@ -198,7 +198,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
   if (data.empty())
     return {};
   DataStreamBuffer ds(std::move(data));
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto rpcData = ds.read<ByteArray>();
   if (!rpcData)
     return std::unexpected(std::move(rpcData.error()));
@@ -209,7 +209,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
   if (!shipUpdates)
     return std::unexpected(std::move(shipUpdates.error()));
   if (!shipUpdates->empty()) {
-    auto decoded = DataStreamBuffer::deserialize<WorldChunks>(std::move(*shipUpdates));
+    auto decoded = DataStreamBuffer::deserialize<WorldChunks>(shipUpdates->span());
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     m_newShipUpdates.merge(*decoded, true);
@@ -219,7 +219,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
     if (!customWorldUpdates)
       return std::unexpected(std::move(customWorldUpdates.error()));
     for (auto&& p : *customWorldUpdates) {
-      auto decoded = DataStreamBuffer::deserialize<WorldChunks>(std::move(p.second));
+      auto decoded = DataStreamBuffer::deserialize<WorldChunks>(p.second.span());
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       m_newCustomWorldUpdates[p.first].merge(*decoded, true);

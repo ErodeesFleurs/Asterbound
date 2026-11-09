@@ -1201,7 +1201,7 @@ TEST(NetElements, MapFullStorePreservesPendingWireOrder) {
   // Pending set, remove, clear, set must follow the live entries unchanged.
   std::array<char, 14> const delta{2, 0, 3, 0x33, 2, 1, 7, 2, 2, 2, 0, 9, 0x19, 0};
   DataStreamBuffer pending;
-  ASSERT_TRUE(pending.writeData(delta));
+  ASSERT_TRUE(pending.write_data(delta));
   ASSERT_TRUE(pending.seek(0));
   ASSERT_TRUE(map.readNetDelta(pending, 1.0f));
   EXPECT_EQ(map.size(), 2u);
@@ -1273,7 +1273,7 @@ TEST(NetElements, MapFullStoreWriteFailuresRetainCommittedPrefix) {
 
     // A real reader commits the first set only once its value is complete.
     DataStreamBuffer input;
-    ASSERT_TRUE(input.writeData(prefix));
+    ASSERT_TRUE(input.write_data(prefix));
     ASSERT_TRUE(input.seek(0));
     NetElementMap<std::uint8_t, std::uint8_t> restored;
     restored.set(99, 99);
@@ -1314,7 +1314,7 @@ TEST(NetElements, MapDeltaWriteFailuresRetainCommittedPrefix) {
     EXPECT_TRUE(std::equal(prefix.begin(), prefix.end(), expected.begin()));
 
     DataStreamBuffer input;
-    ASSERT_TRUE(input.writeData(prefix));
+    ASSERT_TRUE(input.write_data(prefix));
     ASSERT_TRUE(input.seek(0));
     NetElementMap<std::uint8_t, std::uint8_t> restored;
     EXPECT_FALSE(restored.readNetDelta(input, 0.0f));

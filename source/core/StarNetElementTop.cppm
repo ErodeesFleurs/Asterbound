@@ -76,24 +76,24 @@ NetElementTop<BaseNetElement>::NetElementTop() requires std::default_initializab
 template <typename BaseNetElement>
 [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> NetElementTop<BaseNetElement>::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   if (fromVersion == 0) {
     { auto result = ds.write<bool>(true); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = BaseNetElement::netStore(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
-    return std::pair<ByteArray, std::uint64_t>{ds.takeData(), m_netVersion.increment()};
+    return std::pair<ByteArray, std::uint64_t>{ds.take_data(), m_netVersion.increment()};
   }
   { auto result = ds.write<bool>(false); if (!result) return std::unexpected(std::move(result.error())); }
   auto written = BaseNetElement::writeNetDelta(ds, fromVersion, rules);
   if (!written) return std::unexpected(std::move(written.error()));
   if (!*written) return std::pair<ByteArray, std::uint64_t>{ByteArray(), m_netVersion.current()};
-  return std::pair<ByteArray, std::uint64_t>{ds.takeData(), m_netVersion.increment()};
+  return std::pair<ByteArray, std::uint64_t>{ds.take_data(), m_netVersion.increment()};
 }
 
 template <typename BaseNetElement>
 [[nodiscard]] std::expected<void, StarException> NetElementTop<BaseNetElement>::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
   if (data.empty()) return BaseNetElement::blankNetDelta(interpolationTime);
   DataStreamBuffer ds(std::move(data));
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto full = ds.read<bool>();
   if (!full) return std::unexpected(std::move(full.error()));
   if (*full) return BaseNetElement::netLoad(ds, rules);

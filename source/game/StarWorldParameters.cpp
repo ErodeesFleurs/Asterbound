@@ -242,7 +242,7 @@ std::expected<void, StarException> VisitableWorldParameters::write(DataStream& d
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.writeContainer<WeatherPool::ItemsList>(weatherPool.items());
+    auto result = ds.write_container<WeatherPool::ItemsList>(weatherPool.items());
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
@@ -679,7 +679,7 @@ std::expected<void, StarException> TerrestrialWorldParameters::read(DataStream& 
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.readContainer(undergroundLayers, readTerrestrialLayer);
+    auto result = ds.read_container(undergroundLayers, readTerrestrialLayer);
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
@@ -853,7 +853,7 @@ std::expected<void, StarException> TerrestrialWorldParameters::write(DataStream&
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.writeContainer(undergroundLayers, writeTerrestrialLayer);
+    auto result = ds.write_container(undergroundLayers, writeTerrestrialLayer);
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
@@ -1167,7 +1167,7 @@ std::expected<ByteArray, StarException> netStoreVisitableWorldParameters(std::sh
   if (!type) return std::unexpected(std::move(type.error()));
   auto written = parameters->write(ds);
   if (!written) return std::unexpected(std::move(written.error()));
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> netLoadVisitableWorldParameters(ByteArray data) {

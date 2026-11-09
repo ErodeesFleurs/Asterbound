@@ -105,7 +105,11 @@ template <typename Signal>
   if (numToWrite == 0)
     return false;
 
-  { auto result = ds.writeVlqU(numToWrite); if (!result) return std::unexpected(std::move(result.error())); }
+  {
+    auto result = ds.write_vlq_u(numToWrite);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
 
   for (auto const& p : m_signals) {
     if (p.version >= fromVersion)
@@ -118,7 +122,7 @@ template <typename Signal>
 template <typename Signal>
 [[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
   if (!checkWithRules(rules)) return {};
-  auto count = ds.readVlqU();
+  auto count = ds.read_vlq_u();
   if (!count) return std::unexpected(std::move(count.error()));
   std::size_t numToRead = *count;
   for (std::size_t i = 0; i < numToRead; ++i) {

@@ -695,7 +695,7 @@ TEST(VectorCompatibility, SerializationKeepsCoordinateBytesAndFollowingSentinel)
   using V = Vector<std::uint16_t, 3>;
   V const source(0x1234, 0xabcd, 0x00ef);
   DataStreamBuffer stream;
-  stream.setByteOrder(ByteOrder::BigEndian);
+  stream.set_byte_order(ByteOrder::BigEndian);
   ASSERT_TRUE(stream << source);
   ASSERT_TRUE(stream << std::uint8_t(0x7e));
   EXPECT_EQ(stream.data(), ByteArray({"\x12\x34\xab\xcd\x00\xef\x7e", 7}));

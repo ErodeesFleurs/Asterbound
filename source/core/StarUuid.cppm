@@ -27,6 +27,7 @@ public:
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Uuid& uuid);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Uuid const& uuid);
   friend struct hash<Uuid>;
+  friend std::expected<Uuid, StarException> DataStream::read<Uuid>();
 
   // An explicitly unfilled identity for wire staging, never identity generation.
   static Uuid nil() { return Uuid(NilTag{}); }

@@ -382,14 +382,14 @@ TEST(JsonRpcTest, RemoteFailureStillFulfillsNull) {
   ASSERT_TRUE(request);
   DataStreamBuffer requestBuffer(std::move(*request));
   List<Json> requests;
-  ASSERT_TRUE(requestBuffer.readContainer(requests));
+  ASSERT_TRUE(requestBuffer.read_container(requests));
   ASSERT_EQ(requests.size(), 1u);
   EXPECT_EQ(requests[0].getString("handler"), "remote");
   auto id = requests[0].get("id");
   ASSERT_TRUE(id);
   DataStreamBuffer failBuffer;
-  ASSERT_TRUE(failBuffer.writeContainer(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}}));
-  ASSERT_TRUE(sender.receive(failBuffer.takeData()));
+  ASSERT_TRUE(failBuffer.write_container(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}}));
+  ASSERT_TRUE(sender.receive(failBuffer.take_data()));
   EXPECT_EQ(response->finished(), true);
   EXPECT_EQ(response->succeeded(), true);
   EXPECT_EQ(response->failed(), false);

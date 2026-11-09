@@ -142,7 +142,7 @@ template <typename S> void expect_hash_result_policy() {
 
 template <typename S> void expect_set_wire_prefix() {
   S decoded{std::uint8_t(0x7f)};
-  auto read = DataStreamBuffer::deserialize(decoded, ByteArray({"\x04\x10\x10\x20", 4}));
+  auto read = DataStreamBuffer::deserialize(decoded, std::span<char const>("\x04\x10\x10\x20", 4));
   ASSERT_FALSE(read);
   ASSERT_EQ(decoded.size(), 2u);
   EXPECT_TRUE(decoded.contains(0x10));

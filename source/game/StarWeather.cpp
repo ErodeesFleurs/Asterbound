@@ -283,7 +283,7 @@ void ServerWeather::forceWeather(bool force) {
 }
 
 std::expected<void, StarException> ServerWeather::setNetStates() {
-  auto serialized = DataStreamBuffer::serializeContainer(m_weatherPool.items());
+  auto serialized = DataStreamBuffer::serialize_container(m_weatherPool.items());
   if (!serialized) return std::unexpected(std::move(serialized.error()));
   m_weatherPoolNetState.set(std::move(*serialized));
   m_undergroundLevelNetState.set(m_undergroundLevel);
@@ -530,7 +530,7 @@ std::optional<String> ClientWeather::weatherParallax() const {
 
 std::expected<void, StarException> ClientWeather::getNetStates() {
   if (m_weatherPoolNetState.pullUpdated()) {
-    auto items = DataStreamBuffer::deserializeContainer<WeatherPool::ItemsList>(m_weatherPoolNetState.get());
+    auto items = DataStreamBuffer::deserialize_container<WeatherPool::ItemsList>(m_weatherPoolNetState.get().span());
     if (!items) return std::unexpected(std::move(items.error()));
     m_weatherPool = WeatherPool(std::move(*items));
   }

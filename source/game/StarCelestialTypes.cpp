@@ -42,20 +42,21 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   decoded.planetParameters = std::move(*parameters);
-  auto satellites = ds.readMapContainer(decoded.satelliteParameters,
-      [](DataStream& stream, int& orbit, CelestialParameters& parameters) -> std::expected<void, StarException> {
-        auto readOrbit = stream.read(orbit);
-        if (!readOrbit)
-          return std::unexpected(std::move(readOrbit.error()));
-        auto bytes = stream.read<ByteArray>();
-        if (!bytes)
-          return std::unexpected(std::move(bytes.error()));
-        auto decoded = CelestialParameters::create(std::move(*bytes));
-        if (!decoded)
-          return std::unexpected(std::move(decoded.error()));
-        parameters = std::move(*decoded);
-        return {};
-      });
+  auto satellites = ds.read_map_container(
+    decoded.satelliteParameters,
+    [](DataStream& stream, int& orbit, CelestialParameters& parameters) -> std::expected<void, StarException> {
+      auto readOrbit = stream.read(orbit);
+      if (!readOrbit)
+        return std::unexpected(std::move(readOrbit.error()));
+      auto bytes = stream.read<ByteArray>();
+      if (!bytes)
+        return std::unexpected(std::move(bytes.error()));
+      auto decoded = CelestialParameters::create(std::move(*bytes));
+      if (!decoded)
+        return std::unexpected(std::move(decoded.error()));
+      parameters = std::move(*decoded);
+      return {};
+    });
   if (!satellites)
     return std::unexpected(std::move(satellites.error()));
   planet = std::move(decoded);
@@ -69,16 +70,17 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto parameters = ds.write(*bytes);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  auto satellites = ds.writeMapContainer(planet.satelliteParameters,
-      [](DataStream& stream, int orbit, CelestialParameters const& parameters) -> std::expected<void, StarException> {
-        auto writtenOrbit = stream.write(orbit);
-        if (!writtenOrbit)
-          return std::unexpected(std::move(writtenOrbit.error()));
-        auto bytes = parameters.netStore();
-        if (!bytes)
-          return std::unexpected(std::move(bytes.error()));
-        return stream.write(*bytes);
-      });
+  auto satellites = ds.write_map_container(
+    planet.satelliteParameters,
+    [](DataStream& stream, int orbit, CelestialParameters const& parameters) -> std::expected<void, StarException> {
+      auto writtenOrbit = stream.write(orbit);
+      if (!writtenOrbit)
+        return std::unexpected(std::move(writtenOrbit.error()));
+      auto bytes = parameters.netStore();
+      if (!bytes)
+        return std::unexpected(std::move(bytes.error()));
+      return stream.write(*bytes);
+    });
   if (!satellites)
     return std::unexpected(std::move(satellites.error()));
   return std::ref(ds);
@@ -253,20 +255,21 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto prefix = ds >> decoded.chunkIndex >> decoded.constellations;
   if (!prefix)
     return std::unexpected(std::move(prefix.error()));
-  auto systems = ds.readMapContainer(decoded.systemParameters,
-      [](DataStream& stream, Vec3I& location, CelestialParameters& parameters) -> std::expected<void, StarException> {
-        auto readLocation = stream.read(location);
-        if (!readLocation)
-          return std::unexpected(std::move(readLocation.error()));
-        auto bytes = stream.read<ByteArray>();
-        if (!bytes)
-          return std::unexpected(std::move(bytes.error()));
-        auto decoded = CelestialParameters::create(std::move(*bytes));
-        if (!decoded)
-          return std::unexpected(std::move(decoded.error()));
-        parameters = std::move(*decoded);
-        return {};
-      });
+  auto systems = ds.read_map_container(
+    decoded.systemParameters,
+    [](DataStream& stream, Vec3I& location, CelestialParameters& parameters) -> std::expected<void, StarException> {
+      auto readLocation = stream.read(location);
+      if (!readLocation)
+        return std::unexpected(std::move(readLocation.error()));
+      auto bytes = stream.read<ByteArray>();
+      if (!bytes)
+        return std::unexpected(std::move(bytes.error()));
+      auto decoded = CelestialParameters::create(std::move(*bytes));
+      if (!decoded)
+        return std::unexpected(std::move(decoded.error()));
+      parameters = std::move(*decoded);
+      return {};
+    });
   if (!systems)
     return std::unexpected(std::move(systems.error()));
   auto objects = ds.read(decoded.systemObjects);
@@ -280,16 +283,18 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto prefix = ds << chunk.chunkIndex << chunk.constellations;
   if (!prefix)
     return std::unexpected(std::move(prefix.error()));
-  auto systems = ds.writeMapContainer(chunk.systemParameters,
-      [](DataStream& stream, Vec3I const& location, CelestialParameters const& parameters) -> std::expected<void, StarException> {
-        auto writtenLocation = stream.write(location);
-        if (!writtenLocation)
-          return std::unexpected(std::move(writtenLocation.error()));
-        auto bytes = parameters.netStore();
-        if (!bytes)
-          return std::unexpected(std::move(bytes.error()));
-        return stream.write(*bytes);
-      });
+  auto systems =
+    ds.write_map_container(chunk.systemParameters,
+                           [](DataStream& stream, Vec3I const& location,
+                              CelestialParameters const& parameters) -> std::expected<void, StarException> {
+                             auto writtenLocation = stream.write(location);
+                             if (!writtenLocation)
+                               return std::unexpected(std::move(writtenLocation.error()));
+                             auto bytes = parameters.netStore();
+                             if (!bytes)
+                               return std::unexpected(std::move(bytes.error()));
+                             return stream.write(*bytes);
+                           });
   if (!systems)
     return std::unexpected(std::move(systems.error()));
   return ds << chunk.systemObjects;

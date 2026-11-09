@@ -97,7 +97,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   auto text = ds.read(receivedMessage.text);
   if (!text) return std::unexpected(std::move(text.error()));
-  if (ds.streamCompatibilityVersion() >= 5) {
+  if (ds.stream_compatibility_version() >= 5) {
     auto data = ds.read(receivedMessage.data);
     if (!data) return std::unexpected(std::move(data.error()));
   }
@@ -115,7 +115,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   auto text = ds.write(receivedMessage.text);
   if (!text) return std::unexpected(std::move(text.error()));
-  if (ds.streamCompatibilityVersion() >= 5) {
+  if (ds.stream_compatibility_version() >= 5) {
     auto data = ds.write(receivedMessage.data);
     if (!data) return std::unexpected(std::move(data.error()));
   }

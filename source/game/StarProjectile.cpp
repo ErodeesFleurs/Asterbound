@@ -141,7 +141,9 @@ if (!result667) return std::unexpected(std::move(result667.error()));
   return {};
 }
 
-std::expected<std::shared_ptr<Projectile>, StarException> Projectile::create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, DataStreamBuffer& data, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<Projectile>, StarException>
+Projectile::create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, DataStream& data,
+                   NetCompatibilityRules rules) {
   struct MakeShared final : Projectile {
     explicit MakeShared(Root& root) : Entity(root), Projectile(root) {}
   };
@@ -151,14 +153,15 @@ std::expected<std::shared_ptr<Projectile>, StarException> Projectile::create(Roo
   return entity;
 }
 
-std::expected<void, StarException> Projectile::initialize(std::shared_ptr<ProjectileConfig> const& config, DataStreamBuffer& data, NetCompatibilityRules) {
+std::expected<void, StarException> Projectile::initialize(std::shared_ptr<ProjectileConfig> const& config,
+                                                          DataStream& data, NetCompatibilityRules) {
   m_config = config;
   auto result660 = data.read(m_parameters);
 if (!result660) return std::unexpected(std::move(result660.error()));
   auto result661 = setup();
 if (!result661) return std::unexpected(std::move(result661.error()));
 
-  auto result662 = data.readVlqI();
+auto result662 = data.read_vlq_i();
 if (!result662) return std::unexpected(std::move(result662.error()));
 EntityId sourceEntity = std::move(*result662);
   auto result663 = data.read<bool>();
@@ -178,7 +181,7 @@ setTeam(std::move(*result666));
 
 std::expected<ByteArray, StarException> Projectile::netStore(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
 
   auto result977 = ds.write(m_config->typeName);
 if (!result977) return std::unexpected(std::move(result977.error()));
@@ -197,7 +200,7 @@ if (!result982) return std::unexpected(std::move(result982.error()));
   auto result983 = ds.write(getTeam());
 if (!result983) return std::unexpected(std::move(result983.error()));
 
-  return ds.takeData();
+return ds.take_data();
 }
 
 EntityType Projectile::entityType() const {

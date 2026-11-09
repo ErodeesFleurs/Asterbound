@@ -92,13 +92,17 @@ std::expected<std::shared_ptr<IODevice>, StarException> DirectoryAssetSource::op
 }
 
 std::expected<ByteArray, StarException> DirectoryAssetSource::read(String const& path) {
-  auto device = open(path);
-  if (!device)
-    return std::unexpected(std::move(device.error()));
-  auto size = (*device)->size();
+  auto filesystem = toFilesystem(path);
+  if (!filesystem)
+    return std::unexpected(std::move(filesystem.error()));
+  File file(std::move(*filesystem));
+  auto opened = file.open(IOMode::Read);
+  if (!opened)
+    return std::unexpected(std::move(opened.error()));
+  auto size = file.size();
   if (!size)
     return std::unexpected(std::move(size.error()));
-  return (*device)->read_bytes(*size);
+  return file.read_bytes(*size);
 }
 
 std::expected<String, StarException> DirectoryAssetSource::toFilesystem(String const& path) const {

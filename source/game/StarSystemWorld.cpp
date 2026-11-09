@@ -893,8 +893,8 @@ std::expected<ByteArray, StarException> SystemObject::netStore() const {
   auto field3 = ds.write(m_parameters);
   if (!field3)
     return std::unexpected(std::move(field3.error()));
-  
-  return ds.takeData();
+
+  return ds.take_data();
 }
 
 std::expected<Json, StarException> SystemObject::diskStore() const {
@@ -1088,8 +1088,8 @@ std::expected<ByteArray, StarException> SystemClientShip::netStore() const {
   auto field1 = ds.write(m_systemLocation.get());
   if (!field1)
     return std::unexpected(std::move(field1.error()));
-  
-  return ds.takeData();
+
+  return ds.take_data();
 }
 
 void SystemClientShip::setPosition(Vec2F const& position) {

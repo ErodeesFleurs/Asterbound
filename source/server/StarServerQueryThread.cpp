@@ -53,12 +53,12 @@ ServerQueryThread::ServerQueryThread(UniverseServer& universe, std::unique_ptr<U
       m_serverPort(0), m_maxPlayers(maxPlayers), m_serverName(std::move(serverName)),
       m_lastChallengeCheck(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_lastPlayersResponse(), m_lastRulesResponse(),
       m_lastActiveTime() {
-  m_playersResponse.setByteOrder(ByteOrder::LittleEndian);
-  m_playersResponse.setNullTerminatedStrings(true);
-  m_rulesResponse.setByteOrder(ByteOrder::LittleEndian);
-  m_rulesResponse.setNullTerminatedStrings(true);
-  m_generalResponse.setByteOrder(ByteOrder::LittleEndian);
-  m_generalResponse.setNullTerminatedStrings(true);
+  m_playersResponse.set_byte_order(ByteOrder::LittleEndian);
+  m_playersResponse.set_null_terminated_strings(true);
+  m_rulesResponse.set_byte_order(ByteOrder::LittleEndian);
+  m_rulesResponse.set_null_terminated_strings(true);
+  m_generalResponse.set_byte_order(ByteOrder::LittleEndian);
+  m_generalResponse.set_null_terminated_strings(true);
 }
 
 ServerQueryThread::~ServerQueryThread() {

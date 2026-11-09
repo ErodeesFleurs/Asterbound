@@ -697,8 +697,8 @@ std::expected<std::shared_ptr<Player>, StarException> Player::create(Root& rootO
 }
 
 std::expected<void, StarException> Player::netLoad(ByteArray const& netStore, NetCompatibilityRules rules) {
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(netStore.span());
+  ds.set_stream_compatibility_version(rules);
   auto idResult = ds.read<String>();
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
@@ -4688,7 +4688,7 @@ std::expected<Json, StarException> Player::diskStore() {
 
 std::expected<ByteArray, StarException> Player::netStore(NetCompatibilityRules rules) {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto id = uniqueId();
   if (!id)
     return std::unexpected(PlayerException("Player has no unique id"));
@@ -4704,7 +4704,7 @@ std::expected<ByteArray, StarException> Player::netStore(NetCompatibilityRules r
     if (auto result = ds.write(m_humanoidParameters); !result)
       return std::unexpected(std::move(result.error()));
   }
-  return ds.takeData();
+  return ds.take_data();
 }
 
 std::expected<void, StarException> Player::finalizeCreation() {
@@ -5078,11 +5078,11 @@ const String secretProprefix = std::string("\0JsonProperty\0", sizeof("\0JsonPro
 std::optional<StringView> Player::getSecretPropertyView(String const& name) const {
   if (auto tag = m_effectsAnimator->globalTag(secretProprefix + name)) {
     auto const& view = tag->get().utf8();
-    DataStreamExternalBuffer buffer{std::span<char const>(view)};
+    DataStreamReader buffer{std::span<char const>(view)};
     auto type = buffer.read<std::uint8_t>();
     if (!type || static_cast<Json::Type>(*type - 1) != Json::Type::String)
       return {};
-    auto len = buffer.readVlqU();
+    auto len = buffer.read_vlq_u();
     if (!len)
       return {};
     auto pos = buffer.pos();
@@ -5100,7 +5100,7 @@ std::optional<std::reference_wrapper<String const>> Player::getSecretPropertyRef
 
 std::expected<Json, StarException> Player::getSecretProperty(String const& name, Json defaultValue) const {
   if (auto tag = m_effectsAnimator->globalTag(secretProprefix + name)) {
-    DataStreamExternalBuffer buffer{std::span<char const>(tag->get().utf8())};
+    DataStreamReader buffer{std::span<char const>(tag->get().utf8())};
     auto value = buffer.read<Json>();
     if (value)
       return std::move(*value);

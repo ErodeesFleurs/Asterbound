@@ -148,11 +148,11 @@ openSnapshotTransport(Root& root, NetCompatibilityRules rules) {
 
 std::expected<ByteArray, StarException> snapshotPacketBytes(Packet const& packet, NetCompatibilityRules rules) {
   DataStreamBuffer buffer;
-  buffer.setStreamCompatibilityVersion(rules);
+  buffer.set_stream_compatibility_version(rules);
   auto written = packet.write(buffer, rules);
   if (!written)
     return std::unexpected(std::move(written.error()));
-  return buffer.takeData();
+  return buffer.take_data();
 }
 
 bool snapshotFieldsEqual(std::shared_ptr<Packet> const& before, std::shared_ptr<Packet> const& after, bool sameBytes) {

@@ -197,7 +197,8 @@ std::expected<Json, StarException> TileDamageParameters::toJson() const {
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamageParameters& tileDamage) {
-  if (auto r = ds.readMapContainer(tileDamage.m_damages); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.read_map_container(tileDamage.m_damages); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = ds.read(tileDamage.m_damageRecoveryPerSecond); !r) return std::unexpected(std::move(r.error()));
   if (auto r = ds.read(tileDamage.m_requiredHarvestLevel); !r) return std::unexpected(std::move(r.error()));
   if (auto r = ds.read(tileDamage.m_maximumEffectTime); !r) return std::unexpected(std::move(r.error()));
@@ -206,7 +207,8 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamageParameters const& tileDamage) {
-  if (auto r = ds.writeMapContainer(tileDamage.m_damages); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.write_map_container(tileDamage.m_damages); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = ds.write(tileDamage.m_damageRecoveryPerSecond); !r) return std::unexpected(std::move(r.error()));
   if (auto r = ds.write(tileDamage.m_requiredHarvestLevel); !r) return std::unexpected(std::move(r.error()));
   if (auto r = ds.write(tileDamage.m_maximumEffectTime); !r) return std::unexpected(std::move(r.error()));

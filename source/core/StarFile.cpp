@@ -256,13 +256,14 @@ std::expected<String, StarException> File::read_file_string(String const& filena
 }
 
 std::expected<void, StarException> File::write_file(std::span<char const> data, String const& filename) {
-  auto file = File::open(filename, IOMode::Write | IOMode::Truncate);
-  if (!file)
-    return std::unexpected(std::move(file.error()));
-  auto written = (*file)->write_full(data);
+  File file(filename);
+  auto opened = file.open(IOMode::Write | IOMode::Truncate);
+  if (!opened)
+    return std::unexpected(std::move(opened.error()));
+  auto written = file.write_full(data);
   if (!written)
     return std::unexpected(std::move(written.error()));
-  return (*file)->close();
+  return file.close();
 }
 
 std::expected<void, StarException> File::write_file(ByteArray const& data, String const& filename) {

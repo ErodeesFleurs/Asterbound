@@ -101,7 +101,6 @@ public:
 
   [[nodiscard]] std::expected<ByteArray, StarException> read_bytes_absolute(StreamOffset readPosition,
                                                                             std::size_t size);
-  [[nodiscard]] std::expected<void, StarException> write_bytes_absolute(StreamOffset writePosition, ByteArray const& p);
 
 protected:
   void set_mode(IOMode mode);

@@ -224,9 +224,9 @@ if (!result349) return std::unexpected(std::move(result349.error()));
   auto result350 = m_netGroup.addNetElement(m_spawnedDrops);
 if (!result350) return std::unexpected(std::move(result350.error()));
 
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
-  auto stream351 = (ds >> m_time);
+DataStreamReader ds(netStore.span());
+ds.set_stream_compatibility_version(rules);
+auto stream351 = (ds >> m_time);
 if (!stream351) return std::unexpected(std::move(stream351.error()));
   auto stream352 = (ds >> m_master);
 if (!stream352) return std::unexpected(std::move(stream352.error()));
@@ -238,20 +238,25 @@ if (!stream354) return std::unexpected(std::move(stream354.error()));
 if (!stream355) return std::unexpected(std::move(stream355.error()));
   auto stream356 = (ds >> m_rotationRate);
 if (!stream356) return std::unexpected(std::move(stream356.error()));
-  auto result357 = ds.readContainer(m_pieces,
-      [](DataStream& ds, PlantDropPiece& piece)  -> std::expected<void, StarException> {
-        auto result275 = ds.read(piece.image);
-if (!result275) return std::unexpected(std::move(result275.error()));
-        auto result276 = ds.read(piece.offset[0]);
-if (!result276) return std::unexpected(std::move(result276.error()));
-        auto result277 = ds.read(piece.offset[1]);
-if (!result277) return std::unexpected(std::move(result277.error()));
-        auto result278 = ds.read(piece.flip);
-if (!result278) return std::unexpected(std::move(result278.error()));
-        auto result279 = ds.read(piece.kind);
-if (!result279) return std::unexpected(std::move(result279.error()));
-        return {};
-});
+auto result357 =
+  ds.read_container(m_pieces, [](DataStream& ds, PlantDropPiece& piece) -> std::expected<void, StarException> {
+    auto result275 = ds.read(piece.image);
+    if (!result275)
+      return std::unexpected(std::move(result275.error()));
+    auto result276 = ds.read(piece.offset[0]);
+    if (!result276)
+      return std::unexpected(std::move(result276.error()));
+    auto result277 = ds.read(piece.offset[1]);
+    if (!result277)
+      return std::unexpected(std::move(result277.error()));
+    auto result278 = ds.read(piece.flip);
+    if (!result278)
+      return std::unexpected(std::move(result278.error()));
+    auto result279 = ds.read(piece.kind);
+    if (!result279)
+      return std::unexpected(std::move(result279.error()));
+    return {};
+  });
 if (!result357) return std::unexpected(std::move(result357.error()));
   auto stream358 = (ds >> m_stemConfig);
 if (!stream358) return std::unexpected(std::move(stream358.error()));
@@ -279,20 +284,25 @@ if (!stream342) return std::unexpected(std::move(stream342.error()));
 if (!stream343) return std::unexpected(std::move(stream343.error()));
   auto stream344 = (ds << m_rotationRate);
 if (!stream344) return std::unexpected(std::move(stream344.error()));
-  auto result345 = ds.writeContainer(m_pieces,
-      [](DataStream& ds, PlantDropPiece const& piece)  -> std::expected<void, StarException> {
-        auto result270 = ds.write(piece.image);
-if (!result270) return std::unexpected(std::move(result270.error()));
-        auto result271 = ds.write(piece.offset[0]);
-if (!result271) return std::unexpected(std::move(result271.error()));
-        auto result272 = ds.write(piece.offset[1]);
-if (!result272) return std::unexpected(std::move(result272.error()));
-        auto result273 = ds.write(piece.flip);
-if (!result273) return std::unexpected(std::move(result273.error()));
-        auto result274 = ds.write(piece.kind);
-if (!result274) return std::unexpected(std::move(result274.error()));
-        return {};
-});
+auto result345 =
+  ds.write_container(m_pieces, [](DataStream& ds, PlantDropPiece const& piece) -> std::expected<void, StarException> {
+    auto result270 = ds.write(piece.image);
+    if (!result270)
+      return std::unexpected(std::move(result270.error()));
+    auto result271 = ds.write(piece.offset[0]);
+    if (!result271)
+      return std::unexpected(std::move(result271.error()));
+    auto result272 = ds.write(piece.offset[1]);
+    if (!result272)
+      return std::unexpected(std::move(result272.error()));
+    auto result273 = ds.write(piece.flip);
+    if (!result273)
+      return std::unexpected(std::move(result273.error()));
+    auto result274 = ds.write(piece.kind);
+    if (!result274)
+      return std::unexpected(std::move(result274.error()));
+    return {};
+  });
 if (!result345) return std::unexpected(std::move(result345.error()));
   auto stream346 = (ds << m_stemConfig);
 if (!stream346) return std::unexpected(std::move(stream346.error()));
@@ -301,7 +311,7 @@ if (!stream347) return std::unexpected(std::move(stream347.error()));
   auto stream348 = (ds << m_saplingConfig);
 if (!stream348) return std::unexpected(std::move(stream348.error()));
 
-  return ds.takeData();
+return ds.take_data();
 }
 
 EntityType PlantDrop::entityType() const {

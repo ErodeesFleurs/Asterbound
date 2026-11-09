@@ -60,7 +60,7 @@ std::expected<void, StarException> writeImagePatchFixture(GameTest& fixture, Str
   auto encoded = image.writePng(fixture.root().logger(), buffer);
   if (!encoded)
     return std::unexpected(std::move(encoded.error()));
-  written = File::write_file(buffer->takeData(), File::relative_to(directory, "target.png"));
+  written = File::write_file(buffer->take_data(), File::relative_to(directory, "target.png"));
   if (!written)
     return std::unexpected(std::move(written.error()));
   written = File::write_file(patch, File::relative_to(directory, "target.png.patch.lua"));

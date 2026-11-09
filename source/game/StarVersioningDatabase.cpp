@@ -79,13 +79,13 @@ std::expected<VersionedJson, StarException> VersionedJson::read_file(String cons
 std::expected<void, StarException> VersionedJson::write_file(VersionedJson const& versionedJson,
                                                              String const& filename) {
   DataStreamBuffer ds;
-  auto magic = ds.writeData(std::span<char const>(Magic));
+  auto magic = ds.write_data(std::span<char const>(Magic));
   if (!magic) return std::unexpected(std::move(magic.error()));
   auto written = ds.write(versionedJson);
   if (!written) return std::unexpected(std::move(written.error()));
   auto subVersions = writeSubVersioning(ds, versionedJson);
   if (!subVersions) return std::unexpected(std::move(subVersions.error()));
-  return File::overwrite_file_with_rename(ds.takeData(), filename);
+  return File::overwrite_file_with_rename(ds.take_data(), filename);
 }
 std::expected<void, StarException> VersionedJson::writeSubVersioning(DataStream& ds, VersionedJson const& versionedJson) {
   auto version = ds.write(SubVersioning);

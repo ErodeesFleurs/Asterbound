@@ -133,8 +133,8 @@ std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String
 }
 
 std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::netLoadProjectile(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(netStore.span());
+  ds.set_stream_compatibility_version(rules);
   auto typeName = ds.read<String>();
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   auto config = m_configs.find_ref(*typeName);

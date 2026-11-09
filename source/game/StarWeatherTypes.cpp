@@ -154,20 +154,24 @@ std::expected<Json, StarException> WeatherType::toJson() const {
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WeatherType& weatherType) {
   auto name = ds.read(weatherType.name);
   if (!name) return std::unexpected(std::move(name.error()));
-  auto particles = ds.readContainer(weatherType.particles,
-      [](DataStream& ds, WeatherType::ParticleConfig& config) -> std::expected<void, StarException> {
-        auto result = ds >> config.particle >> config.density >> config.autoRotate;
-        if (!result) return std::unexpected(std::move(result.error()));
-        return {};
-      });
+  auto particles =
+    ds.read_container(weatherType.particles,
+                      [](DataStream& ds, WeatherType::ParticleConfig& config) -> std::expected<void, StarException> {
+                        auto result = ds >> config.particle >> config.density >> config.autoRotate;
+                        if (!result)
+                          return std::unexpected(std::move(result.error()));
+                        return {};
+                      });
   if (!particles) return std::unexpected(std::move(particles.error()));
-  auto projectiles = ds.readContainer(weatherType.projectiles,
-      [](DataStream& ds, WeatherType::ProjectileConfig& config) -> std::expected<void, StarException> {
-        auto result = ds >> config.projectile >> config.parameters >> config.velocity >> config.ratePerX
-            >> config.spawnAboveRegion >> config.spawnHorizontalPad >> config.windAffectAmount;
-        if (!result) return std::unexpected(std::move(result.error()));
-        return {};
-      });
+  auto projectiles =
+    ds.read_container(weatherType.projectiles,
+                      [](DataStream& ds, WeatherType::ProjectileConfig& config) -> std::expected<void, StarException> {
+                        auto result = ds >> config.projectile >> config.parameters >> config.velocity >> config.ratePerX
+                          >> config.spawnAboveRegion >> config.spawnHorizontalPad >> config.windAffectAmount;
+                        if (!result)
+                          return std::unexpected(std::move(result.error()));
+                        return {};
+                      });
   if (!projectiles) return std::unexpected(std::move(projectiles.error()));
   auto result = ds >> weatherType.maximumWind >> weatherType.duration >> weatherType.weatherNoises >> weatherType.statusEffects;
   if (!result) return std::unexpected(std::move(result.error()));
@@ -177,20 +181,24 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WeatherType const& weatherType) {
   auto name = ds.write(weatherType.name);
   if (!name) return std::unexpected(std::move(name.error()));
-  auto particles = ds.writeContainer(weatherType.particles,
-      [](DataStream& ds, WeatherType::ParticleConfig const& config) -> std::expected<void, StarException> {
-        auto result = ds << config.particle << config.density << config.autoRotate;
-        if (!result) return std::unexpected(std::move(result.error()));
-        return {};
-      });
+  auto particles = ds.write_container(
+    weatherType.particles,
+    [](DataStream& ds, WeatherType::ParticleConfig const& config) -> std::expected<void, StarException> {
+      auto result = ds << config.particle << config.density << config.autoRotate;
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return {};
+    });
   if (!particles) return std::unexpected(std::move(particles.error()));
-  auto projectiles = ds.writeContainer(weatherType.projectiles,
-      [](DataStream& ds, WeatherType::ProjectileConfig const& config) -> std::expected<void, StarException> {
-        auto result = ds << config.projectile << config.parameters << config.velocity << config.ratePerX
-            << config.spawnAboveRegion << config.spawnHorizontalPad << config.windAffectAmount;
-        if (!result) return std::unexpected(std::move(result.error()));
-        return {};
-      });
+  auto projectiles = ds.write_container(
+    weatherType.projectiles,
+    [](DataStream& ds, WeatherType::ProjectileConfig const& config) -> std::expected<void, StarException> {
+      auto result = ds << config.projectile << config.parameters << config.velocity << config.ratePerX
+                       << config.spawnAboveRegion << config.spawnHorizontalPad << config.windAffectAmount;
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      return {};
+    });
   if (!projectiles) return std::unexpected(std::move(projectiles.error()));
   auto result = ds << weatherType.maximumWind << weatherType.duration << weatherType.weatherNoises << weatherType.statusEffects;
   if (!result) return std::unexpected(std::move(result.error()));

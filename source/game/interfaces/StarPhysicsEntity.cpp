@@ -103,7 +103,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto id = ds.read(decoded.physicsEntityId);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  auto index = ds.readVlqS(decoded.collisionIndex);
+  auto index = ds.read_vlq_s(decoded.collisionIndex);
   if (!index)
     return std::unexpected(std::move(index.error()));
   mci = decoded;
@@ -114,7 +114,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto id = ds.write(mci.physicsEntityId);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  auto index = ds.writeVlqS(mci.collisionIndex);
+  auto index = ds.write_vlq_s(mci.collisionIndex);
   if (!index)
     return std::unexpected(std::move(index.error()));
   return std::ref(ds);

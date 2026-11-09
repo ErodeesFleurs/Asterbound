@@ -428,7 +428,7 @@ TEST(IdMapTest, FullWidthSignedAndUnsignedEndpointsWrapSafely) {
 
     DataStreamBuffer stream;
     Map<Id, std::uint8_t> entries{{min_id, 7}};
-    ASSERT_TRUE(stream.writeMapContainer(entries));
+    ASSERT_TRUE(stream.write_map_container(entries));
     ASSERT_TRUE(stream.write(min_id));
     ASSERT_TRUE(stream.write(max_id));
     ASSERT_TRUE(stream.write(max_id));
@@ -491,7 +491,7 @@ TEST(IdMapTest, MalformedDecodeRetainsExistingEntriesRangeAndCursor) {
                             ByteArray({"\x01\x01\x11\x01", 4}), ByteArray({"\x01\x01\x11\x01\x03", 5}),
                             ByteArray({"\x01\x01\x11\x03\x03\x03", 6}), ByteArray({"\x01\x01\x11\x03\x01\x03", 6}),
                             ByteArray({"\x01\x01\x11\x01\x03\x00", 6}), ByteArray({"\x01\x01\x11\x01\x03\x04", 6})}) {
-    auto read = DataStreamBuffer::deserialize(*created, bytes);
+    auto read = DataStreamBuffer::deserialize(*created, bytes.span());
     EXPECT_FALSE(read);
     auto retained = DataStreamBuffer::serialize(*created);
     ASSERT_TRUE(retained);

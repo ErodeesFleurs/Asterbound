@@ -153,6 +153,7 @@ let
     "core_benchmarks"
     "json_benchmarks"
     "file_benchmarks"
+    "io_benchmarks"
     "array_benchmarks"
     "hash_benchmarks"
     "list_benchmarks"

@@ -787,7 +787,7 @@ return JsonObject{
 
 std::expected<ByteArray, StarException> Plant::netStore(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
-  ds.setStreamCompatibilityVersion(rules);
+  ds.set_stream_compatibility_version(rules);
   auto result638 = ds.viwrite(m_tilePosition[0]);
 if (!result638) return std::unexpected(std::move(result638.error()));
   auto result639 = ds.viwrite(m_tilePosition[1]);
@@ -815,7 +815,7 @@ if (!result649) return std::unexpected(std::move(result649.error()));
 auto result650 = ds.write(std::move(*result649));
 if (!result650) return std::unexpected(std::move(result650.error()));
 
-  return ds.takeData();
+return ds.take_data();
 }
 
 std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, GrassVariant const& config, std::uint64_t seed) {
@@ -1024,8 +1024,8 @@ std::expected<void, StarException> Plant::initialize(ByteArray const& netStore, 
   m_fallsWhenDead = false;
   m_piecesUpdated = true;
 
-  DataStreamBuffer ds(netStore);
-  ds.setStreamCompatibilityVersion(rules);
+  DataStreamReader ds(netStore.span());
+  ds.set_stream_compatibility_version(rules);
   auto result392 = ds.viread(m_tilePosition[0]);
 if (!result392) return std::unexpected(std::move(result392.error()));
   auto result393 = ds.viread(m_tilePosition[1]);
@@ -1388,28 +1388,39 @@ if (!result604) return std::unexpected(std::move(result604.error()));
 std::expected<void, StarException> Plant::readPieces(ByteArray pieces) {
   if (!pieces.empty()) {
     DataStreamBuffer ds(std::move(pieces));
-    auto result600 = ds.readContainer(m_pieces, [](DataStream& ds, PlantPiece& piece)  -> std::expected<void, StarException> {
+    auto result600 =
+      ds.read_container(m_pieces, [](DataStream& ds, PlantPiece& piece) -> std::expected<void, StarException> {
         auto result383 = ds.read(piece.image);
-if (!result383) return std::unexpected(std::move(result383.error()));
+        if (!result383)
+          return std::unexpected(std::move(result383.error()));
         auto result384 = ds.read(piece.offset[0]);
-if (!result384) return std::unexpected(std::move(result384.error()));
+        if (!result384)
+          return std::unexpected(std::move(result384.error()));
         auto result385 = ds.read(piece.offset[1]);
-if (!result385) return std::unexpected(std::move(result385.error()));
+        if (!result385)
+          return std::unexpected(std::move(result385.error()));
         auto result386 = ds.read(piece.rotationType);
-if (!result386) return std::unexpected(std::move(result386.error()));
+        if (!result386)
+          return std::unexpected(std::move(result386.error()));
         auto result387 = ds.read(piece.rotationOffset);
-if (!result387) return std::unexpected(std::move(result387.error()));
+        if (!result387)
+          return std::unexpected(std::move(result387.error()));
         auto result388 = ds.read(piece.structuralSegment);
-if (!result388) return std::unexpected(std::move(result388.error()));
+        if (!result388)
+          return std::unexpected(std::move(result388.error()));
         auto result389 = ds.read(piece.kind);
-if (!result389) return std::unexpected(std::move(result389.error()));
+        if (!result389)
+          return std::unexpected(std::move(result389.error()));
         auto result390 = ds.read(piece.segmentIdx);
-if (!result390) return std::unexpected(std::move(result390.error()));
+        if (!result390)
+          return std::unexpected(std::move(result390.error()));
         auto result391 = ds.read(piece.flip);
-if (!result391) return std::unexpected(std::move(result391.error()));
+        if (!result391)
+          return std::unexpected(std::move(result391.error()));
         return {};
-});
-if (!result600) return std::unexpected(std::move(result600.error()));
+      });
+    if (!result600)
+      return std::unexpected(std::move(result600.error()));
     m_piecesScanned = false;
     if (inWorld())
       {
@@ -1421,29 +1432,40 @@ if (!result601) return std::unexpected(std::move(result601.error()));
 }
 
 std::expected<ByteArray, StarException> Plant::writePieces() const {
-  auto result599 = DataStreamBuffer::serializeContainer(m_pieces, [](DataStream& ds, PlantPiece const& piece)  -> std::expected<void, StarException> {
+  auto result599 = DataStreamBuffer::serialize_container(
+    m_pieces, [](DataStream& ds, PlantPiece const& piece) -> std::expected<void, StarException> {
       auto result374 = ds.write(piece.image);
-if (!result374) return std::unexpected(std::move(result374.error()));
+      if (!result374)
+        return std::unexpected(std::move(result374.error()));
       auto result375 = ds.write(piece.offset[0]);
-if (!result375) return std::unexpected(std::move(result375.error()));
+      if (!result375)
+        return std::unexpected(std::move(result375.error()));
       auto result376 = ds.write(piece.offset[1]);
-if (!result376) return std::unexpected(std::move(result376.error()));
+      if (!result376)
+        return std::unexpected(std::move(result376.error()));
       auto result377 = ds.write(piece.rotationType);
-if (!result377) return std::unexpected(std::move(result377.error()));
+      if (!result377)
+        return std::unexpected(std::move(result377.error()));
       auto result378 = ds.write(piece.rotationOffset);
-if (!result378) return std::unexpected(std::move(result378.error()));
+      if (!result378)
+        return std::unexpected(std::move(result378.error()));
       auto result379 = ds.write(piece.structuralSegment);
-if (!result379) return std::unexpected(std::move(result379.error()));
+      if (!result379)
+        return std::unexpected(std::move(result379.error()));
       auto result380 = ds.write(piece.kind);
-if (!result380) return std::unexpected(std::move(result380.error()));
+      if (!result380)
+        return std::unexpected(std::move(result380.error()));
       auto result381 = ds.write(piece.segmentIdx);
-if (!result381) return std::unexpected(std::move(result381.error()));
+      if (!result381)
+        return std::unexpected(std::move(result381.error()));
       auto result382 = ds.write(piece.flip);
-if (!result382) return std::unexpected(std::move(result382.error()));
+      if (!result382)
+        return std::unexpected(std::move(result382.error()));
       return {};
-});
-if (!result599) return std::unexpected(std::move(result599.error()));
-return std::move(*result599);
+    });
+  if (!result599)
+    return std::unexpected(std::move(result599.error()));
+  return std::move(*result599);
 }
 
 std::expected<void, StarException> Plant::readPiecesFromJson(Json const& pieces) {

@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
 }
 
 std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules) {
-  auto config = DataStreamBuffer::deserialize<Json>(netStore);
+  auto config = DataStreamBuffer::deserialize<Json>(netStore.span());
   if (!config)
     return std::unexpected(std::move(config.error()));
   struct MakeShared final : Stagehand {

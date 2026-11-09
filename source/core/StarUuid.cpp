@@ -82,14 +82,15 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 
 template <>
 std::expected<Uuid, StarException> DataStream::read<Uuid>() {
-  auto bytes = read_bytes(UuidSize);
-  if (!bytes)
-    return std::unexpected(std::move(bytes.error()));
-  return Uuid::create(*bytes);
+  auto uuid = Uuid::nil();
+  auto result = read_data({uuid.m_data.data(), UuidSize});
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  return uuid;
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Uuid const& uuid) {
-  auto result = ds.writeData(uuid.span());
+  auto result = ds.write_data(uuid.span());
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::ref(ds);

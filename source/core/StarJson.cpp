@@ -871,7 +871,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       auto converted = value.toInt();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      auto written = ds.writeVlqI(*converted);
+      auto written = ds.write_vlq_i(*converted);
       if (!written)
         return std::unexpected(std::move(written.error()));
       break;
@@ -889,7 +889,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       auto converted = value.arrayPtr();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      auto count = ds.writeVlqU((*converted)->size());
+      auto count = ds.write_vlq_u((*converted)->size());
       if (!count)
         return std::unexpected(std::move(count.error()));
       for (auto const& entry : **converted) {
@@ -903,7 +903,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       auto converted = value.objectPtr();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      auto count = ds.writeVlqU((*converted)->size());
+      auto count = ds.write_vlq_u((*converted)->size());
       if (!count)
         return std::unexpected(std::move(count.error()));
       for (auto const& entry : **converted) {
@@ -946,7 +946,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
       break;
     }
     case Json::Type::Int: {
-      auto item = ds.readVlqI();
+      auto item = ds.read_vlq_i();
       if (!item)
         return std::unexpected(std::move(item.error()));
       value = Json(std::move(*item));
@@ -960,7 +960,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
       break;
     }
     case Json::Type::Array: {
-      auto count = ds.readVlqU();
+      auto count = ds.read_vlq_u();
       if (!count)
         return std::unexpected(std::move(count.error()));
       JsonArray items;
@@ -974,7 +974,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
       break;
     }
     case Json::Type::Object: {
-      auto count = ds.readVlqU();
+      auto count = ds.read_vlq_u();
       if (!count)
         return std::unexpected(std::move(count.error()));
       JsonObject items;
@@ -997,28 +997,28 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, JsonArray const& value) {
-  auto result = ds.writeContainer(value);
+  auto result = ds.write_container(value);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, JsonArray& value) {
-  auto result = ds.readContainer(value);
+  auto result = ds.read_container(value);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, JsonObject const& value) {
-  auto result = ds.writeMapContainer(value);
+  auto result = ds.write_map_container(value);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, JsonObject& value) {
-  auto result = ds.readMapContainer(value);
+  auto result = ds.read_map_container(value);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::ref(ds);
