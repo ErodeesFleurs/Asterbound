@@ -3,7 +3,7 @@ import std;
 import star.optional;
 import star.format;
 import star.string;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.vector;
 import star.rect;
@@ -17,7 +17,7 @@ class PathFinder;
 
 struct Node {
   friend bool operator==(Node const& a, Node const& b);
-  friend std::ostream& operator<<(std::ostream& os, Node const& node);
+  friend void write_text(TextBuffer& buffer, Node const& node);
 
   Node withVelocity(Vec2F velocity) const;
 
@@ -38,7 +38,7 @@ struct Edge {
   Node target;
 };
 
-typedef AStar::Path<Edge> Path;
+using Path = AStar::Path<Edge>;
 
 struct Parameters {
   friend bool operator==(Parameters const& lhs, Parameters const& rhs);
@@ -107,7 +107,7 @@ inline bool operator==(Node const& a, Node const& b) {
   return a.position == b.position && a.velocity == b.velocity;
 }
 
-inline std::ostream& operator<<(std::ostream& os, Node const& node);
+inline void write_text(TextBuffer& buffer, Node const& node);
 [[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> actionName(Action action);
 [[nodiscard]] std::expected<String, StarException> printEdge(Edge const& edge);
 
@@ -115,15 +115,14 @@ inline std::ostream& operator<<(std::ostream& os, Node const& node);
 
 }
 
-// The formatter specializations have to be visible before the stream operators
-// that use them are defined below, otherwise the instantiations come first.
-template <> struct std::formatter<Star::PlatformerAStar::Node> : Star::StreamFormatter {};
+// The formatter specialization must be visible before formatting Node below.
+template <> struct std::formatter<Star::PlatformerAStar::Node> : Star::TextFormatter {};
 
 namespace Star {
 namespace PlatformerAStar {
 
-inline std::ostream& operator<<(std::ostream& os, Node const& node) {
-  return os << strf("Node{{position = {}, velocity = {}}}", node.position, outputOptional(node.velocity));
+inline void write_text(TextBuffer& buffer, Node const& node) {
+  std::format_to(std::back_inserter(buffer), "Node{{position = {}, velocity = {}}}", node.position, Star::output_optional(node.velocity));
 }
 
 inline bool Node::operator<(Node const& other) const {
@@ -173,5 +172,5 @@ export namespace Star::PlatformerAStar {
   using ::Star::PlatformerAStar::Parameters;
   using ::Star::PlatformerAStar::actionName;
   using ::Star::PlatformerAStar::printEdge;
-  using ::Star::PlatformerAStar::operator<<;
+  using ::Star::PlatformerAStar::write_text;
 }

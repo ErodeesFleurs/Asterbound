@@ -32,7 +32,7 @@ import star.celestial_parameters;
 
 namespace Star {
 
-typedef List<std::pair<Vec2I, Vec2I>> CelestialConstellation;
+using CelestialConstellation = List<std::pair<Vec2I, Vec2I>>;
 
 struct CelestialOrbitRegion {
   String regionName;
@@ -83,8 +83,8 @@ struct CelestialChunk {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialChunk& chunk);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialChunk const& chunk);
 
-typedef Either<Vec2I, Vec3I> CelestialRequest;
-typedef Either<CelestialChunk, CelestialSystemObjects> CelestialResponse;
+using CelestialRequest = Either<Vec2I, Vec3I>;
+using CelestialResponse = Either<CelestialChunk, CelestialSystemObjects>;
 
 struct CelestialBaseInformation {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialBaseInformation& value);

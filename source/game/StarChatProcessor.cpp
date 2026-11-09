@@ -26,17 +26,13 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
   lockWithDiagnostics(locker);
 
   if (nick.empty())
-    nick = strf("Player_{}", clientId);
+    nick = Star::format("Player_{}", clientId);
 
   nick = makeNickUnique(nick);
 
-  for (auto& pair : m_clients) {
-    pair.second.pendingMessages.append({
-        {MessageContext::Broadcast},
-        ServerConnectionId,
-        ServerNick,
-        strf("Player '{}' connected", nick)
-      });
+  for (auto&& pair : m_clients) {
+    pair.second.pendingMessages.push_back(
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' connected", nick)});
   }
 
   auto added = m_clients.add(clientId, ClientInfo(clientId, nick));
@@ -49,22 +45,18 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
 
-  for (auto channel : clientChannels(clientId))
+  for (auto const& channel : clientChannels(clientId))
     leaveChannel(clientId, channel);
 
-  auto clientInfoResult = m_clients.take(clientId);
+  auto clientInfoResult = m_clients.extract_value(clientId);
   if (!clientInfoResult) return std::unexpected(std::move(clientInfoResult.error()));
   auto clientInfo = std::move(*clientInfoResult);
 
   m_nicks.remove(clientInfo.nick);
 
-  for (auto& pair : m_clients) {
-    pair.second.pendingMessages.append({
-        {MessageContext::Broadcast},
-        ServerConnectionId,
-        ServerNick,
-        strf("Player '{}' disconnected", clientInfo.nick)
-      });
+  for (auto&& pair : m_clients) {
+    pair.second.pendingMessages.push_back(
+      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' disconnected", clientInfo.nick)});
   }
 
   return clientInfo.pendingMessages;
@@ -138,7 +130,7 @@ StringList ChatProcessor::clientChannels(ConnectionId clientId) const {
   StringList channels;
   for (auto const& pair : m_channels) {
     if (pair.second.contains(clientId))
-      channels.append(pair.first);
+      channels.push_back(pair.first);
   }
   return channels;
 }
@@ -150,7 +142,7 @@ StringList ChatProcessor::activeChannels() const {
   StringList channels;
   for (auto const& pair : m_channels) {
     if (!pair.second.empty())
-      channels.append(pair.first);
+      channels.push_back(pair.first);
   }
   return channels;
 }
@@ -174,8 +166,8 @@ std::expected<void, StarException> ChatProcessor::broadcast(ConnectionId sourceC
   if (!handled) return std::unexpected(std::move(handled.error()));
   if (*handled) return {};
 
-  for (auto& pair : m_clients)
-    pair.second.pendingMessages.append(message);
+  for (auto&& pair : m_clients)
+    pair.second.pendingMessages.push_back(message);
   return {};
 }
 
@@ -202,7 +194,7 @@ std::expected<void, StarException> ChatProcessor::message(ConnectionId sourceCon
     auto clientInfoResult = m_clients.get(clientId);
     if (!clientInfoResult) return std::unexpected(std::move(clientInfoResult.error()));
     auto& clientInfo = clientInfoResult->get();
-    clientInfo.pendingMessages.append(message);
+    clientInfo.pendingMessages.push_back(message);
   }
   return {};
 }
@@ -229,11 +221,11 @@ std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceCon
   if (sourceConnectionId != ServerConnectionId) {
     auto source = m_clients.get(sourceConnectionId);
     if (!source) return std::unexpected(std::move(source.error()));
-    source->get().pendingMessages.append(message);
+    source->get().pendingMessages.push_back(message);
   }
   auto target = m_clients.get(targetClientId);
   if (!target) return std::unexpected(std::move(target.error()));
-  target->get().pendingMessages.append(message);
+  target->get().pendingMessages.push_back(message);
   return {};
 }
 
@@ -258,15 +250,15 @@ std::expected<void, StarException> ChatProcessor::adminWhisper(ConnectionId targ
 std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendingMessages(ConnectionId clientId) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto client = m_clients.maybeRef(clientId))
-    return take(client->get().pendingMessages);
+  if (auto client = m_clients.find_ref(clientId))
+    return std::exchange(client->get().pendingMessages, {});
   return List<ChatReceivedMessage>{};
 }
 
 void ChatProcessor::setCommandHandler(CommandHandler commandHandler) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  m_commandHandler = commandHandler;
+  m_commandHandler = std::move(commandHandler);
 }
 
 void ChatProcessor::clearCommandHandler() {
@@ -285,10 +277,10 @@ String ChatProcessor::makeNickUnique(String nick) {
 }
 
 std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMessage& message) {
-  auto isCommand = message.text.beginsWith("/");
+  auto isCommand = message.text.starts_with("/");
   if (!isCommand) return std::unexpected(std::move(isCommand.error()));
   if (!*isCommand) return false;
-  auto escaped = message.text.beginsWith("//");
+  auto escaped = message.text.starts_with("//");
   if (!escaped) return std::unexpected(std::move(escaped.error()));
   auto line = message.text.substr(1);
   if (!line) return std::unexpected(std::move(line.error()));
@@ -305,17 +297,17 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
     if (!trimmed) return std::unexpected(std::move(trimmed.error()));
     auto newNick = renick(message.fromConnection, *trimmed);
     if (!newNick) return std::unexpected(std::move(newNick.error()));
-    response = strf("Nick changed to {}", *newNick);
+    response = Star::format("Nick changed to {}", *newNick);
   } else if (*command == "w") {
     auto target = commandLine.extract();
     if (!target) return std::unexpected(std::move(target.error()));
-    if (auto id = m_nicks.maybeRef(*target)) {
+    if (auto id = m_nicks.find_ref(*target)) {
       auto trimmed = commandLine.trim();
       if (!trimmed) return std::unexpected(std::move(trimmed.error()));
       auto sent = whisper(message.fromConnection, id->get(), *trimmed, {});
       if (!sent) return std::unexpected(std::move(sent.error()));
     } else {
-      response = strf("No such nick {}", *target);
+      response = Star::format("No such nick {}", *target);
     }
   } else if (m_commandHandler) {
     auto res = m_commandHandler(message.fromConnection, *command, commandLine);
@@ -327,12 +319,13 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
       m_commandPromises[uuid] = std::make_pair(message.fromConnection, std::move(std::get<RpcPromise<String>>(*res)));
     }
   } else {
-    response = strf("No such command {}", *command);
+    response = Star::format("No such command {}", *command);
   }
   if (!response.empty()) {
     auto client = m_clients.get(message.fromConnection);
     if (!client) return std::unexpected(std::move(client.error()));
-    client->get().pendingMessages.append({MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+    client->get().pendingMessages.push_back(
+      {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
   }
   return true;
 }
@@ -357,12 +350,13 @@ std::expected<void, StarException> ChatProcessor::updatePromises() {
         auto error = entry.second.error();
         if (!error) return std::unexpected(std::move(error.error()));
         if (!*error) return std::unexpected(RpcPromiseException("Failed command has no error"));
-        response = strf("Error: {}", **error);
+        response = Star::format("Error: {}", **error);
       }
       if (!response.empty()) {
         auto client = m_clients.get(entry.first);
         if (!client) return std::unexpected(std::move(client.error()));
-        client->get().pendingMessages.append({MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+        client->get().pendingMessages.push_back(
+          {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
       }
       m_commandPromises.remove(uuid);
     }

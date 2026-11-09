@@ -260,7 +260,7 @@ std::expected<Json, StarException> ObjectDatabase::parseTouchDamage(Root& root, 
     auto damagePathResult = touchDamage.toString();
     if (!damagePathResult)
       return std::unexpected(std::move(damagePathResult.error()));
-    auto damagePath = AssetPath::relativeTo(path, std::move(*damagePathResult));
+    auto damagePath = AssetPath::relative_to(path, std::move(*damagePathResult));
     auto damage = assets->json(damagePath);
     if (!damage)
       return std::unexpected(assets->withAssetContext(std::move(damage.error()), damagePath, "Loading object touch damage"));
@@ -334,7 +334,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!imageNameResult)
             return std::unexpected(std::move(imageNameResult.error()));
           auto imageName = std::move(*imageNameResult);
-          auto resolvedLayerResult = layer.set("image", AssetPath::relativeTo(path, imageName));
+          auto resolvedLayerResult = layer.set("image", AssetPath::relative_to(path, imageName));
           if (!resolvedLayerResult)
             return std::unexpected(std::move(resolvedLayerResult.error()));
           auto resolvedLayer = std::move(*resolvedLayerResult);
@@ -353,14 +353,15 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           return std::unexpected(std::move(drawableResult.error()));
         auto drawable = std::move(*drawableResult);
         drawable.scale(1.0f / TilePixels);
-        orientation->imageLayers.append(std::move(drawable));
+        orientation->imageLayers.push_back(std::move(drawable));
       }
     } else {
       auto imageResult = orientationSettings.getString("image");
       if (!imageResult)
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
-      auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relativeTo(path, image), 1.0 / TilePixels, false, {});
+      auto drawableResult =
+        Drawable::makeImage(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / TilePixels, false, {});
       if (!drawableResult)
         return std::unexpected(std::move(drawableResult.error()));
       auto drawable = std::move(*drawableResult);
@@ -369,7 +370,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         return std::unexpected(std::move(fullbrightResult.error()));
       auto fullbright = std::move(*fullbrightResult);
       drawable.fullbright = fullbright;
-      orientation->imageLayers.append(std::move(drawable));
+      orientation->imageLayers.push_back(std::move(drawable));
     }
     auto renderLayerNameResult = orientationSettings.getString("renderLayer", "Object");
     if (!renderLayerNameResult)
@@ -416,7 +417,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!parsedSpaceResult)
           return std::unexpected(std::move(parsedSpaceResult.error()));
         auto parsedSpace = std::move(*parsedSpaceResult);
-        orientation->spaces.append(parsedSpace);
+        orientation->spaces.push_back(parsedSpace);
       }
     } else {
       orientation->spaces = {{0, 0}};
@@ -434,7 +435,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!colorResult)
         return std::unexpected(std::move(colorResult.error()));
       auto color = std::move(*colorResult);
-      imageKeys.set("color", color.takeUtf8());
+      imageKeys.set("color", color.take_utf8());
       auto keysConfigResult = jsonMergeQueryDef("imageKeys", JsonObject(), baseConfig, orientation->config);
       if (!keysConfigResult)
         return std::unexpected(std::move(keysConfigResult.error()));
@@ -452,7 +453,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       }
       for (auto const& layer : orientation->imageLayers) {
         if (layer.isImage()) {
-          auto image = AssetPath::join(layer.imagePart().image).replaceTags(imageKeys, true, "default");
+          auto image = AssetPath::join(layer.imagePart().image).replace_tags(imageKeys, true, "default");
           auto thresholdResult = orientationSettings.getDouble("spaceScan");
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
@@ -461,7 +462,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);
-          spaceScanSpaces.addAll(scanned);
+          spaceScanSpaces.insert_range(scanned);
         }
       }
       orientation->spaces = spaceScanSpaces.values();
@@ -510,26 +511,26 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (anchorType == "left") {
         for (auto space : orientation->spaces) {
           if (space[0] == orientation->boundBox.xMin())
-            orientation->anchors.append({TileLayer::Foreground, space + Vec2I(-1, 0), tilled, soil, anchorMaterial});
+            orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(-1, 0), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "bottom") {
         for (auto space : orientation->spaces) {
           if (space[1] == orientation->boundBox.yMin())
-            orientation->anchors.append({TileLayer::Foreground, space + Vec2I(0, -1), tilled, soil, anchorMaterial});
+            orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(0, -1), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "right") {
         for (auto space : orientation->spaces) {
           if (space[0] == orientation->boundBox.xMax())
-            orientation->anchors.append({TileLayer::Foreground, space + Vec2I(1, 0), tilled, soil, anchorMaterial});
+            orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(1, 0), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "top") {
         for (auto space : orientation->spaces) {
           if (space[1] == orientation->boundBox.yMax())
-            orientation->anchors.append({TileLayer::Foreground, space + Vec2I(0, 1), tilled, soil, anchorMaterial});
+            orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(0, 1), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "background") {
         for (auto space : orientation->spaces)
-          orientation->anchors.append({TileLayer::Background, space, tilled, soil, anchorMaterial});
+          orientation->anchors.push_back({TileLayer::Background, space, tilled, soil, anchorMaterial});
       } else {
         return std::unexpected(ObjectException::format("Unknown anchor type: {}", anchorType));
       }
@@ -543,7 +544,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!positionResult)
         return std::unexpected(std::move(positionResult.error()));
       auto position = std::move(*positionResult);
-      orientation->anchors.append({TileLayer::Background, position, tilled, soil, anchorMaterial});
+      orientation->anchors.push_back({TileLayer::Background, position, tilled, soil, anchorMaterial});
     }
     auto fgAnchorsResult = orientationSettings.getArray("fgAnchors", JsonArray());
     if (!fgAnchorsResult)
@@ -554,7 +555,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!positionResult)
         return std::unexpected(std::move(positionResult.error()));
       auto position = std::move(*positionResult);
-      orientation->anchors.append({TileLayer::Foreground, position, tilled, soil, anchorMaterial});
+      orientation->anchors.push_back({TileLayer::Foreground, position, tilled, soil, anchorMaterial});
     }
     auto anchorAnyResult = orientationSettings.getBool("anchorAny", false);
     if (!anchorAnyResult)
@@ -601,7 +602,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!materialResult)
           return std::unexpected(std::move(materialResult.error()));
         auto material = std::move(*materialResult);
-        orientation->materialSpaces.append({spacePosition, material});
+        orientation->materialSpaces.push_back({spacePosition, material});
       }
     } else if (collisionType == "solid" || collisionType == "platform") {
       auto material = collisionType == "solid" ? ObjectSolidMaterialId : ObjectPlatformMaterialId;
@@ -617,12 +618,12 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!spacePositionResult)
             return std::unexpected(std::move(spacePositionResult.error()));
           auto spacePosition = std::move(*spacePositionResult);
-          orientation->materialSpaces.append({spacePosition, material});
+          orientation->materialSpaces.push_back({spacePosition, material});
         }
       } else {
         for (auto const& space : orientation->spaces) {
           if (collisionType == "solid" || space[1] == orientation->boundBox.yMax())
-            orientation->materialSpaces.append({space, material});
+            orientation->materialSpaces.push_back({space, material});
         }
       }
     }
@@ -639,7 +640,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!positionResult)
           return std::unexpected(std::move(positionResult.error()));
         auto position = std::move(*positionResult);
-        parsedSpaces.append(position);
+        parsedSpaces.push_back(position);
       }
       orientation->interactiveSpaces = std::move(parsedSpaces);
     }
@@ -668,7 +669,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!emitterResult)
         return std::unexpected(std::move(emitterResult.error()));
       auto emitter = std::move(*emitterResult);
-      orientation->particleEmitters.append(std::move(emitter));
+      orientation->particleEmitters.push_back(std::move(emitter));
     }
     auto emittersResult = orientationSettings.getArray("particleEmitters", JsonArray());
     if (!emittersResult)
@@ -679,7 +680,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!emitterResult)
         return std::unexpected(std::move(emitterResult.error()));
       auto emitter = std::move(*emitterResult);
-      orientation->particleEmitters.append(std::move(emitter));
+      orientation->particleEmitters.push_back(std::move(emitter));
     }
     auto areaResult = orientationSettings.opt("statusEffectArea");
     if (!areaResult)
@@ -697,7 +698,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       return std::unexpected(std::move(touchDamageConfigResult.error()));
     auto touchDamageConfig = std::move(*touchDamageConfigResult);
     orientation->touchDamageConfig = std::move(touchDamageConfig);
-    res.append(std::move(orientation));
+    res.push_back(std::move(orientation));
   }
   return res;
 }
@@ -728,7 +729,7 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
       return config->getString("objectName");
     }();
     if (!name) {
-      auto logged = root.logger().errorException(strf("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
+      auto logged = root.logger().errorException(Star::format("Error loading object file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (database->m_paths.contains(*name)) {
@@ -760,12 +761,12 @@ bool ObjectDatabase::isObject(String const& objectName) const {
 
 std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::getConfig(String const& objectName) const {
   std::lock_guard locker(m_cacheMutex);
-  auto result = m_configCache.get(objectName,
-      [&database = *this](String const& name) -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
-        if (auto path = database.m_paths.maybeRef(name))
-          return database.readConfig(path->get());
-        return std::unexpected(ObjectException::format("No such object named '{}'", name));
-      });
+  auto result = m_configCache.get(
+    objectName, [&database = *this](String const& name) -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
+      if (auto path = database.m_paths.find_ref(name))
+        return database.readConfig(path->get());
+      return std::unexpected(ObjectException::format("No such object named '{}'", name));
+    });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return result->get();
@@ -866,12 +867,12 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
       return std::unexpected(std::move(details.error()));
   }
   if (*originalName == "perfectlygenericitem") {
-    auto logged = m_root.logger().errorException(strf("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+    auto logged = m_root.logger().errorException(Star::format("Could not re-instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     return createObject(*originalName, *originalParams);
   }
-  auto logged = m_root.logger().errorException(strf("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
+  auto logged = m_root.logger().errorException(Star::format("Could not instantiate object '{}'", *originalName), ExceptionDiagnostic(originalError));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   return createObject("perfectlygenericitem", JsonObject{
@@ -974,17 +975,15 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (*type) {
-    if (!LightTypeNames)
-      return std::unexpected(LightTypeNames.error());
-    auto namedType = LightTypeNames->getLeft(**type);
+    auto namedType = enumValue<LightTypeNames>(**type);
     if (!namedType)
       return std::unexpected(std::move(namedType.error()));
-    object.lightType = namedType->get();
+    object.lightType = *namedType;
   } else {
     auto pointLight = config.getBool("pointLight", false);
     if (!pointLight)
       return std::unexpected(std::move(pointLight.error()));
-    object.lightType = (LightType)*pointLight;
+    object.lightType = static_cast<LightType>(*pointLight);
   }
   auto pointBeam = config.getFloat("pointBeam", 0.0f);
   if (!pointBeam)
@@ -1024,7 +1023,7 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
 std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::readConfig(String const& path) const {
   auto assetsResult = m_root.assets();
   if (!assetsResult)
-    return std::unexpected(ObjectException(strf("Error loading object '{}'", path), std::move(assetsResult.error())));
+    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), std::move(assetsResult.error())));
   auto assets = std::move(*assetsResult);
   auto result = [&, &root = m_root]() -> std::expected<std::shared_ptr<ObjectConfig>, StarException> {
     auto configResult = assets->json(path);
@@ -1061,12 +1060,12 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     auto scripts = config.get("scripts", JsonArray()).and_then(jsonToStringList);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    std::ranges::for_each(*scripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    std::ranges::for_each(*scripts, [&](String& script) { script = AssetPath::relative_to(path, script); });
     objectConfig->scripts = std::move(*scripts);
     auto animationScripts = config.get("animationScripts", JsonArray()).and_then(jsonToStringList);
     if (!animationScripts)
       return std::unexpected(std::move(animationScripts.error()));
-    std::ranges::for_each(*animationScripts, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+    std::ranges::for_each(*animationScripts, [&](String& script) { script = AssetPath::relative_to(path, script); });
     objectConfig->animationScripts = std::move(*animationScripts);
     auto priceResult = config.getInt("price", 0);
     if (!priceResult)
@@ -1134,16 +1133,16 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field9Result)
       return std::unexpected(std::move(field9Result.error()));
     auto field9 = std::move(*field9Result);
-          auto descriptor = ItemDescriptor::create(field7, (std::size_t)field8, field9);
-          if (!descriptor)
-            return std::unexpected(std::move(descriptor.error()));
-          group.append(std::move(*descriptor));
+    auto descriptor = ItemDescriptor::create(field7, static_cast<std::size_t>(field8), field9);
+    if (!descriptor)
+      return std::unexpected(std::move(descriptor.error()));
+    group.push_back(std::move(*descriptor));
         }
-        objectConfig->breakDropOptions.append(std::move(group));
+        objectConfig->breakDropOptions.push_back(std::move(group));
       }
       // Explicit empty break options mean always dropping nothing.
       if (objectConfig->breakDropOptions.empty())
-        objectConfig->breakDropOptions.append({});
+        objectConfig->breakDropOptions.push_back({});
     }
     if (auto containsResult = config.contains("smashDropPool"); !containsResult)
       return std::unexpected(std::move(containsResult.error()));
@@ -1172,9 +1171,9 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field11Result)
       return std::unexpected(std::move(field11Result.error()));
     auto field11 = std::move(*field11Result);
-          group.append(std::move(field11));
+    group.push_back(std::move(field11));
         }
-        objectConfig->smashDropOptions.append(std::move(group));
+        objectConfig->smashDropOptions.push_back(std::move(group));
       }
     }
     auto field12Result = config.getArray("smashSounds", JsonArray());
@@ -1186,7 +1185,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field13Result)
       return std::unexpected(std::move(field13Result.error()));
     auto field13 = std::move(*field13Result);
-      objectConfig->smashSoundOptions.append(AssetPath::relativeTo(path, field13));
+    objectConfig->smashSoundOptions.push_back(AssetPath::relative_to(path, field13));
     }
     if (auto containsResult = config.contains("smashParticles"); !containsResult)
       return std::unexpected(std::move(containsResult.error()));
@@ -1270,7 +1269,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field35Result)
       return std::unexpected(std::move(field35Result.error()));
     auto field35 = std::move(*field35Result);
-      objectConfig->statusEffects.append(std::move(field35));
+    objectConfig->statusEffects.push_back(std::move(field35));
     }
     auto touchDamageConfigResult = parseTouchDamage(root, path, config);
     if (!touchDamageConfigResult)
@@ -1303,7 +1302,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       auto reference = value.toString();
       if (!reference)
         return std::unexpected(std::move(reference.error()));
-      auto animationPath = AssetPath::relativeTo(path, *reference);
+      auto animationPath = AssetPath::relative_to(path, *reference);
       auto animation = assets->json(animationPath);
       if (!animation)
         return std::unexpected(assets->withAssetContext(std::move(animation.error()), animationPath, "Loading object animation"));
@@ -1354,7 +1353,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field42Result)
       return std::unexpected(std::move(field42Result.error()));
     auto field42 = std::move(*field42Result);
-      particleEmitters.append(std::move(field42));
+    particleEmitters.push_back(std::move(field42));
     }
     auto field43Result = config.getArray("particleEmitters", JsonArray());
     if (!field43Result)
@@ -1365,10 +1364,10 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     if (!field44Result)
       return std::unexpected(std::move(field44Result.error()));
     auto field44 = std::move(*field44Result);
-      particleEmitters.append(std::move(field44));
+    particleEmitters.push_back(std::move(field44));
     }
     for (auto const& orientation : objectConfig->orientations)
-      orientation->particleEmitters.appendAll(particleEmitters);
+      orientation->particleEmitters.append_range(particleEmitters);
     auto rootingResult = config.getBool("rooting", false);
     if (!rootingResult)
       return std::unexpected(std::move(rootingResult.error()));
@@ -1382,7 +1381,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     return objectConfig;
   }();
   if (!result)
-    return std::unexpected(ObjectException(strf("Error loading object '{}'", path), assets->withAssetContext(std::move(result.error()), path, "Loading object configuration")));
+    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), assets->withAssetContext(std::move(result.error()), path, "Loading object configuration")));
   return result;
 }
 
@@ -1412,11 +1411,12 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relativeTo(config->path, *placementImage), 1.0 / TilePixels, false, Vec2F(position) + imagePosition / TilePixels);
+    auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
+                                              1.0 / TilePixels, false, Vec2F(position) + imagePosition / TilePixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
     auto drawable = std::move(*drawableResult);
-    drawables.append(std::move(drawable));
+    drawables.push_back(std::move(drawable));
   } else {
     auto orientationIndexResult = config->findValidOrientation(world, position, direction);
     if (!orientationIndexResult)
@@ -1444,7 +1444,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!colorResult)
       return std::unexpected(std::move(colorResult.error()));
     auto color = std::move(*colorResult);
-    imageKeys.set("color", color.takeUtf8());
+    imageKeys.set("color", color.take_utf8());
     auto keysConfigResult = jsonMergeQueryDef("imageKeys", JsonObject(), config->config, orientation->config, parameters);
     if (!keysConfigResult)
       return std::unexpected(std::move(keysConfigResult.error()));
@@ -1463,7 +1463,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
       auto& image = drawable.imagePart().image;
-      auto taggedImage = AssetPath::join(image).replaceTags(imageKeys, true, "default");
+      auto taggedImage = AssetPath::join(image).replace_tags(imageKeys, true, "default");
       image = std::move(taggedImage);
       if (orientation->flipImages) {
         auto boundsResult = drawable.boundBox(*imageMetadata, false);
@@ -1472,7 +1472,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
         auto bounds = std::move(*boundsResult);
         drawable.scale(Vec2F(-1, 1), bounds.center() - drawable.position);
       }
-      drawables.append(std::move(drawable));
+      drawables.push_back(std::move(drawable));
     }
     Drawable::translateAll(drawables, Vec2F(position) + orientation->imagePosition);
   }

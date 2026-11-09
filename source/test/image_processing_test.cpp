@@ -306,17 +306,17 @@ TEST(ImageProcessingTest, OptimizedDeterministicColorScaleCropChainsMatchSequent
                                   MultiplyImageOperation{Vec4B(179, 93, 233, 113)}};
       List<ImageOperation> operations;
       for (unsigned k = 0; k < colors.size(); ++k)
-        operations.append(colors[(k + trial) % colors.size()]);
-      operations.append(CropImageOperation{RectI(1, 1, 7, 5)});
-      operations.append(ScaleImageOperation{ScaleImageOperation::Nearest, Vec2F(2.7f, 2.0f)});
+        operations.push_back(colors[(k + trial) % colors.size()]);
+      operations.push_back(CropImageOperation{RectI(1, 1, 7, 5)});
+      operations.push_back(ScaleImageOperation{ScaleImageOperation::Nearest, Vec2F(2.7f, 2.0f)});
       for (unsigned k = 0; k < colors.size(); ++k)
-        operations.append(colors[(k + trial + 3) % colors.size()]);
-      operations.append(CropImageOperation{RectI(1, 1, 12, 6)});
-      operations.append(ScaleImageOperation{ScaleImageOperation::Bilinear, Vec2F(0.75f, 1.25f)});
-      operations.append(CropImageOperation{RectI(1, 1, 6, 4)});
-      operations.append(ScanLinesImageOperation{FadeToColorImageOperation(Vec3B(13, 71, 131), 0.3f),
-                                                FadeToColorImageOperation(Vec3B(191, 37, 19), 0.6f)});
-      operations.append(FlipImageOperation{FlipImageOperation::FlipXY});
+        operations.push_back(colors[(k + trial + 3) % colors.size()]);
+      operations.push_back(CropImageOperation{RectI(1, 1, 12, 6)});
+      operations.push_back(ScaleImageOperation{ScaleImageOperation::Bilinear, Vec2F(0.75f, 1.25f)});
+      operations.push_back(CropImageOperation{RectI(1, 1, 6, 4)});
+      operations.push_back(ScanLinesImageOperation{FadeToColorImageOperation(Vec3B(13, 71, 131), 0.3f),
+                                                   FadeToColorImageOperation(Vec3B(191, 37, 19), 0.6f)});
+      operations.push_back(FlipImageOperation{FlipImageOperation::FlipXY});
       expectOptimizedOperations(operations, original);
     }
   }
@@ -544,7 +544,7 @@ TEST(ImageProcessingTest, ListOperationsPreserveInputOnSuccessAndReferenceFailur
   ASSERT_NO_FATAL_FAILURE(expectPixels(*listed, expected));
   ASSERT_NO_FATAL_FAILURE(expectPixels(original, before));
 
-  operations.append(BlendImageOperation{BlendImageOperation::Multiply, {"failure", "unreachable"}, Vec2I()});
+  operations.push_back(BlendImageOperation{BlendImageOperation::Multiply, {"failure", "unreachable"}, Vec2I()});
   std::vector<String> calls;
   ImageReferenceCallback callback =
     [&](String const& name) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {

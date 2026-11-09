@@ -63,9 +63,19 @@ extern CollisionSet const DefaultCollisionSet;
 // Defines what can be "blocks" e.g. for tile rendering: Block and Slippery
 extern CollisionSet const BlockCollisionSet;
 
-extern std::expected<EnumMap<TileCollisionOverride>, StarException> const TileCollisionOverrideNames;
+inline constexpr auto TileCollisionOverrideNames = sortedEnumNames(
+  std::to_array<std::pair<TileCollisionOverride, std::string_view>>({{TileCollisionOverride::None, "None"},
+                                                                     {TileCollisionOverride::Empty, "Empty"},
+                                                                     {TileCollisionOverride::Platform, "Platform"},
+                                                                     {TileCollisionOverride::Block, "Block"}}));
 
-extern std::expected<EnumMap<CollisionKind>, StarException> const CollisionKindNames;
+inline constexpr auto CollisionKindNames =
+  sortedEnumNames(std::to_array<std::pair<CollisionKind, std::string_view>>({{CollisionKind::Null, "Null"},
+                                                                             {CollisionKind::None, "None"},
+                                                                             {CollisionKind::Platform, "Platform"},
+                                                                             {CollisionKind::Dynamic, "Dynamic"},
+                                                                             {CollisionKind::Slippery, "Slippery"},
+                                                                             {CollisionKind::Block, "Block"}}));
 
 bool isColliding(CollisionKind kind, CollisionSet const& collisionSet);
 bool isSolidColliding(CollisionKind kind);
@@ -106,9 +116,7 @@ inline bool CollisionSet::contains(CollisionKind kind) const {
   return m_kinds & kindBit(kind);
 }
 
-inline std::uint8_t CollisionSet::kindBit(CollisionKind kind) {
-  return 1 << ((std::uint8_t)kind + 1);
-}
+inline std::uint8_t CollisionSet::kindBit(CollisionKind kind) { return 1 << (static_cast<std::uint8_t>(kind) + 1); }
 
 inline bool isColliding(CollisionKind kind, CollisionSet const& collisionSet) {
   return collisionSet.contains(kind);

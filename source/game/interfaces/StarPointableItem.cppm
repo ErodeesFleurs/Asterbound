@@ -28,7 +28,7 @@ public:
     return Star::typeName<PointableItem>();
   }
 
-  virtual ~PointableItem() {}
+  virtual ~PointableItem() = default;
 
   [[nodiscard]]
   virtual std::expected<float, StarException> getAngleDir(float aimAngle, Direction facingDirection);

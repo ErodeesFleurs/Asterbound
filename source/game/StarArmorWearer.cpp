@@ -160,7 +160,7 @@ std::expected<bool, StarException> ArmorWearer::setupHumanoid(Humanoid& humanoid
 
     if (armor.visible && armor.isCosmetic && item && item->visible(i >= 8)) {
       for (auto armorType : item->armorTypesToHide())
-        ++wornCosmeticTypes[(std::uint8_t)armorType];
+        ++wornCosmeticTypes[static_cast<std::uint8_t>(armorType)];
     }
   }
 
@@ -187,7 +187,7 @@ std::expected<bool, StarException> ArmorWearer::setupHumanoid(Humanoid& humanoid
       auto& item = armor.item;
       bool allowed = armor.visible && item && item->visible(i >= 8) && !(forceNude && !item->bypassNude());
       if (allowed && !armor.isCosmetic) {
-        std::uint8_t typeIndex = (std::uint8_t)armor.item->armorType();
+        std::uint8_t typeIndex = static_cast<std::uint8_t>(armor.item->armorType());
         std::uint8_t prevWorn = m_wornCosmeticTypes[typeIndex];
         std::uint8_t curWorn = wornCosmeticTypes[typeIndex];
         if (curWorn == 0) {
@@ -243,19 +243,19 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effectEmi
     auto& armor = m_armors[i];
     if (auto item = as<EffectSourceItem>(armor.item)) {
       auto armorType = armor.item->armorType();
-      if (!armor.visible || (!armor.isCosmetic && m_wornCosmeticTypes[(std::uint8_t)armorType] > 0))
+      if (!armor.visible || (!armor.isCosmetic && m_wornCosmeticTypes[static_cast<std::uint8_t>(armorType)] > 0))
         continue;
       auto newEffects = item->effectSources();
       if (!newEffects)
         return std::unexpected(std::move(newEffects.error()));
       if (armorType == ArmorType::Head)
-        headEffects.addAll(*newEffects);
+        headEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Chest)
-        chestEffects.addAll(*newEffects);
+        chestEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Legs)
-        legsEffects.addAll(*newEffects);
+        legsEffects.insert_range(*newEffects);
       else if (armorType == ArmorType::Back)
-        backEffects.addAll(*newEffects);
+        backEffects.insert_range(*newEffects);
     }
   }
 
@@ -295,7 +295,7 @@ std::expected<Json, StarException> ArmorWearer::diskStore() const {
     auto stored = armor.item->descriptor().diskStore(**versioning);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    String id = i < 8 ? String(slotNames[i]) : strf("cosmetic{}Item", i - 7);
+    String id = i < 8 ? String(slotNames[i]) : Star::format("cosmetic{}Item", i - 7);
     res[id] = std::move(*stored);
   }
   return res;
@@ -309,7 +309,7 @@ std::expected<void, StarException> ArmorWearer::diskLoad(Json const& diskStore) 
       "headItem", "chestItem", "legsItem", "backItem",
       "headCosmeticItem", "chestCosmeticItem", "legsCosmeticItem", "backCosmeticItem"};
   for (std::size_t i = 0; i != m_armors.size(); ++i) {
-    String id = i < 8 ? String(slotNames[i]) : strf("cosmetic{}Item", i - 7);
+    String id = i < 8 ? String(slotNames[i]) : Star::format("cosmetic{}Item", i - 7);
     auto itemJson = diskStore.get(id, {});
     if (!itemJson)
       return std::unexpected(std::move(itemJson.error()));
@@ -332,10 +332,10 @@ std::expected<List<PersistentStatusEffect>, StarException> ArmorWearer::statusEf
       auto effects = m_armors[i].item->statusEffects();
       if (!effects)
         return std::unexpected(std::move(effects.error()));
-      statusEffects.appendAll(std::move(*effects));
+      statusEffects.append_range(std::move(*effects));
     }
     if (m_armors[i].isCurrentlyVisible)
-      statusEffects.appendAll(m_armors[i].item->cosmeticStatusEffects());
+      statusEffects.append_range(m_armors[i].item->cosmeticStatusEffects());
   }
 
   return statusEffects;
@@ -453,7 +453,7 @@ ItemDescriptor ArmorWearer::backCosmeticItemDescriptor() const {
 }
 
 bool ArmorWearer::setCosmeticItem(std::uint8_t slot, std::shared_ptr<ArmorItem> cosmeticItem) {
-  return setItem(slot + 8, cosmeticItem, true);
+  return setItem(slot + 8, std::move(cosmeticItem), true);
 }
 
 std::shared_ptr<ArmorItem> ArmorWearer::cosmeticItem(std::uint8_t slot) const {

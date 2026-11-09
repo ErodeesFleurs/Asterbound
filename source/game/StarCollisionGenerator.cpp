@@ -11,9 +11,7 @@ import star.vector;
 import star.rect;
 namespace Star {
 
-void CollisionGenerator::init(CollisionKindAccessor accessor) {
-  m_accessor = accessor;
-}
+void CollisionGenerator::init(CollisionKindAccessor accessor) { m_accessor = std::move(accessor); }
 
 std::expected<List<CollisionBlock>, StarException> CollisionGenerator::getBlocks(RectI const& region) const {
   if (region.isNull())
@@ -44,7 +42,7 @@ void CollisionGenerator::getBlocksPlatforms(List<CollisionBlock>& list, RectI co
           block.kind = kind;
           block.poly = PolyF(std::move(vertices));
           block.polyBounds = block.poly.boundBox();
-          list.append(std::move(block));
+          list.push_back(std::move(block));
         };
 
         // This was once simple and elegant and made sense but then I made it
@@ -160,7 +158,7 @@ void CollisionGenerator::getBlocksMarchingSquares(List<CollisionBlock>& list, Re
     }
     block.polyBounds = block.poly.boundBox();
     block.kind = std::max({collisionKind(x, y), collisionKind(x + 1, y), collisionKind(x, y + 1), collisionKind(x + 1, y + 1)});
-    list.append(std::move(block));
+    list.push_back(std::move(block));
   };
 
   int xMin = region.xMin();

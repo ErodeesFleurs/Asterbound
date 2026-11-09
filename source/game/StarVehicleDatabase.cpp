@@ -115,13 +115,13 @@ std::expected<std::shared_ptr<VehicleDatabase>, StarException> VehicleDatabase::
       return {};
     }();
     if (!load)
-      return std::unexpected(VehicleDatabaseException(strf("Error loading vehicle '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading vehicle")));
+      return std::unexpected(VehicleDatabaseException(Star::format("Error loading vehicle '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading vehicle")));
   }
   return database;
 }
 
 std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::create(String const& vehicleName, Json const& extraConfig) const {
-  auto configPair = m_vehicles.maybeRef(vehicleName);
+  auto configPair = m_vehicles.find_ref(vehicleName);
   if (!configPair)
     return std::unexpected(VehicleDatabaseException::format("No such vehicle named '{}'", vehicleName));
   return Vehicle::create(m_root, configPair->get().second, configPair->get().first, extraConfig);

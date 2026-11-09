@@ -98,9 +98,12 @@ private:
     self.m_movementController->get().setRotation(rotation);
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("setAnchorState", [&self = *this](EntityId entity, std::size_t position) {
-    return self.m_movementController->get().setAnchorState({entity, position});
-  }); !result)
+  if (auto result = callbacks.registerCallback("setAnchorState",
+                                               [&self = *this](EntityId entity, std::size_t position) {
+                                                 return self.m_movementController->get().setAnchorState(
+                                                   {.entityId = entity, .positionIndex = position});
+                                               });
+      !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("resetAnchorState", [&self = *this]() { return self.m_movementController->get().resetAnchorState(); }); !result)
     return std::unexpected(std::move(result.error()));
@@ -304,7 +307,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
+        return std::unexpected(controls.error().with_related(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;
@@ -377,7 +380,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
+        return std::unexpected(controls.error().with_related(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;
@@ -449,7 +452,7 @@ public:
     auto controls = m_movement.performControls();
     if (!controls) {
       if (!result)
-        return std::unexpected(controls.error().withRelated(result.error(), "Original Lua movement update failure"));
+        return std::unexpected(controls.error().with_related(result.error(), "Original Lua movement update failure"));
       return std::unexpected(std::move(controls.error()));
     }
     return result;

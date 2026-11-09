@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -64,7 +65,7 @@ public:
 
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
   for (std::string_view name : {"player", "universe"}) {
-    auto exists = File::exists(File::relativeTo(storage, name));
+    auto exists = File::exists(File::relative_to(storage, name));
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists)
@@ -286,7 +287,7 @@ ByteArray makeWave(std::size_t frames) {
   auto text = [&](std::string_view value) { bytes.append(std::span(value).first(4)); };
   auto le = [&](std::uint32_t value, unsigned width) {
     for (unsigned i = 0; i != width; ++i)
-      bytes.appendByte(static_cast<char>((value >> (8 * i)) & 255));
+      bytes.push_back(static_cast<char>((value >> (8 * i)) & 255));
   };
   text("RIFF"); le(static_cast<std::uint32_t>(36 + frames * 2), 4);
   text("WAVE"); text("fmt "); le(16, 4); le(1, 2); le(1, 2);
@@ -338,7 +339,7 @@ struct AudioOutput {
 };
 
 std::expected<void, StarException> audioBatch(AudioFixture& fixture, AudioOutput& output, bool clone) {
-  auto width = std::size_t(64) * fixture.source.channels();
+  auto width = static_cast<std::size_t>(64) * fixture.source.channels();
   for (std::size_t i = 0; i != output.counts.size(); ++i) {
     auto position = (i * 97) % (fixture.frames - 64);
     auto readOne = [&](Audio& audio) -> std::expected<void, StarException> {
@@ -373,8 +374,8 @@ void audioCloneSeekRead(benchmark::State& state, BenchmarkSession& session, bool
     session.fail(state, fixture.error());
     return;
   }
-  auto width = std::size_t(64) * fixture->source.channels();
-  AudioOutput expected{std::vector<std::int16_t>(count * width), std::vector<std::size_t>(count)};
+  auto width = static_cast<std::size_t>(64) * fixture->source.channels();
+  AudioOutput expected{.samples = std::vector<std::int16_t>(count * width), .counts = std::vector<std::size_t>(count)};
   auto checked = audioBatch(*fixture, expected, false);
   auto reset = fixture->source.seekSample(0);
   if (!checked || !reset || !std::ranges::all_of(expected.counts, [&](auto n) { return n == width; })
@@ -453,7 +454,7 @@ std::expected<CacheFixture, StarException> prepareCache(BenchmarkSession& sessio
       return std::unexpected(std::move(bytes.error()));
     if (!*image || (*image)->empty() || !*bytes || (*bytes)->empty())
       return std::unexpected(StarException("Mixed cache PNG/bytes fixture is empty"));
-    auto content = mix(hashBytes(**bytes), (std::uint64_t((*image)->width()) << 32) | (*image)->height());
+    auto content = mix(hashBytes(**bytes), (static_cast<std::uint64_t>((*image)->width()) << 32) | (*image)->height());
     fixture.content.push_back(content);
     fixture.checksum = mix(fixture.checksum, content);
     fixture.images.emplace_back(path);
@@ -487,7 +488,8 @@ bool validateCache(CacheFixture const& fixture, CacheHandles const& handles) {
   for (std::size_t i = 0; i != fixture.paths.size(); ++i) {
     if (!handles.images[i] || handles.images[i]->empty() || !handles.bytes[i] || handles.bytes[i]->empty())
       return false;
-    auto content = mix(hashBytes(*handles.bytes[i]), (std::uint64_t(handles.images[i]->width()) << 32) | handles.images[i]->height());
+    auto content = mix(hashBytes(*handles.bytes[i]),
+                       (static_cast<std::uint64_t>(handles.images[i]->width()) << 32) | handles.images[i]->height());
     if (content != fixture.content[i])
       return false;
   }
@@ -611,31 +613,36 @@ void assetsMixedCleanup(benchmark::State& state, BenchmarkSession& session) {
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);
   BenchmarkLifetime benchmarkLifetime;
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    std::fprintf(stderr, "%s\n", storage.error().what());
+    if (!Star::print(stderr, "{}\n", storage.error().what()))
+      return 1;
     return 1;
   }
   settings.runtimeConfigFile.reset();
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   BenchmarkSession session{**root};

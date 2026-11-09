@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.list;
 
 import star.array;
@@ -14,12 +14,11 @@ namespace Star {
 template <typename T, std::size_t N>
 class Box {
 public:
-  typedef Vector<T, N> Coord;
-  typedef Star::Line<T, N> Line;
-  typedef typename Line::IntersectResult LineIntersectResult;
+  using Coord = Vector<T, N>;
+  using Line = Star::Line<T, N>;
+  using LineIntersectResult = typename Line::IntersectResult;
 
-  template <std::size_t P, typename T2 = void>
-  using Enable2D = typename std::enable_if<P == 2 && N == P, T2>::type;
+  template <std::size_t P, typename T2 = void> using Enable2D = std::enable_if_t<P == 2 && N == P, T2>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -263,15 +262,16 @@ protected:
 };
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Box<T, N> const& box);
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Box<T, N> const& box);
 
 template<typename T>
 using Rect = Box<T, 2>;
 
-typedef Rect<int> RectI;
-typedef Rect<unsigned> RectU;
-typedef Rect<float> RectF;
-typedef Rect<double> RectD;
+using RectI = Rect<int>;
+using RectU = Rect<unsigned>;
+using RectF = Rect<float>;
+using RectD = Rect<double>;
 
 template <typename T, std::size_t N>
 Box<T, N> Box<T, N>::null() {
@@ -322,8 +322,7 @@ Box<T, N> Box<T, N>::withCenter(Coord const& center, Coord const& size) {
   return Box(center - size / 2, center + size / 2);
 }
 
-template <typename T, std::size_t N>
-Box<T, N>::Box() {}
+template <typename T, std::size_t N> Box<T, N>::Box() = default;
 
 template <typename T, std::size_t N>
 Box<T, N>::Box(Coord const& min, Coord const& max)
@@ -333,12 +332,7 @@ template <typename T, std::size_t N>
 Box<T, N>::Box(Box const& b)
   : m_min(b.min()), m_max(b.max()) {}
 
-template <typename T, std::size_t N>
-Box<T, N>& Box<T, N>::operator=(Box<T, N> const& b) {
-  m_min = b.m_min;
-  m_max = b.m_max;
-  return *this;
-}
+template <typename T, std::size_t N> Box<T, N>& Box<T, N>::operator=(Box<T, N> const& b) = default;
 
 template <typename T, std::size_t N>
 template <typename T2>
@@ -371,8 +365,8 @@ bool Box<T, N>::isEmpty() const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::combine(Box const& box) {
-  m_min = box.m_min.piecewiseMin(m_min);
-  m_max = box.m_max.piecewiseMax(m_max);
+  m_min = box.m_min.piecewise_min(m_min);
+  m_max = box.m_max.piecewise_max(m_max);
 }
 
 template <typename T, std::size_t N>
@@ -384,8 +378,8 @@ Box<T, N> Box<T, N>::combined(Box const& box) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::combine(Coord const& point) {
-  m_min = m_min.piecewiseMin(point);
-  m_max = m_max.piecewiseMax(point);
+  m_min = m_min.piecewise_min(point);
+  m_max = m_max.piecewise_max(point);
 }
 
 template <typename T, std::size_t N>
@@ -397,8 +391,8 @@ Box<T, N> Box<T, N>::combined(Coord const& point) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::limit(Box const& box) {
-  m_min = m_min.piecewiseMax(box.m_min);
-  m_max = m_max.piecewiseMin(box.m_max);
+  m_min = m_min.piecewise_max(box.m_min);
+  m_max = m_max.piecewise_min(box.m_max);
 }
 
 template <typename T, std::size_t N>
@@ -441,7 +435,7 @@ T Box<T, N>::size(std::size_t dim) const {
 
 template <typename T, std::size_t N>
 void Box<T, N>::setAspect(Coord as, bool shrink) {
-  Coord nBox = (m_max - m_min).piecewiseDivide(as);
+  Coord nBox = (m_max - m_min).piecewise_divide(as);
   Coord extent;
   if (shrink)
     extent = Coord::filled(nBox.min());
@@ -639,12 +633,12 @@ Box<T, N> Box<T, N>::flipped(std::size_t dimension) const {
 
 template <typename T, std::size_t N>
 auto Box<T, N>::normal(Coord const& coord) const -> Coord {
-  return (coord - m_min).piecewiseDivide(m_max - m_min);
+  return (coord - m_min).piecewise_divide(m_max - m_min);
 }
 
 template <typename T, std::size_t N>
 auto Box<T, N>::eval(Coord const& normalizedCoord) const -> Coord {
-  return normalizedCoord.piecewiseMultiply(m_max - m_min) + m_min;
+  return normalizedCoord.piecewise_multiply(m_max - m_min) + m_min;
 }
 
 template <typename T, std::size_t N>
@@ -821,9 +815,13 @@ template <typename... TN>
 void Box<T, N>::combineThings(Box&) {}
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Box<T, N> const& box) {
-  os << "Box{min:" << box.min() << " max:" << box.max() << "}";
-  return os;
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Box<T, N> const& box) {
+  output.append("Box{min:");
+  append_text(output, box.min());
+  output.append(" max:");
+  append_text(output, box.max());
+  output.push_back('}');
 }
 
 template <typename T, std::size_t N>
@@ -1043,7 +1041,7 @@ auto Box<T, N>::subtract(Box const& rect) const -> Enable2D<P, List<Box>> {
   if (overlap.isEmpty()) {
     // If this rect doesn't overlap at all with the subtracted one, obviously
     // the entire rect is new territory.
-    regions.append(*this);
+    regions.push_back(*this);
   } else {
     // If there is overlap with this rect, we need to add the left, bottom,
     // right, and top sections.  These can overlap at the corners, so the left
@@ -1052,16 +1050,16 @@ auto Box<T, N>::subtract(Box const& rect) const -> Enable2D<P, List<Box>> {
     // the overlap section.
 
     if (xMin() < overlap.xMin())
-      regions.append(Box(xMin(), yMin(), overlap.xMin(), yMax()));
+      regions.push_back(Box(xMin(), yMin(), overlap.xMin(), yMax()));
 
     if (overlap.xMax() < xMax())
-      regions.append(Box(overlap.xMax(), yMin(), xMax(), yMax()));
+      regions.push_back(Box(overlap.xMax(), yMin(), xMax(), yMax()));
 
     if (yMin() < overlap.yMin())
-      regions.append(Box(rect.xMin(), yMin(), rect.xMax(), overlap.yMin()));
+      regions.push_back(Box(rect.xMin(), yMin(), rect.xMax(), overlap.yMin()));
 
     if (overlap.yMax() < yMax())
-      regions.append(Box(rect.xMin(), overlap.yMax(), rect.xMax(), yMax()));
+      regions.push_back(Box(rect.xMin(), overlap.yMax(), rect.xMax(), yMax()));
   }
 
   return regions;
@@ -1080,7 +1078,8 @@ auto Box<T, N>::nearestCoordTo(Coord const& c) const -> Coord {
 export module star.rect;
 
 export template <typename T, std::size_t N>
-struct std::formatter<Star::Box<T, N>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
+struct std::formatter<Star::Box<T, N>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Box;
@@ -1089,5 +1088,5 @@ export namespace Star {
   using ::Star::RectU;
   using ::Star::RectF;
   using ::Star::RectD;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

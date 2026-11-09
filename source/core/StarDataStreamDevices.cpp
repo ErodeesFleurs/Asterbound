@@ -43,20 +43,18 @@ DataStreamIODevice::DataStreamIODevice(IODevice& device)
   return m_device.seek(static_cast<StreamOffset>(pos), mode);
 }
 
-[[nodiscard]] std::expected<bool, StarException> DataStreamIODevice::atEnd() {
-  return m_device.atEnd();
-}
+[[nodiscard]] std::expected<bool, StarException> DataStreamIODevice::at_end() { return m_device.at_end(); }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> DataStreamIODevice::pos() {
   return m_device.pos();
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamIODevice::readData(std::span<char> data) {
-  return m_device.readFull(data);
+  return m_device.read_full(data);
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamIODevice::writeData(std::span<char const> data) {
-  return m_device.writeFull(data);
+  return m_device.write_full(data);
 }
 
 DataStreamBuffer::DataStreamBuffer() = default;
@@ -127,9 +125,7 @@ bool DataStreamBuffer::empty() const {
   return m_buffer.seek(static_cast<StreamOffset>(pos), mode);
 }
 
-[[nodiscard]] std::expected<bool, StarException> DataStreamBuffer::atEnd() {
-  return m_buffer.atEnd();
-}
+[[nodiscard]] std::expected<bool, StarException> DataStreamBuffer::at_end() { return m_buffer.at_end(); }
 
 [[nodiscard]] std::expected<std::size_t, StarException> DataStreamBuffer::pos() {
   auto result = m_buffer.pos();
@@ -147,11 +143,11 @@ void DataStreamBuffer::reset(ByteArray b) {
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamBuffer::readData(std::span<char> data) {
-  return m_buffer.readFull(data);
+  return m_buffer.read_full(data);
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamBuffer::writeData(std::span<char const> data) {
-  return m_buffer.writeFull(data);
+  return m_buffer.write_full(data);
 }
 
 DataStreamExternalBuffer::DataStreamExternalBuffer() : m_buffer() {}
@@ -182,9 +178,7 @@ bool DataStreamExternalBuffer::empty() const {
   return m_buffer.seek(static_cast<StreamOffset>(pos), mode);
 }
 
-[[nodiscard]] std::expected<bool, StarException> DataStreamExternalBuffer::atEnd() {
-  return m_buffer.atEnd();
-}
+[[nodiscard]] std::expected<bool, StarException> DataStreamExternalBuffer::at_end() { return m_buffer.at_end(); }
 
 [[nodiscard]] std::expected<std::size_t, StarException> DataStreamExternalBuffer::pos() {
   auto result = m_buffer.pos();
@@ -207,10 +201,10 @@ void DataStreamExternalBuffer::reset(std::span<char const> externalData) {
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamExternalBuffer::readData(std::span<char> data) {
-  return m_buffer.readFull(data);
+  return m_buffer.read_full(data);
 }
 [[nodiscard]] std::expected<void, StarException> DataStreamExternalBuffer::writeData(std::span<char const> data) {
-  return m_buffer.writeFull(data);
+  return m_buffer.write_full(data);
 }
 
 }

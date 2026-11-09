@@ -136,7 +136,10 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
     auto item = rconvert<Item>(*this);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, *item, std::placeholders::_1, std::placeholders::_2));
+    auto configCallbacks = LuaBindings::makeConfigCallbacks(
+      [item = *item](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
+        return item.get().instanceValue(name, defaultValue);
+      });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     auto addedConfig = m_scriptComponent->addCallbacks("config", std::move(*configCallbacks));

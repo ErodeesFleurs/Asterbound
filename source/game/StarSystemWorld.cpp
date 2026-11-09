@@ -86,8 +86,8 @@ std::expected<CelestialOrbit, StarException> CelestialOrbit::fromJson(Json const
   auto position = jsonToVec2F(*positionData);
   if (!position)
     return std::unexpected(std::move(position.error()));
-  
-  return CelestialOrbit{std::move(*target), (int)*direction, *time, *position};
+
+  return CelestialOrbit{std::move(*target), static_cast<int>(*direction), *time, *position};
 }
 
 Json CelestialOrbit::toJson() const {
@@ -373,7 +373,8 @@ std::expected<std::uint64_t, StarException> SystemWorld::coordinateSeed(Celestia
     // Preserve the original planetary seed's boolean orbit component.
     planet = bool(*orbit);
   }
-  return staticRandomU64(coordinate.location()[0], coordinate.location()[1], coordinate.location()[2], planet, satellite, seedMix);
+  return static_random_u64(coordinate.location()[0], coordinate.location()[1], coordinate.location()[2], planet,
+                           satellite, seedMix);
 }
 
 std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCoordinate const& coordinate) const {
@@ -439,7 +440,7 @@ std::expected<Vec2F, StarException> SystemWorld::orbitPosition(CelestialOrbit co
   float interval = orbitInterval(distance, false);
   float timeOffset = std::fmod(time() - orbit.enterTime, interval) / interval;
   float angle = (orbit.enterPosition * -1).angle() + (orbit.direction * timeOffset * (std::numbers::pi * 2));
-  return targetPosition + Vec2F::withAngle(angle, distance);
+  return targetPosition + Vec2F::with_angle(angle, distance);
 }
 
 std::expected<float, StarException> SystemWorld::clusterSize(CelestialCoordinate const& coordinate) const {
@@ -618,7 +619,7 @@ std::expected<Json, StarException> SystemWorld::systemObjectTypeConfig(Root& roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  return (*assets)->json(strf("/system_objects.config:{}", name));
+  return (*assets)->json(Star::format("/system_objects.config:{}", name));
 }
 
 std::expected<std::optional<Vec2F>, StarException> SystemWorld::systemLocationPosition(SystemLocation const& location) const {
@@ -645,7 +646,7 @@ Vec2F SystemWorld::randomArrivalPosition() const {
   RandomSource rand(this->root().random().randu64());
   float range = m_config.arrivalRange[0] + (rand.randf() * (m_config.arrivalRange[1] - m_config.arrivalRange[0]));
   float angle = rand.randf() * std::numbers::pi * 2;
-  return Vec2F::withAngle(angle, range);
+  return Vec2F::with_angle(angle, range);
 }
 
 std::expected<std::optional<WarpAction>, StarException> SystemWorld::objectWarpAction(Uuid const& uuid) const {
@@ -1011,7 +1012,8 @@ std::expected<void, StarException> SystemClientShip::serverUpdate(SystemWorld& s
     if (!size)
       return std::unexpected(std::move(size.error()));
     Vec2F toShip = *position - this->position();
-    return CelestialOrbit{planet, 1, system.time(), Vec2F::withAngle(toShip.angle(), *size / 2.0 + m_config.orbitDistance)};
+    return CelestialOrbit{planet, 1, system.time(),
+                          Vec2F::with_angle(toShip.angle(), *size / 2.0 + m_config.orbitDistance)};
   };
   if (std::holds_alternative<CelestialCoordinate>(m_systemLocation.get())) {
     auto const& coordinate = std::get<CelestialCoordinate>(m_systemLocation.get());

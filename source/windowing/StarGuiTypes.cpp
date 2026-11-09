@@ -19,9 +19,9 @@ GuiDirection otherDirection(GuiDirection direction) {
       return GuiDirection::Horizontal;
     default:
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((false));
+        Star::star_assert_failed((false));
       }
-      return (GuiDirection)-1;
+      return static_cast<GuiDirection>(-1);
   }
 }
 
@@ -30,10 +30,10 @@ extern std::expected<EnumMap<GuiDirection>, StarException> const GuiDirectionNam
 });
 
 std::expected<String, StarException> rarityBorder(String rarity) {
-  auto absolute = rarity.beginsWith("/");
+  auto absolute = rarity.starts_with("/");
   if (!absolute)
     return std::unexpected(std::move(absolute.error()));
-  return (*absolute ? rarity : strf("/interface/inventory/itemborder{}.png", rarity)).toLower();
+  return (*absolute ? rarity : Star::format("/interface/inventory/itemborder{}.png", rarity)).to_lower();
 }
 
 }

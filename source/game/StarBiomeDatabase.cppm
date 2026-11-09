@@ -72,7 +72,7 @@ private:
     Json parameters;
     Json toJson() const;
   };
-  typedef StringMap<Config> ConfigMap;
+  using ConfigMap = StringMap<Config>;
 
   [[nodiscard]]
   static std::expected<float, StarException> pickHueShiftFromJson(Json source, std::uint64_t seed, String const& key);

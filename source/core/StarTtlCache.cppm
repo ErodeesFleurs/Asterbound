@@ -15,8 +15,8 @@ namespace Star {
 template <typename LruCacheType>
 class TtlCacheBase {
 public:
-  typedef typename LruCacheType::Key Key;
-  typedef typename LruCacheType::Value::second_type Value;
+  using Key = typename LruCacheType::Key;
+  using Value = typename LruCacheType::Value::second_type;
 
   explicit TtlCacheBase(RandomService& random);
   TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear = std::chrono::milliseconds(1000), std::size_t maxSize = NPos, bool ttlUpdateEnabled = true);
@@ -44,8 +44,8 @@ public:
 
   // If the value is in the cache, returns it and updates the access time,
   // otherwise returns an empty optional.
-  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Value>>, StarException> maybeRef(Key const& key);
-  std::optional<std::reference_wrapper<Value const>> maybeRef(Key const& key) const;
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Value>>, StarException> find_ref(Key const& key);
+  std::optional<std::reference_wrapper<Value const>> find_ref(Key const& key) const;
 
   // Put the given value into the cache.
   [[nodiscard]] std::expected<void, StarException> set(Key const& key, Value value);
@@ -166,7 +166,7 @@ template <typename LruCacheType>
 auto TtlCacheBase<LruCacheType>::values() const -> List<Value> {
   List<Value> values;
   for (auto& p : m_cache.values())
-    values.append(std::move(p.second));
+    values.push_back(std::move(p.second));
   return values;
 }
 
@@ -176,8 +176,9 @@ void TtlCacheBase<LruCacheType>::setTtlUpdateEnabled(bool enabled) {
 }
 
 template <typename LruCacheType>
-[[nodiscard]] auto TtlCacheBase<LruCacheType>::maybeRef(Key const& key) -> std::expected<std::optional<std::reference_wrapper<Value>>, StarException> {
-  if (auto p = m_cache.maybeRef(key)) {
+[[nodiscard]] auto TtlCacheBase<LruCacheType>::find_ref(Key const& key)
+  -> std::expected<std::optional<std::reference_wrapper<Value>>, StarException> {
+  if (auto p = m_cache.find_ref(key)) {
     if (m_ttlUpdateEnabled) {
       auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
       if (!smear)
@@ -190,8 +191,8 @@ template <typename LruCacheType>
 }
 
 template <typename LruCacheType>
-auto TtlCacheBase<LruCacheType>::maybeRef(Key const& key) const -> std::optional<std::reference_wrapper<Value const>> {
-  if (auto value = m_cache.maybeRef(key))
+auto TtlCacheBase<LruCacheType>::find_ref(Key const& key) const -> std::optional<std::reference_wrapper<Value const>> {
+  if (auto value = m_cache.find_ref(key))
     return std::reference_wrapper<Value const>(value->get().second);
   return std::nullopt;
 }

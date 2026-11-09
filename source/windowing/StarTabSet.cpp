@@ -129,7 +129,7 @@ std::expected<void, StarException> TabSetWidget::addTab(String const& widgetName
     if (!tabs) return std::unexpected(GuiException("Tab set callback target no longer exists"));
     return tabs->tabSelect(page);
   });
-  auto addedButton = m_tabBar->addChild(toString(page), button);
+  auto addedButton = m_tabBar->addChild(Star::to_string(page), button);
   if (!addedButton)
     return std::unexpected(std::move(addedButton.error()));
   auto addedPage = m_stack->addChild(widgetName, widget);

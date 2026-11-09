@@ -12,16 +12,16 @@ namespace Star {
 template <typename Element, std::size_t MaxStackSize>
 class SmallVector {
 public:
-  typedef Element* iterator;
-  typedef Element const* const_iterator;
+  using iterator = Element*;
+  using const_iterator = Element const*;
 
-  typedef std::reverse_iterator<iterator> reverse_iterator;
-  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  typedef Element value_type;
+  using value_type = Element;
 
-  typedef Element& reference;
-  typedef Element const& const_reference;
+  using reference = Element&;
+  using const_reference = Element const&;
 
   SmallVector();
   SmallVector(SmallVector const& other);
@@ -181,8 +181,7 @@ auto SmallVector<Element, MaxStackSize>::operator=(SmallVector const& other) -> 
 
   reserve(other.size());
   auto overlap = std::min(size(), other.size());
-  for (std::size_t i = 0; i < overlap; ++i)
-    operator[](i) = other[i];
+  std::copy_n(other.begin(), overlap, begin());
   while (size() < other.size())
     emplace_back(other[size()]);
   while (size() > other.size())
@@ -208,8 +207,7 @@ auto SmallVector<Element, MaxStackSize>::operator=(SmallVector&& other) -> Small
     other.m_capacity = other.m_begin + MaxStackSize;
   } else {
     auto overlap = std::min(size(), other.size());
-    for (std::size_t i = 0; i < overlap; ++i)
-      operator[](i) = std::move(other[i]);
+    std::move(other.begin(), other.begin() + overlap, begin());
     while (size() < other.size())
       emplace_back(std::move(other[size()]));
     while (size() > other.size())
@@ -224,8 +222,7 @@ template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::operator=(std::initializer_list<Element> list) -> SmallVector& {
   reserve(list.size());
   auto overlap = std::min(size(), list.size());
-  for (std::size_t i = 0; i < overlap; ++i)
-    operator[](i) = list.begin()[i];
+  std::copy_n(list.begin(), overlap, begin());
   while (size() < list.size())
     emplace_back(list.begin()[size()]);
   while (size() > list.size())
@@ -301,7 +298,7 @@ auto SmallVector<Element, MaxStackSize>::at(std::size_t i) const -> std::expecte
 template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) -> reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < size()));
+    Star::star_assert_failed((i < size()));
   }
   return m_begin[i];
 }
@@ -309,7 +306,7 @@ auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) -> reference 
 template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::operator[](std::size_t i) const -> const_reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < size()));
+    Star::star_assert_failed((i < size()));
   }
   return m_begin[i];
 }
@@ -435,6 +432,7 @@ void SmallVector<Element, MaxStackSize>::clear() {
 template <typename Element, std::size_t MaxStackSize>
 auto SmallVector<Element, MaxStackSize>::erase(iterator pos) -> iterator {
   std::size_t index = pos - ptr();
+  // Assignments can append without reallocating, so keep the live size bound.
   for (std::size_t i = index; i < size() - 1; ++i)
     operator[](i) = std::move(operator[](i + 1));
   discardBack();
@@ -448,6 +446,7 @@ auto SmallVector<Element, MaxStackSize>::erase(iterator begin, iterator end) -> 
   std::size_t toRemove = endIndex - startIndex;
   if (toRemove == 0)
     return begin;
+  // As above, an assignment can extend the suffix that still needs shifting.
   for (std::size_t i = endIndex; i < size(); ++i)
     operator[](startIndex + (i - endIndex)) = std::move(operator[](i));
   while (toRemove--)
@@ -463,11 +462,20 @@ bool SmallVector<Element, MaxStackSize>::operator==(SmallVector const& other) co
   if (size() != other.size())
     return false;
 
-  for (std::size_t i = 0; i < size(); ++i) {
-    if (operator[](i) != other[i])
-      return false;
+  if constexpr (std::is_floating_point_v<Element>) {
+    // Preserve the original floating comparison under production fast-math.
+    for (std::size_t i = 0; i < size(); ++i) {
+      if (operator[](i) != other[i])
+        return false;
+    }
+    return true;
+  } else {
+    return std::equal(begin(), end(), other.begin(), [](Element const& left, Element const& right) -> bool {
+      if (left != right)
+        return false;
+      return true;
+    });
   }
-  return true;
 }
 
 template <typename Element, std::size_t MaxStackSize>
@@ -477,20 +485,30 @@ bool SmallVector<Element, MaxStackSize>::operator!=(SmallVector const& other) co
 
 template <typename Element, std::size_t MaxStackSize>
 bool SmallVector<Element, MaxStackSize>::operator<(SmallVector const& other) const {
-  for (std::size_t i = 0; i < size(); ++i) {
-    if (i >= other.size())
-      return false;
+  if constexpr (std::is_floating_point_v<Element>) {
+    // Preserve the original floating comparison under production fast-math.
+    for (std::size_t i = 0; i < size(); ++i) {
+      if (i >= other.size())
+        return false;
 
-    Element const& a = operator[](i);
-    Element const& b = other[i];
+      Element const& a = operator[](i);
+      Element const& b = other[i];
 
-    if (a < b)
-      return true;
-    else if (b < a)
-      return false;
+      if (a < b)
+        return true;
+      else if (b < a)
+        return false;
+    }
+
+    return size() < other.size();
+  } else {
+    return std::lexicographical_compare(begin(), end(), other.begin(), other.end(),
+                                        [](Element const& left, Element const& right) -> bool {
+                                          if (left < right)
+                                            return true;
+                                          return false;
+                                        });
   }
-
-  return size() < other.size();
 }
 
 template <typename Element, std::size_t MaxStackSize>

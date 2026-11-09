@@ -10,12 +10,11 @@ using namespace Star;
 
 void testLine(Vec2D a, Vec2D b, Vec2I offset, List<Vec2I> comp) {
   List<Vec2I> res;
-  auto traversed = forBlocksAlongLine(a + Vec2D(offset),
-      b - a,
-      [&res](int x, int y) -> std::expected<bool, StarException> {
-        res.append({x, y});
-        return true;
-      });
+  auto traversed =
+    forBlocksAlongLine(a + Vec2D(offset), b - a, [&res](int x, int y) -> std::expected<bool, StarException> {
+      res.push_back({x, y});
+      return true;
+    });
   ASSERT_EQ(traversed, true);
   for (auto& c : comp)
     c += offset;

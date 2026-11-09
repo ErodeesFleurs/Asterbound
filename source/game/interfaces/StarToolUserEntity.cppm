@@ -104,7 +104,7 @@ public:
 
   // FIXME: These were all fine, just need to be fixed because now we have the
   // movement controller itself and can use that directly
-  virtual Vec2F position() const = 0;
+  Vec2F position() const override = 0;
   virtual Vec2F velocity() const = 0;
   virtual Direction facingDirection() const = 0;
   virtual Direction walkingDirection() const = 0;

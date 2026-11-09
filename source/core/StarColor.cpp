@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.map;
 import star.string;
 import star.byte_array;
@@ -106,10 +107,10 @@ Color Color::rgba(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a
 
 Color Color::fromUint32(std::uint32_t v) {
   Color c;
-  c.setAlpha(((std::uint8_t*)(&v))[3]);
-  c.setRed(((std::uint8_t*)(&v))[2]);
-  c.setGreen(((std::uint8_t*)(&v))[1]);
-  c.setBlue(((std::uint8_t*)(&v))[0]);
+  c.setAlpha((reinterpret_cast<std::uint8_t*>(&v))[3]);
+  c.setRed((reinterpret_cast<std::uint8_t*>(&v))[2]);
+  c.setGreen((reinterpret_cast<std::uint8_t*>(&v))[1]);
+  c.setBlue((reinterpret_cast<std::uint8_t*>(&v))[0]);
   return c;
 }
 
@@ -137,9 +138,9 @@ Color Color::temperature(float temp) {
     b = 255;
   }
 
-  c.setRedF((float)r / 255.0f);
-  c.setGreenF((float)g / 255.0f);
-  c.setBlueF((float)b / 255.0f);
+  c.setRedF(static_cast<float>(r) / 255.0f);
+  c.setGreenF(static_cast<float>(g) / 255.0f);
+  c.setBlueF(static_cast<float>(b) / 255.0f);
 
   return c;
 }
@@ -232,7 +233,7 @@ Color Color::gray(std::uint8_t g) {
   return Color::rgb(g, g, g);
 }
 
-Color::Color() {}
+Color::Color() = default;
 
 std::expected<Color, StarException> Color::create(StringView name) {
   if (name.utf8().rfind('#', 0) == 0)
@@ -245,7 +246,7 @@ std::expected<Color, StarException> Color::create(StringView name) {
   auto i = NamedColors->find(*key);
   if (i != NamedColors->end())
     return i->second;
-  return std::unexpected(ColorException(strf("Named color {} not found", name), false));
+  return std::unexpected(ColorException(Star::format("Named color {} not found", name), false));
 }
 
 float Color::redF() const {
@@ -310,10 +311,10 @@ void Color::setAlpha(std::uint8_t a) {
 
 std::uint32_t Color::toUint32() const {
   std::uint32_t val;
-  ((std::uint8_t*)(&val))[3] = alpha();
-  ((std::uint8_t*)(&val))[2] = red();
-  ((std::uint8_t*)(&val))[1] = green();
-  ((std::uint8_t*)(&val))[0] = blue();
+  (reinterpret_cast<std::uint8_t*>(&val))[3] = alpha();
+  (reinterpret_cast<std::uint8_t*>(&val))[2] = red();
+  (reinterpret_cast<std::uint8_t*>(&val))[1] = green();
+  (reinterpret_cast<std::uint8_t*>(&val))[0] = blue();
   return val;
 }
 
@@ -440,9 +441,8 @@ bool Color::operator!=(const Color& c) const {
   return m_data != c.m_data;
 }
 
-std::ostream& operator<<(std::ostream& os, const Color& c) {
-  os << c.toRgbaF();
-  return os;
+void write_text(TextBuffer& buffer, Color const& c) {
+  append_text(buffer, c.toRgbaF());
 }
 
 float Color::toLinear(float in) {
@@ -512,9 +512,7 @@ Color Color::operator+(Color const& c) const {
   return Color::rgbaf(m_data + c.toRgbaF());
 }
 
-Color Color::operator*(Color const& c) const {
-  return Color::rgbaf(m_data.piecewiseMultiply(c.toRgbaF()));
-}
+Color Color::operator*(Color const& c) const { return Color::rgbaf(m_data.piecewise_multiply(c.toRgbaF())); }
 
 Color& Color::operator+=(Color const& c) {
   return * this = *this + c;
@@ -622,22 +620,22 @@ Vec4B Color::hueShiftVec4B(Vec4B color, float hue) {
 std::expected<Vec4B, StarException> Color::hexToVec4B(StringView s) {
   Array<std::uint8_t, 4> cbytes{};
   std::expected<std::size_t, StarException> decoded;
-  if (s.utf8Size() == 3 || s.utf8Size() == 4) {
-    decoded = nibbleDecode({s.utf8Ptr(), s.utf8Size()}, {(char*)cbytes.data(), 4});
+  if (s.utf8_size() == 3 || s.utf8_size() == 4) {
+    decoded = nibbleDecode({s.utf8_data(), s.utf8_size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
-    for (std::size_t i = 0; i < s.utf8Size(); ++i)
+    for (std::size_t i = 0; i < s.utf8_size(); ++i)
       cbytes[i] = (cbytes[i] << 4) | cbytes[i];
-    if (s.utf8Size() == 3)
+    if (s.utf8_size() == 3)
       cbytes[3] = 255;
-  } else if (s.utf8Size() == 6 || s.utf8Size() == 8) {
-    decoded = hexDecode({s.utf8Ptr(), s.utf8Size()}, {(char*)cbytes.data(), 4});
+  } else if (s.utf8_size() == 6 || s.utf8_size() == 8) {
+    decoded = hexDecode({s.utf8_data(), s.utf8_size()}, {reinterpret_cast<char*>(cbytes.data()), 4});
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
-    if (s.utf8Size() == 6)
+    if (s.utf8_size() == 6)
       cbytes[3] = 255;
   } else {
-    return std::unexpected(ColorException(strf("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8Size(), s), false));
+    return std::unexpected(ColorException(Star::format("Improper size {} for hex string '{}' in Color::hexToVec4B", s.utf8_size(), s), false));
   }
   return Vec4B(std::move(cbytes));
 }

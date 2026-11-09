@@ -61,6 +61,12 @@ TEST(SmallVectorTest, Destructors) {
 }
 
 namespace {
+struct ContextualVectorComparison {
+  bool value;
+  explicit operator bool() const { return value; }
+  bool operator!() const { return value; }
+};
+
 struct SmallVectorLifetime {
   int alive = 0;
   int copies = 0;
@@ -127,6 +133,50 @@ struct MoveOnlyVectorValue {
 };
 }
 
+TEST(SmallVectorTest, EqualityNeedsOnlyContextualInequality) {
+  struct Value {
+    int value;
+    std::reference_wrapper<int> comparisons;
+    ContextualVectorComparison operator!=(Value const& other) const {
+      ++comparisons.get();
+      return {value != other.value};
+    }
+  };
+  int comparisons = 0;
+  SmallVector<Value, 3> left{{1, comparisons}, {2, comparisons}};
+  SmallVector<Value, 3> right{{1, comparisons}, {2, comparisons}};
+  EXPECT_TRUE(left == right);
+  EXPECT_EQ(comparisons, 2);
+  right[0].value = 3;
+  comparisons = 0;
+  EXPECT_FALSE(left == right);
+  EXPECT_EQ(comparisons, 1);
+  comparisons = 0;
+  EXPECT_TRUE(left == left);
+  EXPECT_EQ(comparisons, 0);
+  ASSERT_TRUE(right.pop_back());
+  EXPECT_FALSE(left == right);
+  EXPECT_EQ(comparisons, 0);
+}
+
+TEST(SmallVectorTest, OrderingNeedsOnlyContextualLess) {
+  struct Value {
+    int value;
+    ContextualVectorComparison operator<(Value const& other) const { return {value < other.value}; }
+  };
+  SmallVector<Value, 3> prefix{{1}, {2}};
+  SmallVector<Value, 3> longer{{1}, {2}, {3}};
+  SmallVector<Value, 3> greater{{1}, {4}};
+  SmallVector<Value, 3> empty;
+  EXPECT_TRUE(prefix < longer);
+  EXPECT_FALSE(longer < prefix);
+  EXPECT_TRUE(longer < greater);
+  EXPECT_FALSE(greater < longer);
+  EXPECT_FALSE(prefix < prefix);
+  EXPECT_TRUE(empty < prefix);
+  EXPECT_FALSE(prefix < empty);
+  EXPECT_FALSE(empty < empty);
+}
 
 TEST(SmallVectorTest, ZeroCapacityAndOveralignedStorage) {
   struct alignas(64) Value {
@@ -469,3 +519,92 @@ TEST(SmallVectorTest, AliasedEmplaceStagesValueBeforeGrowth) {
   EXPECT_EQ(text, (SmallVector<std::string, 1>{"first", "first"}));
 }
 
+TEST(SmallVectorTest, AssignmentPreservesForwardEffectsAndReverseTailDestruction) {
+  struct Value {
+    std::reference_wrapper<std::vector<int>> events;
+    int value;
+    Value(std::vector<int>& events, int value) : events(events), value(value) {}
+    Value(Value const& other) : events(other.events), value(other.value) { events.get().push_back(300 + value); }
+    Value(Value&& other) : events(other.events), value(std::exchange(other.value, -1)) {
+      events.get().push_back(400 + value);
+    }
+    Value& operator=(Value const& other) {
+      value = other.value;
+      events.get().push_back(100 + value);
+      return *this;
+    }
+    Value& operator=(Value&& other) {
+      value = std::exchange(other.value, -1);
+      events.get().push_back(200 + value);
+      return *this;
+    }
+    ~Value() { events.get().push_back(-value); }
+  };
+  std::vector<int> events;
+  SmallVector<Value, 4> source;
+  source.emplace_back(events, 10);
+  source.emplace_back(events, 20);
+  SmallVector<Value, 4> target;
+  for (int i = 1; i <= 4; ++i)
+    target.emplace_back(events, i);
+  events.clear();
+  EXPECT_EQ(&(target = source), &target);
+  EXPECT_EQ(events, (std::vector<int>{110, 120, -4, -3}));
+  ASSERT_EQ(target.size(), 2u);
+  EXPECT_EQ(target[0].value, 10);
+  EXPECT_EQ(target[1].value, 20);
+
+  target.emplace_back(events, 3);
+  target.emplace_back(events, 4);
+  events.clear();
+  EXPECT_EQ(&(target = std::move(source)), &target);
+  EXPECT_EQ(events, (std::vector<int>{210, 220, -4, -3, 1, 1}));
+  EXPECT_TRUE(source.empty());
+  ASSERT_EQ(target.size(), 2u);
+  EXPECT_EQ(target[0].value, 10);
+  EXPECT_EQ(target[1].value, 20);
+}
+
+TEST(SmallVectorTest, EraseIncludesElementsAppendedByMoveAssignment) {
+  struct Value {
+    std::reference_wrapper<std::function<void()>> afterMove;
+    int value;
+    Value(std::function<void()>& afterMove, int value) : afterMove(afterMove), value(value) {}
+    Value(Value const&) = delete;
+    Value(Value&& other) : afterMove(other.afterMove), value(std::exchange(other.value, -1)) {}
+    Value& operator=(Value&& other) {
+      value = std::exchange(other.value, -1);
+      if (afterMove.get())
+        afterMove.get()();
+      return *this;
+    }
+  };
+  std::function<void()> afterMove;
+  SmallVector<Value, 8> values;
+  for (int i : {10, 20, 30})
+    values.emplace_back(afterMove, i);
+  bool appended = false;
+  afterMove = [&] {
+    if (!std::exchange(appended, true))
+      values.emplace_back(afterMove, 40);
+  };
+  EXPECT_EQ(values.erase(values.begin()), values.begin());
+  ASSERT_EQ(values.size(), 3u);
+  EXPECT_EQ(values[0].value, 20);
+  EXPECT_EQ(values[1].value, 30);
+  EXPECT_EQ(values[2].value, 40);
+
+  values.clear();
+  for (int i : {10, 20, 30, 40})
+    values.emplace_back(afterMove, i);
+  appended = false;
+  afterMove = [&] {
+    if (!std::exchange(appended, true))
+      values.emplace_back(afterMove, 50);
+  };
+  EXPECT_EQ(values.erase(values.begin(), values.begin() + 2), values.begin());
+  ASSERT_EQ(values.size(), 3u);
+  EXPECT_EQ(values[0].value, 30);
+  EXPECT_EQ(values[1].value, 40);
+  EXPECT_EQ(values[2].value, 50);
+}

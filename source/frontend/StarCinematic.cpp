@@ -201,7 +201,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto skipTo = timeSkipDefinition.getFloat("skipTo");
     if (!skipTo)
       return std::unexpected(std::move(skipTo.error()));
-    m_timeSkips.append(TimeSkip{*available, *skipTo});
+    m_timeSkips.push_back(TimeSkip{.availableTime = *available, .skipToTime = *skipTo});
   }
   std::sort(m_timeSkips.begin(), m_timeSkips.end(), [](TimeSkip const& a, TimeSkip const& b) {
     return a.availableTime < b.availableTime;
@@ -217,7 +217,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto zoom = cameraDefinition.getFloat("zoom", 1.0f);
     if (!zoom)
       return std::unexpected(std::move(zoom.error()));
-    CameraKeyFrame keyFrame{*timecode, *zoom, {}};
+    CameraKeyFrame keyFrame{.timecode = *timecode, .zoom = *zoom, .pan = {}};
     auto hasPan = cameraDefinition.contains("pan");
     if (!hasPan)
       return std::unexpected(std::move(hasPan.error()));
@@ -230,7 +230,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
         return std::unexpected(std::move(pan.error()));
       keyFrame.pan = *pan;
     }
-    m_cameraKeyFrames.append(keyFrame);
+    m_cameraKeyFrames.push_back(keyFrame);
   }
 
   auto panels = definition.getArray("panels");
@@ -336,11 +336,11 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
       decoded = assignIfPresent("textPercentage", keyframe.textPercentage, &Json::toFloat);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      panel->keyFrames.append(std::move(keyframe));
+      panel->keyFrames.push_back(std::move(keyframe));
       float endTimecode = panel->endTime > 0 ? std::min(panel->endTime, panel->startTime + *timecode) : panel->startTime + *timecode;
       m_completionTime = std::max(m_completionTime, endTimecode);
     }
-    m_panels.append(std::move(panel));
+    m_panels.push_back(std::move(panel));
   }
 
   auto audio = definition.getArray("audio");
@@ -364,7 +364,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     if (!resource)
       return std::unexpected(std::move(resource.error()));
     cue.resource = std::move(*resource);
-    m_audioCues.append(std::move(cue));
+    m_audioCues.push_back(std::move(cue));
     m_completionTime = std::max(m_completionTime, *timecode);
     m_completionTime = std::max(m_completionTime, *endTimecode);
   }
@@ -430,9 +430,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
   return {};
 }
 
-void Cinematic::setPlayer(std::shared_ptr<Player> player) {
-  m_player = player;
-}
+void Cinematic::setPlayer(std::shared_ptr<Player> player) { m_player = std::move(player); }
 
 void Cinematic::update(float) {
   m_currentTimeSkip = {};
@@ -530,7 +528,7 @@ std::expected<void, StarException> Cinematic::render() {
         m_completable = true;
       if (!values.alpha)
         continue;
-      auto frame = toString(static_cast<int>(values.frame) % panel->animationFrames);
+      auto frame = Star::to_string(static_cast<int>(values.frame) % panel->animationFrames);
       auto alphaColor = Color::rgbaf(1.0f, 1.0f, 1.0f, values.alpha);
       for (auto const& d : panel->drawables) {
         auto metadata = m_guiContext.get().root().imageMetadataDatabase();
@@ -539,7 +537,7 @@ std::expected<void, StarException> Cinematic::render() {
         auto image = d.getString("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
-        auto definition = d.set("image", image->replaceTags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));
+        auto definition = d.set("image", image->replace_tags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));
         if (!definition)
           return std::unexpected(std::move(definition.error()));
         auto drawable = Drawable::create(**metadata, *definition);
@@ -601,9 +599,9 @@ std::expected<void, StarException> Cinematic::render() {
     auto resetScissor = renderer.setScissorRect({});
     if (!resetScissor) {
       if (!panelsRendered)
-        return std::unexpected(panelsRendered.error().withContext(
-            strf("Cinematic scissor restoration failed: {}",
-                printException(ExceptionDiagnostic(resetScissor.error()), true))));
+        return std::unexpected(panelsRendered.error().with_context(
+            Star::format("Cinematic scissor restoration failed: {}",
+                Star::print_exception(ExceptionDiagnostic(resetScissor.error()), true))));
       return std::unexpected(std::move(resetScissor.error()));
     }
   }
@@ -738,7 +736,8 @@ void Cinematic::updateCamera(float timecode) {
 }
 
 float Cinematic::currentTimecode() const {
-  return std::min((float)m_timer.time() - m_backgroundFadeTime, m_completionTime - 2 * m_backgroundFadeTime);
+  return std::min(static_cast<float>(m_timer.time()) - m_backgroundFadeTime,
+                  m_completionTime - 2 * m_backgroundFadeTime);
 }
 
 Cinematic::PanelValues Cinematic::determinePanelValues(std::shared_ptr<Panel> panel, float timecode) {

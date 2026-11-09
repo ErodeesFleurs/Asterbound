@@ -17,7 +17,7 @@ namespace Star {
 template <typename T>
 class NetElementBasicField : public NetElement {
 public:
-  virtual ~NetElementBasicField() = default;
+  ~NetElementBasicField() override = default;
 
   T const& get() const;
 
@@ -71,8 +71,8 @@ protected:
   [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override;
 };
 
-typedef NetElementIntegral<std::int64_t> NetElementInt;
-typedef NetElementIntegral<std::uint64_t> NetElementUInt;
+using NetElementInt = NetElementIntegral<std::int64_t>;
+using NetElementUInt = NetElementIntegral<std::uint64_t>;
 
 // Properly encodes NPos no matter the platform width of size_t NetElement
 // size_t values are NOT clamped when setting.
@@ -144,8 +144,8 @@ private:
   std::function<std::expected<void, StarException>(DataStream&, T const&)> m_writer;
 };
 
-typedef NetElementData<String> NetElementString;
-typedef NetElementData<ByteArray> NetElementBytes;
+using NetElementString = NetElementData<String>;
+using NetElementBytes = NetElementData<ByteArray>;
 
 template <typename T>
 T const& NetElementBasicField<T>::get() const {
@@ -265,7 +265,7 @@ template <typename T>
     // case, this is an error or the step tracking is wildly off, so just clear
     // any other incoming values.
     if (interpolationTime > 0.0f && (m_pendingInterpolatedValues->empty() || interpolationTime >= m_pendingInterpolatedValues->back().first)) {
-      m_pendingInterpolatedValues->append({interpolationTime, std::move(t)});
+      m_pendingInterpolatedValues->push_back({interpolationTime, std::move(t)});
     } else {
       m_value = std::move(t);
       m_pendingInterpolatedValues->clear();
@@ -320,7 +320,8 @@ template <typename Enum>
 template <typename Enum>
 [[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::writeData(DataStream& ds, Enum const& v) const {
   if constexpr (sizeof(Enum) == 1) return ds.write(v);
-  else return ds.viwrite((std::int64_t)v);
+  else
+    return ds.viwrite(static_cast<std::int64_t>(v));
 }
 
 template <typename T>

@@ -434,16 +434,16 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
           if (!instanceValueResult30)
             return std::unexpected(std::move(instanceValueResult30.error()));
           if (auto actionTypeName = std::move(*instanceValueResult30)) {
-            auto const& enumResult31 = InteractActionTypeNames;
-            if (!enumResult31)
-              return std::unexpected(enumResult31.error());
-            auto toStringResult32 = actionTypeName.toString();
-            if (!toStringResult32)
-              return std::unexpected(std::move(toStringResult32.error()));
-            auto getLeftResult33 = (*enumResult31).getLeft(std::move(*toStringResult32));
-            if (!getLeftResult33)
-              return std::unexpected(std::move(getLeftResult33.error()));
-            auto actionType = getLeftResult33->get();
+            auto const& action_names = InteractActionTypeNames;
+            if (!action_names)
+              return std::unexpected(action_names.error());
+            auto action_name = actionTypeName.toString();
+            if (!action_name)
+              return std::unexpected(std::move(action_name.error()));
+            auto action_lookup = (*action_names).get_left(std::move(*action_name));
+            if (!action_lookup)
+              return std::unexpected(std::move(action_lookup.error()));
+            auto actionType = action_lookup->get();
             if (actionType >= InteractActionType::OpenCraftingInterface && actionType <= InteractActionType::ScriptPane) {
               auto instanceValueResult34 = sourceItem->instanceValue("interactData", Json());
               if (!instanceValueResult34)
@@ -488,7 +488,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     });
   if (!sortByComputedValueResult41)
     return std::unexpected(std::move(sortByComputedValueResult41.error()));
-  for (auto name : bagOrder) {
+  for (auto const& name : bagOrder) {
     auto getResult42 = itemBagConfig.get(name);
     if (!getResult42)
       return std::unexpected(std::move(getResult42.error()));
@@ -496,9 +496,18 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!getStringResult43)
       return std::unexpected(std::move(getStringResult43.error()));
     auto itemGrid = std::move(*getStringResult43);
-    invWindowReader.registerCallback(itemGrid, std::bind(leftClickCallback, name, std::placeholders::_1));
-    invWindowReader.registerCallback(itemGrid + ".right", std::bind(bagGridCallback, name, std::placeholders::_1));
-    invWindowReader.registerCallback(itemGrid + ".middle", std::bind(middleClickCallback, name, std::placeholders::_1));
+    invWindowReader.registerCallback(
+      itemGrid, [leftClickCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return leftClickCallback(name, widget);
+      });
+    invWindowReader.registerCallback(
+      itemGrid + ".right", [bagGridCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return bagGridCallback(name, widget);
+      });
+    invWindowReader.registerCallback(
+      itemGrid + ".middle", [middleClickCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
+        return middleClickCallback(name, widget);
+      });
   }
 
   invWindowReader.registerCallback("close", [this](Widget&)  -> std::expected<void, StarException> {
@@ -531,14 +540,14 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       if (!toStringResult48)
         return std::unexpected(std::move(toStringResult48.error()));
       auto selected = std::move(*toStringResult48);
-      auto keyOfResult49 = m_tabButtonData.keyOf(selected);
-      if (!keyOfResult49)
-        return std::unexpected(std::move(keyOfResult49.error()));
-      auto selectTabResult50 = selectTab(std::move(*keyOfResult49));
-      if (!selectTabResult50)
-        return std::unexpected(std::move(selectTabResult50.error()));
-    
-  return {};
+      auto tab_lookup = m_tabButtonData.key_of(selected);
+      if (!tab_lookup)
+        return std::unexpected(std::move(tab_lookup.error()));
+      auto tab_selected = selectTab(std::move(*tab_lookup));
+      if (!tab_selected)
+        return std::unexpected(std::move(tab_selected.error()));
+
+      return {};
 });
 
   auto registerSlotCallbacks = [&](String name, InventorySlot slot)  -> std::expected<void, StarException> {
@@ -612,18 +621,18 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     return std::unexpected(std::move(toFloatResult60.error()));
   m_trashBurn = GameTimer(std::move(*toFloatResult60));
 
-  auto fetchChildResult61 = fetchChild<ImageWidget>("techHeadDisabled");
-  if (!fetchChildResult61)
-    return std::unexpected(std::move(fetchChildResult61.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult61));
-  auto fetchChildResult62 = fetchChild<ImageWidget>("techBodyDisabled");
-  if (!fetchChildResult62)
-    return std::unexpected(std::move(fetchChildResult62.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult62));
-  auto fetchChildResult63 = fetchChild<ImageWidget>("techLegsDisabled");
-  if (!fetchChildResult63)
-    return std::unexpected(std::move(fetchChildResult63.error()));
-  m_disabledTechOverlays.append(std::move(*fetchChildResult63));
+  auto head_overlay = fetchChild<ImageWidget>("techHeadDisabled");
+  if (!head_overlay)
+    return std::unexpected(std::move(head_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*head_overlay));
+  auto body_overlay = fetchChild<ImageWidget>("techBodyDisabled");
+  if (!body_overlay)
+    return std::unexpected(std::move(body_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*body_overlay));
+  auto legs_overlay = fetchChild<ImageWidget>("techLegsDisabled");
+  if (!legs_overlay)
+    return std::unexpected(std::move(legs_overlay.error()));
+  m_disabledTechOverlays.push_back(std::move(*legs_overlay));
 
   {
     auto const& enumResult64 = EquipmentSlotNames;
@@ -663,7 +672,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     }
   }
 
-  for (auto name : bagOrder) {
+  for (auto const& name : bagOrder) {
     auto getResult70 = itemBagConfig.get(name);
     if (!getResult70)
       return std::unexpected(std::move(getResult70.error()));
@@ -865,7 +874,7 @@ std::expected<std::shared_ptr<Pane>, StarException> InventoryPane::createTooltip
       return std::unexpected(enumResult109.error());
     for (auto const& p : (*enumResult109)) {
       {
-        auto fetchChildResult110 = fetchChild<ImageWidget>(strf("tech{}", p.second));
+        auto fetchChildResult110 = fetchChild<ImageWidget>(Star::format("tech{}", p.second));
         if (!fetchChildResult110)
           return std::unexpected(std::move(fetchChildResult110.error()));
         if (auto techIcon = std::move(*fetchChildResult110)) {
@@ -1108,7 +1117,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       return std::unexpected(enumResult137.error());
     for (auto const& p : (*enumResult137)) {
       {
-        auto fetchChildResult138 = fetchChild<ImageWidget>(strf("tech{}", p.second));
+        auto fetchChildResult138 = fetchChild<ImageWidget>(Star::format("tech{}", p.second));
         if (!fetchChildResult138)
           return std::unexpected(std::move(fetchChildResult138.error()));
         if (auto techIcon = std::move(*fetchChildResult138)) {
@@ -1209,7 +1218,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto maxHealthResult152 = m_player->maxHealth();
   if (!maxHealthResult152)
     return std::unexpected(std::move(maxHealthResult152.error()));
-  auto setTextResult153 = healthLabel->setText(strf("{:.1f}", std::move(*maxHealthResult152)));
+  auto setTextResult153 = healthLabel->setText(Star::format("{:.1f}", std::move(*maxHealthResult152)));
   if (!setTextResult153)
     return std::unexpected(std::move(setTextResult153.error()));
   auto fetchChildResult154 = fetchChild<LabelWidget>("energytext");
@@ -1219,7 +1228,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto maxEnergyResult155 = m_player->maxEnergy();
   if (!maxEnergyResult155)
     return std::unexpected(std::move(maxEnergyResult155.error()));
-  auto setTextResult156 = energyLabel->setText(strf("{:.1f}", std::move(*maxEnergyResult155)));
+  auto setTextResult156 = energyLabel->setText(Star::format("{:.1f}", std::move(*maxEnergyResult155)));
   if (!setTextResult156)
     return std::unexpected(std::move(setTextResult156.error()));
   auto fetchChildResult157 = fetchChild<LabelWidget>("weapontext");
@@ -1229,7 +1238,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto powerMultiplierResult158 = m_player->powerMultiplier();
   if (!powerMultiplierResult158)
     return std::unexpected(std::move(powerMultiplierResult158.error()));
-  auto setTextResult159 = weaponLabel->setText(strf("{:.1f}%", std::move(*powerMultiplierResult158) * 100));
+  auto setTextResult159 = weaponLabel->setText(Star::format("{:.1f}%", std::move(*powerMultiplierResult158) * 100));
   if (!setTextResult159)
     return std::unexpected(std::move(setTextResult159.error()));
   auto fetchChildResult160 = fetchChild<LabelWidget>("defensetext");
@@ -1245,7 +1254,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     }
   else
     {
-      auto setTextResult162 = defenseLabel->setText(strf("{:.1f}", m_player->protection()));
+      auto setTextResult162 = defenseLabel->setText(Star::format("{:.1f}", m_player->protection()));
       if (!setTextResult162)
         return std::unexpected(std::move(setTextResult162.error()));
       
@@ -1255,7 +1264,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   if (!fetchChildResult163)
     return std::unexpected(std::move(fetchChildResult163.error()));
   auto moneyLabel = std::move(*fetchChildResult163);
-  auto setTextResult164 = moneyLabel->setText(toString(m_player->currency("money")));
+  auto setTextResult164 = moneyLabel->setText(Star::to_string(m_player->currency("money")));
   if (!setTextResult164)
     return std::unexpected(std::move(setTextResult164.error()));
 
@@ -1273,7 +1282,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     auto showResult168 = essenceLabel->show();
     if (!showResult168)
       return std::unexpected(std::move(showResult168.error()));
-    auto setTextResult169 = essenceLabel->setText(toString(m_player->currency("essence")));
+    auto setTextResult169 = essenceLabel->setText(Star::to_string(m_player->currency("essence")));
     if (!setTextResult169)
       return std::unexpected(std::move(setTextResult169.error()));
   } else {
@@ -1328,7 +1337,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
         auto nameResult182 = pet->name();
         if (!nameResult182)
           return std::unexpected(std::move(nameResult182.error()));
-        auto toUpperResult183 = std::move(*nameResult182)->toUpper();
+        auto toUpperResult183 = std::move(*nameResult182)->to_upper();
         if (!toUpperResult183)
           return std::unexpected(std::move(toUpperResult183.error()));
         auto setTextResult184 = nameLabel->setText(std::move(*toUpperResult183));
@@ -1353,7 +1362,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       if (!statResult188)
         return std::unexpected(std::move(statResult188.error()));
       if (auto attack = std::move(*statResult188)) {
-        auto setTextResult189 = attackLabel->setText(strf("{:.1f}", *attack));
+        auto setTextResult189 = attackLabel->setText(Star::format("{:.1f}", *attack));
         if (!setTextResult189)
           return std::unexpected(std::move(setTextResult189.error()));
       } else {
@@ -1372,7 +1381,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       if (!statResult192)
         return std::unexpected(std::move(statResult192.error()));
       if (auto defense = std::move(*statResult192)) {
-        auto setTextResult193 = defenseLabel->setText(strf("{:.1f}", *defense));
+        auto setTextResult193 = defenseLabel->setText(Star::format("{:.1f}", *defense));
         if (!setTextResult193)
           return std::unexpected(std::move(setTextResult193.error()));
       } else {
@@ -1455,7 +1464,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   }
 
   if (auto item = inventory->swapSlotItem()) {
-    float pitch = 1.f - ((float)item->count() / (float)item->maxStack()) * .2f;
+    float pitch = 1.f - (static_cast<float>(item->count()) / static_cast<float>(item->maxStack())) * .2f;
     if (!m_currentSwapSlotItem || !item->matches(*m_currentSwapSlotItem, true))
       {
         auto randFromResult210 = RandomSource(context.root().random().randu64()).randFrom(m_pickUpSounds);
@@ -1537,7 +1546,7 @@ std::expected<void, StarException> InventoryPane::selectTab(String const& select
       auto toStringResult223 = button.get().data().toString();
       if (!toStringResult223)
         return std::unexpected(std::move(toStringResult223.error()));
-      auto equalsIgnoreCaseResult224 = std::move(*toStringResult223).equalsIgnoreCase(m_tabButtonData[selected]);
+      auto equalsIgnoreCaseResult224 = std::move(*toStringResult223).equals_ignore_case(m_tabButtonData[selected]);
       if (!equalsIgnoreCaseResult224)
         return std::unexpected(std::move(equalsIgnoreCaseResult224.error()));
       if (std::move(*equalsIgnoreCaseResult224))

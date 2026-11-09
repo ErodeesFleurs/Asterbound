@@ -54,7 +54,7 @@ private:
 
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, float v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::set", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] = pixels[1] = pixels[2] = v;
   return {};
@@ -62,7 +62,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::set", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] = v.x();
   pixels[1] = v.y();
@@ -72,7 +72,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 
 inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::add", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::add", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   pixels[0] += v.x();
   pixels[1] += v.y();
@@ -82,7 +82,7 @@ inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, 
 
 inline std::expected<Vec3F, StarException> Lightmap::get(unsigned x, unsigned y) const {
   if (x >= m_width || y >= m_height)
-    return std::unexpected(LightmapException(strf("[{}, {}] out of range in Lightmap::get", x, y)));
+    return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::get", x, y)));
   auto pixels = data().subspan(y * m_width * 3 + x * 3, 3);
   return Vec3F(pixels[0], pixels[1], pixels[2]);
 }
@@ -124,7 +124,7 @@ public:
   explicit CellularLightingCalculator();
   explicit CellularLightingCalculator(bool monochrome);
 
-  typedef ColoredCellularLightArray::Cell Cell;
+  using Cell = ColoredCellularLightArray::Cell;
 
   [[nodiscard]] std::expected<void, StarException> setMonochrome(bool monochrome);
 
@@ -166,7 +166,7 @@ private:
 // uses scalar lights with no color calculation.
 class CellularLightIntensityCalculator {
 public:
-  typedef ScalarCellularLightArray::Cell Cell;
+  using Cell = ScalarCellularLightArray::Cell;
 
   [[nodiscard]] std::expected<void, StarException> setParameters(Json const& config);
 
@@ -195,9 +195,11 @@ inline std::size_t CellularLightingCalculator::baseIndexFor(Vec2I const& positio
 
 inline void CellularLightingCalculator::setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle) {
   if (m_monochrome)
-    m_lightArray.rightRef().cellAtIndex(cellIndex) = ScalarCellularLightArray::Cell{light.sum() / 3, obstacle};
+    m_lightArray.rightRef().cellAtIndex(cellIndex) =
+      ScalarCellularLightArray::Cell{.light = light.sum() / 3, .obstacle = obstacle};
   else
-    m_lightArray.leftRef().cellAtIndex(cellIndex) = ColoredCellularLightArray::Cell{light, obstacle};
+    m_lightArray.leftRef().cellAtIndex(cellIndex) =
+      ColoredCellularLightArray::Cell{.light = light, .obstacle = obstacle};
 }
 
 }

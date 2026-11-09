@@ -157,20 +157,20 @@ std::expected<RootLoader, StarException> RootLoader::create(Defaults defaults) {
     "Boot time configuration file, defaults to sbinit.config");
   if (!boot) return std::unexpected(std::move(boot.error()));
   auto logfile = loader.addParameter("logfile", "logfile", Optional,
-    strf("Log to the given logfile relative to the root directory, defaults to {}",
+    Star::format("Log to the given logfile relative to the root directory, defaults to {}",
       loader.m_defaults.logFile ? *loader.m_defaults.logFile : "no log file"));
   if (!logfile) return std::unexpected(std::move(logfile.error()));
   auto levelName = enumName<LogLevelNames>(loader.m_defaults.logLevel);
   if (!levelName) return std::unexpected(std::move(levelName.error()));
   auto loglevel = loader.addParameter("loglevel", "level", Optional,
-    strf("Sets the logging level (debug|info|warn|error), defaults to {}", *levelName));
+    Star::format("Sets the logging level (debug|info|warn|error), defaults to {}", *levelName));
   if (!loglevel) return std::unexpected(std::move(loglevel.error()));
-  auto quiet = loader.addSwitch("quiet", strf("Do not log to stdout, defaults to {}", loader.m_defaults.quiet));
+  auto quiet = loader.addSwitch("quiet", Star::format("Do not log to stdout, defaults to {}", loader.m_defaults.quiet));
   if (!quiet) return std::unexpected(std::move(quiet.error()));
-  auto verbose = loader.addSwitch("verbose", strf("Log to stdout, defaults to {}", !loader.m_defaults.quiet));
+  auto verbose = loader.addSwitch("verbose", Star::format("Log to stdout, defaults to {}", !loader.m_defaults.quiet));
   if (!verbose) return std::unexpected(std::move(verbose.error()));
   auto runtime = loader.addSwitch("runtimeconfig",
-    strf("Sets the path to the runtime configuration storage file relative to root directory, defauts to {}",
+    Star::format("Sets the path to the runtime configuration storage file relative to root directory, defauts to {}",
       loader.m_defaults.runtimeConfigFile ? *loader.m_defaults.runtimeConfigFile : "no storage file"));
   if (!runtime) return std::unexpected(std::move(runtime.error()));
   return loader;
@@ -213,8 +213,8 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
   auto loadSettings = [&]() -> std::expected<Root::Settings, StarException> {
     if (!BaseAssetsSettings) return std::unexpected(BaseAssetsSettings.error());
     if (!BaseDefaultConfiguration) return std::unexpected(BaseDefaultConfiguration.error());
-    String bootConfigFile = options.parameters.value("bootconfig").maybeFirst().value_or("sbinit.config");
-    auto contents = File::readFileString(bootConfigFile);
+    String bootConfigFile = options.parameters.value("bootconfig").front_value().value_or("sbinit.config");
+    auto contents = File::read_file_string(bootConfigFile);
     if (!contents) return std::unexpected(std::move(contents.error()));
     auto boot = Json::parseJson(*contents);
     if (!boot) return std::unexpected(std::move(boot.error()));
@@ -275,7 +275,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     auto logDirectory = boot->optString("logDirectory");
     if (!logDirectory) return std::unexpected(std::move(logDirectory.error()));
     rootSettings.logDirectory = std::move(*logDirectory);
-    rootSettings.logFile = options.parameters.value("logfile").maybeFirst();
+    rootSettings.logFile = options.parameters.value("logfile").front_value();
     if (!rootSettings.logFile)
       rootSettings.logFile = m_defaults.logFile;
     auto backups = boot->getUInt("logFileBackups", 10);
@@ -285,7 +285,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     if (!ugc) return std::unexpected(std::move(ugc.error()));
     rootSettings.includeUGC = *ugc;
 
-    if (auto level = options.parameters.value("loglevel").maybeFirst()) {
+    if (auto level = options.parameters.value("loglevel").front_value()) {
       auto parsed = enumValue<LogLevelNames>(*level);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       rootSettings.logLevel = *parsed;
@@ -298,7 +298,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
       rootSettings.quiet = false;
     else
       rootSettings.quiet = m_defaults.quiet;
-    if (auto runtime = options.parameters.value("runtimeconfig").maybeFirst())
+    if (auto runtime = options.parameters.value("runtimeconfig").front_value())
       rootSettings.runtimeConfigFile = *runtime;
     else
       rootSettings.runtimeConfigFile = m_defaults.runtimeConfigFile;
@@ -306,7 +306,7 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
   };
   auto settings = loadSettings();
   if (!settings)
-    return std::unexpected(settings.error().withContext("Could not perform initial Root load"));
+    return std::unexpected(settings.error().with_context("Could not perform initial Root load"));
   return settings;
 }
 

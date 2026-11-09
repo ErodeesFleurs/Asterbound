@@ -35,7 +35,7 @@ private:
 class Songbook : public NetElementSyncGroup {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<Songbook>, StarException> create(Root& root, String const& species);
-  ~Songbook();
+  ~Songbook() override;
 
   [[nodiscard]] std::expected<void, StarException> update(EntityMode mode, World& world);
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback);

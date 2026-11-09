@@ -12,7 +12,7 @@ class Assets;
 
 enum class HitType;
 
-typedef String TargetMaterial;
+using TargetMaterial = String;
 
 struct ElementalType {
   String resistanceStat;

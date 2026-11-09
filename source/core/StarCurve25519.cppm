@@ -22,10 +22,10 @@ constexpr std::size_t SecretKeySize = 32;
 constexpr std::size_t PrivateKeySize = 64;
 constexpr std::size_t SignatureSize = 64;
 
-typedef Array<std::uint8_t, PublicKeySize> PublicKey;
-typedef Array<std::uint8_t, SecretKeySize> SecretKey;
-typedef Array<std::uint8_t, PrivateKeySize> PrivateKey;
-typedef Array<std::uint8_t, SignatureSize> Signature;
+using PublicKey = Array<std::uint8_t, PublicKeySize>;
+using SecretKey = Array<std::uint8_t, SecretKeySize>;
+using PrivateKey = Array<std::uint8_t, PrivateKeySize>;
+using Signature = Array<std::uint8_t, SignatureSize>;
 
 // The process/application owner chooses the identity lifetime explicitly.
 // Generation remains lazy, so owning an identity does not consume its injected

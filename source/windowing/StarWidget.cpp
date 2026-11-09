@@ -1,4 +1,5 @@
 import std;
+import star.text_formatter;
 import star.json;
 import star.vector;
 import star.casting;
@@ -188,7 +189,7 @@ void Widget::determineSizeFromChildren() {
 
   for (auto& child : m_members) {
     Vec2I childMax = child->position() + child->size();
-    max = max.piecewiseMax(childMax);
+    max = max.piecewise_max(childMax);
   }
 
   setSize(max);
@@ -462,7 +463,7 @@ std::expected<bool, StarException> Widget::containsChild(String const& name) {
   auto child = fetchChild(name);
   if (!child)
     return std::unexpected(std::move(child.error()));
-  return bool(*child);
+  return static_cast<bool>(*child);
 }
 
 std::expected<std::shared_ptr<Widget>, StarException> Widget::fetchChild(String const& name) {
@@ -551,10 +552,10 @@ String Widget::fullName() const {
 String Widget::toStringImpl(int indentLevel) const {
   auto leader = String(" ") * indentLevel;
   String childrenString;
-  for (auto child : m_members) {
+  for (auto const& child : m_members) {
     childrenString.append(child->toStringImpl(indentLevel + 4));
   }
-  String output = strf(R"OUTPUT({}{} : {{
+  String output = Star::format(R"OUTPUT({}{} : {{
 {}  address : {},
 {}  visible : {},
 {}  position : {},
@@ -595,9 +596,8 @@ std::expected<bool, StarException> Widget::setLabel(String const& name, String c
   return false;
 }
 
-std::ostream& operator<<(std::ostream& os, Widget const& widget) {
-  os << widget.toStringImpl(0);
-  return os;
+void write_text(TextBuffer& buffer, Widget const& widget) {
+  append_text(buffer, widget.toStringImpl(0));
 }
 
 }

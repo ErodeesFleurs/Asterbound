@@ -1,9 +1,11 @@
+#include <cstdio>
 import std;
 import star.json;
 import star.native_runtime;
 import star.lua;
 import star.string;
 import star.format;
+import star.io_device;
 import star.output_proxy;
 import star.logging;
 import star.option_parser;
@@ -58,42 +60,51 @@ int main(int argc, char** argv) {
 
     String code;
     bool continuation = false;
-    while (!std::cin.eof()) {
-      auto getline = [](std::istream& stream) -> String {
+    while (!std::feof(stdin)) {
+      auto read_line = []() -> std::expected<String, StarException> {
         std::string line;
-        std::getline(stream, line);
+        for (int byte; (byte = std::fgetc(stdin)) != EOF && byte != '\n';)
+          line.push_back(static_cast<char>(byte));
+        if (std::ferror(stdin))
+          return std::unexpected(IOException("Failed reading code from standard input"));
         return String(std::move(line));
       };
-      if (continuation) {
-        std::cout << ">> ";
-        std::cout.flush();
-        code += getline(std::cin);
-        code += "\n";
-      } else {
-        std::cout << "> ";
-        std::cout.flush();
-        code = getline(std::cin);
-        code += "\n";
-      }
+      auto prompted = Star::print("{}", continuation ? ">> " : "> ");
+      if (!prompted)
+        return std::unexpected(std::move(prompted.error()));
+      auto line = read_line();
+      if (!line)
+        return std::unexpected(std::move(line.error()));
+      if (continuation)
+        code += *line;
+      else
+        code = std::move(*line);
+      code += "\n";
 
+      std::expected<void, StarException> output;
       auto evaluated = [&]() -> std::expected<void, StarException> {
         auto values = context->eval<LuaVariadic<LuaValue>>(code);
         if (!values)
           return std::unexpected(std::move(values.error()));
         for (auto const& value : *values) {
-          auto text = printLuaValue(value);
+          auto text = Star::print_lua_value(value);
           if (!text)
             return std::unexpected(std::move(text.error()));
-          coutf("{}\n", *text);
+          output = Star::print("{}\n", *text);
+          if (!output)
+            return std::unexpected(std::move(output.error()));
         }
         return {};
       }();
+      if (!output)
+        return std::unexpected(std::move(evaluated.error()));
       if (evaluated) {
         continuation = false;
       } else if (evaluated.error().is<LuaIncompleteStatementException>()) {
         continuation = true;
       } else {
-        coutf("Error: {}\n", outputException(ExceptionDiagnostic(evaluated.error()), false));
+        if (auto written = Star::print("Error: {}\n", Star::output_exception(ExceptionDiagnostic(evaluated.error()), false)); !written)
+          return std::unexpected(std::move(written.error()));
         continuation = false;
       }
     }
@@ -101,7 +112,8 @@ int main(int argc, char** argv) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

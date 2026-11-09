@@ -47,7 +47,7 @@ public:
     virtual bool expired() const = 0;
   };
 
-  typedef std::shared_ptr<Texture> TextureHandle;
+  using TextureHandle = std::shared_ptr<Texture>;
 
   TextureAtlasSet(unsigned cellSize, unsigned atlasNumCells);
 
@@ -142,7 +142,7 @@ private:
 
   unsigned m_atlasCellSize;
   unsigned m_atlasNumCells;
-  unsigned m_textureFitTries;
+  unsigned m_textureFitTries = 3;
 
   List<std::unique_ptr<TextureAtlas>> m_atlases;
   HashSet<std::shared_ptr<TextureEntry>> m_textures;
@@ -150,7 +150,7 @@ private:
 
 template <typename AtlasTextureHandle>
 TextureAtlasSet<AtlasTextureHandle>::TextureAtlasSet(unsigned cellSize, unsigned atlasNumCells)
-  : m_atlasCellSize(cellSize), m_atlasNumCells(atlasNumCells), m_textureFitTries(3) {}
+    : m_atlasCellSize(cellSize), m_atlasNumCells(atlasNumCells) {}
 
 template <typename AtlasTextureHandle>
 Vec2U TextureAtlasSet<AtlasTextureHandle>::atlasTextureSize() const {
@@ -228,10 +228,8 @@ template <typename AtlasTextureHandle>
   auto atlasTexture = createAtlasTexture(atlasTextureSize(), PixelFormat::RGBA32);
   if (!atlasTexture)
     return std::unexpected(std::move(atlasTexture.error()));
-  m_atlases.append(std::make_unique<TextureAtlas>(TextureAtlas{
-      std::move(*atlasTexture),
-      std::unique_ptr<bool[]>(new bool[m_atlasNumCells * m_atlasNumCells]()), 0
-    }));
+  m_atlases.push_back(std::make_unique<TextureAtlas>(
+    TextureAtlas{std::move(*atlasTexture), std::unique_ptr<bool[]>(new bool[m_atlasNumCells * m_atlasNumCells]()), 0}));
 
   auto texture = tryAtlas(*m_atlases[m_atlases.size() - 1]);
   if (texture && *texture)
@@ -384,13 +382,13 @@ void TextureAtlasSet<AtlasTextureHandle>::setAtlasRegionUsed(TextureAtlas& textu
       val = used;
       if (oldVal && !val) {
         if constexpr (Star::DebugEnabled) {
-          Star::starAssertFailed((textureAtlas.usedCellCount != 0));
+          Star::star_assert_failed((textureAtlas.usedCellCount != 0));
         }
         textureAtlas.usedCellCount -= 1;
       } else if (!oldVal && used) {
         textureAtlas.usedCellCount += 1;
         if constexpr (Star::DebugEnabled) {
-          Star::starAssertFailed((textureAtlas.usedCellCount <= square(m_atlasNumCells)));
+          Star::star_assert_failed((textureAtlas.usedCellCount <= square(m_atlasNumCells)));
         }
       }
     }

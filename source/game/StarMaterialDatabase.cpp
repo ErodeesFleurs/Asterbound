@@ -90,14 +90,13 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!logged) return std::unexpected(std::move(logged.error()));
         continue;
       }
-      if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
       auto collisionName = meta.getString("collisionKind");
       if (!collisionName) return std::unexpected(std::move(collisionName.error()));
-      auto collision = CollisionKindNames->getLeft(*collisionName);
+      auto collision = enumValue<CollisionKindNames>(*collisionName);
       if (!collision) return std::unexpected(std::move(collision.error()));
-      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(collision->get()));
+      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(*collision));
       if (!blocks) return std::unexpected(std::move(blocks.error()));
-      setMetaMaterial(matId, MetaMaterialInfo{matName, matId, collision->get(), *blocks});
+      setMetaMaterial(matId, MetaMaterialInfo{matName, matId, *collision, *blocks});
     }
     return {};
   };
@@ -114,315 +113,391 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
   if (!queuedMods) return std::unexpected(std::move(queuedMods.error()));
   for (auto const& path : materials->get()) {
     auto const& file = path.string();
-    auto readFile = [&, &database = *this]() -> std::expected<void, StarException> {
+    auto read_file = [&, &database = *this]() -> std::expected<void, StarException> {
       auto config = assets->json(file);
-      if (!config) return std::unexpected(std::move(config.error()));
+      if (!config)
+        return std::unexpected(std::move(config.error()));
       MaterialInfo material;
       auto id = config->getInt("materialId");
-      if (!id) return std::unexpected(std::move(id.error()));
+      if (!id)
+        return std::unexpected(std::move(id.error()));
       material.id = *id;
       {
         auto value = config->getString("materialName");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.name = std::move(*value);
       }
       material.path = file;
       material.config = *config;
       {
         auto value = config->getString("itemDrop", "");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.itemDrop = std::move(*value);
       }
       JsonObject descriptions;
       auto members = config->iterateObject();
-      if (!members) return std::unexpected(std::move(members.error()));
+      if (!members)
+        return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {
-        auto description = entry.first.endsWith("Description");
-        if (!description) return std::unexpected(std::move(description.error()));
-        if (*description) descriptions[entry.first] = entry.second;
+        auto description = entry.first.ends_with("Description");
+        if (!description)
+          return std::unexpected(std::move(description.error()));
+        if (*description)
+          descriptions[entry.first] = entry.second;
       }
       {
         auto value = config->getString("description", "");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         descriptions["description"] = std::move(*value);
       }
       {
         auto value = config->getString("shortdescription", "");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         descriptions["shortdescription"] = std::move(*value);
       }
       material.descriptions = std::move(descriptions);
       {
         auto value = config->getString("category");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.category = std::move(*value);
       }
       auto colorConfig = config->get("particleColor", JsonArray{0, 0, 0, 255});
-      if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
+      if (!colorConfig)
+        return std::unexpected(std::move(colorConfig.error()));
       {
         auto value = jsonToColor(*colorConfig);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.particleColor = std::move(*value);
       }
       auto particle = config->optString("miningParticle");
-      if (!particle) return std::unexpected(std::move(particle.error()));
+      if (!particle)
+        return std::unexpected(std::move(particle.error()));
       if (*particle) {
         {
           auto value = pdb->config(**particle);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           material.miningParticle = std::move(*value);
         }
       }
       auto sounds = config->opt("miningSounds");
-      if (!sounds) return std::unexpected(std::move(sounds.error()));
+      if (!sounds)
+        return std::unexpected(std::move(sounds.error()));
       if (*sounds) {
         auto names = jsonToStringList(**sounds);
-        if (!names) return std::unexpected(std::move(names.error()));
-        for (auto const& name : *names) material.miningSounds.append(AssetPath::relativeTo(file, name));
+        if (!names)
+          return std::unexpected(std::move(names.error()));
+        for (auto const& name : *names)
+          material.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
       auto footstep = config->optString("footstepSound");
-      if (!footstep) return std::unexpected(std::move(footstep.error()));
-      if (*footstep) material.footstepSound = AssetPath::relativeTo(file, **footstep);
+      if (!footstep)
+        return std::unexpected(std::move(footstep.error()));
+      if (*footstep)
+        material.footstepSound = AssetPath::relative_to(file, **footstep);
       {
         auto value = config->getInt("tillableMod", NoModId);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.tillableMod = std::move(*value);
       }
       {
         auto value = config->getBool("soil", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.soil = std::move(*value);
       }
       {
         auto value = config->getBool("falling", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.falling = std::move(*value);
       }
       {
         auto value = config->getBool("cascading", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.cascading = std::move(*value);
       }
       auto renderConfig = config->opt("renderTemplate");
-      if (!renderConfig) return std::unexpected(std::move(renderConfig.error()));
+      if (!renderConfig)
+        return std::unexpected(std::move(renderConfig.error()));
       if (*renderConfig) {
         auto renderTemplate = assets->fetchJson(**renderConfig, file);
-        if (!renderTemplate) return std::unexpected(std::move(renderTemplate.error()));
+        if (!renderTemplate)
+          return std::unexpected(std::move(renderTemplate.error()));
         auto parameters = config->get("renderParameters");
-        if (!parameters) return std::unexpected(std::move(parameters.error()));
+        if (!parameters)
+          return std::unexpected(std::move(parameters.error()));
         auto merged = jsonMerge(*renderTemplate, *parameters);
         auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
-        if (!profile) return std::unexpected(std::move(profile.error()));
+        if (!profile)
+          return std::unexpected(std::move(profile.error()));
         material.materialRenderProfile = std::make_shared<MaterialRenderProfile>(std::move(*profile));
       }
       auto damageConfig = config->get("damageTable", "/tiles/defaultDamage.config");
-      if (!damageConfig) return std::unexpected(std::move(damageConfig.error()));
+      if (!damageConfig)
+        return std::unexpected(std::move(damageConfig.error()));
       auto damage = assets->fetchJson(*damageConfig);
-      if (!damage) return std::unexpected(std::move(damage.error()));
+      if (!damage)
+        return std::unexpected(std::move(damage.error()));
       auto health = config->optFloat("health");
-      if (!health) return std::unexpected(std::move(health.error()));
+      if (!health)
+        return std::unexpected(std::move(health.error()));
       auto harvest = config->optUInt("requiredHarvestLevel");
-      if (!harvest) return std::unexpected(std::move(harvest.error()));
+      if (!harvest)
+        return std::unexpected(std::move(harvest.error()));
       std::optional<unsigned> harvestLevel;
-      if (*harvest) harvestLevel = **harvest;
+      if (*harvest)
+        harvestLevel = **harvest;
       {
         auto value = TileDamageParameters::create(*assets, *damage, *health, harvestLevel);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.damageParameters = std::move(*value);
       }
-      if (!CollisionKindNames) return std::unexpected(CollisionKindNames.error());
       auto collisionName = config->getString("collisionKind", "block");
-      if (!collisionName) return std::unexpected(std::move(collisionName.error()));
-      auto collision = CollisionKindNames->getLeft(*collisionName);
-      if (!collision) return std::unexpected(std::move(collision.error()));
-      material.collisionKind = collision->get();
+      if (!collisionName)
+        return std::unexpected(std::move(collisionName.error()));
+      auto collision = enumValue<CollisionKindNames>(*collisionName);
+      if (!collision)
+        return std::unexpected(std::move(collision.error()));
+      material.collisionKind = *collision;
       {
         auto value = config->getBool("foregroundOnly", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.foregroundOnly = std::move(*value);
       }
       {
         auto value = config->getBool("supportsMods", !(material.falling || material.cascading || material.collisionKind != CollisionKind::Block));
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.supportsMods = std::move(*value);
       }
       {
         auto value = config->getBool("blocksLiquidFlow", isSolidColliding(material.collisionKind));
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         material.blocksLiquidFlow = std::move(*value);
       }
       if (material.id != *id || !isRealMaterial(material.id))
-        return std::unexpected(MaterialException(strf("Material id {} does not fall in the valid range\n", *id)));
+        return std::unexpected(MaterialException(Star::format("Material id {} does not fall in the valid range\n", *id)));
       if (database.containsMaterial(material.id))
-        return std::unexpected(MaterialException(strf("Duplicate material id {} found for material {}", material.id, material.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate material id {} found for material {}", material.id, material.name)));
       if (database.isMaterialName(material.name))
-        return std::unexpected(MaterialException(strf("Duplicate material name '{}' found", material.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate material name '{}' found", material.name)));
       database.setMaterial(material.id, material);
 
       auto interactions = config->getArray("liquidInteractions", {});
-      if (!interactions) return std::unexpected(std::move(interactions.error()));
+      if (!interactions)
+        return std::unexpected(std::move(interactions.error()));
       for (auto const& entry : *interactions) {
         auto liquid = entry.getUInt("liquidId");
-        if (!liquid) return std::unexpected(std::move(liquid.error()));
+        if (!liquid)
+          return std::unexpected(std::move(liquid.error()));
         LiquidMaterialInteraction interaction;
         {
           auto value = entry.getFloat("consumeLiquid", 0.0f);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);
         }
         {
           auto value = entry.getUInt("transformMaterialId", NullMaterialId);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.transformTo = std::move(*value);
         }
         {
           auto value = entry.getBool("topOnly", false);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
         }
-        database.m_liquidMaterialInteractions[{(LiquidId)*liquid, material.id}] = interaction;
+        database.m_liquidMaterialInteractions[{static_cast<LiquidId>(*liquid), material.id}] = interaction;
       }
       return {};
     };
-    auto loaded = readFile();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading material file {}", file), loaded.error()), file, "Loading material"));
+    auto loaded = read_file();
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading material file {}", file), loaded.error()), file, "Loading material"));
   }
   for (auto const& path : mods->get()) {
     auto const& file = path.string();
-    auto readFile = [&, &database = *this]() -> std::expected<void, StarException> {
+    auto read_file = [&, &database = *this]() -> std::expected<void, StarException> {
       auto config = assets->json(file);
-      if (!config) return std::unexpected(std::move(config.error()));
+      if (!config)
+        return std::unexpected(std::move(config.error()));
       ModInfo mod;
       auto id = config->getInt("modId");
-      if (!id) return std::unexpected(std::move(id.error()));
+      if (!id)
+        return std::unexpected(std::move(id.error()));
       mod.id = *id;
       {
         auto value = config->getString("modName");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.name = std::move(*value);
       }
       mod.path = file;
       mod.config = *config;
       {
         auto value = config->getString("itemDrop", "");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.itemDrop = std::move(*value);
       }
       JsonObject descriptions;
       auto members = config->iterateObject();
-      if (!members) return std::unexpected(std::move(members.error()));
+      if (!members)
+        return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {
-        auto description = entry.first.endsWith("Description");
-        if (!description) return std::unexpected(std::move(description.error()));
-        if (*description) descriptions[entry.first] = entry.second;
+        auto description = entry.first.ends_with("Description");
+        if (!description)
+          return std::unexpected(std::move(description.error()));
+        if (*description)
+          descriptions[entry.first] = entry.second;
       }
       {
         auto value = config->getString("description", "");
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         descriptions["description"] = std::move(*value);
       }
 
       mod.descriptions = std::move(descriptions);
 
       auto colorConfig = config->get("particleColor", JsonArray{0, 0, 0, 255});
-      if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
+      if (!colorConfig)
+        return std::unexpected(std::move(colorConfig.error()));
       {
         auto value = jsonToColor(*colorConfig);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.particleColor = std::move(*value);
       }
       auto particle = config->optString("miningParticle");
-      if (!particle) return std::unexpected(std::move(particle.error()));
+      if (!particle)
+        return std::unexpected(std::move(particle.error()));
       if (*particle) {
         {
           auto value = pdb->config(**particle);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           mod.miningParticle = std::move(*value);
         }
       }
       auto sounds = config->opt("miningSounds");
-      if (!sounds) return std::unexpected(std::move(sounds.error()));
+      if (!sounds)
+        return std::unexpected(std::move(sounds.error()));
       if (*sounds) {
         auto names = jsonToStringList(**sounds);
-        if (!names) return std::unexpected(std::move(names.error()));
-        for (auto const& name : *names) mod.miningSounds.append(AssetPath::relativeTo(file, name));
+        if (!names)
+          return std::unexpected(std::move(names.error()));
+        for (auto const& name : *names)
+          mod.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
       auto footstep = config->optString("footstepSound");
-      if (!footstep) return std::unexpected(std::move(footstep.error()));
-      if (*footstep) mod.footstepSound = AssetPath::relativeTo(file, **footstep);
+      if (!footstep)
+        return std::unexpected(std::move(footstep.error()));
+      if (*footstep)
+        mod.footstepSound = AssetPath::relative_to(file, **footstep);
       {
         auto value = config->getBool("tilled", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.tilled = std::move(*value);
       }
       {
         auto value = config->getBool("breaksWithTile", false);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.breaksWithTile = std::move(*value);
       }
       auto renderConfig = config->opt("renderTemplate");
-      if (!renderConfig) return std::unexpected(std::move(renderConfig.error()));
+      if (!renderConfig)
+        return std::unexpected(std::move(renderConfig.error()));
       if (*renderConfig) {
         auto renderTemplate = assets->fetchJson(**renderConfig);
-        if (!renderTemplate) return std::unexpected(std::move(renderTemplate.error()));
+        if (!renderTemplate)
+          return std::unexpected(std::move(renderTemplate.error()));
         auto parameters = config->get("renderParameters");
-        if (!parameters) return std::unexpected(std::move(parameters.error()));
+        if (!parameters)
+          return std::unexpected(std::move(parameters.error()));
         auto merged = jsonMerge(*renderTemplate, *parameters);
         auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
-        if (!profile) return std::unexpected(std::move(profile.error()));
+        if (!profile)
+          return std::unexpected(std::move(profile.error()));
         mod.modRenderProfile = std::make_shared<MaterialRenderProfile>(std::move(*profile));
       }
       auto damageConfig = config->get("damageTable", "/tiles/defaultDamage.config");
-      if (!damageConfig) return std::unexpected(std::move(damageConfig.error()));
+      if (!damageConfig)
+        return std::unexpected(std::move(damageConfig.error()));
       auto damage = assets->fetchJson(*damageConfig);
-      if (!damage) return std::unexpected(std::move(damage.error()));
+      if (!damage)
+        return std::unexpected(std::move(damage.error()));
       auto health = config->optFloat("health");
-      if (!health) return std::unexpected(std::move(health.error()));
+      if (!health)
+        return std::unexpected(std::move(health.error()));
       auto harvest = config->optUInt("harvestLevel");
-      if (!harvest) return std::unexpected(std::move(harvest.error()));
+      if (!harvest)
+        return std::unexpected(std::move(harvest.error()));
       std::optional<unsigned> harvestLevel;
-      if (*harvest) harvestLevel = **harvest;
+      if (*harvest)
+        harvestLevel = **harvest;
       {
         auto value = TileDamageParameters::create(*assets, *damage, *health, harvestLevel);
-        if (!value) return std::unexpected(std::move(value.error()));
+        if (!value)
+          return std::unexpected(std::move(value.error()));
         mod.damageParameters = std::move(*value);
       }
 
       if (mod.id != *id || !isRealMod(mod.id))
-        return std::unexpected(MaterialException(strf("Mod id {} does not fall in the valid range\n", mod.id)));
+        return std::unexpected(MaterialException(Star::format("Mod id {} does not fall in the valid range\n", mod.id)));
       if (database.containsMod(mod.id))
-        return std::unexpected(MaterialException(strf("Duplicate mod id {} found for mod {}", mod.id, mod.name)));
-      if (database.m_modIndex.contains(mod.name) || database.m_metaModIndex.hasLeftValue(mod.name))
-        return std::unexpected(MaterialException(strf("Duplicate mod name '{}' found", mod.name)));
+        return std::unexpected(MaterialException(Star::format("Duplicate mod id {} found for mod {}", mod.id, mod.name)));
+      if (database.m_modIndex.contains(mod.name) || database.m_metaModIndex.contains_left(mod.name))
+        return std::unexpected(MaterialException(Star::format("Duplicate mod name '{}' found", mod.name)));
       database.setMod(mod.id, mod);
       database.m_modIndex[mod.name] = mod.id;
       auto interactions = config->getArray("liquidInteractions", {});
-      if (!interactions) return std::unexpected(std::move(interactions.error()));
+      if (!interactions)
+        return std::unexpected(std::move(interactions.error()));
       for (auto const& entry : *interactions) {
         auto liquid = entry.getUInt("liquidId");
-        if (!liquid) return std::unexpected(std::move(liquid.error()));
+        if (!liquid)
+          return std::unexpected(std::move(liquid.error()));
         LiquidModInteraction interaction;
         {
           auto value = entry.getFloat("consumeLiquid", 0.0f);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);
         }
         {
           auto value = entry.getUInt("transformModId", NoModId);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.transformTo = std::move(*value);
         }
         {
           auto value = entry.getBool("topOnly", false);
-          if (!value) return std::unexpected(std::move(value.error()));
+          if (!value)
+            return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
         }
-        database.m_liquidModInteractions[{(LiquidId)*liquid, mod.id}] = interaction;
+        database.m_liquidModInteractions[{static_cast<LiquidId>(*liquid), mod.id}] = interaction;
       }
       return {};
     };
-    auto loaded = readFile();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(strf("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
+    auto loaded = read_file();
+    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
   }
   auto footstepConfig = assets->json("/client.config:defaultFootstepSound");
   if (!footstepConfig) return std::unexpected(assets->withAssetContext(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
@@ -436,7 +511,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
 
 StringList MaterialDatabase::materialNames() const {
   StringList names = m_materialIndex.keys();
-  names.appendAll(m_metaMaterialIndex.keys());
+  names.append_range(m_metaMaterialIndex.keys());
   return names;
 }
 
@@ -492,7 +567,7 @@ std::expected<String, StarException> MaterialDatabase::materialDescription(Mater
   if (!info) return std::unexpected(std::move(info.error()));
   auto description = info->get().descriptions.getString("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(strf("{}Description", species), *description);
+  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::materialDescription(MaterialId id) const {
@@ -515,7 +590,7 @@ std::expected<String, StarException> MaterialDatabase::materialCategory(Material
 
 StringList MaterialDatabase::modNames() const {
   StringList modNames = m_modIndex.keys();
-  modNames.appendAll(m_metaModIndex.leftValues());
+  modNames.append_range(m_metaModIndex.left_values());
   return modNames;
 }
 
@@ -525,20 +600,22 @@ bool MaterialDatabase::isModName(String const& name) const {
 
 bool MaterialDatabase::isValidModId(ModId mod) const {
   if (isRealMod(mod))
-    return mod < m_mods.size() && (bool)m_mods[mod];
+    return mod < m_mods.size() && static_cast<bool>(m_mods[mod]);
   else
-    return m_metaModIndex.hasRightValue(mod);
+    return m_metaModIndex.contains_right(mod);
 }
 
 std::expected<ModId, StarException> MaterialDatabase::modId(String const& name) const {
-  if (auto id = m_metaModIndex.maybeRight(name)) return *id;
+  if (auto id = m_metaModIndex.maybe_right(name))
+    return *id;
   auto id = m_modIndex.get(name);
   if (!id) return std::unexpected(std::move(id.error()));
   return id->get();
 }
 
 std::expected<std::reference_wrapper<String const>, StarException> MaterialDatabase::modName(ModId id) const {
-  if (!isRealMod(id)) return m_metaModIndex.getLeft(id);
+  if (!isRealMod(id))
+    return m_metaModIndex.get_left(id);
   auto info = getModInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
   return std::cref(info->get().name);
@@ -563,7 +640,7 @@ std::expected<String, StarException> MaterialDatabase::modDescription(ModId id, 
   if (!info) return std::unexpected(std::move(info.error()));
   auto description = info->get().descriptions.getString("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(strf("{}Description", species), *description);
+  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::modDescription(ModId id) const {
@@ -762,8 +839,9 @@ std::expected<bool, StarException> MaterialDatabase::supportsMod(MaterialId mate
   return info->get().supportsMods;
 }
 
-MaterialDatabase::MetaMaterialInfo::MetaMaterialInfo(String name, MaterialId id, CollisionKind collisionKind, bool blocksLiquidFlow)
-  : name(name), id(id), collisionKind(collisionKind), blocksLiquidFlow(blocksLiquidFlow) {}
+MaterialDatabase::MetaMaterialInfo::MetaMaterialInfo(String name, MaterialId id, CollisionKind collisionKind,
+                                                     bool blocksLiquidFlow)
+    : name(std::move(name)), id(id), collisionKind(collisionKind), blocksLiquidFlow(blocksLiquidFlow) {}
 
 MaterialDatabase::MaterialInfo::MaterialInfo() : id(NullMaterialId), tillableMod(NoModId), falling(), cascading() {}
 
@@ -808,17 +886,17 @@ void MaterialDatabase::setMod(ModId modId, ModInfo info) {
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::MetaMaterialInfo const>, StarException> MaterialDatabase::getMetaMaterialInfo(MaterialId id) const {
-  if (!containsMetaMaterial(id)) return std::unexpected(MaterialException(strf("No such metamaterial id: {}\n", id)));
+  if (!containsMetaMaterial(id)) return std::unexpected(MaterialException(Star::format("No such metamaterial id: {}\n", id)));
   return std::cref(*m_metaMaterials[metaMaterialIndex(id)]);
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::MaterialInfo const>, StarException> MaterialDatabase::getMaterialInfo(MaterialId id) const {
-  if (!containsMaterial(id)) return std::unexpected(MaterialException(strf("No such material id: {}\n", id)));
+  if (!containsMaterial(id)) return std::unexpected(MaterialException(Star::format("No such material id: {}\n", id)));
   return std::cref(*m_materials[id]);
 }
 
 std::expected<std::reference_wrapper<MaterialDatabase::ModInfo const>, StarException> MaterialDatabase::getModInfo(ModId id) const {
-  if (!containsMod(id)) return std::unexpected(MaterialException(strf("No such mod id: {}\n", id)));
+  if (!containsMod(id)) return std::unexpected(MaterialException(Star::format("No such mod id: {}\n", id)));
   return std::cref(*m_mods[id]);
 }
 

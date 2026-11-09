@@ -17,10 +17,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.set;
@@ -248,7 +248,7 @@ public:
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> run() override;
+  [[nodiscard]] std::expected<void, StarException> run() override;
 
 private:
   explicit UniverseServer(Root& root);
@@ -447,7 +447,7 @@ private:
 
   std::shared_ptr<LuaRoot> m_luaRoot;
 
-  typedef LuaMessageScript ScriptComponent;
+  using ScriptComponent = LuaMessageScript;
   StringMap<std::shared_ptr<UniverseServer::ScriptComponent>> m_scriptContexts;
 
   mutable std::recursive_mutex m_messageLock;

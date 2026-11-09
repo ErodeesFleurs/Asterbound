@@ -20,9 +20,10 @@ int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   QApplication app(argc, argv);
   auto reportError = [](StarException const& error) {
-    auto diagnostic = strf("{}", outputException(ExceptionDiagnostic(error), true));
+    auto diagnostic = Star::format("{}", Star::output_exception(ExceptionDiagnostic(error), true));
     QMessageBox::critical(nullptr, "Error", toQString(String(diagnostic)));
-    coutf("{}\n", diagnostic);
+    if (!Star::print("{}\n", diagnostic))
+      std::_Exit(1);
   };
   if (!nativeRuntime) {
     reportError(nativeRuntime.error());

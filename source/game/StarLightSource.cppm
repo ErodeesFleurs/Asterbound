@@ -14,7 +14,8 @@ enum class LightType : std::uint8_t {
   PointAsSpread = 2 // Point with spread-like range
 };
 
-extern std::expected<EnumMap<LightType>, StarException> const LightTypeNames;
+inline constexpr auto LightTypeNames = sortedEnumNames(std::to_array<std::pair<LightType, std::string_view>>(
+  {{LightType::Spread, "Spread"}, {LightType::Point, "Point"}, {LightType::PointAsSpread, "PointAsSpread"}}));
 
 struct LightSource {
   Vec2F position;

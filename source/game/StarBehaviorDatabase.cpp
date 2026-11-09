@@ -9,20 +9,6 @@ import star.format;
 import star.assets;
 import star.behavior_database;
 namespace Star {
-extern std::expected<EnumMap<NodeParameterType>, StarException> const NodeParameterTypeNames = EnumMap<NodeParameterType>::create({
-  {NodeParameterType::Json, "json"}, {NodeParameterType::Entity, "entity"},
-  {NodeParameterType::Position, "position"}, {NodeParameterType::Vec2, "vec2"},
-  {NodeParameterType::Number, "number"}, {NodeParameterType::Bool, "bool"},
-  {NodeParameterType::List, "list"}, {NodeParameterType::Table, "table"}, {NodeParameterType::String, "string"}
-});
-extern std::expected<EnumMap<BehaviorNodeType>, StarException> const BehaviorNodeTypeNames = EnumMap<BehaviorNodeType>::create({
-  {BehaviorNodeType::Action, "Action"}, {BehaviorNodeType::Decorator, "Decorator"},
-  {BehaviorNodeType::Composite, "Composite"}, {BehaviorNodeType::Module, "Module"}
-});
-extern std::expected<EnumMap<CompositeType>, StarException> const CompositeTypeNames = EnumMap<CompositeType>::create({
-  {CompositeType::Sequence, "Sequence"}, {CompositeType::Selector, "Selector"},
-  {CompositeType::Parallel, "Parallel"}, {CompositeType::Dynamic, "Dynamic"}, {CompositeType::Randomize, "Randomize"}
-});
 std::expected<NodeParameterValue, StarException> nodeParameterValueFromJson(Json const& json) {
   auto key = json.optString("key");
   if (!key) return std::unexpected(std::move(key.error()));
@@ -32,38 +18,37 @@ std::expected<NodeParameterValue, StarException> nodeParameterValueFromJson(Json
   return NodeParameterValue(*value);
 }
 std::expected<Json, StarException> jsonFromNodeParameter(NodeParameter const& parameter) {
-  if (!NodeParameterTypeNames) return std::unexpected(NodeParameterTypeNames.error());
-  auto type = NodeParameterTypeNames->getRight(parameter.first);
+  auto type = enumName<NodeParameterTypeNames>(parameter.first);
   if (!type) return std::unexpected(std::move(type.error()));
-  JsonObject result{{"type", type->get()}};
+  JsonObject result{{"type", *type}};
   if (std::holds_alternative<String>(parameter.second)) result["key"] = std::get<String>(parameter.second);
   else result["value"] = std::get<Json>(parameter.second);
   return Json(std::move(result));
 }
 std::expected<NodeParameter, StarException> jsonToNodeParameter(Json const& json) {
-  if (!NodeParameterTypeNames) return std::unexpected(NodeParameterTypeNames.error());
   auto name = json.getString("type");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = NodeParameterTypeNames->getLeft(*name);
+  auto type = enumValue<NodeParameterTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
   auto key = json.optString("key");
   if (!key) return std::unexpected(std::move(key.error()));
-  if (*key) return NodeParameter{type->get(), **key};
+  if (*key)
+    return NodeParameter{*type, **key};
   auto value = json.opt("value");
   if (!value) return std::unexpected(std::move(value.error()));
-  return NodeParameter{type->get(), value->value_or(Json())};
+  return NodeParameter{*type, value->value_or(Json())};
 }
 std::expected<Json, StarException> jsonFromNodeOutput(NodeOutput const& output) {
-  if (!NodeParameterTypeNames) return std::unexpected(NodeParameterTypeNames.error());
-  auto type = NodeParameterTypeNames->getRight(output.first);
+  auto type = enumName<NodeParameterTypeNames>(output.first);
   if (!type) return std::unexpected(std::move(type.error()));
-  return JsonObject{{"type", type->get()}, {"key", output.second.first ? Json(*output.second.first) : Json()}, {"ephemeral", output.second.second}};
+  return JsonObject{{"type", *type},
+                    {"key", output.second.first ? Json(*output.second.first) : Json()},
+                    {"ephemeral", output.second.second}};
 }
 std::expected<NodeOutput, StarException> jsonToNodeOutput(Json const& json) {
-  if (!NodeParameterTypeNames) return std::unexpected(NodeParameterTypeNames.error());
   auto name = json.getString("type");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = NodeParameterTypeNames->getLeft(*name);
+  auto type = enumValue<NodeParameterTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
   auto keyJson = json.get("key");
   if (!keyJson) return std::unexpected(std::move(keyJson.error()));
@@ -71,10 +56,10 @@ std::expected<NodeOutput, StarException> jsonToNodeOutput(Json const& json) {
   if (!key) return std::unexpected(std::move(key.error()));
   auto ephemeral = json.optBool("ephemeral");
   if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
-  return NodeOutput{type->get(), {*key, ephemeral->value_or(false)}};
+  return NodeOutput{*type, {*key, ephemeral->value_or(false)}};
 }
 std::expected<void, StarException> applyTreeParameters(StringMap<NodeParameter>& parameters, StringMap<NodeParameterValue> const& treeParameters) {
-  for (auto& p : parameters) {
+  for (auto&& p : parameters) {
     auto value = replaceBehaviorTag(p.second.second, treeParameters);
     if (!value) return std::unexpected(std::move(value.error()));
     p.second.second = std::move(*value);
@@ -90,10 +75,10 @@ std::expected<NodeParameterValue, StarException> replaceBehaviorTag(NodeParamete
     text = *string;
   }
   if (text) {
-    auto begins = text->beginsWith('<');
+    auto begins = text->starts_with('<');
     if (!begins) return std::unexpected(std::move(begins.error()));
     if (*begins) {
-      auto ends = text->endsWith('>');
+      auto ends = text->ends_with('>');
       if (!ends) return std::unexpected(std::move(ends.error()));
       if (*ends) {
         auto size = text->size();
@@ -101,7 +86,7 @@ std::expected<NodeParameterValue, StarException> replaceBehaviorTag(NodeParamete
         auto key = text->substr(1, *size - 2);
         if (!key) return std::unexpected(std::move(key.error()));
         if (auto replacement = treeParameters.maybe(*key)) return *replacement;
-        return std::unexpected(StarException(strf("No parameter specified for tag '{}'", *text)));
+        return std::unexpected(StarException(Star::format("No parameter specified for tag '{}'", *text)));
       }
     }
   }
@@ -169,7 +154,7 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       }
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
   }
   auto behaviors = assets->scanExtension("behavior");
   if (!behaviors) return std::unexpected(std::move(behaviors.error()));
@@ -182,12 +167,12 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       if (!config) return std::unexpected(std::move(config.error()));
       auto name = config->getString("name");
       if (!name) return std::unexpected(std::move(name.error()));
-      if (database->m_configs.contains(*name)) return std::unexpected(StarException(strf("Duplicate behavior tree '{}'", *name)));
+      if (database->m_configs.contains(*name)) return std::unexpected(StarException(Star::format("Duplicate behavior tree '{}'", *name)));
       database->m_configs[*name] = std::move(*config);
       database->m_configPaths[*name] = file;
       return {};
     }();
-    if (!load) return std::unexpected(StarException(strf("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
   }
   for (auto const& pair : database->m_configs) {
     if (!database->m_behaviors.contains(pair.first)) {
@@ -199,18 +184,18 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
 }
 std::expected<std::shared_ptr<BehaviorTree const>, StarException> BehaviorDatabase::behaviorTree(String const& name) const {
   if (auto tree = m_behaviors.maybe(name)) return *tree;
-  return std::unexpected(StarException(strf("No such behavior tree '{}'", name)));
+  return std::unexpected(StarException(Star::format("No such behavior tree '{}'", name)));
 }
 std::expected<Json, StarException> BehaviorDatabase::behaviorConfig(String const& name) const {
   if (auto config = m_configs.maybe(name)) return *config;
-  return std::unexpected(StarException(strf("No such behavior tree '{}'", name)));
+  return std::unexpected(StarException(Star::format("No such behavior tree '{}'", name)));
 }
 std::expected<void, StarException> BehaviorDatabase::loadTree(String const& name) {
   auto config = behaviorConfig(name);
   if (!config) return std::unexpected(std::move(config.error()));
   auto tree = buildTree(*config, {});
   if (!tree) {
-    if (auto path = m_configPaths.maybeRef(name))
+    if (auto path = m_configPaths.find_ref(name))
       return std::unexpected(m_assets->withAssetContext(std::move(tree.error()), path->get(), "Building behavior tree"));
     return std::unexpected(std::move(tree.error()));
   }
@@ -244,50 +229,54 @@ std::expected<CompositeNode, StarException> BehaviorDatabase::compositeNode(Json
   for (auto const& child : *array) {
     auto node = behaviorNode(child, treeParameters, tree);
     if (!node) return std::unexpected(std::move(node.error()));
-    children.append(*node);
+    children.push_back(*node);
   }
-  if (!CompositeTypeNames) return std::unexpected(CompositeTypeNames.error());
   auto name = config.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = CompositeTypeNames->getLeft(*name);
+  auto type = enumValue<CompositeTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
-  switch (type->get()) {
-    case CompositeType::Sequence: return CompositeNode(SequenceNode(std::move(children)));
-    case CompositeType::Selector: return CompositeNode(SelectorNode(std::move(children)));
-    case CompositeType::Dynamic: return CompositeNode(DynamicNode(std::move(children)));
-    case CompositeType::Randomize: return CompositeNode(RandomizeNode(std::move(children)));
-    case CompositeType::Parallel: {
-      auto success = parameters.get("success");
-      if (!success) return std::unexpected(std::move(success.error()));
-      auto failure = parameters.get("fail");
-      if (!failure) return std::unexpected(std::move(failure.error()));
-      auto const& successValue = success->get().second;
-      auto const& failureValue = failure->get().second;
-      if (!std::holds_alternative<Json>(successValue) || !std::holds_alternative<Json>(failureValue))
-        return std::unexpected(StarException("Parallel thresholds must be JSON values"));
-      auto s = std::get<Json>(successValue).optInt();
-      if (!s) return std::unexpected(std::move(s.error()));
-      auto f = std::get<Json>(failureValue).optInt();
-      if (!f) return std::unexpected(std::move(f.error()));
-      int succeed = s->value_or(-1), fail = f->value_or(-1);
-      if (succeed == -1) succeed = children.size();
-      if (fail == -1) fail = children.size();
-      return CompositeNode(ParallelNode(succeed, fail, std::move(children)));
-    }
+  switch (*type) {
+  case CompositeType::Sequence: return CompositeNode(SequenceNode(std::move(children)));
+  case CompositeType::Selector: return CompositeNode(SelectorNode(std::move(children)));
+  case CompositeType::Dynamic: return CompositeNode(DynamicNode(std::move(children)));
+  case CompositeType::Randomize: return CompositeNode(RandomizeNode(std::move(children)));
+  case CompositeType::Parallel: {
+    auto success = parameters.get("success");
+    if (!success)
+      return std::unexpected(std::move(success.error()));
+    auto failure = parameters.get("fail");
+    if (!failure)
+      return std::unexpected(std::move(failure.error()));
+    auto const& successValue = success->get().second;
+    auto const& failureValue = failure->get().second;
+    if (!std::holds_alternative<Json>(successValue) || !std::holds_alternative<Json>(failureValue))
+      return std::unexpected(StarException("Parallel thresholds must be JSON values"));
+    auto s = std::get<Json>(successValue).optInt();
+    if (!s)
+      return std::unexpected(std::move(s.error()));
+    auto f = std::get<Json>(failureValue).optInt();
+    if (!f)
+      return std::unexpected(std::move(f.error()));
+    int succeed = s->value_or(-1), fail = f->value_or(-1);
+    if (succeed == -1)
+      succeed = children.size();
+    if (fail == -1)
+      fail = children.size();
+    return CompositeNode(ParallelNode(succeed, fail, std::move(children)));
   }
-  return std::unexpected(StarException(strf("Composite node type '{}' could not be created from JSON", *name)));
+  }
+  return std::unexpected(StarException(Star::format("Composite node type '{}' could not be created from JSON", *name)));
 }
 std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDatabase::behaviorNode(Json const& json, StringMap<NodeParameterValue> const& treeParameters, BehaviorTree& tree) const {
-  if (!BehaviorNodeTypeNames) return std::unexpected(BehaviorNodeTypeNames.error());
   auto typeName = json.getString("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto type = BehaviorNodeTypeNames->getLeft(*typeName);
+  auto type = enumValue<BehaviorNodeTypeNames>(*typeName);
   if (!type) return std::unexpected(std::move(type.error()));
   auto name = json.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));
   auto config = json.getObject("parameters", {});
   if (!config) return std::unexpected(std::move(config.error()));
-  if (type->get() == BehaviorNodeType::Module) {
+  if (*type == BehaviorNodeType::Module) {
     auto parameters = treeParameters;
     for (auto const& p : *config) {
       auto value = nodeParameterValueFromJson(p.second);
@@ -300,18 +289,18 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!moduleConfig) return std::unexpected(std::move(moduleConfig.error()));
     auto module = buildTree(*moduleConfig, parameters);
     if (!module) {
-      if (auto path = m_configPaths.maybeRef(*name))
+      if (auto path = m_configPaths.find_ref(*name))
         return std::unexpected(m_assets->withAssetContext(std::move(module.error()), path->get(), "Building behavior tree"));
       return std::unexpected(std::move(module.error()));
     }
-    tree.scripts.addAll((*module)->scripts);
-    tree.functions.addAll((*module)->functions);
+    tree.scripts.insert_range((*module)->scripts);
+    tree.functions.insert_range((*module)->functions);
     return (*module)->root;
   }
   auto defaults = m_nodeParameters.get(*name);
   if (!defaults) return std::unexpected(std::move(defaults.error()));
   auto parameters = defaults->get();
-  for (auto& p : parameters) {
+  for (auto&& p : parameters) {
     if (auto configured = config->maybe(p.first)) {
       auto value = nodeParameterValueFromJson(*configured);
       if (!value) return std::unexpected(std::move(value.error()));
@@ -320,7 +309,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
   }
   auto applied = applyTreeParameters(parameters, treeParameters);
   if (!applied) return std::unexpected(std::move(applied.error()));
-  if (type->get() == BehaviorNodeType::Action) {
+  if (*type == BehaviorNodeType::Action) {
     tree.functions.add(*name);
     auto outputs = json.getObject("output", {});
     if (!outputs) return std::unexpected(std::move(outputs.error()));
@@ -328,7 +317,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!defaults) return std::unexpected(std::move(defaults.error()));
     auto output = defaults->get();
     Json outputConfig(*outputs);
-    for (auto& p : output) {
+    for (auto&& p : output) {
       auto configured = outputConfig.optString(p.first);
       if (!configured) return std::unexpected(std::move(configured.error()));
       auto replacement = replaceOutputBehaviorTag(*configured ? *configured : p.second.second.first, treeParameters);
@@ -337,7 +326,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     }
     return std::make_shared<BehaviorNode>(ActionNode(*name, std::move(parameters), std::move(output)));
   }
-  if (type->get() == BehaviorNodeType::Decorator) {
+  if (*type == BehaviorNodeType::Decorator) {
     tree.functions.add(*name);
     auto childJson = json.get("child");
     if (!childJson) return std::unexpected(std::move(childJson.error()));
@@ -345,11 +334,11 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     if (!child) return std::unexpected(std::move(child.error()));
     return std::make_shared<BehaviorNode>(DecoratorNode(*name, std::move(parameters), *child));
   }
-  if (type->get() == BehaviorNodeType::Composite) {
+  if (*type == BehaviorNodeType::Composite) {
     auto composite = compositeNode(json, std::move(parameters), treeParameters, tree);
     if (!composite) return std::unexpected(std::move(composite.error()));
     return std::make_shared<BehaviorNode>(std::move(*composite));
   }
-  return std::unexpected(StarException(strf("Behavior node type '{}' could not be created from JSON", *typeName)));
+  return std::unexpected(StarException(Star::format("Behavior node type '{}' could not be created from JSON", *typeName)));
 }
 }

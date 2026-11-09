@@ -51,7 +51,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       auto icon = codexJson->getString("icon", *defaultIcon);
       if (!icon)
         return std::unexpected(std::move(icon.error()));
-      auto resolved = codexJson->set("icon", AssetPath::relativeTo(AssetPath::directory(file), *icon));
+      auto resolved = codexJson->set("icon", AssetPath::relative_to(AssetPath::directory(file), *icon));
       if (!resolved)
         return std::unexpected(std::move(resolved.error()));
       auto codex = Codex::create(*resolved, file);
@@ -62,7 +62,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       return codex;
     }();
     if (!loaded)
-      return std::unexpected(CodexDatabaseException(strf("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
+      return std::unexpected(CodexDatabaseException(Star::format("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
     result->m_codexes[(*loaded)->id()] = std::move(*loaded);
   }
   return result;
@@ -73,7 +73,7 @@ StringMap<std::shared_ptr<Codex const>> CodexDatabase::codexes() const {
 }
 
 std::shared_ptr<Codex const> CodexDatabase::codex(String const& codexId) const {
-  if (auto codex = m_codexes.maybeRef(codexId))
+  if (auto codex = m_codexes.find_ref(codexId))
     return codex->get();
   return {};
 }

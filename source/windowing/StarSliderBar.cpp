@@ -226,9 +226,7 @@ void SliderBarWidget::setEnabled(bool enabled) {
   }
 }
 
-void SliderBarWidget::setCallback(WidgetCallbackFunc callback) {
-  m_callback = callback;
-}
+void SliderBarWidget::setCallback(WidgetCallbackFunc callback) { m_callback = std::move(callback); }
 
 std::expected<void, StarException> SliderBarWidget::update(float dt) {
   float gridLow = m_grid->position()[0];
@@ -243,7 +241,7 @@ std::expected<void, StarException> SliderBarWidget::update(float dt) {
   }
 
   if (m_updateJog) {
-    float percent = (float)m_val / (m_high - m_low);
+    float percent = static_cast<float>(m_val) / (m_high - m_low);
 
     float jogPos = (gridHigh - gridLow) * percent + gridLow - m_jog->size()[0] * 0.5;
 

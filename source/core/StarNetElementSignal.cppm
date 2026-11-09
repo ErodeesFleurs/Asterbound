@@ -77,7 +77,7 @@ template <typename Signal>
 template <typename Signal>
 [[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::disableNetInterpolation() {
   m_netInterpolationEnabled = false;
-  for (auto& p : take(m_pendingSignals))
+  for (auto& p : std::exchange(m_pendingSignals, {}))
     send(std::move(p.second));
   return {};
 }
@@ -126,10 +126,10 @@ template <typename Signal>
     { auto result = ds.read(s); if (!result) return std::unexpected(std::move(result.error())); }
     if (m_netInterpolationEnabled && interpolationTime > 0.0f) {
       if (!m_pendingSignals.empty() && m_pendingSignals.back().first > interpolationTime) {
-        for (auto& p : take(m_pendingSignals))
+        for (auto& p : std::exchange(m_pendingSignals, {}))
           send(std::move(p.second));
       }
-      m_pendingSignals.append({interpolationTime, std::move(s)});
+      m_pendingSignals.push_back({interpolationTime, std::move(s)});
     } else {
       send(std::move(s));
     }
@@ -139,7 +139,7 @@ template <typename Signal>
 
 template <typename Signal>
 void NetElementSignal<Signal>::send(Signal signal) {
-  m_signals.append({m_netVersion ? m_netVersion->get().current() : 0, signal, false});
+  m_signals.push_back({m_netVersion ? m_netVersion->get().current() : 0, signal, false});
   while (m_signals.size() > m_maxSignalQueue)
     m_signals.pop_front();
 }
@@ -149,7 +149,7 @@ List<Signal> NetElementSignal<Signal>::receive() {
   List<Signal> received;
   for (auto& p : m_signals) {
     if (!p.received) {
-      received.append(p.signal);
+      received.push_back(p.signal);
       p.received = true;
     }
   }

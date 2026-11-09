@@ -38,7 +38,7 @@ AudioInstance::AudioInstance(Audio audio)
   : m_audio(std::move(audio)) {
   m_mixerGroup = MixerGroup::Effects;
 
-  m_volume = {1.0f, 1.0f, 0};
+  m_volume = {.value = 1.0f, .target = 1.0f, .velocity = 0};
 
   m_pitchMultiplier = 1.0f;
   m_pitchMultiplierTarget = 1.0f;
@@ -83,7 +83,7 @@ void AudioInstance::setRangeMultiplier(float rangeMultiplier) {
 
 void AudioInstance::setVolume(float targetValue, float rampTime) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((targetValue >= 0));
+    Star::star_assert_failed((targetValue >= 0));
   }
   std::lock_guard locker(m_mutex);
 
@@ -102,7 +102,7 @@ void AudioInstance::setVolume(float targetValue, float rampTime) {
 
 void AudioInstance::setPitchMultiplier(float targetValue, float rampTime) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((targetValue >= 0));
+    Star::star_assert_failed((targetValue >= 0));
   }
   std::lock_guard locker(m_mutex);
 
@@ -191,12 +191,12 @@ Mixer::Mixer(Logger& logger, unsigned sampleRate, unsigned channels) : m_logger(
   m_sampleRate = sampleRate;
   m_channels = channels;
 
-  m_volume = {1.0f, 1.0f, 0};
+  m_volume = {.value = 1.0f, .target = 1.0f, .velocity = 0};
 
-  m_groupVolumes[MixerGroup::Effects] = {1.0f, 1.0f, 0};
-  m_groupVolumes[MixerGroup::Music] = {1.0f, 1.0f, 0};
-  m_groupVolumes[MixerGroup::Cinematic] = {1.0f, 1.0f, 0};
-  m_groupVolumes[MixerGroup::Instruments] = {1.0f, 1.0f, 0};
+  m_groupVolumes[MixerGroup::Effects] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
+  m_groupVolumes[MixerGroup::Music] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
+  m_groupVolumes[MixerGroup::Cinematic] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
+  m_groupVolumes[MixerGroup::Instruments] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
 
   m_speed = 1.0f;
 }
@@ -213,7 +213,10 @@ std::expected<void, StarException> Mixer::addEffect(String const& effectName, Ef
   if (!effectFunction)
     return std::unexpected(AudioException("Cannot add an empty audio effect"));
   std::lock_guard locker(m_effectsMutex);
-  m_effects[effectName] = std::make_shared<EffectInfo>(EffectInfo{std::move(effectFunction), 0.0f, rateOfChangeFromRampTime(rampTime), false});
+  m_effects[effectName] = std::make_shared<EffectInfo>(EffectInfo{.effectFunction = std::move(effectFunction),
+                                                                  .amount = 0.0f,
+                                                                  .velocity = rateOfChangeFromRampTime(rampTime),
+                                                                  .finished = false});
   return {};
 }
 
@@ -283,7 +286,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
   std::size_t bufferSize = frameCount * m_channels;
   m_mixBuffer.resize(bufferSize, 0);
 
-  float time = (float)frameCount / sampleRate;
+  float time = static_cast<float>(frameCount) / sampleRate;
   float beginVolume = volume;
   float endVolume = approach(targetVolume, volume, volumeVelocity * time);
 
@@ -301,7 +304,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
   {
     std::lock_guard locker(m_queueMutex);
     // Mix all active sounds
-    for (auto& p : m_audios) {
+    for (auto&& p : m_audios) {
       auto& audioInstance = p.first;
       auto& audioState = p.second;
 
@@ -370,7 +373,9 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
             if (sampleTime > *audioInstance->m_clockStop) {
               float volume = 0.0f;
               if (audioInstance->m_clockStopFadeOut > 0)
-                volume = 1.0f - (float)(sampleTime - *audioInstance->m_clockStop) / (float)audioInstance->m_clockStopFadeOut;
+                volume = 1.0f
+                  - static_cast<float>((sampleTime - *audioInstance->m_clockStop))
+                    / static_cast<float>(audioInstance->m_clockStopFadeOut);
 
               if (volume <= 0) {
                 for (std::size_t c = 0; c < channels; ++c)
@@ -387,7 +392,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
 
         for (std::size_t s = 0; s < ramt / channels; ++s) {
           float vol = std::lerp(beginVolume * groupVolume * audioStopVolBegin,
-                                endVolume * groupEndVolume * audioStopVolEnd, (float)s / frameCount);
+                                endVolume * groupEndVolume * audioStopVolEnd, static_cast<float>(s) / frameCount);
           for (std::size_t c = 0; c < channels; ++c) {
             float sample = m_mixBuffer[s * channels + c] * vol * audioState.positionalChannelVolumes[c] * audioInstance->m_volume.value;
             std::int16_t& outSample = outBuffer[s * channels + c];
@@ -440,7 +445,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer
         return std::unexpected(std::move(effected.error()));
 
       for (std::size_t s = 0; s < frameCount; ++s) {
-        float amt = std::lerp(effectBegin, effectEnd, (float)s / frameCount);
+        float amt = std::lerp(effectBegin, effectEnd, static_cast<float>(s) / frameCount);
         for (std::size_t c = 0; c < channels; ++c) {
           std::int16_t prev = outBuffer[s * channels + c];
           outBuffer[s * channels + c] = lerp(amt, prev, m_mixBuffer[s * channels + c]);
@@ -475,13 +480,14 @@ Mixer::EffectFunction Mixer::lowpass(std::size_t avgSize) const {
       for (std::size_t f = 0; f < frames; ++f) {
         for (std::size_t c = 0; c < channels; ++c) {
           auto& filterChannel = filter[c];
-          filterChannel.append(buffer[f * channels + c] / 32767.0f);
+          filterChannel.push_back(buffer[f * channels + c] / 32767.0f);
           while (filterChannel.size() > avgSize) {
-            auto removed = filterChannel.takeFirst();
+            auto removed = filterChannel.take_front();
             if (!removed)
               return std::unexpected(std::move(removed.error()));
           }
-          buffer[f * channels + c] = std::ranges::fold_left_first(filterChannel, std::plus<float>()).value_or(0.0f) / (float)avgSize * 32767.0f;
+          buffer[f * channels + c] = std::ranges::fold_left_first(filterChannel, std::plus<float>()).value_or(0.0f)
+            / static_cast<float>(avgSize) * 32767.0f;
         }
       }
       return {};
@@ -513,9 +519,9 @@ Mixer::EffectFunction Mixer::echo(float time, float dry, float wet) const {
         for (std::size_t c = 0; c < channels; ++c) {
           auto& filterChannel = filter[c];
           buffer[f * channels + c] = buffer[f * channels + c] * dry + filter[c][0] * wet;
-          filterChannel.append(buffer[f * channels + c]);
+          filterChannel.push_back(buffer[f * channels + c]);
           while (filterChannel.size() > echoLength) {
-            auto removed = filterChannel.takeFirst();
+            auto removed = filterChannel.take_front();
             if (!removed)
               return std::unexpected(std::move(removed.error()));
           }
@@ -525,7 +531,7 @@ Mixer::EffectFunction Mixer::echo(float time, float dry, float wet) const {
     }
   };
 
-  return Echo{(unsigned)(time * m_sampleRate), dry, wet, {}};
+  return Echo{.echoLength = static_cast<unsigned>((time * m_sampleRate)), .dry = dry, .wet = wet, .filter = {}};
 }
 
 void Mixer::setGroupVolume(MixerGroup group, float targetValue, float rampTime) {
@@ -546,7 +552,7 @@ std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFun
     eraseWhere(m_audios, [](auto const& p) {
       return p.first->m_finished;
     });
-    for (auto& p : m_audios) {
+    for (auto&& p : m_audios) {
       if (positionalAttenuationFunction && p.first->m_position) {
         for (unsigned c = 0; c < m_channels; ++c) {
           auto attenuation = positionalAttenuationFunction(c, *p.first->m_position, p.first->m_rangeMultiplier);

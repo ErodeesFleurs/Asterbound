@@ -64,7 +64,7 @@ struct WeatherType {
   std::optional<String> parallax;
 };
 
-typedef WeightedPool<String> WeatherPool;
+using WeatherPool = WeightedPool<String>;
 
 [[nodiscard]]
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WeatherType& weatherType);

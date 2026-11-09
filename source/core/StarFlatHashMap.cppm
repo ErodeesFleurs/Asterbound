@@ -11,35 +11,44 @@ namespace Star {
 template <typename Key, typename Mapped, typename Hash = hash<Key>, typename Equals = std::equal_to<>, typename Allocator = std::allocator<Key>>
 class FlatHashMap {
 public:
-  typedef Key key_type;
-  typedef Mapped mapped_type;
-  typedef std::pair<key_type const, mapped_type> value_type;
-  typedef std::size_t size_type;
-  typedef std::ptrdiff_t difference_type;
-  typedef Hash hasher;
-  typedef Equals key_equal;
-  typedef Allocator allocator_type;
-  typedef value_type& reference;
-  typedef value_type const& const_reference;
-  typedef value_type* pointer;
-  typedef value_type const* const_pointer;
+  using key_type = Key;
+  using mapped_type = Mapped;
+  using value_type = std::pair<key_type const, mapped_type>;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using hasher = Hash;
+  using key_equal = Equals;
+  using allocator_type = Allocator;
+  // References bind the genuine mutable-key storage without pretending it is
+  // a different pair specialization. Only mapped values are publicly mutable.
+  using reference = std::pair<key_type const&, mapped_type&>;
+  using const_reference = std::pair<key_type const&, mapped_type const&>;
+
+  template <typename Reference> struct arrow_proxy {
+    Reference entry;
+    Reference const* operator->() const { return std::addressof(entry); }
+  };
+
+  using pointer = arrow_proxy<reference>;
+  using const_pointer = arrow_proxy<const_reference>;
 
 private:
-  typedef std::pair<key_type, mapped_type> TableValue;
+  using TableValue = std::pair<key_type, mapped_type>;
 
   struct GetKey {
     key_type const& operator()(TableValue const& value) const;
   };
 
-  typedef FlatHashTable<TableValue, key_type, GetKey, Hash, Equals, typename std::allocator_traits<Allocator>::template rebind_alloc<TableValue>> Table;
+  using Table = FlatHashTable<TableValue, key_type, GetKey, Hash, Equals,
+                              typename std::allocator_traits<Allocator>::template rebind_alloc<TableValue>>;
 
 public:
   struct const_iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashMap::value_type const value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashMap::value_type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = typename FlatHashMap::const_pointer;
+    using reference = typename FlatHashMap::const_reference;
 
     bool operator==(const_iterator const& rhs) const;
     bool operator!=(const_iterator const& rhs) const;
@@ -47,18 +56,18 @@ public:
     const_iterator& operator++();
     const_iterator operator++(int);
 
-    value_type& operator*() const;
-    value_type* operator->() const;
+    reference operator*() const;
+    pointer operator->() const;
 
-    typename Table::const_iterator inner;
+    typename Table::const_iterator inner{};
   };
 
   struct iterator {
-    typedef std::forward_iterator_tag iterator_category;
-    typedef typename FlatHashMap::value_type value_type;
-    typedef std::ptrdiff_t difference_type;
-    typedef value_type* pointer;
-    typedef value_type& reference;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = typename FlatHashMap::value_type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = typename FlatHashMap::pointer;
+    using reference = typename FlatHashMap::reference;
 
     bool operator==(iterator const& rhs) const;
     bool operator!=(iterator const& rhs) const;
@@ -66,12 +75,12 @@ public:
     iterator& operator++();
     iterator operator++(int);
 
-    value_type& operator*() const;
-    value_type* operator->() const;
+    reference operator*() const;
+    pointer operator->() const;
 
     operator const_iterator() const;
 
-    typename Table::iterator inner;
+    typename Table::iterator inner{};
   };
 
   FlatHashMap();
@@ -121,10 +130,10 @@ public:
   void clear();
 
   std::pair<iterator, bool> insert(value_type const& value);
-  template <typename T, typename = typename std::enable_if<std::is_constructible<TableValue, T&&>::value>::type>
+  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
   std::pair<iterator, bool> insert(T&& value);
   iterator insert(const_iterator hint, value_type const& value);
-  template <typename T, typename = typename std::enable_if<std::is_constructible<TableValue, T&&>::value>::type>
+  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
   iterator insert(const_iterator hint, T&& value);
   template <typename InputIt>
   void insert(InputIt first, InputIt last);
@@ -137,7 +146,7 @@ public:
 
   template <typename... Args>
   std::pair<iterator, bool> try_emplace(key_type const& key, Args&&... args) {
-    auto result = m_table.insertWith(key, [&] {
+    auto result = m_table.insert_with(key, [&] {
       return TableValue(std::piecewise_construct, std::forward_as_tuple(key),
           std::forward_as_tuple(std::forward<Args>(args)...));
     });
@@ -146,7 +155,7 @@ public:
 
   template <typename... Args>
   std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args) {
-    auto result = m_table.insertWith(key, [&] {
+    auto result = m_table.insert_with(key, [&] {
       return TableValue(std::piecewise_construct, std::forward_as_tuple(std::move(key)),
           std::forward_as_tuple(std::forward<Args>(args)...));
     });
@@ -184,26 +193,23 @@ public:
   iterator find(key_type const& key);
 
   template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
-    }
-  const_iterator find(LookupKey const& key) const { return const_iterator{m_table.find(key)}; }
+    requires transparent_hash_lookup<hasher, key_equal, key_type, LookupKey>
+  const_iterator find(LookupKey const& key) const {
+    return const_iterator{m_table.find(key)};
+  }
 
   template <typename LookupKey>
-    requires requires(hasher const& h, key_equal const& equal, key_type const& stored, LookupKey const& query) {
-      typename hasher::is_transparent;
-      typename key_equal::is_transparent;
-      { h(query) } -> std::convertible_to<std::size_t>;
-      { equal(stored, query) } -> std::convertible_to<bool>;
-    }
-  iterator find(LookupKey const& key) { return iterator{m_table.find(key)}; }
+    requires transparent_hash_lookup<hasher, key_equal, key_type, LookupKey>
+  iterator find(LookupKey const& key) {
+    return iterator{m_table.find(key)};
+  }
   std::pair<iterator, iterator> equal_range(key_type const& key);
   std::pair<const_iterator, const_iterator> equal_range(key_type const& key) const;
 
   void reserve(std::size_t capacity);
+  hasher hash_function() const noexcept(std::is_nothrow_copy_constructible_v<hasher>) { return m_table.hash_function(); }
+  key_equal key_eq() const noexcept(std::is_nothrow_copy_constructible_v<key_equal>) { return m_table.key_eq(); }
+  allocator_type get_allocator() const noexcept { return m_table.get_allocator(); }
 
   bool operator==(FlatHashMap const& rhs) const;
   bool operator!=(FlatHashMap const& rhs) const;
@@ -241,13 +247,13 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator*() const -> value_type& {
-  return *operator->();
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator*() const -> reference {
+  return {inner->first, inner->second};
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator->() const -> value_type* {
-  return (value_type*)(&*inner);
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::const_iterator::operator->() const -> pointer {
+  return pointer{**this};
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
@@ -274,13 +280,13 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator++(int
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator*() const -> value_type& {
-  return *operator->();
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator*() const -> reference {
+  return {inner->first, inner->second};
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator->() const -> value_type* {
-  return (value_type*)(&*inner);
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::iterator::operator->() const -> pointer {
+  return pointer{**this};
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
@@ -331,24 +337,19 @@ FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, In
   : FlatHashMap(first, last, bucketCount, hash, key_equal(), alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap const& other)
-  : FlatHashMap(other, other.m_table.getAllocator()) {}
+FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap const& other) : m_table(other.m_table) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap const& other, allocator_type const& alloc)
-  : FlatHashMap(alloc) {
-  operator=(other);
-}
+    : m_table(other.m_table, alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap&& other)
-  : FlatHashMap(std::move(other), other.m_table.getAllocator()) {}
+    : m_table(std::move(other.m_table)) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap&& other, allocator_type const& alloc)
-  : FlatHashMap(alloc) {
-  operator=(std::move(other));
-}
+    : m_table(std::move(other.m_table), alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(std::initializer_list<value_type> init, std::size_t bucketCount, hasher const& hash,
@@ -369,10 +370,7 @@ FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(std::initializer_
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::operator=(FlatHashMap const& other) -> FlatHashMap& {
-  m_table.clear();
-  m_table.reserve(other.size());
-  for (auto const& p : other)
-    m_table.insert(p);
+  m_table = other.m_table;
   return *this;
 }
 
@@ -461,8 +459,6 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(const_iterator, T
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 template <typename InputIt>
 void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(InputIt first, InputIt last) {
-  if constexpr (std::forward_iterator<InputIt>)
-    m_table.reserve(m_table.size() + std::distance(first, last));
   for (auto i = first; i != last; ++i)
     m_table.insert(*i);
 }

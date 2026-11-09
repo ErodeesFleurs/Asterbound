@@ -1,7 +1,7 @@
 module;
 
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 
 import star.array;
 import star.math_common;
@@ -12,9 +12,9 @@ namespace Star {
 template <typename T>
 class Matrix3 {
 public:
-  typedef Vector<T, 3> Vec3;
-  typedef Vector<T, 2> Vec2;
-  typedef Array<Vec3, 3> Rows;
+  using Vec3 = Vector<T, 3>;
+  using Vec2 = Vector<T, 2>;
+  using Rows = Array<Vec3, 3>;
 
   static Matrix3 identity();
 
@@ -115,8 +115,8 @@ private:
   Rows m_rows;
 };
 
-typedef Matrix3<float> Mat3F;
-typedef Matrix3<double> Mat3D;
+using Mat3F = Matrix3<float>;
+using Mat3D = Matrix3<double>;
 
 template <typename T>
 Matrix3<T> Matrix3<T>::identity() {
@@ -145,8 +145,7 @@ Matrix3<T> Matrix3<T>::scaling(Vec2 const& scale, Vec2 const& point) {
   return Matrix3(scale[0], 0, point[0] - point[0] * scale[0], 0, scale[1], point[1] - point[1] * scale[1], 0, 0, 1);
 }
 
-template <typename T>
-Matrix3<T>::Matrix3() {}
+template <typename T> Matrix3<T>::Matrix3() = default;
 
 template <typename T>
 Matrix3<T>::Matrix3(T r1c1, T r1c2, T r1c3, T r2c1, T r2c2, T r2c3, T r3c1, T r3c2, T r3c3)
@@ -185,12 +184,12 @@ auto Matrix3<T>::operator[](const std::size_t i) const -> Vec3 const & {
 
 template <typename T>
 T* Matrix3<T>::ptr() requires (sizeof(Vec3) == 3 * sizeof(T) && sizeof(Rows) == 3 * sizeof(Vec3)) {
-  return m_rows[0].ptr();
+  return m_rows[0].data();
 }
 
 template <typename T>
 T const* Matrix3<T>::ptr() const requires (sizeof(Vec3) == 3 * sizeof(T) && sizeof(Rows) == 3 * sizeof(Vec3)) {
-  return m_rows[0].ptr();
+  return m_rows[0].data();
 }
 
 template <typename T>
@@ -309,7 +308,7 @@ Vector<T2, 2> Matrix3<T>::transformVec2(Vector<T2, 2> const& point) const {
 
 template <typename T>
 float Matrix3<T>::transformAngle(float angle) const {
-  Vec2 a = Vec2::withAngle(angle, 1.0f);
+  Vec2 a = Vec2::with_angle(angle, 1.0f);
   Matrix3 m = *this;
   m[0][2] = 0;
   m[1][2] = 0;
@@ -449,11 +448,17 @@ Matrix3<T> operator*(T s, const Matrix3<T>& m) {
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, Matrix3<T> m) {
-  os << m[0][0] << ' ' << m[0][1] << ' ' << m[0][2] << std::endl;
-  os << m[1][0] << ' ' << m[1][1] << ' ' << m[1][2] << std::endl;
-  os << m[2][0] << ' ' << m[2][1] << ' ' << m[2][2];
-  return os;
+  requires nonfallible_text_writable<T>
+void write_text(TextBuffer& output, Matrix3<T> const& matrix) {
+  for (std::size_t row = 0; row != 3; ++row) {
+    if (row != 0)
+      output.push_back('\n');
+    for (std::size_t column = 0; column != 3; ++column) {
+      if (column != 0)
+        output.push_back(' ');
+      append_text(output, matrix[row][column]);
+    }
+  }
 }
 
 }
@@ -461,7 +466,8 @@ std::ostream& operator<<(std::ostream& os, Matrix3<T> m) {
 export module star.matrix3;
 
 export template <typename T>
-struct std::formatter<Star::Matrix3<T>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<T>
+struct std::formatter<Star::Matrix3<T>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Matrix3;
@@ -471,5 +477,5 @@ export namespace Star {
   using ::Star::transpose;
   using ::Star::ortho;
   using ::Star::operator*;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

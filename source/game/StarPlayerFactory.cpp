@@ -125,7 +125,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
     auto item = ItemDescriptor::create(itemJson);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    config->defaultItems.append(std::move(*item));
+    config->defaultItems.push_back(std::move(*item));
   }
   auto blueprintConfig = json.get("defaultBlueprints", JsonObject());
   if (!blueprintConfig)
@@ -137,7 +137,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
     auto item = ItemDescriptor::create(itemJson);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    config->defaultBlueprints.append(std::move(*item));
+    config->defaultBlueprints.push_back(std::move(*item));
   }
   auto boundsConfig = json.get("metaBoundBox");
   if (!boundsConfig)

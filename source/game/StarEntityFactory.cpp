@@ -193,7 +193,7 @@ std::expected<ByteArray, StarException> EntityFactory::netStoreEntity(std::share
     return m_vehicleDatabase->netStore(vehicle, rules);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(entity->entityType());
+    auto name = EntityTypeNames->get_right(entity->entityType());
     if (!name) return std::unexpected(std::move(name.error()));
     return std::unexpected(EntityFactoryException::format("Don't know how to make net store for entity type '{}'", name->get()));
   }
@@ -225,7 +225,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::netLoadEnti
     return m_vehicleDatabase->netLoad(netStore, rules);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(type);
+    auto name = EntityTypeNames->get_right(type);
     if (!name) return std::unexpected(std::move(name.error()));
     return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from net store", name->get()));
   }
@@ -253,7 +253,7 @@ std::expected<Json, StarException> EntityFactory::diskStoreEntity(std::shared_pt
     return m_vehicleDatabase->diskStore(vehicle);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(entity->entityType());
+    auto name = EntityTypeNames->get_right(entity->entityType());
     if (!name) return std::unexpected(std::move(name.error()));
     return std::unexpected(EntityFactoryException::format("Don't know how to make disk store for entity type '{}'", name->get()));
   }
@@ -281,7 +281,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::diskLoadEnt
     return m_vehicleDatabase->diskLoad(diskStore);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(type);
+    auto name = EntityTypeNames->get_right(type);
     if (!name) return std::unexpected(std::move(name.error()));
     return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from disk store", name->get()));
   }
@@ -291,7 +291,7 @@ std::expected<Json, StarException> EntityFactory::loadVersionedJson(VersionedJso
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto identifier = EntityStorageIdentifiers->getRight(expectedType);
+  auto identifier = EntityStorageIdentifiers->get_right(expectedType);
   if (!identifier) return std::unexpected(std::move(identifier.error()));
   return m_versioningDatabase->loadVersionedJson(versionedJson, identifier->get());
 }
@@ -300,7 +300,7 @@ std::expected<VersionedJson, StarException> EntityFactory::storeVersionedJson(En
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto identifier = EntityStorageIdentifiers->getRight(type);
+  auto identifier = EntityStorageIdentifiers->get_right(type);
   if (!identifier) return std::unexpected(std::move(identifier.error()));
   return m_versioningDatabase->makeCurrentVersionedJson(identifier->get(), store);
 }
@@ -309,7 +309,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::loadVersion
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto type = EntityStorageIdentifiers->getLeft(versionedJson.identifier);
+  auto type = EntityStorageIdentifiers->get_left(versionedJson.identifier);
   if (!type) return std::unexpected(std::move(type.error()));
   auto store = loadVersionedJson(versionedJson, type->get());
   if (!store) return std::unexpected(std::move(store.error()));

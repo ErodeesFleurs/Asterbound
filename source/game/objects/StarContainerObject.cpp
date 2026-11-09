@@ -250,7 +250,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
   if (!initialized) {
     auto cleaned = Object::uninit();
     if (!cleaned)
-      return std::unexpected(initialized.error().withContext(strf("Container initialization cleanup failed: {}", outputException(cleaned.error(), false))));
+      return std::unexpected(initialized.error().with_context(Star::format("Container initialization cleanup failed: {}", Star::output_exception(cleaned.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   return {};
@@ -265,7 +265,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    for (auto const& item : take(m_lostItems)) {
+    for (auto const& item : std::exchange(m_lostItems, {})) {
       auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
@@ -332,13 +332,13 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       }
       m_ageItemsTimer.setElapsedTime(0.0);
     }
-    if (take(m_runUpdatedCallback)) {
+    if (std::exchange(m_runUpdatedCallback, false)) {
       auto operation4 = m_scriptComponent.invoke("containerCallback");
       if (!operation4)
         return std::unexpected(std::move(operation4.error()));
     }
   } else {
-    setImageKey("key", toString(m_currentState));
+    setImageKey("key", Star::to_string(m_currentState));
     setImageKey("state", m_crafting.get() ? String("crafting") : String("idle"));
     m_animationFrameCooldown -= 1;
   }
@@ -475,7 +475,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));
   auto database = std::move(*databaseResult);
-  auto matches0Result = message.equalsIgnoreCase("startCrafting");
+  auto matches0Result = message.equals_ignore_case("startCrafting");
   if (!matches0Result)
     return std::unexpected(std::move(matches0Result.error()));
   auto matches0 = std::move(*matches0Result);
@@ -485,7 +485,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation1.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches1Result = message.equalsIgnoreCase("stopCrafting");
+  auto matches1Result = message.equals_ignore_case("stopCrafting");
   if (!matches1Result)
     return std::unexpected(std::move(matches1Result.error()));
   auto matches1 = std::move(*matches1Result);
@@ -495,7 +495,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation2.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches2Result = message.equalsIgnoreCase("burnContainerContents");
+  auto matches2Result = message.equals_ignore_case("burnContainerContents");
   if (!matches2Result)
     return std::unexpected(std::move(matches2Result.error()));
   auto matches2 = std::move(*matches2Result);
@@ -505,7 +505,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(operation3.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches3Result = message.equalsIgnoreCase("addItems");
+  auto matches3Result = message.equals_ignore_case("addItems");
   if (!matches3Result)
     return std::unexpected(std::move(matches3Result.error()));
   auto matches3 = std::move(*matches3Result);
@@ -524,7 +524,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches4Result = message.equalsIgnoreCase("putItems");
+  auto matches4Result = message.equals_ignore_case("putItems");
   if (!matches4Result)
     return std::unexpected(std::move(matches4Result.error()));
   auto matches4 = std::move(*matches4Result);
@@ -551,7 +551,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches5Result = message.equalsIgnoreCase("takeItems");
+  auto matches5Result = message.equals_ignore_case("takeItems");
   if (!matches5Result)
     return std::unexpected(std::move(matches5Result.error()));
   auto matches5 = std::move(*matches5Result);
@@ -578,7 +578,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches6Result = message.equalsIgnoreCase("swapItems");
+  auto matches6Result = message.equals_ignore_case("swapItems");
   if (!matches6Result)
     return std::unexpected(std::move(matches6Result.error()));
   auto matches6 = std::move(*matches6Result);
@@ -610,7 +610,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches7Result = message.equalsIgnoreCase("applyAugment");
+  auto matches7Result = message.equals_ignore_case("applyAugment");
   if (!matches7Result)
     return std::unexpected(std::move(matches7Result.error()));
   auto matches7 = std::move(*matches7Result);
@@ -637,7 +637,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
   }
-  auto matches8Result = message.equalsIgnoreCase("consumeItems");
+  auto matches8Result = message.equals_ignore_case("consumeItems");
   if (!matches8Result)
     return std::unexpected(std::move(matches8Result.error()));
   auto matches8 = std::move(*matches8Result);
@@ -656,7 +656,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(Json(result));
   }
-  auto matches9Result = message.equalsIgnoreCase("consumeItemsAt");
+  auto matches9Result = message.equals_ignore_case("consumeItemsAt");
   if (!matches9Result)
     return std::unexpected(std::move(matches9Result.error()));
   auto matches9 = std::move(*matches9Result);
@@ -683,7 +683,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto result = std::move(*resultResult);
     return ChainableJsonMessageResponse(Json(result));
   }
-  auto matches10Result = message.equalsIgnoreCase("clearContainer");
+  auto matches10Result = message.equals_ignore_case("clearContainer");
   if (!matches10Result)
     return std::unexpected(std::move(matches10Result.error()));
   auto matches10 = std::move(*matches10Result);
@@ -694,7 +694,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     auto items = std::move(*itemsResult);
     JsonArray result;
     for (auto const& item : items)
-      result.append(itemSafeDescriptor(item).toJson());
+      result.push_back(itemSafeDescriptor(item).toJson());
     return ChainableJsonMessageResponse(std::move(result));
   }
   return Object::receiveMessage(sendingConnection, message, args);
@@ -717,7 +717,7 @@ std::expected<Json, StarException> ContainerObject::containerGuiConfig() const {
   if (!pathResult)
     return std::unexpected(std::move(pathResult.error()));
   auto path = std::move(*pathResult);
-  auto resolvedResult = path.replace("<slots>", toString(m_items->size()));
+  auto resolvedResult = path.replace("<slots>", Star::to_string(m_items->size()));
   if (!resolvedResult)
     return std::unexpected(std::move(resolvedResult.error()));
   auto resolved = std::move(*resolvedResult);
@@ -1007,7 +1007,7 @@ std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerO
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
-    items.append(std::move(item));
+    items.push_back(std::move(item));
   }
   return items;
 });
@@ -1036,7 +1036,7 @@ std::expected<void, StarException> ContainerObject::startCrafting() {
     if (m_crafting.get())
       return {};
     auto inputItems = m_items->items();
-    auto operation2 = inputItems.removeLast();
+    auto operation2 = inputItems.pop_back_checked();
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
     auto recipeResult = recipeForMaterials(inputItems);
@@ -1125,7 +1125,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
           level = std::min(maxLevel, level + fuelSingle * count);
           auto consumed = item->consume(count);
           if constexpr (Star::DebugEnabled) {
-            Star::starAssertFailed((consumed));
+            Star::star_assert_failed((consumed));
           }
           ((void)(consumed));
         }
@@ -1157,7 +1157,7 @@ std::expected<void, StarException> ContainerObject::setNetStates() {
   auto operation1 = Object::setNetStates();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  if (take(m_itemsUpdated)) {
+  if (std::exchange(m_itemsUpdated, false)) {
     DataStreamBuffer ds;
     auto operation2 = m_items->write(ds);
     if (!operation2)
@@ -1226,7 +1226,7 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   if (!overflowResult)
     return std::unexpected(std::move(overflowResult.error()));
   auto overflow = std::move(*overflowResult);
-  m_lostItems.appendAll(std::move(overflow));
+  m_lostItems.append_range(std::move(overflow));
   return {};
 }
 
@@ -1277,7 +1277,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
   if (!m_crafting.get())
     return {};
   auto inputItems = m_items->items();
-  auto operation1 = inputItems.removeLast();
+  auto operation1 = inputItems.pop_back_checked();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto recipeResult = recipeForMaterials(inputItems);
@@ -1311,7 +1311,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
       bool consumed = m_items->consumeItems(input);
       ((void)(consumed));
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((consumed));
+        Star::star_assert_failed((consumed));
       }
     }
     auto databaseResult = root().itemDatabase();

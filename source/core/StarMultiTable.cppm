@@ -18,29 +18,29 @@ namespace Star {
 template <typename ElementT, typename PositionT, std::size_t RankN>
 class MultiTable {
 public:
-  typedef ElementT Element;
-  typedef PositionT Position;
+  using Element = ElementT;
+  using Position = PositionT;
   static std::size_t const Rank = RankN;
 
-  typedef Star::MultiArray<ElementT, RankN> MultiArray;
+  using MultiArray = Star::MultiArray<ElementT, RankN>;
 
-  typedef Star::MultiArrayInterpolator2<MultiArray, Position> Interpolator2;
-  typedef Star::MultiArrayInterpolator4<MultiArray, Position> Interpolator4;
-  typedef Star::MultiArrayPiecewiseInterpolator<MultiArray, Position> PiecewiseInterpolator;
+  using Interpolator2 = Star::MultiArrayInterpolator2<MultiArray, Position>;
+  using Interpolator4 = Star::MultiArrayInterpolator4<MultiArray, Position>;
+  using PiecewiseInterpolator = Star::MultiArrayPiecewiseInterpolator<MultiArray, Position>;
 
-  typedef Array<Position, Rank> PositionArray;
-  typedef Array<Position, 2> WeightArray2;
-  typedef Array<Position, 4> WeightArray4;
-  typedef typename MultiArray::SizeArray SizeArray;
-  typedef typename MultiArray::IndexArray IndexArray;
-  typedef List<Position> Range;
-  typedef Array<Range, Rank> RangeArray;
+  using PositionArray = Array<Position, Rank>;
+  using WeightArray2 = Array<Position, 2>;
+  using WeightArray4 = Array<Position, 4>;
+  using SizeArray = typename MultiArray::SizeArray;
+  using IndexArray = typename MultiArray::IndexArray;
+  using Range = List<Position>;
+  using RangeArray = Array<Range, Rank>;
 
-  typedef std::function<WeightArray2(Position)> WeightFunction2;
-  typedef std::function<WeightArray4(Position)> WeightFunction4;
-  typedef std::function<Element(PositionArray const&)> InterpolateFunction;
+  using WeightFunction2 = std::function<WeightArray2(Position)>;
+  using WeightFunction4 = std::function<WeightArray4(Position)>;
+  using InterpolateFunction = std::function<Element(PositionArray const&)>;
 
-  MultiTable() : m_interpolationMode(InterpolationMode::Linear), m_boundMode(BoundMode::Clamp) {}
+  MultiTable() {}
 
   // Set input ranges on a particular dimension.  Will resize underlying storage
   // to fit range.
@@ -157,19 +157,18 @@ private:
 
   RangeArray m_ranges;
   MultiArray m_array;
-  InterpolationMode m_interpolationMode;
-  BoundMode m_boundMode;
+  InterpolationMode m_interpolationMode = InterpolationMode::Linear;
+  BoundMode m_boundMode = BoundMode::Clamp;
 };
 
-typedef MultiTable<float, float, 2> MultiTable2F;
-typedef MultiTable<double, double, 2> MultiTable2D;
+using MultiTable2F = MultiTable<float, float, 2>;
+using MultiTable2D = MultiTable<double, double, 2>;
 
-typedef MultiTable<float, float, 3> MultiTable3F;
-typedef MultiTable<double, double, 3> MultiTable3D;
+using MultiTable3F = MultiTable<float, float, 3>;
+using MultiTable3D = MultiTable<double, double, 3>;
 
-typedef MultiTable<float, float, 4> MultiTable4F;
-typedef MultiTable<double, double, 4> MultiTable4D;
-
+using MultiTable4F = MultiTable<float, float, 4>;
+using MultiTable4D = MultiTable<double, double, 4>;
 }
 
 export module star.multi_table;

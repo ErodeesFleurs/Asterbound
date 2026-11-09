@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
       auto items = jsonToList<ItemDescriptor>(option, [](Json const& entry) { return ItemDescriptor::create(entry); });
       if (!items)
         return std::unexpected(std::move(items.error()));
-      result->rewards.append(std::move(*items));
+      result->rewards.push_back(std::move(*items));
     }
   }
   auto rewardParameters = config.get("rewardParameters", JsonArray{});
@@ -150,7 +150,7 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
     auto quest = QuestTemplate::create(*config);
     if (!quest) return std::unexpected(std::move(quest.error()));
     if (!database->m_templates.insert((*quest)->templateId, *quest).second)
-      return std::unexpected(StarException(strf("Duplicate quest template '{}'", (*quest)->templateId)));
+      return std::unexpected(StarException(Star::format("Duplicate quest template '{}'", (*quest)->templateId)));
     return {};
     }();
     if (!loaded)
@@ -160,7 +160,8 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
 }
 List<String> QuestTemplateDatabase::allQuestTemplateIds() const { return m_templates.keys(); }
 std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplateDatabase::questTemplate(String const& id) const {
-  if (auto result = m_templates.maybeRef(id)) return result->get();
+  if (auto result = m_templates.find_ref(id))
+    return result->get();
   auto logged = m_logger.error("No quest template found for id '{}'", id);
   if (!logged) return std::unexpected(std::move(logged.error()));
   return std::shared_ptr<QuestTemplate>();

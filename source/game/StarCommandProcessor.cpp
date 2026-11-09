@@ -57,10 +57,10 @@ import star.ordered_set;
 import star.lock_file;
 import star.io_device;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.ref_ptr;
 import star.listener;
@@ -293,14 +293,14 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
     auto object = commands[i].toObject();
     if (!object) return std::unexpected(std::move(object.error()));
     StringList list = object->keys();
-    std::sort(list.begin(), list.end(), std::less<String>());
+    std::sort(list.begin(), list.end(), std::less<>());
     auto templateJson = assets->json("/help.config:" + names[i] + "HelpText");
     if (!templateJson) return std::unexpected(std::move(templateJson.error()));
     auto text = templateJson->toString();
     if (!text) return std::unexpected(std::move(text.error()));
     String description = "/" + list.join(", /");
     std::array<std::pair<std::string_view, std::string_view>, 1> bindings{{{"commands", description.utf8()}}};
-    auto formatted = formatTags(text->utf8(), bindings);
+    auto formatted = Star::format_tags(text->utf8(), bindings);
     if (!formatted) return std::unexpected(std::move(formatted.error()));
     if (i) result += "\n";
     result += *formatted;
@@ -322,7 +322,7 @@ std::expected<String, StarException> CommandProcessor::admin(ConnectionId connec
     if (*permission) return **permission;
     auto target = playerCidFromCommand((*arguments)[0], m_universe);
     if (!target) return std::unexpected(std::move(target.error()));
-    if (!*target) return strf("No user with specifier {} found.", (*arguments)[0]);
+    if (!*target) return Star::format("No user with specifier {} found.", (*arguments)[0]);
     targetClientId = **target;
   } else {
     auto canBecome = m_universe.canBecomeAdmin(connectionId);
@@ -345,8 +345,8 @@ std::expected<String, StarException> CommandProcessor::admin(ConnectionId connec
   if (!set) return std::unexpected(std::move(set.error()));
   auto nick = m_universe.clientNick(targetClientId);
   if (!nick) return std::unexpected(std::move(nick.error()));
-  if (!*wasAdmin) return strf("Admin privileges now given to {}", *nick);
-  return strf("Admin privileges taken away from {}", *nick);
+  if (!*wasAdmin) return Star::format("Admin privileges now given to {}", *nick);
+  return Star::format("Admin privileges taken away from {}", *nick);
 }
 
 std::expected<String, StarException> CommandProcessor::serverDebug(ConnectionId connectionId, String const&) {
@@ -363,7 +363,7 @@ std::expected<String, StarException> CommandProcessor::serverDebug(ConnectionId 
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   auto set = m_universe.setServerDebug(connectionId, !*enabled);
   if (!set) return std::unexpected(std::move(set.error()));
-  return strf("Server debug {}", !*enabled ? std::string_view("enabled") : std::string_view("disabled"));
+  return Star::format("Server debug {}", !*enabled ? std::string_view("enabled") : std::string_view("disabled"));
 }
 
 std::expected<String, StarException> CommandProcessor::pvp(ConnectionId connectionId, String const&) {
@@ -376,7 +376,7 @@ std::expected<String, StarException> CommandProcessor::pvp(ConnectionId connecti
   if (*nowPvp != *wasPvp) {
     auto nick = m_universe.clientNick(connectionId);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    auto sent = m_universe.adminBroadcast(*nowPvp ? strf("Player {} is now PVP", *nick) : strf("Player {} is a big wimp and is no longer PVP", *nick));
+    auto sent = m_universe.adminBroadcast(*nowPvp ? Star::format("Player {} is now PVP", *nick) : Star::format("Player {} is a big wimp and is no longer PVP", *nick));
     if (!sent) return std::unexpected(std::move(sent.error()));
   }
   auto pvp = m_universe.isPvp(connectionId);
@@ -389,7 +389,7 @@ std::expected<String, StarException> CommandProcessor::whoami(ConnectionId conne
   if (!nick) return std::unexpected(std::move(nick.error()));
   auto admin = m_universe.isAdmin(connectionId);
   if (!admin) return std::unexpected(std::move(admin.error()));
-  return strf("Server: You are {}. You are {}an Admin", *nick, *admin ? std::string_view() : std::string_view("not "));
+  return Star::format("Server: You are {}. You are {}an Admin", *nick, *admin ? std::string_view() : std::string_view("not "));
 }
 
 std::expected<String, StarException> CommandProcessor::warp(ConnectionId connectionId, String const& argumentString) {
@@ -410,7 +410,7 @@ std::expected<String, StarException> CommandProcessor::warp(ConnectionId connect
   {
     auto logged = m_root.logger().warnException("Could not parse warp target", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not parse the argument {} as a warp target", argumentString);
+    return Star::format("Could not parse the argument {} as a warp target", argumentString);
     }
 
 }
@@ -465,7 +465,7 @@ std::expected<String, StarException> CommandProcessor::warpRandom(ConnectionId c
   }
   auto warped = m_universe.clientWarpPlayer(connectionId, WarpToWorld(CelestialWorldId(*target)));
   if (!warped) return std::unexpected(std::move(warped.error()));
-  return strf("warping to {}", *target);
+  return Star::format("warping to {}", *target);
 }
 
 std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId connectionId, String const& argumentsString) {
@@ -480,7 +480,7 @@ std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId con
     return "Not enough arguments to /timewarp";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto timeResult = lexicalCast<double>(arguments[0]);
+    auto timeResult = lexical_cast<double>(arguments[0]);
     if (!timeResult) return std::unexpected(std::move(timeResult.error()));
     auto time = *timeResult;
     if (time == 0.0)
@@ -495,7 +495,7 @@ std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId con
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<BadLexicalCast>()) {
-    return strf("Could not parse the argument {} as a time adjustment", arguments[0]);
+    return Star::format("Could not parse the argument {} as a time adjustment", arguments[0]);
     }
   return std::unexpected(std::move(result.error()));
 
@@ -511,14 +511,14 @@ std::expected<String, StarException> CommandProcessor::timescale(ConnectionId co
   auto arguments = std::move(*parsedArguments);
 
   if (arguments.empty())
-    return strf("Current timescale is {:6.6f}x", m_root.timing().timescale);
+    return Star::format("Current timescale is {:6.6f}x", m_root.timing().timescale);
 
-  auto parsedScale = lexicalCast<float>(arguments[0]);
+  auto parsedScale = lexical_cast<float>(arguments[0]);
   if (!parsedScale) return std::unexpected(std::move(parsedScale.error()));
   float timescale = std::clamp(*parsedScale, 0.001f, 32.0f);
   auto set = m_universe.setTimescale(timescale);
   if (!set) return std::unexpected(std::move(set.error()));
-  return strf("Set timescale to {:6.6f}x", timescale);
+  return Star::format("Set timescale to {:6.6f}x", timescale);
 }
 
 std::expected<String, StarException> CommandProcessor::tickrate(ConnectionId connectionId, String const& argumentsString) {
@@ -531,13 +531,13 @@ std::expected<String, StarException> CommandProcessor::tickrate(ConnectionId con
   auto arguments = std::move(*parsedArguments);
 
   if (arguments.empty())
-    return strf("Current tick rate is {:4.2f}Hz", 1.0f / m_root.timing().serverTimestep);
+    return Star::format("Current tick rate is {:4.2f}Hz", 1.0f / m_root.timing().serverTimestep);
 
-  auto parsedRate = lexicalCast<float>(arguments[0]);
+  auto parsedRate = lexical_cast<float>(arguments[0]);
   if (!parsedRate) return std::unexpected(std::move(parsedRate.error()));
   float tickRate = std::clamp(*parsedRate, 5.f, 500.f);
   m_universe.setTickRate(tickRate);
-  return strf("Set tick rate to {:4.2f}Hz", tickRate);
+  return Star::format("Set tick rate to {:4.2f}Hz", tickRate);
 }
 
 std::expected<String, StarException> CommandProcessor::setTileProtection(ConnectionId connectionId, String const& argumentString) {
@@ -553,29 +553,35 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
     return "Not enough arguments to /settileprotection. Use /settileprotection <dungeonId> <protected>";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto last = arguments.takeLast();
-    if (!last) return std::unexpected(std::move(last.error()));
+    auto last = arguments.take_back();
+    if (!last)
+      return std::unexpected(std::move(last.error()));
     auto protectedJson = Json::parse(*last);
-    if (!protectedJson) return std::unexpected(std::move(protectedJson.error()));
+    if (!protectedJson)
+      return std::unexpected(std::move(protectedJson.error()));
     auto protectedValue = protectedJson->toBool();
-    if (!protectedValue) return std::unexpected(std::move(protectedValue.error()));
+    if (!protectedValue)
+      return std::unexpected(std::move(protectedValue.error()));
     bool isProtected = *protectedValue;
     List<DungeonId> dungeonIds;
     for (auto& banana : arguments) {
       auto sliced = banana.split("..");
-      if (!sliced) return std::unexpected(std::move(sliced.error()));
+      if (!sliced)
+        return std::unexpected(std::move(sliced.error()));
       auto slices = std::move(*sliced);
       auto it = slices.begin();
       DungeonId previous = 0;
       while (it != slices.end()) {
-        auto currentResult = lexicalCast<DungeonId>(*it);
-        if (!currentResult) return std::unexpected(std::move(currentResult.error()));
+        auto currentResult = lexical_cast<DungeonId>(*it);
+        if (!currentResult)
+          return std::unexpected(std::move(currentResult.error()));
         DungeonId current = *currentResult;
-        dungeonIds.append(current);
+        dungeonIds.push_back(current);
         if (it++ != slices.begin() && previous != current) {
-          if (current < previous) std::swap(previous, current);
+          if (current < previous)
+            std::swap(previous, current);
           for (DungeonId id = previous + 1; id != current; ++id)
-            dungeonIds.append(id);
+            dungeonIds.push_back(id);
         }
         previous = current;
       }
@@ -587,18 +593,18 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
        changed = *count;
        return {};
       });
-    if (!executed) return std::unexpected(std::move(executed.error()));
+    if (!executed)
+      return std::unexpected(std::move(executed.error()));
     if (!*executed) {
       return "Invalid client state";
     }
-    String output = strf("{} {} dungeon IDs", isProtected ? std::string_view("Protected") : std::string_view("Unprotected"), changed);
-    return changed < dungeonIds.size() ? strf("{} ({} unchanged)", output, dungeonIds.size() - changed) : output;
-  
+    String output = Star::format("{} {} dungeon IDs", isProtected ? std::string_view("Protected") : std::string_view("Unprotected"), changed);
+    return changed < dungeonIds.size() ? Star::format("{} ({} unchanged)", output, dungeonIds.size() - changed) : output;
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<BadLexicalCast>()) {
-    return strf("Could not parse /settileprotection parameters. Use /settileprotection <dungeonId...> <protected>", argumentString);
+    return Star::format("Could not parse /settileprotection parameters. Use /settileprotection <dungeonId...> <protected>", argumentString);
     }
   return std::unexpected(std::move(result.error()));
 
@@ -612,11 +618,11 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
   auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
-  if (arguments.size() < 1)
+  if (arguments.empty())
     return "Not enough arguments to /setdungeonid. Use /setdungeonid <dungeonId>";
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto dungeonIdResult = lexicalCast<DungeonId>(arguments[0]);
+    auto dungeonIdResult = lexical_cast<DungeonId>(arguments[0]);
     if (!dungeonIdResult) return std::unexpected(std::move(dungeonIdResult.error()));
     DungeonId dungeonId = *dungeonIdResult;
 
@@ -633,7 +639,7 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<BadLexicalCast>()) {
-    return strf("Could not parse /setdungeonid parameters. Use /setdungeonid <dungeonId>!", argumentString);
+    return Star::format("Could not parse /setdungeonid parameters. Use /setdungeonid <dungeonId>!", argumentString);
     }
   return std::unexpected(std::move(result.error()));
 
@@ -675,7 +681,7 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
     std::optional<std::uint64_t> seed;
 
     if (arguments.size() >= 2) {
-      auto amountResult = lexicalCast<std::uint64_t>(arguments[1]);
+      auto amountResult = lexical_cast<std::uint64_t>(arguments[1]);
       if (!amountResult) return std::unexpected(std::move(amountResult.error()));
       amount = *amountResult;
     }
@@ -687,13 +693,13 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
     }
 
     if (arguments.size() >= 4) {
-      auto levelResult = lexicalCast<float>(arguments[3]);
+      auto levelResult = lexical_cast<float>(arguments[3]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
 
     if (arguments.size() >= 5) {
-      auto seedResult = lexicalCast<std::uint64_t>(arguments[4]);
+      auto seedResult = lexical_cast<std::uint64_t>(arguments[4]);
       if (!seedResult) return std::unexpected(std::move(seedResult.error()));
       seed = *seedResult;
     }
@@ -720,24 +726,24 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<JsonParsingException>()) {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawnitem '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not parse item parameters";
     }
   if (exception.is<ItemException>()) {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawnitem '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
   if (exception.is<BadLexicalCast>()) {
     auto logged = m_root.logger().warnException("Error while processing /spawnitem command. Number expected", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
   {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawnitem '{}' command", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawnitem '{}' command", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
 
 }
@@ -759,7 +765,7 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
     float level = 1;
 
     if (arguments.size() >= 2) {
-      auto levelResult = lexicalCast<float>(arguments[1]);
+      auto levelResult = lexical_cast<float>(arguments[1]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
@@ -788,24 +794,24 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
   if (result) return std::move(*result);
   auto const& exception = result.error();
   if (exception.is<JsonParsingException>()) {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawntreasure '{}' command. Json parse problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not parse item parameters";
     }
   if (exception.is<ItemException>()) {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawntreasure '{}' command. Item instantiation problem", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
   if (exception.is<BadLexicalCast>()) {
     auto logged = m_root.logger().warnException("Error while processing /spawntreasure command. Number expected", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
   {
-    auto logged = m_root.logger().warnException(strf("Error while processing /spawntreasure '{}' command", arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Error while processing /spawntreasure '{}' command", arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not load item '{}'", arguments[0]);
+    return Star::format("Could not load item '{}'", arguments[0]);
     }
 
 }
@@ -830,7 +836,7 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
 
     float level = 1;
     if (arguments.size() >= 2) {
-      auto levelResult = lexicalCast<float>(arguments[1]);
+      auto levelResult = lexical_cast<float>(arguments[1]);
       if (!levelResult) return std::unexpected(std::move(levelResult.error()));
       level = *levelResult;
     }
@@ -868,9 +874,9 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warnException(strf("Could not spawn Monster of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Could not spawn Monster of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not spawn Monster of type '{}'", argumentString);
+    return Star::format("Could not spawn Monster of type '{}'", argumentString);
     }
 
 }
@@ -896,12 +902,12 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
       return "You must specify a species and NPC type to spawn.";
 
     if (arguments.size() >= 3) {
-      auto npcLevelResult = lexicalCast<float>(arguments[2]);
+      auto npcLevelResult = lexical_cast<float>(arguments[2]);
       if (!npcLevelResult) return std::unexpected(std::move(npcLevelResult.error()));
       npcLevel = *npcLevelResult;
     }
     if (arguments.size() >= 4) {
-      auto seedResult = lexicalCast<std::uint64_t>(arguments[3]);
+      auto seedResult = lexical_cast<std::uint64_t>(arguments[3]);
       if (!seedResult) return std::unexpected(std::move(seedResult.error()));
       seed = *seedResult;
     }
@@ -932,9 +938,9 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warnException(strf("Could not spawn NPC of species '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Could not spawn NPC of species '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not spawn NPC of species '{}'", argumentString);
+    return Star::format("Could not spawn NPC of species '{}'", argumentString);
     }
 
 }
@@ -987,7 +993,7 @@ std::expected<String, StarException> CommandProcessor::spawnVehicle(ConnectionId
   {
     auto logged = m_root.logger().warnException("Could not spawn vehicle", ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not spawn vehicle");
+    return Star::format("Could not spawn vehicle");
     }
 
 }
@@ -1035,9 +1041,9 @@ std::expected<String, StarException> CommandProcessor::spawnStagehand(Connection
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warnException(strf("Could not spawn Stagehand of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Could not spawn Stagehand of type '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return strf("Could not spawn Stagehand of type '{}'", argumentString);
+    return Star::format("Could not spawn Stagehand of type '{}'", argumentString);
     }
 
 }
@@ -1055,7 +1061,7 @@ std::expected<String, StarException> CommandProcessor::clearStagehand(Connection
         auto queryRect = RectF::withCenter((*aimPosition), Vec2F{2, 2});
         auto stagehands = world.query<Stagehand>(queryRect);
         if (!stagehands) return std::unexpected(std::move(stagehands.error()));
-        for (auto stagehand : *stagehands) {
+        for (auto const& stagehand : *stagehands) {
           auto removedEntity = world.removeEntity(stagehand->entityId(), true);
           if (!removedEntity) return std::unexpected(std::move(removedEntity.error()));
           ++removed;
@@ -1063,7 +1069,7 @@ std::expected<String, StarException> CommandProcessor::clearStagehand(Connection
         return {};
       });
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? strf("Removed {} stagehands", removed) : String("Invalid client state");
+  return *done ? Star::format("Removed {} stagehands", removed) : String("Invalid client state");
 }
 
 std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId connectionId, String const& argumentString) {
@@ -1084,7 +1090,7 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
     auto liquidsDatabase = std::move(*liquidsDatabaseResult);
 
     if (!liquidsDatabase->isLiquidName(arguments[0]))
-      return strf("No such liquid {}", arguments[0]);
+      return Star::format("No such liquid {}", arguments[0]);
 
     auto liquidResult = liquidsDatabase->liquidId(arguments[0]);
     if (!liquidResult) return std::unexpected(std::move(liquidResult.error()));
@@ -1092,10 +1098,10 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
 
     float quantity = 1.0f;
     if (arguments.size() > 1) {
-      if (auto maybeQuantity = maybeLexicalCast<float>(arguments[1]))
+      if (auto maybeQuantity = maybe_lexical_cast<float>(arguments[1]))
         quantity = *maybeQuantity;
       else
-        return strf("Could not parse quantity value '{}'", arguments[1]);
+        return Star::format("Could not parse quantity value '{}'", arguments[1]);
     }
 
     auto done = m_universe.executeForClient(connectionId, [&](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
@@ -1113,7 +1119,7 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
   if (result) return std::move(*result);
   auto const& exception = result.error();
   {
-    auto logged = m_root.logger().warnException(strf("Could not spawn liquid '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
+    auto logged = m_root.logger().warnException(Star::format("Could not spawn liquid '{}'", arguments.empty() ? String() : arguments[0]), ExceptionDiagnostic(exception));
     if (!logged) return std::unexpected(std::move(logged.error()));
     return "Could not spawn liquid.";
     }
@@ -1136,21 +1142,21 @@ std::expected<String, StarException> CommandProcessor::kick(ConnectionId connect
   if (!toKickResult) return std::unexpected(std::move(toKickResult.error()));
   auto toKick = *toKickResult;
   if (!toKick)
-    return strf("No user with specifier {} found.", arguments[0]);
+    return Star::format("No user with specifier {} found.", arguments[0]);
 
   // Like IRC, if only the nick is passed then the nick is used as the reason
   if (arguments.size() == 1) {
     auto nick = m_universe.clientNick(*toKick);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    arguments.append(*nick);
+    arguments.push_back(*nick);
   }
 
   auto disconnected = m_universe.disconnectClient(*toKick, arguments[1]);
   if (!disconnected) return std::unexpected(std::move(disconnected.error()));
 
-  return strf("Successfully kicked user with specifier {}. ConnectionId: {}. Reason given: {}",
+  return Star::format("Successfully kicked user with specifier {}. ConnectionId: {}. Reason given: {}",
       arguments[0],
-      outputOptional(toKick),
+      Star::output_optional(toKick),
       arguments[1]);
 }
 
@@ -1170,7 +1176,7 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
   if (!toKickResult) return std::unexpected(std::move(toKickResult.error()));
   auto toKick = *toKickResult;
   if (!toKick)
-    return strf("No user with specifier {} found.", arguments[0]);
+    return Star::format("No user with specifier {} found.", arguments[0]);
 
   String reason = arguments[0];
   if (arguments.size() < 2) {
@@ -1191,15 +1197,15 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
     } else if (arguments[2] == "both") {
       type = {true, true};
     } else {
-      return strf("Invalid argument {} passed as ban type to /ban.  Options are ip, uuid, or both.", arguments[2]);
+      return Star::format("Invalid argument {} passed as ban type to /ban.  Options are ip, uuid, or both.", arguments[2]);
     }
   }
 
   std::optional<int> banTime;
   if (arguments.size() == 4) {
-    auto parsedTime = lexicalCast<int>(arguments[3]);
+    auto parsedTime = lexical_cast<int>(arguments[3]);
     if (!parsedTime) {
-      if (parsedTime.error().is<BadLexicalCast>()) return strf("Invalid argument {} passed as ban time to /ban.", arguments[3]);
+      if (parsedTime.error().is<BadLexicalCast>()) return Star::format("Invalid argument {} passed as ban time to /ban.", arguments[3]);
       return std::unexpected(std::move(parsedTime.error()));
     }
     banTime = *parsedTime;
@@ -1208,8 +1214,8 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
   auto banned = m_universe.banUser(*toKick, reason, type, banTime);
   if (!banned) return std::unexpected(std::move(banned.error()));
 
-  return strf("Successfully kicked user with specifier {}. ConnectionId: {}. Reason given: {}",
-      arguments[0], outputOptional(toKick), reason);
+  return Star::format("Successfully kicked user with specifier {}. ConnectionId: {}. Reason given: {}",
+      arguments[0], Star::output_optional(toKick), reason);
 }
 
 std::expected<String, StarException> CommandProcessor::unbanIp(ConnectionId connectionId, String const& argumentString) {
@@ -1228,9 +1234,9 @@ std::expected<String, StarException> CommandProcessor::unbanIp(ConnectionId conn
   if (!success) return std::unexpected(std::move(success.error()));
 
   if (*success)
-    return strf("Successfully removed IP {} from ban list", arguments[0]);
+    return Star::format("Successfully removed IP {} from ban list", arguments[0]);
   else
-    return strf("'{}' is not a valid IP or was not found in the bans list", arguments[0]);
+    return Star::format("'{}' is not a valid IP or was not found in the bans list", arguments[0]);
 }
 
 std::expected<String, StarException> CommandProcessor::unbanUuid(ConnectionId connectionId, String const& argumentString) {
@@ -1249,9 +1255,9 @@ std::expected<String, StarException> CommandProcessor::unbanUuid(ConnectionId co
   if (!success) return std::unexpected(std::move(success.error()));
 
   if (*success)
-    return strf("Successfully removed UUID {} from ban list", arguments[0]);
+    return Star::format("Successfully removed UUID {} from ban list", arguments[0]);
   else
-    return strf("'{}' is not a valid UUID or was not found in the bans list", arguments[0]);
+    return Star::format("'{}' is not a valid UUID or was not found in the bans list", arguments[0]);
 }
 
 std::expected<String, StarException> CommandProcessor::list(ConnectionId connectionId, String const&) {
@@ -1267,7 +1273,7 @@ std::expected<String, StarException> CommandProcessor::list(ConnectionId connect
   for (auto cid : m_universe.clientIds()) {
     auto nick = m_universe.clientNick(cid);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    res.append(strf("${} : {} : ${}", cid, *nick, m_universe.uuidForClient(cid)->hex()));
+    res.push_back(Star::format("${} : {} : ${}", cid, *nick, m_universe.uuidForClient(cid)->hex()));
   }
 
   return res.join("\n");
@@ -1282,23 +1288,23 @@ std::expected<String, StarException> CommandProcessor::clientCoordinate(Connecti
   auto permission = adminCheck(connectionId, "find other players");
   if (!permission) return std::unexpected(std::move(permission.error()));
   if (!*permission) {
-    if (arguments.size() > 0) {
+    if (!arguments.empty()) {
       auto cidResult = playerCidFromCommand(arguments[0], m_universe);
       if (!cidResult) return std::unexpected(std::move(cidResult.error()));
       auto cid = *cidResult;
       if (!cid)
-        return strf("No user with specifier {} found.", arguments[0]);
+        return Star::format("No user with specifier {} found.", arguments[0]);
       targetClientId = *cid;
-      targetLabel = strf("Client {}'s", arguments[0]);
+      targetLabel = Star::format("Client {}'s", arguments[0]);
     }
   }
 
   if (targetClientId) {
     auto worldId = m_universe.clientWorld(targetClientId);
     if (!worldId) return std::unexpected(std::move(worldId.error()));
-    auto world = printWorldId(*worldId);
+    auto world = Star::print_world_id(*worldId);
     if (!world) return std::unexpected(std::move(world.error()));
-    return strf("{} current location is {}", targetLabel, *world);
+    return Star::format("{} current location is {}", targetLabel, *world);
   } else {
     return "";
   }
@@ -1329,7 +1335,7 @@ std::expected<String, StarException> CommandProcessor::eval(ConnectionId connect
   if (!m_scriptComponent.context()) return std::unexpected(LuaException("Lua script component is not initialized"));
   auto value = m_scriptComponent.context()->eval(lua);
   if (!value) return std::unexpected(std::move(value.error()));
-  return printLuaValue(*value);
+  return Star::print_lua_value(*value);
 }
 
 std::expected<String, StarException> CommandProcessor::entityEval(ConnectionId connectionId, String const& lua) {
@@ -1358,15 +1364,15 @@ std::expected<String, StarException> CommandProcessor::entityEval(ConnectionId c
         std::shared_ptr<ScriptedEntity> targetEntity;
         for (auto const& entity : entities) {
           if (!targetEntity
-              || vmagSquared(entity->position() - (*aimPosition))
-                  < vmagSquared(targetEntity->position() - (*aimPosition)))
+              || vmag_squared(entity->position() - (*aimPosition))
+                < vmag_squared(targetEntity->position() - (*aimPosition)))
             targetEntity = entity;
         }
 
         auto res = targetEntity->evalScript(lua);
         if (!res) return std::unexpected(std::move(res.error()));
         if (*res) {
-          auto printed = printLuaValue(**res);
+          auto printed = Star::print_lua_value(**res);
           if (!printed) return std::unexpected(std::move(printed.error()));
           message = std::move(*printed);
         } else {
@@ -1421,9 +1427,9 @@ std::expected<String, StarException> CommandProcessor::placeDungeon(ConnectionId
     if (!xText) return std::unexpected(std::move(xText.error()));
     auto yText = pos->at(1);
     if (!yText) return std::unexpected(std::move(yText.error()));
-    auto x = lexicalCast<int>(xText->get());
+    auto x = lexical_cast<int>(xText->get());
     if (!x) return std::unexpected(std::move(x.error()));
-    auto y = lexicalCast<int>(yText->get());
+    auto y = lexical_cast<int>(yText->get());
     if (!y) return std::unexpected(std::move(y.error()));
     targetPosition = Vec2I(*x, *y);
   }
@@ -1479,7 +1485,7 @@ std::expected<String, StarException> CommandProcessor::addBiomeRegion(Connection
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
   String biomeName = arguments[0];
-  auto widthResult = lexicalCast<int>(arguments[1]);
+  auto widthResult = lexical_cast<int>(arguments[1]);
   if (!widthResult) return std::unexpected(std::move(widthResult.error()));
   int width = *widthResult;
 
@@ -1495,7 +1501,7 @@ std::expected<String, StarException> CommandProcessor::addBiomeRegion(Connection
       });
 
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? strf("added region of biome {} with width {}", biomeName, width) : String("failed to add biome region");
+  return *done ? Star::format("added region of biome {} with width {}", biomeName, width) : String("failed to add biome region");
 }
 
 std::expected<String, StarException> CommandProcessor::expandBiomeRegion(ConnectionId connectionId, String const& argumentString) {
@@ -1509,7 +1515,7 @@ std::expected<String, StarException> CommandProcessor::expandBiomeRegion(Connect
   auto requiredArgument = arguments.at(0);
   if (!requiredArgument) return std::unexpected(std::move(requiredArgument.error()));
 
-  auto newWidthResult = lexicalCast<int>(arguments[0]);
+  auto newWidthResult = lexical_cast<int>(arguments[0]);
   if (!newWidthResult) return std::unexpected(std::move(newWidthResult.error()));
   int newWidth = *newWidthResult;
 
@@ -1521,7 +1527,7 @@ std::expected<String, StarException> CommandProcessor::expandBiomeRegion(Connect
       });
 
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? strf("expanded region to width {}", newWidth) : String("failed to expand biome region");
+  return *done ? Star::format("expanded region to width {}", newWidth) : String("failed to expand biome region");
 }
 
 std::expected<String, StarException> CommandProcessor::updatePlanetType(ConnectionId connectionId, String const& argumentString) {
@@ -1544,7 +1550,7 @@ std::expected<String, StarException> CommandProcessor::updatePlanetType(Connecti
   auto done = m_universe.updatePlanetType(coordinate, newType, weatherBiome);
 
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? strf("set planet at {} to type {} weatherBiome {}", coordinate, newType, weatherBiome) : String("failed to update planet type");
+  return *done ? Star::format("set planet at {} to type {} weatherBiome {}", coordinate, newType, weatherBiome) : String("failed to update planet type");
 }
 
 std::expected<String, StarException> CommandProcessor::setWeather(ConnectionId connectionId, String const& argumentString) {
@@ -1563,7 +1569,7 @@ std::expected<String, StarException> CommandProcessor::setWeather(ConnectionId c
       return {};
     });
     if (!done) return std::unexpected(std::move(done.error()));
-    return *done ? strf("weathers: {}", list.join(", ")) : String("failed to query weather");
+    return *done ? Star::format("weathers: {}", list.join(", ")) : String("failed to query weather");
   }
   String weatherName = arguments[0];
   bool force = false;
@@ -1589,7 +1595,7 @@ std::expected<String, StarException> CommandProcessor::setWeather(ConnectionId c
     done = m_universe.setWeather(coordinate, weatherName, force);
   }
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? (coordinate.isNull() ? strf("set weather to {}{}", weatherName, force ? std::string_view(" (forced)") : std::string_view()) : strf("set weather for {} to {}{}", coordinate, weatherName, force ? std::string_view(" (forced)") : std::string_view())) : String("failed to set weather");
+  return *done ? (coordinate.isNull() ? Star::format("set weather to {}{}", weatherName, force ? std::string_view(" (forced)") : std::string_view()) : Star::format("set weather for {} to {}{}", coordinate, weatherName, force ? std::string_view(" (forced)") : std::string_view())) : String("failed to set weather");
 }
 
 
@@ -1613,14 +1619,14 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
   constexpr std::string_view UsernamePrefix = "@";
   constexpr std::string_view CidPrefix = "$";
   constexpr std::string_view UUIDPrefix = "$$";
-  auto username = player.beginsWith(UsernamePrefix);
+  auto username = player.starts_with(UsernamePrefix);
   if (!username) return std::unexpected(std::move(username.error()));
   if (*username) {
     auto name = player.substr(UsernamePrefix.size());
     if (!name) return std::unexpected(std::move(name.error()));
     return universe.findNick(*name);
   }
-  auto uuidPrefix = player.beginsWith(UUIDPrefix);
+  auto uuidPrefix = player.starts_with(UUIDPrefix);
   if (!uuidPrefix) return std::unexpected(std::move(uuidPrefix.error()));
   if (*uuidPrefix) {
     auto text = player.substr(UUIDPrefix.size());
@@ -1629,12 +1635,12 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
     if (uuid) return universe.clientForUuid(*uuid);
     if (!uuid.error().is<UuidException>()) return std::unexpected(std::move(uuid.error()));
   } else {
-    auto cidPrefix = player.beginsWith(CidPrefix);
+    auto cidPrefix = player.starts_with(CidPrefix);
     if (!cidPrefix) return std::unexpected(std::move(cidPrefix.error()));
     if (*cidPrefix) {
       auto text = player.substr(CidPrefix.size());
       if (!text) return std::unexpected(std::move(text.error()));
-      auto cid = maybeLexicalCast<ConnectionId>(*text).value_or(ServerConnectionId);
+      auto cid = maybe_lexical_cast<ConnectionId>(*text).value_or(ServerConnectionId);
       if (universe.isConnectedClient(cid)) return std::optional<ConnectionId>(cid);
     }
   }
@@ -1729,11 +1735,11 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
       if (!wrapped) return std::unexpected(std::move(wrapped.error()));
       return ServerCommandResult(std::move(*wrapped));
     }
-    auto printed = printLuaValue(std::get<LuaValue>(result));
+    auto printed = Star::print_lua_value(std::get<LuaValue>(result));
     if (!printed) return std::unexpected(std::move(printed.error()));
     return ServerCommandResult(std::move(*printed));
   }
-  return ServerCommandResult(strf("No such command {}", command));
+  return ServerCommandResult(Star::format("No such command {}", command));
 }
 
 std::expected<std::optional<String>, StarException> CommandProcessor::adminCheck(ConnectionId connectionId, String const& commandDescription) const {
@@ -1753,7 +1759,7 @@ std::expected<std::optional<String>, StarException> CommandProcessor::adminCheck
   if (!*anyone) {
     auto admin = m_universe.isAdmin(connectionId);
     if (!admin) return std::unexpected(std::move(admin.error()));
-    if (!*admin) return std::optional<String>(strf("Insufficient privileges to {}.", commandDescription));
+    if (!*admin) return std::optional<String>(Star::format("Insufficient privileges to {}.", commandDescription));
   }
   return std::optional<String>{};
 }
@@ -1762,13 +1768,17 @@ std::expected<std::optional<String>, StarException> CommandProcessor::localCheck
   if (connectionId == ServerConnectionId) return std::optional<String>{};
   auto local = m_universe.isLocal(connectionId);
   if (!local) return std::unexpected(std::move(local.error()));
-  if (!*local) return std::optional<String>(strf("The {} command can only be used locally.", commandDescription));
+  if (!*local) return std::optional<String>(Star::format("The {} command can only be used locally.", commandDescription));
   return std::optional<String>{};
 }
 
 std::expected<LuaCallbacks, StarException> CommandProcessor::makeCommandCallbacks() {
   LuaCallbacks callbacks;
-  auto registered = callbacks.registerCallbackWithSignature<std::expected<std::optional<String>, StarException>, ConnectionId, String>("adminCheck", std::bind(&CommandProcessor::adminCheck, std::ref(*this), std::placeholders::_1, std::placeholders::_2));
+  auto registered =
+    callbacks.registerCallbackWithSignature<std::expected<std::optional<String>, StarException>, ConnectionId, String>(
+      "adminCheck", [this](ConnectionId connectionId, String const& commandDescription) {
+        return adminCheck(connectionId, commandDescription);
+      });
   if (!registered) return std::unexpected(std::move(registered.error()));
   return callbacks;
 }

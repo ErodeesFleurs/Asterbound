@@ -225,7 +225,8 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
     return std::unexpected(std::move(ticked.error()));
   for (auto const& p : m_canvasClickCallbacks) {
     for (auto const& clickEvent : p.first->pullClickEvents()) {
-      auto result = m_script.invoke(p.second, jsonFromVec2I(clickEvent.position), (std::uint8_t)clickEvent.button, clickEvent.buttonDown);
+      auto result = m_script.invoke(p.second, jsonFromVec2I(clickEvent.position),
+                                    static_cast<std::uint8_t>(clickEvent.button), clickEvent.buttonDown);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -236,7 +237,7 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
       if (!keyName)
         return std::unexpected(std::move(keyName.error()));
       // KeyNames borrows whole static string literals; Lua copies their bytes.
-      auto result = m_script.invoke(p.second, (int)keyEvent.key, keyEvent.keyDown, *keyName);
+      auto result = m_script.invoke(p.second, static_cast<int>(keyEvent.key), keyEvent.keyDown, *keyName);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -401,7 +402,7 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
     // Preserve background dimensions while including its declarative children.
     auto backgroundSize = size();
     determineSizeFromChildren();
-    setSize(size().piecewiseMax(backgroundSize));
+    setSize(size().piecewise_max(backgroundSize));
   }
   auto clicks = m_config.getObject("canvasClickCallbacks", {});
   if (!clicks)
@@ -495,7 +496,7 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
   for (auto action : context().actions(event)) {
-    auto name = InterfaceActionNames->getRight(action);
+    auto name = InterfaceActionNames->get_right(action);
     if (!name)
       return std::unexpected(std::move(name.error()));
     actions.emplace_back(name->get());

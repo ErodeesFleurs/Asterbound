@@ -152,14 +152,14 @@ if (!result5) return std::unexpected(std::move(result5.error()));
 String typeName = std::move(*result5);
 
       if (types.contains(typeName))
-        return std::unexpected(NpcException(strf("Repeat npc type name '{}'", typeName)));
+        return std::unexpected(NpcException(Star::format("Repeat npc type name '{}'", typeName)));
 
       types[typeName] = config;
 
       return {};
     }();
     if (!loaded)
-      return std::unexpected(NpcException(strf("Error loading npc type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading NPC type")));
+      return std::unexpected(NpcException(Star::format("Error loading npc type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading NPC type")));
   }
   return {};
 }
@@ -243,8 +243,8 @@ variant.humanoidParameters = std::move(*result19);
     if (!result24) return std::unexpected(std::move(result24.error()));
     auto result25 = jsonToStringList(std::move(*result24));
     if (!result25) return std::unexpected(std::move(result25.error()));
-    auto result26 = std::move(*result23)->generateName(
-            std::move(*result25)[(int)identity.gender], randSource);
+    auto result26 =
+      std::move(*result23)->generateName(std::move(*result25)[static_cast<int>(identity.gender)], randSource);
     if (!result26) return std::unexpected(std::move(result26.error()));
     identity.name = std::move(*result26);
       }
@@ -356,12 +356,12 @@ if (!result55) return std::unexpected(std::move(result55.error()));
 auto result56 = jsonToList<PersistentStatusEffect>(std::move(*result55), jsonToPersistentStatusEffect);
 if (!result56) return std::unexpected(std::move(result56.error()));
 variant.innateStatusEffects = std::move(*result56);
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result57 = config.get("touchDamage", {});
+auto result57 = config.get("touchDamage", {});
 if (!result57) return std::unexpected(std::move(result57.error()));
 variant.touchDamageConfig = std::move(*result57);
 
@@ -420,7 +420,7 @@ bool matchColorIndices = std::move(*result65);
           auto result68 = result67->get().toObject();
           if (!result68)
             return std::unexpected(std::move(result68.error()));
-          for (auto itemSlotConfig : std::move(*result68)) {
+          for (auto const& itemSlotConfig : std::move(*result68)) {
             auto result69 = itemSlotConfig.second.arrayPtr();
             if (!result69)
               return std::unexpected(std::move(result69.error()));
@@ -688,12 +688,12 @@ auto result138 = jsonToList<PersistentStatusEffect>(std::move(*result137), jsonT
 if (!result138) return std::unexpected(std::move(result138.error()));
 variant.innateStatusEffects = std::move(*result138);
 
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result139 = config.get("touchDamage", {});
+auto result139 = config.get("touchDamage", {});
 if (!result139) return std::unexpected(std::move(result139.error()));
 variant.touchDamageConfig = std::move(*result139);
 
@@ -882,12 +882,12 @@ auto result189 = jsonToList<PersistentStatusEffect>(std::move(*result188), jsonT
 if (!result189) return std::unexpected(std::move(result189.error()));
 variant.innateStatusEffects = std::move(*result189);
 
-  variant.innateStatusEffects.append(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-  variant.innateStatusEffects.append(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
+variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
 
-  auto result190 = config.get("touchDamage", {});
+auto result190 = config.get("touchDamage", {});
 if (!result190) return std::unexpected(std::move(result190.error()));
 variant.touchDamageConfig = std::move(*result190);
 
@@ -993,25 +993,29 @@ itemDatabase = std::move(*result208);
     itemCatalog = std::cref(*itemDatabase);
   }
 
-  auto makeItem = [&npcVariant, itemCatalog](ItemDescriptor itemDescriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
-    return itemCatalog->get().item(itemDescriptor, npcVariant.level, npcVariant.seed);
+  auto makeItem = [&npcVariant,
+                   itemCatalog](ItemDescriptor itemDescriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
+    return itemCatalog->get().item(std::move(itemDescriptor), npcVariant.level, npcVariant.seed);
   };
 
   auto result209 = ArmorWearer::create(m_root);
 if (!result209) return std::unexpected(std::move(result209.error()));
 auto armor = std::move(*result209);
-  for (auto item : npcVariant.items) {
-    {
-  if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result210 = EquipmentSlotNames->maybeLeft(item.first);
-  if (!result210) return std::unexpected(std::move(result210.error()));
-  if (auto equipmentSlot = std::move(*result210)) {
-        auto result211 = makeItem(item.second);
-  if (!result211) return std::unexpected(std::move(result211.error()));
-  armor->setItem((std::uint8_t)*equipmentSlot, as<ArmorItem>(std::move(*result211)));
-      }
-}
+for (auto const& item : npcVariant.items) {
+  {
+    if (!EquipmentSlotNames)
+      return std::unexpected(EquipmentSlotNames.error());
+    auto result210 = EquipmentSlotNames->maybe_left(item.first);
+    if (!result210)
+      return std::unexpected(std::move(result210.error()));
+    if (auto equipmentSlot = std::move(*result210)) {
+      auto result211 = makeItem(item.second);
+      if (!result211)
+        return std::unexpected(std::move(result211.error()));
+      armor->setItem(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(std::move(*result211)));
+    }
   }
+}
 
   auto result212 = armor->setupHumanoid(*humanoid, false);
 if (!result212) return std::unexpected(std::move(result212.error()));

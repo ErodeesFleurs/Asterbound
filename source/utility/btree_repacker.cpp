@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.set;
 import star.io_device;
 import star.btree;
@@ -45,10 +46,10 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   String bTreePath = inputArgument->get();
   String outputFilename = opts.arguments.get(1, bTreePath + ".repack");
 
-  auto outputDirectory = File::fullPath(File::dirName(outputFilename));
+  auto outputDirectory = File::full_path(File::dir_name(outputFilename));
   if (!outputDirectory)
     return std::unexpected(std::move(outputDirectory.error()));
-  outputFilename = File::relativeTo(*outputDirectory, File::baseName(outputFilename));
+  outputFilename = File::relative_to(*outputDirectory, File::base_name(outputFilename));
   // Open the old database.
   BTreeDatabase db(logger);
   auto inputFile = File::open(bTreePath, IOMode::Read);
@@ -85,7 +86,8 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   auto openedOutput = newDb.open();
   if (!openedOutput)
     return std::unexpected(std::move(openedOutput.error()));
-  coutf("Repacking {}...\n", bTreePath);
+  if (auto written = Star::print("Repacking {}...\n", bTreePath); !written)
+    return std::unexpected(std::move(written.error()));
 
   unsigned count = 0, overwritten = 0;
   auto visitor = [&](ByteArray key, ByteArray data) -> std::expected<void, StarException> {
@@ -98,7 +100,8 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
     return {};
   };
   auto errorHandler = [&](String const& error, ExceptionDiagnostic const& diagnostic) -> std::expected<void, StarException> {
-    coutf("{}: {}\n", error, outputException(diagnostic, false));
+    if (auto written = Star::print("{}: {}\n", error, Star::output_exception(diagnostic, false)); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   };
   auto recovered = db.recoverAll(visitor, errorHandler);
@@ -115,19 +118,22 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   if (!closedOutput)
     return std::unexpected(std::move(closedOutput.error()));
 
-  coutf("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count(), count, overwritten);
+  if (auto written = Star::print("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count(), count, overwritten); !written)
+    return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = repackBTree(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

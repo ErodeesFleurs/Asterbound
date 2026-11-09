@@ -54,7 +54,7 @@ std::expected<std::shared_ptr<Statistics>, StarException> Statistics::create(Roo
 std::expected<void, StarException> Statistics::writeStatistics() {
   auto versioningDatabase = m_root.versioningDatabase();
   if (!versioningDatabase) return std::unexpected(std::move(versioningDatabase.error()));
-  String filename = File::relativeTo(m_storageDirectory, "statistics");
+  String filename = File::relative_to(m_storageDirectory, "statistics");
 
   JsonObject stats;
   for (auto const& entry : m_stats)
@@ -66,17 +66,17 @@ std::expected<void, StarException> Statistics::writeStatistics() {
 
   auto versionedStorage = (*versioningDatabase)->makeCurrentVersionedJson("Statistics", storage);
   if (!versionedStorage) return std::unexpected(std::move(versionedStorage.error()));
-  return VersionedJson::writeFile(*versionedStorage, filename);
+  return VersionedJson::write_file(*versionedStorage, filename);
 }
 
 Json Statistics::stat(String const& name, Json def) const {
-  if (auto value = m_stats.maybeRef(name))
+  if (auto value = m_stats.find_ref(name))
     return value->get().value;
   return def;
 }
 
 std::optional<String> Statistics::statType(String const& name) const {
-  if (auto value = m_stats.maybeRef(name))
+  if (auto value = m_stats.find_ref(name))
     return value->get().type;
   return {};
 }
@@ -86,7 +86,7 @@ bool Statistics::achievementUnlocked(String const& name) const {
 }
 
 void Statistics::recordEvent(String const& name, Json const& fields) {
-  m_pendingEvents.append(std::make_pair(name, fields));
+  m_pendingEvents.push_back(std::make_pair(name, fields));
 }
 
 bool Statistics::reset() {
@@ -192,7 +192,7 @@ std::expected<void, StarException> Statistics::setStat(String const& name, Strin
   }
   auto database = m_root.statisticsDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  m_pendingAchievementChecks.addAll((*database)->achievementsForStat(name));
+  m_pendingAchievementChecks.insert_range((*database)->achievementsForStat(name));
   return {};
 }
 
@@ -223,27 +223,35 @@ std::expected<void, StarException> Statistics::readStatistics() {
   auto database = m_root.versioningDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   auto loaded = [&]() -> std::expected<void, StarException> {
-    String filename = File::relativeTo(m_storageDirectory, "statistics");
+    String filename = File::relative_to(m_storageDirectory, "statistics");
     auto exists = File::exists(filename);
-    if (!exists) return std::unexpected(std::move(exists.error()));
-    if (!*exists) return {};
-    auto versioned = VersionedJson::readFile(filename);
-    if (!versioned) return std::unexpected(std::move(versioned.error()));
+    if (!exists)
+      return std::unexpected(std::move(exists.error()));
+    if (!*exists)
+      return {};
+    auto versioned = VersionedJson::read_file(filename);
+    if (!versioned)
+      return std::unexpected(std::move(versioned.error()));
     auto storage = (*database)->loadVersionedJson(*versioned, "Statistics");
-    if (!storage) return std::unexpected(std::move(storage.error()));
+    if (!storage)
+      return std::unexpected(std::move(storage.error()));
     auto stats = storage->getObject("stats", {});
-    if (!stats) return std::unexpected(std::move(stats.error()));
+    if (!stats)
+      return std::unexpected(std::move(stats.error()));
     StringMap<Stat> parsedStats;
     for (auto const& entry : *stats) {
       auto stat = Stat::fromJson(entry.second);
-      if (!stat) return std::unexpected(std::move(stat.error()));
+      if (!stat)
+        return std::unexpected(std::move(stat.error()));
       parsedStats[entry.first] = std::move(*stat);
     }
     m_stats = std::move(parsedStats);
     auto achievementsJson = storage->get("achievements", JsonArray{});
-    if (!achievementsJson) return std::unexpected(std::move(achievementsJson.error()));
+    if (!achievementsJson)
+      return std::unexpected(std::move(achievementsJson.error()));
     auto achievements = jsonToStringSet(*achievementsJson);
-    if (!achievements) return std::unexpected(std::move(achievements.error()));
+    if (!achievements)
+      return std::unexpected(std::move(achievements.error()));
     m_achievements = std::move(*achievements);
     return {};
   }();
@@ -262,7 +270,7 @@ std::expected<void, StarException> Statistics::mergeServiceStatistics() {
     if (!unlocked) return std::unexpected(std::move(unlocked.error()));
   }
   // Locally store all the achievements we unlocked in a different install:
-  m_achievements.addAll(serviceAchievements);
+  m_achievements.insert_range(serviceAchievements);
 
   // Publish our local statistics, in case we made progress while the service
   // was unavailable.
@@ -286,17 +294,36 @@ std::expected<void, StarException> Statistics::mergeServiceStatistics() {
 std::expected<LuaCallbacks, StarException> Statistics::makeStatisticsCallbacks() {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String, String, Json>("setStat", std::bind(&Statistics::setStat, std::ref(*this), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String, String, Json>(
+        "setStat",
+        [this](String const& name, String const& type, Json const& value) { return setStat(name, type, value); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<Json, String, Json>("stat", std::bind(&Statistics::stat, std::ref(*this), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<Json, String, Json>(
+        "stat", [this](String const& name, Json def) { return stat(name, std::move(def)); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::optional<String>, String>("statType", std::bind(&Statistics::statType, std::ref(*this), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<std::optional<String>, String>(
+        "statType", [this](String const& name) { return statType(name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<bool, String>("achievementUnlocked", std::bind(&Statistics::achievementUnlocked, std::ref(*this), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
+        "achievementUnlocked", [this](String const& name) { return achievementUnlocked(name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<bool, StarException>, String>("checkAchievement", std::bind(&Statistics::checkAchievement, std::ref(*this), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<std::expected<bool, StarException>, String>(
+        "checkAchievement", [this](String const& name) { return checkAchievement(name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String>("unlockAchievement", std::bind(&Statistics::unlockAchievement, std::ref(*this), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String>(
+        "unlockAchievement", [this](String const& name) { return unlockAchievement(name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
   return callbacks;
 }

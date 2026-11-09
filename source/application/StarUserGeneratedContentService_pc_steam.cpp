@@ -35,14 +35,14 @@ SteamUserGeneratedContentService::SteamUserGeneratedContentService(std::shared_p
 
 StringList SteamUserGeneratedContentService::subscribedContentIds() const {
   List<PublishedFileId_t> contentIds(SteamAPI_ISteamUGC_GetNumSubscribedItems(SteamAPI_SteamUGC(), false), {});
-  SteamAPI_ISteamUGC_GetSubscribedItems(SteamAPI_SteamUGC(), contentIds.ptr(), contentIds.size(), false);
+  SteamAPI_ISteamUGC_GetSubscribedItems(SteamAPI_SteamUGC(), contentIds.data(), contentIds.size(), false);
   return contentIds.transformed([](PublishedFileId_t id) {
-      return String(toString(id));
+      return String(Star::to_string(id));
     });
 }
 
 std::expected<std::optional<String>, StarException> SteamUserGeneratedContentService::contentDownloadDirectory(String const& contentId) const {
-  auto parsed = lexicalCast<PublishedFileId_t>(contentId);
+  auto parsed = lexical_cast<PublishedFileId_t>(contentId);
   if (!parsed)
     return std::unexpected(std::move(parsed.error()));
   PublishedFileId_t id = *parsed;
@@ -60,7 +60,7 @@ std::expected<UserGeneratedContentService::UGCState, StarException> SteamUserGen
   if (m_downloadError)
     return std::unexpected(*m_downloadError);
   List<PublishedFileId_t> contentIds(SteamAPI_ISteamUGC_GetNumSubscribedItems(SteamAPI_SteamUGC(), false), {});
-  SteamAPI_ISteamUGC_GetSubscribedItems(SteamAPI_SteamUGC(), contentIds.ptr(), contentIds.size(), false);
+  SteamAPI_ISteamUGC_GetSubscribedItems(SteamAPI_SteamUGC(), contentIds.data(), contentIds.size(), false);
 
   if (!m_checkedUGC) {
     bool contentNeedsUpdate = false;

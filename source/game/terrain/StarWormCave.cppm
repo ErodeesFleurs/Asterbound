@@ -121,12 +121,12 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   int sectorRadius = sectorSize * *configuredRadius;
   for (int x = sector[0] - sectorRadius; x <= sector[0] + sectorRadius; x += sectorSize)
     for (int y = sector[1] - sectorRadius; y <= sector[1] + sectorRadius; y += sectorSize) {
-      RandomSource rs(staticRandomU64(x, y, seed));
+      RandomSource rs(static_random_u64(x, y, seed));
       auto drawnCount = rs.randf(numberOfWormsPerSectorRange[0], numberOfWormsPerSectorRange[1]);
       if (!drawnCount)
         return std::unexpected(std::move(drawnCount.error()));
       float numberOfWorms = *drawnCount * commonality;
-      int intNumberOfWorms = (int)numberOfWorms;
+      int intNumberOfWorms = static_cast<int>(numberOfWorms);
       if (rs.randf() < (numberOfWorms - intNumberOfWorms))
         intNumberOfWorms++;
       for (int n = 0; n < intNumberOfWorms; ++n) {
@@ -155,7 +155,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
         if (!length)
           return std::unexpected(std::move(length.error()));
         worm.goalLength = *length * commonality;
-        worms.append(worm);
+        worms.push_back(worm);
       }
     }
 
@@ -195,13 +195,13 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
       // move the worm, slowing down a bit as we reach the ends to reduce
       // stutter
       float thisSpeed = std::max(0.75f, wormSpeed * taperFactor);
-      worm.pos += Vec2F::withAngle(worm.angle) * thisSpeed;
+      worm.pos += Vec2F::with_angle(worm.angle) * thisSpeed;
       worm.length += thisSpeed;
 
       // maybe set new goal angle
-      if (staticRandomFloat(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
+      if (static_random_float(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
         worm.goalAngle = pfmod(
-            staticRandomFloatRange(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
+          static_random_float_range(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
       }
 
       if (worm.angle != worm.goalAngle) {

@@ -89,13 +89,13 @@ std::expected<void, StarException> QuestManager::init(Player& player, World& wor
     if (!initialized) {
       auto error = std::move(initialized.error());
       auto shutdown = uninit();
-      if (!shutdown) error = error.withRelated(shutdown.error(), "Error rolling back quest manager");
+      if (!shutdown) error = error.with_related(shutdown.error(), "Error rolling back quest manager");
       return std::unexpected(std::move(error));
     }
   }
   m_trackOnWorldQuests = true;
   if (m_trackedQuestId) {
-    if (auto quest = m_quests.maybeRef(*m_trackedQuestId)) {
+    if (auto quest = m_quests.find_ref(*m_trackedQuestId)) {
       if (quest->get()->hideCrossServer() && quest->get()->serverUuid() && *quest->get()->serverUuid() != m_player->get().clientContext()->serverUuid()) m_trackedQuestId.reset();
     }
   }
@@ -133,7 +133,9 @@ std::expected<bool, StarException> QuestManager::canStart(QuestArcDescriptor con
     auto config = (*database)->questTemplate(descriptor.templateId);
     if (!config) return std::unexpected(std::move(config.error()));
     if (!*config) return false;
-    if (auto quest = m_quests.maybeRef(descriptor.questId)) if (quest->get()->state() != QuestState::Failed) return false;
+    if (auto quest = m_quests.find_ref(descriptor.questId))
+      if (quest->get()->state() != QuestState::Failed)
+        return false;
     for (auto const& prerequisite : (*config)->prerequisiteQuests) if (!hasCompleted(prerequisite)) return false;
     for (auto const& item : (*config)->requiredItems) if (!m_player->get().inventory()->hasItem(item)) return false;
     if ((*config)->requiredShipLevel && m_player->get().shipUpgrades().shipLevel < *(*config)->requiredShipLevel) return false;
@@ -161,11 +163,11 @@ std::expected<std::shared_ptr<Quest>, StarException> QuestManager::getQuest(Stri
 }
 bool QuestManager::hasQuest(String const& id) const { return m_quests.contains(id); }
 bool QuestManager::hasAcceptedQuest(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() != QuestState::New && quest->get()->state() != QuestState::Offer;
 }
 bool QuestManager::isActive(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Active;
 }
 bool QuestManager::isCurrent(String const& id) const { return (m_onWorldQuestId ? m_onWorldQuestId : m_trackedQuestId) == id; }
@@ -176,13 +178,16 @@ void QuestManager::setAsTracked(std::optional<String> const& id) {
     if (m_onWorldQuestId) { m_onWorldQuestId.reset(); m_trackOnWorldQuests = false; }
   } else { m_trackedQuestId.reset(); m_trackOnWorldQuests = true; }
 }
-void QuestManager::markAsRead(String const& id) { if (auto quest = m_quests.maybeRef(id)) quest->get()->markAsRead(); }
+void QuestManager::markAsRead(String const& id) {
+  if (auto quest = m_quests.find_ref(id))
+    quest->get()->markAsRead();
+}
 bool QuestManager::hasCompleted(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Complete;
 }
 bool QuestManager::canTurnIn(String const& id) const {
-  auto quest = m_quests.maybeRef(id);
+  auto quest = m_quests.find_ref(id);
   return quest && quest->get()->state() == QuestState::Active && quest->get()->canTurnIn();
 }
 std::optional<std::shared_ptr<Quest>> QuestManager::getFirstNewQuest() {
@@ -275,7 +280,7 @@ bool QuestManager::dialogValid(std::uint64_t token) const {
   auto const& lease = found->second;
   if (lease.preview) return true;
   if (lease.stateRevision != lease.quest->stateRevision()) return false;
-  auto current = m_quests.maybeRef(lease.quest->questId());
+  auto current = m_quests.find_ref(lease.quest->questId());
   if (current && current->get() != lease.quest) return false;
   if (!current && !(lease.acknowledged && lease.quest->ephemeral() && lease.kind != "offer")) return false;
   auto state = lease.quest->state();
@@ -301,7 +306,7 @@ std::expected<Json, StarException> QuestManager::dialogCinema(std::uint64_t toke
   auto gender = enumName<GenderNames>(m_player->get().gender());
   if (!gender) return std::unexpected(std::move(gender.error()));
   auto path =
-    (**cinema).replaceTags(StringMap<String>{{"species", m_player->get().species()}, {"gender", String(*gender)}});
+    (**cinema).replace_tags(StringMap<String>{{"species", m_player->get().species()}, {"gender", String(*gender)}});
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   return (*assets)->fetchJson(path);
@@ -344,14 +349,16 @@ void sortQuests(List<std::shared_ptr<Quest>>& quests) {
 List<std::shared_ptr<Quest>> QuestManager::listActiveQuests() const {
   List<std::shared_ptr<Quest>> result;
   for (auto const& [id, quest] : m_quests)
-    if (quest->state() == QuestState::Active && quest->showInLog() && questValidOnServer(quest)) result.append(quest);
+    if (quest->state() == QuestState::Active && quest->showInLog() && questValidOnServer(quest))
+      result.push_back(quest);
   sortQuests(result);
   return result;
 }
 List<std::shared_ptr<Quest>> QuestManager::listCompletedQuests() const {
   List<std::shared_ptr<Quest>> result;
   for (auto const& [id, quest] : m_quests)
-    if (quest->state() == QuestState::Complete && quest->showInLog() && questValidOnServer(quest)) result.append(quest);
+    if (quest->state() == QuestState::Complete && quest->showInLog() && questValidOnServer(quest))
+      result.push_back(quest);
   sortQuests(result);
   return result;
 }
@@ -365,14 +372,18 @@ std::optional<String> QuestManager::currentQuestId() const { return m_trackedQue
 std::optional<std::shared_ptr<Quest>> QuestManager::currentQuest() const {
   auto id = m_onWorldQuestId ? m_onWorldQuestId : m_trackedQuestId;
   if (id && isActive(*id)) {
-    if (auto quest = m_quests.maybeRef(*id)) if (quest->get()->showInLog()) return quest->get();
+    if (auto quest = m_quests.find_ref(*id))
+      if (quest->get()->showInLog())
+        return quest->get();
   }
   return {};
 }
 std::optional<String> QuestManager::trackedQuestId() const { return m_trackedQuestId; }
 std::optional<std::shared_ptr<Quest>> QuestManager::trackedQuest() const {
   if (m_trackedQuestId && isActive(*m_trackedQuestId)) {
-    if (auto quest = m_quests.maybeRef(*m_trackedQuestId)) if (quest->get()->showInLog()) return quest->get();
+    if (auto quest = m_quests.find_ref(*m_trackedQuestId))
+      if (quest->get()->showInLog())
+        return quest->get();
   }
   return {};
 }
@@ -405,7 +416,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
         if (*start && !arc.quests.empty()) {
           auto config = (*templates)->questTemplate(arc.quests[0].templateId);
           if (!config) return std::unexpected(std::move(config.error()));
-          if (!*config) return std::unexpected(StarException(strf("No quest template found for id '{}'", arc.quests[0].templateId)));
+          if (!*config) return std::unexpected(StarException(Star::format("No quest template found for id '{}'", arc.quests[0].templateId)));
           type = (*config)->questGiverIndicator;
           break;
         }
@@ -452,7 +463,7 @@ std::expected<StringSet, StarException> QuestManager::interestingObjects() {
       if (std::holds_alternative<Json>(**response)) {
         auto objects = jsonToStringSet(std::get<Json>(**response));
         if (!objects) return std::unexpected(std::move(objects.error()));
-        result.addAll(*objects);
+        result.insert_range(*objects);
       }
     }
   }
@@ -498,7 +509,7 @@ std::expected<void, StarException> QuestManager::update(float dt) {
     if (state == QuestState::New || (finished && quest->ephemeral() && !quest->showDialog())) {
       auto uninitialized = quest->uninit();
       if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
-      expired.append(entry.first);
+      expired.push_back(entry.first);
     }
   }
   for (auto const& id : expired) m_quests.remove(id);
@@ -512,7 +523,7 @@ std::expected<void, StarException> QuestManager::update(float dt) {
 std::expected<void, StarException> QuestManager::startInitialQuests() {
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto json = (*assets)->json(strf("/quests/quests.config:initialquests.{}", m_player->get().species()));
+  auto json = (*assets)->json(Star::format("/quests/quests.config:initialquests.{}", m_player->get().species()));
   if (!json) return std::unexpected(std::move(json.error()));
   auto initial = json->toArray();
   if (!initial) return std::unexpected(std::move(initial.error()));

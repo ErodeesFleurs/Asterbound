@@ -56,14 +56,14 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
     auto array = binding.second.toArray();
     if (!array) return std::unexpected(std::move(array.error()));
     for (auto const& text : *array) {
-      auto emote = HumanoidEmoteNames->getLeft(binding.first);
+      auto emote = HumanoidEmoteNames->get_left(binding.first);
       if (!emote) return std::unexpected(std::move(emote.error()));
       auto string = text.toString();
       if (!string) return std::unexpected(std::move(string.error()));
       EmoteBinding value;
       value.emote = emote->get();
       value.text = std::move(*string);
-      result->m_emoteBindings.append(std::move(value));
+      result->m_emoteBindings.push_back(std::move(value));
     }
   }
   return result;
@@ -77,8 +77,8 @@ std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String 
     if (!begin) return std::unexpected(std::move(begin.error()));
     for (auto it = *begin; it != text.end(); ++it) {
       auto c = *it;
-      if (String::toUpper(c) != String::toLower(c)) {
-        if (String::toUpper(c) == c)
+      if (String::to_upper(c) != String::to_lower(c)) {
+        if (String::to_upper(c) == c)
           caps++;
         else
           noCaps++;
@@ -106,7 +106,7 @@ std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String 
       continue;
     auto length = option.text.length();
     if (!length) return std::unexpected(std::move(length.error()));
-    float r = *p + (float)*length * 0.01f;
+    float r = *p + static_cast<float>(*length) * 0.01f;
     if (r > bestMatch) {
       bestMatch = r;
       result = option.emote;

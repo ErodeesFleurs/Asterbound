@@ -14,23 +14,23 @@ template <typename T, std::size_t BlockSize>
 class BlockAllocator {
   static_assert(BlockSize > 0);
 public:
-  typedef T value_type;
+  using value_type = T;
 
-  typedef T* pointer;
-  typedef T const* const_pointer;
+  using pointer = T*;
+  using const_pointer = T const*;
 
-  typedef T& reference;
-  typedef T const& const_reference;
+  using reference = T&;
+  using const_reference = T const&;
 
   // Allocator can be shared, but since it is NOT thread safe this should not
   // be done by default.
-  typedef std::false_type propagate_on_container_copy_assignment;
-  typedef std::true_type propagate_on_container_move_assignment;
-  typedef std::true_type propagate_on_container_swap;
+  using propagate_on_container_copy_assignment = std::false_type;
+  using propagate_on_container_move_assignment = std::true_type;
+  using propagate_on_container_swap = std::true_type;
 
   template <class U>
   struct rebind {
-    typedef BlockAllocator<U, BlockSize> other;
+    using other = BlockAllocator<U, BlockSize>;
   };
 
   BlockAllocator();
@@ -104,7 +104,7 @@ private:
     std::allocator<T> multiAllocator;
   };
 
-  typedef std::unordered_map<TypeKey, std::shared_ptr<void>> BlockAllocatorFamily;
+  using BlockAllocatorFamily = std::unordered_map<TypeKey, std::shared_ptr<void>>;
 
   static Data* getAllocatorData(BlockAllocatorFamily& family);
 
@@ -161,7 +161,7 @@ template <typename T, std::size_t BlockSize>
 void BlockAllocator<T, BlockSize>::deallocate(T* p, std::size_t n) {
   if (n == 1) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((p));
+      Star::star_assert_failed((p));
     }
 
     auto i = std::upper_bound(m_data->blocks.begin(), m_data->blocks.end(), p, [](T* a, std::unique_ptr<Block> const& b) {
@@ -169,7 +169,7 @@ void BlockAllocator<T, BlockSize>::deallocate(T* p, std::size_t n) {
       });
 
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((i != m_data->blocks.begin()));
+      Star::star_assert_failed((i != m_data->blocks.begin()));
     }
     --i;
 
@@ -212,7 +212,7 @@ bool BlockAllocator<T, BlockSize>::operator!=(BlockAllocator<U, BlockSize> const
 template <typename T, std::size_t BlockSize>
 T* BlockAllocator<T, BlockSize>::Block::allocate() {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((allocationCount < BlockSize));
+    Star::star_assert_failed((allocationCount < BlockSize));
   }
 
   T* allocated;
@@ -222,7 +222,7 @@ T* BlockAllocator<T, BlockSize>::Block::allocate() {
     auto chunk = chunkPointer(firstUnallocated);
     auto unallocated = chunk->unallocated();
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((unallocated->prev == NullChunkIndex));
+      Star::star_assert_failed((unallocated->prev == NullChunkIndex));
     }
     firstUnallocated = unallocated->next;
     std::destroy_at(unallocated);
@@ -238,14 +238,14 @@ T* BlockAllocator<T, BlockSize>::Block::allocate() {
 template <typename T, std::size_t BlockSize>
 void BlockAllocator<T, BlockSize>::Block::deallocate(T* ptr) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((allocationCount > 0));
+    Star::star_assert_failed((allocationCount > 0));
   }
 
   // The stride is sizeof(Chunk), not sizeof(T), and the T objects are not an
   // array.  Use byte addresses rather than subtracting unrelated T pointers.
   auto offset = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(chunks.data());
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((offset < sizeof(chunks) && offset % sizeof(Chunk) == 0));
+    Star::star_assert_failed((offset < sizeof(chunks) && offset % sizeof(Chunk) == 0));
   }
   auto chunkIndex = static_cast<ChunkIndex>(offset / sizeof(Chunk));
   std::construct_at(reinterpret_cast<Unallocated*>(chunkPointer(chunkIndex)),
@@ -269,7 +269,7 @@ bool BlockAllocator<T, BlockSize>::Block::empty() const {
 template <typename T, std::size_t BlockSize>
 auto BlockAllocator<T, BlockSize>::Block::chunkPointer(ChunkIndex chunkIndex) -> Chunk* {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((chunkIndex < BlockSize));
+    Star::star_assert_failed((chunkIndex < BlockSize));
   }
   return &chunks[chunkIndex];
 }
@@ -280,7 +280,7 @@ typename BlockAllocator<T, BlockSize>::Data* BlockAllocator<T, BlockSize>::getAl
   auto& dataptr = family[typeKey<Data>()];
   if (!dataptr)
     dataptr = std::make_shared<Data>();
-  return (Data*)dataptr.get();
+  return static_cast<Data*>(dataptr.get());
 }
 
 }

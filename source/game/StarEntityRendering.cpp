@@ -37,7 +37,7 @@ namespace Star {
 
 class TileDrawer;
 
-RenderCallback::~RenderCallback() {}
+RenderCallback::~RenderCallback() = default;
 
 std::optional<std::reference_wrapper<TileDrawer>> RenderCallback::tileDrawer() const {
   return std::nullopt;

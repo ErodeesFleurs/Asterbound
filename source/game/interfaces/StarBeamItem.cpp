@@ -222,14 +222,14 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
   else
     m_beamCurve.dest() = itemWorld->get().geometry().diff(centerOfTile(*aimPosition), itemOwner->get().position());
 
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared())
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
     m_beamCurve[2] = m_beamCurve.dest();
   else
     m_beamCurve[2] = m_beamCurve[2] + (m_beamCurve.dest() - m_beamCurve[2]) * m_farControlPointElasticity;
 
   Vec2F desiredNearControlPoint = (m_beamCurve.dest() - m_beamCurve.origin()) * m_nearControlPointDistance;
 
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared())
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
     m_beamCurve[1] = m_beamCurve.origin();
   else if (itemOwner->get().facingDirection() != getAngleSide(m_beamCurve[1].angle()).second)
     m_beamCurve[1] = desiredNearControlPoint;
@@ -276,8 +276,8 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     return {};
 
   List<Particle> beamLeftovers;
-  for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun * 2 - .5); i++) {
-    float pos = (float)i / (float)(int)(curveLen * m_targetSegmentRun * 2 + .5);
+  for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun * 2 - .5); i++) {
+    float pos = static_cast<float>(i) / static_cast<float>(static_cast<int>(curveLen * m_targetSegmentRun * 2 + .5));
     float curveLoc = m_beamCurve.arcLenPara(pos);
     Particle beamParticle;
     beamParticle.type = Particle::Type::Ember;
@@ -299,7 +299,7 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     beamParticle.timeToLive = 0.25f;
     beamParticle.destructionAction = Particle::DestructionAction::Shrink;
     beamParticle.destructionTime = 0.2f;
-    beamLeftovers.append(std::move(beamParticle));
+    beamLeftovers.push_back(std::move(beamParticle));
   }
   // Capture world positions at the producing tick, not at display sampling or
   // a later owner position.
@@ -319,7 +319,7 @@ std::expected<List<Drawable>, StarException> BeamItem::nonRotatedDrawables() con
 }
 
 std::expected<float, StarException> BeamItem::getAngle(float angle) {
-  if (m_beamCurve.dest().magnitudeSquared() < m_beamCurve.origin().magnitudeSquared()
+  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared()
       || m_beamCurve.origin() == m_beamCurve[1])
     return angle;
   return getAngleSide(m_beamCurve[1].angle()).first;
@@ -386,13 +386,13 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
 
       String endImage = "";
       if (m_endType != EndType::Invalid) {
-        endImage = m_endImages[(unsigned)m_endType];
+        endImage = m_endImages[static_cast<unsigned>(m_endType)];
       }
 
       if (!endImage.empty()) {
         if (!m_beamCanPlace) {
           ImageOperation op = HueShiftImageOperation::hueShiftDegrees(120);
-          endImage = strf("{}?{}", endImage, imageOperationToString(op));
+          endImage = Star::format("{}?{}", endImage, imageOperationToString(op));
         }
         auto metadata = beamRoot().imageMetadataDatabase();
         if (!metadata)
@@ -422,8 +422,10 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
         Vec4B secondStripe = innerStripe.toRgba();
 
-        for (auto i = 1; i < (int)(curveLen * m_targetSegmentRun - .5); i++) { // one less than full length
-          float pos = (float)i / (float)(int)(curveLen * m_targetSegmentRun + .5); // project the discrete steps evenly
+        for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun - .5); i++) {// one less than full length
+          float pos = static_cast<float>(i)
+            / static_cast<float>(
+                        static_cast<int>(curveLen * m_targetSegmentRun + .5));// project the discrete steps evenly
 
           Vec2F currentLoc =
               m_beamCurve.pointAt(pos) + Vec2F(rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter),

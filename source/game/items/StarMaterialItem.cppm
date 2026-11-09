@@ -180,7 +180,7 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<MaterialItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& settings);
-  virtual ~MaterialItem() {}
+  ~MaterialItem() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
@@ -294,7 +294,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
         auto metadata = root.imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto added = drawable.imagePart().addDirectives(**metadata, Directives(String(strf("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
+        auto added = drawable.imagePart().addDirectives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }
@@ -337,9 +337,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto overrideName = config.getString("collisionOverride", "None");
   if (!overrideName)
     return std::unexpected(std::move(overrideName.error()));
-  if (!TileCollisionOverrideNames)
-    return std::unexpected(TileCollisionOverrideNames.error());
-  auto collisionOverride = TileCollisionOverrideNames->maybeLeft(*overrideName);
+  auto collisionOverride = maybeEnumValue<TileCollisionOverrideNames>(*overrideName);
   if (!collisionOverride)
     return std::unexpected(std::move(collisionOverride.error()));
   item->m_collisionOverride = collisionOverride->value_or(TileCollisionOverride::None);
@@ -360,14 +358,14 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     if (!mining)
       return std::unexpected(std::move(mining.error()));
     if (!mining->empty())
-      item->m_placeSounds.append(std::move(*mining));
+      item->m_placeSounds.push_back(std::move(*mining));
     auto step = (*database)->footstepSound(item->m_material);
     if (!step)
       return std::unexpected(std::move(step.error()));
     if (!step->empty())
-      item->m_placeSounds.append(std::move(*step));
+      item->m_placeSounds.push_back(std::move(*step));
     else if (item->m_placeSounds.empty())
-      item->m_placeSounds.append((*database)->defaultFootstepSound());
+      item->m_placeSounds.push_back((*database)->defaultFootstepSound());
   }
   item->m_shifting = false;
   item->m_lastTileAreaRadiusCache = 0.0f;
@@ -428,18 +426,16 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         if (!baseKind)
           return std::unexpected(std::move(baseKind.error()));
         for (std::size_t i = 0; i != *presses; ++i) {
-          constexpr auto limit = (std::uint8_t)TileCollisionOverride::Block + 1;
+          constexpr auto limit = static_cast<std::uint8_t>(TileCollisionOverride::Block) + 1;
           while (true) {
-            m_collisionOverride = TileCollisionOverride(((std::uint8_t)m_collisionOverride + 1) % limit);
+            m_collisionOverride = TileCollisionOverride((static_cast<std::uint8_t>(m_collisionOverride) + 1) % limit);
             if (collisionKindFromOverride(m_collisionOverride) != *baseKind)
               break;
           }
-          if (!TileCollisionOverrideNames)
-            return std::unexpected(TileCollisionOverrideNames.error());
-          auto name = TileCollisionOverrideNames->getRight(m_collisionOverride);
+          auto name = enumName<TileCollisionOverrideNames>(m_collisionOverride);
           if (!name)
             return std::unexpected(std::move(name.error()));
-          auto stored = player->get().setSecretProperty(CollisionOverridePropertyKey, name->get());
+          auto stored = player->get().setSecretProperty(CollisionOverridePropertyKey, *name);
           if (!stored)
             return std::unexpected(std::move(stored.error()));
         }
@@ -496,7 +492,11 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    float pulse = (float)std::sin(2 * std::numbers::pi * 4.0 * std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()).time_since_epoch().count());
+    float pulse = static_cast<float>(
+      std::sin(2 * std::numbers::pi * 4.0
+               * std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now())
+                   .time_since_epoch()
+                   .count()));
     float pulseA = 0.85 - pulse * 0.15f;
     float pulseB = 0.85 + pulse * 0.15f;
     Color color = itemOwner->get().favoriteColor().mix(Color::White);
@@ -591,7 +591,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
       magnitude = limit;
     }
 
-    steps = (unsigned)std::ceil(magnitude * (std::numbers::pi / 2));
+    steps = static_cast<unsigned>(std::ceil(magnitude * (std::numbers::pi / 2)));
   }
 
   CollisionKind collisionKind;
@@ -633,7 +633,11 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
       auto hue = placementHueShift(pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
-      modifications.emplaceAppend(pos, PlaceMaterial{layer, materialId(), *hue, m_collisionOverride});
+      modifications.emplace_back(pos,
+                                 PlaceMaterial{.layer = layer,
+                                               .material = materialId(),
+                                               .materialHueShift = *hue,
+                                               .collisionOverride = m_collisionOverride});
     }
 
     // Make sure not to make any more modifications than we have consumables.
@@ -650,7 +654,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   }
 
   if (total) {
-    float intensity = std::clamp(std::sqrt((float)total) / 16, 0.0f, 1.0f);
+    float intensity = std::clamp(std::sqrt(static_cast<float>(total)) / 16, 0.0f, 1.0f);
     auto sound = root().random().randValueFrom(m_placeSounds);
     auto pitch = root().random().randf(0.9f, 1.1f);
     if (!pitch)
@@ -703,7 +707,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
       continue;
     if (itemWorld->get().material(pos, layer) == materialId())
       continue;
-    swapPositions.append(pos);
+    swapPositions.push_back(pos);
   }
 
   if (swapPositions.empty())
@@ -734,12 +738,16 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     auto hue = placementHueShift(pos);
     if (!hue)
       return std::unexpected(std::move(hue.error()));
-    toSwap.emplaceAppend(pos, PlaceMaterial{layer, materialId(), *hue, m_collisionOverride});
+    toSwap.emplace_back(pos,
+                        PlaceMaterial{.layer = layer,
+                                      .material = materialId(),
+                                      .materialHueShift = *hue,
+                                      .collisionOverride = m_collisionOverride});
     auto destroys = itemWorld->get().damageWouldDestroy(pos, layer, damage);
     if (!destroys)
       return std::unexpected(std::move(destroys.error()));
     if (!*destroys)
-      willDamage.append(pos);
+      willDamage.push_back(pos);
   }
   
   std::size_t success;
@@ -754,8 +762,8 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     List<Vec2I> toDamage;
 
     for (auto pair : toSwap)
-      toDamage.append(pair.first);
-    
+      toDamage.push_back(pair.first);
+
     auto damaged = itemWorld->get().damageTiles(toDamage, layer, itemOwner->get().position(), damage, itemOwner->get().entityId());
     if (!damaged)
       return std::unexpected(std::move(damaged.error()));
@@ -865,10 +873,10 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
 
       locker.unlock();
       for (auto& index : tileDrawables.keys()) {
-        auto taken = tileDrawables.take(index);
+        auto taken = tileDrawables.extract_value(index);
         if (!taken)
           return std::unexpected(std::move(taken.error()));
-        drawables.appendAll(std::move(*taken));
+        drawables.append_range(std::move(*taken));
       }
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
@@ -920,9 +928,7 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
     auto name = collision->toString();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (!TileCollisionOverrideNames)
-      return std::unexpected(TileCollisionOverrideNames.error());
-    auto value = TileCollisionOverrideNames->maybeLeft(*name);
+    auto value = maybeEnumValue<TileCollisionOverrideNames>(*name);
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_collisionOverride = value->value_or(TileCollisionOverride::None);
@@ -976,12 +982,14 @@ std::expected<bool, StarException> MaterialItem::canPlace(bool shifting) const {
       auto hue = placementHueShift(pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
-      auto foreground = itemWorld->get().canModifyTile(pos, PlaceMaterial{TileLayer::Foreground, material, *hue}, false);
+      auto foreground = itemWorld->get().canModifyTile(
+        pos, PlaceMaterial{.layer = TileLayer::Foreground, .material = material, .materialHueShift = *hue}, false);
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
       if (*foreground)
         return true;
-      auto background = itemWorld->get().canModifyTile(pos, PlaceMaterial{TileLayer::Background, material, *hue}, false);
+      auto background = itemWorld->get().canModifyTile(
+        pos, PlaceMaterial{.layer = TileLayer::Background, .material = material, .materialHueShift = *hue}, false);
       if (!background)
         return std::unexpected(std::move(background.error()));
       if (*background)
@@ -1030,25 +1038,27 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::previewTiles(bool 
         return std::unexpected(std::move(hue.error()));
       if (c >= count())
         break;
-      auto foreground = itemWorld->get().canModifyTile(pos, PlaceMaterial{TileLayer::Foreground, material, *hue}, false);
+      auto foreground = itemWorld->get().canModifyTile(
+        pos, PlaceMaterial{.layer = TileLayer::Foreground, .material = material, .materialHueShift = *hue}, false);
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
       if (*foreground) {
-        result.append({pos, true, material, *hue, true});
+        result.push_back({pos, true, material, *hue, true});
         c++;
       } else {
         bool backPlaceable = false;
         if (twoHanded()) {
-          auto background = itemWorld->get().canModifyTile(pos, PlaceMaterial{TileLayer::Background, material, *hue}, false);
+          auto background = itemWorld->get().canModifyTile(
+            pos, PlaceMaterial{.layer = TileLayer::Background, .material = material, .materialHueShift = *hue}, false);
           if (!background)
             return std::unexpected(std::move(background.error()));
           backPlaceable = *background;
         }
         if (backPlaceable) {
-          result.append({pos, true, material, *hue, true, light, true, color});
+          result.push_back({pos, true, material, *hue, true, light, true, color});
           c++;
         } else {
-          result.append({pos, true, material, *hue, true});
+          result.push_back({pos, true, material, *hue, true});
         }
       }
     }

@@ -126,7 +126,7 @@ namespace JsonExtraDetail {
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size != Size)
-      return std::unexpected(JsonException(strf("Json array not of size {} in {}", Size, name)));
+      return std::unexpected(JsonException(Star::format("Json array not of size {} in {}", Size, name)));
     Array<T, Size> result;
     for (std::size_t i = 0; i < Size; ++i) {
       auto item = std::invoke(getter, v, i);
@@ -350,7 +350,7 @@ std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& p
     auto converted = JsonExtraDetail::convert<Json>(converter, pair.second);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    result.append(JsonObject{{"weight", pair.first}, {"item", std::move(*converted)}});
+    result.push_back(JsonObject{{"weight", pair.first}, {"item", std::move(*converted)}});
   }
   return Json(std::move(result));
 }

@@ -26,7 +26,7 @@ namespace Star {
 template <typename Element>
 class NetElementDynamicGroup : public NetElement {
 public:
-  typedef std::uint32_t ElementId;
+  using ElementId = std::uint32_t;
   static ElementId const NullElementId = 0;
 
   NetElementDynamicGroup() requires std::default_initializable<Element>
@@ -71,8 +71,8 @@ private:
   // will fall back to a full serialization of the entire state.
   static std::int64_t const MaxChangeDataVersions = 100;
 
-  typedef ElementId ElementRemovalType;
-  typedef std::pair<ElementId, ByteArray> ElementAdditionType;
+  using ElementRemovalType = ElementId;
+  using ElementAdditionType = std::pair<ElementId, ByteArray>;
 
   template <typename BaseType>
   struct ElementResetWrapper : BaseType {
@@ -100,15 +100,16 @@ private:
 
     template <class Arg>
     ElementResetWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<ElementResetWrapper, typename std::decay<Arg>::type>::value,
-          "ElementReset can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<ElementResetWrapper, std::decay_t<Arg>>,
+                    "ElementReset can not implicitly be assigned from std::monostate-derived classes or strong "
+                    "std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef ElementResetWrapper<std::monostate> ElementReset;
+  using ElementReset = ElementResetWrapper<std::monostate>;
   using ElementRemoval = StrongTypedefBuiltin<ElementRemovalType, struct ElementRemovalTag>;
   template <typename BaseType>
   struct ElementAdditionWrapper : BaseType {
@@ -136,19 +137,20 @@ private:
 
     template <class Arg>
     ElementAdditionWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<ElementAdditionWrapper, typename std::decay<Arg>::type>::value,
-          "ElementAddition can not implicitly be assigned from ElementAdditionType-derived classes or strong ElementAdditionType typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<ElementAdditionWrapper, std::decay_t<Arg>>,
+                    "ElementAddition can not implicitly be assigned from ElementAdditionType-derived classes or strong "
+                    "ElementAdditionType typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef ElementAdditionWrapper<ElementAdditionType> ElementAddition;
+  using ElementAddition = ElementAdditionWrapper<ElementAdditionType>;
 
-  typedef std::variant<ElementReset, ElementRemoval, ElementAddition> ElementChange;
+  using ElementChange = std::variant<ElementReset, ElementRemoval, ElementAddition>;
 
-  typedef IdMap<ElementId, std::shared_ptr<Element>> ElementMap;
+  using ElementMap = IdMap<ElementId, std::shared_ptr<Element>>;
 
   void addChangeData(ElementChange change);
 
@@ -159,7 +161,7 @@ private:
   bool m_interpolationEnabled = false;
   float m_extrapolationHint = 0.0f;
 
-  ElementMap m_idMap = ElementMap::template withRange<1, std::numeric_limits<ElementId>::max()>();
+  ElementMap m_idMap = ElementMap::template with_range<1, std::numeric_limits<ElementId>::max()>();
 
   Deque<std::pair<std::uint64_t, ElementChange>> m_changeData;
   std::uint64_t m_changeDataLastVersion = 0;
@@ -311,7 +313,7 @@ template <typename Element>
       if (p.first >= fromVersion) {
         if (std::holds_alternative<ElementAddition>(p.second)) {
           ElementId id = std::get<ElementAddition>(p.second).first;
-          if (auto element = m_idMap.maybeRef(id)) {
+          if (auto element = m_idMap.find_ref(id)) {
             { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
             { auto result = ds.writeVlqU(1); if (!result) return std::unexpected(std::move(result.error())); }
             DataStreamBuffer storeBuffer;
@@ -333,7 +335,11 @@ template <typename Element>
       if (*written) {
         { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
         { auto result = ds.writeVlqU(p.first + 1); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = ds.writeBytes(m_buffer.data()); if (!result) return std::unexpected(std::move(result.error())); }
+        {
+          auto result = ds.write_bytes(m_buffer.data());
+          if (!result)
+            return std::unexpected(std::move(result.error()));
+        }
         m_buffer.clear();
       }
     }
@@ -409,12 +415,13 @@ template <typename Element>
 void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
   std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
+    Star::star_assert_failed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
-  m_changeData.append({currentVersion, std::move(change)});
+  m_changeData.push_back({currentVersion, std::move(change)});
 
-  m_changeDataLastVersion = std::max<std::int64_t>((std::int64_t)currentVersion - MaxChangeDataVersions, 0);
+  m_changeDataLastVersion =
+    std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
   while (!m_changeData.empty() && m_changeData.front().first < m_changeDataLastVersion)
     m_changeData.pop_front();
 }

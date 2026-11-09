@@ -70,7 +70,7 @@ Json PlayerCodexes::toJson() const {
 List<PlayerCodexes::CodexEntry> PlayerCodexes::codexes() const {
   List<CodexEntry> result;
   for (auto pair : m_codexes)
-    result.append(pair.second);
+    result.push_back(pair.second);
   std::sort(result.begin(), result.end(),
       [](CodexEntry const& left, CodexEntry const& right) -> bool {
         return std::make_tuple(left.second, left.first->title()) < std::make_tuple(right.second, right.first->title());
@@ -79,7 +79,7 @@ List<PlayerCodexes::CodexEntry> PlayerCodexes::codexes() const {
 }
 
 std::shared_ptr<Codex const> PlayerCodexes::codex(String const& codexId) const {
-  if (auto entry = m_codexes.maybeRef(codexId))
+  if (auto entry = m_codexes.find_ref(codexId))
     return entry->get().first;
   return {};
 }
@@ -102,7 +102,7 @@ std::expected<std::shared_ptr<Codex const>, StarException> PlayerCodexes::learnC
 }
 
 bool PlayerCodexes::codexRead(String const& codexId) const {
-  auto entry = m_codexes.maybeRef(codexId);
+  auto entry = m_codexes.find_ref(codexId);
   return entry && entry->get().second;
 }
 
@@ -126,7 +126,7 @@ std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String con
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto config = (*assets)->json(strf("/player.config:defaultCodexes.{}", playerSpecies));
+  auto config = (*assets)->json(Star::format("/player.config:defaultCodexes.{}", playerSpecies));
   if (!config)
     return std::unexpected(std::move(config.error()));
   auto codexes = jsonToStringList(*config);
@@ -141,7 +141,7 @@ std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String con
 }
 
 std::shared_ptr<Codex const> PlayerCodexes::firstNewCodex() const {
-  for (auto pair : m_codexes) {
+  for (auto const& pair : m_codexes) {
     if (!pair.second.second)
       return pair.second.first;
   }

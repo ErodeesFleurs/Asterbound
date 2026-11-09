@@ -104,12 +104,12 @@ public:
   // members are drawn strictly in the order they are added,
   // so add them in the correct order.
 
-  [[nodiscard]] virtual std::expected<bool, StarException> sendEvent(InputEvent const& event);
+  [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
   [[nodiscard]] virtual std::expected<void, StarException> setFocus(Widget const& focus);
   virtual void removeFocus(Widget const& focus);
   virtual void removeFocus();
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt);
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
   [[nodiscard]] virtual std::expected<void, StarException> tick(float dt);
 
   bool dragActive() const;
@@ -135,8 +135,8 @@ public:
   String subTitle() const;
   std::shared_ptr<Widget> titleIcon() const;
 
-  virtual std::optional<std::reference_wrapper<Pane>> window();
-  virtual std::optional<std::reference_wrapper<Pane const>> window() const;
+  std::optional<std::reference_wrapper<Pane>> window() override;
+  std::optional<std::reference_wrapper<Pane const>> window() const override;
 
   PaneAnchor anchor();
   void setAnchor(PaneAnchor anchor);
@@ -155,7 +155,7 @@ protected:
   Pane(GuiContext& context);
   [[nodiscard]] std::expected<void, StarException> initializePane();
   virtual std::shared_ptr<GuiReader> reader();
-  [[nodiscard]] virtual std::expected<void, StarException> renderImpl();
+  [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
   String m_bgHeader;
   String m_bgBody;

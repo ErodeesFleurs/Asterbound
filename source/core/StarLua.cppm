@@ -13,6 +13,7 @@ import star.map;
 import star.set;
 import star.optional;
 import star.format;
+import star.text_formatter;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
@@ -38,7 +39,7 @@ public:
     return typeName<LuaExecutionHost>();
   }
 };
-typedef RefPtr<LuaEngine> LuaEnginePtr;
+using LuaEnginePtr = RefPtr<LuaEngine>;
 
 // General Lua diagnostic category.
 struct LuaExceptionTag {
@@ -71,22 +72,24 @@ struct LuaConversionExceptionTag {
 };
 using LuaConversionException = StarError<LuaConversionExceptionTag, LuaException>;
 
-typedef std::monostate LuaNilType;
-typedef bool LuaBoolean;
-typedef lua_Integer LuaInt;
-typedef lua_Number LuaFloat;
+using LuaNilType = std::monostate;
+using LuaBoolean = bool;
+using LuaInt = lua_Integer;
+using LuaFloat = lua_Number;
 class LuaString;
 class LuaTable;
 class LuaFunction;
 class LuaThread;
 class LuaUserData;
-typedef std::variant<LuaNilType, LuaBoolean, LuaInt, LuaFloat, LuaString, LuaTable, LuaFunction, LuaThread, LuaUserData> LuaValue;
+using LuaValue =
+  std::variant<LuaNilType, LuaBoolean, LuaInt, LuaFloat, LuaString, LuaTable, LuaFunction, LuaThread, LuaUserData>;
 
 // Used to wrap multiple return values from calling a lua function or to pass
 // multiple values as arguments to a lua function from a container.  If this is
 // used as an argument to a lua callback function, it must be the final
 // argument of the function!
 template <typename T>
+// A project sequence tag: Lua codecs expand these values into distinct stack slots.
 class LuaVariadic : public List<T> {
 public:
   using List<T>::List;
@@ -97,8 +100,7 @@ public:
 
 // Unpack a container and apply each of the arguments separately to a lua
 // function, similar to lua's unpack.
-template <typename Container>
-LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Container&& c);
+template <typename Container> LuaVariadic<typename std::decay_t<Container>::value_type> luaUnpack(Container&& c);
 
 // Similar to LuaVariadic, but a tuple type so automatic per-entry type
 // conversion is done.  This can only be used as the return value of a wrapped
@@ -106,7 +108,7 @@ LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Containe
 template <typename... Types>
 class LuaTupleReturn : public std::tuple<Types...> {
 public:
-  typedef std::tuple<Types...> Base;
+  using Base = std::tuple<Types...>;
 
   explicit LuaTupleReturn(Types const&... args);
   template <typename... UTypes>
@@ -133,8 +135,7 @@ template <typename... Types>
 LuaTupleReturn<Types&...> luaTie(Types&... args);
 
 // Constructs a LuaTupleReturn from the given arguments similar to make_tuple
-template <typename... Types>
-LuaTupleReturn<typename std::decay<Types>::type...> luaTupleReturn(Types&&... args);
+template <typename... Types> LuaTupleReturn<std::decay_t<Types>...> luaTupleReturn(Types&&... args);
 
 // Synchronous stack borrows. Views never escape their call; use own() when a
 // value must survive it. All allocating/metamethod operations stay protected.
@@ -227,12 +228,12 @@ struct LuaRegistryReference {
   };
 
   // Wrapped callbacks decode borrowed arguments and append their results.
-  typedef std::function<std::expected<int, StarException>(LuaStack)> LuaWrappedFunction;
+  using LuaWrappedFunction = std::function<std::expected<int, StarException>(LuaStack)>;
 }
 
 // Rendering may inspect tables and therefore reports recoverable Lua errors.
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, LuaValue const& value);
-[[nodiscard]] std::expected<String, StarException> printLuaValue(LuaValue const& value);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, LuaValue const& value);
+[[nodiscard]] std::expected<String, StarException> print_lua_value(LuaValue const& value);
 
 // Holds a reference to a LuaEngine and a value held internally inside the
 // registry of that engine.  The lifetime of the LuaEngine will be extended
@@ -416,7 +417,7 @@ private:
 // LuaContext can (mostly) not affect any other.
 class LuaContext : protected LuaTable {
 public:
-  typedef std::function<std::expected<void, StarException>(LuaStackValue, StringView)> RequireFunction;
+  using RequireFunction = std::function<std::expected<void, StarException>(LuaStackValue, StringView)>;
 
   using LuaTable::LuaTable;
 
@@ -566,7 +567,7 @@ public:
   // functions that can affect the real world disabled.
   [[nodiscard]] static std::expected<LuaEnginePtr, StarException> create(bool safe = true);
 
-  ~LuaEngine();
+  ~LuaEngine() override;
 
   LuaEngine(LuaEngine const&) = delete;
   LuaEngine(LuaEngine&&) = default;
@@ -913,9 +914,9 @@ struct LuaIntConverter {
     if (v.is<LuaString>()) {
       auto text = v.stringView().utf8();
       text = text.substr(0, text.find('\0'));
-      if (auto n = maybeLexicalCast<LuaInt>(text))
+      if (auto n = maybe_lexical_cast<LuaInt>(text))
         return static_cast<T>(*n);
-      if (auto n = maybeLexicalCast<LuaFloat>(text))
+      if (auto n = maybe_lexical_cast<LuaFloat>(text))
         return fromFloat(*n);
     }
     return std::nullopt;
@@ -966,9 +967,9 @@ struct LuaFloatConverter {
     if (v.is<LuaString>()) {
       auto text = v.stringView().utf8();
       text = text.substr(0, text.find('\0'));
-      if (auto n = maybeLexicalCast<LuaFloat>(text))
+      if (auto n = maybe_lexical_cast<LuaFloat>(text))
         return static_cast<T>(*n);
-      if (auto n = maybeLexicalCast<LuaInt>(text))
+      if (auto n = maybe_lexical_cast<LuaInt>(text))
         return static_cast<T>(*n);
     }
     return std::nullopt;
@@ -990,9 +991,9 @@ struct LuaConverter<String> {
     if (v.is<LuaString>())
       return v.toString();
     if (v.is<LuaInt>())
-      return String(toString(v.as<LuaInt>()));
+      return String(Star::to_string(v.as<LuaInt>()));
     if (v.is<LuaFloat>())
-      return String(toString(v.as<LuaFloat>()));
+      return String(Star::to_string(v.as<LuaFloat>()));
     return std::nullopt;
   }
 };
@@ -1010,7 +1011,7 @@ struct LuaConverter<std::string> {
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
       return std::nullopt;
-    return std::move(**converted).takeUtf8();
+    return std::move(**converted).take_utf8();
   }
 };
 
@@ -1056,9 +1057,9 @@ template <> struct LuaConverter<LuaString> : LuaValueConverter<LuaString> {
     if (v.is<LuaString>())
       return LuaValueConverter<LuaString>::to(v);
     if (v.is<LuaInt>())
-      return v.stack().engine().createString(toString(v.as<LuaInt>()));
+      return v.stack().engine().createString(Star::to_string(v.as<LuaInt>()));
     if (v.is<LuaFloat>())
-      return v.stack().engine().createString(toString(v.as<LuaFloat>()));
+      return v.stack().engine().createString(Star::to_string(v.as<LuaFloat>()));
     return std::nullopt;
   }
 };
@@ -1198,7 +1199,7 @@ struct LuaConverter<SmallList<T, MaxStackSize>> : LuaContainerConverter<SmallLis
 template <>
 struct LuaConverter<StringList> : LuaContainerConverter<StringList> {};
 
-template <SetContainer Container>
+template <set_container Container>
 struct LuaConverter<Container> : LuaContainerConverter<Container> {};
 
 template <typename Key, typename Value, typename Compare, typename Allocator>
@@ -1281,7 +1282,7 @@ namespace LuaDetail {
         auto value = stack.read<T>(first + i);
         if (!value)
           return std::unexpected(std::move(value.error()));
-        result.append(std::move(*value));
+        result.push_back(std::move(*value));
       }
       return result;
     }
@@ -1578,16 +1579,9 @@ namespace LuaDetail {
   std::optional<LuaInt> asInteger(LuaValue const& v);
 }
 
-template <typename Container>
-LuaVariadic<typename std::decay<Container>::type::value_type> luaUnpack(Container&& c) {
-  LuaVariadic<typename std::decay<Container>::type::value_type> ret;
-  if (std::is_rvalue_reference<Container&&>::value) {
-    for (auto& e : c)
-      ret.append(std::move(e));
-  } else {
-    for (auto const& e : c)
-      ret.append(e);
-  }
+template <typename Container> LuaVariadic<typename std::decay_t<Container>::value_type> luaUnpack(Container&& c) {
+  LuaVariadic<typename std::decay_t<Container>::value_type> ret;
+  ret.append_range(std::forward<Container>(c));
   return ret;
 }
 
@@ -1654,9 +1648,8 @@ LuaTupleReturn<Types&...> luaTie(Types&... args) {
   return LuaTupleReturn<Types&...>(args...);
 }
 
-template <typename... Types>
-LuaTupleReturn<typename std::decay<Types>::type...> luaTupleReturn(Types&&... args) {
-  return LuaTupleReturn<typename std::decay<Types>::type...>(std::forward<Types>(args)...);
+template <typename... Types> LuaTupleReturn<std::decay_t<Types>...> luaTupleReturn(Types&&... args) {
+  return LuaTupleReturn<std::decay_t<Types>...>(std::forward<Types>(args)...);
 }
 
 namespace LuaDetail {
@@ -2578,7 +2571,7 @@ template <typename T>
 
 inline void LuaEngine::destroyHandle(int handleIndex) {
   // Registry references are released later by the engine's handle cleanup.
-  m_handleFree.append(handleIndex);
+  m_handleFree.push_back(handleIndex);
 }
 
 template <typename T>
@@ -2727,7 +2720,7 @@ export namespace Star {
   template <>
   struct LuaConverter<StringList>;
 
-  template <SetContainer Container>
+  template <set_container Container>
   struct LuaConverter<Container>;
 
   template <typename Key, typename Value, typename Compare, typename Allocator>
@@ -2779,7 +2772,8 @@ export namespace Star {
   using ::Star::LuaUserData;
   using ::Star::LuaValue;
   using ::Star::LuaVariadic;
-  using ::Star::printLuaValue;
+  using ::Star::print_lua_value;
+  using ::Star::write_text;
   template <> struct LuaConverter<LuaStackValue>;
   using ::Star::LuaProfileEntry;
   using ::Star::LuaConverter;

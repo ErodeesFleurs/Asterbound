@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
       return {};
     }();
     if (!loaded)
-      return std::unexpected(NameGeneratorException(strf("Error reading name source config {}", file), loaded.error()));
+      return std::unexpected(NameGeneratorException(Star::format("Error reading name source config {}", file), loaded.error()));
   }
   auto profanityConfig = (*assets)->json("/names/profanityfilter.config");
   if (!profanityConfig)
@@ -86,7 +86,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
     auto word = entry.toString();
     if (!word)
       return std::unexpected(std::move(word.error()));
-    auto lower = word->toLower();
+    auto lower = word->to_lower();
     if (!lower)
       return std::unexpected(std::move(lower.error()));
     result->m_profanityFilter.add(std::move(*lower));
@@ -138,7 +138,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
   String result;
   String mode = "alts";
   std::size_t index = 0;
-  bool titleCase = false;
+  bool title_case = false;
   if (rule[0].isType(Json::Type::Object)) {
     meta = rule[0];
     auto configuredMode = meta.getString("mode", mode);
@@ -148,7 +148,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
     auto configuredTitleCase = meta.getBool("titleCase", false);
     if (!configuredTitleCase)
       return std::unexpected(std::move(configuredTitleCase.error()));
-    titleCase = *configuredTitleCase;
+    title_case = *configuredTitleCase;
     ++index;
   }
   auto evaluate = [&](Json const& entry) -> std::expected<String, StarException> {
@@ -178,7 +178,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
     auto sourceName = meta.getString("source");
     if (!sourceName)
       return std::unexpected(std::move(sourceName.error()));
-    auto source = m_markovSources.maybeRef(*sourceName);
+    auto source = m_markovSources.find_ref(*sourceName);
     if (!source)
       return std::unexpected(NameGeneratorException::format("Unknown name source '{}'", *sourceName));
     auto range = meta.get("targetLength").and_then([](Json const& value) { return value.arrayPtr(); });
@@ -215,7 +215,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
         auto link = piece.slice(*length - source->get().prefixSize, *length);
         if (!link)
           return std::unexpected(std::move(link.error()));
-        auto chain = source->get().chains.maybeRef(*link);
+        auto chain = source->get().chains.find_ref(*link);
         if (!chain)
           break;
         auto next = random.randFrom(chain->get());
@@ -233,19 +233,19 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
   } else {
     return std::unexpected(StarException::format("Unknown mode: {}", mode));
   }
-  if (titleCase)
-    return result.titleCase();
+  if (title_case)
+    return result.title_case();
   return result;
 }
 
 std::expected<bool, StarException> PatternedNameGenerator::isProfane(String const& name) const {
-  auto lower = name.toLower();
+  auto lower = name.to_lower();
   if (!lower)
     return std::unexpected(std::move(lower.error()));
   auto rotated = lower->rot13();
   if (!rotated)
     return std::unexpected(std::move(rotated.error()));
-  auto matches = rotated->splitAny(" -");
+  auto matches = rotated->split_any(" -");
   if (!matches)
     return std::unexpected(std::move(matches.error()));
   for (auto const& word : m_profanityFilter) {
@@ -280,7 +280,7 @@ std::expected<MarkovSource, StarException> PatternedNameGenerator::makeMarkovSou
       return std::unexpected(std::move(length.error()));
     if (*length < prefixSize || *length < endSize)
       continue;
-    auto name = original.toLower();
+    auto name = original.to_lower();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto lowerLength = name->length();
@@ -295,12 +295,12 @@ std::expected<MarkovSource, StarException> PatternedNameGenerator::makeMarkovSou
       if (!prefix)
         return std::unexpected(std::move(prefix.error()));
       if (i == 0)
-        source.starts.append(*prefix);
+        source.starts.push_back(*prefix);
       if (i + prefixSize < *lowerLength) {
         auto next = name->slice(i + prefixSize, i + prefixSize + 1);
         if (!next)
           return std::unexpected(std::move(next.error()));
-        source.chains[*prefix].append(std::move(*next));
+        source.chains[*prefix].push_back(std::move(*next));
       }
     }
   }

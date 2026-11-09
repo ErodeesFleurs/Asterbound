@@ -40,7 +40,7 @@ struct PngState {
 };
 
 void logPngMessage(PngState& state, std::string_view kind, std::string_view message) noexcept {
-  auto name = state.device.deviceName();
+  auto name = state.device.device_name();
   if (!name) {
     state.error = std::move(name.error());
     return;
@@ -68,7 +68,7 @@ void pngWarning(png_structp png, png_const_charp message) noexcept {
 void readPngData(png_structp png, png_bytep data, png_size_t length) noexcept {
   auto& state = *static_cast<PngState*>(png_get_io_ptr(png));
   {
-    auto result = state.device.readFull({reinterpret_cast<char*>(data), length});
+    auto result = state.device.read_full({reinterpret_cast<char*>(data), length});
     if (!result)
       state.error = std::move(result.error());
   }
@@ -80,7 +80,7 @@ void readPngData(png_structp png, png_bytep data, png_size_t length) noexcept {
 void writePngData(png_structp png, png_bytep data, png_size_t length) noexcept {
   auto& state = *static_cast<PngState*>(png_get_io_ptr(png));
   {
-    auto result = state.device.writeFull({reinterpret_cast<char*>(data), length});
+    auto result = state.device.write_full({reinterpret_cast<char*>(data), length});
     if (!result)
       state.error = std::move(result.error());
   }
@@ -182,14 +182,14 @@ bool writePngRows(PngState& state, unsigned width, unsigned height, unsigned cha
 
 std::expected<void, StarException> readPngSignature(IODevice& device) {
   png_byte header[8]{};
-  auto result = device.readFull({reinterpret_cast<char*>(header), sizeof(header)});
+  auto result = device.read_full({reinterpret_cast<char*>(header), sizeof(header)});
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (png_sig_cmp(header, 0, sizeof(header))) {
-    auto name = device.deviceName();
+    auto name = device.device_name();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    return std::unexpected(ImageException(strf("File {} is not a png image!", *name)));
+    return std::unexpected(ImageException(Star::format("File {} is not a png image!", *name)));
   }
   return {};
 }
@@ -198,7 +198,7 @@ std::expected<void, StarException> readPngSignature(IODevice& device) {
 
 std::expected<bool, StarException> Image::isPng(std::shared_ptr<IODevice> device) {
   png_byte header[8]{};
-  auto read = device->readAbsolute(0, {reinterpret_cast<char*>(header), sizeof(header)});
+  auto read = device->read_absolute(0, {reinterpret_cast<char*>(header), sizeof(header)});
   if (!read)
     return std::unexpected(std::move(read.error()));
   return *read == sizeof(header) && !png_sig_cmp(header, 0, sizeof(header));
@@ -313,9 +313,9 @@ void Image::reset(unsigned width, unsigned height, std::optional<PixelFormat> pf
   } else {
     std::uint8_t* newData = nullptr;
     if (!m_data)
-      newData = (std::uint8_t*)Star::malloc(imageSize);
+      newData = static_cast<std::uint8_t*>(Star::malloc(imageSize));
     else
-      newData = (std::uint8_t*)Star::realloc(m_data, imageSize);
+      newData = static_cast<std::uint8_t*>(Star::realloc(m_data, imageSize));
 
     if (!newData)
       std::terminate();
@@ -375,7 +375,7 @@ std::expected<void, StarException> Image::fillRect(Vec2U const& pos, Vec2U const
 
 std::expected<void, StarException> Image::set(Vec2U const& pos, Vec4B const& c) {
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::set", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::set", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     m_data[offset] = c[0];
@@ -393,7 +393,7 @@ std::expected<void, StarException> Image::set(Vec2U const& pos, Vec4B const& c) 
 
 std::expected<void, StarException> Image::set(Vec2U const& pos, Vec3B const& c) {
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::set", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::set", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     m_data[offset] = c[0];
@@ -412,7 +412,7 @@ std::expected<void, StarException> Image::set(Vec2U const& pos, Vec3B const& c) 
 std::expected<Vec4B, StarException> Image::get(Vec2U const& pos) const {
   Vec4B c;
   if (pos[0] >= m_width || pos[1] >= m_height) {
-    return std::unexpected(ImageException(strf("{} out of range in Image::get", pos)));
+    return std::unexpected(ImageException(Star::format("{} out of range in Image::get", pos)));
   } else if (bytesPerPixel() == 4) {
     std::size_t offset = pos[1] * m_width * 4 + pos[0] * 4;
     c[0] = m_data[offset];
@@ -452,8 +452,8 @@ std::expected<Vec4B, StarException> Image::getrgb(Vec2U const& pos) const {
 
 Vec4B Image::clamp(Vec2I const& pos) const {
   Vec4B c;
-  unsigned x = (unsigned)Star::clamp<int>(pos[0], 0, m_width - 1);
-  unsigned y = (unsigned)Star::clamp<int>(pos[1], 0, m_height - 1);
+  unsigned x = static_cast<unsigned>(Star::clamp<int>(pos[0], 0, m_width - 1));
+  unsigned y = static_cast<unsigned>(Star::clamp<int>(pos[1], 0, m_height - 1));
   if (m_width == 0 || m_height == 0) {
     return {0, 0, 0, 0};
   } else if (bytesPerPixel() == 4) {
@@ -482,7 +482,7 @@ Vec4B Image::clamprgb(Vec2I const& pos) const {
 
 std::expected<Image, StarException> Image::subImage(Vec2U const& pos, Vec2U const& size) const {
   if (pos[0] + size[0] > m_width || pos[1] + size[1] > m_height)
-    return std::unexpected(ImageException(strf("call to subImage with pos {} size {} out of image bounds ({}, {})", pos, size, m_width, m_height)));
+    return std::unexpected(ImageException(Star::format("call to subImage with pos {} size {} out of image bounds ({}, {})", pos, size, m_width, m_height)));
 
   Image sub(size[0], size[1], m_pixelFormat);
 
@@ -501,7 +501,7 @@ std::expected<Image, StarException> Image::subImage(Vec2U const& pos, Vec2U cons
 }
 
 std::expected<void, StarException> Image::copyInto(Vec2U const& min, Image const& image) {
-  Vec2U max = (min + image.size()).piecewiseMin(size());
+  Vec2U max = (min + image.size()).piecewise_min(size());
 
   for (unsigned y = min[1]; y < max[1]; ++y) {
     for (unsigned x = min[0]; x < max[0]; ++x) {
@@ -517,7 +517,7 @@ std::expected<void, StarException> Image::copyInto(Vec2U const& min, Image const
 }
 
 std::expected<void, StarException> Image::drawInto(Vec2U const& min, Image const& image) {
-  Vec2U max = (min + image.size()).piecewiseMin(size());
+  Vec2U max = (min + image.size()).piecewise_min(size());
 
   for (unsigned y = min[1]; y < max[1]; ++y) {
     for (unsigned x = min[0]; x < max[0]; ++x) {

@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.format;
 import star.output_proxy;
@@ -13,16 +14,18 @@ using namespace Star;
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    coutf("Error! Caught exception {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print("Error! Caught exception {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto run = [&]() -> std::expected<int, StarException> {
     if (argc != 3) {
-      coutf("Usage, {} <versioned_json_json> <versioned_json_binary>\n", argv[0]);
+      if (auto written = Star::print("Usage, {} <versioned_json_json> <versioned_json_binary>\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
       return -1;
     }
 
-    auto text = File::readFileString(String(std::string_view(argv[1])));
+    auto text = File::read_file_string(String(std::string_view(argv[1])));
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto json = Json::parse(*text);
@@ -31,14 +34,15 @@ int main(int argc, char** argv) {
     auto versionedJson = VersionedJson::fromJson(*json);
     if (!versionedJson)
       return std::unexpected(std::move(versionedJson.error()));
-    auto written = VersionedJson::writeFile(*versionedJson, String(std::string_view(argv[2])));
+    auto written = VersionedJson::write_file(*versionedJson, String(std::string_view(argv[2])));
     if (!written)
       return std::unexpected(std::move(written.error()));
     return 0;
   };
   auto result = run();
   if (!result) {
-    coutf("Error! Caught exception {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print("Error! Caught exception {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

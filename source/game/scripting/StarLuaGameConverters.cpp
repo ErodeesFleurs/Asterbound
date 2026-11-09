@@ -94,25 +94,16 @@ template <typename Enum>
 [[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> enumName(std::expected<EnumMap<Enum>, StarException> const& names, Enum value) {
   if (!names)
     return std::unexpected(names.error());
-  return names->getRight(value);
+  return names->get_right(value);
 }
 
 template <typename Enum>
 [[nodiscard]] std::expected<std::optional<Enum>, StarException> enumValue(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
   if (!names)
     return std::unexpected(names.error());
-  return names->maybeLeft(value);
+  return names->maybe_left(value);
 }
 
-template <typename Enum>
-[[nodiscard]] std::expected<Enum, StarException> requiredEnum(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
-  if (!names)
-    return std::unexpected(names.error());
-  auto result = names->getLeft(value);
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return result->get();
-}
 
 }
 
@@ -136,12 +127,12 @@ std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack st
 std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
     auto string = v.toString();
-    auto swap = string.equalsIgnoreCase("swap");
+    auto swap = string.equals_ignore_case("swap");
     if (!swap)
       return std::unexpected(std::move(swap.error()));
     if (*swap)
       return InventorySlot(SwapSlot());
-    auto trash = string.equalsIgnoreCase("trash");
+    auto trash = string.equals_ignore_case("trash");
     if (!trash)
       return std::unexpected(std::move(trash.error()));
     if (*trash)
@@ -159,33 +150,33 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
       return std::unexpected(std::move(read.error()));
     if (!*read)
       return std::nullopt;
-    return InventorySlot(BagSlot(std::move(name), (std::uint8_t)index));
+    return InventorySlot(BagSlot(std::move(name), static_cast<std::uint8_t>(index)));
   }
   return std::nullopt;
 }
 
 std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack stack, CollisionKind k) {
-  auto name = enumName(CollisionKindNames, k);
+  auto name = Star::enumName<CollisionKindNames>(k);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return stack.push(name->get());
+  return stack.push(*name);
 }
 
 std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
-  if (v.is<LuaString>())
-    return enumValue(CollisionKindNames, v.toString());
+  if (v.is<LuaString>()) {
+    auto name = v.toString();
+    return maybeEnumValue<CollisionKindNames>(name);
+  }
   return std::nullopt;
 }
 
 std::expected<void, StarException> LuaConverter<CollisionSet>::from(LuaStack stack, CollisionSet const& s) {
-  if (!CollisionKindNames)
-    return std::unexpected(CollisionKindNames.error());
-  auto created = stack.createTable(static_cast<int>(CollisionKindNames->size()), 0);
+  auto created = stack.createTable(static_cast<int>(CollisionKindNames.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
   int i = 1;
-  for (auto const& value : *CollisionKindNames) {
+  for (auto const& value : CollisionKindNames) {
     if (s.contains(value.first)) {
       auto result = table.set(i++, value.second);
       if (!result)
@@ -284,7 +275,7 @@ template <> struct LuaUserDataMethods<LuaPathFinder> {
 std::expected<void, StarException>
 LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::from(LuaStack stack,
                                                                  std::shared_ptr<PlatformerAStar::PathFinder> finder) {
-  return stack.pushUserData(LuaPathFinder{std::move(finder), stack.engine().promiseLifetime()});
+  return stack.pushUserData(LuaPathFinder{.finder = std::move(finder), .lifetime = stack.engine().promiseLifetime()});
 }
 
 std::expected<std::optional<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException>
@@ -487,7 +478,7 @@ std::expected<void, StarException> LuaConverter<EphemeralStatusEffect>::from(Lua
 std::expected<std::optional<EphemeralStatusEffect>, StarException>
 LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
   if (v.is<LuaString>())
-    return EphemeralStatusEffect{UniqueStatusEffect(v.toString()), {}};
+    return EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect(v.toString()), .duration = {}};
   if (!v.is<LuaTable>())
     return std::nullopt;
   auto const& table = v;
@@ -503,7 +494,7 @@ LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
       return std::unexpected(std::move(duration.error()));
   }
   if (*effect && *duration)
-    return EphemeralStatusEffect{std::move(**effect), std::move(**duration)};
+    return EphemeralStatusEffect{.uniqueEffect = std::move(**effect), .duration = std::move(**duration)};
   return std::nullopt;
 }
 
@@ -747,10 +738,10 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
 }
 
 std::expected<void, StarException> LuaConverter<Collection>::from(LuaStack stack, Collection const& c) {
-  auto type = enumName(CollectionTypeNames, c.type);
+  auto type = Star::enumName<CollectionTypeNames>(c.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  return makeTable(stack, "name", c.name, "type", type->get(), "title", c.title);
+  return makeTable(stack, "name", c.name, "type", *type, "title", c.title);
 }
 
 std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>::to(LuaStackValue v) {
@@ -763,7 +754,7 @@ std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = enumValue(CollectionTypeNames, type);
+  auto converted = maybeEnumValue<CollectionTypeNames>(type);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
@@ -880,22 +871,27 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       return std::unexpected(StarException("Use of expired blackboard"));
     return locked->set(type, key, value);
   };
-  auto getMethod = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>("get",
-    [get](std::weak_ptr<Blackboard> const& board, String const& type, String const& key) -> std::expected<LuaValue, StarException> {
-      auto converted = requiredEnum(NodeParameterTypeNames, type);
+  auto getMethod = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
+    "get",
+    [get](std::weak_ptr<Blackboard> const& board, String const& type,
+          String const& key) -> std::expected<LuaValue, StarException> {
+      auto converted = Star::enumValue<NodeParameterTypeNames>(type);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       return get(board, *converted, key);
     });
   if (!getMethod)
     return std::unexpected(std::move(getMethod.error()));
-  auto setMethod = methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>("set",
-    [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key, LuaValue const& value) -> std::expected<void, StarException> {
-      auto converted = requiredEnum(NodeParameterTypeNames, type);
-      if (!converted)
-        return std::unexpected(std::move(converted.error()));
-      return set(board, *converted, key, value);
-    });
+  auto setMethod =
+    methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>(
+      "set",
+      [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key,
+            LuaValue const& value) -> std::expected<void, StarException> {
+        auto converted = Star::enumValue<NodeParameterTypeNames>(type);
+        if (!converted)
+          return std::unexpected(std::move(converted.error()));
+        return set(board, *converted, key, value);
+      });
   if (!setMethod)
     return std::unexpected(std::move(setMethod.error()));
   static constexpr std::array<std::tuple<std::string_view, std::string_view, NodeParameterType>, 8> typedMethods{{

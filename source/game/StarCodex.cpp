@@ -46,7 +46,7 @@ std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& c
     auto text = page.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    result->m_pages.append(std::move(*text));
+    result->m_pages.push_back(std::move(*text));
   }
   auto itemConfig = config.get("itemConfig", Json());
   if (!itemConfig)

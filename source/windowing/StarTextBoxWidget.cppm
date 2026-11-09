@@ -62,7 +62,7 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<TextBoxWidget>, StarException> create(GuiContext& context, String const& startingText, String const& hint, WidgetCallbackFunc callback);
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 
   String const& getText() const;
   [[nodiscard]] std::expected<bool, StarException> setText(String const& text, bool callback = true, bool moveCursor = true);
@@ -106,17 +106,17 @@ public:
   void setTextAlign(HorizontalAnchor hAnchor);
   [[nodiscard]] std::expected<int, StarException> getCursorDrawOffset() const;
 
-  [[nodiscard]] virtual std::expected<void, StarException> mouseOver() override;
-  [[nodiscard]] virtual std::expected<void, StarException> mouseOut() override;
-  [[nodiscard]] virtual std::expected<void, StarException> mouseReturnStillDown() override;
+  [[nodiscard]] std::expected<void, StarException> mouseOver() override;
+  [[nodiscard]] std::expected<void, StarException> mouseOut() override;
+  [[nodiscard]] std::expected<void, StarException> mouseReturnStillDown() override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> blur() override;
+  [[nodiscard]] std::expected<void, StarException> blur() override;
 
-  [[nodiscard]] virtual std::expected<KeyboardCaptureMode, StarException> keyboardCaptureMode() const override;
-  [[nodiscard]] virtual std::expected<std::optional<std::pair<RectI, int>>, StarException> keyboardCaptureArea() const override;
+  [[nodiscard]] std::expected<KeyboardCaptureMode, StarException> keyboardCaptureMode() const override;
+  [[nodiscard]] std::expected<std::optional<std::pair<RectI, int>>, StarException> keyboardCaptureArea() const override;
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> renderImpl() override;
+  [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
 private:
   TextBoxWidget(GuiContext& context, String const& startingText, String const& hint, WidgetCallbackFunc callback);

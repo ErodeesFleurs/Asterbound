@@ -14,7 +14,7 @@ namespace Star {
 template <typename DataT, std::size_t Dimension, std::size_t Order, class PointT = Vector<DataT, Dimension>>
 class Spline : public Array<PointT, Order + 1> {
 public:
-  typedef Array<PointT, Order + 1> PointData;
+  using PointData = Array<PointT, Order + 1>;
 
   template <typename... T>
   Spline(PointT const& e1, T const&... rest)
@@ -35,7 +35,7 @@ public:
       EmergencyLog::warn("Passed out of range time to Spline::pointAt");
     }
 
-    if (auto p = m_pointCache.maybeRef(t))
+    if (auto p = m_pointCache.find_ref(t))
       return p->get();
 
     PointData intermediates(*this);
@@ -73,7 +73,7 @@ public:
     }
 
     if (!begin) {
-      if (auto p = m_lengthCache.maybeRef(end))
+      if (auto p = m_lengthCache.find_ref(end))
         return p->get();
     }
 
@@ -153,8 +153,7 @@ protected:
   mutable LruCache<float, DataT> m_lengthCache;
 };
 
-typedef Spline<float, 2, 3, Vec2F> CSplineF;
-
+using CSplineF = Spline<float, 2, 3, Vec2F>;
 }
 
 export module star.spline;

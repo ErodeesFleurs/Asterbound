@@ -6,6 +6,7 @@ import star.lexical_cast;
 import star.unicode;
 
 import star.formatted_json;
+import star.text_formatter;
 import star.json_path;
 
 #include "gtest/gtest.h"
@@ -136,7 +137,7 @@ List<String> keyOrder(FormattedJson const& json) {
   List<String> keys;
   for (JsonElement const& elem : json.elements()) {
     if (std::holds_alternative<ObjectKeyElement>(elem))
-      keys.append(std::get<ObjectKeyElement>(elem).key);
+      keys.push_back(std::get<ObjectKeyElement>(elem).key);
   }
   return keys;
 }
@@ -152,7 +153,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result23 = json.set("foo", (*result201));
   ASSERT_TRUE(result23);
   json = (*result23);
-  expectedKeys.append("foo");
+  expectedKeys.push_back("foo");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result202 = FormattedJson::create(Json{"..."});
@@ -160,7 +161,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result24 = json.set("baz", (*result202));
   ASSERT_TRUE(result24);
   json = (*result24);
-  expectedKeys.append("baz");
+  expectedKeys.push_back("baz");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result203 = FormattedJson::create(Json{"world"});
@@ -168,7 +169,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result25 = json.prepend("hello", (*result203));
   ASSERT_TRUE(result25);
   json = (*result25);
-  expectedKeys.insertAt(0, "hello");
+  expectedKeys.insert_at(0, "hello");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result204 = FormattedJson::create(Json{"alal"});
@@ -176,7 +177,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result26 = json.insertBefore("lala", (*result204), "foo");
   ASSERT_TRUE(result26);
   json = (*result26);
-  expectedKeys.insertAt(1, "lala");
+  expectedKeys.insert_at(1, "lala");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result205 = FormattedJson::create(Json{"ipsum"});
@@ -184,7 +185,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result27 = json.insertAfter("lorem", (*result205), "foo");
   ASSERT_TRUE(result27);
   json = (*result27);
-  expectedKeys.insertAt(3, "lorem");
+  expectedKeys.insert_at(3, "lorem");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   auto result206 = FormattedJson::create(Json{"sit amet"});
@@ -192,7 +193,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   auto result28 = json.append("dolor", (*result206));
   ASSERT_TRUE(result28);
   json = (*result28);
-  expectedKeys.append("dolor");
+  expectedKeys.push_back("dolor");
   EXPECT_EQ(keyOrder(json), expectedKeys);
 
   // If the key already exists, the key order doesn't change.
@@ -761,7 +762,7 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
       if (object)
         entries[String(key)] = Json(i);
       else
-        array.append(Json(i));
+        array.push_back(Json(i));
     }
     original += object ? '}' : ']';
     changed += object ? '}' : ']';
@@ -861,6 +862,24 @@ TEST(FormattedJsonTest, DuplicateTokensKeepLastSemanticValueAndRebuildIndex) {
   EXPECT_EQ(*originalText, original);
 }
 
+TEST(FormattedJsonTest, UnicodeEscapesRejectInvalidDigitsInKeysAndValues) {
+  for (std::string_view text : {R"({"key":"\uGGGG"})", R"({"key":"\u12g4"})",
+           R"({"\uG123":17})", R"({"\u1G23":17})", R"({"\u12G3":17})", R"({"\u123G":17})",
+           R"({"key":"\uD83D\uDE0g"})", R"({"key":"\u123"})"}) {
+    auto parsed = FormattedJson::parse(String(text));
+    EXPECT_FALSE(parsed) << text;
+  }
+  auto valid = FormattedJson::parse(R"({ "\u006bey": ["\u0000", "\uD83D\uDE00", "\u00aF"] })");
+  ASSERT_TRUE(valid);
+  EXPECT_EQ(valid->toJson(),
+      (Json(JsonObject{{"key", JsonArray{String(std::string_view("\0", 1)), "😀", "¯"}}})));
+  auto output = valid->repr();
+  ASSERT_TRUE(output);
+  auto reparsed = FormattedJson::parse(*output);
+  ASSERT_TRUE(reparsed);
+  EXPECT_EQ(reparsed->toJson(), valid->toJson());
+}
+
 TEST(FormattedJsonTest, NestedUnicodeTriviaAndNumberSpellingSurviveRebuild) {
   String original = "{ /* 日本語 🌟 */ \"値\": [ -0.00e+0, \"café🚀\" ] // end\n}";
   auto parsed = FormattedJson::parse(original);
@@ -940,7 +959,7 @@ TEST(FormattedJsonTest, Utf8WriterPreservesKeyQuirksAndValueNuls) {
   EXPECT_EQ(*value, text);
 }
 
-TEST(FormattedJsonTest, UnicodeAndOutputFailuresKeepTheirFirstError) {
+TEST(FormattedJsonTest, UnicodeFailuresKeepTheirFirstError) {
   std::string invalidKey = "key";
   invalidKey.push_back('\0');
   invalidKey.push_back(static_cast<char>(0xff));
@@ -956,18 +975,14 @@ TEST(FormattedJsonTest, UnicodeAndOutputFailuresKeepTheirFirstError) {
   EXPECT_TRUE(parsed.error().is<JsonParsingException>());
   EXPECT_FALSE(parsed.error().is<UnicodeException>());
 
-  auto valid = FormattedJson::parse("[1]");
-  ASSERT_TRUE(valid);
-  std::ostream failed(nullptr);
-  auto outputFailure = Star::operator<<(failed, *valid);
-  ASSERT_FALSE(outputFailure);
-  EXPECT_TRUE(outputFailure.error().is<JsonException>());
-
   auto invalidScalar = FormattedJson::create(Json(String(std::string(1, static_cast<char>(0xff)))));
   ASSERT_TRUE(invalidScalar);
-  auto earlierFailure = Star::operator<<(failed, *invalidScalar);
+  TextBuffer output;
+  output.append("unchanged");
+  auto earlierFailure = write_text(output, *invalidScalar);
   ASSERT_FALSE(earlierFailure);
   EXPECT_TRUE(earlierFailure.error().is<UnicodeException>());
+  EXPECT_EQ(output.view(), "unchanged");
 }
 
 TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
@@ -976,7 +991,7 @@ TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
        List<String>{"-0", "1.00", "6.25e2", "{ /* 日本語 🌟 */ \"dup\":1, \"dup\":2 }", "[\r\n  3,\r\n  4\r\n]"}) {
     auto parsed = FormattedJson::parse(text);
     ASSERT_TRUE(parsed);
-    values.append(std::move(*parsed));
+    values.push_back(std::move(*parsed));
   }
   auto empty = FormattedJson::createArray({});
   ASSERT_TRUE(empty);
@@ -1022,10 +1037,10 @@ TEST(FormattedJsonTest, BatchArrayUnicodeFailureDoesNotWritePartialOutput) {
   List<FormattedJson> values{*valid, *invalid};
   auto batch = FormattedJson::createArray(values);
   ASSERT_TRUE(batch);
-  std::ostringstream output;
-  output << "unchanged";
-  auto written = Star::operator<<(output, *batch);
+  TextBuffer output;
+  output.append("unchanged");
+  auto written = write_text(output, *batch);
   ASSERT_FALSE(written);
   EXPECT_TRUE(written.error().is<UnicodeException>());
-  EXPECT_EQ(output.str(), "unchanged");
+  EXPECT_EQ(output.view(), "unchanged");
 }

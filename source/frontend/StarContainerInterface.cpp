@@ -211,15 +211,15 @@ std::expected<std::shared_ptr<ContainerPane>, StarException> ContainerPane::crea
   auto base = pane->initializePane();
   if (!base)
     return std::unexpected(std::move(base.error()));
-  auto initialized = pane->initialize(worldClient, std::move(player), std::move(containerInteractor));
+  auto initialized = pane->initialize(std::move(worldClient), std::move(player), std::move(containerInteractor));
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   return pane;
 }
 
 std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, std::shared_ptr<ContainerInteractor> containerInteractor) {
-  m_worldClient = worldClient;
-  m_player = player;
+  m_worldClient = std::move(worldClient);
+  m_player = std::move(player);
   m_containerInteractor = std::move(containerInteractor);
 
   auto container = m_containerInteractor->openContainer();
@@ -478,7 +478,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
       return std::unexpected(std::move(fetchChildResult263.error()));
     if (auto countWidget = std::move(*fetchChildResult263))
       {
-        auto replaceResult264 = countWidget->text().replace("<slots>", toString(container->containerSize()));
+        auto replaceResult264 = countWidget->text().replace("<slots>", Star::to_string(container->containerSize()));
         if (!replaceResult264)
           return std::unexpected(std::move(replaceResult264.error()));
         auto setTextResult265 = countWidget->setText(std::move(*replaceResult264));

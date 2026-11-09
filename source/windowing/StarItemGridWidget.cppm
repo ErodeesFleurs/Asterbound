@@ -113,7 +113,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> setBackingImageAffinity(bool full, bool empty);
   [[nodiscard]] std::expected<void, StarException> showDurability(bool show);
 
-  virtual RectI getScissorRect() const override;
+  RectI getScissorRect() const override;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;

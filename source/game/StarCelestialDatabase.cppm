@@ -205,7 +205,8 @@ protected:
   static std::optional<CelestialOrbitRegion> orbitRegion(
       List<CelestialOrbitRegion> const& orbitRegions, int planetaryOrbitNumber);
 
-  typedef std::function<std::expected<void, StarException>(std::function<std::expected<void, StarException>()>&&)>&& UnlockDuringFunction;
+  using UnlockDuringFunction =
+    std::function<std::expected<void, StarException>(std::function<std::expected<void, StarException>()>&&)>&&;
   [[nodiscard]] std::expected<std::reference_wrapper<CelestialChunk const>, StarException> getChunk(Vec2I const& chunkLocation, UnlockDuringFunction unlockDuring = {});
 
   [[nodiscard]] std::expected<CelestialChunk, StarException> produceChunk(Vec2I const& chunkLocation) const;

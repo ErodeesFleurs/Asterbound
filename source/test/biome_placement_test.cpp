@@ -50,12 +50,12 @@ const GameTestRegistration storageRoundTrip("BiomePlacement", "ConfigAndStorageP
       ASSERT_TRUE(stored) << stored.error().what();
       auto canonicalMode = stored->getString("mode");
       ASSERT_TRUE(canonicalMode) << canonicalMode.error().what();
-      auto loweredMode = String(mode).toLower();
+      auto loweredMode = String(mode).to_lower();
       ASSERT_TRUE(loweredMode) << loweredMode.error().what();
       EXPECT_EQ(*canonicalMode, *loweredMode);
       auto canonicalType = stored->getString("distribution");
       ASSERT_TRUE(canonicalType) << canonicalType.error().what();
-      auto loweredType = String(type).toLower();
+      auto loweredType = String(type).to_lower();
       ASSERT_TRUE(loweredType) << loweredType.error().what();
       EXPECT_EQ(*canonicalType, *loweredType);
       auto repeated = BiomeItemDistribution::create(fixture.root(), config, seed);

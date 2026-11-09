@@ -96,7 +96,7 @@ std::expected<ShipUpgrades, StarException> ShipUpgrades::create(Json config) {
   auto capabilities = jsonToStringList(*capabilitiesJson);
   if (!capabilities)
     return std::unexpected(std::move(capabilities.error()));
-  result.capabilities.addAll(*capabilities);
+  result.capabilities.insert_range(*capabilities);
   return result;
 }
 
@@ -104,7 +104,7 @@ Json ShipUpgrades::toJson() const {
   JsonArray capabilitiesJson;
   capabilitiesJson.reserve(capabilities.size());
   for (auto const& capability : capabilities)
-    capabilitiesJson.append(capability);
+    capabilitiesJson.push_back(capability);
   return JsonObject{{"shipLevel", shipLevel},
       {"maxFuel", maxFuel},
       {"crewSize", crewSize},
@@ -117,7 +117,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
   auto level = upgrades.optUInt("shipLevel");
   if (!level)
     return std::unexpected(std::move(level.error()));
-  shipLevel = std::max(shipLevel, (unsigned)level->value_or(shipLevel));
+  shipLevel = std::max(shipLevel, static_cast<unsigned>(level->value_or(shipLevel)));
   auto fuel = upgrades.optUInt("maxFuel");
   if (!fuel)
     return std::unexpected(std::move(fuel.error()));
@@ -125,7 +125,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
   auto crew = upgrades.optUInt("crewSize");
   if (!crew)
     return std::unexpected(std::move(crew.error()));
-  crewSize = std::max(crewSize, (unsigned)crew->value_or(crewSize));
+  crewSize = std::max(crewSize, static_cast<unsigned>(crew->value_or(crewSize)));
   auto efficiency = upgrades.optFloat("fuelEfficiency");
   if (!efficiency)
     return std::unexpected(std::move(efficiency.error()));
@@ -144,7 +144,7 @@ std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades:
     auto additional = jsonToStringList(*json);
     if (!additional)
       return std::unexpected(std::move(additional.error()));
-    capabilities.addAll(*additional);
+    capabilities.insert_range(*additional);
   }
   return std::ref(*this);
 }

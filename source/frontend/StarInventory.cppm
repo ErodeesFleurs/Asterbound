@@ -103,7 +103,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> clearChangedSlots();
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 
   [[nodiscard]] std::expected<void, StarException> selectTab(String const& selected);
 

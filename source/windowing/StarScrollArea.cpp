@@ -269,9 +269,9 @@ std::expected<float, StarException> ScrollBar::sizeRatio() const {
     if (!scrollArea)
       return std::unexpected(GuiException("Scroll bar has a non-scroll-area parent"));
     if (m_direction == GuiDirection::Vertical) {
-      return scrollArea->get().contentSize()[1] / (float)(scrollArea->get().areaSize()[1]);
+      return scrollArea->get().contentSize()[1] / static_cast<float>(scrollArea->get().areaSize()[1]);
     } else {
-      return scrollArea->get().contentSize()[0] / (float)(scrollArea->get().areaSize()[0]);
+      return scrollArea->get().contentSize()[0] / static_cast<float>(scrollArea->get().areaSize()[0]);
     }
   }
 
@@ -286,11 +286,11 @@ std::expected<float, StarException> ScrollBar::scrollRatio() const {
     if (m_direction == GuiDirection::Vertical) {
       if (scrollArea->get().maxScrollPosition()[1] == 0)
         return 0;
-      return scrollArea->get().scrollOffset()[1] / (float)(scrollArea->get().maxScrollPosition()[1]);
+      return scrollArea->get().scrollOffset()[1] / static_cast<float>(scrollArea->get().maxScrollPosition()[1]);
     } else {
       if (scrollArea->get().maxScrollPosition()[0] == 0)
         return 0;
-      return scrollArea->get().scrollOffset()[0] / (float)(scrollArea->get().maxScrollPosition()[0]);
+      return scrollArea->get().scrollOffset()[0] / static_cast<float>(scrollArea->get().maxScrollPosition()[0]);
     }
   }
   return 0;
@@ -370,12 +370,12 @@ std::expected<Vec2I, StarException> ScrollBar::offsetFromThumbPosition(Vec2I con
   if (m_direction == GuiDirection::Vertical) {
     int scrollSpan = *track - m_thumb->size()[1];
     int scrollOffset = clamp((thumbPosition[1] - ScrollButtonStackSize), 0, scrollSpan);
-    float scrollRatio = (float)scrollOffset / (float)scrollSpan;
+    float scrollRatio = static_cast<float>(scrollOffset) / static_cast<float>(scrollSpan);
     return Vec2I{scrollArea->get().scrollOffset()[0], static_cast<int>(std::ceil(scrollArea->get().maxScrollPosition()[1] * scrollRatio))};
   } else {
     int scrollSpan = *track - m_thumb->size()[0];
     int scrollOffset = clamp((thumbPosition[0] - ScrollButtonStackSize), 0, scrollSpan);
-    float scrollRatio = (float)scrollOffset / (float)scrollSpan;
+    float scrollRatio = static_cast<float>(scrollOffset) / static_cast<float>(scrollSpan);
     return Vec2I{static_cast<int>(std::ceil(scrollArea->get().maxScrollPosition()[0] * scrollRatio)), scrollArea->get().scrollOffset()[1]};
   }
 }
@@ -587,14 +587,12 @@ std::expected<void, StarException> ScrollArea::update(float dt) {
   if (m_verticalScroll && maxScroll != m_lastMaxScroll)
     m_scrollOffset += (maxScroll - m_lastMaxScroll);
 
-  m_scrollOffset = m_scrollOffset.piecewiseClamp(Vec2I(), maxScroll);
+  m_scrollOffset = m_scrollOffset.piecewise_clamp(Vec2I(), maxScroll);
   m_lastMaxScroll = maxScroll;
   return {};
 }
 
-Vec2I ScrollArea::maxScrollPosition() const {
-  return Vec2I().piecewiseMax(contentSize() - size());
-}
+Vec2I ScrollArea::maxScrollPosition() const { return Vec2I().piecewise_max(contentSize() - size()); }
 
 std::expected<void, StarException> ScrollArea::drawChildren() {
   RectI innerDrawingArea = m_drawingArea;
@@ -639,7 +637,7 @@ int ScrollArea::advanceFactorHelper() {
   m_advanceLimiter = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   if ((t > ScrollAdvanceTimer) || (t < std::chrono::milliseconds::zero()))
     t = ScrollAdvanceTimer;
-  return (int)std::ceil((m_buttonAdvance * t.count()) / (float)ScrollAdvanceTimer.count());
+  return static_cast<int>(std::ceil((m_buttonAdvance * t.count()) / static_cast<float>(ScrollAdvanceTimer.count())));
 }
 
 void ScrollArea::setUpdatesChildren(bool slop) {

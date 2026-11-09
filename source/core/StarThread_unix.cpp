@@ -35,12 +35,12 @@ struct ThreadImpl {
     auto& state = *static_cast<ThreadImpl*>(data);
 #ifdef STAR_SYSTEM_MACOS
     char tname[MaxThreadNameLength];
-    std::snprintf(tname, sizeof(tname), "%s", state.name.utf8Ptr());
+    std::snprintf(tname, sizeof(tname), "%s", state.name.utf8_data());
     pthread_setname_np(tname);
 #endif
     auto result = state.function();
     if (!result)
-      EmergencyLog::error("Thread {} failed: {}", state.name, outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Thread {} failed: {}", state.name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
     state.stopped = true;
     return nullptr;
   }
@@ -59,12 +59,12 @@ struct ThreadImpl {
     if (ret != 0) {
       stopped = true;
       joined = true;
-      return std::unexpected(StarException(strf("Failed to create thread, error {}", ret)));
+      return std::unexpected(StarException(Star::format("Failed to create thread, error {}", ret)));
     }
 
     // ensure the name is under the max allowed
     char tname[MaxThreadNameLength];
-    std::snprintf(tname, sizeof(tname), "%s", name.utf8Ptr());
+    std::snprintf(tname, sizeof(tname), "%s", name.utf8_data());
 
 #ifdef STAR_SYSTEM_FREEBSD
     pthread_set_name_np(pthread, tname);
@@ -82,7 +82,7 @@ struct ThreadImpl {
       return false;
     int ret = pthread_join(pthread, NULL);
     if (ret != 0)
-      return std::unexpected(StarException(strf("Failed to join thread, error {}", ret)));
+      return std::unexpected(StarException(Star::format("Failed to join thread, error {}", ret)));
     joined = true;
     return true;
   }
@@ -122,7 +122,7 @@ void lockWithDiagnostics(std::unique_lock<std::recursive_mutex>& lock) {
     lock = std::unique_lock<std::recursive_mutex>(mutex, std::adopt_lock);
     return;
   }
-  printStack("Recursive mutex lock is taking too long");
+  Star::print_stack("Recursive mutex lock is taking too long");
 #endif
   lock.lock();
 }
@@ -153,7 +153,7 @@ Thread::Thread(Thread&&) = default;
 Thread::~Thread() {
   if (m_impl && !isJoined()) {
     EmergencyLog::error("Thread {} destroyed without joining", name());
-    fatalError("Cannot destroy an unjoined thread", false);
+    Star::fatal_error("Cannot destroy an unjoined thread", false);
   }
 }
 
@@ -161,7 +161,7 @@ Thread& Thread::operator=(Thread&& other) {
   if (this != &other) {
     if (m_impl && !isJoined()) {
       EmergencyLog::error("Thread {} overwritten without joining", name());
-      fatalError("Cannot overwrite an unjoined thread", false);
+      Star::fatal_error("Cannot overwrite an unjoined thread", false);
     }
     m_impl = std::move(other.m_impl);
   }
@@ -205,18 +205,18 @@ std::expected<ThreadFunction<void>, StarException> ThreadFunction<void>::create(
 ThreadFunction<void>::~ThreadFunction() {
   auto result = finish();
   if (!result)
-    EmergencyLog::error("Thread function {} failed during destruction: {}", name(), outputException(ExceptionDiagnostic(result.error()), true));
+    EmergencyLog::error("Thread function {} failed during destruction: {}", name(), Star::output_exception(ExceptionDiagnostic(result.error()), true));
   if (!isFinished())
-    fatalError("Cannot destroy an unjoined thread function", false);
+    Star::fatal_error("Cannot destroy an unjoined thread function", false);
 }
 
 ThreadFunction<void>& ThreadFunction<void>::operator=(ThreadFunction&& other) {
   if (this != &other) {
     auto result = finish();
     if (!result)
-      EmergencyLog::error("Thread function {} failed during reassignment: {}", name(), outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Thread function {} failed during reassignment: {}", name(), Star::output_exception(ExceptionDiagnostic(result.error()), true));
     if (!isFinished())
-      fatalError("Cannot overwrite an unjoined thread function", false);
+      Star::fatal_error("Cannot overwrite an unjoined thread function", false);
     m_impl = std::move(other.m_impl);
   }
   return *this;

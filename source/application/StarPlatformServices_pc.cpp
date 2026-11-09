@@ -76,7 +76,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
 
   bool steamFlatpakInstalled = false;
 
-  auto flatpakDirectory = File::isDirectory("/var/lib/flatpak/app/com.valvesoftware.Steam");
+  auto flatpakDirectory = File::is_directory("/var/lib/flatpak/app/com.valvesoftware.Steam");
   if (!flatpakDirectory)
     return std::unexpected(std::move(flatpakDirectory.error()));
   if (*flatpakDirectory) {
@@ -85,11 +85,11 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
     steamFlatpakInstalled = true;
   }
 
-  auto steamRoot = String::joinWith("", String(std::string_view(std::getenv("HOME"))), "/.steam");
+  auto steamRoot = String::join_with("", String(std::string_view(std::getenv("HOME"))), "/.steam");
   if (!steamRoot)
     return std::unexpected(std::move(steamRoot.error()));
   String steamRootPath = std::move(*steamRoot);
-  auto steamDirectory = File::isDirectory(steamRootPath);
+  auto steamDirectory = File::is_directory(steamRootPath);
   if (!steamDirectory)
     return std::unexpected(std::move(steamDirectory.error()));
   if (!*steamDirectory) {
@@ -105,7 +105,7 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
     // and normal.
     if (steamFlatpakInstalled) {
       // Check if ~/.steam points to a flatpak installation
-      auto steamAbsRootPath = File::fullPath(steamRootPath);
+      auto steamAbsRootPath = File::full_path(steamRootPath);
       if (!steamAbsRootPath)
         return std::unexpected(std::move(steamAbsRootPath.error()));
       auto isFlatpak = steamAbsRootPath->contains("com.valvesoftware.Steam");
@@ -277,7 +277,7 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
   if (provideP2PNetworking) {
     auto p2pNetworkingService = std::make_shared<PcP2PNetworkingService>(services->m_state);
     for (auto& argument : platformArguments) {
-      auto connectArgument = argument.beginsWith("+platform:connect:");
+      auto connectArgument = argument.starts_with("+platform:connect:");
       if (!connectArgument)
         return std::unexpected(std::move(connectArgument.error()));
       if (*connectArgument) {
@@ -310,7 +310,7 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
   if (services->m_state->discordAvailable) {
     if (auto logged = logger.debug("Registering Starbound to Discord at path: {}", path); !logged)
       return std::unexpected(std::move(logged.error()));
-    auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8Ptr());
+    auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8_data());
     if (registered != discord::Result::Ok)
       return std::unexpected(ApplicationException::format("Could not register Discord launch command (err {})", (int)registered));
   }

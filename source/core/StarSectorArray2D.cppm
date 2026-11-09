@@ -19,8 +19,8 @@ namespace Star {
 template <typename ElementT, std::size_t SectorSize>
 class SectorArray2D {
 public:
-  typedef ElementT Element;
-  typedef Vec2S Sector;
+  using Element = ElementT;
+  using Sector = Vec2S;
 
   struct SectorRange {
     // Lower left sector
@@ -39,7 +39,7 @@ public:
     Element elements[SectorSize * SectorSize];
   };
 
-  typedef MultiArray<Element, 2> DynamicArray;
+  using DynamicArray = MultiArray<Element, 2>;
 
   SectorArray2D();
   SectorArray2D(std::size_t numSectorsWide, std::size_t numSectorsHigh);
@@ -106,7 +106,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> evalColumnsParallel(WorkerPool& workers, std::size_t minX, std::size_t minY, std::size_t width, std::size_t height, Function&& function, bool evalEmpty = false);
 
 private:
-  typedef MultiArray<std::unique_ptr<Array>, 2> SectorArray;
+  using SectorArray = MultiArray<std::unique_ptr<Array>, 2>;
 
   template <typename Function>
   [[nodiscard]] std::expected<bool, StarException> evalPriv(std::size_t minX, std::size_t minY, std::size_t width, std::size_t height, Function&& function, bool evalEmpty);
@@ -132,7 +132,7 @@ SectorArray2D<ElementT, SectorSize>::Array::Array(Element const& def) {
 template <typename ElementT, std::size_t SectorSize>
 ElementT const& SectorArray2D<ElementT, SectorSize>::Array::operator()(std::size_t x, std::size_t y) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((x < SectorSize && y < SectorSize));
+    Star::star_assert_failed((x < SectorSize && y < SectorSize));
   }
   return elements[x * SectorSize + y];
 }
@@ -140,13 +140,12 @@ ElementT const& SectorArray2D<ElementT, SectorSize>::Array::operator()(std::size
 template <typename ElementT, std::size_t SectorSize>
 ElementT& SectorArray2D<ElementT, SectorSize>::Array::operator()(std::size_t x, std::size_t y) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((x < SectorSize && y < SectorSize));
+    Star::star_assert_failed((x < SectorSize && y < SectorSize));
   }
   return elements[x * SectorSize + y];
 }
 
-template <typename ElementT, std::size_t SectorSize>
-SectorArray2D<ElementT, SectorSize>::SectorArray2D() {}
+template <typename ElementT, std::size_t SectorSize> SectorArray2D<ElementT, SectorSize>::SectorArray2D() = default;
 
 template <typename ElementT, std::size_t SectorSize>
 SectorArray2D<ElementT, SectorSize>::SectorArray2D(std::size_t numSectorsWide, std::size_t numSectorsHigh) {
@@ -196,7 +195,7 @@ Vec2S SectorArray2D<ElementT, SectorSize>::sectorCorner(Sector const& id) const 
 template <typename ElementT, std::size_t SectorSize>
 bool SectorArray2D<ElementT, SectorSize>::hasSector(Sector const& id) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((id[0] < m_sectors.size(0) && id[1] < m_sectors.size(1)));
+    Star::star_assert_failed((id[0] < m_sectors.size(0) && id[1] < m_sectors.size(1)));
   }
   return (bool)m_sectors(id[0], id[1]);
 }

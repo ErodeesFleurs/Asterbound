@@ -36,9 +36,6 @@ import star.image_metadata_database;
 import star.math_common;
 namespace Star {
 
-extern std::expected<EnumMap<MaterialJoinType>, StarException> const MaterialJoinTypeNames = EnumMap<MaterialJoinType>::create({
-    {MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}});
-
 [[nodiscard]]
 std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchList(Json const& matchSpec, RuleMap const& ruleMap, PieceMap const& pieceMap, MatchMap const& matchMap) {
   MaterialRenderMatchList result;
@@ -72,13 +69,13 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
         point.position = std::move(*value);
       }
       if (std::abs(point.position[0]) > MaterialRenderProfileMaxNeighborDistance || std::abs(point.position[1]) > MaterialRenderProfileMaxNeighborDistance)
-        return std::unexpected(MaterialRenderProfileException(strf("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
+        return std::unexpected(MaterialRenderProfileException(Star::format("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
       auto name = pointConfig.getString(1);
       if (!name) return std::unexpected(std::move(name.error()));
       auto rule = ruleMap.get(*name);
       if (!rule) return std::unexpected(std::move(rule.error()));
       point.rule = rule->get();
-      match->matchPoints.append(std::move(point));
+      match->matchPoints.push_back(std::move(point));
     }
     auto pieces = config.getArray("pieces", {});
     if (!pieces) return std::unexpected(std::move(pieces.error()));
@@ -91,7 +88,7 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
       if (!positionConfig) return std::unexpected(std::move(positionConfig.error()));
       auto position = jsonToVec2F(*positionConfig);
       if (!position) return std::unexpected(std::move(position.error()));
-      match->resultingPieces.append({renderPiece->get(), *position});
+      match->resultingPieces.push_back({renderPiece->get(), *position});
     }
     auto subMatches = config.get("subMatches", {});
     if (!subMatches) return std::unexpected(std::move(subMatches.error()));
@@ -130,7 +127,7 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
       if (!value) return std::unexpected(std::move(value.error()));
       match->occlude = std::move(*value);
     }
-    result.append(std::move(match));
+    result.push_back(std::move(match));
   }
   return result;
 }
@@ -139,12 +136,12 @@ std::expected<String, StarException> MaterialRenderProfile::pieceImage(String co
   auto piece = pieces.get(pieceName);
   if (!piece) return std::unexpected(std::move(piece.error()));
   String texture = piece->get()->texture;
-  if (hueShift != MaterialHue()) texture = strf("{}?hueshift={}", texture, materialHueToDegrees(hueShift));
+  if (hueShift != MaterialHue()) texture = Star::format("{}?hueshift={}", texture, materialHueToDegrees(hueShift));
   auto variants = piece->get()->variants.get(colorVariant);
   if (!variants) return std::unexpected(std::move(variants.error()));
   auto rect = variants->get().wrap(variant);
   if (!rect) return std::unexpected(std::move(rect.error()));
-  return strf("{}?crop={};{};{};{}", texture, rect->get().xMin(), rect->get().yMin(), rect->get().xMax(), rect->get().yMax());
+  return Star::format("{}?crop={};{};{};{}", texture, rect->get().xMin(), rect->get().yMin(), rect->get().xMax(), rect->get().yMax());
 }
 
 std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarException> MaterialRenderProfile::damageImage(float damageLevel, TileDamageType damageType) const {
@@ -172,7 +169,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   profile.colorVariants = 0;
   if (*multiColored) {
     {
-      auto value = spec.getUInt("colorVariants", (std::uint64_t)MaxMaterialColorVariant + 1);
+      auto value = spec.getUInt("colorVariants", static_cast<std::uint64_t>(MaxMaterialColorVariant) + 1);
       if (!value) return std::unexpected(std::move(value.error()));
       profile.colorVariants = std::move(*value);
     }
@@ -182,7 +179,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   for (auto const& entry : *directives) {
     auto text = entry.toString();
     if (!text) return std::unexpected(std::move(text.error()));
-    profile.colorDirectives.append(Directives(*text));
+    profile.colorDirectives.push_back(Directives(*text));
   }
   {
     auto value = spec.getBool("occludesBelow", true);
@@ -210,12 +207,11 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   if (!rules) return std::unexpected(std::move(rules.error()));
   for (auto const& pair : *rules) {
     auto rule = std::make_shared<MaterialRule>();
-    if (!MaterialJoinTypeNames) return std::unexpected(MaterialJoinTypeNames.error());
     auto joinName = pair.second.getString("join", "all");
     if (!joinName) return std::unexpected(std::move(joinName.error()));
-    auto join = MaterialJoinTypeNames->getLeft(*joinName);
+    auto join = enumValue<MaterialJoinTypeNames>(*joinName);
     if (!join) return std::unexpected(std::move(join.error()));
-    rule->join = join->get();
+    rule->join = *join;
     auto entries = pair.second.getArray("entries", {});
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entryConfig : *entries) {
@@ -223,35 +219,35 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
       if (!inverse) return std::unexpected(std::move(inverse.error()));
       auto type = entryConfig.getString("type");
       if (!type) return std::unexpected(std::move(type.error()));
-      if (auto match0 = type->equalsIgnoreCase("Connects"); !match0) return std::unexpected(std::move(match0.error()));
+      if (auto match0 = type->equals_ignore_case("Connects"); !match0) return std::unexpected(std::move(match0.error()));
       else if (*match0) {
-        rule->entries.append({MaterialRule::RuleConnects(), *inverse});
+        rule->entries.push_back({MaterialRule::RuleConnects(), *inverse});
       }
-      else if (auto match1 = type->equalsIgnoreCase("Shadows"); !match1) return std::unexpected(std::move(match1.error()));
+      else if (auto match1 = type->equals_ignore_case("Shadows"); !match1) return std::unexpected(std::move(match1.error()));
       else if (*match1) {
-        rule->entries.append({MaterialRule::RuleShadows(), *inverse});
+        rule->entries.push_back({MaterialRule::RuleShadows(), *inverse});
       }
-      else if (auto match2 = type->equalsIgnoreCase("EqualsSelf"); !match2) return std::unexpected(std::move(match2.error()));
+      else if (auto match2 = type->equals_ignore_case("EqualsSelf"); !match2) return std::unexpected(std::move(match2.error()));
       else if (*match2) {
         auto matchHue = entryConfig.getBool("matchHue", false);
         if (!matchHue) return std::unexpected(std::move(matchHue.error()));
         MaterialRule::RuleEntry entry{{}, *inverse};
         entry.rule.emplace<4>(MaterialRule::RuleEqualsSelf{*matchHue});
-        rule->entries.append(std::move(entry));
+        rule->entries.push_back(std::move(entry));
       }
-      else if (auto match3 = type->equalsIgnoreCase("EqualsId"); !match3) return std::unexpected(std::move(match3.error()));
+      else if (auto match3 = type->equals_ignore_case("EqualsId"); !match3) return std::unexpected(std::move(match3.error()));
       else if (*match3) {
         auto id = entryConfig.getUInt("id");
         if (!id) return std::unexpected(std::move(id.error()));
-        rule->entries.append({MaterialRule::RuleEqualsId{(std::uint16_t)*id}, *inverse});
+        rule->entries.push_back({MaterialRule::RuleEqualsId{static_cast<std::uint16_t>(*id)}, *inverse});
       }
-      else if (auto match4 = type->equalsIgnoreCase("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
+      else if (auto match4 = type->equals_ignore_case("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
       else if (*match4) {
         auto name = entryConfig.getString("propertyName");
         if (!name) return std::unexpected(std::move(name.error()));
         auto value = entryConfig.get("propertyValue");
         if (!value) return std::unexpected(std::move(value.error()));
-        rule->entries.append({MaterialRule::RulePropertyEquals{std::move(*name), std::move(*value)}, *inverse});
+        rule->entries.push_back({MaterialRule::RulePropertyEquals{std::move(*name), std::move(*value)}, *inverse});
       }
     }
     profile.rules[pair.first] = std::move(rule);
@@ -267,7 +263,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     if (!defaultTexture) return std::unexpected(std::move(defaultTexture.error()));
     auto texture = pair.second.getString("texture", *defaultTexture);
     if (!texture) return std::unexpected(std::move(texture.error()));
-    piece->texture = AssetPath::relativeTo(relativePath, *texture);
+    piece->texture = AssetPath::relative_to(relativePath, *texture);
     auto defaultVariants = spec.getUInt("variants", 1);
     if (!defaultVariants) return std::unexpected(std::move(defaultVariants.error()));
     auto variants = pair.second.getUInt("variants", *defaultVariants);
@@ -295,10 +291,10 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     for (unsigned v = 0; v < *variants; ++v) {
       auto i = DefaultMaterialColorVariant;
       auto rect = RectF::withSize(*position + *variantStride * v, *size);
-      piece->variants[i].append(flip(rect));
+      piece->variants[i].push_back(flip(rect));
       for (MaterialColorVariant c = 0; c != profile.colorVariants; ++c) {
         auto rect = RectF::withSize(*position + *variantStride * v + *colorStride * ++i, *size);
-        piece->variants[i].append(flip(rect));
+        piece->variants[i].push_back(flip(rect));
       }
     }
     profile.pieces[pair.first] = std::move(piece);

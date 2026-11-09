@@ -128,21 +128,21 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
       return std::unexpected(std::move(movingCollisionResult.error()));
     auto movingCollision = std::move(*movingCollisionResult);
     collision.movingCollision = std::move(movingCollision);
-    collision.xPosition.set(take(collision.movingCollision.position[0]));
-    collision.yPosition.set(take(collision.movingCollision.position[1]));
+    collision.xPosition.set(std::exchange(collision.movingCollision.position[0], 0.0f));
+    collision.yPosition.set(std::exchange(collision.movingCollision.position[1], 0.0f));
     auto enabledResult = pair.second.getBool("enabled", true);
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));
     auto enabled = std::move(*enabledResult);
     collision.enabled.set(enabled);
   }
-  object->m_physicsForces.sortByKey();
+  object->m_physicsForces.sort_by_key();
   for (auto& pair : object->m_physicsForces) {
     auto operation2 = object->m_netGroup.addNetElement(pair.second.enabled);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
   }
-  object->m_physicsCollisions.sortByKey();
+  object->m_physicsCollisions.sort_by_key();
   for (auto& pair : object->m_physicsCollisions) {
     auto operation3 = object->m_netGroup.addNetElement(pair.second.xPosition);
     if (!operation3)
@@ -209,7 +209,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
   if (!initialized) {
     auto removed = m_scriptComponent.removeCallbacks("physics");
     if (!removed)
-      return std::unexpected(initialized.error().withContext(strf("Physics callback cleanup failed: {}", outputException(removed.error(), false))));
+      return std::unexpected(initialized.error().with_context(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
   m_metaBoundBox = Object::metaBoundBox();
@@ -245,7 +245,7 @@ std::expected<List<PhysicsForceRegion>, StarException> PhysicsObject::forceRegio
     if (p.second.enabled.get()) {
       PhysicsForceRegion forceRegion = p.second.forceRegion;
       std::visit([pos = position()](auto& fr) { fr.translate(pos); }, forceRegion);
-      forces.append(std::move(forceRegion));
+      forces.push_back(std::move(forceRegion));
     }
   }
   return forces;
@@ -256,7 +256,7 @@ std::size_t PhysicsObject::movingCollisionCount() const {
 }
 
 std::expected<std::optional<PhysicsMovingCollision>, StarException> PhysicsObject::movingCollision(std::size_t positionIndex) const {
-  auto config = m_physicsCollisions.valueAt(positionIndex);
+  auto config = m_physicsCollisions.value_at(positionIndex);
   if (!config)
     return std::unexpected(std::move(config.error()));
   if (!config->get().enabled.get())

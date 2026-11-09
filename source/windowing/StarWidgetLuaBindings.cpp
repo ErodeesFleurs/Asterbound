@@ -296,7 +296,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
   if (auto registered = registerCanvasMethod("drawImageRect",
                                              [](std::shared_ptr<CanvasWidget> canvas, String image, RectF texture,
                                                 RectF screen, std::optional<Color> color) {
-                                               canvas->drawImageRect(image, texture, screen,
+                                               canvas->drawImageRect(std::move(image), texture, screen,
                                                                      color.value_or(Color::White).toRgba());
                                              });
       !registered)
@@ -304,8 +304,8 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
   if (auto registered = registerCanvasMethod("drawTiledImage",
                                              [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2D offset,
                                                 RectF screen, std::optional<float> scale, std::optional<Color> color) {
-                                               canvas->drawTiledImage(image, scale.value_or(1.0f), offset, screen,
-                                                                      color.value_or(Color::White).toRgba());
+                                               canvas->drawTiledImage(std::move(image), scale.value_or(1.0f), offset,
+                                                                      screen, color.value_or(Color::White).toRgba());
                                              });
       !registered)
     return std::unexpected(std::move(registered.error()));
@@ -405,7 +405,10 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
           return withWidget<CanvasWidget>(
             parentWidget, widgetName,
             [&](std::shared_ptr<CanvasWidget> widget) -> std::expected<std::optional<LuaCanvas>, StarException> {
-              return LuaCanvas{std::move(widget), engine.promiseLifetime(), {}, parentWidget};
+              return LuaCanvas{.canvas = std::move(widget),
+                               .lifetime = engine.promiseLifetime(),
+                               .hostLifetime = {},
+                               .owner = parentWidget};
             });
         });
       !registered)
@@ -516,7 +519,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("addChild", [parentWidget, reader](String const& widgetName, Json const& config, std::optional<String> const& childName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
-      String name = childName.value_or(toString(widget->context().root().random().randu64()));
+      String name = childName.value_or(Star::to_string(widget->context().root().random().randu64()));
       auto child = reader->makeSingle(name, config);
       if (!child)
         return std::unexpected(std::move(child.error()));

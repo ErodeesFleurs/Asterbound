@@ -27,10 +27,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import std;
@@ -141,7 +141,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
   
   if (auto registration = callbacks.registerCallback("sendOwnUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     auto pair = RpcPromise<Json>::createPair();
-    auto passed = universe.passMessage({message, JsonArray::from(std::move(args)), pair.second});
+    auto passed =
+      universe.passMessage({.message = message, .args = JsonArray::from(std::move(args)), .keeper = pair.second});
     if (!passed)
       return std::unexpected(std::move(passed.error()));
     return std::move(pair.first);
@@ -155,12 +156,15 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     return universe.sendUniverseMessage(ServerConnectionId,message,JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
-  
-  if (auto registration = callbacks.registerCallback("createClientCustomWorld", [&universe](String name, Json templateData)  -> std::expected<void, StarException> {
-    return universe.createCustomWorld(name, templateData);
-  }); !registration)
-      return std::unexpected(std::move(registration.error()));
-  
+
+  if (auto registration =
+        callbacks.registerCallback("createClientCustomWorld",
+                                   [&universe](String name, Json templateData) -> std::expected<void, StarException> {
+                                     return universe.createCustomWorld(name, std::move(templateData));
+                                   });
+      !registration)
+    return std::unexpected(std::move(registration.error()));
+
   if (auto registration = callbacks.registerCallback("createClientCustomWorldFromConfig", [&root, &universe](String name, Json worldConfig)  -> std::expected<void, StarException> {
     std::uint64_t worldSeed;
     auto hasSeed = worldConfig.contains("seed");
@@ -178,7 +182,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     if (!worldType)
       return std::unexpected(std::move(worldType.error()));
     std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> worldParameters;
-    if (auto terrestrialMatch = worldType->equalsIgnoreCase("Terrestrial"); !terrestrialMatch) {
+    if (auto terrestrialMatch = worldType->equals_ignore_case("Terrestrial"); !terrestrialMatch) {
       return std::unexpected(std::move(terrestrialMatch.error()));
     } else if (*terrestrialMatch) {
       auto planetType = worldConfig.getString("planetType");
@@ -188,11 +192,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
       if (!planetSize)
         return std::unexpected(std::move(planetSize.error()));
       worldParameters = generateTerrestrialWorldParameters(root, *planetType, *planetSize, worldSeed);
-    } else if (auto asteroidMatch = worldType->equalsIgnoreCase("Asteroids"); !asteroidMatch) {
+    } else if (auto asteroidMatch = worldType->equals_ignore_case("Asteroids"); !asteroidMatch) {
       return std::unexpected(std::move(asteroidMatch.error()));
     } else if (*asteroidMatch) {
       worldParameters = generateAsteroidsWorldParameters(root, worldSeed);
-    } else if (auto dungeonMatch = worldType->equalsIgnoreCase("FloatingDungeon"); !dungeonMatch) {
+    } else if (auto dungeonMatch = worldType->equals_ignore_case("FloatingDungeon"); !dungeonMatch) {
       return std::unexpected(std::move(dungeonMatch.error()));
     } else if (*dungeonMatch) {
       auto dungeonWorld = worldConfig.getString("dungeonWorld");
@@ -215,7 +219,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     if (*beamUpRule) {
       if (!BeamUpRuleNames)
         return std::unexpected(BeamUpRuleNames.error());
-      auto rule = BeamUpRuleNames->getLeft(**beamUpRule);
+      auto rule = BeamUpRuleNames->get_left(**beamUpRule);
       if (!rule)
         return std::unexpected(std::move(rule.error()));
       (*worldParameters)->beamUpRule = rule->get();

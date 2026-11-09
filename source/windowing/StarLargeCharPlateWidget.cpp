@@ -195,11 +195,11 @@ std::expected<std::shared_ptr<LargeCharPlateWidget>, StarException> LargeCharPla
     offset = *parsedOffset;
     auto hName = config->getString(hKey, hDefault);
     if (!hName) return std::unexpected(std::move(hName.error()));
-    auto h = HorizontalAnchorNames->getLeft(*hName);
+    auto h = HorizontalAnchorNames->get_left(*hName);
     if (!h) return std::unexpected(std::move(h.error()));
     auto vName = config->getString(vKey, "bottom");
     if (!vName) return std::unexpected(std::move(vName.error()));
-    auto v = VerticalAnchorNames->getLeft(*vName);
+    auto v = VerticalAnchorNames->get_left(*vName);
     if (!v) return std::unexpected(std::move(v.error()));
     auto label = LabelWidget::create(context, std::move(text), Color::White, h->get(), v->get());
     if (!label) return std::unexpected(std::move(label.error()));
@@ -282,7 +282,7 @@ std::expected<void, StarException> LargeCharPlateWidget::setPlayer(std::shared_p
   if (!modesJson) return std::unexpected(std::move(modesJson.error()));
   auto modes = modesJson->toArray();
   if (!modes) return std::unexpected(std::move(modes.error()));
-  auto modeJson = modes->at(m_player ? 1 + (int)m_player->modeType() : 0);
+  auto modeJson = modes->at(m_player ? 1 + static_cast<int>(m_player->modeType()) : 0);
   if (!modeJson) return std::unexpected(std::move(modeJson.error()));
   auto mode = modeJson->get().toArray();
   if (!mode) return std::unexpected(std::move(mode.error()));

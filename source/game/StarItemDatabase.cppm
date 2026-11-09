@@ -272,7 +272,7 @@ private:
   std::shared_ptr<LuaRoot> m_luaRoot;
   std::shared_ptr<Rebuilder> m_rebuilder;
 
-  typedef std::tuple<ItemDescriptor, std::optional<float>, std::optional<std::uint64_t>> ItemCacheEntry;
+  using ItemCacheEntry = std::tuple<ItemDescriptor, std::optional<float>, std::optional<std::uint64_t>>;
 
   mutable std::mutex m_cacheMutex;
   mutable HashTtlCache<ItemCacheEntry, std::shared_ptr<Item>> m_itemCache;

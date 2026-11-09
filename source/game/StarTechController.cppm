@@ -155,7 +155,7 @@ private:
     NetElementGroup netGroup;
   };
 
-  typedef NetElementDynamicGroup<TechAnimator> TechAnimatorGroup;
+  using TechAnimatorGroup = NetElementDynamicGroup<TechAnimator>;
 
   struct TechModule {
     explicit TechModule(Root& root) : scriptComponent(root) {}

@@ -69,7 +69,7 @@ std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bbox.xMax() - bbox.xMin() <= (float)m_size[0]));
+    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<float>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
@@ -96,12 +96,12 @@ std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bbox.xMax() - bbox.xMin() <= (int)m_size[0]));
+    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<int>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
   // side of the wrap point
-  if (bboxWrap.xMax() > (int)m_size[0]) {
+  if (bboxWrap.xMax() > static_cast<int>(m_size[0])) {
     return StaticList<RectI, 2>::create({RectI(bboxWrap.xMin(), bboxWrap.yMin(), m_size[0], bboxWrap.yMax()),
         RectI(0, bboxWrap.yMin(), bboxWrap.xMax() - m_size[0], bboxWrap.yMax())});
   } else {
@@ -154,7 +154,7 @@ std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(Poly
   for (unsigned i = 0; i < poly.sides(); i++) {
     Line2F segment = poly.side(i);
     if ((segment.min()[0] < 0) ^ (segment.max()[0] < 0)) {
-      Vec2F worldCorrect = {(float)m_size[0], 0};
+      Vec2F worldCorrect = {static_cast<float>(m_size[0]), 0};
       Vec2F intersect = segment.intersection(worldBoundLeft, true).point;
       if (segment.min()[0] < 0) {
         res[polySelect].add(segment.min() + worldCorrect);
@@ -168,7 +168,7 @@ std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(Poly
         res[polySelect].add(Vec2F(m_size[0], intersect[1]));
       }
     } else if ((segment.min()[0] > m_size[0]) ^ (segment.max()[0] > m_size[0])) {
-      Vec2F worldCorrect = {(float)m_size[0], 0};
+      Vec2F worldCorrect = {static_cast<float>(m_size[0]), 0};
       Vec2F intersect = segment.intersection(worldBoundRight, true).point;
       if (segment.min()[0] > m_size[0]) {
         res[polySelect].add(segment.min() - worldCorrect);
@@ -183,9 +183,9 @@ std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(Poly
       }
     } else {
       if (segment.min()[0] < 0) {
-        res[polySelect].add(segment.min() + Vec2F((float)m_size[0], 0));
+        res[polySelect].add(segment.min() + Vec2F(static_cast<float>(m_size[0]), 0));
       } else if (segment.min()[0] > m_size[0]) {
-        res[polySelect].add(segment.min() - Vec2F((float)m_size[0], 0));
+        res[polySelect].add(segment.min() - Vec2F(static_cast<float>(m_size[0]), 0));
       } else {
         res[polySelect].add(segment.min());
       }
@@ -210,18 +210,18 @@ std::expected<StaticList<Vec2I, 2>, StarException> WorldGeometry::splitXRegion(V
     return StaticList<Vec2I, 2>::create({xRegion});
 
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] >= xRegion[0]));
+    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
   }
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] - xRegion[0] <= (int)m_size[0]));
+    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<int>(m_size[0])));
   }
 
   int x1 = xwrap(xRegion[0]);
   int x2 = x1 + xRegion[1] - xRegion[0];
 
-  if (x2 > (int)m_size[0]) {
+  if (x2 > static_cast<int>(m_size[0])) {
     return StaticList<Vec2I, 2>::create({Vec2I(x1, m_size[0]), Vec2I(0.0f, x2 - m_size[0])});
   } else {
     return StaticList<Vec2I, 2>::create({Vec2I(x1, x2)});
@@ -233,12 +233,12 @@ std::expected<StaticList<Vec2F, 2>, StarException> WorldGeometry::splitXRegion(V
     return StaticList<Vec2F, 2>::create({xRegion});
 
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] >= xRegion[0]));
+    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
   }
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((xRegion[1] - xRegion[0] <= (float)m_size[0]));
+    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<float>(m_size[0])));
   }
 
   float x1 = xwrap(xRegion[0]);
@@ -325,7 +325,7 @@ std::expected<bool, StarException> WorldGeometry::lineIntersectsPoly(Line2F cons
   for (auto a : *lines) {
     auto polys = splitPoly(poly);
     if (!polys) return std::unexpected(std::move(polys.error()));
-    for (auto b : *polys) {
+    for (auto const& b : *polys) {
       if (b.intersects(a)) {
         return true;
       }
@@ -338,10 +338,10 @@ std::expected<bool, StarException> WorldGeometry::lineIntersectsPoly(Line2F cons
 std::expected<bool, StarException> WorldGeometry::polyIntersectsPoly(PolyF const& polyA, PolyF const& polyB) const {
   auto first = splitPoly(polyA);
   if (!first) return std::unexpected(std::move(first.error()));
-  for (auto a : *first) {
+  for (auto const& a : *first) {
     auto second = splitPoly(polyB);
     if (!second) return std::unexpected(std::move(second.error()));
-    for (auto b : *second) {
+    for (auto const& b : *second) {
       if (b.intersects(a))
         return true;
     }
@@ -378,7 +378,7 @@ std::expected<std::optional<Vec2F>, StarException> WorldGeometry::lineIntersects
   for (auto a : *lines) {
     auto polys = splitPoly(poly);
     if (!polys) return std::unexpected(std::move(polys.error()));
-    for (auto b : *polys) {
+    for (auto const& b : *polys) {
       if (auto intersection = b.lineIntersection(a))
         return intersection->point;
     }

@@ -146,8 +146,8 @@ public:
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<WorldServer, World>(this, key); }
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<WorldServer>(); }
 
-  typedef LuaEntityScript ScriptComponent;
-  typedef std::function<std::expected<void, StarException>(Json const&)> WorldPropertyListener;
+  using ScriptComponent = LuaEntityScript;
+  using WorldPropertyListener = std::function<std::expected<void, StarException>(Json const&)>;
 
   // Create a new world with the given template, writing new storage file.
   // Failure discards uncommitted storage; only fully initialized worlds escape.
@@ -158,7 +158,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<WorldServer>, StarException> create(Root& root, std::shared_ptr<IODevice> const& storage);
   // Load an existing world from the given in-memory chunks
   [[nodiscard]] static std::expected<std::shared_ptr<WorldServer>, StarException> create(Root& root, WorldChunks const& chunks);
-  ~WorldServer();
+  ~WorldServer() override;
   // Final save and teardown; idempotent, including after a reported failure.
   [[nodiscard]] std::expected<void, StarException> close();
 
@@ -444,7 +444,7 @@ private:
     List<Vec2I> roots;
   };
 
-  typedef std::function<std::expected<std::reference_wrapper<ServerTile const>, StarException>(Vec2I)> ServerTileGetter;
+  using ServerTileGetter = std::function<std::expected<std::reference_wrapper<ServerTile const>, StarException>(Vec2I)>;
 
   [[nodiscard]] std::expected<void, StarException> init(bool firstTime);
 

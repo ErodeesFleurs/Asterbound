@@ -170,7 +170,8 @@ std::expected<std::shared_ptr<UnlockItem>, StarException> UnlockItem::create(Roo
   auto metadata = root.imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory, *image), 1.0f / TilePixels, true, Vec2F());
+  auto drawable =
+    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, Vec2F());
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables = {std::move(*drawable)};
@@ -231,9 +232,9 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
         auto blueprint = ItemDescriptor::create(value);
         if (!blueprint)
           return std::unexpected(std::move(blueprint.error()));
-        blueprints.append(std::move(*blueprint));
+        blueprints.push_back(std::move(*blueprint));
       }
-      auto speciesConfig = (*assets)->json(strf("/species/{}.species", player->get().species()));
+      auto speciesConfig = (*assets)->json(Star::format("/species/{}.species", player->get().species()));
       if (!speciesConfig)
         return std::unexpected(std::move(speciesConfig.error()));
       auto speciesBlueprints = speciesConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.getArray(*m_tierRecipesUnlock, JsonArray()); });
@@ -243,7 +244,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
         auto blueprint = ItemDescriptor::create(value);
         if (!blueprint)
           return std::unexpected(std::move(blueprint.error()));
-        blueprints.append(std::move(*blueprint));
+        blueprints.push_back(std::move(*blueprint));
       }
       for (auto const& blueprint : blueprints) {
         auto added = player->get().addBlueprint(blueprint);

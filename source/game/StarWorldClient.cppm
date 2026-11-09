@@ -149,12 +149,12 @@ public:
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<WorldClient, World>(this, key); }
   std::string_view dynamicTypeName() const noexcept override { return Star::typeName<WorldClient>(); }
 
-  typedef LuaEntityScript ScriptComponent;
-  
+  using ScriptComponent = LuaEntityScript;
+
   [[nodiscard]] static std::expected<std::shared_ptr<WorldClient>, StarException> create(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe);
   [[nodiscard]] static std::expected<std::shared_ptr<WorldClient>, StarException> create(Root& root, ClientSubWorldId subWorldId, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> close();
-  ~WorldClient();
+  ~WorldClient() override;
 
   ConnectionId connection() const override;
   WorldGeometry geometry() const override;
@@ -306,7 +306,7 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> waitForLighting(std::optional<std::reference_wrapper<WorldRenderData>> renderData = std::nullopt);
 
-  typedef std::function<std::expected<bool, StarException>(std::shared_ptr<Player>, StringView)> BroadcastCallback;
+  using BroadcastCallback = std::function<std::expected<bool, StarException>(std::shared_ptr<Player>, StringView)>;
   BroadcastCallback& broadcastCallback();
   
   bool shouldExpire();
@@ -374,7 +374,7 @@ private:
     bool operator<(DamageNumberKey const& other) const;
   };
 
-  typedef std::function<std::expected<std::reference_wrapper<ClientTile const>, StarException>(Vec2I)> ClientTileGetter;
+  using ClientTileGetter = std::function<std::expected<std::reference_wrapper<ClientTile const>, StarException>(Vec2I)>;
 
   [[nodiscard]] std::expected<void, StarException> lightingTileGather();
   [[nodiscard]] std::expected<void, StarException> lightingCalc();

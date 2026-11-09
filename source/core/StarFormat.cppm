@@ -1,7 +1,9 @@
 module;
+#include <stdio.h>
 import std;
 
 import star.type_identity;
+import star.text_formatter;
 
 namespace Star {
 struct OutputProxy;
@@ -11,44 +13,95 @@ inline constexpr bool DebugEnabled = true;
 inline constexpr bool DebugEnabled = false;
 #endif
 
-
+// Formatting reads the same const lvalue arguments used by make_format_args.
+// std::formattable checks the mapped formatter's real parse/format operations,
+// including character arrays, rather than an unconstrained format call.
+template <typename T>
+concept format_argument = std::formattable<std::remove_reference_t<T> const&, char>;
 
 template <typename... T>
-std::string strf(std::format_string<T...> fmt, T&&... args);
+  requires (format_argument<T> && ...)
+std::string format(std::format_string<T...> fmt, T&&... args);
 
 
 template <typename Char, typename... T>
-std::string strfChecked(std::basic_format_string<Char, T...> fmt, T const&... args);
+  requires std::same_as<Char, char> && (format_argument<T> && ...)
+std::string format_checked(std::basic_format_string<Char, T...> fmt, T const&... args);
 
 class StarException;
+struct ExceptionSummary;
+
+// Evaluate only at category-query/base instantiation sites, not on the
+// incomplete StarError specialization while its constructors are declared.
+template <typename Error>
+concept error_category = std::derived_from<std::remove_cvref_t<Error>, StarException>
+    && requires(TypeKey key) {
+      { std::remove_cvref_t<Error>::matches_error_type(key) } noexcept -> std::same_as<bool>;
+    };
 
 // A diagnostic is an immutable graph. Only its lazily rendered views mutate;
 // child emission deliberately bypasses whole-chain caches so rendering a deep
 // chain does not materialize and retain every suffix of that chain.
 class ExceptionPayload {
 public:
-  explicit ExceptionPayload(std::function<void(std::ostream&, bool)> printer)
-    : m_printer(std::move(printer)) {}
+  explicit ExceptionPayload(bool (*matcher)(TypeKey) noexcept,
+      std::shared_ptr<ExceptionSummary const> summary)
+    : matcher(matcher), summary(std::move(summary)) {}
+  virtual ~ExceptionPayload() noexcept = default;
 
-  void emit(std::ostream& os, bool fullStacktrace) const {
-    m_printer(os, fullStacktrace);
-  }
+  virtual void emit(TextBuffer& buffer, bool fullStacktrace) const = 0;
 
   std::string const& rendered(bool fullStacktrace) const {
     auto index = fullStacktrace ? 1u : 0u;
     std::call_once(m_renderOnce[index], [this, index, fullStacktrace] {
-      std::ostringstream os;
-      emit(os, fullStacktrace);
-      m_rendered[index] = os.str();
+      TextBuffer buffer;
+      emit(buffer, fullStacktrace);
+      m_rendered[index] = std::move(buffer).str();
     });
     return m_rendered[index];
   }
 
+  bool (*const matcher)(TypeKey) noexcept;
+  std::shared_ptr<ExceptionSummary const> const summary;
+
 private:
-  std::function<void(std::ostream&, bool)> const m_printer;
   mutable std::array<std::once_flag, 2> m_renderOnce;
   mutable std::array<std::string, 2> m_rendered;
 };
+
+template <typename Printer>
+concept exception_printer = requires(Printer const& printer, TextBuffer& buffer, bool fullStacktrace) {
+  { std::invoke(printer, buffer, fullStacktrace) } -> std::same_as<void>;
+};
+
+// Keep the concrete closure in the same allocation as its immutable metadata
+// and caches. Only native stack providers still use their existing std::function.
+template <exception_printer Printer>
+class PrintedExceptionPayload final : public ExceptionPayload {
+public:
+  template <typename Source>
+    requires std::constructible_from<Printer, Source>
+  PrintedExceptionPayload(Source&& printer, bool (*matcher)(TypeKey) noexcept,
+      std::shared_ptr<ExceptionSummary const> summary)
+    : ExceptionPayload(matcher, std::move(summary)), m_printer(std::forward<Source>(printer)) {}
+
+  void emit(TextBuffer& buffer, bool fullStacktrace) const override {
+    std::invoke(m_printer, buffer, fullStacktrace);
+  }
+
+private:
+  Printer const m_printer;
+};
+
+template <typename Printer>
+  requires exception_printer<std::remove_cvref_t<Printer>>
+      && std::constructible_from<std::remove_cvref_t<Printer>, Printer>
+std::shared_ptr<ExceptionPayload const> make_exception_payload(Printer&& printer,
+    bool (*matcher)(TypeKey) noexcept = nullptr,
+    std::shared_ptr<ExceptionSummary const> summary = {}) {
+  return std::make_shared<PrintedExceptionPayload<std::remove_cvref_t<Printer>> const>(
+      std::forward<Printer>(printer), matcher, std::move(summary));
+}
 
 enum class ExceptionSummaryKind { Native, ScriptRuntime, ScriptSyntax, PatchRuntime, PatchSyntax, Resource };
 
@@ -73,21 +126,21 @@ struct ExceptionSummary {
 class ExceptionDiagnostic {
 public:
   ExceptionDiagnostic(StarException const& exception);
-  std::shared_ptr<ExceptionSummary const> const& diagnosticSummary() const noexcept { return m_summary; }
+  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const noexcept { return m_payload->summary; }
 
-  friend void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace);
-  friend std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace);
-  friend OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
+  friend void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool fullStacktrace);
+  friend std::string print_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
+  friend OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
 
 private:
   friend class StarException;
   std::shared_ptr<ExceptionPayload const> m_payload;
-  std::shared_ptr<ExceptionSummary const> m_summary;
 };
 
 class StarException {
 public:
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static StarException format(std::format_string<Args...> fmt, Args const&... args);
 
   StarException() noexcept : StarException(std::string("StarException")) {}
@@ -106,134 +159,152 @@ public:
 
   char const* what() const noexcept { return m_payload->rendered(false).c_str(); }
 
-  template <typename Error>
+  template <error_category Error>
   bool is() const noexcept {
-    return m_matchesErrorType(typeKey<Error>());
+    return m_payload->matcher(typeKey<Error>());
   }
 
-  static bool matchesErrorType(TypeKey key) noexcept {
+  static bool matches_error_type(TypeKey key) noexcept {
     return key == typeKey<StarException>();
   }
 
-  std::shared_ptr<ExceptionSummary const> const& diagnosticSummary() const noexcept { return m_summary; }
+  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const noexcept { return m_payload->summary; }
 
-  StarException withSummary(ExceptionSummary summary) const& {
-    auto result = *this;
-    result.m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
-    return result;
-  }
-
-  StarException withSummary(ExceptionSummary summary) && {
-    m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
-    return std::move(*this);
-  }
-
-  StarException withContext(std::string context) const& {
+  StarException with_summary(ExceptionSummary summary) const& {
     return StarException(
-        [context = std::move(context), cause = m_payload](std::ostream& os, bool fullStacktrace) {
-          os << context << "\nCaused by: ";
-          cause->emit(os, fullStacktrace);
+        [source = m_payload](TextBuffer& buffer, bool fullStacktrace) {
+          source->emit(buffer, fullStacktrace);
         },
-        m_matchesErrorType, m_summary);
+        m_payload->matcher, std::make_shared<ExceptionSummary const>(std::move(summary)));
   }
 
-  StarException withContext(std::string context) && {
+  StarException with_summary(ExceptionSummary summary) && {
+    auto matcher = m_payload->matcher;
     return StarException(
-        [context = std::move(context), cause = std::move(m_payload)](std::ostream& os, bool fullStacktrace) {
-          os << context << "\nCaused by: ";
-          cause->emit(os, fullStacktrace);
+        [source = std::move(m_payload)](TextBuffer& buffer, bool fullStacktrace) {
+          source->emit(buffer, fullStacktrace);
         },
-        m_matchesErrorType, std::move(m_summary));
+        matcher, std::make_shared<ExceptionSummary const>(std::move(summary)));
   }
 
-  StarException withRelated(StarException const& secondary, std::string context) const& {
+  StarException with_context(std::string context) const& {
+    return StarException(
+        [context = std::move(context), cause = m_payload](TextBuffer& buffer, bool fullStacktrace) {
+          buffer.append(context);
+          buffer.append("\nCaused by: ");
+          cause->emit(buffer, fullStacktrace);
+        },
+        m_payload->matcher, m_payload->summary);
+  }
+
+  StarException with_context(std::string context) && {
+    auto matcher = m_payload->matcher;
+    auto summary = m_payload->summary;
+    return StarException(
+        [context = std::move(context), cause = std::move(m_payload)](TextBuffer& buffer, bool fullStacktrace) {
+          buffer.append(context);
+          buffer.append("\nCaused by: ");
+          cause->emit(buffer, fullStacktrace);
+        },
+        matcher, std::move(summary));
+  }
+
+  StarException with_related(StarException const& secondary, std::string context) const& {
     return StarException(
         [primary = m_payload, secondary = secondary.m_payload, context = std::move(context)](
-            std::ostream& os, bool fullStacktrace) {
-          primary->emit(os, fullStacktrace);
-          os << "\n" << context << "\nRelated error: ";
-          secondary->emit(os, fullStacktrace);
+            TextBuffer& buffer, bool fullStacktrace) {
+          primary->emit(buffer, fullStacktrace);
+          buffer.push_back('\n');
+          buffer.append(context);
+          buffer.append("\nRelated error: ");
+          secondary->emit(buffer, fullStacktrace);
         },
-        m_matchesErrorType, m_summary);
+        m_payload->matcher, m_payload->summary);
   }
 
-  StarException withRelated(StarException const& secondary, std::string context) && {
-    // Copy the secondary handle first: secondary may alias this value.
+  StarException with_related(StarException const& secondary, std::string context) && {
+    // Copy all metadata and the secondary first: secondary may alias this value.
+    auto matcher = m_payload->matcher;
+    auto summary = m_payload->summary;
     auto related = secondary.m_payload;
     return StarException(
         [primary = std::move(m_payload), secondary = std::move(related), context = std::move(context)](
-            std::ostream& os, bool fullStacktrace) {
-          primary->emit(os, fullStacktrace);
-          os << "\n" << context << "\nRelated error: ";
-          secondary->emit(os, fullStacktrace);
+            TextBuffer& buffer, bool fullStacktrace) {
+          primary->emit(buffer, fullStacktrace);
+          buffer.push_back('\n');
+          buffer.append(context);
+          buffer.append("\nRelated error: ");
+          secondary->emit(buffer, fullStacktrace);
         },
-        m_matchesErrorType, std::move(m_summary));
+        matcher, std::move(summary));
   }
 
   friend class ExceptionDiagnostic;
 
 protected:
-  StarException(std::string_view type, std::string message, bool genStackTrace = true) noexcept
-    : StarException(type, std::move(message), genStackTrace, {}) {}
-  StarException(std::string_view type, std::string message, ExceptionDiagnostic cause) noexcept
-    : StarException(type, std::move(message), true, std::move(cause.m_summary)) {
-    m_payload = std::make_shared<ExceptionPayload const>(
-        [self = std::move(m_payload), cause = std::move(cause.m_payload)](std::ostream& os, bool fullStacktrace) {
-          self->emit(os, fullStacktrace);
-          os << "\nCaused by: ";
-          cause->emit(os, fullStacktrace);
-        });
-  }
-  StarException(std::string_view type, std::string message, bool genStackTrace,
-      std::shared_ptr<ExceptionSummary const> inheritedSummary) noexcept
-    : m_summary(std::move(inheritedSummary)) {
-    if (!m_summary) {
-      ExceptionSummary summary;
-      summary.category = type;
-      summary.reason = message;
-      m_summary = std::make_shared<ExceptionSummary const>(std::move(summary));
-    }
-    auto stack = genStackTrace ? std::make_shared<ExceptionPayload const>(captureOriginStack()) : nullptr;
-    m_payload = std::make_shared<ExceptionPayload const>(
-        [type = std::string(type), message = std::move(message), stack = std::move(stack)](
-            std::ostream& os, bool fullStacktrace) {
-          os << "(" << type << ")";
-          if (!message.empty())
-            os << " " << message;
-          if (fullStacktrace && stack)
-            os << '\n' << stack->rendered(true);
-        });
-  }
-
-  template <typename Error>
-  void setErrorType() noexcept {
-    m_matchesErrorType = &Error::matchesErrorType;
-  }
+  StarException(std::string_view type, std::string message, bool genStackTrace = true,
+      bool (*matcher)(TypeKey) noexcept = &StarException::matches_error_type) noexcept
+    : StarException(type, std::move(message), genStackTrace, matcher, {}) {}
+  StarException(std::string_view type, std::string message, ExceptionDiagnostic cause,
+      bool (*matcher)(TypeKey) noexcept = &StarException::matches_error_type) noexcept
+    : StarException(type, std::move(message), true, matcher, std::move(cause.m_payload)) {}
 
 private:
-  static std::function<void(std::ostream&, bool)> captureOriginStack();
-  bool (*m_matchesErrorType)(TypeKey) noexcept = &StarException::matchesErrorType;
-  StarException(std::function<void(std::ostream&, bool)> printer,
+  StarException(std::string_view type, std::string message, bool genStackTrace,
+      bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionPayload const> cause) noexcept {
+    auto summary = cause ? cause->summary : nullptr;
+    if (!summary) {
+      ExceptionSummary origin;
+      origin.category = type;
+      origin.reason = message;
+      summary = std::make_shared<ExceptionSummary const>(std::move(origin));
+    }
+    auto stack = genStackTrace ? make_exception_payload(capture_origin_stack()) : nullptr;
+    m_payload = make_exception_payload(
+        [type = std::string(type), message = std::move(message), stack = std::move(stack), cause = std::move(cause)](
+            TextBuffer& buffer, bool fullStacktrace) {
+          buffer.push_back('(');
+          buffer.append(type);
+          buffer.push_back(')');
+          if (!message.empty()) {
+            buffer.push_back(' ');
+            buffer.append(message);
+          }
+          if (fullStacktrace && stack) {
+            buffer.push_back('\n');
+            buffer.append(stack->rendered(true));
+          }
+          if (cause) {
+            buffer.append("\nCaused by: ");
+            cause->emit(buffer, fullStacktrace);
+          }
+        },
+        matcher, std::move(summary));
+  }
+
+  static std::function<void(TextBuffer&, bool)> capture_origin_stack();
+  template <typename Printer>
+    requires exception_printer<std::remove_cvref_t<Printer>>
+        && std::constructible_from<std::remove_cvref_t<Printer>, Printer>
+  StarException(Printer&& printer,
       bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionSummary const> summary) noexcept
-    : m_matchesErrorType(matcher), m_payload(std::make_shared<ExceptionPayload const>(std::move(printer))),
-      m_summary(std::move(summary)) {}
+    : m_payload(make_exception_payload(std::forward<Printer>(printer), matcher, std::move(summary))) {}
   std::shared_ptr<ExceptionPayload const> m_payload;
-  std::shared_ptr<ExceptionSummary const> m_summary;
 };
 
 inline ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
-  : m_payload(exception.m_payload), m_summary(exception.m_summary) {}
+  : m_payload(exception.m_payload) {}
 
-inline void printException(std::ostream& os, ExceptionDiagnostic const& e, bool fullStacktrace) {
-  os << e.m_payload->rendered(fullStacktrace);
+inline void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool fullStacktrace) {
+  buffer.append(e.m_payload->rendered(fullStacktrace));
 }
 
-inline std::string printException(ExceptionDiagnostic const& e, bool fullStacktrace) {
+inline std::string print_exception(ExceptionDiagnostic const& e, bool fullStacktrace) {
   return e.m_payload->rendered(fullStacktrace);
 }
-OutputProxy outputException(ExceptionDiagnostic const& e, bool fullStacktrace);
+OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
 
-inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> const& summary) {
+inline std::string exception_summary(std::shared_ptr<ExceptionSummary const> const& summary) {
   if (!summary)
     return "Error";
   std::string_view category = summary->category;
@@ -245,56 +316,63 @@ inline std::string exceptionSummary(std::shared_ptr<ExceptionSummary const> cons
     case ExceptionSummaryKind::PatchSyntax: category = "Lua patch syntax error"; break;
     case ExceptionSummaryKind::Resource: category = "Resource error"; break;
   }
-  std::ostringstream out;
-  out << category;
+  TextBuffer buffer;
+  buffer.append(category);
   auto reason = std::string_view(summary->reason);
   reason = reason.substr(0, reason.find_first_of("\r\n"));
-  if (!reason.empty())
-    out << ": " << reason;
-  if (!summary->operation.empty())
-    out << "\n  Operation: " << summary->operation;
-  if (!summary->asset.empty())
-    out << "\n  Asset: " << summary->asset;
-  if (!summary->assetProvider.empty() && summary->assetProvider != summary->patchProvider)
-    out << "\n  Asset provider: " << summary->assetProvider;
-  if (!summary->patch.empty())
-    out << "\n  Patch: " << summary->patch;
-  if (!summary->patchProvider.empty())
-    out << "\n  Patch provider: " << summary->patchProvider;
+  auto append_field = [&](std::string_view prefix, std::string_view value) {
+    if (!value.empty()) {
+      buffer.append(prefix);
+      buffer.append(value);
+    }
+  };
+  append_field(": ", reason);
+  append_field("\n  Operation: ", summary->operation);
+  append_field("\n  Asset: ", summary->asset);
+  if (summary->assetProvider != summary->patchProvider)
+    append_field("\n  Asset provider: ", summary->assetProvider);
+  append_field("\n  Patch: ", summary->patch);
+  append_field("\n  Patch provider: ", summary->patchProvider);
   for (std::size_t i = 0; i < summary->locations.size(); ++i) {
     auto const& location = summary->locations[i];
-    out << (i == 0 ? "\n  Script: " : "\n  Called from: ") << location.source;
-    if (location.line > 0)
-      out << ":" << location.line;
+    buffer.append(i == 0 ? "\n  Script: " : "\n  Called from: ");
+    buffer.append(location.source);
+    if (location.line > 0) {
+      buffer.push_back(':');
+      append_text(buffer, location.line);
+    }
     if (!location.provider.empty() && location.provider != summary->patchProvider
         && location.provider != summary->assetProvider
         && std::none_of(summary->locations.begin(), summary->locations.begin() + i,
-            [&](auto const& previous) { return previous.provider == location.provider; }))
-      out << "\n    Provider: " << location.provider;
+            [&](auto const& previous) { return previous.provider == location.provider; })) {
+      buffer.append("\n    Provider: ");
+      buffer.append(location.provider);
+    }
   }
-  return out.str();
+  return std::move(buffer).str();
 }
 
-inline std::string exceptionSummary(StarException const& error) {
-  return exceptionSummary(error.diagnosticSummary());
+inline std::string exception_summary(StarException const& error) {
+  return exception_summary(error.diagnostic_summary());
 }
 
-inline std::string exceptionSummary(ExceptionDiagnostic const& error) {
-  return exceptionSummary(error.diagnosticSummary());
+inline std::string exception_summary(ExceptionDiagnostic const& error) {
+  return exception_summary(error.diagnostic_summary());
 }
-inline std::string exceptionReport(ExceptionDiagnostic const& error) {
-  std::ostringstream out;
-  out << exceptionSummary(error) << "\nDetails:\n";
-  printException(out, error, true);
-  return std::move(out).str();
+inline std::string exception_report(ExceptionDiagnostic const& error) {
+  TextBuffer buffer;
+  buffer.append(exception_summary(error));
+  buffer.append("\nDetails:\n");
+  print_exception(buffer, error, true);
+  return std::move(buffer).str();
 }
 
 
-void printStack(std::string_view message);
+void print_stack(std::string_view message);
 
 // Log error and stack-trace and possibly show a dialog box if available, then
 // abort.
-void fatalError(std::string_view message, bool showStackTrace);
+void fatal_error(std::string_view message, bool showStackTrace);
 
 // The file and line of an assertion are a language construct now
 // (std::source_location) instead of __FILE__/__LINE__ stringification.
@@ -305,24 +383,25 @@ void fatalError(std::string_view message, bool showStackTrace);
 // types with an explicit operator bool (std::unique_ptr, for instance) stop
 // compiling.
 template <typename T>
-inline void starAssertFailed(T&& condition, std::source_location location = std::source_location::current()) {
+  requires (!DebugEnabled || requires(T& value) { value ? true : false; })
+inline void star_assert_failed(T&& condition, std::source_location location = std::source_location::current()) {
 #ifndef NDEBUG
   if (condition)
     return;
 
-  std::string const message = strf("assert failure in file {} line {}", location.file_name(), location.line());
-  Star::fatalError(message, true);
+  std::string const message = format("assert failure in file {} line {}", location.file_name(), location.line());
+  Star::fatal_error(message, true);
 #else
   (void)condition;
   (void)location;
 #endif
 }
 
-inline void debugPrintStack(std::source_location location = std::source_location::current()) {
+inline void debug_print_stack(std::source_location location = std::source_location::current()) {
 #ifndef NDEBUG
-  // The message outlives the call: printStack may hand it on before returning.
-  std::string const message = strf("Debug: file {} line {}", location.file_name(), location.line());
-  Star::printStack(message);
+  // The message outlives the call: print_stack may hand it on before returning.
+  std::string const message = format("Debug: file {} line {}", location.file_name(), location.line());
+  Star::print_stack(message);
 #else
   (void)location;
 #endif
@@ -331,33 +410,38 @@ inline void debugPrintStack(std::source_location location = std::source_location
 
 // Domain error values preserve their category when stored as StarException.
 template <typename Tag, typename Base>
+  requires std::same_as<Base, std::remove_cvref_t<Base>> && error_category<Base>
+      && requires { { Tag::name() } -> std::convertible_to<std::string_view>; }
 class StarError : public Base {
 public:
   template <typename... Args>
+    requires (format_argument<Args> && ...)
   static StarError format(std::format_string<Args...> fmt, Args const&... args) {
-    return StarError(strfChecked(fmt, args...));
+    return StarError(format_checked(fmt, args...));
   }
 
 
-  static bool matchesErrorType(TypeKey key) noexcept {
-    return key == typeKey<StarError>() || Base::matchesErrorType(key);
+  static bool matches_error_type(TypeKey key) noexcept {
+    return key == typeKey<StarError>() || Base::matches_error_type(key);
   }
 
-  StarError() : Base(Tag::name(), std::string(), true) { this->template setErrorType<StarError>(); }
+  StarError() : StarError(Tag::name(), std::string(), true) {}
   explicit StarError(std::string message, bool genStackTrace = true)
-    : Base(Tag::name(), std::move(message), genStackTrace) { this->template setErrorType<StarError>(); }
-  explicit StarError(ExceptionDiagnostic cause) : Base(Tag::name(), std::string(), std::move(cause)) {
-    this->template setErrorType<StarError>();
-  }
-  StarError(std::string message, ExceptionDiagnostic cause) : Base(Tag::name(), std::move(message), std::move(cause)) {
-    this->template setErrorType<StarError>();
-  }
+    : StarError(Tag::name(), std::move(message), genStackTrace) {}
+  explicit StarError(ExceptionDiagnostic cause)
+    : StarError(Tag::name(), std::string(), std::move(cause)) {}
+  StarError(std::string message, ExceptionDiagnostic cause)
+    : StarError(Tag::name(), std::move(message), std::move(cause)) {}
 
 protected:
-  StarError(std::string_view type, std::string message, bool genStackTrace = true)
-    : Base(type, std::move(message), genStackTrace) { this->template setErrorType<StarError>(); }
-  StarError(std::string_view type, std::string message, ExceptionDiagnostic cause)
-    : Base(type, std::move(message), std::move(cause)) { this->template setErrorType<StarError>(); }
+  // Each base forwards the final matcher unchanged. No published node is
+  // subsequently rewritten while a more-derived category is constructed.
+  StarError(std::string_view type, std::string message, bool genStackTrace = true,
+      bool (*matcher)(TypeKey) noexcept = &StarError::matches_error_type)
+    : Base(type, std::move(message), genStackTrace, matcher) {}
+  StarError(std::string_view type, std::string message, ExceptionDiagnostic cause,
+      bool (*matcher)(TypeKey) noexcept = &StarError::matches_error_type)
+    : Base(type, std::move(message), std::move(cause), matcher) {}
 };
 
 struct OutOfRangeExceptionTag {
@@ -374,8 +458,9 @@ struct MemoryExceptionTag {
 using MemoryException = StarError<MemoryExceptionTag, StarException>;
 
 template <typename... Args>
+  requires (format_argument<Args> && ...)
 StarException StarException::format(std::format_string<Args...> fmt, Args const&... args) {
-  return StarException(strfChecked(fmt, args...));
+  return StarException(format_checked(fmt, args...));
 }
 
 
@@ -389,7 +474,7 @@ using FormatException = StarError<FormatExceptionTag, StarException>;
 
 // Tags are UTF-8 byte sequences; values are copied verbatim, including NULs.
 // A doubled '<' is literal. Bindings use the first matching name.
-[[nodiscard]] inline std::expected<std::string, StarException> formatTags(
+[[nodiscard]] inline std::expected<std::string, StarException> format_tags(
     std::string_view text,
     std::span<std::pair<std::string_view, std::string_view> const> tags) {
   std::string output;
@@ -423,61 +508,95 @@ using FormatException = StarError<FormatExceptionTag, StarException>;
   return output;
 }
 
-namespace Detail {
+namespace format_detail {
   // Only callers holding a compile-time checked format string use this path.
   template <typename... T>
-  std::string vformatChecked(std::string_view fmt, T const&... args) {
+    requires (format_argument<T> && ...)
+  std::string format_checked_text(std::string_view fmt, T const&... args) {
     return std::vformat(fmt, std::make_format_args(args...));
+  }
+
+  template <typename... T>
+  concept console_format_arguments = (format_argument<T> && ...)
+      && requires(TextBuffer& buffer, std::format_string<T...> fmt, T&... args) {
+        std::format_to(std::back_inserter(buffer), fmt, std::forward<T>(args)...);
+      };
+
+  inline std::mutex console_mutex;
+
+  // The caller owns console_mutex through writing and flushing, so concurrent
+  // messages cannot interleave and the original automatic flush is preserved.
+  [[nodiscard]] inline std::expected<void, StarException> write_console(std::FILE* file, std::string_view text) {
+    auto written = text.empty() ? 0 : std::fwrite(text.data(), 1, text.size(), file);
+    bool write_failed = written != text.size() || std::ferror(file);
+    auto flush_status = std::fflush(file);
+    if (write_failed)
+      return std::unexpected(IOException("Failed to write console output"));
+    if (flush_status != 0)
+      return std::unexpected(IOException("Failed to flush console output"));
+    return {};
   }
 }
 
 // Consteval validation happens at the caller, before a literal is forwarded.
 template <typename... T>
-std::string strf(std::format_string<T...> fmt, T&&... args) {
-  return Detail::vformatChecked(fmt.get(), args...);
+  requires (format_argument<T> && ...)
+std::string format(std::format_string<T...> fmt, T&&... args) {
+  return format_detail::format_checked_text(fmt.get(), args...);
 }
 
 // Keep the argument types used to check a wrapper's format string.
 template <typename Char, typename... T>
-std::string strfChecked(std::basic_format_string<Char, T...> fmt, T const&... args) {
-  return Detail::vformatChecked(fmt.get(), args...);
+  requires std::same_as<Char, char> && (format_argument<T> && ...)
+std::string format_checked(std::basic_format_string<Char, T...> fmt, T const&... args) {
+  return format_detail::format_checked_text(fmt.get(), args...);
 }
-
 
 template <typename... T>
-void format(std::ostream& out, std::format_string<T...> fmt, T&&... args) {
-  // Preserve ostream field padding when the caller has set a width.
-  if (out.width() != 0) {
-    out << Detail::vformatChecked(fmt.get(), args...);
-    return;
-  }
-  std::ostream::sentry sentry(out);
-  if (sentry) {
-    auto output = std::format_to(std::ostreambuf_iterator<char>(out), fmt, std::forward<T>(args)...);
-    if (output.failed())
-      out.setstate(std::ios_base::badbit);
-  }
+  requires format_detail::console_format_arguments<T...>
+[[nodiscard]] std::expected<void, StarException> print(std::FILE* file, std::format_string<T...> fmt, T&&... args) {
+  TextBuffer buffer;
+  std::format_to(std::back_inserter(buffer), fmt, std::forward<T>(args)...);
+  std::lock_guard lock(format_detail::console_mutex);
+  return format_detail::write_console(file, buffer.view());
 }
 
-
-// Automatically flushes; use format to avoid flushing.
 template <typename... T>
-void coutf(std::format_string<T...> fmt, T&&... args) {
-  Star::format(std::cout, fmt, std::forward<T>(args)...);
-  std::cout.flush();
+  requires format_detail::console_format_arguments<T...>
+[[nodiscard]] std::expected<void, StarException> print(std::format_string<T...> fmt, T&&... args) {
+  return Star::print(stdout, fmt, std::forward<T>(args)...);
 }
 
-
-// Automatically flushes; use format to avoid flushing.
 template <typename... T>
-void cerrf(std::format_string<T...> fmt, T&&... args) {
-  Star::format(std::cerr, fmt, std::forward<T>(args)...);
-  std::cerr.flush();
+  requires format_detail::console_format_arguments<T...>
+[[nodiscard]] std::expected<void, StarException> println(std::FILE* file, std::format_string<T...> fmt, T&&... args) {
+  TextBuffer buffer;
+  std::format_to(std::back_inserter(buffer), fmt, std::forward<T>(args)...);
+  buffer.push_back('\n');
+  std::lock_guard lock(format_detail::console_mutex);
+  return format_detail::write_console(file, buffer.view());
 }
 
+template <typename... T>
+  requires format_detail::console_format_arguments<T...>
+[[nodiscard]] std::expected<void, StarException> println(std::format_string<T...> fmt, T&&... args) {
+  return Star::println(stdout, fmt, std::forward<T>(args)...);
+}
+
+[[nodiscard]] inline std::expected<void, StarException> flush(std::FILE* file) {
+  std::lock_guard lock(format_detail::console_mutex);
+  if (std::fflush(file) != 0 || std::ferror(file))
+    return std::unexpected(IOException("Failed to flush console output"));
+  return {};
+}
+
+[[nodiscard]] inline std::expected<void, StarException> flush() {
+  return Star::flush(stdout);
+}
 
 template <class Type>
-inline std::string toString(Type const& t) {
+  requires format_argument<Type>
+inline std::string to_string(Type const& t) {
   return std::format("{}", t);
 }
 
@@ -486,13 +605,15 @@ inline std::string toString(Type const& t) {
 export module star.format;
 
 export namespace Star {
+using ::Star::format_argument;
 using ::Star::DebugEnabled;
 using ::Star::ExceptionDiagnostic;
 using ::Star::ExceptionSummaryKind;
 using ::Star::ExceptionSummary;
-using ::Star::exceptionSummary;
-using ::Star::exceptionReport;
+using ::Star::exception_summary;
+using ::Star::exception_report;
 using ::Star::StarException;
+using ::Star::error_category;
 using ::Star::StarError;
 using ::Star::OutOfRangeExceptionTag;
 using ::Star::OutOfRangeException;
@@ -502,17 +623,17 @@ using ::Star::MemoryExceptionTag;
 using ::Star::MemoryException;
 using ::Star::FormatExceptionTag;
 using ::Star::FormatException;
-using ::Star::printException;
-using ::Star::outputException;
-using ::Star::printStack;
-using ::Star::fatalError;
-using ::Star::starAssertFailed;
-using ::Star::debugPrintStack;
-using ::Star::strf;
-using ::Star::strfChecked;
+using ::Star::print_exception;
+using ::Star::output_exception;
+using ::Star::print_stack;
+using ::Star::fatal_error;
+using ::Star::star_assert_failed;
+using ::Star::debug_print_stack;
 using ::Star::format;
-using ::Star::coutf;
-using ::Star::cerrf;
-using ::Star::toString;
-using ::Star::formatTags;
+using ::Star::format_checked;
+using ::Star::print;
+using ::Star::println;
+using ::Star::flush;
+using ::Star::to_string;
+using ::Star::format_tags;
 }

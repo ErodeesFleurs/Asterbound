@@ -135,7 +135,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
     auto number = value->toUInt();
     if (!number)
       return std::unexpected(std::move(number.error()));
-    key = (Key)*number;
+    key = static_cast<Key>(*number);
   } else {
     auto repr = value->repr();
     if (!repr)
@@ -158,14 +158,14 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
       return std::unexpected(std::move(parsed.error()));
     mods |= *parsed;
   }
-  return KeyChord{key, mods};
+  return KeyChord{.key = key, .mods = mods};
 }
 
 std::expected<Json, StarException> inputDescriptorToJson(KeyChord const& chord) {
   JsonArray modNames;
   for (auto const& p : KeyModNames) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
-      modNames.append(String(p.second));
+      modNames.push_back(String(p.second));
   }
   auto name = enumName<KeyNames>(chord.key);
   if (!name)
@@ -177,59 +177,59 @@ std::expected<String, StarException> printInputDescriptor(KeyChord chord) {
   StringList modNames;
   for (auto const& p : KeyModNames) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
-      modNames.append(String(p.second));
+      modNames.push_back(String(p.second));
   }
   auto name = enumName<KeyNames>(chord.key);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  return String::joinWith(" + ", modNames.join(" + "), String(*name));
+  return String::join_with(" + ", modNames.join(" + "), String(*name));
 }
 
 KeyBindings::KeyBindings() = default;
 
 std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json const& json) {
   if (!InterfaceActionNames)
-    return std::unexpected(InterfaceActionNames.error().withContext("Could not set keybindings from configuration"));
+    return std::unexpected(InterfaceActionNames.error().with_context("Could not set keybindings from configuration"));
   KeyBindings bindings;
   auto entries = json.iterateObject();
   if (!entries)
-    return std::unexpected(entries.error().withContext("Could not set keybindings from configuration"));
+    return std::unexpected(entries.error().with_context("Could not set keybindings from configuration"));
   for (auto const& entry : *entries) {
-    auto action = InterfaceActionNames->getLeft(entry.first);
+    auto action = InterfaceActionNames->get_left(entry.first);
     if (!action)
-      return std::unexpected(action.error().withContext("Could not set keybindings from configuration"));
+      return std::unexpected(action.error().with_context("Could not set keybindings from configuration"));
     auto inputs = entry.second.iterateArray();
     if (!inputs)
-      return std::unexpected(inputs.error().withContext("Could not set keybindings from configuration"));
+      return std::unexpected(inputs.error().with_context("Could not set keybindings from configuration"));
     for (auto const& input : *inputs) {
       auto chord = inputDescriptorFromJson(input);
       if (!chord) {
         auto logged = root.logger().warn("Could not load keybinding for {}: {}\n",
-            entry.first, outputException(ExceptionDiagnostic(chord.error()), false));
+            entry.first, Star::output_exception(ExceptionDiagnostic(chord.error()), false));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         continue;
       }
-      bindings.m_actions[chord->key].append({chord->mods, action->get()});
+      bindings.m_actions[chord->key].push_back({chord->mods, action->get()});
     }
   }
   return bindings;
 }
 
 Set<InterfaceAction> KeyBindings::actions(Key key) const {
-  return actions(KeyChord{key, KeyMod::NoMod});
+  return actions(KeyChord{.key = key, .mods = KeyMod::NoMod});
 }
 
 Set<InterfaceAction> KeyBindings::actions(InputEvent const& event) const {
   if (std::holds_alternative<KeyDownEvent>(event))
-    return actions(KeyChord{std::get<KeyDownEvent>(event).key, std::get<KeyDownEvent>(event).mods});
+    return actions(KeyChord{.key = std::get<KeyDownEvent>(event).key, .mods = std::get<KeyDownEvent>(event).mods});
   return {};
 }
 
 Set<InterfaceAction> KeyBindings::actions(KeyChord chord) const {
   std::size_t mostMatchedMods = 0;
   Set<InterfaceAction> matching;
-  auto bindings = m_actions.maybeRef(chord.key);
+  auto bindings = m_actions.find_ref(chord.key);
   if (!bindings)
     return matching;
   for (auto const& pair : bindings->get()) {
@@ -254,7 +254,7 @@ Set<InterfaceAction> KeyBindings::actions(KeyChord chord) const {
 
 Set<InterfaceAction> KeyBindings::actionsForKey(Key key) const {
   Set<InterfaceAction> matching;
-  if (auto bindings = m_actions.maybeRef(key)) {
+  if (auto bindings = m_actions.find_ref(key)) {
     for (auto const& pair : bindings->get())
       matching.add(pair.second);
   }

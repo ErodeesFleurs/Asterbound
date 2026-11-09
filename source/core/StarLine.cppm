@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 
 import star.math_common;
@@ -12,7 +12,7 @@ namespace Star {
 template <typename T, std::size_t N>
 class Line {
 public:
-  typedef Vector<T, N> VectorType;
+  using VectorType = Vector<T, N>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -222,7 +222,7 @@ public:
     requires (P == 2 && N == P)
   T lineProjection(VectorType const& l2) const {
     VectorType d = diff();
-    return ((l2[0] - min()[0]) * d[0] + (l2[1] - min()[1]) * d[1]) / d.magnitudeSquared();
+    return ((l2[0] - min()[0]) * d[0] + (l2[1] - min()[1]) * d[1]) / d.magnitude_squared();
   }
 
   template <std::size_t P = N>
@@ -274,22 +274,26 @@ private:
   VectorType m_max;
 };
 
-typedef Line<float, 2> Line2F;
-typedef Line<double, 2> Line2D;
-typedef Line<int, 2> Line2I;
+using Line2F = Line<float, 2>;
+using Line2D = Line<double, 2>;
+using Line2I = Line<int, 2>;
 
 template <typename T, std::size_t N>
-std::ostream& operator<<(std::ostream& os, Line<T, N> const& l) {
-  os << '[' << l.min() << ", " << l.max() << ']';
-  return os;
+  requires nonfallible_text_writable<Vector<T, N>>
+void write_text(TextBuffer& output, Line<T, N> const& line) {
+  output.push_back('[');
+  append_text(output, line.min());
+  output.append(", ");
+  append_text(output, line.max());
+  output.push_back(']');
 }
 
 template <typename T, std::size_t N>
 struct hash<Line<T, N>> {
   std::size_t operator()(Line<T, N> const& line) const {
     std::size_t hashval = 0;
-    hashCombine(hashval, vectorHasher(line.min()));
-    hashCombine(hashval, vectorHasher(line.max()));
+    hash_combine(hashval, vectorHasher(line.min()));
+    hash_combine(hashval, vectorHasher(line.max()));
     return hashval;
   }
   Star::hash<typename Line<T, N>::VectorType> vectorHasher;
@@ -306,13 +310,14 @@ export namespace Star {
 
 
 export template <typename T, std::size_t N>
-struct std::formatter<Star::Line<T, N>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
+struct std::formatter<Star::Line<T, N>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Line;
   using ::Star::Line2F;
   using ::Star::Line2D;
   using ::Star::Line2I;
-  using ::Star::operator<<;
+  using ::Star::write_text;
   using ::Star::hash;
 }

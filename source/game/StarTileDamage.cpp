@@ -44,15 +44,15 @@ List<Vec2I> tileAreaBrush(float range, Vec2F const& centerOffset, bool squareMod
       Vec2F fromCenter = Vec2F(x, y) + Vec2F(0.5, 0.5) + offset; // distance to the center of the tile
       Vec2I intPos = Vec2I(x, y);
       if (squareMode || fromCenter.magnitude() <= range) {
-        result.append(intPos + intOffset);
+        result.push_back(intPos + intOffset);
       }
     }
   }
   std::sort(result.begin(), result.end(), [](Vec2I const& a, Vec2I const& b) {
-      auto ams = a.magnitudeSquared();
-      auto bms = b.magnitudeSquared();
-      return std::tie(ams, a) < std::tie(bms, b);
-    });
+    auto ams = a.magnitude_squared();
+    auto bms = b.magnitude_squared();
+    return std::tie(ams, a) < std::tie(bms, b);
+  });
 
   return result;
 }
@@ -109,7 +109,7 @@ std::expected<TileDamageParameters, StarException> TileDamageParameters::create(
   auto factors = config.getObject("damageFactors");
   if (!factors) return std::unexpected(std::move(factors.error()));
   for (auto const& pair : *factors) {
-    auto type = TileDamageTypeNames->getLeft(pair.first);
+    auto type = TileDamageTypeNames->get_left(pair.first);
     if (!type) return std::unexpected(std::move(type.error()));
     auto amount = pair.second.toFloat();
     if (!amount) return std::unexpected(std::move(amount.error()));
@@ -165,14 +165,14 @@ TileDamageParameters TileDamageParameters::sum(TileDamageParameters const& other
   result.m_requiredHarvestLevel = std::max(m_requiredHarvestLevel, other.m_requiredHarvestLevel);
   result.m_maximumEffectTime = std::max(m_maximumEffectTime, other.m_maximumEffectTime);
 
-  for (auto const& key : m_damages.keyView()) {
+  for (auto const& key : m_damages.key_view()) {
     if (other.m_damages.contains(key))
       result.m_damages[key] = result.m_totalHealth / ((m_totalHealth / m_damages.value(key, 0)) + (other.m_totalHealth / other.m_damages.value(key, 0)));
     else
       result.m_damages[key] = m_damages.value(key, 0);
   }
 
-  for (auto const& key : m_damages.keyView()) {
+  for (auto const& key : m_damages.key_view()) {
     if (m_damages.contains(key))
       result.m_damages[key] = result.m_totalHealth / ((m_totalHealth / m_damages.value(key, 0)) + (other.m_totalHealth / other.m_damages.value(key, 0)));
     else
@@ -186,7 +186,7 @@ std::expected<Json, StarException> TileDamageParameters::toJson() const {
   if (!TileDamageTypeNames) return std::unexpected(TileDamageTypeNames.error());
   JsonObject factors;
   for (auto const& pair : m_damages) {
-    auto name = TileDamageTypeNames->getRight(pair.first);
+    auto name = TileDamageTypeNames->get_right(pair.first);
     if (!name) return std::unexpected(std::move(name.error()));
     factors.emplace(name->get(), pair.second);
   }

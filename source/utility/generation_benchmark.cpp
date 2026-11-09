@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json;
 import star.output_proxy;
 import star.native_runtime;
@@ -149,11 +150,13 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(initialized.error()));
     auto& [root, options] = *initialized;
 
-    coutf("Fully loading root...");
+    if (auto written = Star::print("Fully loading root..."); !written)
+      return std::unexpected(std::move(written.error()));
     auto loaded = root->fullyLoad();
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
-    coutf(" done\n");
+    if (auto written = Star::print(" done\n"); !written)
+      return std::unexpected(std::move(written.error()));
 
     auto celestialDatabase = CelestialMasterDatabase::create(*root);
     if (!celestialDatabase)
@@ -187,7 +190,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto text = regionsOption->first();
       if (!text)
         return std::unexpected(std::move(text.error()));
-      auto parsed = lexicalCast<unsigned>(text->get());
+      auto parsed = lexical_cast<unsigned>(text->get());
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       regionsToGenerate = *parsed;
@@ -198,7 +201,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto text = regionSizeOption->first();
       if (!text)
         return std::unexpected(std::move(text.error()));
-      auto parsed = lexicalCast<unsigned>(text->get());
+      auto parsed = lexical_cast<unsigned>(text->get());
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       regionSize = *parsed;
@@ -209,13 +212,14 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto text = reportEveryOption->first();
       if (!text)
         return std::unexpected(std::move(text.error()));
-      auto parsed = lexicalCast<unsigned>(text->get());
+      auto parsed = lexical_cast<unsigned>(text->get());
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       reportEvery = *parsed;
     }
 
-    coutf("testing generation on coordinate {}\n", coordinate);
+    if (auto written = Star::print("testing generation on coordinate {}\n", coordinate); !written)
+      return std::unexpected(std::move(written.error()));
 
     auto worldParameters = (*celestialDatabase)->parameters(coordinate);
     if (!worldParameters)
@@ -229,7 +233,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 
     auto rand = RandomSource(worldTemplate->worldSeed());
 
-    auto storage = File::ephemeralFile(root->random());
+    auto storage = File::ephemeral_file(root->random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto server = WorldServer::create(*root, std::move(worldTemplate), *storage);
@@ -241,13 +245,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto start = std::chrono::steady_clock::now();
     auto lastReport = std::chrono::steady_clock::now();
 
-    coutf("Starting world generation for {} regions\n", regionsToGenerate);
+    if (auto written = Star::print("Starting world generation for {} regions\n", regionsToGenerate); !written)
+      return std::unexpected(std::move(written.error()));
 
     for (unsigned i = 0; i < regionsToGenerate; ++i) {
       if (i != 0 && i % reportEvery == 0) {
         float gps = reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
         lastReport = std::chrono::steady_clock::now();
-        coutf("[{}] {}s | Generatons Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps);
+        if (auto written = Star::print("[{}] {}s | Generatons Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps); !written)
+          return std::unexpected(std::move(written.error()));
       }
 
       auto x = rand.randInt(0, worldSize[0]);
@@ -262,14 +268,16 @@ static std::expected<void, StarException> run(int argc, char** argv) {
         return std::unexpected(std::move(generated.error()));
     }
 
-    coutf("Finished generating {} regions with size {}x{} in world '{}' in {} seconds", regionsToGenerate, regionSize, regionSize, coordinate, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+    if (auto written = Star::print("Finished generating {} regions with size {}x{} in world '{}' in {} seconds", regionsToGenerate, regionSize, regionSize, coordinate, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
+      return std::unexpected(std::move(written.error()));
     return worldServer.close();
 }
 
 int main(int argc, char** argv) {
   auto result = run(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return 0;

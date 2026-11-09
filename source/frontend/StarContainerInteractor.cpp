@@ -43,7 +43,7 @@ std::expected<void, StarException> ContainerInteractor::openContainer(std::share
   m_openContainer = std::move(containerEntity);
   if (m_openContainer) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((m_openContainer->inWorld()));
+      Star::star_assert_failed((m_openContainer->inWorld()));
     }
     auto opened = m_openContainer->containerOpen();
     if (!opened) {
@@ -90,7 +90,7 @@ std::expected<List<ContainerResult>, StarException> ContainerInteractor::pullCon
     if (!finished)
       return std::unexpected(std::move(finished.error()));
     if (*result)
-      results.append(std::move(**result));
+      results.push_back(std::move(**result));
     if (*finished)
       it = m_pendingResults.erase(it);
     else
@@ -107,7 +107,7 @@ std::expected<void, StarException> ContainerInteractor::swapInContainer(std::siz
     auto wrapped = promise->wrap(resultFromItem);
     if (!wrapped)
       return std::unexpected(std::move(wrapped.error()));
-    m_pendingResults.append(std::move(*wrapped));
+    m_pendingResults.push_back(std::move(*wrapped));
   }
   return {};
 }
@@ -120,7 +120,7 @@ std::expected<void, StarException> ContainerInteractor::addToContainer(std::shar
     auto wrapped = promise->wrap(resultFromItem);
     if (!wrapped)
       return std::unexpected(std::move(wrapped.error()));
-    m_pendingResults.append(std::move(*wrapped));
+    m_pendingResults.push_back(std::move(*wrapped));
   }
   return {};
 }
@@ -133,7 +133,7 @@ std::expected<void, StarException> ContainerInteractor::takeFromContainerSlot(st
     auto wrapped = promise->wrap(resultFromItem);
     if (!wrapped)
       return std::unexpected(std::move(wrapped.error()));
-    m_pendingResults.append(std::move(*wrapped));
+    m_pendingResults.push_back(std::move(*wrapped));
   }
   return {};
 }
@@ -146,7 +146,7 @@ std::expected<void, StarException> ContainerInteractor::applyAugmentInContainer(
     auto wrapped = promise->wrap(resultFromItem);
     if (!wrapped)
       return std::unexpected(std::move(wrapped.error()));
-    m_pendingResults.append(std::move(*wrapped));
+    m_pendingResults.push_back(std::move(*wrapped));
   }
   return {};
 }
@@ -174,7 +174,7 @@ std::expected<void, StarException> ContainerInteractor::clearContainer() {
     auto promise = container->clearContainer();
     if (!promise)
       return std::unexpected(std::move(promise.error()));
-    m_pendingResults.append(std::move(*promise));
+    m_pendingResults.push_back(std::move(*promise));
   }
   return {};
 }

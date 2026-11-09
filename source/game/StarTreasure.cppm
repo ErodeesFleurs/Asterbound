@@ -69,7 +69,7 @@ private:
   // Specifies either an item descriptor or the name of a valid treasurepool to
   // be
   // used when an entry is selected in a "fill" or "pool" list
-  typedef std::variant<std::monostate, String, ItemDescriptor> TreasureEntry;
+  using TreasureEntry = std::variant<std::monostate, String, ItemDescriptor>;
 
   struct ItemPool {
     ItemPool();
@@ -95,7 +95,7 @@ private:
     // Note that this flag does not apply to child pools
     bool allowDuplication;
   };
-  typedef ParametricTable<float, ItemPool> TreasurePool;
+  using TreasurePool = ParametricTable<float, ItemPool>;
 
   struct TreasureChest {
     TreasureChest();
@@ -104,7 +104,7 @@ private:
     String treasurePool;
     float minimumLevel;
   };
-  typedef List<TreasureChest> TreasureChestSet;
+  using TreasureChestSet = List<TreasureChest>;
 
   Root& m_root;
   StringMap<TreasurePool> m_treasurePools;

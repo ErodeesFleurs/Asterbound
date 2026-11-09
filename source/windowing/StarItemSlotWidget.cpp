@@ -74,7 +74,7 @@ namespace Star {
 
 static String formatShortSize(std::uint64_t n) {
     if (n < 10000)
-      return toString(n);
+      return Star::to_string(n);
 
     std::uint64_t divisor = 1000ull;
     char suffix = 'k';
@@ -98,17 +98,17 @@ static String formatShortSize(std::uint64_t n) {
 
     std::uint64_t whole = n / divisor;
     if (whole >= 100ull)
-        return strf("{}{:c}", whole, suffix);
+        return Star::format("{}{:c}", whole, suffix);
 
     std::uint64_t remainder = n - (whole * divisor);
     std::uint64_t frac = (remainder / (divisor / 1000));
 
     if (frac == 0)
-      return strf("{}{:c}", whole, suffix);
+      return Star::format("{}{:c}", whole, suffix);
     else if (whole >= 10)
-      return strf("{}.{}{:c}", whole, frac / 100, suffix);
+      return Star::format("{}.{}{:c}", whole, frac / 100, suffix);
     else
-      return strf("{}.{:02d}{:c}", whole, frac / 10, suffix);
+      return Star::format("{}.{:02d}{:c}", whole, frac / 10, suffix);
 }
 
 ItemSlotWidget::ItemSlotWidget(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage, Animation newItemIndicator, Animation highlightAnimation)
@@ -173,7 +173,7 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
     if (!size) return std::unexpected(std::move(size.error()));
     backingSize = Vec2I(*size);
   }
-  widget->setSize(area->max().piecewiseMax(backingSize));
+  widget->setSize(area->max().piecewise_max(backingSize));
   auto slotConfig = (*assets)->json("/interface/itemSlot.config");
   if (!slotConfig) return std::unexpected(std::move(slotConfig.error()));
   auto children = slotConfig->get("config");
@@ -221,16 +221,12 @@ std::expected<bool, StarException> ItemSlotWidget::sendEvent(InputEvent const& e
   return false;
 }
 
-void ItemSlotWidget::setCallback(WidgetCallbackFunc callback) {
-  m_callback = callback;
-}
+void ItemSlotWidget::setCallback(WidgetCallbackFunc callback) { m_callback = std::move(callback); }
 
-void ItemSlotWidget::setRightClickCallback(WidgetCallbackFunc callback) {
-  m_rightClickCallback = callback;
-}
+void ItemSlotWidget::setRightClickCallback(WidgetCallbackFunc callback) { m_rightClickCallback = std::move(callback); }
 
 void ItemSlotWidget::setMiddleClickCallback(WidgetCallbackFunc callback) {
-  m_middleClickCallback = callback;
+  m_middleClickCallback = std::move(callback);
 }
 
 void ItemSlotWidget::setItem(std::shared_ptr<Item> const& item) {
@@ -290,8 +286,8 @@ void ItemSlotWidget::setHighlightEnabled(bool highlight) {
 
 std::expected<void, StarException> ItemSlotWidget::renderImpl() {
   auto drawCooldown = [&slot = *this]() -> std::expected<void, StarException> {
-    int frame = (int)std::roundf(slot.m_progress * 18);
-    return slot.context().drawInterfaceQuad(AssetPath(String(strf("/interface/cooldown.png:{}", frame))), Vec2F(slot.screenPosition()));
+    int frame = static_cast<int>(std::roundf(slot.m_progress * 18));
+    return slot.context().drawInterfaceQuad(AssetPath(String(Star::format("/interface/cooldown.png:{}", frame))), Vec2F(slot.screenPosition()));
   };
   if (m_item) {
     if (m_drawBackingImageWhenFull && !m_backingImage.empty()) {

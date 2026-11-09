@@ -1,7 +1,7 @@
 module;
 import std;
 import star.format;
-import star.stream_formatter;
+import star.text_formatter;
 import star.list;
 import star.array;
 import star.optional;
@@ -22,21 +22,21 @@ using MultiArrayException = StarError<MultiArrayExceptionTag, StarException>;
 template <typename ElementT, std::size_t RankN>
 class MultiArray {
 public:
-  typedef List<ElementT> Storage;
+  using Storage = List<ElementT>;
 
-  typedef ElementT Element;
+  using Element = ElementT;
   static std::size_t const Rank = RankN;
 
-  typedef Array<std::size_t, Rank> IndexArray;
-  typedef Array<std::size_t, Rank> SizeArray;
+  using IndexArray = Array<std::size_t, Rank>;
+  using SizeArray = Array<std::size_t, Rank>;
 
   using Extents = std::dextents<std::size_t, Rank>;
   using View = std::mdspan<Element, Extents, std::layout_right>;
   using ConstView = std::mdspan<Element const, Extents, std::layout_right>;
 
-  typedef typename Storage::iterator iterator;
-  typedef typename Storage::const_iterator const_iterator;
-  typedef Element value_type;
+  using iterator = typename Storage::iterator;
+  using const_iterator = typename Storage::const_iterator;
+  using value_type = Element;
 
   MultiArray();
   template <typename... T>
@@ -109,8 +109,8 @@ public:
   template <typename OpType>
   void forEach(OpType&& op) const;
 
-  template <typename OStream>
-  void print(OStream& os) const;
+  void print(TextBuffer& output) const
+      requires std::same_as<optional_diagnostic_result<Element>, void>;
 
   // Api for more direct access to elements.
 
@@ -133,8 +133,8 @@ public:
 private:
   std::size_t storageIndex(IndexArray const& index) const;
 
-  template <typename OStream>
-  void subPrint(OStream& os, IndexArray index, std::size_t dim) const;
+  void sub_print(TextBuffer& output, IndexArray index, std::size_t dim) const
+      requires std::same_as<optional_diagnostic_result<Element>, void>;
 
   template <typename OpType>
   void subForEach(IndexArray const& min, SizeArray const& size, OpType&& op, IndexArray& index, std::size_t offset, std::size_t dim) const;
@@ -149,26 +149,27 @@ private:
   SizeArray m_shape;
 };
 
-typedef MultiArray<int, 2> MultiArray2I;
-typedef MultiArray<std::size_t, 2> MultiArray2S;
-typedef MultiArray<unsigned, 2> MultiArray2U;
-typedef MultiArray<float, 2> MultiArray2F;
-typedef MultiArray<double, 2> MultiArray2D;
+using MultiArray2I = MultiArray<int, 2>;
+using MultiArray2S = MultiArray<std::size_t, 2>;
+using MultiArray2U = MultiArray<unsigned, 2>;
+using MultiArray2F = MultiArray<float, 2>;
+using MultiArray2D = MultiArray<double, 2>;
 
-typedef MultiArray<int, 3> MultiArray3I;
-typedef MultiArray<std::size_t, 3> MultiArray3S;
-typedef MultiArray<unsigned, 3> MultiArray3U;
-typedef MultiArray<float, 3> MultiArray3F;
-typedef MultiArray<double, 3> MultiArray3D;
+using MultiArray3I = MultiArray<int, 3>;
+using MultiArray3S = MultiArray<std::size_t, 3>;
+using MultiArray3U = MultiArray<unsigned, 3>;
+using MultiArray3F = MultiArray<float, 3>;
+using MultiArray3D = MultiArray<double, 3>;
 
-typedef MultiArray<int, 4> MultiArray4I;
-typedef MultiArray<std::size_t, 4> MultiArray4S;
-typedef MultiArray<unsigned, 4> MultiArray4U;
-typedef MultiArray<float, 4> MultiArray4F;
-typedef MultiArray<double, 4> MultiArray4D;
+using MultiArray4I = MultiArray<int, 4>;
+using MultiArray4S = MultiArray<std::size_t, 4>;
+using MultiArray4U = MultiArray<unsigned, 4>;
+using MultiArray4F = MultiArray<float, 4>;
+using MultiArray4D = MultiArray<double, 4>;
 
 template <typename Element, std::size_t Rank>
-std::ostream& operator<<(std::ostream& os, MultiArray<Element, Rank> const& array);
+  requires std::same_as<optional_diagnostic_result<Element>, void>
+void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array);
 
 template <typename Element, std::size_t Rank>
 MultiArray<Element, Rank>::MultiArray() {
@@ -308,7 +309,7 @@ template <typename Element, std::size_t Rank>
 std::expected<std::reference_wrapper<Element const>, StarException> MultiArray<Element, Rank>::at(IndexArray const& index) const {
   for (std::size_t i = Rank; i != 0; --i) {
     if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(strf("Out of bounds on MultiArray::at({})", index)));
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
   }
 
   return std::reference_wrapper<Element const>(m_data[storageIndex(index)]);
@@ -318,7 +319,7 @@ template <typename Element, std::size_t Rank>
 std::expected<std::reference_wrapper<Element>, StarException> MultiArray<Element, Rank>::at(IndexArray const& index) {
   for (std::size_t i = Rank; i != 0; --i) {
     if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(strf("Out of bounds on MultiArray::at({})", index)));
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
   }
 
   return std::reference_wrapper<Element>(m_data[storageIndex(index)]);
@@ -340,7 +341,7 @@ template <typename Element, std::size_t Rank>
 std::expected<void, StarException> MultiArray<Element, Rank>::set(IndexArray const& index, Element element) {
   for (std::size_t i = Rank; i != 0; --i) {
     if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(strf("Out of bounds on MultiArray::set({})", index)));
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::set({})", index)));
   }
 
   m_data[storageIndex(index)] = std::move(element);
@@ -410,9 +411,9 @@ void MultiArray<Element, Rank>::forEach(OpType&& op) const {
 }
 
 template <typename Element, std::size_t Rank>
-template <typename OStream>
-void MultiArray<Element, Rank>::print(OStream& os) const {
-  subPrint(os, IndexArray(), 0);
+void MultiArray<Element, Rank>::print(TextBuffer& output) const
+    requires std::same_as<optional_diagnostic_result<Element>, void> {
+  sub_print(output, IndexArray(), 0);
 }
 
 template <typename Element, std::size_t Rank>
@@ -432,13 +433,10 @@ Element& MultiArray<Element, Rank>::atIndex(std::size_t index) {
 
 template <typename Element, std::size_t Rank>
 Element const* MultiArray<Element, Rank>::data() const {
-  return m_data.ptr();
+  return m_data.data();
 }
 
-template <typename Element, std::size_t Rank>
-Element* MultiArray<Element, Rank>::data() {
-  return m_data.ptr();
-}
+template <typename Element, std::size_t Rank> Element* MultiArray<Element, Rank>::data() { return m_data.data(); }
 
 template <typename Element, std::size_t Rank>
 typename MultiArray<Element, Rank>::View MultiArray<Element, Rank>::view() &
@@ -456,35 +454,33 @@ template <typename Element, std::size_t Rank>
 std::size_t MultiArray<Element, Rank>::storageIndex(IndexArray const& index) const {
   std::size_t loc = index[0];
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((index[0] < m_shape[0]));
+    Star::star_assert_failed((index[0] < m_shape[0]));
   }
   for (std::size_t i = 1; i < Rank; ++i) {
     loc = loc * m_shape[i] + index[i];
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((index[i] < m_shape[i]));
+      Star::star_assert_failed((index[i] < m_shape[i]));
     }
   }
   return loc;
 }
 
 template <typename Element, std::size_t Rank>
-template <typename OStream>
-void MultiArray<Element, Rank>::subPrint(OStream& os, IndexArray index, std::size_t dim) const {
+void MultiArray<Element, Rank>::sub_print(TextBuffer& output, IndexArray index, std::size_t dim) const
+    requires std::same_as<optional_diagnostic_result<Element>, void> {
   if (dim == Rank - 1) {
     for (std::size_t i = 0; i < m_shape[dim]; ++i) {
       index[dim] = i;
-      if constexpr (requires { outputOptional(m_data[storageIndex(index)]); })
-        os << outputOptional(m_data[storageIndex(index)]) << ' ';
-      else
-        os << m_data[storageIndex(index)] << ' ';
+      append_text(output, optional_diagnostic_value(m_data[storageIndex(index)]));
+      output.push_back(' ');
     }
-    os << std::endl;
+    output.push_back('\n');
   } else {
     for (std::size_t i = 0; i < m_shape[dim]; ++i) {
       index[dim] = i;
-      subPrint(os, index, dim + 1);
+      sub_print(output, index, dim + 1);
     }
-    os << std::endl;
+    output.push_back('\n');
   }
 }
 
@@ -537,9 +533,9 @@ void MultiArray<Element, Rank>::subCopy(MultiArray const& source, IndexArray con
 }
 
 template <typename Element, std::size_t Rank>
-std::ostream& operator<<(std::ostream& os, MultiArray<Element, Rank> const& array) {
-  array.print(os);
-  return os;
+  requires std::same_as<optional_diagnostic_result<Element>, void>
+void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array) {
+  array.print(output);
 }
 
 }
@@ -547,7 +543,8 @@ std::ostream& operator<<(std::ostream& os, MultiArray<Element, Rank> const& arra
 export module star.multi_array;
 
 export template <typename Element, std::size_t Rank>
-struct std::formatter<Star::MultiArray<Element, Rank>> : Star::StreamFormatter {};
+  requires std::same_as<Star::optional_diagnostic_result<Element>, void>
+struct std::formatter<Star::MultiArray<Element, Rank>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::MultiArrayExceptionTag;
@@ -568,5 +565,5 @@ export namespace Star {
   using ::Star::MultiArray4U;
   using ::Star::MultiArray4F;
   using ::Star::MultiArray4D;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

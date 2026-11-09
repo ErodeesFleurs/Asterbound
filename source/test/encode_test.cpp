@@ -1,8 +1,16 @@
+#include <zlib-ng.h>
 import std;
 import star.string;
 import star.byte_array;
 import star.encode;
 import star.format;
+import star.compression;
+
+typedef struct ZSTD_CCtx_s ZSTD_CCtx;
+typedef struct ZSTD_DCtx_s ZSTD_DCtx;
+typedef ZSTD_DCtx ZSTD_DStream;
+typedef ZSTD_CCtx ZSTD_CStream;
+import star.zstd_compression;
 
 #include "gtest/gtest.h"
 
@@ -90,4 +98,247 @@ TEST(EncodeTest, BorrowedSpans) {
   ASSERT_TRUE(result11) << result11.error().what();
   EXPECT_EQ((*result11), 1u);
   EXPECT_EQ(output[0], 'M');
+}
+
+TEST(EncodeTest, OwningEncodersPreserveEmptyBinaryAndPaddingBoundaries) {
+  struct Case {
+    std::string_view input;
+    std::string_view hex;
+    std::string_view base64;
+  };
+  Case const cases[]{{"", "", ""},
+                     {"M", "4d", "TQ=="},
+                     {"Ma", "4d61", "TWE="},
+                     {"Man", "4d616e", "TWFu"},
+                     {std::string_view("\0\x7f\x80\xff", 4), "007f80ff", "AH+A/w=="}};
+  for (auto const& test : cases) {
+    SCOPED_TRACE(test.hex);
+    auto input = std::span<char const>(test.input.data(), test.input.size());
+    EXPECT_EQ(hexEncode(input), String(test.hex));
+    EXPECT_EQ(base64Encode(input), String(test.base64));
+  }
+}
+
+TEST(EncodeTest, OwningHexDecoderPreservesPermissiveNibblesAndOddTails) {
+  struct Case {
+    String input;
+    ByteArray expected;
+  };
+  Case const cases[]{{"", {}},
+                     {"f", {}},
+                     {"g1f", ByteArray({"\x01", 1})},
+                     {"Fg?fZZ1", ByteArray({"\xf0\x0f\0", 3})},
+                     {String(std::string_view("a\0Ff0", 5)), ByteArray({"\xa0\xff", 2})}};
+  for (auto const& test : cases) {
+    auto decoded = hexDecode(test.input);
+    ASSERT_TRUE(decoded) << decoded.error().what();
+    EXPECT_EQ(*decoded, test.expected);
+  }
+}
+
+TEST(EncodeTest, OwningBase64DecoderPublishesOnlyAcceptedPartialGroups) {
+  struct Case {
+    String input;
+    ByteArray expected;
+  };
+  Case const cases[]{{"", {}},
+                     {"T", {}},
+                     {"TQ", ByteArray({"M", 1})},
+                     {"TWE", ByteArray({"Ma", 2})},
+                     {"TWFu", ByteArray({"Man", 3})},
+                     {"TWFuT", ByteArray({"Man", 3})},
+                     {"TWFuTQ", ByteArray({"ManM", 4})},
+                     {"TQ=ignored", ByteArray({"M", 1})},
+                     {"TWE!ignored", ByteArray({"Ma", 2})},
+                     {"!TWFu", {}},
+                     {String(std::string_view("TQ\0TWFu", 7)), ByteArray({"M", 1})},
+                     {"AH+A/w==", ByteArray({"\0\x7f\x80\xff", 4})}};
+  for (auto const& test : cases) {
+    auto decoded = base64Decode(test.input);
+    ASSERT_TRUE(decoded) << decoded.error().what();
+    EXPECT_EQ(*decoded, test.expected);
+  }
+}
+
+namespace {
+
+// A single final stored block keeps checksum and truncation failures independent
+// of compressor heuristics, while crossing the 32768-byte output-call boundary.
+ByteArray storedFrame(ByteArray const& payload, bool gzip) {
+  ByteArray frame = gzip ? ByteArray({"\x1f\x8b\x08\0\0\0\0\0\0\xff", 10}) : ByteArray({"\x78\x01", 2});
+  auto appendLittle = [&](std::uint32_t value, unsigned bytes) {
+    for (unsigned i = 0; i < bytes; ++i)
+      frame.push_back(static_cast<char>(value >> (8 * i)));
+  };
+  frame.push_back(1);
+  appendLittle(payload.size(), 2);
+  appendLittle(static_cast<std::uint16_t>(~payload.size()), 2);
+  frame.append(payload);
+  if (gzip) {
+    auto crc = zng_crc32(0, reinterpret_cast<std::uint8_t const*>(payload.data()), payload.size());
+    appendLittle(crc, 4);
+    appendLittle(payload.size(), 4);
+  } else {
+    auto adler = zng_adler32(1, reinterpret_cast<std::uint8_t const*>(payload.data()), payload.size());
+    for (int shift = 24; shift >= 0; shift -= 8)
+      frame.push_back(static_cast<char>(adler >> shift));
+  }
+  return frame;
+}
+
+std::expected<ByteArray, StarException> stagedDeflate(ByteArray const& input, CompressionLevel level) {
+  zng_stream stream{};
+  auto status = zng_deflateInit(&stream, level);
+  if (status != Z_OK)
+    return std::unexpected(IOException("Cannot initialize reference deflate"));
+  auto cleanup = [](zng_stream* stream) { zng_deflateEnd(stream); };
+  std::unique_ptr<zng_stream, decltype(cleanup)> owner(&stream, cleanup);
+  stream.next_in = reinterpret_cast<std::uint8_t const*>(input.data());
+  stream.avail_in = input.size();
+  std::array<std::uint8_t, 32768> staging;
+  ByteArray result;
+  do {
+    stream.next_out = staging.data();
+    stream.avail_out = staging.size();
+    status = zng_deflate(&stream, Z_FINISH);
+    if (status != Z_OK && status != Z_STREAM_END)
+      return std::unexpected(IOException("Reference deflate failed"));
+    result.append({reinterpret_cast<char const*>(staging.data()), staging.size() - stream.avail_out});
+  } while (status != Z_STREAM_END);
+  return result;
+}
+
+}
+
+TEST(CompressionTest, DirectOutputPreservesStagedDeflateBytesAcrossChunkBoundaries) {
+  for (auto size : {32767u, 32768u, 32769u, 65537u}) {
+    ByteArray input;
+    input.resize(size);
+    std::uint32_t state = 0x12345678;
+    for (char& byte : input) {
+      state = state * 1664525u + 1013904223u;
+      byte = static_cast<char>(state >> 24);
+    }
+    for (auto level : {0, 2, 5, 9}) {
+      SCOPED_TRACE(size);
+      SCOPED_TRACE(level);
+      auto expected = stagedDeflate(input, level);
+      ASSERT_TRUE(expected) << expected.error().what();
+      auto compressed = compressData(input, level);
+      ASSERT_TRUE(compressed) << compressed.error().what();
+      EXPECT_EQ(*compressed, *expected);
+      auto decoded = uncompressData(*compressed);
+      ASSERT_TRUE(decoded) << decoded.error().what();
+      EXPECT_EQ(*decoded, input);
+    }
+  }
+}
+
+TEST(CompressionTest, InflateFailuresPublishOnlyPreviouslyAcceptedCodecCalls) {
+  ByteArray payload(32768 + 37, 'p');
+  for (bool gzip : {false, true}) {
+    SCOPED_TRACE(gzip);
+    auto frame = storedFrame(payload, gzip);
+    auto decode = [&](ByteArray const& input, ByteArray& output, std::size_t limit = 0) {
+      return gzip ? uncompressDataGzip(input, output, limit) : uncompressData(input, output, limit);
+    };
+    ByteArray output = ByteArray::from_string("old output");
+    ASSERT_TRUE(decode(frame, output));
+    EXPECT_EQ(output, payload);
+    for (auto limit : {1u, 32767u, 32768u, 32769u}) {
+      auto result = decode(frame, output, limit);
+      ASSERT_FALSE(result);
+      EXPECT_TRUE(result.error().is<IOException>());
+      EXPECT_EQ(output, ByteArray(limit < 32768 ? 0 : 32768, 'p'));
+    }
+    ASSERT_TRUE(decode(frame, output, payload.size()));
+    EXPECT_EQ(output, payload);
+
+    auto corrupt = frame;
+    auto checksumOffset = corrupt.size() - (gzip ? 8 : 4);
+    corrupt[checksumOffset] ^= 1;
+    auto checksumFailure = decode(corrupt, output);
+    ASSERT_FALSE(checksumFailure);
+    EXPECT_TRUE(checksumFailure.error().is<IOException>());
+    EXPECT_EQ(output, ByteArray(32768, 'p'));
+
+    auto truncated = frame;
+    truncated.resize(checksumOffset);
+    auto truncatedFailure = decode(truncated, output);
+    ASSERT_FALSE(truncatedFailure);
+    EXPECT_TRUE(truncatedFailure.error().is<IOException>());
+    EXPECT_EQ(output, payload);
+
+    auto malformed = ByteArray::from_string("not compressed");
+    ASSERT_FALSE(decode(malformed, output));
+    EXPECT_TRUE(output.empty());
+    ASSERT_TRUE(decode(ByteArray(), output));
+    EXPECT_TRUE(output.empty());
+  }
+}
+
+TEST(CompressionTest, InitializationFailureAndEmptyInputPreserveClearOrdering) {
+  ByteArray input = ByteArray::from_string("payload");
+  ByteArray output = ByteArray::from_string("old output");
+  auto failed = compressData(input, output, 100);
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<IOException>());
+  EXPECT_TRUE(output.empty());
+  output = input;
+  EXPECT_TRUE(compressData(ByteArray(), output, 100));
+  EXPECT_TRUE(output.empty());
+}
+
+TEST(CompressionTest, ZstdOneShotAndStreamErrorsPreserveExistingOutput) {
+  ByteArray input(300000, 'z');
+  auto compressed = ZstdCompression::compress(input);
+  ASSERT_TRUE(compressed) << compressed.error().what();
+  auto decompressed = ZstdCompression::decompress(*compressed);
+  ASSERT_TRUE(decompressed) << decompressed.error().what();
+  EXPECT_EQ(*decompressed, input);
+  auto malformed = ByteArray::from_string("not a ZSTD frame");
+  ByteArray output = ByteArray::from_string("existing");
+  auto original = output;
+  EXPECT_FALSE(ZstdCompression::decompress(malformed, output));
+  EXPECT_EQ(output, original);
+  auto truncated = *compressed;
+  truncated.resize(truncated.size() - 1);
+  EXPECT_FALSE(ZstdCompression::decompress(truncated, output));
+  EXPECT_EQ(output, original);
+
+  auto decoder = DecompressionStream::create();
+  ASSERT_TRUE(decoder) << decoder.error().what();
+  auto followedByInvalidFrame = *compressed;
+  followedByInvalidFrame.append(malformed);
+  EXPECT_FALSE((*decoder)->decompress(followedByInvalidFrame, output));
+  EXPECT_EQ(output, original);
+}
+
+TEST(CompressionTest, OwningSmallResultsCompactScratchSlackButReusableOutputsKeepCapacity) {
+  auto input = ByteArray::from_string("seventeen bytes!!");
+  auto compressed = compressData(input);
+  ASSERT_TRUE(compressed) << compressed.error().what();
+  auto retained = std::max(input.size(), compressed->size());
+  EXPECT_LE(compressed->capacity() - retained, retained);
+  auto decoded = uncompressData(*compressed);
+  ASSERT_TRUE(decoded) << decoded.error().what();
+  EXPECT_EQ(*decoded, input);
+  EXPECT_LE(decoded->capacity() - decoded->size(), decoded->size());
+
+  auto gzip = storedFrame(input, true);
+  auto gzipDecoded = uncompressDataGzip(gzip);
+  ASSERT_TRUE(gzipDecoded) << gzipDecoded.error().what();
+  EXPECT_EQ(*gzipDecoded, input);
+  EXPECT_LE(gzipDecoded->capacity() - gzipDecoded->size(), gzipDecoded->size());
+
+  ByteArray reusable;
+  ASSERT_TRUE(compressData(input, reusable));
+  EXPECT_GE(reusable.capacity(), 32768u);
+  auto reusableCapacity = reusable.capacity();
+  ASSERT_TRUE(uncompressData(*compressed, reusable));
+  EXPECT_EQ(reusable, input);
+  EXPECT_GE(reusable.capacity(), reusableCapacity);
+  ASSERT_TRUE(uncompressDataGzip(gzip, reusable));
+  EXPECT_EQ(reusable, input);
+  EXPECT_GE(reusable.capacity(), reusableCapacity);
 }

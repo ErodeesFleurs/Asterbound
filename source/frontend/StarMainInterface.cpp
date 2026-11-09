@@ -473,7 +473,7 @@ std::expected<void, StarException> MainInterface::handleInventoryDismissed() {
     if (auto closed = m_containerInteractor->closeContainer(); !closed)
       return std::unexpected(std::move(closed.error()));
   }
-  for (EntityId id : m_interactionScriptPanes.keyView()) {
+  for (EntityId id : m_interactionScriptPanes.key_view()) {
     auto pane = as<ScriptPane>(m_interactionScriptPanes[id]);
     if (m_paneManager.isDisplayed(pane)) {
       auto withInventory = pane->openWithInventory();
@@ -811,8 +811,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
 
 std::expected<bool, StarException> MainInterface::paneIdAvailable(String const& id) {
   if (id.empty() || id == "$ui") return false;
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  return !MainInterfacePanesNames->getLeft(id).has_value();
+  return !enumValue<MainInterfacePanesNames>(id).has_value();
 }
 
 std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const {
@@ -822,7 +821,7 @@ std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const 
   for (auto const& pane : *targets) {
     for (auto const& entry : m_paneInstances) {
       if (entry.second.first == pane) {
-        ids.append(entry.first);
+        ids.push_back(entry.first);
         break;
       }
     }
@@ -832,7 +831,7 @@ std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const 
 
 std::expected<bool, StarException> MainInterface::paneLayerOccupied(String const& layer) const {
   if (!PaneLayerNames) return std::unexpected(PaneLayerNames.error());
-  auto parsed = PaneLayerNames->getLeft(layer);
+  auto parsed = PaneLayerNames->get_left(layer);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   return static_cast<bool>(m_paneManager.topPane({parsed->get()}));
 }
@@ -841,9 +840,9 @@ std::expected<void, StarException> MainInterface::createPane(String const& id, J
   auto available = paneIdAvailable(id);
   if (!available) return std::unexpected(std::move(available.error()));
   if (!*available || m_paneInstances.contains(id))
-    return std::unexpected(GuiException(strf("Pane id '{}' is already registered", id)));
+    return std::unexpected(GuiException(Star::format("Pane id '{}' is already registered", id)));
   if (!PaneLayerNames) return std::unexpected(PaneLayerNames.error());
-  auto parsed = PaneLayerNames->getLeft(layer);
+  auto parsed = PaneLayerNames->get_left(layer);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto pane = BaseScriptPane::create(context(), std::move(config));
   if (!pane) return std::unexpected(std::move(pane.error()));
@@ -854,7 +853,7 @@ std::expected<void, StarException> MainInterface::createPane(String const& id, J
 }
 
 std::expected<void, StarException> MainInterface::destroyPane(String const& id) {
-  auto instance = m_paneInstances.maybeRef(id);
+  auto instance = m_paneInstances.find_ref(id);
   if (!instance) return {};
   auto pane = instance->get().first;
   if (m_paneManager.isDisplayed(pane)) {
@@ -868,18 +867,17 @@ std::expected<void, StarException> MainInterface::destroyPane(String const& id) 
 }
 
 std::expected<std::shared_ptr<Pane>, StarException> MainInterface::findRegisteredPane(String const& id) {
-  if (auto instance = m_paneInstances.maybeRef(id))
+  if (auto instance = m_paneInstances.find_ref(id))
     return std::shared_ptr<Pane>(instance->get().first);
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) return std::shared_ptr<Pane>{};
-  auto pane = m_paneManager.maybeRegisteredPane(type->get());
+  auto pane = m_paneManager.maybeRegisteredPane(*type);
   if (!pane) return std::unexpected(std::move(pane.error()));
   return *pane;
 }
 
 std::expected<void, StarException> MainInterface::displayRegisteredPane(String const& id) {
-  if (auto instance = m_paneInstances.maybeRef(id)) {
+  if (auto instance = m_paneInstances.find_ref(id)) {
     auto [pane, layer] = instance->get();
     if (m_paneManager.isDisplayed(pane)) {
       if (auto shown = pane->show(); !shown)
@@ -888,26 +886,24 @@ std::expected<void, StarException> MainInterface::displayRegisteredPane(String c
     }
     return m_paneManager.displayPane(layer, pane);
   }
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (!type) {
     if (!m_uiController) return std::unexpected(std::move(type.error()));
     auto opened = m_uiController->invoke<Json>("open", id);
     if (!opened) return std::unexpected(std::move(opened.error()));
     return {};
   }
-  auto displayed = m_paneManager.displayRegisteredPane(type->get());
+  auto displayed = m_paneManager.displayRegisteredPane(*type);
   if (!displayed) return std::unexpected(std::move(displayed.error()));
   return {};
 }
 
 std::expected<void, StarException> MainInterface::togglePane(String const& id) {
-  if (!MainInterfacePanesNames) return std::unexpected(MainInterfacePanesNames.error());
-  auto type = MainInterfacePanesNames->getLeft(id);
+  auto type = enumValue<MainInterfacePanesNames>(id);
   if (type) {
-    if (type->get() == MainInterfacePanes::CraftingPlain)
+    if (*type == MainInterfacePanes::CraftingPlain)
       return togglePlainCraftingWindow();
-    auto toggled = m_paneManager.toggleRegisteredPane(type->get());
+    auto toggled = m_paneManager.toggleRegisteredPane(*type);
     if (!toggled) return std::unexpected(std::move(toggled.error()));
   } else {
     auto toggled = m_uiController->invoke<Json>("toggle", id);
@@ -921,7 +917,7 @@ std::expected<std::optional<Json>, StarException> MainInterface::callPane(String
   if (!pane) return std::unexpected(std::move(pane.error()));
   auto scripted = as<BaseScriptPane>(*pane);
   if (!scripted)
-    return std::unexpected(GuiException(strf("Pane '{}' does not expose Lua methods", id)));
+    return std::unexpected(GuiException(Star::format("Pane '{}' does not expose Lua methods", id)));
   return scripted->call(method, arguments);
 }
 
@@ -948,7 +944,7 @@ std::expected<void, StarException> MainInterface::addChatMessages(List<ChatRecei
     if (!logged) return std::unexpected(std::move(logged.error()));
     auto json = message.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    payload.append(std::move(*json));
+    payload.push_back(std::move(*json));
   }
   return sendPaneEvent("chat", "messages", JsonObject{{"messages", std::move(payload)}, {"showPane", showPane}});
 }
@@ -1035,7 +1031,7 @@ std::expected<bool, StarException> MainInterface::travel(String const& operation
     return true;
   }
   if (operation != "beamUp" && operation != "beamDown" && operation != "deploy")
-    return std::unexpected(GuiException(strf("Unknown travel operation '{}'", operation)));
+    return std::unexpected(GuiException(Star::format("Unknown travel operation '{}'", operation)));
   auto allowed = operation == "beamUp" ? m_client->canBeamUp() : m_client->canBeamDown(operation == "deploy");
   if (!allowed) return std::unexpected(std::move(allowed.error()));
   if (!*allowed) return false;
@@ -1149,9 +1145,7 @@ std::expected<void, StarException> MainInterface::togglePlainCraftingWindow() {
   return {};
 }
 
-bool MainInterface::windowsOpen() const {
-  return (bool)m_paneManager.topPane({PaneLayer::Window});
-}
+bool MainInterface::windowsOpen() const { return static_cast<bool>(m_paneManager.topPane({PaneLayer::Window})); }
 
 std::shared_ptr<MerchantPane> MainInterface::activeMerchantPane() const {
   if (m_paneManager.isDisplayed(m_merchantWindow))
@@ -1186,7 +1180,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
         bool& enabled;
         bool previous;
         ~CommandInputScope() { enabled = previous; }
-      } commandScope{m_commandInput, std::exchange(m_commandInput, userSubmit)};
+      } commandScope{.enabled = m_commandInput, .previous = std::exchange(m_commandInput, userSubmit)};
       std::optional<Input::ClipboardUnlock> clipboardUnlock;
       if (userSubmit) {
         auto input = context().input();
@@ -1207,9 +1201,9 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     if (!InterfaceActionNames) return std::unexpected(InterfaceActionNames.error());
     JsonArray actions;
     for (auto action : context().actions(event)) {
-      auto name = InterfaceActionNames->getRight(action);
+      auto name = InterfaceActionNames->get_right(action);
       if (!name) return std::unexpected(std::move(name.error()));
-      actions.append(name->get());
+      actions.push_back(name->get());
     }
     auto captured = m_paneManager.keyboardCapturedPane();
     if (!captured) return std::unexpected(std::move(captured.error()));
@@ -1327,7 +1321,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
       player->endTrigger();
   }
   bool captured = false;
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     auto consumed = pair.second->sendEvent(event);
     if (!consumed)
       return std::unexpected(std::move(consumed.error()));
@@ -1373,14 +1367,14 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     if (!containerPane) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
-        return std::unexpected(containerPane.error().withRelated(closed.error(), "Closing container after pane construction failure also failed"));
+        return std::unexpected(containerPane.error().with_related(closed.error(), "Closing container after pane construction failure also failed"));
       return std::unexpected(std::move(containerPane.error()));
     }
     auto inventory = m_paneManager.displayRegisteredPane(MainInterfacePanes::Inventory);
     if (!inventory) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
-        return std::unexpected(inventory.error().withRelated(closed.error(), "Closing container after inventory display failure also failed"));
+        return std::unexpected(inventory.error().with_related(closed.error(), "Closing container after inventory display failure also failed"));
       return std::unexpected(std::move(inventory.error()));
     }
     m_containerPane = std::move(*containerPane);
@@ -1401,7 +1395,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       auto closed = m_containerInteractor->closeContainer();
       m_containerPane.reset();
       if (!closed)
-        return std::unexpected(displayed.error().withRelated(closed.error(), "Closing container after pane display failure also failed"));
+        return std::unexpected(displayed.error().with_related(closed.error(), "Closing container after pane display failure also failed"));
       return std::unexpected(std::move(displayed.error()));
     }
     auto inventoryPane = m_paneManager.registeredPane(MainInterfacePanes::Inventory);
@@ -1479,7 +1473,10 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
           auto name = config->getString("bookmarkName", "");
           if (!name)
             return std::unexpected(std::move(name.error()));
-          currentLocation = TeleportBookmark{{playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)}, planetName, *name, icon};
+          currentLocation = TeleportBookmark{.target = {playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)},
+                                             .targetName = planetName,
+                                             .bookmarkName = *name,
+                                             .icon = icon};
           auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
           if (!bookmarks)
             return std::unexpected(std::move(bookmarks.error()));
@@ -1662,7 +1659,8 @@ std::expected<void, StarException> MainInterface::update(float dt) {
               m_cinematicOverlay->stop();
             }
           } else {
-            auto logged = context().root().logger().warn("MainInterface: ignoring non-object cinematic of type {}", (int)definition.type());
+            auto logged = context().root().logger().warn("MainInterface: ignoring non-object cinematic of type {}",
+                                                         static_cast<int>(definition.type()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             m_cinematicOverlay->stop();
@@ -1698,7 +1696,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   }
 
   if (!m_joinRequestDialog->isDisplayed()) {
-    if (auto req = m_queuedJoinRequests.maybeTakeLast()) {
+    if (auto req = m_queuedJoinRequests.try_take_back()) {
       auto displayed = m_paneManager.displayRegisteredPane(MainInterfacePanes::JoinRequest);
       if (!displayed)
         return std::unexpected(std::move(displayed.error()));
@@ -1836,7 +1834,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
     }
   }
 
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     pair.second->setPosition(Vec2I());
     auto size = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
     if (!size)
@@ -1878,7 +1876,7 @@ std::expected<void, StarException> MainInterface::render() {
   if (!size)
     return std::unexpected(std::move(size.error()));
   RectI screenRect = RectI::withSize(Vec2I(), Vec2I(*size));
-  for (auto& pair : m_canvases) {
+  for (auto&& pair : m_canvases) {
     pair.second->setPosition(Vec2I());
     auto canvasSize = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
     if (!canvasSize)
@@ -1906,7 +1904,7 @@ std::expected<StringList, StarException> MainInterface::executeClientCommand(Str
     bool& enabled;
     bool previous;
     ~CommandInputScope() { enabled = previous; }
-  } commandScope{m_commandInput, std::exchange(m_commandInput, false)};
+  } commandScope{.enabled = m_commandInput, .previous = std::exchange(m_commandInput, false)};
   if (commandScope.previous)
     m_lastCommand = command;
   return m_clientCommandProcessor->handleCommand(command);
@@ -1990,7 +1988,7 @@ std::expected<void, StarException> MainInterface::warpTo(WarpAction const& warpA
 }
 
 std::expected<std::shared_ptr<CanvasWidget>, StarException> MainInterface::fetchCanvas(String const& canvasName, bool ignoreInterfaceScale) {
-  if (auto existing = m_canvases.maybeRef(canvasName)) {
+  if (auto existing = m_canvases.find_ref(canvasName)) {
     existing->get()->setIgnoreInterfaceScale(ignoreInterfaceScale);
     return existing->get();
   }
@@ -2021,7 +2019,7 @@ std::expected<void, StarException> MainInterface::takeScriptPanes(List<ScriptPan
         return false;
       auto sourceEntityId = scriptPane->sourceEntityId();
       m_interactionScriptPanes.remove(sourceEntityId);
-      auto& info = out.emplaceAppend();
+      auto& info = out.emplace_back();
       info.scriptPane = scriptPane;
       info.config = scriptPane->rawConfig();
       info.sourceEntityId = sourceEntityId;
@@ -2102,7 +2100,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       int counter = 0;
       for (auto const& pair : logMapValues) {
         TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.fontSize * interfaceScale() * counter++)};
-        String& text = formatted.emplace_back(strf("{}^lightgray;:^green,set; {}", pair.first, pair.second));
+        String& text = formatted.emplace_back(Star::format("{}^lightgray;:^green,set; {}", pair.first, pair.second));
         auto size = context().determineTextSize(text, positioning);
         if (!size) return std::unexpected(std::move(size.error()));
         m_debugTextRect.combine(size->padded(m_config->debugBackgroundPad));
@@ -2158,7 +2156,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
   auto drawn = drawDebug();
   auto cleared = context().clearTextStyle();
   if (!drawn && !cleared)
-    return std::unexpected(drawn.error().withRelated(cleared.error(), "Debug text cleanup failed"));
+    return std::unexpected(drawn.error().with_related(cleared.error(), "Debug text cleanup failed"));
   if (!drawn) return std::unexpected(std::move(drawn.error()));
   return cleared;
 }
@@ -2183,7 +2181,7 @@ std::expected<void, StarException> MainInterface::updateCursor() {
         }
       }
       if (!cursorOverride) {
-        for (auto item : {player->primaryHandItem(), player->altHandItem()}) {
+        for (auto const& item : {player->primaryHandItem(), player->altHandItem()}) {
           if (auto activeItem = as<ActiveItem>(item)) {
             if (auto cursor = activeItem->cursor()) {
               cursorOverride = cursor;
@@ -2230,12 +2228,12 @@ std::expected<void, StarException> MainInterface::renderCursor() {
     if (!width) return std::unexpected(std::move(width.error()));
     auto height = windowHeight();
     if (!height) return std::unexpected(std::move(height.error()));
-    return m_cursorItem->render(RectI::withSize({}, {(int)*width, (int)*height}));
+    return m_cursorItem->render(RectI::withSize({}, {static_cast<int>(*width), static_cast<int>(*height)}));
   };
   auto drawn = drawItem();
   auto reset = context().resetInterfaceScissorRect();
   if (!drawn && !reset)
-    return std::unexpected(drawn.error().withRelated(reset.error(), "Cursor item scissor cleanup failed"));
+    return std::unexpected(drawn.error().with_related(reset.error(), "Cursor item scissor cleanup failed"));
   if (!drawn) return std::unexpected(std::move(drawn.error()));
   return reset;
 }
@@ -2258,7 +2256,7 @@ std::expected<void, StarException> MainInterface::displayScriptPane(std::shared_
   if (*layerName) {
     if (!PaneLayerNames)
       return std::unexpected(PaneLayerNames.error());
-    auto parsed = PaneLayerNames->getLeft(**layerName);
+    auto parsed = PaneLayerNames->get_left(**layerName);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     layer = parsed->get();

@@ -256,8 +256,8 @@ using EntityCallbackOf = std::function<std::expected<void, StarException>(std::s
 template <typename EntityT>
 using EntityFilterOf = std::function<std::expected<bool, StarException>(std::shared_ptr<EntityT> const&)>;
 
-typedef EntityCallbackOf<Entity> EntityCallback;
-typedef EntityFilterOf<Entity> EntityFilter;
+using EntityCallback = EntityCallbackOf<Entity>;
+using EntityFilter = EntityFilterOf<Entity>;
 
 // Filters based first on dynamic casting to the given type, then optionally on
 // the given derived type filter.

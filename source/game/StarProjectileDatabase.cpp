@@ -87,7 +87,7 @@ std::expected<std::shared_ptr<ProjectileDatabase>, StarException> ProjectileData
     String file = scannedFile.string();
     auto config = database->readConfig(file);
     if (!config) {
-      if (auto logged = root.logger().errorException(strf("Could not read projectile '{}'", file), ExceptionDiagnostic(config.error())); !logged)
+      if (auto logged = root.logger().errorException(Star::format("Could not read projectile '{}'", file), ExceptionDiagnostic(config.error())); !logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
@@ -109,26 +109,26 @@ bool ProjectileDatabase::isProjectile(String const& projectileName) const {
 }
 
 std::expected<Json, StarException> ProjectileDatabase::projectileConfig(String const& type) const {
-  auto config = m_configs.maybeRef(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  auto config = m_configs.find_ref(type);
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->config;
 }
 
 std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::createProjectile(String const& type, Json const& parameters) const {
-  auto config = m_configs.maybeRef(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  auto config = m_configs.find_ref(type);
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return Projectile::create(m_root, config->get(), parameters);
 }
 
 std::expected<String, StarException> ProjectileDatabase::damageKindImage(String const& type) const {
-  auto config = m_configs.maybeRef(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  auto config = m_configs.find_ref(type);
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->damageKindImage;
 }
 
 std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String const& type) const {
-  auto config = m_configs.maybeRef(type);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", type)));
+  auto config = m_configs.find_ref(type);
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
   return config->get()->movementSettings.getFloat("gravityMultiplier", 1);
 }
 
@@ -137,8 +137,8 @@ std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::ne
   ds.setStreamCompatibilityVersion(rules);
   auto typeName = ds.read<String>();
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto config = m_configs.maybeRef(*typeName);
-  if (!config) return std::unexpected(ProjectileDatabaseException(strf("Unknown projectile with typeName {}.", *typeName)));
+  auto config = m_configs.find_ref(*typeName);
+  if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", *typeName)));
   return Projectile::create(m_root, config->get(), ds, rules);
 }
 
@@ -177,7 +177,7 @@ auto physicsType = std::move(*result78);
   auto result79 = config.getObject("movementSettings", JsonObject());
 if (!result79) return std::unexpected(std::move(result79.error()));
 JsonObject movementSettings = std::move(*result79);
-  auto physicsPath = strf("/projectiles/physics.config:{}", physicsType);
+  auto physicsPath = Star::format("/projectiles/physics.config:{}", physicsType);
   auto result80 = assets->json(physicsPath);
 if (!result80) return std::unexpected(assets->withAssetContext(std::move(result80.error()), physicsPath, "Loading projectile physics"));
   projectileConfig->movementSettings = jsonMerge(std::move(*result80), movementSettings);
@@ -232,13 +232,13 @@ auto result96 = c.getFloat("time");
 if (!result96) return std::unexpected(std::move(result96.error()));
 auto result97 = c.getBool("repeat", true);
 if (!result97) return std::unexpected(std::move(result97.error()));
-projectileConfig->periodicActions.append(std::make_tuple(std::move(*result96), std::move(*result97), c));
+projectileConfig->periodicActions.push_back(std::make_tuple(std::move(*result96), std::move(*result97), c));
 }
 
   auto result98 = config.getString("image");
 if (!result98) return std::unexpected(std::move(result98.error()));
-projectileConfig->image = AssetPath::relativeTo(path, std::move(*result98));
-  auto result99 = config.getUInt("frameNumber", 1);
+projectileConfig->image = AssetPath::relative_to(path, std::move(*result98));
+auto result99 = config.getUInt("frameNumber", 1);
 if (!result99) return std::unexpected(std::move(result99.error()));
 projectileConfig->frameNumber = std::move(*result99);
   auto result100 = config.getFloat("animationCycle", 1.0);
@@ -289,16 +289,16 @@ projectileConfig->lightPosition = std::move(*result114);
 if (!result115) return std::unexpected(std::move(result115.error()));
 if (auto lightType = std::move(*result115))
     {
-if (!LightTypeNames) return std::unexpected(LightTypeNames.error());
-auto result116 = LightTypeNames->getLeft(*lightType);
-if (!result116) return std::unexpected(std::move(result116.error()));
-projectileConfig->lightType = result116->get();
+  auto result116 = enumValue<LightTypeNames>(*lightType);
+  if (!result116)
+    return std::unexpected(std::move(result116.error()));
+  projectileConfig->lightType = *result116;
 }
   else
     {
 auto result117 = config.getBool("pointLight", false);
 if (!result117) return std::unexpected(std::move(result117.error()));
-projectileConfig->lightType = (LightType)std::move(*result117);
+projectileConfig->lightType = static_cast<LightType>(std::move(*result117));
 }
 
   auto result118 = config.getString("persistentAudio", "");
@@ -342,14 +342,14 @@ projectileConfig->damageRepeatTimeout = std::move(*result126);
 
   if (!projectileConfig->damageKindImage.empty())
     projectileConfig->damageKindImage =
-        AssetPath::relativeTo(projectileConfig->directory, projectileConfig->damageKindImage);
+      AssetPath::relative_to(projectileConfig->directory, projectileConfig->damageKindImage);
 
   auto result127 = config.getArray("statusEffects", {});
 if (!result127) return std::unexpected(std::move(result127.error()));
 for (auto const& effect : std::move(*result127)) {
 auto result128 = jsonToEphemeralStatusEffect(effect);
 if (!result128) return std::unexpected(std::move(result128.error()));
-projectileConfig->statusEffects.append(std::move(*result128));
+projectileConfig->statusEffects.push_back(std::move(*result128));
 }
 
   auto result129 = config.getArray("emitters", JsonArray());
@@ -379,7 +379,7 @@ projectileConfig->onlyHitTerrain = std::move(*result135);
   auto result136 = config.getString("clientEntityMode", "ClientMasterAllowed");
 if (!result136) return std::unexpected(std::move(result136.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
-auto result137 = ClientEntityModeNames->getLeft(std::move(*result136));
+auto result137 = ClientEntityModeNames->get_left(std::move(*result136));
 if (!result137) return std::unexpected(std::move(result137.error()));
 projectileConfig->clientEntityMode = result137->get();
   auto result138 = config.getBool("masterOnly", false);
@@ -390,7 +390,7 @@ projectileConfig->masterOnly = std::move(*result138);
 if (!result139) return std::unexpected(std::move(result139.error()));
 auto result140 = jsonToStringList(std::move(*result139));
 if (!result140) return std::unexpected(std::move(result140.error()));
-std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relativeTo(path, script); });
+std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relative_to(path, script); });
 projectileConfig->scripts = std::move(*result140);
 
   auto result141 = config.get("physicsForces", JsonObject());
@@ -405,7 +405,7 @@ if (!result143) return std::unexpected(std::move(result143.error()));
 for (auto const& effect : std::move(*result143)) {
 auto result144 = jsonToPersistentStatusEffect(effect);
 if (!result144) return std::unexpected(std::move(result144.error()));
-projectileConfig->persistentStatusEffects.append(std::move(*result144));
+projectileConfig->persistentStatusEffects.push_back(std::move(*result144));
 }
   auto result145 = config.get("statusEffectArea", JsonArray());
 if (!result145) return std::unexpected(std::move(result145.error()));

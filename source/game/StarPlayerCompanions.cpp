@@ -108,7 +108,7 @@ std::expected<std::shared_ptr<Companion>, StarException> Companion::create(Root&
     auto drawable = Drawable::create(**metadata, entry);
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
-    companion->m_portrait.append(std::move(*drawable));
+    companion->m_portrait.push_back(std::move(*drawable));
   }
   return companion;
 }
@@ -183,7 +183,7 @@ std::expected<void, StarException> PlayerCompanions::diskLoad(Json const& diskSt
       auto companion = Companion::create(m_root, entry);
       if (!companion)
         return std::unexpected(std::move(companion.error()));
-      loaded[category.first].append(std::move(*companion));
+      loaded[category.first].push_back(std::move(*companion));
     }
     // Retain empty categories in the saved state.
     loaded[category.first];
@@ -200,14 +200,14 @@ std::expected<Json, StarException> PlayerCompanions::diskStore() const {
   for (auto const& category : m_companions) {
     JsonArray entries;
     for (auto const& companion : category.second)
-      entries.append(companion->toJson());
+      entries.push_back(companion->toJson());
     companions[category.first] = std::move(entries);
   }
   return JsonObject{{"scriptStorage", std::move(*storage)}, {"companions", std::move(companions)}};
 }
 
 List<std::shared_ptr<Companion>> PlayerCompanions::getCompanions(String const& category) const {
-  if (auto companions = m_companions.maybeRef(category))
+  if (auto companions = m_companions.find_ref(category))
     return companions->get();
   return {};
 }
@@ -248,7 +248,7 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
   if (!setup) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(setup.error().withContext(strf("Companion initialization rollback failed: {}", cleanup.error().what())));
+      return std::unexpected(setup.error().with_context(Star::format("Companion initialization rollback failed: {}", cleanup.error().what())));
   }
   return setup;
 }
@@ -258,7 +258,7 @@ std::expected<void, StarException> PlayerCompanions::uninit() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(result.error().what());
+        *error = error->with_context(result.error().what());
       else
         error = std::move(result.error());
     }
@@ -303,7 +303,7 @@ std::expected<LuaCallbacks, StarException> PlayerCompanions::makeCompanionsCallb
       auto companion = Companion::create(m_root, json);
       if (!companion)
         return std::unexpected(std::move(companion.error()));
-      loaded.append(std::move(*companion));
+      loaded.push_back(std::move(*companion));
     }
     m_companions[category] = std::move(loaded);
     return {};

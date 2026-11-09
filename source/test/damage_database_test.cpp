@@ -26,21 +26,21 @@ namespace {
 // supplies runtime services, not damage definitions from the installed game.
 std::expected<std::shared_ptr<DamageDatabase>, StarException>
 damageFixture(GameTest& fixture, String const& directory, std::initializer_list<std::pair<String, String>> files) {
-  auto damageDirectory = File::makeDirectoryRecursive(File::relativeTo(directory, "damage"));
+  auto damageDirectory = File::create_directories(File::relative_to(directory, "damage"));
   if (!damageDirectory)
     return std::unexpected(std::move(damageDirectory.error()));
-  auto preload = File::writeFile(String("[]"), File::relativeTo(directory, "preload.config"));
+  auto preload = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
   if (!preload)
     return std::unexpected(std::move(preload.error()));
-  auto elements = File::writeFile(String(R"({
+  auto elements = File::write_file(String(R"({
     "default":{"resistanceStat":"defaultResistance","damageNumberParticles":{}},
     "ElementOnly":{"resistanceStat":"elementResistance","damageNumberParticles":{}}
   })"),
-                                  File::relativeTo(directory, "damage/elementaltypes.config"));
+                                   File::relative_to(directory, "damage/elementaltypes.config"));
   if (!elements)
     return std::unexpected(std::move(elements.error()));
   for (auto const& [path, contents] : files) {
-    auto written = File::writeFile(contents, File::relativeTo(directory, path));
+    auto written = File::write_file(contents, File::relative_to(directory, path));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -58,9 +58,9 @@ damageFixture(GameTest& fixture, String const& directory, std::initializer_list<
 
 const GameTestRegistration
   damageLookup("DamageDatabaseTest", "CaseInsensitiveKindsAndIndependentElementalTypes", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database = damageFixture(fixture, *directory,
                                   {{"damage/default.damage", R"({"kind":"DeFaUlT"})"},
                                    {"damage/mixed.damage", R"({"kind":"MiXeD","elementalType":"ElementOnly"})"},
@@ -96,15 +96,15 @@ const GameTestRegistration
 
 const GameTestRegistration
   damageDuplicates("DamageDatabaseTest", "RejectsExactAndCaseOnlyKindDuplicates", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     for (String const& duplicate : {String("MiXeD"), String("mIxEd")}) {
       SCOPED_TRACE(duplicate.utf8());
-      auto caseDirectory = File::relativeTo(*directory, duplicate);
+      auto caseDirectory = File::relative_to(*directory, duplicate);
       auto database = damageFixture(fixture, caseDirectory,
                                     {{"damage/first.damage", R"({"kind":"MiXeD"})"},
-                                     {"damage/second.damage", strf(R"({{"kind":"{}"}})", duplicate)}});
+                                     {"damage/second.damage", Star::format(R"({{"kind":"{}"}})", duplicate)}});
       ASSERT_FALSE(database);
       auto message = std::string_view(database.error().what());
       EXPECT_NE(message.find("Duplicate damage kind Name"), std::string_view::npos);
@@ -114,9 +114,9 @@ const GameTestRegistration
 
 const GameTestRegistration
   damageUndefinedElement("DamageDatabaseTest", "RejectsUndefinedElementalTypeDuringLoad", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database =
       damageFixture(fixture, *directory,
                     {{"damage/invalid.damage", R"({"kind":"MissingElementKind","elementalType":"MissingElement"})"}});
@@ -128,9 +128,9 @@ const GameTestRegistration
 
 const GameTestRegistration
   damageNestedEffects("DamageDatabaseTest", "NestedEffectsPreservePayloadsAndNullDefaults", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database = damageFixture(fixture, *directory,
                                   {{"damage/elementaltypes.config", R"({
         "default":{"resistanceStat":"health","damageNumberParticles":{"hIt":"normal","kIlL":"finish"}}
@@ -176,9 +176,9 @@ const GameTestRegistration
 
 const GameTestRegistration
   damageNestedFailures("DamageDatabaseTest", "NestedTypesAndHitNamesRetainFirstErrorOrder", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     struct Failure {
       String elements;
       String damage;
@@ -201,7 +201,7 @@ const GameTestRegistration
     unsigned index = 0;
     for (auto const& failure : cases) {
       SCOPED_TRACE(index);
-      auto caseDirectory = File::relativeTo(*directory, strf("case{}", index++));
+      auto caseDirectory = File::relative_to(*directory, Star::format("case{}", index++));
       auto database = failure.elements.empty()
         ? damageFixture(fixture, caseDirectory, {{"damage/invalid.damage", failure.damage}})
         : damageFixture(

@@ -20,12 +20,12 @@ namespace Star {
 template <typename BaseMap>
 class NetElementMapWrapper : public NetElement, private BaseMap {
 public:
-  typedef typename BaseMap::iterator iterator;
-  typedef typename BaseMap::const_iterator const_iterator;
+  using iterator = typename BaseMap::iterator;
+  using const_iterator = typename BaseMap::const_iterator;
 
-  typedef typename BaseMap::key_type key_type;
-  typedef typename BaseMap::mapped_type mapped_type;
-  typedef typename BaseMap::value_type value_type;
+  using key_type = typename BaseMap::key_type;
+  using mapped_type = typename BaseMap::mapped_type;
+  using value_type = typename BaseMap::value_type;
 
   void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
@@ -41,7 +41,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<std::reference_wrapper<mapped_type const>, StarException> get(key_type const& key) const;
-  std::optional<std::reference_wrapper<mapped_type const>> maybeRef(key_type const& key) const;
+  std::optional<std::reference_wrapper<mapped_type const>> find_ref(key_type const& key) const;
 
   const_iterator begin() const;
   const_iterator end() const;
@@ -70,8 +70,8 @@ public:
 
   const_iterator erase(const_iterator i);
 
-  [[nodiscard]] std::expected<mapped_type, StarException> take(key_type const& k);
-  std::optional<mapped_type> maybeTake(key_type const& k);
+  [[nodiscard]] std::expected<mapped_type, StarException> extract_value(key_type const& k);
+  std::optional<mapped_type> try_extract_value(key_type const& k);
 
   void clear();
 
@@ -101,7 +101,7 @@ private:
   };
   struct ClearChange {};
 
-  typedef std::variant<SetChange, RemoveChange, ClearChange> ElementChange;
+  using ElementChange = std::variant<SetChange, RemoveChange, ClearChange>;
 
   [[nodiscard]] static std::expected<void, StarException> writeSetChange(DataStream& ds, key_type const& key,
                                                                          mapped_type const& value);
@@ -134,7 +134,7 @@ void NetElementMapWrapper<BaseMap>::initNetVersion(std::optional<std::reference_
   m_changeData.clear();
   m_changeDataLastVersion = 0;
 
-  for (auto& change : Star::take(m_pendingChangeData))
+  for (auto& change : std::exchange(m_pendingChangeData, {}))
     applyChange(std::move(change.second));
 
   addChangeData(ClearChange());
@@ -151,7 +151,7 @@ template <typename BaseMap>
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::disableNetInterpolation() {
   m_interpolationEnabled = false;
-  for (auto& change : Star::take(m_pendingChangeData))
+  for (auto& change : std::exchange(m_pendingChangeData, {}))
     applyChange(std::move(change.second));
   return {};
 }
@@ -279,8 +279,9 @@ template <typename BaseMap>
 }
 
 template <typename BaseMap>
-auto NetElementMapWrapper<BaseMap>::maybeRef(key_type const& key) const -> std::optional<std::reference_wrapper<mapped_type const>> {
-  return BaseMap::maybeRef(key);
+auto NetElementMapWrapper<BaseMap>::find_ref(key_type const& key) const
+  -> std::optional<std::reference_wrapper<mapped_type const>> {
+  return BaseMap::find_ref(key);
 }
 
 template <typename BaseMap>
@@ -311,7 +312,7 @@ auto NetElementMapWrapper<BaseMap>::insert(key_type k, mapped_type v) -> std::pa
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::add(key_type k, mapped_type v) {
   if (BaseMap::contains(k))
-    return std::unexpected(MapException::format("Entry with key '{}' already present.", outputAny(k)));
+    return std::unexpected(MapException::format("Entry with key '{}' already present.", Star::output_any(k)));
   insert(value_type(std::move(k), std::move(v)));
   return {};
 }
@@ -365,17 +366,18 @@ auto NetElementMapWrapper<BaseMap>::erase(const_iterator i) -> const_iterator {
 }
 
 template <typename BaseMap>
-[[nodiscard]] auto NetElementMapWrapper<BaseMap>::take(key_type const& k) -> std::expected<mapped_type, StarException> {
+[[nodiscard]] auto NetElementMapWrapper<BaseMap>::extract_value(key_type const& k)
+  -> std::expected<mapped_type, StarException> {
   auto i = BaseMap::find(k);
   if (i == BaseMap::end())
-    return std::unexpected(MapException::format("Key '{}' not found in Map::take()", outputAny(k)));
+    return std::unexpected(MapException::format("Key '{}' not found in Map::extract_value()", Star::output_any(k)));
   auto m = std::move(i->second);
   erase(i);
   return m;
 }
 
 template <typename BaseMap>
-auto NetElementMapWrapper<BaseMap>::maybeTake(key_type const& k) -> std::optional<mapped_type> {
+auto NetElementMapWrapper<BaseMap>::try_extract_value(key_type const& k) -> std::optional<mapped_type> {
   auto i = BaseMap::find(k);
   if (i == BaseMap::end())
     return {};
@@ -408,7 +410,7 @@ void NetElementMapWrapper<BaseMap>::reset(BaseMap values) {
   }
 
   for (auto const& p : values) {
-    auto v = maybeRef(p.first);
+    auto v = find_ref(p.first);
     if (!v || !(v->get() == p.second)) {
       addChangeData(SetChange{p.first, p.second});
       m_updated = true;
@@ -487,12 +489,13 @@ template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
   std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
+    Star::star_assert_failed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
   }
 
-  m_changeData.append({currentVersion, std::move(change)});
+  m_changeData.push_back({currentVersion, std::move(change)});
 
-  m_changeDataLastVersion = std::max<std::int64_t>((std::int64_t)currentVersion - MaxChangeDataVersions, 0);
+  m_changeDataLastVersion =
+    std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
   while (!m_changeData.empty() && m_changeData.front().first < m_changeDataLastVersion)
     m_changeData.pop_front();
 }
@@ -500,10 +503,10 @@ void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
 template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::addPendingChangeData(ElementChange change, float interpolationTime) {
   if (!m_pendingChangeData.empty() && interpolationTime < m_pendingChangeData.back().first) {
-    for (auto& change : Star::take(m_pendingChangeData))
+    for (auto& change : std::exchange(m_pendingChangeData, {}))
       applyChange(std::move(change.second));
   }
-  m_pendingChangeData.append({interpolationTime, std::move(change)});
+  m_pendingChangeData.push_back({interpolationTime, std::move(change)});
 }
 
 template <typename BaseMap>

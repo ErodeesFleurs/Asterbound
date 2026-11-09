@@ -429,7 +429,7 @@ private:
 
   struct PatchContextKeyHash {
     std::size_t operator()(PatchContextKey const& key) const {
-      return hashOf(std::addressof(key.source.get()), key.path);
+      return hash_of(std::addressof(key.source.get()), key.path);
     }
   };
 

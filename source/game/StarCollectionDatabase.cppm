@@ -24,7 +24,8 @@ enum class CollectionType : std::uint16_t {
   Item,
   Monster
 };
-extern std::expected<EnumMap<CollectionType>, StarException> const CollectionTypeNames;
+inline constexpr auto CollectionTypeNames = sortedEnumNames(std::to_array<std::pair<CollectionType, std::string_view>>(
+  {{CollectionType::Generic, "generic"}, {CollectionType::Item, "item"}, {CollectionType::Monster, "monster"}}));
 
 struct Collectable {
   Collectable();

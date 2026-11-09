@@ -169,13 +169,13 @@ std::expected<Json, StarException> TechController::diskStore() {
   JsonArray modules;
   if (m_overriddenTech) {
     for (auto const& name : *m_overriddenTech)
-      modules.append(JsonObject{{"module", name}, {"scriptData", JsonObject()}});
+      modules.push_back(JsonObject{{"module", name}, {"scriptData", JsonObject()}});
   } else {
     for (auto const& module : m_techModules) {
       auto storage = module.scriptComponent.getScriptStorage();
       if (!storage)
         return std::unexpected(std::move(storage.error()));
-      modules.append(JsonObject{{"module", module.config.name}, {"scriptData", std::move(*storage)}});
+      modules.push_back(JsonObject{{"module", module.config.name}, {"scriptData", std::move(*storage)}});
     }
   }
   return JsonObject{{"techModules", std::move(modules)}};
@@ -193,7 +193,7 @@ std::expected<void, StarException> TechController::diskLoad(Json const& store) {
     auto data = module.getObject("scriptData", {});
     if (!data)
       return std::unexpected(std::move(data.error()));
-    moduleInits.append(std::make_tuple(std::move(*name), std::move(*data)));
+    moduleInits.push_back(std::make_tuple(std::move(*name), std::move(*data)));
   }
   return setupTechModules(moduleInits);
 }
@@ -219,7 +219,7 @@ std::expected<void, StarException> TechController::uninit() {
     auto unloaded = unloadModule(module);
     if (!unloaded) {
       if (error)
-        *error = error->withContext(unloaded.error().what());
+        *error = error->with_context(unloaded.error().what());
       else
         error = std::move(unloaded.error());
     }
@@ -251,9 +251,7 @@ std::expected<void, StarException> TechController::reloadTech() {
   return setLoadedTech(loadedTech(), true);
 }
 
-bool TechController::techOverridden() const {
-  return (bool)m_overriddenTech;
-}
+bool TechController::techOverridden() const { return static_cast<bool>(m_overriddenTech); }
 
 std::expected<void, StarException> TechController::setOverrideTech(StringList const& techModules) {
   if (!m_overriddenTech)
@@ -414,7 +412,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
         if (piece.second < 0.0f)
-          drawables.append(std::move(piece.first));
+          drawables.push_back(std::move(piece.first));
       }
     }
   }
@@ -433,7 +431,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
         if (piece.second >= 0.0f)
-          drawables.append(std::move(piece.first));
+          drawables.push_back(std::move(piece.first));
       }
     }
   }
@@ -450,7 +448,7 @@ std::expected<List<LightSource>, StarException> TechController::lightSources(flo
       auto lights = sample.lightSources(m_movementController->get().position());
       if (!lights)
         return std::unexpected(std::move(lights.error()));
-      lightSources.appendAll(std::move(*lights));
+      lightSources.append_range(std::move(*lights));
     }
   }
 
@@ -462,7 +460,7 @@ List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible())
-      newAudios.appendAll(animator->dynamicTarget.pullNewAudios());
+      newAudios.append_range(animator->dynamicTarget.pullNewAudios());
     else
       animator->dynamicTarget.pullNewAudios();
   }
@@ -475,7 +473,7 @@ List<Particle> TechController::pullNewParticles() {
 
   for (auto const& animator : m_techAnimators.netElements()) {
     if (animator->isVisible())
-      newParticles.appendAll(animator->dynamicTarget.pullNewParticles());
+      newParticles.append_range(animator->dynamicTarget.pullNewParticles());
     else
       animator->dynamicTarget.pullNewParticles();
   }
@@ -583,7 +581,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
     auto unloaded = unloadModule(module);
     if (!unloaded) {
       if (unloadError)
-        *unloadError = unloadError->withContext(unloaded.error().what());
+        *unloadError = unloadError->with_context(unloaded.error().what());
       else
         unloadError = std::move(unloaded.error());
     }
@@ -620,7 +618,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
         return std::unexpected(std::move(image.error()));
       (*moduleAnimator)->animator->setPartTag(entry.first, "partImage", std::move(*image));
     }
-    auto& module = m_techModules.emplaceAppend(m_root);
+    auto& module = m_techModules.emplace_back(m_root);
     module.config = std::move(*config);
     module.visible = *visible;
     module.toolUsageSuppressed = false;
@@ -641,7 +639,7 @@ std::expected<void, StarException> TechController::unloadModule(TechModule& modu
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(result.error().what());
+        *error = error->with_context(result.error().what());
       else
         error = std::move(result.error());
     }
@@ -696,7 +694,7 @@ std::expected<void, StarException> TechController::initializeModules() {
     for (auto& module : m_techModules) {
       auto unloaded = unloadModule(module);
       if (!unloaded)
-        error = error.withContext(unloaded.error().what());
+        error = error.with_context(unloaded.error().what());
     }
     return std::unexpected(std::move(error));
   }
@@ -750,7 +748,7 @@ std::expected<LuaCallbacks, StarException> TechController::makeTechCallbacks(Tec
         if (state) {
           if (!ParentStateNames)
             return std::unexpected(ParentStateNames.error());
-          auto value = ParentStateNames->getLeft(*state);
+          auto value = ParentStateNames->get_left(*state);
           if (!value)
             return std::unexpected(std::move(value.error()));
           m_parentState.set(value->get());

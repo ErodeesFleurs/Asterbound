@@ -13,7 +13,7 @@ namespace Star {
 template <typename T>
 class RefPtr {
 public:
-  typedef T element_type;
+  using element_type = T;
 
   RefPtr();
   explicit RefPtr(T* p, bool addRef = true);
@@ -115,7 +115,7 @@ protected:
   virtual ~RefCounter() = default;
 
 private:
-  std::size_t m_refCounter;
+  std::size_t m_refCounter = 0;
 };
 
 template <typename T>
@@ -303,9 +303,7 @@ inline void refPtrDecRef(RefCounter* p) {
     delete p;
 }
 
-inline RefCounter::RefCounter()
-  : m_refCounter(0) {}
-
+inline RefCounter::RefCounter() {}
 }
 
 export module star.ref_ptr;

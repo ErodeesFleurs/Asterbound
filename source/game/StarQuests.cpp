@@ -44,10 +44,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.worker_pool;
@@ -250,10 +250,10 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
   for (auto const& descriptor : root.random().randValueFrom(qt.rewards, {})) {
     auto item = (*items)->item(descriptor);
     if (!item) return std::unexpected(std::move(item.error()));
-    quest->m_rewards.append(*item);
+    quest->m_rewards.push_back(*item);
   }
   for (auto const& name : qt.rewardParameters) {
-    auto parameter = quest->m_parameters.maybeRef(name);
+    auto parameter = quest->m_parameters.find_ref(name);
     if (!parameter) continue;
     if (std::holds_alternative<QuestItem>(parameter->get().detail)) {
       auto descriptor = std::get<QuestItem>(parameter->get().detail).descriptor();
@@ -297,7 +297,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto stateName = store->getString("state");
   if (!stateName) return std::unexpected(std::move(stateName.error()));
   if (!QuestStateNames) return std::unexpected(QuestStateNames.error());
-  auto state = QuestStateNames->getLeft(*stateName);
+  auto state = QuestStateNames->get_left(*stateName);
   if (!state) return std::unexpected(std::move(state.error()));
   quest->m_state = state->get();
   auto arcJson = store->get("arc");
@@ -352,7 +352,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   for (auto const& entry : *rewards) {
     auto item = (*items)->diskLoad(entry);
     if (!item) return std::unexpected(std::move(item.error()));
-    quest->m_rewards.append(*item);
+    quest->m_rewards.push_back(*item);
   }
   auto updated = store->getInt("lastUpdatedOn");
   if (!updated) return std::unexpected(std::move(updated.error()));
@@ -400,7 +400,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
     for (auto const& value : *array) {
       auto drawable = Drawable::create(**metadata, value);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      result.append(std::move(*drawable));
+      result.push_back(std::move(*drawable));
     }
     return result;
   });
@@ -421,7 +421,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   auto versions = m_root.versioningDatabase();
   if (!versions) return std::unexpected(std::move(versions.error()));
   if (!QuestStateNames) return std::unexpected(QuestStateNames.error());
-  auto state = QuestStateNames->getRight(m_state);
+  auto state = QuestStateNames->get_right(m_state);
   if (!state) return std::unexpected(std::move(state.error()));
   auto arc = m_arc.diskStore(m_root);
   if (!arc) return std::unexpected(std::move(arc.error()));
@@ -429,7 +429,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   JsonObject result{{"state", state->get()}, {"arc", *arc}, {"arcPos", m_arcPos},
       {"parameters", *parameters}, {"money", m_money}};
-  auto world = jsonFromOptional(m_worldId, printWorldId);
+  auto world = jsonFromOptional(m_worldId, Star::print_world_id);
   if (!world) return std::unexpected(std::move(world.error()));
   result["worldId"] = std::move(*world);
   auto location = jsonFromOptional(m_location, [](std::pair<Vec3I, SystemLocation> const& location) -> Json {
@@ -663,9 +663,7 @@ std::optional<Uuid> Quest::serverUuid() const {
   return m_serverUuid;
 }
 
-void Quest::setWorldId(std::optional<WorldId> worldId) {
-  m_worldId = worldId;
-}
+void Quest::setWorldId(std::optional<WorldId> worldId) { m_worldId = std::move(worldId); }
 
 void Quest::setLocation(std::optional<std::pair<Vec3I, SystemLocation>> location) {
   m_location = std::move(location);
@@ -866,7 +864,7 @@ std::expected<void, StarException> Quest::initScript() {
   if (!result) {
     auto error = std::move(result.error());
     auto shutdown = uninitScript();
-    if (!shutdown) error = error.withRelated(shutdown.error(), "Error rolling back quest script");
+    if (!shutdown) error = error.with_related(shutdown.error(), "Error rolling back quest script");
     return std::unexpected(std::move(error));
   }
   return {};
@@ -934,7 +932,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("state", [&quest = *this]() -> std::expected<String, StarException> {
     if (!QuestStateNames) return std::unexpected(QuestStateNames.error());
-    auto name = QuestStateNames->getRight(quest.state());
+    auto name = QuestStateNames->get_right(quest.state());
     if (!name) return std::unexpected(std::move(name.error()));
     return name->get();
   }); !r) return std::unexpected(std::move(r.error()));
@@ -964,7 +962,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("worldId", [&quest = *this]() -> std::expected<std::optional<String>, StarException> {
     if (!quest.m_worldId) return std::optional<String>();
-    auto name = printWorldId(*quest.m_worldId);
+    auto name = Star::print_world_id(*quest.m_worldId);
     if (!name) return std::unexpected(std::move(name.error()));
     return std::optional<String>(*name);
   }); !r) return std::unexpected(std::move(r.error()));
@@ -1047,20 +1045,28 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     for (auto const& json : *portrait) {
       auto drawable = Drawable::create(**metadata, json);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      result.append(std::move(*drawable));
+      result.push_back(std::move(*drawable));
     }
-    if (auto previous = quest.m_portraits.maybeRef(name); previous && previous->get() == result) return {};
+    if (auto previous = quest.m_portraits.find_ref(name); previous && previous->get() == result)
+      return {};
     quest.m_portraits[name] = std::move(result);
     quest.m_portraitRevision = nextQuestPresentationRevision();
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setPortraitTitle", [&quest = *this](String const& name, std::optional<String> const& title) {
-    auto previous = quest.m_portraitTitles.maybeRef(name);
-    if ((!previous && !title) || (previous && title && previous->get() == *title)) return;
-    if (title) quest.m_portraitTitles[name] = *title;
-    else quest.m_portraitTitles.remove(name);
-    quest.m_portraitRevision = nextQuestPresentationRevision();
-  }); !r) return std::unexpected(std::move(r.error()));
+  if (auto r =
+        callbacks.registerCallback("setPortraitTitle",
+                                   [&quest = *this](String const& name, std::optional<String> const& title) {
+                                     auto previous = quest.m_portraitTitles.find_ref(name);
+                                     if ((!previous && !title) || (previous && title && previous->get() == *title))
+                                       return;
+                                     if (title)
+                                       quest.m_portraitTitles[name] = *title;
+                                     else
+                                       quest.m_portraitTitles.remove(name);
+                                     quest.m_portraitRevision = nextQuestPresentationRevision();
+                                   });
+      !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("addReward", [&quest = *this](Json const& reward) -> std::expected<void, StarException> {
     auto descriptor = ItemDescriptor::create(reward);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
@@ -1100,7 +1106,7 @@ std::expected<void, StarException> Quest::addReward(ItemDescriptor const& reward
   if (!database) return std::unexpected(std::move(database.error()));
   auto item = (*database)->item(reward);
   if (!item) return std::unexpected(std::move(item.error()));
-  m_rewards.append(*item);
+  m_rewards.push_back(*item);
   m_rewardsRevision = nextQuestPresentationRevision();
   return {};
 }
@@ -1121,7 +1127,7 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   auto portrait = jsonFromList(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   JsonObject paramJson = (*config)->parameterExamples;
-  for (auto& [name, parameter] : paramJson) {
+  for (auto&& [name, parameter] : paramJson) {
     auto typed = parameter.set("type", (*config)->parameterTypes[name]);
     if (!typed) return std::unexpected(std::move(typed.error()));
     auto pictured = typed->set("portrait", *portrait);
@@ -1131,15 +1137,15 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   auto parameters = questParamsFromJson(paramJson);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   QuestDescriptor descriptor{"preview", templateId, std::move(*parameters), root.random().randu64()};
-  auto next = position.equalsIgnoreCase("next");
+  auto next = position.equals_ignore_case("next");
   if (!next) return std::unexpected(std::move(next.error()));
   bool isLast = false, isFirst = false;
   if (!*next) {
-    auto last = position.equalsIgnoreCase("last");
+    auto last = position.equals_ignore_case("last");
     if (!last) return std::unexpected(std::move(last.error()));
     isLast = *last;
     if (!isLast) {
-      auto first = position.equalsIgnoreCase("first");
+      auto first = position.equals_ignore_case("first");
       if (!first) return std::unexpected(std::move(first.error()));
       isFirst = *first;
     }

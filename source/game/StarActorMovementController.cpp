@@ -92,7 +92,7 @@ import star.platformer_astar;
 import star.algorithm;
 namespace Star {
 
-ActorJumpProfile::ActorJumpProfile() {}
+ActorJumpProfile::ActorJumpProfile() = default;
 
 std::expected<ActorJumpProfile, StarException> ActorJumpProfile::create(Json const& config) {
   ActorJumpProfile value;
@@ -194,7 +194,7 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::s
   return create(Json(std::move(*object)));
 }
 
-ActorMovementParameters::ActorMovementParameters() {}
+ActorMovementParameters::ActorMovementParameters() = default;
 
 std::expected<ActorMovementParameters, StarException> ActorMovementParameters::create(Json const& config) {
   ActorMovementParameters value;
@@ -898,12 +898,12 @@ void ActorMovementController::controlForce(Vec2F const& force) {
 }
 
 void ActorMovementController::controlApproachVelocity(Vec2F const& targetVelocity, float maxControlForce) {
-  m_controlApproachVelocities.append({targetVelocity, maxControlForce});
+  m_controlApproachVelocities.push_back({targetVelocity, maxControlForce});
 }
 
 void ActorMovementController::controlApproachVelocityAlongAngle(
     float angle, float targetVelocity, float maxControlForce, bool positiveOnly) {
-  m_controlApproachVelocityAlongAngles.append({angle, targetVelocity, maxControlForce, positiveOnly});
+  m_controlApproachVelocityAlongAngles.push_back({angle, targetVelocity, maxControlForce, positiveOnly});
 }
 
 void ActorMovementController::controlApproachXVelocity(float targetXVelocity, float maxControlForce) {
@@ -974,7 +974,7 @@ std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovemen
     m_pathController->reset();
   }
 
-  return take(m_pathMoveResult);
+  return std::exchange(m_pathMoveResult, {});
 }
 
 std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovementController::controlPathMove(Vec2F const& position, bool run, std::optional<PlatformerAStar::Parameters> const& parameters) {
@@ -1157,7 +1157,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
 
     if (m_controlFly) {
       Vec2F flyVelocity = *m_controlFly;
-      if (flyVelocity.magnitudeSquared() != 0)
+      if (flyVelocity.magnitude_squared() != 0)
         flyVelocity = flyVelocity.normalized() * (*activeParameters.flySpeed);
 
       if (m_liquidMovement.get())
@@ -1301,7 +1301,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       m_walking.set(!running && m_controlMove);
       m_crouching.set(m_controlCrouch && !m_controlMove);
     }
-    m_flying.set((bool)m_controlFly);
+    m_flying.set(static_cast<bool>(m_controlFly));
 
     bool falling = (yVelocity() < (*activeParameters.fallStatusSpeedMin)) && !m_groundMovement.get();
     m_falling.set(falling);
@@ -1578,7 +1578,7 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
               if (edge.target.position == newPathStart.source.position) {
                 // splice the new path onto our current path up to this index
                 auto newPath = m_path->slice(0, i + 1);
-                newPath.appendAll(path);
+                newPath.append_range(path);
                 path = std::move(newPath);
 
                 newEdgeTimer = m_edgeTimer;
@@ -1605,7 +1605,7 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
             // concatenate the bridge path with the new path
             if (!bridgePathFinder->result()) return std::unexpected(ActorMovementControllerException("Successful bridge search has no path"));
             auto newPath = *bridgePathFinder->result();
-            newPath.appendAll(path);
+            newPath.append_range(path);
             path = newPath;
           } else {
             // if the gap isn't bridged in a single tick, reset and start over
@@ -1725,7 +1725,7 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
     return {};
   }
 
-  if (auto lastEdge = m_path->maybeLast()) {
+  if (auto lastEdge = m_path->back_value()) {
     movementController.setPosition(lastEdge->target.position);
     movementController.setVelocity(Vec2F());
   }

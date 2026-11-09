@@ -55,8 +55,8 @@ public:
 private:
   explicit ChatBubbleManager(GuiContext& context);
   [[nodiscard]] std::expected<void, StarException> initialize();
-  typedef std::tuple<String, Vec2F> BubbleImage;
-  typedef std::tuple<String, TextStyle, bool, Vec2F> BubbleText;
+  using BubbleImage = std::tuple<String, Vec2F>;
+  using BubbleText = std::tuple<String, TextStyle, bool, Vec2F>;
 
   struct Bubble {
     EntityId entity;

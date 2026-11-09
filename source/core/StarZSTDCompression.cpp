@@ -23,8 +23,10 @@ IOException zstdError(std::string_view operation, std::size_t status) {
 
 void CompressionStream::StreamDeleter::operator()(ZSTD_CStream* stream) const noexcept {
   auto status = ZSTD_freeCStream(stream);
-  if (ZSTD_isError(status))
-    fprintf(stderr, "Failed to free ZSTD compression stream (%zu): %s\n", status, ZSTD_getErrorName(status));
+  if (ZSTD_isError(status)) {
+    if (auto written = Star::print(stderr, "Failed to free ZSTD compression stream ({}): {}\n", status, ZSTD_getErrorName(status)); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<std::unique_ptr<CompressionStream>, StarException> CompressionStream::create() {
@@ -57,7 +59,7 @@ std::expected<void, StarException> CompressionStream::compress(std::span<char co
       return std::unexpected(IOException("ZSTD compressed output size overflow"));
     }
     out.resize(written + chunkSize);
-    ZSTD_outBuffer output = {out.ptr() + written, chunkSize, 0};
+    ZSTD_outBuffer output = {out.data() + written, chunkSize, 0};
     auto status = ZSTD_compressStream2(m_cStream.get(), &output, &input, ZSTD_e_flush);
     if (ZSTD_isError(status)) {
       out.resize(originalSize);
@@ -89,8 +91,10 @@ std::expected<ByteArray, StarException> CompressionStream::compress(ByteArray co
 
 void DecompressionStream::StreamDeleter::operator()(ZSTD_DStream* stream) const noexcept {
   auto status = ZSTD_freeDStream(stream);
-  if (ZSTD_isError(status))
-    fprintf(stderr, "Failed to free ZSTD decompression stream (%zu): %s\n", status, ZSTD_getErrorName(status));
+  if (ZSTD_isError(status)) {
+    if (auto written = Star::print(stderr, "Failed to free ZSTD decompression stream ({}): {}\n", status, ZSTD_getErrorName(status)); !written)
+      std::_Exit(1);
+  }
 }
 
 std::expected<std::unique_ptr<DecompressionStream>, StarException> DecompressionStream::create() {
@@ -120,7 +124,7 @@ std::expected<void, StarException> DecompressionStream::decompress(std::span<cha
       return std::unexpected(IOException("ZSTD decompressed output size overflow"));
     }
     out.resize(written + chunkSize);
-    ZSTD_outBuffer output = {out.ptr() + written, chunkSize, 0};
+    ZSTD_outBuffer output = {out.data() + written, chunkSize, 0};
     auto previousInput = input.pos;
     auto status = ZSTD_decompressStream(m_dStream.get(), &output, &input);
     if (ZSTD_isError(status)) {
@@ -162,8 +166,9 @@ std::expected<ByteArray, StarException> ZstdCompression::compress(std::span<char
   auto maxOutSize = ZSTD_compressBound(inLen);
   if (ZSTD_isError(maxOutSize))
     return std::unexpected(zstdError("compression bound", maxOutSize));
-  ByteArray out(maxOutSize, 0);
-  auto compressedSize = ZSTD_compress(out.ptr(), maxOutSize, in.data(), inLen, compressionLevel);
+  ByteArray out;
+  out.resize(maxOutSize);
+  auto compressedSize = ZSTD_compress(out.data(), maxOutSize, in.data(), inLen, compressionLevel);
   if (ZSTD_isError(compressedSize))
     return std::unexpected(zstdError("compression", compressedSize));
   out.resize(compressedSize);
@@ -194,8 +199,9 @@ std::expected<ByteArray, StarException> ZstdCompression::decompress(std::span<ch
     return std::unexpected(IOException("Cannot determine ZSTD decompressed size"));
   if (frameContentSize > MaxUncompressedSize)
     return std::unexpected(IOException::format("ZSTD frame declares {} bytes, above the {} byte limit", frameContentSize, MaxUncompressedSize));
-  ByteArray out(frameContentSize, 0);
-  auto result = ZSTD_decompress(out.ptr(), frameContentSize, in.data(), in.size());
+  ByteArray out;
+  out.resize(frameContentSize);
+  auto result = ZSTD_decompress(out.data(), frameContentSize, in.data(), in.size());
   if (ZSTD_isError(result))
     return std::unexpected(zstdError("decompression", result));
   out.resize(result);

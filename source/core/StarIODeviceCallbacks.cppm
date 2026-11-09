@@ -39,7 +39,7 @@ private:
 namespace Star {
 
 std::expected<IODeviceCallbacks, StarException> IODeviceCallbacks::create(IODevice& device) {
-  if (!device.isOpen()) {
+  if (!device.is_open()) {
     auto opened = device.open(IOMode::Read);
     if (!opened) return std::unexpected(std::move(opened.error()));
   }

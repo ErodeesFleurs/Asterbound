@@ -57,7 +57,7 @@ namespace Star {
 template <typename KeyT>
 class RegisteredPaneManager : public PaneManager {
 public:
-  typedef KeyT Key;
+  using Key = KeyT;
 
   explicit RegisteredPaneManager(GuiContext& context) : PaneManager(context) {}
 
@@ -110,15 +110,15 @@ private:
 template <typename KeyT>
 template <typename T>
 [[nodiscard]] std::expected<std::shared_ptr<T>, StarException> RegisteredPaneManager<KeyT>::registeredPane(KeyT const& paneId) const {
-  if (auto v = m_registeredPanes.maybeRef(paneId))
+  if (auto v = m_registeredPanes.find_ref(paneId))
     return convert<T>(v->get().pane);
-  return std::unexpected(GuiException(strf("No pane named '{}' found in RegisteredPaneManager", outputAny(paneId))));
+  return std::unexpected(GuiException(Star::format("No pane named '{}' found in RegisteredPaneManager", Star::output_any(paneId))));
 }
 
 template <typename KeyT>
 template <typename T>
 [[nodiscard]] std::expected<std::shared_ptr<T>, StarException> RegisteredPaneManager<KeyT>::maybeRegisteredPane(KeyT const& paneId) const {
-  if (auto v = m_registeredPanes.maybeRef(paneId))
+  if (auto v = m_registeredPanes.find_ref(paneId))
     return convert<T>(v->get().pane);
   return std::shared_ptr<T>{};
 }
@@ -128,14 +128,14 @@ template <typename KeyT>
     KeyT paneId, PaneLayer paneLayer, std::shared_ptr<Pane> pane, DismissCallback onDismiss) {
   if (!m_registeredPanes.insert(std::move(paneId), {std::move(paneLayer), std::move(pane), std::move(onDismiss)}).second)
     return std::unexpected(GuiException(
-        strf("Registered pane with name '{}' registered a second time in RegisteredPaneManager::registerPane",
-            outputAny(paneId))));
+        Star::format("Registered pane with name '{}' registered a second time in RegisteredPaneManager::registerPane",
+            Star::output_any(paneId))));
   return {};
 }
 
 template <typename KeyT>
 [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> RegisteredPaneManager<KeyT>::deregisterPane(KeyT const& paneId) {
-  if (auto v = m_registeredPanes.maybeTake(paneId)) {
+  if (auto v = m_registeredPanes.try_extract_value(paneId)) {
     if (isDisplayed(v->pane)) {
       auto dismissed = dismissPane(v->pane);
       if (!dismissed)
@@ -143,7 +143,7 @@ template <typename KeyT>
     }
     return v->pane;
   }
-  return std::unexpected(GuiException(strf("No pane named '{}' found in RegisteredPaneManager::deregisterPane", outputAny(paneId))));
+  return std::unexpected(GuiException(Star::format("No pane named '{}' found in RegisteredPaneManager::deregisterPane", Star::output_any(paneId))));
 }
 
 template <typename KeyT>
@@ -212,9 +212,9 @@ template <typename KeyT>
 template <typename KeyT>
 [[nodiscard]] std::expected<std::reference_wrapper<typename RegisteredPaneManager<KeyT>::PaneInfo const>, StarException> RegisteredPaneManager<KeyT>::getRegisteredPaneInfo(
     KeyT const& paneId) const {
-  if (auto p = m_registeredPanes.maybeRef(paneId))
+  if (auto p = m_registeredPanes.find_ref(paneId))
     return *p;
-  return std::unexpected(GuiException(strf("No registered pane with name '{}' found in  RegisteredPaneManager", outputAny(paneId))));
+  return std::unexpected(GuiException(Star::format("No registered pane with name '{}' found in  RegisteredPaneManager", Star::output_any(paneId))));
 }
 }
 

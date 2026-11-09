@@ -44,7 +44,7 @@ public:
   explicit DataStreamIODevice(IODevice& device);
 
   [[nodiscard]] std::expected<void, StarException> seek(std::size_t pos, IOSeek seek = IOSeek::Absolute);
-  [[nodiscard]] std::expected<bool, StarException> atEnd() override;
+  [[nodiscard]] std::expected<bool, StarException> at_end() override;
   [[nodiscard]] std::expected<StreamOffset, StarException> pos();
 
   [[nodiscard]] std::expected<void, StarException> readData(std::span<char> data) override;
@@ -139,7 +139,7 @@ public:
   bool empty() const;
 
   [[nodiscard]] std::expected<void, StarException> seek(std::size_t pos, IOSeek seek = IOSeek::Absolute);
-  [[nodiscard]] std::expected<bool, StarException> atEnd() override;
+  [[nodiscard]] std::expected<bool, StarException> at_end() override;
   [[nodiscard]] std::expected<std::size_t, StarException> pos();
 
   // Set new buffer.
@@ -175,7 +175,7 @@ public:
   bool empty() const;
 
   [[nodiscard]] std::expected<void, StarException> seek(std::size_t pos, IOSeek mode = IOSeek::Absolute);
-  [[nodiscard]] std::expected<bool, StarException> atEnd() override;
+  [[nodiscard]] std::expected<bool, StarException> at_end() override;
   [[nodiscard]] std::expected<std::size_t, StarException> pos();
   [[nodiscard]] std::expected<std::size_t, StarException> remaining();
 

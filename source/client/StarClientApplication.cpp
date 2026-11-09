@@ -414,9 +414,9 @@ std::expected<void, StarException> ClientApplication::shutdown() {
   std::optional<StarException> failure;
   auto remember = [&](std::expected<void, StarException> result) {
     if (!result) {
-      auto logged = m_root->logger().error("Client shutdown: {}", outputException(ExceptionDiagnostic(result.error()), true));
+      auto logged = m_root->logger().error("Client shutdown: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true));
       if (!logged)
-        EmergencyLog::error("Client shutdown logging failed: {}", outputException(ExceptionDiagnostic(logged.error()), true));
+        EmergencyLog::error("Client shutdown logging failed: {}", Star::output_exception(ExceptionDiagnostic(logged.error()), true));
       if (!failure)
         failure = std::move(result.error());
     }
@@ -584,7 +584,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     ImFontConfig config{};
     config.FontDataOwnedByAtlas = false;
     config.FontLoaderFlags = ImGuiFreeTypeLoaderFlags_ForceAutoHint;
-    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.ptr(), m_immediateFont.size(),
+    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.data(), m_immediateFont.size(),
       16, &config, io.Fonts->GetGlyphRangesDefault());
   }
   auto minScale = assets->json("/interface.config:minInterfaceScale").and_then([](Json j) { return j.toFloat(); });
@@ -733,8 +733,8 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
   restorePresentedCamera();
   if (std::holds_alternative<KeyDownEvent>(event)) {
     auto const& keyDown = std::get<KeyDownEvent>(event);
-    m_heldKeyEvents.append(keyDown);
-    m_edgeKeyEvents.append(keyDown);
+    m_heldKeyEvents.push_back(keyDown);
+    m_edgeKeyEvents.push_back(keyDown);
   } else if (std::holds_alternative<KeyUpEvent>(event)) {
     auto const& keyUp = std::get<KeyUpEvent>(event);
     eraseWhere(m_heldKeyEvents, [&](auto& keyEvent) {
@@ -815,9 +815,17 @@ std::expected<void, StarException> ClientApplication::update() {
       auto join = service->pullPendingJoin();
       if (!std::holds_alternative<std::monostate>(join)) {
         if (std::holds_alternative<P2PNetworkingPeerId>(join))
-          m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{std::move(std::get<P2PNetworkingPeerId>(join)), {}, {}, false};
+          m_pendingMultiPlayerConnection =
+            PendingMultiPlayerConnection{.server = std::move(std::get<P2PNetworkingPeerId>(join)),
+                                         .account = {},
+                                         .password = {},
+                                         .forceLegacy = false};
         else
-          m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{std::move(std::get<HostAddressWithPort>(join)), {}, {}, false};
+          m_pendingMultiPlayerConnection =
+            PendingMultiPlayerConnection{.server = std::move(std::get<HostAddressWithPort>(join)),
+                                         .account = {},
+                                         .password = {},
+                                         .forceLegacy = false};
         join.emplace<0>();
         auto changed = changeState(MainAppState::Title);
         if (!changed)
@@ -989,7 +997,7 @@ std::expected<void, StarException> ClientApplication::render() {
       auto rendered = worldClient->render(m_renderData, TilePainter::BorderTileSize, m_worldPainter->tileDrawer(), presentation);
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
-      m_root->logMap().set("client_render_world_client", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - clientStart).count()));
+      m_root->logMap().set("client_render_world_client", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - clientStart).count()));
 
       auto paintStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
       auto painted = m_worldPainter->render(m_renderData, [&]() -> std::expected<bool, StarException> {
@@ -997,8 +1005,8 @@ std::expected<void, StarException> ClientApplication::render() {
       });
       if (!painted)
         return std::unexpected(std::move(painted.error()));
-      m_root->logMap().set("client_render_world_painter", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - paintStart).count()));
-      m_root->logMap().set("client_render_world_total", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - totalStart).count()));
+      m_root->logMap().set("client_render_world_painter", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - paintStart).count()));
+      m_root->logMap().set("client_render_world_total", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - totalStart).count()));
       m_preparedCamera = PresentedCamera{camera, worldClient, m_player, playerEpoch, renderEpoch};
       
       auto size = Vec2F(renderer->screenSize());
@@ -1029,7 +1037,7 @@ std::expected<void, StarException> ClientApplication::render() {
     auto cinematic = m_cinematicOverlay->render();
     if (!cinematic)
       return std::unexpected(std::move(cinematic.error()));
-    m_root->logMap().set("client_render_interface", strf("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
+    m_root->logMap().set("client_render_interface", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
   }
 
   if (!m_errorScreen->accepted())
@@ -1079,7 +1087,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   auto assets = *assetsResult;
   auto renderer = Application::renderer();
   auto loadEffectConfig = [&](String const& name) -> std::expected<void, StarException> {
-    String path = strf("/rendering/effects/{}.config", name);
+    String path = Star::format("/rendering/effects/{}.config", name);
     auto exists = assets->assetExists(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
@@ -1093,17 +1101,17 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!shaderConfig)
       return std::unexpected(std::move(shaderConfig.error()));
     StringMap<String> shaders;
-    for (auto& entry : *shaderConfig) {
+    for (auto&& entry : *shaderConfig) {
       if (!entry.second.isType(Json::Type::String))
         continue;
       auto shader = entry.second.toString();
       if (!shader)
         return std::unexpected(std::move(shader.error()));
-      auto multiline = shader->hasChar('\n');
+      auto multiline = shader->has_char('\n');
       if (!multiline)
         return std::unexpected(std::move(multiline.error()));
       if (!*multiline) {
-        auto relative = AssetPath::relativeTo(path, *shader);
+        auto relative = AssetPath::relative_to(path, *shader);
         auto bytes = assets->bytes(relative);
         if (!bytes)
           return std::unexpected(std::move(bytes.error()));
@@ -1139,7 +1147,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   auto groups = assets->json("/client.config:postProcessGroups").and_then([](Json j) { return j.toObject(); });
   if (!groups)
     return std::unexpected(std::move(groups.error()));
-  for (auto& [name, definition] : *groups) {
+  for (auto&& [name, definition] : *groups) {
     auto groupConfig = groupsConfig->opt(name);
     if (!groupConfig)
       return std::unexpected(std::move(groupConfig.error()));
@@ -1151,7 +1159,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
       if (!enabled)
         return std::unexpected(std::move(enabled.error()));
     } else {
-      auto saved = config->setPath(strf("{}.{}", postProcessGroupsRoot, name), JsonObject());
+      auto saved = config->setPath(Star::format("{}.{}", postProcessGroupsRoot, name), JsonObject());
       if (!saved)
         return std::unexpected(std::move(saved.error()));
     }
@@ -1187,14 +1195,15 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!label)
       return std::unexpected(std::move(label.error()));
     if (*label) {
-      auto added = m_labelledPostProcessLayers.add(**label, m_postProcessLayers.count());
+      auto added = m_labelledPostProcessLayers.add(**label, m_postProcessLayers.size());
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
     auto passes = layer.getUInt("passes", 1);
     if (!passes)
       return std::unexpected(std::move(passes.error()));
-    m_postProcessLayers.append(PostProcessLayer{std::move(*effects), (unsigned)*passes, group});
+    m_postProcessLayers.push_back(
+      PostProcessLayer{.effects = std::move(*effects), .passes = static_cast<unsigned>(*passes), .group = group});
   }
   return loadEffectConfig("interface");
 }
@@ -1218,7 +1227,7 @@ std::expected<void, StarException> ClientApplication::setPostProcessGroupEnabled
     auto config = m_root->configuration();
     if (!config)
       return std::unexpected(std::move(config.error()));
-    return (*config)->setPath(strf("{}.{}.enabled", postProcessGroupsRoot, group), enabled);
+    return (*config)->setPath(Star::format("{}.{}.enabled", postProcessGroupsRoot, group), enabled);
   }
   return {};
 }
@@ -1284,7 +1293,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
   auto remember = [&](auto result) {
     if (!result) {
       if (cleanupError)
-        cleanupError = cleanupError->withContext(strf("Additional client cleanup failure: {}", outputException(ExceptionDiagnostic(result.error()), true)));
+        cleanupError = cleanupError->with_context(Star::format("Additional client cleanup failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
       else
         cleanupError = std::move(result.error());
     }
@@ -1460,8 +1469,8 @@ std::expected<void, StarException> ClientApplication::prepareTitleForm() {
     return std::unexpected(std::move(port.error()));
   if (m_pendingMultiPlayerConnection) {
     auto const& pending = std::get<HostAddressWithPort>(m_pendingMultiPlayerConnection->server);
-    *address = toString(pending.address());
-    *port = toString(pending.port());
+    *address = Star::to_string(pending.address());
+    *port = Star::to_string(pending.port());
   }
   if (auto updated = m_titleScreen->setMultiPlayerAddress(*address); !updated)
     return updated;
@@ -1505,7 +1514,7 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
     if (!intro)
       return std::unexpected(std::move(intro.error()));
     if (auto pending =
-          m_player->setPendingCinematic(Json(intro->replaceTags(StringMap<String>{{"species", m_player->species()}})));
+          m_player->setPendingCinematic(Json(intro->replace_tags(StringMap<String>{{"species", m_player->species()}})));
         !pending)
       return pending;
   } else if (auto pending = m_player->setPendingCinematic(Json()); !pending) {
@@ -1537,7 +1546,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
   m_cinematicOverlay->setPlayer(m_player);
-  m_timeSinceJoin = (std::int64_t)Time::millisecondsSinceEpoch() / 1000;
+  m_timeSinceJoin = static_cast<std::int64_t>(Time::millisecondsSinceEpoch()) / 1000;
   return true;
 }
 
@@ -1552,7 +1561,7 @@ std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
         auto socket = TcpSocket::connectTo(server).and_then(
           [&](auto tcp) { return TcpPacketSocket::open(m_root->logger(), std::move(tcp)); });
         if (!socket)
-          return setError(strf("Join failed! Error connecting to '{}'", server), ExceptionDiagnostic(socket.error()))
+          return setError(Star::format("Join failed! Error connecting to '{}'", server), ExceptionDiagnostic(socket.error()))
             .transform([] { return false; });
         packetSocket = std::move(*socket);
       } else if constexpr (std::same_as<Server, P2PNetworkingPeerId>) {
@@ -1618,7 +1627,7 @@ std::expected<bool, StarException> ClientApplication::connectSinglePlayer() {
   if (!connected)
     return setError("Error connecting locally", ExceptionDiagnostic(connected.error())).transform([] { return false; });
   if (*connected)
-    return setError(strf("Error connecting locally: {}", **connected)).transform([] { return false; });
+    return setError(Star::format("Error connecting locally: {}", **connected)).transform([] { return false; });
   return true;
 }
 
@@ -1686,7 +1695,7 @@ std::expected<void, StarException> ClientApplication::recoverToTitle(std::expect
     auto& result = reference.get();
     if (!result) {
       if (failure)
-        failure = failure->withContext(strf("Additional client recovery failure: {}", outputException(ExceptionDiagnostic(result.error()), true)));
+        failure = failure->with_context(Star::format("Additional client recovery failure: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)));
       else
         failure = std::move(result.error());
     }
@@ -1701,16 +1710,16 @@ std::expected<void, StarException> ClientApplication::setError(String const& err
   auto displayed = m_errorScreen->setMessage(error);
   auto recovered = recoverToTitle(std::move(logged), std::move(displayed));
   if (!recovered)
-    return std::unexpected(recovered.error().withContext(error.utf8()));
+    return std::unexpected(recovered.error().with_context(error.utf8()));
   return recovered;
 }
 
 std::expected<void, StarException> ClientApplication::setError(String const& error, ExceptionDiagnostic const& diagnostic) {
-  auto logged = m_root->logger().error("{}\n{}", error, outputException(diagnostic, true));
-  auto displayed = m_errorScreen->setMessage(strf("{}\n{}", error, outputException(diagnostic, false)));
+  auto logged = m_root->logger().error("{}\n{}", error, Star::output_exception(diagnostic, true));
+  auto displayed = m_errorScreen->setMessage(Star::format("{}\n{}", error, Star::output_exception(diagnostic, false)));
   auto recovered = recoverToTitle(std::move(logged), std::move(displayed));
   if (!recovered)
-    return std::unexpected(recovered.error().withContext(strf("{}\n{}", error, outputException(diagnostic, true))));
+    return std::unexpected(recovered.error().with_context(Star::format("{}\n{}", error, Star::output_exception(diagnostic, true))));
   return recovered;
 }
 
@@ -1728,14 +1737,14 @@ std::expected<void, StarException> ClientApplication::loadMods() {
   for (auto& id : service->subscribedContentIds()) {
     auto directory = service->contentDownloadDirectory(id);
     if (!directory) {
-      if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available: {}", id, outputException(ExceptionDiagnostic(directory.error()), true)); !logged)
+      if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available: {}", id, Star::output_exception(ExceptionDiagnostic(directory.error()), true)); !logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
     if (*directory) {
       if (auto logged = m_root->logger().info("Loading mods from user generated content with id '{}' from directory '{}'", id, **directory); !logged)
         return std::unexpected(std::move(logged.error()));
-      directories.append(**directory);
+      directories.push_back(**directory);
     } else {
       if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available", id); !logged)
         return std::unexpected(std::move(logged.error()));
@@ -1783,7 +1792,7 @@ std::expected<void, StarException> ClientApplication::updateMods(float dt) {
   const bool downloadFailed = !download;
   if (downloadFailed) {
     // Preserve installed/local-mod recovery without retrying or calling a failed download successful.
-    if (auto logged = m_root->logger().warn("Could not update subscribed user generated content; loading available installed content: {}", outputException(ExceptionDiagnostic(download.error()), true)); !logged)
+    if (auto logged = m_root->logger().warn("Could not update subscribed user generated content; loading available installed content: {}", Star::output_exception(ExceptionDiagnostic(download.error()), true)); !logged)
       return std::unexpected(std::move(logged.error()));
   }
   if (auto logged = m_root->logger().info("{}", downloadFailed ? "Loading available installed user generated content..." : "Loading updated user generated content..."); !logged)
@@ -1792,14 +1801,14 @@ std::expected<void, StarException> ClientApplication::updateMods(float dt) {
   for (auto& id : service->subscribedContentIds()) {
     auto directory = service->contentDownloadDirectory(id);
     if (!directory) {
-      if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available: {}", id, outputException(ExceptionDiagnostic(directory.error()), true)); !logged)
+      if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available: {}", id, Star::output_exception(ExceptionDiagnostic(directory.error()), true)); !logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
     if (*directory) {
       if (auto logged = m_root->logger().info("Loading mods from user generated content with id '{}' from directory '{}'", id, **directory); !logged)
         return std::unexpected(std::move(logged.error()));
-      directories.append(**directory);
+      directories.push_back(**directory);
     } else {
       if (auto logged = m_root->logger().warn("User generated content with id '{}' is not available", id); !logged)
         return std::unexpected(std::move(logged.error()));
@@ -1934,17 +1943,19 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
         auto defaultPort = (*config)->get("gameServerPort").and_then([](Json j) { return j.toUInt(); });
         if (!defaultPort)
           return std::unexpected(std::move(defaultPort.error()));
-        *portString = toString(*defaultPort);
+        *portString = Star::to_string(*defaultPort);
       }
-      auto port = maybeLexicalCast<std::uint16_t>(*portString);
+      auto port = maybe_lexical_cast<std::uint16_t>(*portString);
       if (!port)
-        return setError(strf("invalid port: {}", *portString));
+        return setError(Star::format("invalid port: {}", *portString));
       auto address = HostAddressWithPort::lookup(*addressString, *port);
       if (!address)
         return setError("Error resolving server address", ExceptionDiagnostic(address.error()));
-      m_pendingMultiPlayerConnection = PendingMultiPlayerConnection{
-        *address, m_titleScreen->multiPlayerAccount(), m_titleScreen->multiPlayerPassword(), m_titleScreen->multiPlayerForceLegacy()
-      };
+      m_pendingMultiPlayerConnection =
+        PendingMultiPlayerConnection{.server = *address,
+                                     .account = m_titleScreen->multiPlayerAccount(),
+                                     .password = m_titleScreen->multiPlayerPassword(),
+                                     .forceLegacy = m_titleScreen->multiPlayerForceLegacy()};
       if (auto saved = (*config)->setPath("title.multiPlayerAddress", m_titleScreen->multiPlayerAddress()); !saved)
         return std::unexpected(std::move(saved.error()));
       if (auto saved = (*config)->setPath("title.multiPlayerPort", m_titleScreen->multiPlayerPort()); !saved)
@@ -2006,21 +2017,21 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         if (tag == "playerName")
           return m_player->name().transform([](String name) { return Text::stripEscapeCodes(name); });
         if (tag == "playerHealth")
-          return toString(m_player->health());
+          return Star::to_string(m_player->health());
         if (tag == "playerMaxHealth")
-          return m_player->maxHealth().transform([](float value) { return toString(value); });
+          return m_player->maxHealth().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerEnergy")
-          return m_player->energy().transform([](float value) { return toString(value); });
+          return m_player->energy().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerMaxEnergy")
-          return m_player->maxEnergy().transform([](float value) { return toString(value); });
+          return m_player->maxEnergy().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerBreath")
-          return toString(m_player->breath());
+          return Star::to_string(m_player->breath());
         if (tag == "playerMaxBreath")
-          return m_player->maxBreath().transform([](float value) { return toString(value); });
+          return m_player->maxBreath().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerXPos")
-          return toString(std::round(m_player->position().x()));
+          return Star::to_string(std::round(m_player->position().x()));
         if (tag == "playerYPos")
-          return toString(std::round(m_player->position().y()));
+          return Star::to_string(std::round(m_player->position().y()));
         if (tag == "worldName") {
           if (std::holds_alternative<ClientShipWorldId>(m_universeClient->clientContext()->playerWorldId()))
             return "Player Ship";
@@ -2051,14 +2062,14 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           auto text = getActivityDetail(*tag);
           if (!text)
             return std::unexpected(std::move(text.error()));
-          detailsList.append(std::move(*text));
+          detailsList.push_back(std::move(*text));
         }
         finalDetails = detailsList.join("\n");
       } else if (activityDetails->isType(Json::Type::String)) {
         auto text = activityDetails->toString();
         if (!text)
           return std::unexpected(std::move(text.error()));
-        auto details = text->lookupTags(getActivityDetail);
+        auto details = text->lookup_tags(getActivityDetail);
         if (!details)
           return std::unexpected(std::move(details.error()));
         finalDetails = std::move(*details);
@@ -2154,7 +2165,8 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (isActionTakenEdge(InterfaceAction::EmoteSleep))
         m_player->addEmote(HumanoidEmote::Sleep);
 
-      if (int newZoomDirection = (int)m_input->bindHeld("opensb", "zoomIn") - (int)m_input->bindHeld("opensb", "zoomOut"))
+      if (int newZoomDirection = static_cast<int>(m_input->bindHeld("opensb", "zoomIn"))
+            - static_cast<int>(m_input->bindHeld("opensb", "zoomOut")))
         m_cameraZoomDirection = newZoomDirection;
     }
     if (m_cameraZoomDirection != 0) {
@@ -2164,7 +2176,9 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (!zoom)
         return std::unexpected(std::move(zoom.error()));
       float curZoom = *zoom,
-            newZoom = std::max(1.f, curZoom * std::powf(1.f + (float)m_cameraZoomDirection * 0.5f, std::min(1.f, dt * 5.f))),
+            newZoom = std::max(
+              1.f,
+              curZoom * std::powf(1.f + static_cast<float>(m_cameraZoomDirection) * 0.5f, std::min(1.f, dt * 5.f))),
             intZoom = std::max(1.f, (goingIn ? std::floor(curZoom) : std::ceil(curZoom)) + m_cameraZoomDirection);
       bool pastInt = goingIn ? newZoom + threshold > intZoom
                              : newZoom - threshold < intZoom;
@@ -2177,7 +2191,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         return std::unexpected(std::move(saved.error()));
     }
 
-    if (m_controllerInput && m_controllerLeftStick.magnitudeSquared() > 0.01f)
+    if (m_controllerInput && m_controllerLeftStick.magnitude_squared() > 0.01f)
       m_player->setMoveVector(m_controllerLeftStick);
     else
       m_player->setMoveVector(Vec2F());
@@ -2195,7 +2209,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         app.get().m_cinematicOverlay->stop();
         String errMessage;
         if (auto disconnectReason = app.get().m_universeClient->disconnectReason())
-          errMessage = strf("You were disconnected from the server for the following reason:\n{}", *disconnectReason);
+          errMessage = Star::format("You were disconnected from the server for the following reason:\n{}", *disconnectReason);
         else
           errMessage = "Client-server connection no longer valid!";
         if (auto displayed = app.get().setError(errMessage); !displayed)
@@ -2228,7 +2242,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       auto& broadcastCallback = worldClient->broadcastCallback();
       if (!broadcastCallback) {
         broadcastCallback = [&](std::shared_ptr<Player> player, StringView broadcast) -> std::expected<bool, StarException> {
-          auto& view = broadcast.utf8();
+          auto view = broadcast.utf8();
           if (view.rfind(VoiceBroadcastPrefix.utf8(), 0) != NPos) {
             auto entityId = player->entityId();
             auto speaker = m_voice->speaker(connectionForEntity(entityId));
@@ -2243,7 +2257,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
             if (!mouth)
               return std::unexpected(std::move(mouth.error()));
             (*speaker)->position = *mouth;
-            auto received = m_voice->receive(*speaker, view.substr(VoiceBroadcastPrefix.utf8Size()));
+            auto received = m_voice->receive(*speaker, view.substr(VoiceBroadcastPrefix.utf8_size()));
             if (!received)
               return std::unexpected(std::move(received.error()));
           }
@@ -2333,24 +2347,24 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       return std::unexpected(std::move(aimResult.error()));
     Vec2F aimPosition = *aimResult;
     float fps = app->renderFps();
-    m_root->logMap().set("client_render_rate", strf("{:4.2f} FPS ({:4.2f}ms)", fps, (1.0f / app->renderFps()) * 1000.0f));
-    m_root->logMap().set("client_update_rate", strf("{:4.2f}Hz", app->updateRate()));
+    m_root->logMap().set("client_render_rate", Star::format("{:4.2f} FPS ({:4.2f}ms)", fps, (1.0f / app->renderFps()) * 1000.0f));
+    m_root->logMap().set("client_update_rate", Star::format("{:4.2f}Hz", app->updateRate()));
     if (m_mainInterface->isDebugDisplayed()) {
       auto const& frame = frameTimings();
       m_root->logMap().set("client_frame_previous",
-                           strf("{}us; events={}us; updates={}us/{}; throttle={}us", frame.total, frame.events,
+                           Star::format("{}us; events={}us; updates={}us/{}; throttle={}us", frame.total, frame.events,
                                 frame.updates, frame.updateCount, frame.throttle));
       m_root->logMap().set("client_frame_submission",
-                           strf("render={}us; finish={}us; ImGui={}us; present={}us (CPU, not GPU)", frame.render,
+                           Star::format("render={}us; finish={}us; ImGui={}us; present={}us (CPU, not GPU)", frame.render,
                                 frame.finish, frame.gui, frame.present));
     }
-    m_root->logMap().set("player_pos", strf("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", m_player->position()[0], m_player->position()[1]));
-    m_root->logMap().set("player_vel", strf("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", m_player->velocity()[0], m_player->velocity()[1]));
-    m_root->logMap().set("player_aim", strf("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", aimPosition[0], aimPosition[1]));
+    m_root->logMap().set("player_pos", Star::format("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", m_player->position()[0], m_player->position()[1]));
+    m_root->logMap().set("player_vel", Star::format("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", m_player->velocity()[0], m_player->velocity()[1]));
+    m_root->logMap().set("player_aim", Star::format("[ ^#f45;{:4.2f}^reset;, ^#49f;{:4.2f}^reset; ]", aimPosition[0], aimPosition[1]));
     if (auto world = m_universeClient->worldClient()) {
       auto aim = Vec2I::floor(aimPosition);
-      m_root->logMap().set("tile_liquid_level", toString(world->liquidLevel(aim).level));
-      m_root->logMap().set("tile_dungeon_id", world->isTileProtected(aim) ? strf("^red;{}", world->dungeonId(aim)) : toString(world->dungeonId(aim)));
+      m_root->logMap().set("tile_liquid_level", Star::to_string(world->liquidLevel(aim).level));
+      m_root->logMap().set("tile_dungeon_id", world->isTileProtected(aim) ? Star::format("^red;{}", world->dungeonId(aim)) : Star::to_string(world->dungeonId(aim)));
     }
 
     if (m_mainInterface->currentState() == MainInterface::ReturnToTitle)
@@ -2435,8 +2449,8 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   }
   Vec2F newCameraPosition;
 
-  newCameraPosition.setX(playerCameraPosition.x());
-  newCameraPosition.setY(playerCameraPosition.y());
+  newCameraPosition.set_x(playerCameraPosition.x());
+  newCameraPosition.set_y(playerCameraPosition.y());
 
   auto baseCamera = newCameraPosition;
 
@@ -2464,8 +2478,8 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
     newCameraPosition = newCameraPosition + cameraDelta * (cameraSmoothFactor - 1.0) / cameraSmoothFactor;
   m_cameraPositionSmoother = newCameraPosition;
 
-  newCameraPosition.setX(newCameraPosition.x() + m_cameraXOffset / camera.pixelRatio());
-  newCameraPosition.setY(newCameraPosition.y() + m_cameraYOffset / camera.pixelRatio());
+  newCameraPosition.set_x(newCameraPosition.x() + m_cameraXOffset / camera.pixelRatio());
+  newCameraPosition.set_y(newCameraPosition.y() + m_cameraYOffset / camera.pixelRatio());
 
   auto smoothDelta = newCameraPosition - baseCamera;
 
@@ -2488,7 +2502,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
       MessageBoxW(nullptr, text->c_str(), L"OpenStarbound startup error", MB_OK | MB_ICONERROR);
       return;
     }
-    Star::EmergencyLog::error("Could not convert startup diagnostic to UTF-16: {}", Star::outputException(Star::ExceptionDiagnostic(text.error()), true));
+    Star::EmergencyLog::error("Could not convert startup diagnostic to UTF-16: {}", Star::output_exception(Star::ExceptionDiagnostic(text.error()), true));
     // Preserve the actual diagnostic even when its bytes are not valid UTF-8.
     std::wstring escaped = L"Startup failed. Diagnostic bytes (non-ASCII bytes escaped):\n";
     constexpr wchar_t digits[] = L"0123456789ABCDEF";
@@ -2505,14 +2519,14 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   };
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    reportStartupFailure(Star::strf("Client native initialization failed: {}", Star::outputException(Star::ExceptionDiagnostic(nativeRuntime.error()), true)));
+    reportStartupFailure(Star::format("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true)));
     return 1;
   }
   int nArgs;
   LPWSTR* argsList = CommandLineToArgvW(GetCommandLineW(), &nArgs);
   if (!argsList) {
     auto error = GetLastError();
-    reportStartupFailure(Star::strf("Could not read Windows command line: Windows error {}", error));
+    reportStartupFailure(Star::format("Could not read Windows command line: Windows error {}", error));
     return 1;
   }
   std::unique_ptr<void, decltype(&LocalFree)> argsOwner(argsList, &LocalFree);
@@ -2520,10 +2534,10 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   for (int i = 0; i < nArgs; ++i) {
     auto arg = Star::String::create(argsList[i]);
     if (!arg) {
-      reportStartupFailure(Star::strf("Invalid Windows command line: {}", Star::outputException(Star::ExceptionDiagnostic(arg.error()), true)));
+      reportStartupFailure(Star::format("Invalid Windows command line: {}", Star::output_exception(Star::ExceptionDiagnostic(arg.error()), true)));
       return 1;
     }
-    args.append(std::move(*arg));
+    args.push_back(std::move(*arg));
   }
   if (IsDebuggerPresent() && AllocConsole()) {
     std::freopen("CONOUT$", "w", stdout);
@@ -2537,13 +2551,13 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    Star::EmergencyLog::error("Client native initialization failed: {}", Star::outputException(Star::ExceptionDiagnostic(nativeRuntime.error()), true));
+    Star::EmergencyLog::error("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true));
     return 1;
   }
   Star::StringList args;
   args.reserve(argc);
   for (int i = 0; i < argc; ++i)
-    args.append(Star::String(std::string_view(argv[i])));
+    args.push_back(Star::String(std::string_view(argv[i])));
   return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), args);
 }
 #endif

@@ -128,14 +128,13 @@ std::expected<void, StarException> WorldPainter::initialize() {
   auto entries = directives->iterateObject();
   if (!entries) return std::unexpected(std::move(entries.error()));
   for (auto const& p : *entries) {
-    if (!EntityHighlightEffectTypeNames) return std::unexpected(EntityHighlightEffectTypeNames.error());
-    auto type = EntityHighlightEffectTypeNames->getLeft(p.first);
+    auto type = enumValue<EntityHighlightEffectTypeNames>(p.first);
     if (!type) return std::unexpected(std::move(type.error()));
     auto underlay = p.second.getString("underlay", "");
     if (!underlay) return std::unexpected(std::move(underlay.error()));
     auto overlay = p.second.getString("overlay", "");
     if (!overlay) return std::unexpected(std::move(overlay.error()));
-    m_highlightDirectives.set(type->get(), {Directives(*underlay), Directives(*overlay)});
+    m_highlightDirectives.set(*type, {Directives(*underlay), Directives(*overlay)});
   }
   auto loadVector = [this](String const& path) -> std::expected<Vec2F, StarException> {
     auto json = m_assets->json(path);
@@ -303,7 +302,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
   for (auto const& ed : renderData.entityDrawables) {
     for (auto const& p : ed.layers)
       if (!p.second.empty())
-        m_entityDrawableLayers[p.first].append({ed.highlightEffect, std::cref(p.second)});
+        m_entityDrawableLayers[p.first].push_back({ed.highlightEffect, std::cref(p.second)});
   }
 
   auto entityDrawableIterator = m_entityDrawableLayers.begin();
@@ -478,7 +477,7 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
   auto maxLevel = m_highlightConfig.getFloat("maxHighlightLevel", 1.0);
   if (!maxLevel) return std::unexpected(std::move(maxLevel.error()));
   highlightEffect.level *= *maxLevel;
-  if (auto directives = m_highlightDirectives.maybeRef(highlightEffect.type); directives && highlightEffect.level > 0) {
+  if (auto directives = m_highlightDirectives.find_ref(highlightEffect.type); directives && highlightEffect.level > 0) {
     auto const& underlayDirectives = directives->get().first;
     auto const& overlayDirectives = directives->get().second;
     auto drawHighlight = [&](Drawable const& drawable,

@@ -26,7 +26,7 @@ std::expected<StringList, StarException> colorDirectivesFromConfig(JsonArray con
     auto text = entry.type() == Json::Type::Object ? paletteSwapDirectivesFromConfig(entry) : entry.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    result.append(std::move(*text));
+    result.push_back(std::move(*text));
   }
   return result;
 }
@@ -97,10 +97,10 @@ ImageOperation imageOperationFromString(StringView string) {
         else {
           auto from = Color::hexToVec4B(*source);
           if (!from)
-            return ErrorImageOperation{std::move(from.error())};
+            return ErrorImageOperation{.cause = std::move(from.error())};
           auto to = Color::hexToVec4B(hex);
           if (!to)
-            return ErrorImageOperation{std::move(to.error())};
+            return ErrorImageOperation{.cause = std::move(to.error())};
           operation.colorReplaceMap[*from] = *to;
           source.reset();
         }
@@ -118,7 +118,7 @@ ImageOperation imageOperationFromString(StringView string) {
       bits.emplace_back(text.substr(begin, end - begin));
     begin = end + 1;
   }
-  auto error = [](StarException cause) -> ImageOperation { return ErrorImageOperation{std::move(cause)}; };
+  auto error = [](StarException cause) -> ImageOperation { return ErrorImageOperation{.cause = std::move(cause)}; };
   if (bits.empty())
     return error(ImageOperationException("Missing image operation"));
   auto type = bits[0];
@@ -152,7 +152,7 @@ ImageOperation imageOperationFromString(StringView string) {
     auto color = Color::fromHex(bits[1]);
     if (!color)
       return error(std::move(color.error()));
-    auto amount = lexicalCast<float>(bits[2]);
+    auto amount = lexical_cast<float>(bits[2]);
     if (!amount)
       return error(std::move(amount.error()));
     FadeToColorImageOperation fade(color->toRgb(), *amount);
@@ -161,10 +161,11 @@ ImageOperation imageOperationFromString(StringView string) {
     auto secondColor = Color::fromHex(bits[3]);
     if (!secondColor)
       return error(std::move(secondColor.error()));
-    auto secondAmount = lexicalCast<float>(bits[4]);
+    auto secondAmount = lexical_cast<float>(bits[4]);
     if (!secondAmount)
       return error(std::move(secondAmount.error()));
-    return ScanLinesImageOperation{fade, FadeToColorImageOperation(secondColor->toRgb(), *secondAmount)};
+    return ScanLinesImageOperation{.fade1 = fade,
+                                   .fade2 = FadeToColorImageOperation(secondColor->toRgb(), *secondAmount)};
   }
   if (type == "addmask" || type == "submask" || type == "blendmult" || type == "blendscreen") {
     StringList references;
@@ -179,17 +180,23 @@ ImageOperation imageOperationFromString(StringView string) {
     }
     Vec2I offset;
     for (std::size_t i = 2; i < std::min<std::size_t>(bits.size(), 4); ++i) {
-      auto value = lexicalCast<int>(bits[i]);
+      auto value = lexical_cast<int>(bits[i]);
       if (!value)
         return error(std::move(value.error()));
       offset[i - 2] = *value;
     }
     if (type == "addmask" || type == "submask")
-      return AlphaMaskImageOperation{type == "addmask" ? AlphaMaskImageOperation::Additive : AlphaMaskImageOperation::Subtractive, std::move(references), offset};
-    return BlendImageOperation{type == "blendmult" ? BlendImageOperation::Multiply : BlendImageOperation::Screen, std::move(references), offset};
+      return AlphaMaskImageOperation{.mode = type == "addmask" ? AlphaMaskImageOperation::Additive
+                                                               : AlphaMaskImageOperation::Subtractive,
+                                     .maskImages = std::move(references),
+                                     .offset = offset};
+    return BlendImageOperation{.mode =
+                                 type == "blendmult" ? BlendImageOperation::Multiply : BlendImageOperation::Screen,
+                               .blendImages = std::move(references),
+                               .offset = offset};
   }
   if (type == "border" || type == "outline") {
-    auto pixels = lexicalCast<unsigned>(bits[1]);
+    auto pixels = lexical_cast<unsigned>(bits[1]);
     if (!pixels)
       return error(std::move(pixels.error()));
     auto start = Color::fromHex(bits[2]);
@@ -198,12 +205,16 @@ ImageOperation imageOperationFromString(StringView string) {
     auto end = bits.size() > 3 ? Color::fromHex(bits[3]) : start;
     if (!end)
       return error(std::move(end.error()));
-    return BorderImageOperation{*pixels, start->toRgba(), end->toRgba(), type == "outline", false};
+    return BorderImageOperation{.pixels = *pixels,
+                                .startColor = start->toRgba(),
+                                .endColor = end->toRgba(),
+                                .outlineOnly = type == "outline",
+                                .includeTransparent = false};
   }
   if (type == "crop") {
     float values[4]{};
     for (unsigned i = 0; i < 4; ++i) {
-      auto value = lexicalCast<float>(bits[i + 1]);
+      auto value = lexical_cast<float>(bits[i + 1]);
       if (!value)
         return error(std::move(value.error()));
       values[i] = *value;
@@ -212,7 +223,7 @@ ImageOperation imageOperationFromString(StringView string) {
   }
   if (type == "hueshift" || type == "saturation" || type == "brightness" || type == "scale"
       || type == "scalenearest" || type == "scalebilinear" || type == "scalebicubic") {
-    auto value = lexicalCast<float>(bits[1]);
+    auto value = lexical_cast<float>(bits[1]);
     if (!value)
       return error(std::move(value.error()));
     if (type == "hueshift")
@@ -221,64 +232,64 @@ ImageOperation imageOperationFromString(StringView string) {
       return SaturationShiftImageOperation::saturationShift100(*value);
     if (type == "brightness")
       return BrightnessMultiplyImageOperation::brightnessMultiply100(*value);
-    auto second = bits.size() > 2 ? lexicalCast<float>(bits[2]) : value;
+    auto second = bits.size() > 2 ? lexical_cast<float>(bits[2]) : value;
     if (!second)
       return error(std::move(second.error()));
     auto mode = type == "scalenearest" ? ScaleImageOperation::Nearest
       : type == "scalebicubic" ? ScaleImageOperation::Bicubic : ScaleImageOperation::Bilinear;
-    return ScaleImageOperation{mode, Vec2F(*value, *second)};
+    return ScaleImageOperation{.mode = mode, .scale = Vec2F(*value, *second)};
   }
   return NullImageOperation{};
 }
 
 String imageOperationToString(ImageOperation const& operation) {
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
-    return strf("hueshift={}", op->get().hueShiftAmount * 360.0f);
+    return Star::format("hueshift={}", op->get().hueShiftAmount * 360.0f);
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
-    return strf("saturation={}", op->get().saturationShiftAmount * 100.0f);
+    return Star::format("saturation={}", op->get().saturationShiftAmount * 100.0f);
   } else if (auto op = (std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<BrightnessMultiplyImageOperation>(operation))} : std::nullopt)) {
-    return strf("brightness={}", (op->get().brightnessMultiply - 1.0f) * 100.0f);
+    return Star::format("brightness={}", (op->get().brightnessMultiply - 1.0f) * 100.0f);
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
-    return strf("fade={}={}", Color::rgb(op->get().color).toHex(), op->get().amount);
+    return Star::format("fade={}={}", Color::rgb(op->get().color).toHex(), op->get().amount);
   } else if (auto op = (std::holds_alternative<ScanLinesImageOperation>(operation) ? std::optional{std::cref(std::get<ScanLinesImageOperation>(operation))} : std::nullopt)) {
-    return strf("scanlines={}={}={}={}",
+    return Star::format("scanlines={}={}={}={}",
         Color::rgb(op->get().fade1.color).toHex(),
         op->get().fade1.amount,
         Color::rgb(op->get().fade2.color).toHex(),
         op->get().fade2.amount);
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
-    return strf("setcolor={}", Color::rgb(op->get().color).toHex());
+    return Star::format("setcolor={}", Color::rgb(op->get().color).toHex());
   } else if (auto op = (std::holds_alternative<ColorReplaceImageOperation>(operation) ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))} : std::nullopt)) {
     String str = "replace";
     for (auto const& pair : op->get().colorReplaceMap)
-      str += strf(";{}={}", Color::rgba(pair.first).toHex(), Color::rgba(pair.second).toHex());
+      str += Star::format(";{}={}", Color::rgba(pair.first).toHex(), Color::rgba(pair.second).toHex());
     return str;
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == AlphaMaskImageOperation::Additive)
-      return strf("addmask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("addmask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
     else if (op->get().mode == AlphaMaskImageOperation::Subtractive)
-      return strf("submask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("submask={};{};{}", op->get().maskImages.join("+"), op->get().offset[0], op->get().offset[1]);
   } else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == BlendImageOperation::Multiply)
-      return strf("blendmult={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("blendmult={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
     else if (op->get().mode == BlendImageOperation::Screen)
-      return strf("blendscreen={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
+      return Star::format("blendscreen={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
-    return strf("multiply={}", Color::rgba(op->get().color).toHex());
+    return Star::format("multiply={}", Color::rgba(op->get().color).toHex());
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
     if (op->get().outlineOnly)
-      return strf("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
     else
-      return strf("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
   } else if (auto op = (std::holds_alternative<ScaleImageOperation>(operation) ? std::optional{std::cref(std::get<ScaleImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == ScaleImageOperation::Nearest)
-      return strf("scalenearest={}", op->get().scale);
+      return Star::format("scalenearest={}", op->get().scale);
     else if (op->get().mode == ScaleImageOperation::Bilinear)
-      return strf("scalebilinear={}", op->get().scale);
+      return Star::format("scalebilinear={}", op->get().scale);
     else if (op->get().mode == ScaleImageOperation::Bicubic)
-      return strf("scalebicubic={}", op->get().scale);
+      return Star::format("scalebicubic={}", op->get().scale);
   } else if (auto op = (std::holds_alternative<CropImageOperation>(operation) ? std::optional{std::cref(std::get<CropImageOperation>(operation))} : std::nullopt)) {
-    return strf("crop={};{};{};{}", op->get().subset.xMin(), op->get().subset.xMax(), op->get().subset.yMin(), op->get().subset.yMax());
+    return Star::format("crop={};{};{};{}", op->get().subset.xMin(), op->get().subset.xMax(), op->get().subset.yMin(), op->get().subset.yMax());
   } else if (auto op = (std::holds_alternative<FlipImageOperation>(operation) ? std::optional{std::cref(std::get<FlipImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == FlipImageOperation::FlipX)
       return "flipx";
@@ -317,7 +328,7 @@ List<ImageOperation> parseImageOperations(StringView params) {
     if (end == std::string_view::npos)
       end = text.size();
     if (end != begin)
-      operations.append(imageOperationFromString(text.substr(begin, end - begin)));
+      operations.push_back(imageOperationFromString(text.substr(begin, end - begin)));
     begin = end + 1;
   }
   return operations;
@@ -329,9 +340,9 @@ String printImageOperations(List<ImageOperation> const& list) {
 
 void addImageOperationReferences(ImageOperation const& operation, StringList& out) {
   if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt))
-    out.appendAll(op->get().maskImages);
+    out.append_range(op->get().maskImages);
   else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt))
-    out.appendAll(op->get().blendImages);
+    out.append_range(op->get().blendImages);
 }
 
 StringList imageOperationReferences(List<ImageOperation> const& operations) {
@@ -449,12 +460,12 @@ static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, Pixel
         continue;
       }
       Vec4B pixel;
-      std::memcpy(pixel.ptr(), &input, 4);
+      std::memcpy(pixel.data(), &input, 4);
       auto output = input;
       auto bit = bitFor(pixel);
       if ((bits[bit >> 6] >> (bit & 63)) & 1) {
         if (auto replacement = replaceMap.maybe(pixel)) {
-          std::memcpy(&output, replacement->ptr(), 4);
+          std::memcpy(&output, replacement->data(), 4);
           std::memcpy(destination, &output, 4);
         }
       }
@@ -480,11 +491,11 @@ static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation co
       return std::unexpected(std::move(blend.error()));
     if (!*blend)
       return std::unexpected(ImageOperationException::format("Missing blend image '{}'", reference));
-    blendImages.append(**blend);
+    blendImages.push_back(**blend);
   }
 
   std::int64_t offsetX = op.offset[0], offsetY = op.offset[1];
-  PixelRect changed{image.width(), image.height(), 0, 0};
+  PixelRect changed{.x0 = image.width(), .y0 = image.height(), .x1 = 0, .y1 = 0};
   for (auto blend : blendImages) {
     changed.x0 = std::min(changed.x0, std::max<std::int64_t>(0, -offsetX));
     changed.y0 = std::min(changed.y0, std::max<std::int64_t>(0, -offsetY));
@@ -500,9 +511,9 @@ static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation co
       if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
         Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
         if (op.mode == BlendImageOperation::Multiply)
-          fpixel = fpixel.piecewiseMultiply(other);
+          fpixel = fpixel.piecewise_multiply(other);
         else if (op.mode == BlendImageOperation::Screen)
-          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewiseMultiply(Vec4F::filled(1.0f) - other);
+          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewise_multiply(Vec4F::filled(1.0f) - other);
       }
     }
     pixel = Color::v4fToByte(fpixel);
@@ -583,7 +594,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     if (replaceMap.empty())
       return {};
     if (image.bytesPerPixel() == 4)
-      replaceColors(replaceMap, image, {0, 0, image.width(), image.height()});
+      replaceColors(replaceMap, image, {.x0 = 0, .y0 = 0, .x1 = image.width(), .y1 = image.height()});
     else
       image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
         if (auto replacement = replaceMap.maybe(pixel))
@@ -604,7 +615,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
         return std::unexpected(std::move(mask.error()));
       if (!*mask)
         return std::unexpected(ImageOperationException::format("Missing mask image '{}'", reference));
-      maskImages.append(**mask);
+      maskImages.push_back(**mask);
     }
 
     image.forEachPixel([&op, &maskImages](unsigned x, unsigned y, Vec4B& pixel) {
@@ -636,8 +647,8 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
     image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
       pixel = pixel.combine(op->get().color, [](std::uint8_t a, std::uint8_t b) -> std::uint8_t {
-          return (std::uint8_t)(((int)a * (int)b) / 255);
-        });
+        return static_cast<std::uint8_t>((static_cast<int>(a) * static_cast<int>(b)) / 255);
+      });
     });
 
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
@@ -699,7 +710,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     auto scale = op->get().scale;
     if (scale[0] < 0.0f || scale[1] < 0.0f) {
       EmergencyLog::warn("Negative scale in ScaleImageOperation ({})", scale);
-      scale = scale.piecewiseMax(Vec2F::filled(0.f));
+      scale = scale.piecewise_max(Vec2F::filled(0.f));
     }
     auto scaled = op->get().mode == ScaleImageOperation::Nearest ? scaleNearest(image, scale)
       : op->get().mode == ScaleImageOperation::Bicubic ? scaleBicubic(image, scale) : scaleBilinear(image, scale);

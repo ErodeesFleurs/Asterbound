@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -21,6 +22,8 @@ import star.world_layout;
 import star.world_parameters;
 
 using namespace Star;
+
+void register_player_storage_benchmarks(Star::Root& root, bool& failed);
 
 namespace {
 
@@ -48,7 +51,7 @@ struct BenchmarkLifetime {
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
   // A benchmark bootconfig must point at private storage, never a save tree.
   for (std::string_view name : {"player", "universe"}) {
-    auto exists = File::exists(File::relativeTo(storage, name));
+    auto exists = File::exists(File::relative_to(storage, name));
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists)
@@ -308,7 +311,7 @@ void worldLayoutToJson(benchmark::State& state, BenchmarkSession& session) {
       return;
     }
   }
-  state.SetLabel(strf("{}/{}; seed={}; toJson only, no text encoding", *type, *size, seed));
+  state.SetLabel(Star::format("{}/{}; seed={}; toJson only, no text encoding", *type, *size, seed));
   for (auto _ : state) {
     (void)_;
     auto stored = layout->toJson();
@@ -395,7 +398,7 @@ std::expected<void, StarException> inspectProfile(Json const& entries, std::size
     shape.depth = std::max(shape.depth, depth);
     for (unsigned branch = 0; branch != 8; ++branch) {
       for (unsigned leaf = 0; leaf != 8; ++leaf) {
-        if (*name == strf("leaf_{}_{}", branch, leaf))
+        if (*name == Star::format("leaf_{}_{}", branch, leaf))
           shape.leaves[branch * 8 + leaf] = true;
       }
     }
@@ -406,7 +409,7 @@ std::expected<void, StarException> inspectProfile(Json const& entries, std::size
 }
 
 std::expected<void, StarException> requireEmptyProfileDirectory(String const& directory) {
-  auto link = File::isSymlink(directory);
+  auto link = File::is_symlink(directory);
   if (!link)
     return std::unexpected(std::move(link.error()));
   if (*link)
@@ -415,10 +418,10 @@ std::expected<void, StarException> requireEmptyProfileDirectory(String const& di
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (!*exists) {
-    if (auto made = File::makeDirectory(directory); !made)
+    if (auto made = File::create_directory(directory); !made)
       return std::unexpected(std::move(made.error()));
   }
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   if (!entries->empty())
@@ -427,7 +430,7 @@ std::expected<void, StarException> requireEmptyProfileDirectory(String const& di
 }
 
 std::expected<void, StarException> consumeProfiles(String const& directory, bool validate) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   std::optional<StarException> error;
@@ -435,16 +438,16 @@ std::expected<void, StarException> consumeProfiles(String const& directory, bool
   for (auto const& [name, isDirectory] : *entries) {
     // The directory was empty before this owned run. Never recurse or delete
     // unrelated files, even if another process unexpectedly writes here.
-    if (isDirectory || !name.endsWith(".luaprofile")) {
+    if (isDirectory || !name.ends_with(".luaprofile")) {
       if (!error)
         error = StarException("Unexpected entry in private benchmark Lua directory");
       continue;
     }
     ++profiles;
-    auto path = File::relativeTo(directory, name);
+    auto path = File::relative_to(directory, name);
     if (validate) {
       auto checked = [&]() -> std::expected<void, StarException> {
-        auto text = File::readFileString(path);
+        auto text = File::read_file_string(path);
         if (!text)
           return std::unexpected(std::move(text.error()));
         auto json = Json::parseJson(*text);
@@ -521,7 +524,8 @@ void luaNestedProfileExport(benchmark::State& state, BenchmarkSession& session) 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   // Recognized Google Benchmark flags are removed first. Remaining -bootconfig
@@ -530,17 +534,20 @@ int main(int argc, char** argv) {
   BenchmarkLifetime benchmarkLifetime;
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    std::fprintf(stderr, "%s\n", storage.error().what());
+    if (!Star::print(stderr, "{}\n", storage.error().what()))
+      return 1;
     return 1;
   }
   // Never persist configuration or rotate logs, even if extra RootLoader flags
@@ -549,7 +556,8 @@ int main(int argc, char** argv) {
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   BenchmarkSession session{**root};
@@ -568,6 +576,7 @@ int main(int argc, char** argv) {
   benchmark::RegisterBenchmark("LuaRoot/NestedProfileShutdownAndExport", [&](benchmark::State& state) {
     luaNestedProfileExport(state, session);
   })->Iterations(8)->UseRealTime()->Unit(benchmark::kMicrosecond);
+  register_player_storage_benchmarks(**root, session.failed);
   auto matched = benchmark::RunSpecifiedBenchmarks();
   // Remove callbacks borrowing session/Root before those owners leave scope.
   benchmark::ClearRegisteredBenchmarks();

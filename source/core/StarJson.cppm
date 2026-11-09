@@ -7,6 +7,7 @@ import star.data_stream;
 import star.string;
 import star.list;
 import star.format;
+import star.text_formatter;
 
 import star.algorithm;
 namespace Star {
@@ -22,9 +23,9 @@ using JsonParsingException = StarError<JsonParsingExceptionTag, StarException>;
 
 class Json;
 
-typedef List<Json> JsonArray;
+using JsonArray = List<Json>;
 
-typedef StringMap<Json> JsonObject;
+using JsonObject = StringMap<Json>;
 
 // Class for holding representation of JSON data.  Immutable and implicitly
 // shared.
@@ -33,8 +34,8 @@ public:
   template <typename Container>
   struct IteratorWrapper {
     // Keep the immutable container alive when iterating a temporary Json.
-    typedef typename Container::const_iterator const_iterator;
-    typedef const_iterator iterator;
+    using const_iterator = typename Container::const_iterator;
+    using iterator = const_iterator;
 
     const_iterator begin() const;
     const_iterator end() const;
@@ -303,10 +304,10 @@ private:
   std::variant<std::monostate, double, bool, std::int64_t, std::shared_ptr<String const>, std::shared_ptr<JsonArray const>, std::shared_ptr<JsonObject const>> m_data;
 };
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, Json const& v);
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, Json const& value);
 
-// Fixes ambiguity with OrderedHashMap operator<<
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, JsonObject const& v);
+// Keep JSON object serialization distinct from the generic map diagnostic.
+[[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, JsonObject const& value);
 
 // Serialize json to DataStream.  Strings are stored as UTF-8, ints are stored
 // as VLQ, doubles as 64 bit.
@@ -433,6 +434,7 @@ export namespace Star {
   using ::Star::jsonMergeQueryDef;
   using ::Star::jsonPartialMatch;
   using ::Star::hash;
+  using ::Star::write_text;
   using ::Star::operator<<;
   using ::Star::operator>>;
 }

@@ -112,19 +112,26 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeEntityCallbacks(Entity const& entity) {
   LuaCallbacks callbacks;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<EntityId>("id", std::bind(EntityCallbacks::id, std::ref(entity))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<EntityId>("id", [&entity]() { return EntityCallbacks::id(entity); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<LuaTable, LuaEngine&>(
-      "damageTeam", std::bind(EntityCallbacks::damageTeam, std::ref(entity), std::placeholders::_1)); !registration)
+        "damageTeam", [&entity](LuaEngine& engine) { return EntityCallbacks::damageTeam(entity, engine); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<bool, EntityId>(
-      "isValidTarget", std::bind(EntityCallbacks::isValidTarget, std::ref(entity), std::placeholders::_1)); !registration)
+        "isValidTarget", [&entity](EntityId entityId) { return EntityCallbacks::isValidTarget(entity, entityId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<Vec2F, EntityId>(
-      "distanceToEntity", std::bind(EntityCallbacks::distanceToEntity, std::ref(entity), std::placeholders::_1)); !registration)
+        "distanceToEntity",
+        [&entity](EntityId entityId) { return EntityCallbacks::distanceToEntity(entity, entityId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallbackWithSignature<bool, EntityId>(
-      "entityInSight", std::bind(EntityCallbacks::entityInSight, std::ref(entity), std::placeholders::_1)); !registration)
+        "entityInSight", [&entity](EntityId entityId) { return EntityCallbacks::entityInSight(entity, entityId); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration = callbacks.registerCallback("position", [&entity]() { return entity.position(); }); !registration)
@@ -132,7 +139,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeEntityCallbacks(Enti
   if (auto registration = callbacks.registerCallback("entityType", [&entity]() -> std::expected<String, StarException> {
     if (!EntityTypeNames)
       return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->getRight(entity.entityType());
+    auto name = EntityTypeNames->get_right(entity.entityType());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();

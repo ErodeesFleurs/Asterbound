@@ -19,6 +19,7 @@ import star.logging;
 import star.listener;
 import star.version;
 import std;
+import star.text_formatter;
 
 import star.drawable;
 import star.celestial_coordinate;
@@ -70,9 +71,12 @@ import star.world_server;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
-  auto printed = *stream << descriptor;
+  TextBuffer output;
+  auto printed = write_text(output, descriptor);
   if (!printed)
     *stream << "<ItemDescriptor rendering failed: " << printed.error().what() << ">";
+  else
+    *stream << output.view();
 }
 
 }
@@ -154,11 +158,11 @@ const GameTestRegistration itemFallbackDiagnostics(
           return {};
         }
       };
-      auto directory = File::temporaryDirectory(fixture.root().random());
+      auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       auto settings = fixture.rootSettings();
-      settings.storageDirectory = File::relativeTo(*directory, "storage");
+      settings.storageDirectory = File::relative_to(*directory, "storage");
       settings.runtimeConfigFile = {};
       settings.logDirectory = {};
       settings.logFile = {};
@@ -577,7 +581,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   List<long> owners;
   for (auto const& entry : items) {
     ASSERT_TRUE(entry.second->consume(1));
-    owners.append(entry.second.use_count());
+    owners.push_back(entry.second.use_count());
     EXPECT_EQ(view.itemsAt(entry.first), nullptr);
   }
 
@@ -870,98 +874,99 @@ public:
 
 }
 
-const GameTestRegistration nestedReadyCatalog("ItemTest", "BuildersAndRebuildersKeepReadyCatalogAcrossNestedServices", [](GameTest& fixture) {
-  auto temporaryDirectory = File::temporaryDirectory(fixture.root().random());
-  ASSERT_TRUE(temporaryDirectory);
-  auto directory = std::move(*temporaryDirectory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(directory)); });
-  auto overlay = File::relativeTo(directory, "assets");
-  auto writeAsset = [&](String const& path, String const& contents) -> std::expected<void, StarException> {
-    auto absolute = path.beginsWith("/");
-    if (!absolute)
-      return std::unexpected(std::move(absolute.error()));
-    String relative = path;
-    if (*absolute) {
-      auto suffix = path.substr(1);
-      if (!suffix)
-        return std::unexpected(std::move(suffix.error()));
-      relative = std::move(*suffix);
-    }
-    auto destination = File::relativeTo(overlay, relative);
-    auto makeDirectory = File::makeDirectoryRecursive(File::dirName(destination));
-    if (!makeDirectory)
-      return std::unexpected(std::move(makeDirectory.error()));
-    return File::writeFile(contents, destination);
-  };
+const GameTestRegistration
+  nestedReadyCatalog("ItemTest", "BuildersAndRebuildersKeepReadyCatalogAcrossNestedServices", [](GameTest& fixture) {
+    auto temporaryDirectory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(temporaryDirectory);
+    auto directory = std::move(*temporaryDirectory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(directory)); });
+    auto overlay = File::relative_to(directory, "assets");
+    auto writeAsset = [&](String const& path, String const& contents) -> std::expected<void, StarException> {
+      auto absolute = path.starts_with("/");
+      if (!absolute)
+        return std::unexpected(std::move(absolute.error()));
+      String relative = path;
+      if (*absolute) {
+        auto suffix = path.substr(1);
+        if (!suffix)
+          return std::unexpected(std::move(suffix.error()));
+        relative = std::move(*suffix);
+      }
+      auto destination = File::relative_to(overlay, relative);
+      auto makeDirectory = File::create_directories(File::dir_name(destination));
+      if (!makeDirectory)
+        return std::unexpected(std::move(makeDirectory.error()));
+      return File::write_file(contents, destination);
+    };
 
-  // Reuse the actual fixture's legal species/NPC assets, including their real
-  // creation/build scripts. The wrappers add observable nested item consumers.
-  auto assetResult = fixture.root().assets();
-  ASSERT_TRUE(assetResult);
-  auto const& baseAssets = *assetResult;
-  String humanPath;
-  Json humanConfig;
-  auto speciesPaths = baseAssets->scanExtension("species");
-  ASSERT_TRUE(speciesPaths);
-  for (auto const& assetPath : speciesPaths->get()) {
-    auto const& path = assetPath.string();
-    auto config = baseAssets->json(path);
-    ASSERT_TRUE(config);
-    auto kind = config->getString("kind");
-    ASSERT_TRUE(kind);
-    if (*kind == "human") {
-      humanPath = path;
-      humanConfig = std::move(*config);
-      break;
+    // Reuse the actual fixture's legal species/NPC assets, including their real
+    // creation/build scripts. The wrappers add observable nested item consumers.
+    auto assetResult = fixture.root().assets();
+    ASSERT_TRUE(assetResult);
+    auto const& baseAssets = *assetResult;
+    String humanPath;
+    Json humanConfig;
+    auto speciesPaths = baseAssets->scanExtension("species");
+    ASSERT_TRUE(speciesPaths);
+    for (auto const& assetPath : speciesPaths->get()) {
+      auto const& path = assetPath.string();
+      auto config = baseAssets->json(path);
+      ASSERT_TRUE(config);
+      auto kind = config->getString("kind");
+      ASSERT_TRUE(kind);
+      if (*kind == "human") {
+        humanPath = path;
+        humanConfig = std::move(*config);
+        break;
+      }
     }
-  }
-  ASSERT_FALSE(humanPath.empty());
-  Json npcConfig;
-  auto npcPaths = baseAssets->scanExtension("npctype");
-  ASSERT_TRUE(npcPaths);
-  for (auto const& assetPath : npcPaths->get()) {
-    auto const& path = assetPath.string();
-    auto config = baseAssets->json(path);
-    ASSERT_TRUE(config);
-    auto type = config->getString("type");
-    ASSERT_TRUE(type);
-    if (*type == "villager") {
-      npcConfig = std::move(*config);
-      break;
+    ASSERT_FALSE(humanPath.empty());
+    Json npcConfig;
+    auto npcPaths = baseAssets->scanExtension("npctype");
+    ASSERT_TRUE(npcPaths);
+    for (auto const& assetPath : npcPaths->get()) {
+      auto const& path = assetPath.string();
+      auto config = baseAssets->json(path);
+      ASSERT_TRUE(config);
+      auto type = config->getString("type");
+      ASSERT_TRUE(type);
+      if (*type == "villager") {
+        npcConfig = std::move(*config);
+        break;
+      }
     }
-  }
-  ASSERT_FALSE(npcConfig.isNull());
-  auto creationScripts = humanConfig.getArray("createScripts", {});
-  ASSERT_TRUE(creationScripts);
-  if (creationScripts->empty())
-    creationScripts->append("/humanoid/opensb/create.lua");
-  creationScripts->append("/readycatalog/create.lua");
-  auto buildScripts = humanConfig.getArray("buildScripts", {});
-  ASSERT_TRUE(buildScripts);
-  if (buildScripts->empty())
-    buildScripts->append("/humanoid/opensb/build.lua");
-  buildScripts->append("/readycatalog/humanoid.lua");
-  auto humanWithCreation = humanConfig.set("createScripts", *creationScripts);
-  ASSERT_TRUE(humanWithCreation);
-  auto humanWithBuild = humanWithCreation->set("buildScripts", *buildScripts);
-  ASSERT_TRUE(humanWithBuild);
-  humanConfig = std::move(*humanWithBuild);
-  auto humanContents = humanConfig.repr();
-  ASSERT_TRUE(humanContents);
-  ASSERT_TRUE(writeAsset(humanPath, *humanContents));
-  auto npcType = npcConfig.set("type", "readycatalognpc");
-  ASSERT_TRUE(npcType);
-  auto npcHumanoid = npcType->set("humanoidConfig", "/humanoid.config");
-  ASSERT_TRUE(npcHumanoid);
-  auto npcItems = Json::parse(R"({"override":[[0,[{}]]]})");
-  ASSERT_TRUE(npcItems);
-  auto npcWithItems = npcHumanoid->set("items", *npcItems);
-  ASSERT_TRUE(npcWithItems);
-  npcConfig = std::move(*npcWithItems);
-  auto npcContents = npcConfig.repr();
-  ASSERT_TRUE(npcContents);
-  ASSERT_TRUE(writeAsset("/readycatalog/probe.npctype", *npcContents));
-  ASSERT_TRUE(writeAsset("/readycatalog/create.lua", R"(
+    ASSERT_FALSE(npcConfig.isNull());
+    auto creationScripts = humanConfig.getArray("createScripts", {});
+    ASSERT_TRUE(creationScripts);
+    if (creationScripts->empty())
+      creationScripts->push_back("/humanoid/opensb/create.lua");
+    creationScripts->push_back("/readycatalog/create.lua");
+    auto buildScripts = humanConfig.getArray("buildScripts", {});
+    ASSERT_TRUE(buildScripts);
+    if (buildScripts->empty())
+      buildScripts->push_back("/humanoid/opensb/build.lua");
+    buildScripts->push_back("/readycatalog/humanoid.lua");
+    auto humanWithCreation = humanConfig.set("createScripts", *creationScripts);
+    ASSERT_TRUE(humanWithCreation);
+    auto humanWithBuild = humanWithCreation->set("buildScripts", *buildScripts);
+    ASSERT_TRUE(humanWithBuild);
+    humanConfig = std::move(*humanWithBuild);
+    auto humanContents = humanConfig.repr();
+    ASSERT_TRUE(humanContents);
+    ASSERT_TRUE(writeAsset(humanPath, *humanContents));
+    auto npcType = npcConfig.set("type", "readycatalognpc");
+    ASSERT_TRUE(npcType);
+    auto npcHumanoid = npcType->set("humanoidConfig", "/humanoid.config");
+    ASSERT_TRUE(npcHumanoid);
+    auto npcItems = Json::parse(R"({"override":[[0,[{}]]]})");
+    ASSERT_TRUE(npcItems);
+    auto npcWithItems = npcHumanoid->set("items", *npcItems);
+    ASSERT_TRUE(npcWithItems);
+    npcConfig = std::move(*npcWithItems);
+    auto npcContents = npcConfig.repr();
+    ASSERT_TRUE(npcContents);
+    ASSERT_TRUE(writeAsset("/readycatalog/probe.npctype", *npcContents));
+    ASSERT_TRUE(writeAsset("/readycatalog/create.lua", R"(
 local originalCreate = create
 function create(...)
   local identity, parameters, armor = originalCreate(...)
@@ -971,7 +976,7 @@ function create(...)
   return identity, parameters, armor
 end
 )"));
-  ASSERT_TRUE(writeAsset("/readycatalog/humanoid.lua", R"(
+    ASSERT_TRUE(writeAsset("/readycatalog/humanoid.lua", R"(
 local originalBuild = build
 function build(...)
   local config = originalBuild(...)
@@ -982,42 +987,42 @@ function build(...)
 end
 )"));
 
-  ASSERT_TRUE(writeAsset("/_metadata", R"({
+    ASSERT_TRUE(writeAsset("/_metadata", R"({
     "name":"ready_catalog_fixture",
     "errorHandlers":{"item":["/readycatalog/rebuild.lua"]}
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/leaf.item", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/leaf.item", R"({
     "itemName":"readycatalogleaf","rarity":"common",
     "shortdescription":"LeafOwner","description":"Ready catalog leaf"
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/built.item", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/built.item", R"({
     "itemName":"readycatalogbuilt","rarity":"common",
     "shortdescription":"Unbuilt","builder":"/readycatalog/build.lua"
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/broken.item", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/broken.item", R"({
     "itemName":"readycatalogbroken","rarity":"common",
     "shortdescription":"Unrebuilt","builder":"/readycatalog/broken.lua"
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/broken.lua", R"(
+    ASSERT_TRUE(writeAsset("/readycatalog/broken.lua", R"(
 function build()
   error("intentional ready-catalog rebuild")
 end
 )"));
-  ASSERT_TRUE(writeAsset("/readycatalog/probe.treasurepools", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/probe.treasurepools", R"({
     "readycatalogpool":[[0,{"fill":[{"item":"readycatalogleaf"}],"poolRounds":0}]]
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/probe.collection", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/probe.collection", R"({
     "name":"readycatalogcollection","type":"item",
     "collectables":{"leaf":{"item":"readycatalogleaf","icon":"/assetmissing.png"}}
   })"));
-  auto versioningConfig = baseAssets->json("/versioning.config");
-  ASSERT_TRUE(versioningConfig);
-  auto updatedVersioning = versioningConfig->set("ReadyCatalog", 1);
-  ASSERT_TRUE(updatedVersioning);
-  auto versioningContents = updatedVersioning->repr();
-  ASSERT_TRUE(versioningContents);
-  ASSERT_TRUE(writeAsset("/versioning.config", *versioningContents));
-  ASSERT_TRUE(writeAsset("/versioning/ReadyCatalog_0_1.lua", R"(
+    auto versioningConfig = baseAssets->json("/versioning.config");
+    ASSERT_TRUE(versioningConfig);
+    auto updatedVersioning = versioningConfig->set("ReadyCatalog", 1);
+    ASSERT_TRUE(updatedVersioning);
+    auto versioningContents = updatedVersioning->repr();
+    ASSERT_TRUE(versioningContents);
+    ASSERT_TRUE(writeAsset("/versioning.config", *versioningContents));
+    ASSERT_TRUE(writeAsset("/versioning/ReadyCatalog_0_1.lua", R"(
 function update(data)
   return {
     name = root.createItem("readycatalogleaf").name,
@@ -1026,7 +1031,7 @@ function update(data)
 end
 )"));
 
-  String checkNestedServices = R"(
+    String checkNestedServices = R"(
 local function checkNestedServices()
   local leaf = root.itemConfig("readycatalogleaf").config.shortdescription
   assert(leaf == "LeafOwner")
@@ -1047,14 +1052,14 @@ local function checkNestedServices()
   return leaf
 end
 )";
-  ASSERT_TRUE(writeAsset("/readycatalog/build.lua", checkNestedServices + R"(
+    ASSERT_TRUE(writeAsset("/readycatalog/build.lua", checkNestedServices + R"(
 function build(directory, config, parameters)
   config.shortdescription = "NestedReady_" .. checkNestedServices()
   parameters.nestedCatalog = "builder"
   return config, parameters
 end
 )"));
-  ASSERT_TRUE(writeAsset("/readycatalog/rebuild.lua", checkNestedServices + R"(
+    ASSERT_TRUE(writeAsset("/readycatalog/rebuild.lua", checkNestedServices + R"(
 function error(descriptor, message)
   if descriptor.name ~= "readycatalogbroken" then return descriptor end
   assert(string.find(message, "intentional ready%-catalog rebuild"))
@@ -1068,72 +1073,72 @@ function error(descriptor, message)
   })
 end
 )"));
-  ASSERT_TRUE(writeAsset("/readycatalog/built.recipe", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/built.recipe", R"({
     "input":[],"output":{"name":"readycatalogbuilt","count":1},
     "groups":[],"collectables":{}
   })"));
-  ASSERT_TRUE(writeAsset("/readycatalog/broken.recipe", R"({
+    ASSERT_TRUE(writeAsset("/readycatalog/broken.recipe", R"({
     "input":[],"output":{"name":"readycatalogbroken","count":1},
     "groups":[],"collectables":{}
   })"));
 
-  auto settings = fixture.rootSettings();
-  settings.assetSources.append(overlay);
-  settings.storageDirectory = File::relativeTo(directory, "storage");
-  settings.runtimeConfigFile = {};
-  settings.logDirectory = {};
-  settings.logFile = {};
-  settings.includeUGC = false;
-  auto createdRoot = Root::create(settings);
-  ASSERT_TRUE(createdRoot);
-  auto& root = **createdRoot;
-  root.logger().addSink(std::make_shared<ReadyCatalogErrorSink>());
-
-  // These strings are recorded by the INITIAL recipe scan while the Root has
-  // not published ItemDatabase. A later db.item() alone could hide a fallback.
-  auto databaseResult = root.itemDatabase();
-  ASSERT_TRUE(databaseResult);
-  auto const& database = *databaseResult;
-  auto builtRecipes = database->recipesForOutputItem("readycatalogbuilt");
-  ASSERT_EQ(builtRecipes.size(), 1u);
-  EXPECT_EQ(builtRecipes.begin()->guiFilterString.contains("nestedready_leafowner"), true);
-  auto rebuiltRecipes = database->recipesForOutputItem("readycatalogbroken");
-  ASSERT_EQ(rebuiltRecipes.size(), 1u);
-  EXPECT_EQ(rebuiltRecipes.begin()->guiFilterString.contains("rebuiltready_leafowner"), true);
-  auto builtResult = inventoryTestItem(*database, "readycatalogbuilt");
-  ASSERT_TRUE(builtResult);
-  auto const& built = *builtResult;
-  ASSERT_TRUE(built);
-  EXPECT_EQ(built->name(), "readycatalogbuilt");
-  EXPECT_EQ(built->friendlyName(), "NestedReady_LeafOwner");
-  EXPECT_EQ(built->parameters().getString("nestedCatalog"), "builder");
-  auto rebuiltResult = inventoryTestItem(*database, "readycatalogbroken", 3);
-  ASSERT_TRUE(rebuiltResult);
-  auto const& rebuilt = *rebuiltResult;
-  ASSERT_TRUE(rebuilt);
-  EXPECT_EQ(rebuilt->name(), "readycatalogleaf");
-  EXPECT_EQ(rebuilt->count(), 3u);
-  EXPECT_EQ(rebuilt->friendlyName(), "RebuiltReady_LeafOwner");
-  EXPECT_EQ(rebuilt->parameters().getString("nestedCatalog"), "rebuilder");
-  auto collections = root.collectionDatabase();
-  ASSERT_TRUE(collections);
-  auto leaf = (*collections)->collectable("readycatalogcollection", "leaf");
-  ASSERT_TRUE(leaf);
-  EXPECT_EQ(leaf->title, "LeafOwner");
-  auto configuration = root.configuration();
-  ASSERT_TRUE(configuration);
-  auto marker = (*configuration)->get("readySpeciesBuild");
-  ASSERT_TRUE(marker);
-  EXPECT_EQ(marker->toString(), "LeafOwner");
-});
-
-const GameTestRegistration beamPresentationBoundary(
-  "ItemTest", "BeamTransitionsBelongToTicksNotDisplaySampling", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
-    ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
     auto settings = fixture.rootSettings();
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto createdRoot = Root::create(settings);
+    ASSERT_TRUE(createdRoot);
+    auto& root = **createdRoot;
+    root.logger().addSink(std::make_shared<ReadyCatalogErrorSink>());
+
+    // These strings are recorded by the INITIAL recipe scan while the Root has
+    // not published ItemDatabase. A later db.item() alone could hide a fallback.
+    auto databaseResult = root.itemDatabase();
+    ASSERT_TRUE(databaseResult);
+    auto const& database = *databaseResult;
+    auto builtRecipes = database->recipesForOutputItem("readycatalogbuilt");
+    ASSERT_EQ(builtRecipes.size(), 1u);
+    EXPECT_EQ(builtRecipes.begin()->guiFilterString.contains("nestedready_leafowner"), true);
+    auto rebuiltRecipes = database->recipesForOutputItem("readycatalogbroken");
+    ASSERT_EQ(rebuiltRecipes.size(), 1u);
+    EXPECT_EQ(rebuiltRecipes.begin()->guiFilterString.contains("rebuiltready_leafowner"), true);
+    auto builtResult = inventoryTestItem(*database, "readycatalogbuilt");
+    ASSERT_TRUE(builtResult);
+    auto const& built = *builtResult;
+    ASSERT_TRUE(built);
+    EXPECT_EQ(built->name(), "readycatalogbuilt");
+    EXPECT_EQ(built->friendlyName(), "NestedReady_LeafOwner");
+    EXPECT_EQ(built->parameters().getString("nestedCatalog"), "builder");
+    auto rebuiltResult = inventoryTestItem(*database, "readycatalogbroken", 3);
+    ASSERT_TRUE(rebuiltResult);
+    auto const& rebuilt = *rebuiltResult;
+    ASSERT_TRUE(rebuilt);
+    EXPECT_EQ(rebuilt->name(), "readycatalogleaf");
+    EXPECT_EQ(rebuilt->count(), 3u);
+    EXPECT_EQ(rebuilt->friendlyName(), "RebuiltReady_LeafOwner");
+    EXPECT_EQ(rebuilt->parameters().getString("nestedCatalog"), "rebuilder");
+    auto collections = root.collectionDatabase();
+    ASSERT_TRUE(collections);
+    auto leaf = (*collections)->collectable("readycatalogcollection", "leaf");
+    ASSERT_TRUE(leaf);
+    EXPECT_EQ(leaf->title, "LeafOwner");
+    auto configuration = root.configuration();
+    ASSERT_TRUE(configuration);
+    auto marker = (*configuration)->get("readySpeciesBuild");
+    ASSERT_TRUE(marker);
+    EXPECT_EQ(marker->toString(), "LeafOwner");
+  });
+
+const GameTestRegistration
+  beamPresentationBoundary("ItemTest", "BeamTransitionsBelongToTicksNotDisplaySampling", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto settings = fixture.rootSettings();
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
@@ -1141,7 +1146,7 @@ const GameTestRegistration beamPresentationBoundary(
     auto createdRoot = Root::create(std::move(settings));
     ASSERT_TRUE(createdRoot);
     auto& root = **createdRoot;
-    auto storage = File::ephemeralFile(root.random());
+    auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
@@ -1272,20 +1277,20 @@ const GameTestRegistration beamPresentationBoundary(
 
 const GameTestRegistration blueprintLearning(
   "ItemTest", "BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectoryRecursive(overlay));
-    auto patchPath = File::relativeTo(overlay, "player.config.patch");
-    ASSERT_TRUE(File::writeFile(String(R"([
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
+    auto patchPath = File::relative_to(overlay, "player.config.patch");
+    ASSERT_TRUE(File::write_file(String(R"([
     {"op":"replace","path":"/blueprintUnlock","value":"Learned: <ItemName>"},
     {"op":"replace","path":"/blueprintAlreadyKnown","value":"Known: <ItemName>"}
   ])"),
-                                patchPath));
+                                 patchPath));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
@@ -1358,11 +1363,11 @@ const GameTestRegistration blueprintLearning(
 
     // Invalid notification values are real asset errors, not a counter around
     // json(). The silent known path must not read either notification resource.
-    ASSERT_TRUE(File::writeFile(String(R"([
+    ASSERT_TRUE(File::write_file(String(R"([
     {"op":"replace","path":"/blueprintUnlock","value":false},
     {"op":"replace","path":"/blueprintAlreadyKnown","value":false}
   ])"),
-                                patchPath));
+                                 patchPath));
     auto assets = (*root)->assets();
     ASSERT_TRUE(assets);
     (*assets)->hotReload();
@@ -1382,18 +1387,18 @@ const GameTestRegistration blueprintLearning(
 
 const GameTestRegistration
   itemScriptLifecycle("ItemTest", "AugmentAndAgingSettleScriptLifecycleBeforeCommittingItems", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectory(overlay));
-    ASSERT_TRUE(File::writeFile(String(R"({
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::write_file(String(R"({
       "itemName":"lifecycletarget","inventoryIcon":"/assetmissing.png",
       "shortdescription":"Lifecycle target","description":"Script lifecycle target",
       "rarity":"common","maxStack":1000,"itemAgingScripts":["lifecycle.lua"]
     })"),
-                                File::relativeTo(overlay, "target.item")));
-    ASSERT_TRUE(File::writeFile(String(R"(
+                                 File::relative_to(overlay, "target.item")));
+    ASSERT_TRUE(File::write_file(String(R"(
 local function record(stage)
   local key = "lifecycle" .. stage
   root.setConfiguration(key, root.getConfiguration(key) + 1)
@@ -1429,10 +1434,10 @@ function uninit()
   if root.getConfiguration("lifecycleOptions").failCleanup then error("item-cleanup-marker") end
 end
     )"),
-                                File::relativeTo(overlay, "lifecycle.lua")));
+                                 File::relative_to(overlay, "lifecycle.lua")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
@@ -1535,14 +1540,14 @@ const GameTestRegistration
     ASSERT_TRUE(originalDatabase);
     auto original = (*originalDatabase)->getConfig("perfectlygenericitem");
     ASSERT_TRUE(original) << original.error().what();
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
     auto relativeDirectory = AssetPath::directory((*original)->path).substr(1);
     ASSERT_TRUE(relativeDirectory);
-    auto objectDirectory = File::relativeTo(overlay, *relativeDirectory);
-    ASSERT_TRUE(File::makeDirectoryRecursive(objectDirectory));
+    auto objectDirectory = File::relative_to(overlay, *relativeDirectory);
+    ASSERT_TRUE(File::create_directories(objectDirectory));
     Json base = (*original)->config;
     for (std::string_view key : {"damageTeam", "lightColor", "lightColors", "lightType", "pointLight", "pointBeam",
                                  "beamAmbience", "flickerPeriod", "flickerMinIntensity", "flickerMaxIntensity",
@@ -1608,11 +1613,11 @@ const GameTestRegistration
       ASSERT_TRUE(config);
       auto contents = config->repr();
       ASSERT_TRUE(contents);
-      ASSERT_TRUE(File::writeFile(*contents, File::relativeTo(objectDirectory, String(test.name) + ".object")));
+      ASSERT_TRUE(File::write_file(*contents, File::relative_to(objectDirectory, String(test.name) + ".object")));
     }
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};

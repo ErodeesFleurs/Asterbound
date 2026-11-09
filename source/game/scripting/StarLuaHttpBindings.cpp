@@ -120,10 +120,12 @@ struct LuaHttpSession::Impl {
       return {};
     }
     auto promise = httpClient->requestAsync(request.httpRequest);
-    auto added = asyncRequests.add(request.id, {std::move(promise), request.rpcKeeper, request.scopedPromise});
+    auto added = asyncRequests.add(
+      request.id,
+      {.workerPromise = std::move(promise), .rpcKeeper = request.rpcKeeper, .scopedPromise = request.scopedPromise});
     if (!added) {
-      if (auto failed = request.rpcKeeper.fail(strf("HTTP request failed: {}", added.error().what())); !failed)
-        return std::unexpected(failed.error().withRelated(added.error(), "Original HTTP submission failure"));
+      if (auto failed = request.rpcKeeper.fail(Star::format("HTTP request failed: {}", added.error().what())); !failed)
+        return std::unexpected(failed.error().with_related(added.error(), "Original HTTP submission failure"));
     }
     return {};
   }
@@ -148,13 +150,18 @@ struct LuaHttpSession::Impl {
       }
       id = nextRequestId++;
       // Register the native source before attaching the eager stop callback.
-      pendingRequests.append({id, std::move(request), keeper, *domain, {}, lifetime});
+      pendingRequests.push_back({.id = id,
+                                 .httpRequest = std::move(request),
+                                 .rpcKeeper = keeper,
+                                 .domain = *domain,
+                                 .scopedPromise = {},
+                                 .lifetime = lifetime});
     }
-    LuaHttpProgress progress{std::move(owner), id};
+    LuaHttpProgress progress{.session = std::move(owner), .id = id};
     auto scoped = promise.withCancellation(lifetime, "Lua session stopped", progress);
     if (!scoped) {
       if (auto cancelled = progress.cancel(); !cancelled)
-        return std::unexpected(cancelled.error().withRelated(scoped.error(), "Original HTTP scope failure"));
+        return std::unexpected(cancelled.error().with_related(scoped.error(), "Original HTTP scope failure"));
       return std::unexpected(std::move(scoped.error()));
     }
     LuaBindings::HttpTrustRequestCallback callback;
@@ -199,7 +206,7 @@ struct LuaHttpSession::Impl {
       }
     }
     if (preparationError) {
-      if (auto failed = retired->rpcKeeper.fail(strf("HTTP request failed: {}", preparationError->what())); !failed)
+      if (auto failed = retired->rpcKeeper.fail(Star::format("HTTP request failed: {}", preparationError->what())); !failed)
         return std::unexpected(std::move(failed.error()));
       return std::unexpected(std::move(*preparationError));
     }
@@ -218,8 +225,8 @@ struct LuaHttpSession::Impl {
           }
         }
         if (retired) {
-          if (auto failed = retired->rpcKeeper.fail(strf("HTTP request failed: {}", notified.error().what())); !failed)
-            return std::unexpected(failed.error().withRelated(notified.error(), "Original HTTP trust callback failure"));
+          if (auto failed = retired->rpcKeeper.fail(Star::format("HTTP request failed: {}", notified.error().what())); !failed)
+            return std::unexpected(failed.error().with_related(notified.error(), "Original HTTP trust callback failure"));
         }
         return std::unexpected(std::move(notified.error()));
       }
@@ -249,7 +256,7 @@ std::expected<std::shared_ptr<LuaHttpSession>, StarException> LuaHttpSession::cr
 
 LuaHttpSession::~LuaHttpSession() {
   if (auto result = stop(); !result)
-    EmergencyLog::error("Error stopping Lua HTTP session: {}", outputException(result.error(), true));
+    EmergencyLog::error("Error stopping Lua HTTP session: {}", Star::output_exception(result.error(), true));
 }
 
 void LuaHttpSession::setHttpTrustRequestCallback(LuaBindings::HttpTrustRequestCallback callback) {
@@ -281,14 +288,14 @@ std::expected<void, StarException> LuaHttpSession::handleHttpTrustReply(String c
         continue;
       }
       auto result = allowed ? m_impl->executeHttpRequest(*it)
-                            : it->rpcKeeper.fail(strf("HTTP request to domain '{}' denied by user", domain));
+                            : it->rpcKeeper.fail(Star::format("HTTP request to domain '{}' denied by user", domain));
       if (!result) {
         if (!error)
           error = std::move(result.error());
         else
-          EmergencyLog::error("Error settling HTTP trust reply: {}", outputException(result.error(), true));
+          EmergencyLog::error("Error settling HTTP trust reply: {}", Star::output_exception(result.error(), true));
       }
-      retired.append(std::move(*it));
+      retired.push_back(std::move(*it));
       it = pending.erase(it);
     }
   }
@@ -312,18 +319,19 @@ std::expected<void, StarException> LuaHttpSession::poll() {
       auto response = request.workerPromise.get();
       std::expected<void, StarException> settled;
       if (!response)
-        settled = request.rpcKeeper.fail(strf("HTTP request exception: {}", response.error().what()));
+        settled = request.rpcKeeper.fail(Star::format("HTTP request exception: {}", response.error().what()));
       else if (!response->get().error.empty())
-        settled = request.rpcKeeper.fail(strf("HTTP request failed: {}", response->get().error));
+        settled = request.rpcKeeper.fail(Star::format("HTTP request failed: {}", response->get().error));
       else
-        settled = request.rpcKeeper.fulfill({response->get().statusCode, std::move(response->get().body)});
+        settled = request.rpcKeeper.fulfill(
+          {.statusCode = response->get().statusCode, .body = std::move(response->get().body)});
       if (!settled) {
         if (!error)
           error = std::move(settled.error());
         else
-          EmergencyLog::error("Error settling HTTP response: {}", outputException(settled.error(), true));
+          EmergencyLog::error("Error settling HTTP response: {}", Star::output_exception(settled.error(), true));
       }
-      retired.append(std::move(request));
+      retired.push_back(std::move(request));
       it = requests.erase(it);
     }
   }
@@ -370,7 +378,7 @@ std::expected<void, StarException> LuaHttpSession::stop() {
       if (!error)
         error = std::move(result.error());
       else
-        EmergencyLog::error("Error stopping Lua HTTP request: {}", outputException(result.error(), true));
+        EmergencyLog::error("Error stopping Lua HTTP request: {}", Star::output_exception(result.error(), true));
     }
   };
   List<Impl::PendingHttpRequest> pending;
@@ -386,7 +394,7 @@ std::expected<void, StarException> LuaHttpSession::stop() {
   }
   for (auto& request : pending)
     remember(request.rpcKeeper.cancel("HTTP session stopped"));
-  for (auto& [id, request] : active)
+  for (auto&& [id, request] : active)
     remember(request.rpcKeeper.cancel("HTTP session stopped"));
   remember(m_impl->httpClient->stop());
   if (error)
@@ -446,7 +454,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeHttpCallbacks(std::s
     if (!owner) {
       auto [promise, keeper] = RpcPromise<LuaHttpResponse>::createPair();
       if (auto cancelled = keeper.cancel("HTTP session stopped"); !cancelled)
-        return RpcPromise<LuaHttpResponse>::createFailed(strf("HTTP request failed: {}", cancelled.error().what()));
+        return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", cancelled.error().what()));
       return promise;
     }
     auto prepared = [&]() -> std::expected<HttpRequest, StarException> {
@@ -498,10 +506,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeHttpCallbacks(std::s
       return request;
     }();
     if (!prepared)
-      return RpcPromise<LuaHttpResponse>::createFailed(strf("HTTP request failed: {}", prepared.error().what()));
+      return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", prepared.error().what()));
     auto promise = owner->m_impl->request(std::move(*prepared), engine.promiseLifetime(), weakSession);
     if (!promise)
-      return RpcPromise<LuaHttpResponse>::createFailed(strf("HTTP request failed: {}", promise.error().what()));
+      return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", promise.error().what()));
     return std::move(*promise);
   };
   if (auto result = callbacks.registerCallback("createRequest", [requestForMethod](LuaEngine& engine, String const& method, String const& url, std::optional<LuaTable> const& options) {

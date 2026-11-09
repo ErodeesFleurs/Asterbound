@@ -120,11 +120,11 @@ std::expected<std::shared_ptr<ServerWeather>, StarException> ServerWeather::crea
 
 void ServerWeather::setup(WeatherPool weatherPool, float undergroundLevel, WorldGeometry worldGeometry,
     WeatherEffectsActiveQuery weatherEffectsActiveQuery) {
-  m_weatherPool = weatherPool;
+  m_weatherPool = std::move(weatherPool);
   m_undergroundLevel = undergroundLevel;
 
   m_worldGeometry = worldGeometry;
-  m_weatherEffectsActiveQuery = weatherEffectsActiveQuery;
+  m_weatherEffectsActiveQuery = std::move(weatherEffectsActiveQuery);
 
   m_currentWeatherIndex = NPos;
   m_currentWeatherType = {};
@@ -221,9 +221,7 @@ StringList ServerWeather::statusEffects() const {
   return {};
 }
 
-List<std::shared_ptr<Projectile>> ServerWeather::pullNewProjectiles() {
-  return take(m_newProjectiles);
-}
+List<std::shared_ptr<Projectile>> ServerWeather::pullNewProjectiles() { return std::exchange(m_newProjectiles, {}); }
 
 std::expected<std::optional<String>, StarException> ServerWeather::activeWeather() const {
   if (m_currentWeatherIndex == NPos) return std::optional<String>();
@@ -235,7 +233,7 @@ std::expected<std::optional<String>, StarException> ServerWeather::activeWeather
 StringList ServerWeather::weatherList() const {
   StringList weatherList;
   for (std::size_t i = 0; i < m_weatherPool.size(); ++i)
-    weatherList.append(m_weatherPool.items()[i].second);
+    weatherList.push_back(m_weatherPool.items()[i].second);
   return weatherList;
 }
 
@@ -314,7 +312,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
       auto regions = m_worldGeometry.splitXRegion(baseRegion);
       if (!regions) return std::unexpected(std::move(regions.error()));
       for (auto const& region : *regions)
-        baseSpawnRegions.append({region, height});
+        baseSpawnRegions.push_back({region, height});
     }
 
     // We are going to have to eliminate vertically redundant sections of
@@ -322,8 +320,8 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
     // region is a "split point"
     List<int> splitPoints;
     for (auto const& baseSpawnRegion : baseSpawnRegions) {
-      splitPoints.append(baseSpawnRegion.first[0]);
-      splitPoints.append(baseSpawnRegion.first[1]);
+      splitPoints.push_back(baseSpawnRegion.first[0]);
+      splitPoints.push_back(baseSpawnRegion.first[1]);
     }
 
     // Split every spawn region on every split point.
@@ -331,18 +329,18 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
     for (auto const& baseSpawnRegion : baseSpawnRegions) {
       List<Vec2I> regions = {baseSpawnRegion.first};
       for (auto splitPoint : splitPoints) {
-        auto prevRegions = take(regions);
+        auto prevRegions = std::exchange(regions, {});
         for (auto const& region : prevRegions) {
           if (splitPoint > region[0] && splitPoint < region[1]) {
-            regions.append({region[0], splitPoint});
-            regions.append({splitPoint, region[1]});
+            regions.push_back({region[0], splitPoint});
+            regions.push_back({splitPoint, region[1]});
           } else {
-            regions.append(region);
+            regions.push_back(region);
           }
         }
       }
       for (auto const& region : regions)
-        splitSpawnRegions.append({region, baseSpawnRegion.second});
+        splitSpawnRegions.push_back({region, baseSpawnRegion.second});
     }
 
     // Sort the split spawn regions by leftmost point then height, preparing to
@@ -404,7 +402,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
             (*newProjectile)->setInitialPosition(position);
             (*newProjectile)->setInitialVelocity(projectileConfig.velocity + Vec2F(projectileConfig.windAffectAmount * wind(), 0));
             (*newProjectile)->setTeam(EntityDamageTeam(TeamType::Environment));
-            m_newProjectiles.append(std::move(*newProjectile));
+            m_newProjectiles.push_back(std::move(*newProjectile));
           }
         }
       }
@@ -449,7 +447,7 @@ std::expected<std::shared_ptr<ClientWeather>, StarException> ClientWeather::crea
 
 void ClientWeather::setup(WorldGeometry worldGeometry, WeatherEffectsActiveQuery weatherEffectsActiveQuery) {
   m_worldGeometry = worldGeometry;
-  m_weatherEffectsActiveQuery = weatherEffectsActiveQuery;
+  m_weatherEffectsActiveQuery = std::move(weatherEffectsActiveQuery);
   m_currentTime = 0.0;
 }
 
@@ -509,9 +507,7 @@ StringList ClientWeather::statusEffects() const {
   return {};
 }
 
-List<Particle> ClientWeather::pullNewParticles() {
-  return take(m_particles);
-}
+List<Particle> ClientWeather::pullNewParticles() { return std::exchange(m_particles, {}); }
 
 std::expected<std::optional<String>, StarException> ClientWeather::activeWeather() const {
   if (m_currentWeatherIndex == NPos) return std::optional<String>();
@@ -554,7 +550,7 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
         m_worldGeometry.nearestTo(newClientRegion.max(), m_lastParticleVisibleRegion.max()));
 
     Vec2F targetVelocity = particleConfig.particle.velocity + Vec2F(wind(), 0);
-    float angleChange = Vec2F::angleBetween2(Vec2F(0, 1), targetVelocity);
+    float angleChange = Vec2F::angle_between_2(Vec2F(0, 1), targetVelocity);
     visibleRegion.translate(targetVelocity * dt);
 
     for (auto const& renderZone : newClientRegion.subtract(visibleRegion)) {
@@ -578,7 +574,7 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
           }
           if (particleConfig.autoRotate)
             newParticle.rotation += angleChange;
-          m_particles.append(std::move(newParticle));
+          m_particles.push_back(std::move(newParticle));
         }
       }
     }

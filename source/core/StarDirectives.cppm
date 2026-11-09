@@ -152,7 +152,7 @@ struct hash<DirectivesGroup> {
   std::size_t operator()(DirectivesGroup const& s) const;
 };
 
-typedef DirectivesGroup ImageDirectives;
+using ImageDirectives = DirectivesGroup;
 
 inline std::expected<std::reference_wrapper<Directives::Shared const>, StarException> Directives::get() const {
   if (!m_shared)

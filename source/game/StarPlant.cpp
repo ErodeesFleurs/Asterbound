@@ -204,8 +204,8 @@ yOffset += std::move(*result440) / TilePixels;
 if (!result441) return std::unexpected(std::move(result441.error()));
 auto result442 = result441->get().toString();
 if (!result442) return std::unexpected(std::move(result442.error()));
-String baseFile = AssetPath::relativeTo(config.stemDirectory, std::move(*result442));
-    auto result443 = assets->image(baseFile);
+String baseFile = AssetPath::relative_to(config.stemDirectory, std::move(*result442));
+auto result443 = assets->image(baseFile);
 if (!result443) return std::unexpected(std::move(result443.error()));
 float baseImageHeight = std::move(*result443)->height();
     if (config.ceiling)
@@ -213,7 +213,7 @@ float baseImageHeight = std::move(*result443)->height();
 
     {
       PlantPiece piece;
-      piece.image = strf("{}?hueshift={}", baseFile, config.stemHueShift);
+      piece.image = Star::format("{}?hueshift={}", baseFile, config.stemHueShift);
       piece.offset = Vec2F(xOffset, yOffset);
       piece.segmentIdx = segment;
       piece.structuralSegment = true;
@@ -221,7 +221,7 @@ float baseImageHeight = std::move(*result443)->height();
       piece.zLevel = 0.0f;
       piece.rotationType = DontRotate;
       piece.rotationOffset = this->root().random().randf() + roffset;
-      m_pieces.append(piece);
+      m_pieces.push_back(piece);
     }
 
     // base leaves
@@ -262,19 +262,18 @@ if (condition454) {
 if (!result455) return std::unexpected(std::move(result455.error()));
 auto result456 = result455->get().toString();
 if (!result456) return std::unexpected(std::move(result456.error()));
-String baseLeavesFile =
-            AssetPath::relativeTo(config.foliageDirectory, std::move(*result456));
+String baseLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result456));
 
-        PlantPiece piece;
-        piece.image = strf("{}?hueshift={}", baseLeavesFile, config.foliageHueShift);
-        piece.offset = Vec2F{xOf, yOf};
-        piece.segmentIdx = segment;
-        piece.structuralSegment = false;
-        piece.kind = PlantPieceKind::Foliage;
-        piece.zLevel = 3.0f;
-        piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-        piece.rotationOffset = this->root().random().randf() + roffset;
-        m_pieces.append(piece);
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", baseLeavesFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = 3.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = this->root().random().randf() + roffset;
+m_pieces.push_back(piece);
       }
 
       bool condition459 = static_cast<bool>(baseLeavesSettings.contains("backimage"));
@@ -290,18 +289,17 @@ if (condition459) {
 if (!result460) return std::unexpected(std::move(result460.error()));
 auto result461 = result460->get().toString();
 if (!result461) return std::unexpected(std::move(result461.error()));
-String baseLeavesBackFile =
-            AssetPath::relativeTo(config.foliageDirectory, std::move(*result461));
-        PlantPiece piece;
-        piece.image = strf("{}?hueshift={}", baseLeavesBackFile, config.foliageHueShift);
-        piece.offset = Vec2F{xOf, yOf};
-        piece.segmentIdx = segment;
-        piece.structuralSegment = false;
-        piece.kind = PlantPieceKind::Foliage;
-        piece.zLevel = -1.0f;
-        piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-        piece.rotationOffset = this->root().random().randf() + roffset;
-        m_pieces.append(piece);
+String baseLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result461));
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", baseLeavesBackFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = -1.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = this->root().random().randf() + roffset;
+m_pieces.push_back(piece);
       }
     }
 
@@ -377,20 +375,20 @@ yOffset += std::move(*result481) / TilePixels;
 if (!result482) return std::unexpected(std::move(result482.error()));
 auto result483 = result482->get().toString();
 if (!result483) return std::unexpected(std::move(result483.error()));
-String middleFile = AssetPath::relativeTo(config.stemDirectory, std::move(*result483));
+String middleFile = AssetPath::relative_to(config.stemDirectory, std::move(*result483));
 
-      {
-        PlantPiece piece;
-        piece.image = strf("{}?hueshift={}", middleFile, config.stemHueShift);
-        piece.offset = Vec2F(xOffset, yOffset);
-        piece.segmentIdx = segment;
-        piece.structuralSegment = true;
-        piece.kind = PlantPieceKind::Stem;
-        piece.zLevel = 1.0f;
-        piece.rotationType = DontRotate;
-        piece.rotationOffset = this->root().random().randf() + roffset;
-        m_pieces.append(piece);
-      }
+{
+  PlantPiece piece;
+  piece.image = Star::format("{}?hueshift={}", middleFile, config.stemHueShift);
+  piece.offset = Vec2F(xOffset, yOffset);
+  piece.segmentIdx = segment;
+  piece.structuralSegment = true;
+  piece.kind = PlantPieceKind::Stem;
+  piece.zLevel = 1.0f;
+  piece.rotationType = DontRotate;
+  piece.rotationOffset = this->root().random().randf() + roffset;
+  m_pieces.push_back(piece);
+}
 
       // trunk leaves
       auto result484 = config.foliageSettings.getObject("trunkLeaves", {});
@@ -430,18 +428,17 @@ if (condition494) {
 if (!result495) return std::unexpected(std::move(result495.error()));
 auto result496 = result495->get().toString();
 if (!result496) return std::unexpected(std::move(result496.error()));
-String trunkLeavesFile =
-              AssetPath::relativeTo(config.foliageDirectory, std::move(*result496));
-          PlantPiece piece;
-          piece.image = strf("{}?hueshift={}", trunkLeavesFile, config.foliageHueShift);
-          piece.offset = Vec2F{xOf, yOf};
-          piece.segmentIdx = segment;
-          piece.structuralSegment = false;
-          piece.kind = PlantPieceKind::Foliage;
-          piece.zLevel = 3.0f;
-          piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-          piece.rotationOffset = this->root().random().randf() + roffset;
-          m_pieces.append(piece);
+String trunkLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result496));
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", trunkLeavesFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = 3.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = this->root().random().randf() + roffset;
+m_pieces.push_back(piece);
         }
 
         bool condition499 = static_cast<bool>(trunkLeavesSettings.contains("backimage"));
@@ -457,18 +454,17 @@ if (condition499) {
 if (!result500) return std::unexpected(std::move(result500.error()));
 auto result501 = result500->get().toString();
 if (!result501) return std::unexpected(std::move(result501.error()));
-String trunkLeavesBackFile =
-              AssetPath::relativeTo(config.foliageDirectory, std::move(*result501));
-          PlantPiece piece;
-          piece.image = strf("{}?hueshift={}", trunkLeavesBackFile, config.foliageHueShift);
-          piece.offset = Vec2F{xOf, yOf};
-          piece.segmentIdx = segment;
-          piece.structuralSegment = false;
-          piece.kind = PlantPieceKind::Foliage;
-          piece.zLevel = -1.0f;
-          piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-          piece.rotationOffset = this->root().random().randf() + roffset;
-          m_pieces.append(piece);
+String trunkLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result501));
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", trunkLeavesBackFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = -1.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = this->root().random().randf() + roffset;
+m_pieces.push_back(piece);
         }
       }
 
@@ -526,19 +522,19 @@ if (condition517) {
 if (!result518) return std::unexpected(std::move(result518.error()));
 auto result519 = result518->get().toString();
 if (!result519) return std::unexpected(std::move(result519.error()));
-String branchFile = AssetPath::relativeTo(config.stemDirectory, std::move(*result519));
-          {
-            PlantPiece piece;
-            piece.image = strf("{}?hueshift={}", branchFile, config.stemHueShift);
-            piece.offset = Vec2F{xO, yO};
-            piece.segmentIdx = segment;
-            piece.structuralSegment = false;
-            piece.kind = PlantPieceKind::Stem;
-            piece.zLevel = 0.0f;
-            piece.rotationType = m_ceiling ? DontRotate : RotateBranch;
-            piece.rotationOffset = boffset;
-            m_pieces.append(piece);
-          }
+String branchFile = AssetPath::relative_to(config.stemDirectory, std::move(*result519));
+{
+  PlantPiece piece;
+  piece.image = Star::format("{}?hueshift={}", branchFile, config.stemHueShift);
+  piece.offset = Vec2F{xO, yO};
+  piece.segmentIdx = segment;
+  piece.structuralSegment = false;
+  piece.kind = PlantPieceKind::Stem;
+  piece.zLevel = 0.0f;
+  piece.rotationType = m_ceiling ? DontRotate : RotateBranch;
+  piece.rotationOffset = boffset;
+  m_pieces.push_back(piece);
+}
           branchYOffset += h;
 
           // branch leaves
@@ -579,18 +575,17 @@ if (condition530) {
 if (!result531) return std::unexpected(std::move(result531.error()));
 auto result532 = result531->get().toString();
 if (!result532) return std::unexpected(std::move(result532.error()));
-String branchLeavesFile =
-                  AssetPath::relativeTo(config.foliageDirectory, std::move(*result532));
-              PlantPiece piece;
-              piece.image = strf("{}?hueshift={}", branchLeavesFile, config.foliageHueShift);
-              piece.offset = Vec2F{xOf, yOf};
-              piece.segmentIdx = segment;
-              piece.structuralSegment = false;
-              piece.kind = PlantPieceKind::Foliage;
-              piece.zLevel = 3.0f;
-              piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-              piece.rotationOffset = boffset;
-              m_pieces.append(piece);
+String branchLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result532));
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", branchLeavesFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = 3.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = boffset;
+m_pieces.push_back(piece);
             }
 
             bool condition535 = static_cast<bool>(branchLeavesSettings.contains("backimage"));
@@ -606,18 +601,17 @@ if (condition535) {
 if (!result536) return std::unexpected(std::move(result536.error()));
 auto result537 = result536->get().toString();
 if (!result537) return std::unexpected(std::move(result537.error()));
-String branchLeavesBackFile =
-                  AssetPath::relativeTo(config.foliageDirectory, std::move(*result537));
-              PlantPiece piece;
-              piece.image = strf("{}?hueshift={}", branchLeavesBackFile, config.foliageHueShift);
-              piece.offset = Vec2F{xOf, yOf};
-              piece.segmentIdx = segment;
-              piece.structuralSegment = false;
-              piece.kind = PlantPieceKind::Foliage;
-              piece.zLevel = -1.0f;
-              piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-              piece.rotationOffset = boffset;
-              m_pieces.append(piece);
+String branchLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result537));
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", branchLeavesBackFile, config.foliageHueShift);
+piece.offset = Vec2F{xOf, yOf};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = -1.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
+piece.rotationOffset = boffset;
+m_pieces.push_back(piece);
             }
           }
 
@@ -627,7 +621,7 @@ if (!result538) return std::unexpected(std::move(result538.error()));
 auto result539 = result538->get().toDouble();
 if (!result539) return std::unexpected(std::move(result539.error()));
 auto result540 = rnd.randInt(4);
-branchYOffset += (std::move(*result539) / TilePixels) / (float)(1 + result540);
+branchYOffset += (std::move(*result539) / TilePixels) / static_cast<float>(1 + result540);
         }
       }
       segment++;
@@ -668,19 +662,19 @@ yOffset += std::move(*result548) / TilePixels;
 if (!result549) return std::unexpected(std::move(result549.error()));
 auto result550 = result549->get().toString();
 if (!result550) return std::unexpected(std::move(result550.error()));
-String crownFile = AssetPath::relativeTo(config.stemDirectory, std::move(*result550));
-      {
-        PlantPiece piece;
-        piece.image = strf("{}?hueshift={}", crownFile, config.stemHueShift);
-        piece.offset = Vec2F{xOffset, yOffset};
-        piece.segmentIdx = segment;
-        piece.structuralSegment = false;
-        piece.kind = PlantPieceKind::Stem;
-        piece.zLevel = 0.0f;
-        piece.rotationType = m_ceiling ? DontRotate : RotateCrownBranch;
-        piece.rotationOffset = coffset;
-        m_pieces.append(piece);
-      }
+String crownFile = AssetPath::relative_to(config.stemDirectory, std::move(*result550));
+{
+  PlantPiece piece;
+  piece.image = Star::format("{}?hueshift={}", crownFile, config.stemHueShift);
+  piece.offset = Vec2F{xOffset, yOffset};
+  piece.segmentIdx = segment;
+  piece.structuralSegment = false;
+  piece.kind = PlantPieceKind::Stem;
+  piece.zLevel = 0.0f;
+  piece.rotationType = m_ceiling ? DontRotate : RotateCrownBranch;
+  piece.rotationOffset = coffset;
+  m_pieces.push_back(piece);
+}
       // crown leaves
       auto result551 = config.foliageSettings.getObject("crownLeaves", {});
 if (!result551) return std::unexpected(std::move(result551.error()));
@@ -720,19 +714,18 @@ if (condition561) {
 if (!result562) return std::unexpected(std::move(result562.error()));
 auto result563 = result562->get().toString();
 if (!result563) return std::unexpected(std::move(result563.error()));
-String crownLeavesFile =
-              AssetPath::relativeTo(config.foliageDirectory, std::move(*result563));
+String crownLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result563));
 
-          PlantPiece piece;
-          piece.image = strf("{}?hueshift={}", crownLeavesFile, config.foliageHueShift);
-          piece.offset = Vec2F{xO, yO};
-          piece.segmentIdx = segment;
-          piece.structuralSegment = false;
-          piece.kind = PlantPieceKind::Foliage;
-          piece.zLevel = 3.0f;
-          piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
-          piece.rotationOffset = coffset;
-          m_pieces.append(piece);
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", crownLeavesFile, config.foliageHueShift);
+piece.offset = Vec2F{xO, yO};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = 3.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
+piece.rotationOffset = coffset;
+m_pieces.push_back(piece);
         }
 
         bool condition566 = static_cast<bool>(crownLeavesSettings.contains("backimage"));
@@ -748,19 +741,18 @@ if (condition566) {
 if (!result567) return std::unexpected(std::move(result567.error()));
 auto result568 = result567->get().toString();
 if (!result568) return std::unexpected(std::move(result568.error()));
-String crownLeavesBackFile =
-              AssetPath::relativeTo(config.foliageDirectory, std::move(*result568));
+String crownLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result568));
 
-          PlantPiece piece;
-          piece.image = strf("{}?hueshift={}", crownLeavesBackFile, config.foliageHueShift);
-          piece.offset = Vec2F{xO, yO};
-          piece.segmentIdx = segment;
-          piece.structuralSegment = false;
-          piece.kind = PlantPieceKind::Foliage;
-          piece.zLevel = -1.0f;
-          piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
-          piece.rotationOffset = coffset;
-          m_pieces.append(piece);
+PlantPiece piece;
+piece.image = Star::format("{}?hueshift={}", crownLeavesBackFile, config.foliageHueShift);
+piece.offset = Vec2F{xO, yO};
+piece.segmentIdx = segment;
+piece.structuralSegment = false;
+piece.kind = PlantPieceKind::Foliage;
+piece.zLevel = -1.0f;
+piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
+piece.rotationOffset = coffset;
+m_pieces.push_back(piece);
         }
       }
     }
@@ -853,7 +845,7 @@ std::expected<void, StarException> Plant::initialize(GrassVariant const& config,
 
   RandomSource rand(seed);
 
-  String imageName = AssetPath::relativeTo(config.directory, rand.randValueFrom(config.images));
+  String imageName = AssetPath::relative_to(config.directory, rand.randValueFrom(config.images));
 
   Vec2F offset = Vec2F();
   // If this is a ceiling plant, offset the image so that the [0, 0] space is
@@ -869,7 +861,7 @@ float imageHeight = std::move(*result426)[1];
   }
 
   PlantPiece piece;
-  piece.image = strf("{}?hueshift={}", imageName, config.hueShift);
+  piece.image = Star::format("{}?hueshift={}", imageName, config.hueShift);
   piece.offset = offset;
   piece.segmentIdx = 0;
   piece.structuralSegment = true;
@@ -915,7 +907,7 @@ if (!result421) return std::unexpected(std::move(result421.error()));
 auto assets = std::move(*result421);
 
   auto shape = rand.randValueFrom(config.shapes);
-  String shapeImageName = AssetPath::relativeTo(config.directory, shape.image);
+  String shapeImageName = AssetPath::relative_to(config.directory, shape.image);
   auto result422 = assets->image(shapeImageName);
 if (!result422) return std::unexpected(std::move(result422.error()));
 float shapeImageHeight = std::move(*result422)->height();
@@ -927,23 +919,23 @@ float shapeImageHeight = std::move(*result422)->height();
 
   {
     PlantPiece piece;
-    piece.image = strf("{}?hueshift={}", shapeImageName, config.baseHueShift);
+    piece.image = Star::format("{}?hueshift={}", shapeImageName, config.baseHueShift);
     piece.offset = offset;
     piece.segmentIdx = 0;
     piece.structuralSegment = true;
     piece.kind = PlantPieceKind::None;
-    m_pieces.append(piece);
+    m_pieces.push_back(piece);
   }
 
   auto mod = rand.randValueFrom(shape.mods);
   if (!mod.empty()) {
     PlantPiece piece;
-    piece.image = strf("{}?hueshift={}", AssetPath::relativeTo(config.directory, mod), config.modHueShift);
+    piece.image = Star::format("{}?hueshift={}", AssetPath::relative_to(config.directory, mod), config.modHueShift);
     piece.offset = offset;
     piece.segmentIdx = 0;
     piece.structuralSegment = false;
     piece.kind = PlantPieceKind::None;
-    m_pieces.append(piece);
+    m_pieces.push_back(piece);
   }
 
   m_ceiling = config.ceiling;
@@ -1219,7 +1211,7 @@ piece.imageSize = std::move(*result625);
 if (!result626) return std::unexpected(std::move(result626.error()));
 piece.spaces = Set<Vec2I>::from(
         std::move(*result626));
-    spaces.addAll(piece.spaces);
+    spaces.insert_range(piece.spaces);
   }
 
   m_spaces = spaces.values();
@@ -1321,7 +1313,7 @@ if (!result611) return std::unexpected(std::move(result611.error()));
 auto particle = std::move(*result611);
         particle.color.hueShift(hueshift);
         if (!particle.string.empty()) {
-          particle.string = strf("{}?hueshift={}", particle.string, hueshift);
+          particle.string = Star::format("{}?hueshift={}", particle.string, hueshift);
           particle.image = particle.string;
         }
         particle.position = {m_tileDamageX + this->root().random().randf(), m_tileDamageY + this->root().random().randf()};
@@ -1468,7 +1460,7 @@ res.offset = std::move(*result366);
       auto result367 = v.getString("rotationType");
 if (!result367) return std::unexpected(std::move(result367.error()));
 if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-auto result368 = RotationTypeNames->getLeft(std::move(*result367));
+auto result368 = RotationTypeNames->get_left(std::move(*result367));
 if (!result368) return std::unexpected(std::move(result368.error()));
 res.rotationType = result368->get();
       auto result369 = v.getFloat("rotationOffset");
@@ -1479,8 +1471,8 @@ if (!result370) return std::unexpected(std::move(result370.error()));
 res.structuralSegment = std::move(*result370);
       auto result371 = v.getInt("kind");
 if (!result371) return std::unexpected(std::move(result371.error()));
-res.kind = (PlantPieceKind)std::move(*result371);
-      auto result372 = v.getInt("segmentIdx");
+res.kind = static_cast<PlantPieceKind>(std::move(*result371));
+auto result372 = v.getInt("segmentIdx");
 if (!result372) return std::unexpected(std::move(result372.error()));
 res.segmentIdx = std::move(*result372);
       auto result373 = v.getBool("flip");
@@ -1503,9 +1495,10 @@ if (!result598) return std::unexpected(std::move(result598.error()));
 std::expected<Json, StarException> Plant::writePiecesToJson() const {
   auto result596 = jsonFromList<PlantPiece>(m_pieces, [](PlantPiece const& piece) -> std::expected<Json, StarException> {
       if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-auto result363 = RotationTypeNames->getRight(piece.rotationType);
-if (!result363) return std::unexpected(std::move(result363.error()));
-return JsonObject{
+      auto result363 = RotationTypeNames->get_right(piece.rotationType);
+      if (!result363)
+        return std::unexpected(std::move(result363.error()));
+      return JsonObject{
         {"image", piece.image},
         {"offset", jsonFromVec2F(piece.offset)},
         {"rotationType", result363->get()},
@@ -1544,9 +1537,9 @@ if (!result593) return std::unexpected(std::move(result593.error()));
   auto result594 = m_netGroup.addNetElement(m_tileDamageEventNetState);
 if (!result594) return std::unexpected(std::move(result594.error()));
 
-  m_netGroup.setNeedsStoreCallback(std::bind(&Plant::setNetStates, std::ref(*this)));
-  m_netGroup.setNeedsLoadCallback(std::bind(&Plant::getNetStates, std::ref(*this)));
-  return {};
+m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
+m_netGroup.setNeedsLoadCallback([this](bool) { return getNetStates(); });
+return {};
 }
 
 std::expected<void, StarException> Plant::getNetStates() {
@@ -1666,17 +1659,19 @@ auto geometry = result575->get().geometry();
     idx = 0;
     while (idx < m_pieces.size()) {
       if (m_pieces[idx].segmentIdx >= segmentIdx) {
-        auto result576 = m_pieces.takeAt(idx);
-if (!result576) return std::unexpected(std::move(result576.error()));
-droppedPieces.append(std::move(*result576));
+        auto result576 = m_pieces.take_at(idx);
+        if (!result576)
+          return std::unexpected(std::move(result576.error()));
+        droppedPieces.push_back(std::move(*result576));
         continue;
       }
       idx++;
     }
   } else {
-    auto result577 = m_pieces.takeAt(idx);
-if (!result577) return std::unexpected(std::move(result577.error()));
-droppedPieces.append(std::move(*result577));
+    auto result577 = m_pieces.take_at(idx);
+    if (!result577)
+      return std::unexpected(std::move(result577.error()));
+    droppedPieces.push_back(std::move(*result577));
   }
   m_piecesUpdated = true;
 
@@ -1698,8 +1693,8 @@ droppedPieces.append(std::move(*result577));
   Map<int, List<PlantPiece>> segments;
   for (auto& piece : droppedPieces) {
     if (!segments.contains(piece.segmentIdx))
-      segmentOrder.append(piece.segmentIdx);
-    segments[piece.segmentIdx].append(piece);
+      segmentOrder.push_back(piece.segmentIdx);
+    segments[piece.segmentIdx].push_back(piece);
   }
   std::reverse(segmentOrder.begin(), segmentOrder.end());
   auto result578 = this->root().random().randf(-0.3f, 0.3f);
@@ -1738,7 +1733,7 @@ if (!result583) return std::unexpected(std::move(result583.error()));
 
 std::expected<Vec2I, StarException> Plant::baseDamagePosition(List<Vec2I> const& positions) const {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((positions.size()));
+    Star::star_assert_failed((positions.size()));
   }
   auto result572 = positions.at(0);
 if (!result572) return std::unexpected(std::move(result572.error()));

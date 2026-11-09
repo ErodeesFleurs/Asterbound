@@ -2,7 +2,7 @@ module;
 import std;
 import star.format;
 import star.string;
-import star.stream_formatter;
+import star.text_formatter;
 import star.hash;
 import star.json;
 
@@ -55,7 +55,7 @@ struct hash<InstanceWorldId> {
 struct ClientCustomWorldId {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ClientCustomWorldId& clientWorldId);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ClientCustomWorldId const& clientWorldId);
-  friend std::ostream& operator<<(std::ostream& os, ClientCustomWorldId const& worldId);
+  friend void write_text(TextBuffer& output, ClientCustomWorldId const& worldId);
 
   Uuid uuid;
   String name;
@@ -76,7 +76,7 @@ struct hash<ClientCustomWorldId> {
 
   template <typename BaseType>
   struct CelestialWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, CelestialWorldIdWrapper<CelestialCoordinate> const& worldId);
+    friend void write_text(TextBuffer& output, CelestialWorldIdWrapper<CelestialCoordinate> const& worldId);
     using BaseType::BaseType;
 
     CelestialWorldIdWrapper() : BaseType() {}
@@ -101,20 +101,25 @@ struct hash<ClientCustomWorldId> {
 
     template <class Arg>
     CelestialWorldIdWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<CelestialWorldIdWrapper, typename std::decay<Arg>::type>::value,
-          "" "CelestialWorldId" " can not implicitly be assigned from " "CelestialCoordinate" "-derived classes or strong " "CelestialCoordinate"
-          " typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<CelestialWorldIdWrapper, std::decay_t<Arg>>,
+                    ""
+                    "CelestialWorldId"
+                    " can not implicitly be assigned from "
+                    "CelestialCoordinate"
+                    "-derived classes or strong "
+                    "CelestialCoordinate"
+                    " typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef CelestialWorldIdWrapper<CelestialCoordinate> CelestialWorldId;
+  using CelestialWorldId = CelestialWorldIdWrapper<CelestialCoordinate>;
 
   template <typename BaseType>
   struct ClientShipWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, ClientShipWorldIdWrapper<Uuid> const& worldId);
+    friend void write_text(TextBuffer& output, ClientShipWorldIdWrapper<Uuid> const& worldId);
     using BaseType::BaseType;
 
 
@@ -138,20 +143,25 @@ struct hash<ClientCustomWorldId> {
 
     template <class Arg>
     ClientShipWorldIdWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<ClientShipWorldIdWrapper, typename std::decay<Arg>::type>::value,
-          "" "ClientShipWorldId" " can not implicitly be assigned from " "Uuid" "-derived classes or strong " "Uuid"
-          " typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<ClientShipWorldIdWrapper, std::decay_t<Arg>>,
+                    ""
+                    "ClientShipWorldId"
+                    " can not implicitly be assigned from "
+                    "Uuid"
+                    "-derived classes or strong "
+                    "Uuid"
+                    " typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef ClientShipWorldIdWrapper<Uuid> ClientShipWorldId;
+  using ClientShipWorldId = ClientShipWorldIdWrapper<Uuid>;
 
   template <typename BaseType>
   struct CustomWorldIdWrapper : BaseType {
-    friend std::ostream& operator<<(std::ostream& os, CustomWorldIdWrapper<String> const& worldId);
+    friend void write_text(TextBuffer& output, CustomWorldIdWrapper<String> const& worldId);
     using BaseType::BaseType;
 
     CustomWorldIdWrapper() : BaseType() {}
@@ -176,121 +186,129 @@ struct hash<ClientCustomWorldId> {
 
     template <class Arg>
     CustomWorldIdWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<CustomWorldIdWrapper, typename std::decay<Arg>::type>::value,
-          "" "CustomWorldId" " can not implicitly be assigned from " "String" "-derived classes or strong " "String"
-          " typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<CustomWorldIdWrapper, std::decay_t<Arg>>,
+                    ""
+                    "CustomWorldId"
+                    " can not implicitly be assigned from "
+                    "String"
+                    "-derived classes or strong "
+                    "String"
+                    " typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
   };
-  typedef CustomWorldIdWrapper<String> CustomWorldId;
-typedef std::variant<std::monostate, CelestialWorldId, ClientShipWorldId, InstanceWorldId, CustomWorldId, ClientCustomWorldId> WorldId;
+  using CustomWorldId = CustomWorldIdWrapper<String>;
+  using WorldId = std::variant<std::monostate, CelestialWorldId, ClientShipWorldId, InstanceWorldId, CustomWorldId,
+                               ClientCustomWorldId>;
 
-// A negative instance level is reported rather than formatted as a valid world ID.
-[[nodiscard]] std::expected<String, StarException> printWorldId(WorldId const& worldId);
-[[nodiscard]] std::expected<WorldId, StarException> parseWorldId(String const& printedId);
+  // A negative instance level is reported rather than formatted as a valid world ID.
+  [[nodiscard]] std::expected<String, StarException> print_world_id(WorldId const& worldId);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, WorldId const& worldId);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, InstanceWorldId const& worldId);
+  [[nodiscard]] std::expected<WorldId, StarException> parseWorldId(String const& printedId);
 
-std::ostream& operator<<(std::ostream& os, CelestialWorldId const& worldId);
-std::ostream& operator<<(std::ostream& os, ClientShipWorldId const& worldId);
-std::ostream& operator<<(std::ostream& os, CustomWorldId const& worldId);
-std::ostream& operator<<(std::ostream& os, ClientCustomWorldId const& worldId);
+  void write_text(TextBuffer& output, CelestialWorldId const& worldId);
+  void write_text(TextBuffer& output, ClientShipWorldId const& worldId);
+  void write_text(TextBuffer& output, CustomWorldId const& worldId);
+  void write_text(TextBuffer& output, ClientCustomWorldId const& worldId);
 
-template <typename BaseType>
-struct SpawnTargetUniqueEntityWrapper : BaseType {
-  using BaseType::BaseType;
+  template <typename BaseType> struct SpawnTargetUniqueEntityWrapper : BaseType {
+    using BaseType::BaseType;
 
-  SpawnTargetUniqueEntityWrapper() : BaseType() {}
+    SpawnTargetUniqueEntityWrapper() : BaseType() {}
 
-  SpawnTargetUniqueEntityWrapper(SpawnTargetUniqueEntityWrapper const& nt) : BaseType(nt) {}
+    SpawnTargetUniqueEntityWrapper(SpawnTargetUniqueEntityWrapper const& nt) : BaseType(nt) {}
 
-  SpawnTargetUniqueEntityWrapper(SpawnTargetUniqueEntityWrapper&& nt) : BaseType(std::move(nt)) {}
+    SpawnTargetUniqueEntityWrapper(SpawnTargetUniqueEntityWrapper&& nt) : BaseType(std::move(nt)) {}
 
-  explicit SpawnTargetUniqueEntityWrapper(BaseType const& bt) : BaseType(bt) {}
+    explicit SpawnTargetUniqueEntityWrapper(BaseType const& bt) : BaseType(bt) {}
 
-  explicit SpawnTargetUniqueEntityWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
+    explicit SpawnTargetUniqueEntityWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
 
-  SpawnTargetUniqueEntityWrapper& operator=(SpawnTargetUniqueEntityWrapper const& rhs) {
-    BaseType::operator=(rhs);
-    return *this;
-  }
+    SpawnTargetUniqueEntityWrapper& operator=(SpawnTargetUniqueEntityWrapper const& rhs) {
+      BaseType::operator=(rhs);
+      return *this;
+    }
 
-  SpawnTargetUniqueEntityWrapper& operator=(SpawnTargetUniqueEntityWrapper&& rhs) {
-    BaseType::operator=(std::move(rhs));
-    return *this;
-  }
+    SpawnTargetUniqueEntityWrapper& operator=(SpawnTargetUniqueEntityWrapper&& rhs) {
+      BaseType::operator=(std::move(rhs));
+      return *this;
+    }
 
-  template <class Arg>
-  SpawnTargetUniqueEntityWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<SpawnTargetUniqueEntityWrapper, typename std::decay<Arg>::type>::value,
+    template <class Arg> SpawnTargetUniqueEntityWrapper& operator=(Arg&& other) {
+      static_assert(
+        std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+          || std::is_same_v<SpawnTargetUniqueEntityWrapper, std::decay_t<Arg>>,
         "SpawnTargetUniqueEntity can not implicitly be assigned from String-derived classes or strong String typedefs");
 
-    BaseType::operator=(std::forward<Arg>(other));
-    return *this;
-  }
-};
-typedef SpawnTargetUniqueEntityWrapper<String> SpawnTargetUniqueEntity;
-template <typename BaseType>
-struct SpawnTargetPositionWrapper : BaseType {
-  using BaseType::BaseType;
+      BaseType::operator=(std::forward<Arg>(other));
+      return *this;
+    }
+  };
+  using SpawnTargetUniqueEntity = SpawnTargetUniqueEntityWrapper<String>;
+  template <typename BaseType> struct SpawnTargetPositionWrapper : BaseType {
+    using BaseType::BaseType;
 
-  SpawnTargetPositionWrapper() : BaseType() {}
+    SpawnTargetPositionWrapper() : BaseType() {}
 
-  SpawnTargetPositionWrapper(SpawnTargetPositionWrapper const& nt) : BaseType(nt) {}
+    SpawnTargetPositionWrapper(SpawnTargetPositionWrapper const& nt) : BaseType(nt) {}
 
-  SpawnTargetPositionWrapper(SpawnTargetPositionWrapper&& nt) : BaseType(std::move(nt)) {}
+    SpawnTargetPositionWrapper(SpawnTargetPositionWrapper&& nt) : BaseType(std::move(nt)) {}
 
-  explicit SpawnTargetPositionWrapper(BaseType const& bt) : BaseType(bt) {}
+    explicit SpawnTargetPositionWrapper(BaseType const& bt) : BaseType(bt) {}
 
-  explicit SpawnTargetPositionWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
+    explicit SpawnTargetPositionWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
 
-  SpawnTargetPositionWrapper& operator=(SpawnTargetPositionWrapper const& rhs) {
-    BaseType::operator=(rhs);
-    return *this;
-  }
+    SpawnTargetPositionWrapper& operator=(SpawnTargetPositionWrapper const& rhs) {
+      BaseType::operator=(rhs);
+      return *this;
+    }
 
-  SpawnTargetPositionWrapper& operator=(SpawnTargetPositionWrapper&& rhs) {
-    BaseType::operator=(std::move(rhs));
-    return *this;
-  }
+    SpawnTargetPositionWrapper& operator=(SpawnTargetPositionWrapper&& rhs) {
+      BaseType::operator=(std::move(rhs));
+      return *this;
+    }
 
-  template <class Arg>
-  SpawnTargetPositionWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<SpawnTargetPositionWrapper, typename std::decay<Arg>::type>::value,
+    template <class Arg> SpawnTargetPositionWrapper& operator=(Arg&& other) {
+      static_assert(
+        std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+          || std::is_same_v<SpawnTargetPositionWrapper, std::decay_t<Arg>>,
         "SpawnTargetPosition can not implicitly be assigned from Vec2F-derived classes or strong Vec2F typedefs");
 
-    BaseType::operator=(std::forward<Arg>(other));
-    return *this;
-  }
-};
-typedef SpawnTargetPositionWrapper<Vec2F> SpawnTargetPosition;
-using SpawnTargetX = StrongTypedefBuiltin<float, struct SpawnTargetXTag>;
-typedef std::variant<std::monostate, SpawnTargetUniqueEntity, SpawnTargetPosition, SpawnTargetX> SpawnTarget;
+      BaseType::operator=(std::forward<Arg>(other));
+      return *this;
+    }
+  };
+  using SpawnTargetPosition = SpawnTargetPositionWrapper<Vec2F>;
+  using SpawnTargetX = StrongTypedefBuiltin<float, struct SpawnTargetXTag>;
+  using SpawnTarget = std::variant<std::monostate, SpawnTargetUniqueEntity, SpawnTargetPosition, SpawnTargetX>;
 
-Json spawnTargetToJson(SpawnTarget spawnTarget);
-[[nodiscard]] std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v);
+  Json spawnTargetToJson(SpawnTarget spawnTarget);
+  [[nodiscard]] std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v);
 
-String printSpawnTarget(SpawnTarget spawnTarget);
+  String print_spawn_target(SpawnTarget spawnTarget);
 
-struct WarpToWorld {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WarpToWorld& warpToWorld);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WarpToWorld const& warpToWorld);
+  struct WarpToWorld {
+    friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
+                                                                                       WarpToWorld& warpToWorld);
+    friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds,
+                                                                                       WarpToWorld const& warpToWorld);
 
-  WarpToWorld();
-  explicit WarpToWorld(WorldId world, SpawnTarget spawn = {});
-  [[nodiscard]] static std::expected<WarpToWorld, StarException> create(Json v);
+    WarpToWorld();
+    explicit WarpToWorld(WorldId world, SpawnTarget spawn = {});
+    [[nodiscard]] static std::expected<WarpToWorld, StarException> create(Json v);
 
-  WorldId world;
-  SpawnTarget target;
+    WorldId world;
+    SpawnTarget target;
 
-  bool operator==(WarpToWorld const& rhs) const;
-  explicit operator bool() const;
+    bool operator==(WarpToWorld const& rhs) const;
+    explicit operator bool() const;
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
-};
+    [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  };
 
 template <typename BaseType>
 struct WarpToPlayerWrapper : BaseType {
@@ -317,15 +335,15 @@ struct WarpToPlayerWrapper : BaseType {
 
   template <class Arg>
   WarpToPlayerWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<WarpToPlayerWrapper, typename std::decay<Arg>::type>::value,
-        "WarpToPlayer can not implicitly be assigned from Uuid-derived classes or strong Uuid typedefs");
+    static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                    || std::is_same_v<WarpToPlayerWrapper, std::decay_t<Arg>>,
+                  "WarpToPlayer can not implicitly be assigned from Uuid-derived classes or strong Uuid typedefs");
 
     BaseType::operator=(std::forward<Arg>(other));
     return *this;
   }
 };
-typedef WarpToPlayerWrapper<Uuid> WarpToPlayer;
+using WarpToPlayer = WarpToPlayerWrapper<Uuid>;
 
 enum class WarpAlias {
   Return,
@@ -333,10 +351,10 @@ enum class WarpAlias {
   OwnShip
 };
 
-typedef std::variant<std::monostate, WarpToWorld, WarpToPlayer, WarpAlias> WarpAction;
+using WarpAction = std::variant<std::monostate, WarpToWorld, WarpToPlayer, WarpAlias>;
 
 [[nodiscard]] std::expected<WarpAction, StarException> parseWarpAction(String const& warpString);
-[[nodiscard]] std::expected<String, StarException> printWarpAction(WarpAction const& warpAction);
+[[nodiscard]] std::expected<String, StarException> print_warp_action(WarpAction const& warpAction);
 [[nodiscard]] std::expected<JsonObject, StarException> warpActionToJson(WarpAction const& warpAction);
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WarpToWorld& warpToWorld);
@@ -373,10 +391,10 @@ namespace Star {
 }
 
 
-export template <> struct std::formatter<Star::CelestialWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::ClientShipWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::CustomWorldId> : Star::StreamFormatter {};
-export template <> struct std::formatter<Star::ClientCustomWorldId> : Star::StreamFormatter {};
+export template <> struct std::formatter<Star::CelestialWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::ClientShipWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::CustomWorldId> : Star::TextFormatter {};
+export template <> struct std::formatter<Star::ClientCustomWorldId> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::WarpMode;
@@ -390,7 +408,8 @@ export namespace Star {
   using ::Star::CustomWorldIdWrapper;
   using ::Star::CustomWorldId;
   using ::Star::WorldId;
-  using ::Star::printWorldId;
+  using ::Star::print_world_id;
+  using ::Star::write_text;
   using ::Star::parseWorldId;
   using ::Star::SpawnTargetUniqueEntityWrapper;
   using ::Star::SpawnTargetUniqueEntity;
@@ -401,13 +420,13 @@ export namespace Star {
   using ::Star::SpawnTarget;
   using ::Star::spawnTargetToJson;
   using ::Star::spawnTargetFromJson;
-  using ::Star::printSpawnTarget;
+  using ::Star::print_spawn_target;
   using ::Star::WarpToWorld;
   using ::Star::WarpToPlayerWrapper;
   using ::Star::WarpToPlayer;
   using ::Star::WarpAlias;
   using ::Star::WarpAction;
   using ::Star::parseWarpAction;
-  using ::Star::printWarpAction;
+  using ::Star::print_warp_action;
   using ::Star::warpActionToJson;
 }

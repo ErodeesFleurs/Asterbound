@@ -1,4 +1,5 @@
 import star.hash;
+import star.text_formatter;
 import star.json;
 import star.data_stream;
 import star.bi_map;
@@ -235,16 +236,22 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, ItemDescriptor const& descriptor) {
+std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor) {
   auto parameters = descriptor.m_parameters.repr();
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  format(os, "[{}, {}, {}]", descriptor.m_name, descriptor.m_count, *parameters);
-  return std::ref(os);
+  output.push_back('[');
+  append_text(output, descriptor.m_name);
+  output.append(", ");
+  append_text(output, descriptor.m_count);
+  output.append(", ");
+  append_text(output, *parameters);
+  output.push_back(']');
+  return {};
 }
 
 std::size_t hash<ItemDescriptor>::operator()(ItemDescriptor const& v) const {
-  return hashOf(v.m_name, v.m_count, v.m_parametersHash);
+  return hash_of(v.m_name, v.m_count, v.m_parametersHash);
 }
 
 }

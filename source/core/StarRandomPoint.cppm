@@ -23,10 +23,10 @@ namespace Star {
 template <typename PointData, typename DataType = float>
 class Random2dPointGenerator {
 public:
-  typedef Star::Polygon<DataType> Poly;
-  typedef Star::Vector<DataType, 2> Point;
-  typedef Star::Rect<DataType> Rect;
-  typedef List<std::pair<Point, PointData>> PointSet;
+  using Poly = Star::Polygon<DataType>;
+  using Point = Star::Vector<DataType, 2>;
+  using Rect = Star::Rect<DataType>;
+  using PointSet = List<std::pair<Point, PointData>>;
   Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cellSize, Vec2I const& densityRange);
 
   // Each point will in the area will be generated in a predictable order, and
@@ -69,7 +69,7 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
 
       auto points = m_cache.get(Point(x, y), [&](Point const&) -> std::expected<PointSet, StarException> {
           PointSet sectorResult;
-          RandomSource sectorRandomness(staticRandomU64(m_seed, x, y));
+          RandomSource sectorRandomness(static_random_u64(m_seed, x, y));
           auto count = sectorRandomness.randInt(m_densityRange[0], m_densityRange[1]);
           if (!count)
             return std::unexpected(std::move(count.error()));
@@ -80,9 +80,9 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
               auto data = callback(sectorRandomness);
               if (!data)
                 return std::unexpected(std::move(data.error()));
-              sectorResult.append(std::pair<Point, PointData>(pointPos, std::move(*data)));
+              sectorResult.push_back(std::pair<Point, PointData>(pointPos, std::move(*data)));
             } else {
-              sectorResult.append(std::pair<Point, PointData>(pointPos, callback(sectorRandomness)));
+              sectorResult.push_back(std::pair<Point, PointData>(pointPos, callback(sectorRandomness)));
             }
           }
 
@@ -90,7 +90,7 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
         });
       if (!points)
         return std::unexpected(std::move(points.error()));
-      finalResult.appendAll(points->get());
+      finalResult.append_range(points->get());
     }
   }
 

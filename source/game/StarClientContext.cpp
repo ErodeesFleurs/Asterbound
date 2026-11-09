@@ -186,13 +186,9 @@ std::shared_ptr<JsonRpcInterface> ClientContext::rpcInterface() const {
   return m_rpc;
 }
 
-WorldChunks ClientContext::newShipUpdates() {
-  return take(m_newShipUpdates);
-}
+WorldChunks ClientContext::newShipUpdates() { return std::exchange(m_newShipUpdates, {}); }
 
-StringMap<WorldChunks> ClientContext::newCustomWorldUpdates() {
-  return take(m_newCustomWorldUpdates);
-}
+StringMap<WorldChunks> ClientContext::newCustomWorldUpdates() { return std::exchange(m_newCustomWorldUpdates, {}); }
 
 ShipUpgrades ClientContext::shipUpgrades() const {
   return m_shipUpgrades.get();
@@ -222,7 +218,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
     auto customWorldUpdates = ds.read<StringMap<ByteArray>>();
     if (!customWorldUpdates)
       return std::unexpected(std::move(customWorldUpdates.error()));
-    for (auto& p : *customWorldUpdates) {
+    for (auto&& p : *customWorldUpdates) {
       auto decoded = DataStreamBuffer::deserialize<WorldChunks>(std::move(p.second));
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));

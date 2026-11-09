@@ -53,7 +53,7 @@ class Root;
 class TileEntity;
 class ScriptedEntity;
 
-typedef std::function<std::expected<void, StarException>(World&)> WorldAction;
+using WorldAction = std::function<std::expected<void, StarException>(World&)>;
 
 class World {
 public:
@@ -62,7 +62,7 @@ public:
 
   explicit World(Root& root) : m_root(root) {}
   Root& root() const { return m_root; }
-  virtual ~World() {}
+  virtual ~World() = default;
 
   // Will remain constant throughout the life of the world.
   virtual ConnectionId connection() const = 0;
@@ -273,7 +273,7 @@ template <typename EntityT>
         if (!*accepted)
           return {};
       }
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     }
     return {};
   });
@@ -312,7 +312,7 @@ template <typename EntityT>
         if (!*accepted)
           return {};
       }
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     }
     return {};
   });
@@ -326,7 +326,7 @@ template <typename EntityT>
   List<std::shared_ptr<EntityT>> list;
   auto scanned = forEachEntityAtTile(pos, [&](std::shared_ptr<TileEntity> const& entity) -> std::expected<void, StarException> {
     if (auto e = as<EntityT>(entity))
-      list.append(std::move(e));
+      list.push_back(std::move(e));
     return {};
   });
   if (!scanned)
@@ -343,7 +343,7 @@ template <typename Message, typename Receiver>
   for (auto& message : messages) {
     if (error) {
       if (auto failed = message.promise.fail("World message handling stopped"); !failed)
-        *error = error->withRelated(failed.error(), "World message drain also failed");
+        *error = error->with_related(failed.error(), "World message drain also failed");
       continue;
     }
     auto response = receiveMessage(message.message, message.args);
@@ -360,7 +360,7 @@ template <typename Message, typename Receiver>
     }
     if (!completion) {
       if (error)
-        *error = error->withRelated(completion.error(), "World message settlement also failed");
+        *error = error->with_related(completion.error(), "World message settlement also failed");
       else
         error = std::move(completion.error());
     }

@@ -28,15 +28,19 @@ LockFile::LockFile(LockFile&& file)
 
 LockFile::~LockFile() {
   auto result = unlock();
-  if (!result)
-    std::fprintf(stderr, "Error unlocking file during destruction: %s\n", result.error().what());
+  if (!result) {
+    if (auto written = Star::print(stderr, "Error unlocking file during destruction: {}\n", result.error().what()); !written)
+      std::_Exit(1);
+  }
 }
 
 LockFile& LockFile::operator=(LockFile&& file) {
   if (this != &file) {
     auto released = unlock();
-    if (!released)
-      std::fprintf(stderr, "Error unlocking file during move assignment: %s\n", released.error().what());
+    if (!released) {
+      if (auto written = Star::print(stderr, "Error unlocking file during move assignment: {}\n", released.error().what()); !written)
+        std::_Exit(1);
+    }
     m_filename = std::move(file.m_filename);
     m_handle = std::move(file.m_handle);
   }

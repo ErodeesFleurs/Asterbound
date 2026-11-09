@@ -16,9 +16,9 @@ struct JsonRpcExceptionTag {
 };
 using JsonRpcException = StarError<JsonRpcExceptionTag, StarException>;
 
-typedef std::function<std::expected<Json, StarException>(Json const&)> JsonRpcRemoteFunction;
+using JsonRpcRemoteFunction = std::function<std::expected<Json, StarException>(Json const&)>;
 
-typedef StringMap<JsonRpcRemoteFunction> JsonRpcHandlers;
+using JsonRpcHandlers = StringMap<JsonRpcRemoteFunction>;
 
 // Simple interface to just the method invocation part of JsonRpc.
 class JsonRpcInterface {

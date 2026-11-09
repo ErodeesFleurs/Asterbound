@@ -182,14 +182,14 @@ namespace PlatformerAStar {
       if (!accelerationValue) return std::unexpected(std::move(accelerationValue.error()));
       float acc = (*accelerationValue)[1];
       float dropSpeed = acc * std::sqrt(2.0 / std::abs(acc));
-      neighbors.append(Edge{dropCost, Action::Drop, Vec2F(0, 0), node, Node{dropPosition, Vec2F(0, dropSpeed)}});
+      neighbors.push_back(Edge{dropCost, Action::Drop, Vec2F(0, 0), node, Node{dropPosition, Vec2F(0, dropSpeed)}});
     }
     return {};
   }
 
   std::expected<void, StarException> PathFinder::getWalkingNeighborsInDirection(Node const& node, List<Edge>& neighbors, float direction) const {
     auto addNode = [&self = *this, &node, &neighbors](Node const& target) {
-      neighbors.append(self.defaultCostEdge(Action::Walk, node, target));
+      neighbors.push_back(self.defaultCostEdge(Action::Walk, node, target));
     };
 
     Vec2F forward = node.position + Vec2F(direction, 0);
@@ -281,11 +281,14 @@ namespace PlatformerAStar {
   }
 
   std::expected<void, StarException> PathFinder::getFallingNeighbors(Node const& node, List<Edge>& neighbors) const {
-    return forEachArcNeighbor(node, 0.0f, [&self = *this, &node, &neighbors](Node const& target, bool landed) -> std::expected<void, StarException> {
-      neighbors.append(self.defaultCostEdge(Action::Arc, node, target));
-      if (landed) neighbors.append(self.defaultCostEdge(Action::Land, target, Node{target.position, {}}));
-      return {};
-    });
+    return forEachArcNeighbor(
+      node, 0.0f,
+      [&self = *this, &node, &neighbors](Node const& target, bool landed) -> std::expected<void, StarException> {
+        neighbors.push_back(self.defaultCostEdge(Action::Arc, node, target));
+        if (landed)
+          neighbors.push_back(self.defaultCostEdge(Action::Land, target, Node{target.position, {}}));
+        return {};
+      });
   }
 
   std::expected<void, StarException> PathFinder::getJumpingNeighbors(Node const& node, List<Edge>& neighbors) const {
@@ -295,7 +298,7 @@ namespace PlatformerAStar {
       if (!liquid) return std::unexpected(std::move(liquid.error()));
       if (*liquid) jumpCost = m_searchParams.liquidJumpCost.value_or(DefaultLiquidJumpCost);
       auto addVel = [jumpCost, &node, &neighbors](Vec2F const& vel) -> std::expected<void, StarException> {
-        neighbors.append(Edge{jumpCost, Action::Jump, vel, node, node.withVelocity(vel)});
+        neighbors.push_back(Edge{jumpCost, Action::Jump, vel, node, node.withVelocity(vel)});
         return {};
       };
       auto fullJump = forEachArcVelocity(*jumpSpeed, addVel);
@@ -343,18 +346,21 @@ namespace PlatformerAStar {
         Vec2F newPosition = *roundedPosition + Vec2F(dx, dy) * NodeGranularity;
         auto valid = validPosition(newPosition);
         if (!valid) return std::unexpected(std::move(valid.error()));
-        if (*valid) neighbors.append(defaultCostEdge(Action::Fly, node, Node{newPosition, {}}));
+        if (*valid)
+          neighbors.push_back(defaultCostEdge(Action::Fly, node, Node{newPosition, {}}));
       }
     }
     return {};
   }
 
   std::expected<void, StarException> PathFinder::getArcNeighbors(Node const& node, List<Edge>& neighbors) const {
-    return simulateArc(node, [&self = *this, &node, &neighbors](Node const& target, bool landed) -> std::expected<void, StarException> {
-      neighbors.append(self.defaultCostEdge(Action::Arc, node, target));
-      if (landed) neighbors.append(self.defaultCostEdge(Action::Land, target, Node{target.position, {}}));
-      return {};
-    });
+    return simulateArc(
+      node, [&self = *this, &node, &neighbors](Node const& target, bool landed) -> std::expected<void, StarException> {
+        neighbors.push_back(self.defaultCostEdge(Action::Arc, node, target));
+        if (landed)
+          neighbors.push_back(self.defaultCostEdge(Action::Land, target, Node{target.position, {}}));
+        return {};
+      });
   }
 
   std::expected<void, StarException> PathFinder::forEachArcVelocity(float yVelocity, std::function<std::expected<void, StarException>(Vec2F)> func) const {
@@ -528,7 +534,7 @@ namespace PlatformerAStar {
     }
 
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((velocity[1] != 0.0f));
+      Star::star_assert_failed((velocity[1] != 0.0f));
     }
     if (auto result = func(Node{position, velocity}, false); !result) return std::unexpected(std::move(result.error()));
     return {};

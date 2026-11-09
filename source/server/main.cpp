@@ -217,8 +217,8 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
       auto closed = server->close();
       if (!closed) {
         if (auto logged = root->logger().errorException("Server cleanup after failed start also failed", ExceptionDiagnostic(closed.error())); !logged) {
-          EmergencyLog::error("Server cleanup after failed start also failed: {}", exceptionReport(closed.error()));
-          EmergencyLog::error("Server cleanup logging failed: {}", exceptionReport(logged.error()));
+          EmergencyLog::error("Server cleanup after failed start also failed: {}", Star::exception_report(closed.error()));
+          EmergencyLog::error("Server cleanup logging failed: {}", Star::exception_report(logged.error()));
         }
       }
       return std::unexpected(std::move(started.error()));
@@ -302,8 +302,8 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
         if (!shutdownError)
           shutdownError = std::move(result.error());
         else if (auto logged = root->logger().errorException("Additional server shutdown error", ExceptionDiagnostic(result.error())); !logged) {
-          EmergencyLog::error("Additional server shutdown error: {}", exceptionReport(result.error()));
-          EmergencyLog::error("Server shutdown logging failed: {}", exceptionReport(logged.error()));
+          EmergencyLog::error("Additional server shutdown error: {}", Star::exception_report(result.error()));
+          EmergencyLog::error("Server shutdown logging failed: {}", Star::exception_report(logged.error()));
         }
       }
     };
@@ -329,8 +329,8 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
   if (!result) {
     auto logged = root->logger().errorException("Fatal server error", ExceptionDiagnostic(result.error()));
     if (!logged) {
-      EmergencyLog::error("{}", exceptionReport(result.error()));
-      EmergencyLog::error("Fatal server error logging failed: {}", exceptionReport(logged.error()));
+      EmergencyLog::error("{}", Star::exception_report(result.error()));
+      EmergencyLog::error("Fatal server error logging failed: {}", Star::exception_report(logged.error()));
     }
     diagnosticReported = true;
   }
@@ -343,8 +343,8 @@ int main(int argc, char** argv) {
   auto result = nativeRuntime ? runServer(argc, argv, diagnosticReported)
       : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
   if (!result) {
-    auto text = exceptionSummary(result.error());
-    EmergencyLog::error("Fatal server error: {}", diagnosticReported ? text : exceptionReport(result.error()));
+    auto text = Star::exception_summary(result.error());
+    EmergencyLog::error("Fatal server error: {}", diagnosticReported ? text : Star::exception_report(result.error()));
     #if defined STAR_SYSTEM_WINDOWS
     auto wideText = stringToUtf16(text);
     MessageBoxW(nullptr, wideText ? wideText->get() : L"Server startup failed; diagnostic conversion failed. See the log.",

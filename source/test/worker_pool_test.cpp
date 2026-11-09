@@ -38,19 +38,19 @@ TEST(WorkerPoolTest, All) {
   } releaseOnExit{released};
 
   for (std::size_t i = 0; i < 10; ++i)
-    handles.append(workerPool.addWork(incCounter));
+    handles.push_back(workerPool.addWork(incCounter));
 
   ASSERT_TRUE(workerPool.start(10));
   started.wait(false);
   EXPECT_EQ(counter, 0);
 
   for (std::size_t i = 0; i < 90; ++i)
-    handles.append(workerPool.addWork(incCounter));
+    handles.push_back(workerPool.addWork(incCounter));
 
   releaseOnExit.open();
 
   while (handles.size() > 20) {
-    auto handle = handles.takeFirst();
+    auto handle = handles.take_front();
     ASSERT_TRUE(handle);
     ASSERT_TRUE(handle->finish());
   }
@@ -126,21 +126,21 @@ struct StoredLvalueProducer {
 };
 
 template <typename Callable>
-concept AcceptsWork = requires(WorkerPool& pool, Callable&& callable) {
+concept accepts_work = requires(WorkerPool& pool, Callable&& callable) {
   pool.addWork(std::forward<Callable>(callable));
 };
 
 template <typename Callable>
-concept AcceptsIntProducer = requires(WorkerPool& pool, Callable&& callable) {
+concept accepts_int_producer = requires(WorkerPool& pool, Callable&& callable) {
   pool.addProducer<int>(std::forward<Callable>(callable));
 };
 
-static_assert(AcceptsWork<StoredLvalueTask>);
-static_assert(!AcceptsWork<StoredLvalueTask&>);
-static_assert(AcceptsIntProducer<StoredLvalueProducer>);
-static_assert(!AcceptsWork<decltype([] {})>);
-static_assert(!AcceptsWork<StoredLvalueProducer>);
-static_assert(!AcceptsIntProducer<decltype([] { return 1; })>);
+static_assert(accepts_work<StoredLvalueTask>);
+static_assert(!accepts_work<StoredLvalueTask&>);
+static_assert(accepts_int_producer<StoredLvalueProducer>);
+static_assert(!accepts_work<decltype([] {})>);
+static_assert(!accepts_work<StoredLvalueProducer>);
+static_assert(!accepts_int_producer<decltype([] { return 1; })>);
 }
 
 TEST(WorkerPoolTest, ConcreteMoveOnlyCallablesAreInvokedAsStoredLvalues) {

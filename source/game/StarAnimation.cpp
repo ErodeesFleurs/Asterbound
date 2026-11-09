@@ -68,12 +68,10 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto modeName = config.getString("mode", "endAndDisappear");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
-  if (!AnimationModeNames)
-    return std::unexpected(AnimationModeNames.error());
-  auto mode = AnimationModeNames->getLeft(*modeName);
+  auto mode = enumValue<AnimationModeNames>(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
-  m_mode = mode->get();
+  m_mode = *mode;
   auto base = config.getString("frames", "");
   if (!base)
     return std::unexpected(std::move(base.error()));
@@ -154,9 +152,9 @@ void Animation::clearTags() {
 std::expected<Drawable, StarException> Animation::drawable(float pixelSize) const {
   if (m_base.empty() || m_frame < 0)
     return Drawable();
-  String baseFrame = AssetPath::relativeTo(m_directory, m_base).replaceTags(m_tagValues);
+  String baseFrame = AssetPath::relative_to(m_directory, m_base).replace_tags(m_tagValues);
   if (m_appendFrame)
-    baseFrame += ":" + toString(m_frame);
+    baseFrame += ":" + Star::to_string(m_frame);
   auto imageMetadata = m_root.get().imageMetadataDatabase();
   if (!imageMetadata)
     return std::unexpected(std::move(imageMetadata.error()));
@@ -190,7 +188,7 @@ void Animation::update(float dt) {
     m_completed = true;
   }
 
-  m_tagValues["index"] = toString(m_frame);
+  m_tagValues["index"] = Star::to_string(m_frame);
 }
 
 Animation::PlaybackState Animation::playbackState() const {
@@ -216,7 +214,7 @@ void Animation::samplePlayback(PlaybackState const& previous, float elapsed) {
     m_frame = m_variantOffset + clamp<int>(withinCycle / (m_animationCycle / m_frameNumber), 0, m_frameNumber - 1);
   }
   if (m_frame != previousFrame)
-    m_tagValues["index"] = toString(m_frame);
+    m_tagValues["index"] = Star::to_string(m_frame);
 }
 
 bool Animation::isComplete() const {
@@ -231,7 +229,4 @@ void Animation::reset() {
   m_tagValues["index"] = "0";
 }
 
-std::expected<EnumMap<Animation::AnimationMode>, StarException> const Animation::AnimationModeNames = EnumMap<AnimationMode>::create({{AnimationMode::Stop, "Stop"},
-    {AnimationMode::EndAndDisappear, "EndAndDisappear"},
-    {AnimationMode::LoopForever, "LoopForever"}});
 }

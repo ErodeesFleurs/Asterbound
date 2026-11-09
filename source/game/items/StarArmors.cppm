@@ -89,7 +89,7 @@ public:
     return Star::typeName<ArmorItem>();
   }
 
-  virtual ~ArmorItem() {}
+  ~ArmorItem() override = default;
 
   [[nodiscard]]
   std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
@@ -161,12 +161,12 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<HeadArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
-  virtual ~HeadArmor() {}
+  ~HeadArmor() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
 
-  virtual ArmorType armorType() const override;
+  ArmorType armorType() const override;
 
   String const& frameset(Gender gender) const;
   Directives const& maskDirectives() const;
@@ -192,12 +192,12 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<ChestArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
-  virtual ~ChestArmor() {}
+  ~ChestArmor() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
 
-  virtual ArmorType armorType() const override;
+  ArmorType armorType() const override;
 
   // Will have :run, :normal, :duck, and :portrait
   String const& bodyFrameset(Gender gender) const;
@@ -232,12 +232,12 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<LegsArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
-  virtual ~LegsArmor() {}
+  ~LegsArmor() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
 
-  virtual ArmorType armorType() const override;
+  ArmorType armorType() const override;
 
   // Will have :idle, :duck, :walk[1-8], :run[1-8], :jump[1-4], :fall[1-4]
   String const& frameset(Gender gender) const;
@@ -262,12 +262,12 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<BackArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
-  virtual ~BackArmor() {}
+  ~BackArmor() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
 
-  virtual ArmorType armorType() const override;
+  ArmorType armorType() const override;
 
   // Will have :idle, :duck, :walk[1-8], :run[1-8], :jump[1-4], :fall[1-4]
   String const& frameset(Gender gender) const;

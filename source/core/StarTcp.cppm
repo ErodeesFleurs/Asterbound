@@ -40,7 +40,7 @@ private:
 // Simple class to listen for and open TcpSocket instances.
 class TcpServer {
 public:
-  typedef std::function<std::expected<void, StarException>(std::shared_ptr<TcpSocket> socket)> AcceptCallback;
+  using AcceptCallback = std::function<std::expected<void, StarException>(std::shared_ptr<TcpSocket> socket)>;
 
   [[nodiscard]] static std::expected<std::unique_ptr<TcpServer>, StarException> create(Logger& logger, HostAddressWithPort const& address);
   [[nodiscard]] static std::expected<std::unique_ptr<TcpServer>, StarException> create(Logger& logger, std::uint16_t port);

@@ -23,8 +23,8 @@ struct DamageSource {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& damageSource);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& damageSource);
 
-  typedef std::variant<std::monostate, PolyF, Line2F> DamageArea;
-  typedef std::variant<std::monostate, float, Vec2F> Knockback;
+  using DamageArea = std::variant<std::monostate, PolyF, Line2F>;
+  using Knockback = std::variant<std::monostate, float, Vec2F>;
 
   DamageSource();
   [[nodiscard]] static std::expected<DamageSource, StarException> create(Json const& v);

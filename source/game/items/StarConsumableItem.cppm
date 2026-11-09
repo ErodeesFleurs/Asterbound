@@ -286,7 +286,7 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
       auto effect = jsonToEphemeralStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      effects.append(std::move(*effect));
+      effects.push_back(std::move(*effect));
     }
     auto added = itemOwner->get().statusController().addEphemeralEffects(effects);
     if (!added)
@@ -298,7 +298,8 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
     if (!percentage)
       return std::unexpected(std::move(percentage.error()));
     if (*percentage == 1.0f) {
-      auto added = itemOwner->get().statusController().addEphemeralEffect(EphemeralStatusEffect{UniqueStatusEffect("wellfed"), {}});
+      auto added = itemOwner->get().statusController().addEphemeralEffect(
+        EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect("wellfed"), .duration = {}});
       if (!added)
         return std::unexpected(std::move(added.error()));
     }

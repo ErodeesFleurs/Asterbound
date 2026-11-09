@@ -145,7 +145,7 @@ std::expected<bool, StarException> KeybindingsMenu::sendEvent(InputEvent const& 
       if (auto modKey = std::ranges::find(KeyChordMods, keyUp.key, &std::pair<Key, KeyMod>::first);
           modKey != KeyChordMods.end()) {
         m_currentMods &= ~modKey->second;
-        if (auto result = setKeybinding(KeyChord{keyUp.key, m_currentMods}); !result)
+        if (auto result = setKeybinding(KeyChord{.key = keyUp.key, .mods = m_currentMods}); !result)
           return std::unexpected(std::move(result.error()));
         return true;
       }
@@ -159,7 +159,7 @@ std::expected<bool, StarException> KeybindingsMenu::sendEvent(InputEvent const& 
         return std::unexpected(std::move(modKey.error()));
       if (*modKey) {
         m_currentMods |= **modKey;
-      } else if (auto result = setKeybinding(KeyChord{keyDown.key, m_currentMods}); !result) {
+      } else if (auto result = setKeybinding(KeyChord{.key = keyDown.key, .mods = m_currentMods}); !result) {
         return std::unexpected(std::move(result.error()));
       }
       return true;
@@ -227,7 +227,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
         return std::unexpected(std::move(actionString.error()));
       if (!InterfaceActionNames)
         return std::unexpected(InterfaceActionNames.error());
-      auto action = InterfaceActionNames->getLeft(*actionString);
+      auto action = InterfaceActionNames->get_left(*actionString);
       if (!action)
         return std::unexpected(std::move(action.error()));
       List<KeyChord> inputDesc;
@@ -242,7 +242,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
           auto descriptor = inputDescriptorFromJson(bindingEntry);
           if (!descriptor)
             return std::unexpected(std::move(descriptor.error()));
-          inputDesc.append(std::move(*descriptor));
+          inputDesc.push_back(std::move(*descriptor));
         }
         return {};
       };
@@ -267,7 +267,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
         auto description = printInputDescriptor(descriptor);
         if (!description)
           return std::unexpected(std::move(description.error()));
-        descriptions.append(std::move(*description));
+        descriptions.push_back(std::move(*description));
       }
       (*boundKeys)->setText(descriptions.join(", "));
       auto deleteButton = (*newListMember)->requireChild<ButtonWidget>("deleteBinding");
@@ -282,7 +282,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& category : {std::pair{std::ref(*m_playerList), std::string_view("player")}, std::pair{std::ref(*m_toolBarList), std::string_view("toolbar")}, std::pair{std::ref(*m_gameList), std::string_view("game")}}) {
-    auto keybinds = (*assets)->json(strf("/interface/windowconfig/keybindingsmenu.config:keyActions.{}", category.second));
+    auto keybinds = (*assets)->json(Star::format("/interface/windowconfig/keybindingsmenu.config:keyActions.{}", category.second));
     if (!keybinds)
       return std::unexpected(std::move(keybinds.error()));
     if (auto result = doKeybindingsFor(category.first.get(), *keybinds); !result)
@@ -327,7 +327,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
     return std::unexpected(std::move(action.error()));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->get_right(action->get());
   if (!key)
     return std::unexpected(std::move(key.error()));
   auto storedBindings = base->get(key->get());
@@ -341,7 +341,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
     bindings.clear();
   bindings.add(*out);
   if (bindings.size() > m_maxBindings) {
-    if (auto result = bindings.removeFirst(); !result)
+    if (auto result = bindings.remove_first(); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto updated = base->set(key->get(), JsonArray::from(bindings));
@@ -392,7 +392,7 @@ std::expected<void, StarException> KeybindingsMenu::clearActive() {
     return std::unexpected(std::move(action.error()));
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error());
-  auto key = InterfaceActionNames->getRight(action->get());
+  auto key = InterfaceActionNames->get_right(action->get());
   if (!key)
     return std::unexpected(std::move(key.error()));
   (*base)[key->get()] = JsonArray{};

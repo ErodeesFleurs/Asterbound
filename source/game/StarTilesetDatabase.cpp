@@ -69,7 +69,7 @@ namespace Tiled {
     auto value = properties.get<String>("layer");
     if (!value) return std::unexpected(std::move(value.error()));
     if (!LayerNames) return std::unexpected(LayerNames.error());
-    auto layer = LayerNames->getLeft(*value);
+    auto layer = LayerNames->get_left(*value);
     if (!layer) return std::unexpected(std::move(layer.error()));
     return layer->get();
   }
@@ -135,7 +135,7 @@ namespace Tiled {
     auto seed = properties.get<String>("seed");
     if (!seed) return std::unexpected(std::move(seed.error()));
     if (*seed == "stable") return Json(*seed);
-    auto value = lexicalCast<std::uint64_t>(*seed);
+    auto value = lexical_cast<std::uint64_t>(*seed);
     if (!value) return std::unexpected(std::move(value.error()));
     return Json(*value);
   }
@@ -197,7 +197,7 @@ namespace Tiled {
     return std::make_shared<StagehandBrush>(JsonObject{{"type", type}, {"parameters", configured}});
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getDungeonIdBrush(String const& value, Properties&) {
-    return std::make_shared<DungeonIdBrush>(maybeLexicalCast<DungeonId>(value).value_or(NoDungeonId));
+    return std::make_shared<DungeonIdBrush>(maybe_lexical_cast<DungeonId>(value).value_or(NoDungeonId));
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getBiomeItemsBrush(String const&, Properties&) {
     return std::make_shared<BiomeItemsBrush>();
@@ -219,7 +219,7 @@ namespace Tiled {
     if (!layer) return std::unexpected(std::move(layer.error()));
     auto mod = properties.opt<String>("mod");
     if (!mod) return std::unexpected(std::move(mod.error()));
-    auto variant = maybeLexicalCast<int>(variantText);
+    auto variant = maybe_lexical_cast<int>(variantText);
     if (*layer == TileLayer::Background) return std::make_shared<SurfaceBackgroundBrush>(variant, *mod);
     return std::make_shared<SurfaceBrush>(variant, *mod);
   }
@@ -267,9 +267,10 @@ namespace Tiled {
       auto converted = getter(**value, properties);
       if (!converted) return std::unexpected(std::move(converted.error()));
       if constexpr (std::is_same_v<typename decltype(converted)::value_type, std::optional<T>>) {
-        if (*converted) list.append(std::move(**converted));
+        if (*converted)
+          list.push_back(std::move(**converted));
       } else {
-        list.append(std::move(*converted));
+        list.push_back(std::move(*converted));
       }
       return {};
     }
@@ -287,7 +288,7 @@ namespace Tiled {
     if (!hasLayer) return std::unexpected(std::move(hasLayer.error()));
     if (!*hasLayer) {
       if (!LayerNames) return std::unexpected(LayerNames.error());
-      auto name = LayerNames->getRight(layer);
+      auto name = LayerNames->get_right(layer);
       if (!name) return std::unexpected(std::move(name.error()));
       computed["layer"] = name->get();
     } else {
@@ -363,10 +364,9 @@ namespace Tiled {
       auto direction = properties.opt<String>("connectDirection");
       if (!direction) return std::unexpected(std::move(direction.error()));
       if (*direction) {
-        if (!DungeonDirectionNames) return std::unexpected(DungeonDirectionNames.error());
-        auto parsed = DungeonDirectionNames->getLeft(**direction);
+        auto parsed = enumValue<DungeonDirectionNames>(**direction);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
-        configured.direction = parsed->get();
+        configured.direction = *parsed;
       }
       connector = std::move(configured);
     }
@@ -388,7 +388,7 @@ namespace Tiled {
     auto entries = tileProperties->value_or(JsonObject{}).iterateObject();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
-      auto index = lexicalCast<std::size_t>(entry.first);
+      auto index = lexical_cast<std::size_t>(entry.first);
       if (!index) return std::unexpected(std::move(index.error()));
       if (*index >= result->m_tilesBack.size())
         return std::unexpected(StarException::format("Tile index {} exceeds tileset size {}", *index, result->m_tilesBack.size()));
@@ -409,12 +409,12 @@ namespace Tiled {
     return values[id];
   }
   std::size_t Tileset::size() const {
-    if constexpr (Star::DebugEnabled) Star::starAssertFailed((m_tilesBack.size() == m_tilesFront.size()));
+    if constexpr (Star::DebugEnabled) Star::star_assert_failed((m_tilesBack.size() == m_tilesFront.size()));
     return m_tilesBack.size();
   }
   List<std::shared_ptr<Tile const>> const& Tileset::tiles(TileLayer layer) const {
     if (layer == TileLayer::Background) return m_tilesBack;
-    if constexpr (Star::DebugEnabled) Star::starAssertFailed((layer == TileLayer::Foreground));
+    if constexpr (Star::DebugEnabled) Star::star_assert_failed((layer == TileLayer::Foreground));
     return m_tilesFront;
   }
 
@@ -422,7 +422,7 @@ namespace Tiled {
     auto parsed = Json::parseJson(value);
     if (!parsed) {
       if (parsed.error().is<JsonParsingException>())
-        return std::unexpected(parsed.error().withContext("Error parsing Tiled property as Json"));
+        return std::unexpected(parsed.error().with_context("Error parsing Tiled property as Json"));
       return std::unexpected(std::move(parsed.error()));
     }
     return std::move(*parsed);

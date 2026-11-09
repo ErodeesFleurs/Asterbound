@@ -85,7 +85,7 @@ public:
   }
 
   FireableItem();
-  virtual ~FireableItem() {}
+  ~FireableItem() override = default;
 
   FireableItem(FireableItem const& fireableItem);
 
@@ -117,14 +117,15 @@ public:
   virtual Vec2F handPosition() const;
 
   [[nodiscard]]
-  virtual std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
+  std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
   [[nodiscard]]
-  virtual std::expected<void, StarException> uninit() override;
+  std::expected<void, StarException> uninit() override;
   [[nodiscard]]
-  virtual std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
+  std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting,
+                                            HashSet<MoveControlType> const& moves) override;
 
   [[nodiscard]]
-  virtual std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
+  std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
 
   virtual bool validAimPos(Vec2F const& aimPos);
 

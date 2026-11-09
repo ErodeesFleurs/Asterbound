@@ -165,7 +165,7 @@ std::expected<void, StarException> CharSelectionPane::init() {
     auto trimmed = textBox->get().getText().trim();
     if (!trimmed)
       return std::unexpected(std::move(trimmed.error()));
-    auto lowered = trimmed->toLower();
+    auto lowered = trimmed->to_lower();
     if (!lowered)
       return std::unexpected(std::move(lowered.error()));
     m_search = std::move(*lowered);
@@ -299,7 +299,7 @@ std::expected<void, StarException> CharSelectionPane::updateCharacterPlates() {
     return {};
   };
   for (unsigned i = 0; i < 4; ++i) {
-    if (auto result = updatePlayerLine(strf("charSelector{}", i + 1), m_downScroll + i); !result)
+    if (auto result = updatePlayerLine(Star::format("charSelector{}", i + 1), m_downScroll + i); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto up = requireChild("playerUpButton");

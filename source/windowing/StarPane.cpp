@@ -196,7 +196,7 @@ std::expected<void, StarException> Pane::dismissed() {
     auto result = m_mouseOver->mouseOut();
     if (!result) {
       if (error)
-        error = GuiException(strf("Pane dismissal also failed: {}", outputException(ExceptionDiagnostic(result.error()), true)),
+        error = GuiException(Star::format("Pane dismissal also failed: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true)),
             ExceptionDiagnostic(*error));
       else
         error = std::move(result.error());
@@ -206,7 +206,7 @@ std::expected<void, StarException> Pane::dismissed() {
   auto hidden = hide();
   if (!hidden) {
     if (error)
-      error = GuiException(strf("Hiding dismissed pane also failed: {}", outputException(ExceptionDiagnostic(hidden.error()), true)),
+      error = GuiException(Star::format("Hiding dismissed pane also failed: {}", Star::output_exception(ExceptionDiagnostic(hidden.error()), true)),
           ExceptionDiagnostic(*error));
     else
       error = std::move(hidden.error());
@@ -257,7 +257,7 @@ std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
       // m_members while processing the event and fuck everything up
       for (auto const& widget : std::views::reverse(m_members)) {
         if (widget->inMember(mousePos) && widget->active() && widget->interactive())
-          validWidgets.append(widget);
+          validWidgets.push_back(widget);
       }
 
       // Then, go through widgets in highest to lowest z-order and handle mouse
@@ -471,9 +471,7 @@ std::expected<void, StarException> Pane::setBG(String const& header, String cons
   return {};
 }
 
-Pane::BGResult Pane::getBG() const {
-  return {m_bgHeader, m_bgBody, m_bgFooter};
-}
+Pane::BGResult Pane::getBG() const { return {.header = m_bgHeader, .body = m_bgBody, .footer = m_bgFooter}; }
 
 void Pane::lockPosition() {
   m_lockPosition = true;
@@ -603,7 +601,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
       auto played = pane.context().playAudio(*instance);
       if (!played)
         return std::unexpected(std::move(played.error()));
-      pane.m_playingSounds.append({audio, std::move(*instance)});
+      pane.m_playingSounds.push_back({audio, std::move(*instance)});
       return {};
     });
   if (!playSound)
@@ -672,7 +670,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
 
   auto addWidget = registerPaneCallback("addWidget",
     [](Pane& pane, Json const& config, std::optional<String> const& widgetName) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-      String name = widgetName.value_or(toString(pane.context().root().random().randu64()));
+      String name = widgetName.value_or(Star::to_string(pane.context().root().random().randu64()));
       auto guiReader = pane.reader();
       auto widget = guiReader->makeSingle(name, config);
       if (!widget)
@@ -713,7 +711,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
   auto anchorCallback = registerPaneCallback("anchor", [](Pane& pane) -> std::expected<String, StarException> {
     if (!PaneAnchorNames)
       return std::unexpected(PaneAnchorNames.error());
-    auto name = PaneAnchorNames->getRight(pane.anchor());
+    auto name = PaneAnchorNames->get_right(pane.anchor());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();
@@ -723,7 +721,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
   auto setAnchorCallback = registerPaneCallback("setAnchor", [](Pane& pane, String const& name) -> std::expected<void, StarException> {
     if (!PaneAnchorNames)
       return std::unexpected(PaneAnchorNames.error());
-    auto value = PaneAnchorNames->getLeft(name);
+    auto value = PaneAnchorNames->get_left(name);
     if (!value)
       return std::unexpected(std::move(value.error()));
     pane.setAnchor(value->get());
@@ -791,7 +789,7 @@ std::expected<void, StarException> Pane::renderImpl() {
       auto reset = m_context.resetInterfaceScissorRect();
       if (!rendered && !reset)
         return std::unexpected(GuiException(
-            strf("Restoring pane scissor also failed: {}", outputException(ExceptionDiagnostic(reset.error()), true)),
+            Star::format("Restoring pane scissor also failed: {}", Star::output_exception(ExceptionDiagnostic(reset.error()), true)),
             ExceptionDiagnostic(rendered.error())));
       if (!rendered)
         return std::unexpected(std::move(rendered.error()));
@@ -823,7 +821,7 @@ std::expected<void, StarException> Pane::renderImpl() {
     auto cleared = m_context.clearTextStyle();
     if (!drawn && !cleared)
       return std::unexpected(GuiException(
-          strf("Clearing pane text style also failed: {}", outputException(ExceptionDiagnostic(cleared.error()), true)),
+          Star::format("Clearing pane text style also failed: {}", Star::output_exception(ExceptionDiagnostic(cleared.error()), true)),
           ExceptionDiagnostic(drawn.error())));
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));

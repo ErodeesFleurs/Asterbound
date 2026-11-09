@@ -151,7 +151,7 @@ std::expected<void, StarException> PlayerDeployment::init(Player& player, World&
   if (!setup) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(setup.error().withContext(strf("Deployment initialization rollback failed: {}", cleanup.error().what())));
+      return std::unexpected(setup.error().with_context(Star::format("Deployment initialization rollback failed: {}", cleanup.error().what())));
   }
   return setup;
 }
@@ -180,7 +180,7 @@ std::expected<void, StarException> PlayerDeployment::uninit() {
   auto remember = [&](auto result) {
     if (!result) {
       if (error)
-        *error = error->withContext(result.error().what());
+        *error = error->with_context(result.error().what());
       else
         error = std::move(result.error());
     }
@@ -215,7 +215,7 @@ std::expected<void, StarException> PlayerDeployment::collectRenderEvents(RenderC
   auto particles = renderCallback.addParticles(m_scriptComponent.pullNewParticles());
   if (!particles)
     return std::unexpected(std::move(particles.error()));
-  for (auto audio : m_scriptComponent.pullNewAudios()) {
+  for (auto const& audio : m_scriptComponent.pullNewAudios()) {
     audio->setPosition(position);
     auto added = renderCallback.addAudio(audio);
     if (!added)

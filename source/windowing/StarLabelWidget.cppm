@@ -81,7 +81,7 @@ public:
   RectI relativeBoundRect() const override;
 
 protected:
-  virtual RectI getScissorRect() const override;
+  RectI getScissorRect() const override;
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
 private:

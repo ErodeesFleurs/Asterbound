@@ -198,8 +198,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
 
   auto getPieceImage = [](std::shared_ptr<MaterialRenderPiece const> const& piece, Box<float, 2> const& box, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives) -> AssetPath {
     String path = (hue == 0)
-      ? strf("{}?crop={};{};{};{}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax())
-      : strf("{}?crop={};{};{};{}?hueshift={}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax(), materialHueToDegrees(hue));
+      ? Star::format("{}?crop={};{};{};{}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax())
+      : Star::format("{}?crop={};{};{};{}?hueshift={}", piece->texture, box.xMin(), box.yMin(), box.xMax(), box.yMax(), materialHueToDegrees(hue));
 
     AssetPath image(path);
     if (directives)
@@ -214,7 +214,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
   if (materialRenderProfile) {
     occlude = materialRenderProfile->occludesBehind;
     auto materialColorVariant = materialRenderProfile->colorVariants > 0 ? colorVariant % materialRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]) + offset[0], pos[1] + offset[1], (int)variantLayer.value_or(terrainLayer), "main");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]) + offset[0], pos[1] + offset[1],
+                                               static_cast<int>(variantLayer.value_or(terrainLayer)), "main");
     auto& drawList = drawables[materialZLevel(materialRenderProfile->zLevel, material, materialHue, materialColorVariant)];
 
     MaterialPieceResultList pieces;
@@ -230,8 +231,9 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       directives = selected->get();
     }
     for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.maybeRef(materialColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(materialColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)
@@ -246,7 +248,8 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
 
   if (modRenderProfile) {
     auto modColorVariant = modRenderProfile->colorVariants > 0 ? colorVariant % modRenderProfile->colorVariants : 0;
-    std::uint32_t variance = staticRandomU32(renderData.geometry.xwrap(pos[0]), pos[1], (int)variantLayer.value_or(terrainLayer), "mod");
+    std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1],
+                                               static_cast<int>(variantLayer.value_or(terrainLayer)), "mod");
     auto& drawList = drawables[modZLevel(modRenderProfile->zLevel, mod, modHue, modColorVariant)];
 
     MaterialPieceResultList pieces;
@@ -262,8 +265,9 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       directives = selected->get();
     }
     for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.maybeRef(modColorVariant);
-      if (!variant) variant = piecePair.first->variants.maybeRef(0);
+      auto variant = piecePair.first->variants.find_ref(modColorVariant);
+      if (!variant)
+        variant = piecePair.first->variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)
@@ -310,26 +314,24 @@ RenderTile const& TileDrawer::getRenderTile(WorldRenderData const& renderData, V
 
 TileDrawer::QuadZLevel TileDrawer::materialZLevel(std::uint32_t zLevel, MaterialId material, MaterialHue hue, MaterialColorVariant colorVariant) {
   QuadZLevel quadZLevel = 0;
-  quadZLevel |= (std::uint64_t)colorVariant;
-  quadZLevel |= (std::uint64_t)hue << 8;
-  quadZLevel |= (std::uint64_t)material << 16;
-  quadZLevel |= (std::uint64_t)zLevel << 32;
+  quadZLevel |= static_cast<std::uint64_t>(colorVariant);
+  quadZLevel |= static_cast<std::uint64_t>(hue) << 8;
+  quadZLevel |= static_cast<std::uint64_t>(material) << 16;
+  quadZLevel |= static_cast<std::uint64_t>(zLevel) << 32;
   return quadZLevel;
 }
 
 TileDrawer::QuadZLevel TileDrawer::modZLevel(std::uint32_t zLevel, ModId mod, MaterialHue hue, MaterialColorVariant colorVariant) {
   QuadZLevel quadZLevel = 0;
-  quadZLevel |= (std::uint64_t)colorVariant;
-  quadZLevel |= (std::uint64_t)hue << 8;
-  quadZLevel |= (std::uint64_t)mod << 16;
-  quadZLevel |= (std::uint64_t)zLevel << 32;
-  quadZLevel |= (std::uint64_t)1 << 63;
+  quadZLevel |= static_cast<std::uint64_t>(colorVariant);
+  quadZLevel |= static_cast<std::uint64_t>(hue) << 8;
+  quadZLevel |= static_cast<std::uint64_t>(mod) << 16;
+  quadZLevel |= static_cast<std::uint64_t>(zLevel) << 32;
+  quadZLevel |= static_cast<std::uint64_t>(1) << 63;
   return quadZLevel;
 }
 
-TileDrawer::QuadZLevel TileDrawer::damageZLevel() {
-  return (std::uint64_t)(-1);
-}
+TileDrawer::QuadZLevel TileDrawer::damageZLevel() { return static_cast<std::uint64_t>(-1); }
 
 std::expected<bool, StarException> TileDrawer::determineMatchingPieces(MaterialPieceResultList& resultList, std::optional<std::reference_wrapper<bool>> occlude, std::shared_ptr<MaterialDatabase const> const& materialDb, MaterialRenderMatchList const& matchList,
     WorldRenderData const& renderData, Vec2I const& basePos, TileLayer layer, bool isMod) {
@@ -448,7 +450,7 @@ std::expected<bool, StarException> TileDrawer::determineMatchingPieces(MaterialP
       subMatchResult = true;
 
       for (auto const& piecePair : match->resultingPieces)
-        resultList.append({piecePair.first, piecePair.second});
+        resultList.push_back({piecePair.first, piecePair.second});
 
       auto matched = determineMatchingPieces(resultList, occlude, materialDb, match->subMatches, renderData, basePos, layer, isMod);
       if (!matched)

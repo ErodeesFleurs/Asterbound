@@ -32,10 +32,13 @@ struct VoiceExceptionTag {
 using VoiceException = StarError<VoiceExceptionTag, StarException>;
 
 enum class VoiceInputMode : std::uint8_t { VoiceActivity, PushToTalk };
-extern std::expected<EnumMap<VoiceInputMode>, StarException> const VoiceInputModeNames;
+inline constexpr auto VoiceInputModeNames = sortedEnumNames(std::to_array<std::pair<VoiceInputMode, std::string_view>>(
+  {{VoiceInputMode::VoiceActivity, "VoiceActivity"}, {VoiceInputMode::PushToTalk, "PushToTalk"}}));
 
 enum class VoiceChannelMode: std::uint8_t { Mono = 1, Stereo = 2 };
-extern std::expected<EnumMap<VoiceChannelMode>, StarException> const VoiceChannelModeNames;
+inline constexpr auto VoiceChannelModeNames =
+  sortedEnumNames(std::to_array<std::pair<VoiceChannelMode, std::string_view>>(
+    {{VoiceChannelMode::Mono, "Mono"}, {VoiceChannelMode::Stereo, "Stereo"}}));
 
 class VoiceAudioStream;
 class ApplicationController;
@@ -70,7 +73,7 @@ struct VoiceAudioChunk {
 class Voice {
 public:
   // Individual speakers are represented by their connection ID.
-  typedef ConnectionId SpeakerId;
+  using SpeakerId = ConnectionId;
 
   class Speaker {
   public:
@@ -132,7 +135,7 @@ public:
   // Called to mix voice audio with the game.
   void mix(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels);
 
-  typedef std::function<std::expected<float, StarException>(unsigned, Vec2F, float)> PositionalAttenuationFunction;
+  using PositionalAttenuationFunction = std::function<std::expected<float, StarException>(unsigned, Vec2F, float)>;
   [[nodiscard]] std::expected<void, StarException> update(float dt, PositionalAttenuationFunction positionalAttenuationFunction = {});
 
   [[nodiscard]] std::expected<void, StarException> setDeviceName(std::optional<String> device);
@@ -144,7 +147,7 @@ public:
   // Must be called every frame with input state, expires after 1s.
   void setInput(bool input = true);
 
-  inline int encoderChannels() const { return (int)m_channelMode; }
+  inline int encoderChannels() const { return static_cast<int>(m_channelMode); }
 
   [[nodiscard]] static std::expected<std::unique_ptr<OpusDecoder, void(*)(OpusDecoder*)>, StarException> createDecoder(int channels);
   [[nodiscard]] static std::expected<std::unique_ptr<OpusEncoder, void(*)(OpusEncoder*)>, StarException> createEncoder(int channels);

@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.string;
 import star.ordered_map;
@@ -12,7 +13,7 @@ namespace Star {
 
 String VersionOptionParser::getVersionString() const {
   String displayName = m_versionName ? *m_versionName : String();
-  return strf("OpenStarbound{} v{} for v{} ({}) Source ID: {}", displayName.empty() ? "" : strf(" {}", displayName), OpenStarVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
+  return Star::format("OpenStarbound{} v{} for v{} ({}) Source ID: {}", displayName.empty() ? "" : Star::format(" {}", displayName), OpenStarVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
 }
 
 void VersionOptionParser::setVersionName(String const& name) {
@@ -40,20 +41,33 @@ std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::
     return std::unexpected(std::move(parsed.error()));
   auto& [options, errors] = *parsed;
 
-  if (options.switches.contains("version"))
-    coutf("{}\n", getVersionString());
+  if (options.switches.contains("version")) {
+    auto written = Star::print("{}\n", getVersionString());
+    if (!written)
+      std::exit(1);
+  }
 
-  if (options.switches.contains("help"))
-    printHelp(std::cout);
+  if (options.switches.contains("help")) {
+    auto written = print_help(stdout);
+    if (!written)
+      std::exit(1);
+  }
 
   if (options.switches.contains("version") || options.switches.contains("help"))
     std::exit(0);
 
   if (!errors.empty()) {
-    for (auto const& err : errors)
-      coutf("Error: {}\n", err);
-    coutf("\n");
-    printHelp(std::cout);
+    for (auto const& err : errors) {
+      auto written = Star::print("Error: {}\n", err);
+      if (!written)
+        std::exit(1);
+    }
+    auto written = Star::print("\n");
+    if (!written)
+      std::exit(1);
+    written = print_help(stdout);
+    if (!written)
+      std::exit(1);
     std::exit(1);
   }
 
@@ -61,11 +75,11 @@ std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::
 }
 
 std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::commandParseOrDie(int argc, char** argv) {
-  setCommandName(File::baseName(String(std::string_view(argv[0]))));
+  setCommandName(File::base_name(String(std::string_view(argv[0]))));
   StringList arguments;
   arguments.reserve(argc > 0 ? static_cast<std::size_t>(argc - 1) : 0);
   for (int i = 1; i < argc; ++i)
-    arguments.append(String(std::string_view(argv[i])));
+    arguments.push_back(String(std::string_view(argv[i])));
   return parseOrDie(arguments);
 }
 

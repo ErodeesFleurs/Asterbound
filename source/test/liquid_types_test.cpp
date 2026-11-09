@@ -45,16 +45,16 @@ using LiquidReadbackFailure = StarError<LiquidReadbackFailureTag, StarException>
 
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException>
 liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
-  auto created = File::makeDirectoryRecursive(directory);
+  auto created = File::create_directories(directory);
   if (!created)
     return std::unexpected(std::move(created.error()));
-  auto preload = File::writeFile(String("[]"), File::relativeTo(directory, "preload.config"));
+  auto preload = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
   if (!preload)
     return std::unexpected(std::move(preload.error()));
   auto contents = config.printJson();
   if (!contents)
     return std::unexpected(std::move(contents.error()));
-  auto written = File::writeFile(*contents, File::relativeTo(directory, "liquids.config"));
+  auto written = File::write_file(*contents, File::relative_to(directory, "liquids.config"));
   if (!written)
     return std::unexpected(std::move(written.error()));
   Assets::Settings settings{};
@@ -72,9 +72,9 @@ liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
 
 const GameTestRegistration
   liquidEngineConfig("LiquidsDatabaseTest", "RequiredFloatFieldsUseAssetConfiguration", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     Json engine = JsonObject{{"lateralMoveFactor", 1},
                              {"spreadOverfillUpFactor", 2},
                              {"spreadOverfillLateralFactor", 3},
@@ -86,7 +86,7 @@ const GameTestRegistration
                              {"minimumLivenLevelChange", 9},
                              {"minimumLiquidLevel", 10},
                              {"interactTransformationLevel", 11}};
-    auto valid = liquidsFixture(fixture, File::relativeTo(*directory, "valid"),
+    auto valid = liquidsFixture(fixture, File::relative_to(*directory, "valid"),
                                 JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", 12}});
     ASSERT_TRUE(valid) << valid.error().what();
     auto parameters = (*valid)->liquidEngineParameters();
@@ -121,7 +121,7 @@ const GameTestRegistration
         SCOPED_TRACE(missing);
         auto changed = missing ? engine.eraseKey(name) : engine.set(name, "not a float");
         ASSERT_TRUE(changed);
-        auto loaded = liquidsFixture(fixture, File::relativeTo(*directory, strf("case{}", index++)),
+        auto loaded = liquidsFixture(fixture, File::relative_to(*directory, Star::format("case{}", index++)),
                                      JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});
         ASSERT_FALSE(loaded);
         EXPECT_TRUE(loaded.error().is<JsonException>());
@@ -132,7 +132,7 @@ const GameTestRegistration
       Json config = missing ? Json(JsonObject{{"liquidEngineParameters", engine}})
                             : Json(JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", false}});
       auto outer = liquidsFixture(
-        fixture, File::relativeTo(*directory, missing ? String("outerMissing") : String("outerType")), config);
+        fixture, File::relative_to(*directory, missing ? String("outerMissing") : String("outerType")), config);
       ASSERT_FALSE(outer);
       EXPECT_TRUE(outer.error().is<JsonException>());
     }
@@ -232,7 +232,7 @@ public:
   std::expected<void, StarException> record(char kind) {
     calls.push_back(kind);
     if (failure == kind && (kind != 'w' || !committedWrites.empty()))
-      return std::unexpected(LiquidCallbackFailure(strf("Injected liquid callback {}", kind)));
+      return std::unexpected(LiquidCallbackFailure(Star::format("Injected liquid callback {}", kind)));
     return {};
   }
 

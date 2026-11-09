@@ -35,26 +35,26 @@ std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> DirectoryAss
     auto metadataFile = source->toFilesystem(String(fileName));
     if (!metadataFile)
       return std::unexpected(std::move(metadataFile.error()));
-    auto exists = File::isFile(*metadataFile);
+    auto exists = File::is_regular_file(*metadataFile);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists) {
-      auto contents = File::readFileString(*metadataFile);
+      auto contents = File::read_file_string(*metadataFile);
       if (!contents)
         return std::unexpected(std::move(contents.error()));
       auto parsed = Json::parseJson(*contents);
       if (!parsed)
-        return std::unexpected(AssetSourceException(strf("Could not load metadata file '{}' from assets", *metadataFile), parsed.error()));
+        return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), parsed.error()));
       auto metadata = parsed->toObject();
       if (!metadata)
-        return std::unexpected(AssetSourceException(strf("Could not load metadata file '{}' from assets", *metadataFile), metadata.error()));
+        return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), metadata.error()));
       source->m_metadataFile = String(fileName);
       source->m_metadata = std::move(*metadata);
       break;
     }
   }
-  source->m_ignorePatterns.append("^/_metadata$");
-  source->m_ignorePatterns.append("^/\\.metadata$");
+  source->m_ignorePatterns.push_back("^/_metadata$");
+  source->m_ignorePatterns.push_back("^/\\.metadata$");
   auto root = source->toFilesystem("/");
   if (!root)
     return std::unexpected(std::move(root.error()));
@@ -69,6 +69,16 @@ JsonObject DirectoryAssetSource::metadata() const { return m_metadata; }
 StringList DirectoryAssetSource::assetPaths() const { return m_assetPaths; }
 bool DirectoryAssetSource::contains(String const& path) const {
   return std::binary_search(m_assetPaths.begin(), m_assetPaths.end(), path);
+}
+
+std::expected<StreamOffset, StarException> DirectoryAssetSource::file_size(String const& path) {
+  if (!contains(path))
+    return std::unexpected(
+      AssetSourceException::format("Requested file '{}' does not exist in the directory assets", path));
+  auto filesystem = toFilesystem(path);
+  if (!filesystem)
+    return std::unexpected(std::move(filesystem.error()));
+  return File::file_size(*filesystem);
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> DirectoryAssetSource::open(String const& path) {
@@ -88,11 +98,11 @@ std::expected<ByteArray, StarException> DirectoryAssetSource::read(String const&
   auto size = (*device)->size();
   if (!size)
     return std::unexpected(std::move(size.error()));
-  return (*device)->readBytes(*size);
+  return (*device)->read_bytes(*size);
 }
 
 std::expected<String, StarException> DirectoryAssetSource::toFilesystem(String const& path) const {
-  auto absolute = path.beginsWith("/");
+  auto absolute = path.starts_with("/");
   if (!absolute)
     return std::unexpected(std::move(absolute.error()));
   if (!*absolute)
@@ -100,7 +110,7 @@ std::expected<String, StarException> DirectoryAssetSource::toFilesystem(String c
   auto relative = path.substr(1);
   if (!relative)
     return std::unexpected(std::move(relative.error()));
-  return File::relativeTo(m_baseDirectory, File::convertDirSeparators(*relative));
+  return File::relative_to(m_baseDirectory, File::convert_dir_separators(*relative));
 }
 
 std::expected<void, StarException> DirectoryAssetSource::setMetadata(JsonObject metadata) {
@@ -117,7 +127,7 @@ std::expected<void, StarException> DirectoryAssetSource::setMetadata(JsonObject 
       auto printed = Json(metadata).printJson(2, true);
       if (!printed)
         return std::unexpected(std::move(printed.error()));
-      auto written = File::writeFile(*printed, *filesystem);
+      auto written = File::write_file(*printed, *filesystem);
       if (!written)
         return std::unexpected(std::move(written.error()));
     }
@@ -131,7 +141,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
     List<String> const& ancestorDirectories) const {
   auto shouldIgnore = [this](String const& assetPath) -> std::expected<bool, StarException> {
     for (auto const& pattern : m_ignorePatterns) {
-      auto matches = assetPath.regexMatch(pattern, false, false);
+      auto matches = assetPath.regex_match(pattern, false, false);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)
@@ -142,10 +152,10 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
   auto fsDirectory = toFilesystem(assetDirectory);
   if (!fsDirectory)
     return std::unexpected(std::move(fsDirectory.error()));
-  auto entries = File::dirList(*fsDirectory);
+  auto entries = File::directory_entries(*fsDirectory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
-  for (auto entry : *entries) {
+  for (auto const& entry : *entries) {
     String assetPath = assetDirectory + entry.first;
     if (entry.second) {
       auto childDirectory = toFilesystem(assetPath);
@@ -158,7 +168,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
         continue;
       }
       auto childAncestors = ancestorDirectories;
-      childAncestors.append(std::move(*childDirectory));
+      childAncestors.push_back(std::move(*childDirectory));
       auto scanned = scanAll(assetPath + "/", output, childAncestors);
       if (!scanned)
         return std::unexpected(std::move(scanned.error()));
@@ -167,7 +177,7 @@ std::expected<void, StarException> DirectoryAssetSource::scanAll(String const& a
       if (!ignored)
         return std::unexpected(std::move(ignored.error()));
       if (!*ignored)
-        output.append(std::move(assetPath));
+        output.push_back(std::move(assetPath));
     }
   }
   return {};

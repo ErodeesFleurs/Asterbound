@@ -47,7 +47,7 @@ std::expected<FormattedJson, StarException> CommaSeparatedStrings::toJson(String
     auto field = text.trim();
     if (!field)
       return std::unexpected(std::move(field.error()));
-    array.append(Json(std::move(*field)));
+    array.push_back(Json(std::move(*field)));
   }
   return FormattedJson::create(Json(std::move(array)));
 }
@@ -61,7 +61,7 @@ std::expected<String, StarException> CommaSeparatedStrings::fromJson(FormattedJs
     auto text = entry.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    strings.append(std::move(*text));
+    strings.push_back(std::move(*text));
   }
   return strings.join(", ");
 }
@@ -86,15 +86,14 @@ std::expected<String, StarException> Star::reprWithLineEnding(FormattedJson cons
   auto repr = json.repr();
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  return repr->utf8().find('\r') != std::string::npos ? strf("{}\r\n", *repr) : strf("{}\n", *repr);
+  return repr->utf8().find('\r') != std::string::npos ? Star::format("{}\r\n", *repr) : Star::format("{}\n", *repr);
 }
 
 std::expected<void, StarException> OutputOnSeparateLines::out(FormattedJson const& json) {
   auto repr = reprWithLineEnding(json);
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  coutf("{}", *repr);
-  return {};
+  return Star::print("{}", *repr);
 }
 
 std::expected<void, StarException> OutputOnSeparateLines::flush() {
@@ -103,7 +102,7 @@ std::expected<void, StarException> OutputOnSeparateLines::flush() {
 
 std::expected<void, StarException> ArrayOutput::out(FormattedJson const& json) {
   if (!m_unique || !m_results.contains(json))
-    m_results.append(json);
+    m_results.push_back(json);
   return {};
 }
 
@@ -114,7 +113,8 @@ std::expected<void, StarException> ArrayOutput::flush() {
   auto repr = reprWithLineEnding(*array);
   if (!repr)
     return std::unexpected(std::move(repr.error()));
-  coutf("{}", *repr);
+  if (auto written = Star::print("{}", *repr); !written)
+    return std::unexpected(std::move(written.error()));
   return {};
 }
 
@@ -156,13 +156,13 @@ std::expected<FormattedJson, StarException> Star::addOrSet(bool add,
 [[nodiscard]]
 std::expected<void, StarException> forEachFileRecursive(Logger& logger, String const& directory,
     std::function<std::expected<void, StarException>(String const&)> const& func) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    String filename = File::relativeTo(directory, entry.first);
+    String filename = File::relative_to(directory, entry.first);
     if (entry.second) {
-      auto symlink = File::isSymlink(filename);
+      auto symlink = File::is_symlink(filename);
       if (!symlink)
         return std::unexpected(std::move(symlink.error()));
       if (*symlink) {
@@ -189,11 +189,11 @@ std::expected<StringList, StarException> Star::findFiles(Logger& logger, FindInp
   StringList matches;
   auto visited = forEachFileRecursive(logger, findArgs.directory,
       [&findArgs, &matches](String const& filename) -> std::expected<void, StarException> {
-        auto matchesSuffix = filename.endsWith(findArgs.filenameSuffix);
+        auto matchesSuffix = filename.ends_with(findArgs.filenameSuffix);
         if (!matchesSuffix)
           return std::unexpected(std::move(matchesSuffix.error()));
         if (*matchesSuffix)
-          matches.append(filename);
+          matches.push_back(filename);
         return {};
       });
   if (!visited)
@@ -292,7 +292,7 @@ std::expected<void, StarException> process(Logger& logger,
     return process(output, command, options, std::get<JsonLiteralInput>(input).json);
   StringList files;
   if (std::holds_alternative<FileInput>(input)) {
-    files.append(std::get<FileInput>(input).filename);
+    files.push_back(std::get<FileInput>(input).filename);
   } else {
     auto found = findFiles(logger, std::get<FindInput>(input));
     if (!found)
@@ -305,10 +305,10 @@ std::expected<void, StarException> process(Logger& logger,
         auto repr = reprWithLineEnding(json);
         if (!repr)
           return std::unexpected(std::move(repr.error()));
-        return File::overwriteFileWithRename(*repr, file);
+        return File::overwrite_file_with_rename(*repr, file);
       };
     }
-    auto contents = File::readFileString(file);
+    auto contents = File::read_file_string(file);
     if (!contents)
       return std::unexpected(std::move(contents.error()));
     auto processed = process(output, command, options, *contents);
@@ -375,7 +375,7 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
     } else if (arg == "--editor-image") {
       if (available() < 1)
         return {};
-      parsed.options.editorImages.append(parsePath(take()));
+      parsed.options.editorImages.push_back(parsePath(take()));
     } else if (arg == "--input") {
       if (available() < 1)
         return {};
@@ -395,13 +395,13 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
     } else if (arg == "-j") {
       if (available() < 1)
         return {};
-      parsed.inputs.append(JsonLiteralInput{take()});
+      parsed.inputs.push_back(JsonLiteralInput{take()});
     } else if (arg == "--find") {
       if (available() < 2)
         return {};
       String directory = take();
       String suffix = take();
-      parsed.inputs.append(FindInput{std::move(directory), std::move(suffix)});
+      parsed.inputs.push_back(FindInput{std::move(directory), std::move(suffix)});
     } else if (arg == "-i") {
       parsed.options.inPlace = true;
     } else if (arg == "--at") {
@@ -427,10 +427,11 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (!*exists) {
-        cerrf("File {} doesn't exist\n", arg);
+        if (auto written = Star::print(stderr, "File {} doesn't exist\n", arg); !written)
+          return std::unexpected(std::move(written.error()));
         return {};
       }
-      parsed.inputs.append(FileInput{std::move(arg)});
+      parsed.inputs.push_back(FileInput{std::move(arg)});
     }
   }
 
@@ -446,23 +447,28 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
   }
   bool editing = std::holds_alternative<EditCommand>(parsed.command);
   if (editing && !anyFileInputs) {
-    cerrf("Files to edit must be supplied when using --edit.\n");
+    if (auto written = Star::print(stderr, "Files to edit must be supplied when using --edit.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && !anyFileInputs) {
-    cerrf("In-place writing (-i) can only be used with files specified on the command line.\n");
+    if (auto written = Star::print(stderr, "In-place writing (-i) can only be used with files specified on the command line.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && editing) {
-    cerrf("Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n");
+    if (auto written = Star::print(stderr, "Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (editing && anyNonFileInputs) {
-    cerrf("Interactive edit (--edit) can only be used with file input sources.\n");
+    if (auto written = Star::print(stderr, "Interactive edit (--edit) can only be used with file input sources.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.editFormat && !editing) {
-    cerrf("--input can only be used with --edit.\n");
+    if (auto written = Star::print(stderr, "--input can only be used with --edit.\n"); !written)
+      return std::unexpected(std::move(written.error()));
     return {};
   }
   if (!parsed.options.editFormat && editing)
@@ -490,23 +496,31 @@ std::expected<int, StarException> run(int argc, char** argv) {
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     if (!*parsed) {
-      cerrf("Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]);
-      cerrf(
+      if (auto written = Star::print(stderr, "Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --set <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
-          argv[0]);
-      cerrf(
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --add <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
-          argv[0]);
-      cerrf(
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, 
           "Usage: {} --edit <json-path> [(--at (beginning|end) | --before <key> | --after <key>)] [--input "
           "(csv|json|string)] <json-file>+\n",
-          argv[0]);
-      cerrf("\n");
-      cerrf("Example: {} --get /dialog/0/message guard.npctype\n", argv[0]);
-      cerrf("Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]);
-      cerrf("Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]);
+          argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "\n"); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --get /dialog/0/message guard.npctype\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]); !written)
+        return std::unexpected(std::move(written.error()));
       return 1;
     }
 
@@ -538,15 +552,19 @@ std::expected<int, StarException> run(int argc, char** argv) {
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Error initializing native runtime: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Error initializing native runtime: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = run(argc, argv);
   if (result)
     return *result;
-  if (result.error().is<JsonParsingException>() || result.error().is<JsonException>())
-    cerrf("{}\n", result.error().what());
-  else
-    cerrf("Error: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+  if (result.error().is<JsonParsingException>() || result.error().is<JsonException>()) {
+    if (!Star::print(stderr, "{}\n", result.error().what()))
+      return 1;
+  } else {
+    if (!Star::print(stderr, "Error: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)))
+      return 1;
+  }
   return 1;
 }

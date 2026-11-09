@@ -175,7 +175,7 @@ std::expected<void, StarException> ParallaxLayer::fadeToSkyColor(Color skyColor)
   if (fadePercent > 0) {
     auto hex = skyColor.toHex().slice(0, 6);
     if (!hex) return std::unexpected(std::move(hex.error()));
-    String fade = "fade=" + *hex + "=" + toString(fadePercent);
+    String fade = "fade=" + *hex + "=" + Star::to_string(fadePercent);
     addImageDirectives(fade);
   }
   return {};
@@ -281,7 +281,7 @@ std::expected<std::shared_ptr<Parallax>, StarException> Parallax::create(Root& r
   for (auto const& layer : *layers) {
     auto loaded = ParallaxLayer::create(layer);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
-    result->m_layers.append(std::move(*loaded));
+    result->m_layers.push_back(std::move(*loaded));
   }
   std::stable_sort(result->m_layers.begin(), result->m_layers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) { return a.zLevel > b.zLevel; });
   return result;
@@ -318,10 +318,10 @@ ParallaxLayers const& Parallax::layers() const {
 }
 
 std::expected<void, StarException> Parallax::buildLayer(Json const& layerSettings, String const& kind) {
-  auto isFoliage = kind.beginsWith("foliage/");
+  auto isFoliage = kind.starts_with("foliage/");
   if (!isFoliage)
     return std::unexpected(std::move(isFoliage.error()));
-  auto isStem = kind.beginsWith("stem/");
+  auto isStem = kind.starts_with("stem/");
   if (!isStem)
     return std::unexpected(std::move(isStem.error()));
 
@@ -359,14 +359,14 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(baseCount.error()));
   int baseCountValue = *baseCount;
   int base = rnd.randInt(baseCountValue - 1) + 1;
-  layer.textures.append(AssetPath::relativeTo(texPath, "base/" + toString<int>(base) + ".png"));
+  layer.textures.push_back(AssetPath::relative_to(texPath, "base/" + Star::to_string<int>(base) + ".png"));
   auto modCount = layerSettings.getInt("modCount", 0);
   if (!modCount)
     return std::unexpected(std::move(modCount.error()));
   int modCountValue = *modCount;
   int mod = rnd.randInt(modCountValue);
   if (mod != 0)
-    layer.textures.append(AssetPath::relativeTo(texPath, "mod/" + toString<int>(mod) + ".png"));
+    layer.textures.push_back(AssetPath::relative_to(texPath, "mod/" + Star::to_string<int>(mod) + ".png"));
 
   auto parallaxConfig = layerSettings.get("parallax");
   if (!parallaxConfig)
@@ -480,15 +480,15 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(directives.error()));
   layer.addImageDirectives(*directives);
   if (*isFoliage) {
-    layer.addImageDirectives(String(strf("hueshift={}", m_parallaxTreeVariant->foliageHueShift)));
+    layer.addImageDirectives(String(Star::format("hueshift={}", m_parallaxTreeVariant->foliageHueShift)));
   } else if (*isStem) {
-    layer.addImageDirectives(String(strf("hueshift={}", m_parallaxTreeVariant->stemHueShift)));
+    layer.addImageDirectives(String(Star::format("hueshift={}", m_parallaxTreeVariant->stemHueShift)));
   } else {
     auto noHueShift = layerSettings.getBool("nohueshift", false);
     if (!noHueShift)
       return std::unexpected(std::move(noHueShift.error()));
     if (!*noHueShift)
-      layer.addImageDirectives(String(strf("hueshift={}", m_hueShift)));
+      layer.addImageDirectives(String(Star::format("hueshift={}", m_hueShift)));
   }
 
   auto fadePercent = layerSettings.getFloat("fadePercent", 0);
@@ -508,7 +508,7 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     return std::unexpected(std::move(animationCycle.error()));
   layer.animationCycle = *animationCycle;
 
-  m_layers.append(std::move(layer));
+  m_layers.push_back(std::move(layer));
   return {};
 }
 

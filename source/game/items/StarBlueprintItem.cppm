@@ -214,11 +214,11 @@ std::expected<void, StarException> BlueprintItem::fireTriggered() {
 
 std::expected<List<Drawable>, StarException> BlueprintItem::iconDrawables() const {
   List<Drawable> result;
-  result.append(m_recipeIconUnderlay);
+  result.push_back(m_recipeIconUnderlay);
   auto icons = Item::iconDrawables();
   if (!icons)
     return std::unexpected(std::move(icons.error()));
-  result.appendAll(std::move(*icons));
+  result.append_range(std::move(*icons));
   return result;
 }
 

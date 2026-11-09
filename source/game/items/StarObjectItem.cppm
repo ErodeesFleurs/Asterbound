@@ -114,7 +114,7 @@ public:
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<ObjectItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& objectParameters);
-  virtual ~ObjectItem() {}
+  ~ObjectItem() override = default;
 
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
@@ -286,7 +286,7 @@ std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shift
   auto name = objectName();
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto logged = root().logger().errorException(strf("Failed to instantiate object '{}' for placement", *name), ExceptionDiagnostic(attempted.error()));
+  auto logged = root().logger().errorException(Star::format("Failed to instantiate object '{}' for placement", *name), ExceptionDiagnostic(attempted.error()));
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   if (root().logger().loggable(LogLevel::Debug)) {

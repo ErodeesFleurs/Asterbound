@@ -25,12 +25,12 @@ namespace Star {
 template <typename TileT, unsigned SectorSizeT>
 class TileSectorArray {
 public:
-  typedef TileT Tile;
+  using Tile = TileT;
   static unsigned const SectorSize = SectorSizeT;
 
-  typedef SectorArray2D<Tile, SectorSize> SectorArray;
-  typedef typename SectorArray::Sector Sector;
-  typedef typename SectorArray::Array Array;
+  using SectorArray = SectorArray2D<Tile, SectorSize>;
+  using Sector = typename SectorArray::Sector;
+  using Array = typename SectorArray::Array;
 
   TileSectorArray();
   TileSectorArray(Vec2U const& size, Tile defaultTile = Tile());
@@ -181,7 +181,8 @@ Tile TileSectorArray<Tile, SectorSize>::defaultTile() const {
 
 template <typename Tile, unsigned SectorSize>
 auto TileSectorArray<Tile, SectorSize>::sectorFor(Vec2I const& pos) const -> Sector {
-  return m_tileSectors.sectorFor((unsigned)pmod<int>(pos[0], m_worldSize[0]), (unsigned)pos[1]);
+  return m_tileSectors.sectorFor(static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0])),
+                                 static_cast<unsigned>(pos[1]));
 }
 
 template <typename Tile, unsigned SectorSize>
@@ -199,7 +200,7 @@ template <typename Tile, unsigned SectorSize>
     sectors.reserve(sectors.size() + (sectorRange.max[0] - sectorRange.min[0]) * (sectorRange.max[1] - sectorRange.min[1]));
     for (std::size_t x = sectorRange.min[0]; x < sectorRange.max[0]; ++x) {
       for (std::size_t y = sectorRange.min[1]; y < sectorRange.max[1]; ++y)
-        sectors.append({x, y});
+        sectors.push_back({x, y});
     }
   }
   return sectors;
@@ -283,22 +284,22 @@ auto TileSectorArray<Tile, SectorSize>::sectorArray(Sector sector) -> std::optio
 
 template <typename Tile, unsigned SectorSize>
 bool TileSectorArray<Tile, SectorSize>::tileLoaded(Vec2I const& pos) const {
-  if (pos[1] < 0 || pos[1] >= (int)m_worldSize[1])
+  if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return false;
 
-  unsigned xind = (unsigned)pmod<int>(pos[0], m_worldSize[0]);
-  unsigned yind = (unsigned)pos[1];
+  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned yind = static_cast<unsigned>(pos[1]);
 
   return m_tileSectors.get(xind, yind).has_value();
 }
 
 template <typename Tile, unsigned SectorSize>
 Tile const& TileSectorArray<Tile, SectorSize>::tile(Vec2I const& pos) const {
-  if (pos[1] < 0 || pos[1] >= (int)m_worldSize[1])
+  if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return m_default;
 
-  unsigned xind = (unsigned)pmod<int>(pos[0], m_worldSize[0]);
-  unsigned yind = (unsigned)pos[1];
+  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned yind = static_cast<unsigned>(pos[1]);
 
   auto tile = m_tileSectors.get(xind, yind);
   if (tile)
@@ -308,11 +309,11 @@ Tile const& TileSectorArray<Tile, SectorSize>::tile(Vec2I const& pos) const {
 
 template <typename Tile, unsigned SectorSize>
 auto TileSectorArray<Tile, SectorSize>::modifyTile(Vec2I const& pos) -> std::optional<std::reference_wrapper<Tile>> {
-  if (pos[1] < 0 || pos[1] >= (int)m_worldSize[1])
+  if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return std::nullopt;
 
-  unsigned xind = (unsigned)pmod<int>(pos[0], m_worldSize[0]);
-  unsigned yind = (unsigned)pos[1];
+  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned yind = static_cast<unsigned>(pos[1]);
 
   return m_tileSectors.get(xind, yind);
 }
@@ -364,10 +365,16 @@ template <typename MultiArray, typename Function>
           std::size_t arrayColumnIndex = (x + split.xOffset + xArrayOffset) * results.size(1) + y + yArrayOffset;
           if (column) {
             for (std::size_t i = 0; i < columnSize; ++i)
-              if (auto r = function(results.atIndex(arrayColumnIndex + i), Vec2I((int)x + split.xOffset, y + i), (*column)[i]); !r) return std::unexpected(std::move(r.error()));
+              if (auto r = function(results.atIndex(arrayColumnIndex + i),
+                                    Vec2I(static_cast<int>(x) + split.xOffset, y + i), (*column)[i]);
+                  !r)
+                return std::unexpected(std::move(r.error()));
           } else {
             for (std::size_t i = 0; i < columnSize; ++i)
-              if (auto r = function(results.atIndex(arrayColumnIndex + i), Vec2I((int)x + split.xOffset, y + i), m_default); !r) return std::unexpected(std::move(r.error()));
+              if (auto r = function(results.atIndex(arrayColumnIndex + i),
+                                    Vec2I(static_cast<int>(x) + split.xOffset, y + i), m_default);
+                  !r)
+                return std::unexpected(std::move(r.error()));
             }
           return true;
         }, true);
@@ -399,8 +406,10 @@ template <typename Function>
     if (!clampedRect.isEmpty()) {
       // If non-const variant, do not call function if tile not loaded (pass
       // false to evalEmpty in sector array)
-      auto fwrapper = [&](unsigned x, unsigned y, std::optional<std::reference_wrapper<Tile>> tile) -> std::expected<bool, StarException> {
-        if (auto r = function(Vec2I((int)x + split.xOffset, (int)y), tile->get()); !r) return std::unexpected(std::move(r.error()));
+      auto fwrapper = [&](unsigned x, unsigned y,
+                          std::optional<std::reference_wrapper<Tile>> tile) -> std::expected<bool, StarException> {
+        if (auto r = function(Vec2I(static_cast<int>(x) + split.xOffset, static_cast<int>(y)), tile->get()); !r)
+          return std::unexpected(std::move(r.error()));
         return true;
       };
       if (auto r = m_tileSectors.eval(clampedRect.xMin(), clampedRect.yMin(), clampedRect.width(), clampedRect.height(), fwrapper, false); !r) return std::unexpected(std::move(r.error()));
@@ -424,8 +433,10 @@ template <typename Function>
   for (auto const& split : *splits) {
     auto clampedRect = yClampRect(split.rect);
     if (!clampedRect.isEmpty()) {
-      auto fwrapper = [&](std::size_t x, std::size_t y, std::optional<std::span<Tile>> column, std::size_t) -> std::expected<bool, StarException> {
-        if (auto r = function(Vec2I((int)x + split.xOffset, (int)y), *column); !r) return std::unexpected(std::move(r.error()));
+      auto fwrapper = [&](std::size_t x, std::size_t y, std::optional<std::span<Tile>> column,
+                          std::size_t) -> std::expected<bool, StarException> {
+        if (auto r = function(Vec2I(static_cast<int>(x) + split.xOffset, static_cast<int>(y)), *column); !r)
+          return std::unexpected(std::move(r.error()));
         return true;
       };
       if (auto r = m_tileSectors.evalColumns(clampedRect.xMin(), clampedRect.yMin(), clampedRect.width(), clampedRect.height(), fwrapper, false); !r) return std::unexpected(std::move(r.error()));
@@ -442,8 +453,10 @@ template <typename Function>
   for (auto const& split : *splits) {
     auto clampedRect = yClampRect(split.rect);
     if (!clampedRect.isEmpty()) {
-      auto fwrapper = [&](std::size_t x, std::size_t y, std::optional<std::span<Tile>> column, std::size_t) -> std::expected<bool, StarException> {
-        if (auto r = function(Vec2I((int)x + split.xOffset, (int)y), *column); !r) return std::unexpected(std::move(r.error()));
+      auto fwrapper = [&](std::size_t x, std::size_t y, std::optional<std::span<Tile>> column,
+                          std::size_t) -> std::expected<bool, StarException> {
+        if (auto r = function(Vec2I(static_cast<int>(x) + split.xOffset, static_cast<int>(y)), *column); !r)
+          return std::unexpected(std::move(r.error()));
         return true;
       };
       if (auto r = m_tileSectors.evalColumnsParallel(workers, clampedRect.xMin(), clampedRect.yMin(), clampedRect.width(), clampedRect.height(), fwrapper, false); !r) return std::unexpected(std::move(r.error()));
@@ -480,7 +493,7 @@ template <typename Function>
     if (!clampedRect.isEmpty()) {
       // If const variant, call function with default tile if not loaded.
       auto fwrapper = [&](unsigned x, unsigned y, std::optional<std::reference_wrapper<Tile const>> tile) {
-        return function(Vec2I((int)x + split.xOffset, y), tile ? tile->get() : m_default);
+        return function(Vec2I(static_cast<int>(x) + split.xOffset, y), tile ? tile->get() : m_default);
       };
       auto result = m_tileSectors.eval(clampedRect.xMin(), clampedRect.yMin(), clampedRect.width(), clampedRect.height(), fwrapper, true);
       if (!result) return std::unexpected(std::move(result.error()));
@@ -512,11 +525,12 @@ template <typename Tile, unsigned SectorSize>
 [[nodiscard]] auto TileSectorArray<Tile, SectorSize>::splitRect(RectI rect) const -> std::expected<StaticList<SplitRect, 2>, StarException> {
   // TODO: Offset here does not support rects outside of -m_worldSize[0] to 2 * m_worldSize[0]!
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((rect.xMin() >= -(int)m_worldSize[0] && rect.xMax() <= 2 * (int)m_worldSize[0]));
+    Star::star_assert_failed(
+      (rect.xMin() >= -static_cast<int>(m_worldSize[0]) && rect.xMax() <= 2 * static_cast<int>(m_worldSize[0])));
   }
 
   // any rect at least the width of the world is equivalent to a rect that spans the width of the world exactly
-  if (rect.width() >= (int)m_worldSize[0])
+  if (rect.width() >= static_cast<int>(m_worldSize[0]))
     return StaticList<SplitRect, 2>::create({SplitRect{RectI(0, rect.yMin(), m_worldSize[0], rect.yMax()), 0}});
 
   if (rect.isEmpty())
@@ -528,11 +542,11 @@ template <typename Tile, unsigned SectorSize>
   rect.setXMin(xMin);
   rect.setXMax(xMin + width);
 
-  if (rect.xMin() < (int)m_worldSize[0] && rect.xMax() > (int)m_worldSize[0]) {
-    return StaticList<SplitRect, 2>::create({
-      SplitRect{RectI(rect.xMin(), rect.yMin(), m_worldSize[0], rect.yMax()), xOffset},
-      SplitRect{RectI(0, rect.yMin(), rect.xMax() - m_worldSize[0], rect.yMax()), xOffset + (int)m_worldSize[0]}
-    });
+  if (rect.xMin() < static_cast<int>(m_worldSize[0]) && rect.xMax() > static_cast<int>(m_worldSize[0])) {
+    return StaticList<SplitRect, 2>::create(
+      {SplitRect{RectI(rect.xMin(), rect.yMin(), m_worldSize[0], rect.yMax()), xOffset},
+       SplitRect{RectI(0, rect.yMin(), rect.xMax() - m_worldSize[0], rect.yMax()),
+                 xOffset + static_cast<int>(m_worldSize[0])}});
   } else {
     return StaticList<SplitRect, 2>::create({SplitRect{rect, xOffset}});
   }

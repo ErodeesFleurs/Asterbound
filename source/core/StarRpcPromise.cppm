@@ -214,7 +214,7 @@ private:
           auto cancelled = pinned->cancel(std::move(pinned->reason));
           if (!cancelled)
             EmergencyLog::error("Error cancelling RPC observation: {}",
-                                outputException(ExceptionDiagnostic(cancelled.error()), true));
+                                Star::output_exception(ExceptionDiagnostic(cancelled.error()), true));
         }
       }
     };
@@ -373,7 +373,7 @@ AutoFailRpcPromiseKeeper<Result, Error>::~AutoFailRpcPromiseKeeper() {
   if (!m_done) {
     auto completed = fail("Keeper destroyed");
     if (!completed)
-      EmergencyLog::error("Failed to auto-fail RpcPromise keeper: {}", outputException(ExceptionDiagnostic(completed.error()), true));
+      EmergencyLog::error("Failed to auto-fail RpcPromise keeper: {}", Star::output_exception(ExceptionDiagnostic(completed.error()), true));
   }
 }
 

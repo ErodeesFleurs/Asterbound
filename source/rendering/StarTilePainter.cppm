@@ -123,8 +123,8 @@ private:
 
   TilePainter(Root& root, std::shared_ptr<Renderer> renderer);
 
-  typedef std::uint64_t QuadZLevel;
-  typedef std::uint64_t ChunkHash;
+  using QuadZLevel = std::uint64_t;
+  using ChunkHash = std::uint64_t;
 
   enum class TerrainLayer { Background, Midground, Foreground };
 
@@ -135,12 +135,12 @@ private:
     float textureMovementFactor;
   };
 
-  typedef HashMap<TerrainLayer, HashMap<QuadZLevel, std::shared_ptr<RenderBuffer>>> TerrainChunk;
-  typedef HashMap<LiquidId, std::shared_ptr<RenderBuffer>> LiquidChunk;
+  using TerrainChunk = HashMap<TerrainLayer, HashMap<QuadZLevel, std::shared_ptr<RenderBuffer>>>;
+  using LiquidChunk = HashMap<LiquidId, std::shared_ptr<RenderBuffer>>;
 
-  typedef std::tuple<MaterialId, MaterialRenderPieceIndex, MaterialHue, bool> MaterialPieceTextureKey;
-  typedef String AssetTextureKey;
-  typedef std::variant<MaterialPieceTextureKey, AssetTextureKey> TextureKey;
+  using MaterialPieceTextureKey = std::tuple<MaterialId, MaterialRenderPieceIndex, MaterialHue, bool>;
+  using AssetTextureKey = String;
+  using TextureKey = std::variant<MaterialPieceTextureKey, AssetTextureKey>;
 
   struct TextureKeyHash {
     std::size_t operator()(TextureKey const& key) const;

@@ -71,7 +71,7 @@ std::expected<MovementParameters, StarException> MovementParameters::sensibleDef
   return create(Json(std::move(*object)));
 }
 
-MovementParameters::MovementParameters() {}
+MovementParameters::MovementParameters() = default;
 
 std::expected<MovementParameters, StarException> MovementParameters::create(Json const& config) {
   MovementParameters value;
@@ -588,7 +588,7 @@ void MovementController::approachVelocityAlongAngle(float angle, float targetVel
   // difference is the difference between the targetVelocity and this
   // projection.
 
-  Vec2F axis = Vec2F::withAngle(angle, 1.0f);
+  Vec2F axis = Vec2F::with_angle(angle, 1.0f);
 
   float velocityAlongAxis = velocity() * axis;
   float diff = targetVelocity - velocityAlongAxis;
@@ -894,7 +894,7 @@ std::expected<void, StarException> MovementController::tickSlave(float dt) {
 }
 
 void MovementController::setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEntities) {
-  m_ignorePhysicsEntities = ignorePhysicsEntities;
+  m_ignorePhysicsEntities = std::move(ignorePhysicsEntities);
 }
 
 std::expected<void, StarException> MovementController::forEachMovingCollision(RectF const& region, std::function<std::expected<bool, StarException>(MovingCollisionId id, PhysicsMovingCollision, PolyF, RectF)> callback) {
@@ -1084,7 +1084,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
   // The center and candidate positions stay fixed through all separation passes.
   // Cache their distances, but not an unstable sort's permutation of equal keys.
   for (auto& cp : collisionPolys)
-    cp.sortDistance = vmagSquared(cp.sortPosition - sortCenter);
+    cp.sortDistance = vmag_squared(cp.sortPosition - sortCenter);
 
   PolyF translatedBody = body;
   translatedBody.translate(movement);
@@ -1128,8 +1128,8 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
     Vec2F upwardResult = movement + separation.correction;
     float upMag = upwardResult.magnitude();
     // Angle off of horizontal (minimum of either direction)
-    float angleHoriz = std::min(Vec2F(1, 0).angleBetweenNormalized(upwardResult / upMag),
-        Vec2F(-1, 0).angleBetweenNormalized(upwardResult / upMag));
+    float angleHoriz = std::min(Vec2F(1, 0).angle_between_normalized(upwardResult / upMag),
+                                Vec2F(-1, 0).angle_between_normalized(upwardResult / upMag));
 
     // We need to make sure that even if we found a solution with the sliding
     // cheat, we are not beyond the angle and correction limits for the ground
@@ -1217,7 +1217,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
               float t = std::clamp(side.lineProjection(bodyVertex), 0.0f, 1.0f);
               Vec2F nearPoint = side.eval(t);
               if (nearPoint[1] > cp.sortPosition[1]) {
-                if (vmagSquared(bodyVertex - nearPoint) <= square(separationTolerance)) {
+                if (vmag_squared(bodyVertex - nearPoint) <= square(separationTolerance)) {
                   maxSideHorizontalOverlap = thisSideHorizontalOverlap;
                   result.groundSlope = side.diff().normalized();
                   if (result.groundSlope[0] < 0)
@@ -1283,7 +1283,7 @@ MovementController::CollisionSeparation MovementController::collisionSeparate(Li
         continue;
 
       intersectResult = correctedPoly.satIntersection(cp.poly);
-      if (intersectResult.intersects && intersectResult.overlap.magnitudeSquared() > separationToleranceSquared) {
+      if (intersectResult.intersects && intersectResult.overlap.magnitude_squared() > separationToleranceSquared) {
         separation.collisionKind = maxOrNullCollision(separation.collisionKind, cp.collisionKind);
         separation.solutionFound = false;
         break;
@@ -1329,8 +1329,14 @@ void MovementController::updatePositionInterpolators() {
   if (m_world)
     m_xPosition.setInterpolator(m_world->get().geometry().xLerpFunction(m_parameters.discontinuityThreshold));
   else
-    m_xPosition.setInterpolator(std::bind(lerpWithLimit<float, float>, m_parameters.discontinuityThreshold, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  m_yPosition.setInterpolator(std::bind(lerpWithLimit<float, float>, m_parameters.discontinuityThreshold, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    m_xPosition.setInterpolator(
+      [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+        return lerpWithLimit<float, float>(limit, offset, from, to);
+      });
+  m_yPosition.setInterpolator(
+    [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+      return lerpWithLimit<float, float>(limit, offset, from, to);
+    });
 }
 
 std::expected<void, StarException> MovementController::queryCollisions(RectF const& region) {
@@ -1338,7 +1344,7 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
   if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
   World& worldRef = activeWorld->get();
   while (!m_workingCollisions.empty()) {
-    m_collisionBuffers.append(std::move(m_workingCollisions.back().poly));
+    m_collisionBuffers.push_back(std::move(m_workingCollisions.back().poly));
     m_workingCollisions.pop_back();
   }
 
@@ -1346,10 +1352,10 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
     if (!collisionBuffers.empty()) {
       auto poly = std::move(collisionBuffers.back());
       collisionBuffers.pop_back();
-      return workingCollisions.emplaceAppend(CollisionPoly{std::move(poly), {}, {}, {}, {}, {}});
+      return workingCollisions.emplace_back(CollisionPoly{std::move(poly), {}, {}, {}, {}, {}});
     }
     else
-      return workingCollisions.emplaceAppend(CollisionPoly{});
+      return workingCollisions.emplace_back(CollisionPoly{});
   };
 
   auto geometry = worldRef.geometry();

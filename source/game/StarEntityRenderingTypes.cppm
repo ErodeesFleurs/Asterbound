@@ -38,11 +38,11 @@ private:
   std::uint64_t m_epoch;
 };
 
-typedef std::uint32_t EntityRenderLayer;
+using EntityRenderLayer = std::uint32_t;
 
 inline constexpr unsigned RenderLayerUpperBits = 5;
 inline constexpr unsigned RenderLayerLowerBits = 32 - RenderLayerUpperBits;
-inline constexpr EntityRenderLayer RenderLayerLowerMask = (EntityRenderLayer)-1 >> RenderLayerUpperBits;
+inline constexpr EntityRenderLayer RenderLayerLowerMask = static_cast<EntityRenderLayer>(-1) >> RenderLayerUpperBits;
 
 inline constexpr EntityRenderLayer RenderLayerBackgroundOverlay = 1 << RenderLayerLowerBits;
 inline constexpr EntityRenderLayer RenderLayerBackgroundTile = 2 << RenderLayerLowerBits;
@@ -107,7 +107,13 @@ enum class EntityHighlightEffectType {
   Interesting,
   Inspected
 };
-extern std::expected<EnumMap<EntityHighlightEffectType>, StarException> const EntityHighlightEffectTypeNames;
+inline constexpr auto EntityHighlightEffectTypeNames =
+  sortedEnumNames(std::to_array<std::pair<EntityHighlightEffectType, std::string_view>>(
+    {{EntityHighlightEffectType::None, "none"},
+     {EntityHighlightEffectType::Interactive, "interactive"},
+     {EntityHighlightEffectType::Inspectable, "inspectable"},
+     {EntityHighlightEffectType::Interesting, "interesting"},
+     {EntityHighlightEffectType::Inspected, "inspected"}}));
 
 struct EntityHighlightEffect {
   EntityHighlightEffectType type = EntityHighlightEffectType::None;

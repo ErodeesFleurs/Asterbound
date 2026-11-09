@@ -5,8 +5,8 @@ import std;
 import star.math_common;
 namespace Star {
 
-typedef std::uint16_t MaterialId;
-typedef std::uint8_t MaterialHue;
+using MaterialId = std::uint16_t;
+using MaterialHue = std::uint8_t;
 
 // Empty and non-colliding.
 inline constexpr MaterialId EmptyMaterialId = 65535;
@@ -41,11 +41,11 @@ inline constexpr MaterialId FirstEngineMetaMaterialId = 65500;
 // to be used by tile entities or scripts
 inline constexpr MaterialId FirstMetaMaterialId = 65000;
 
-typedef std::uint8_t MaterialColorVariant;
+using MaterialColorVariant = std::uint8_t;
 inline constexpr MaterialColorVariant DefaultMaterialColorVariant = 0;
 inline constexpr MaterialColorVariant MaxMaterialColorVariant = 8;
 
-typedef std::uint16_t ModId;
+using ModId = std::uint16_t;
 
 // Tile has no tilemod
 inline constexpr ModId NoModId = 65535;

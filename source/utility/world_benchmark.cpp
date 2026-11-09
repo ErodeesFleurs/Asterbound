@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.json;
 import star.output_proxy;
 import star.native_runtime;
@@ -122,13 +123,13 @@ using namespace Star;
 template <typename T>
 [[nodiscard]]
 static std::expected<T, StarException> numericOption(OptionParser::Options const& options, String const& name, T fallback) {
-  auto values = options.parameters.maybeRef(name);
+  auto values = options.parameters.find_ref(name);
   if (!values)
     return fallback;
   auto text = values->get().first();
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return lexicalCast<T>(text->get());
+  return lexical_cast<T>(text->get());
 }
 
 [[nodiscard]]
@@ -170,11 +171,13 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     return std::unexpected(std::move(initialized.error()));
   auto& [root, options] = *initialized;
 
-  coutf("Fully loading root...");
+  if (auto written = Star::print("Fully loading root..."); !written)
+    return std::unexpected(std::move(written.error()));
   auto loaded = root->fullyLoad();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
-  coutf(" done\n");
+  if (auto written = Star::print(" done\n"); !written)
+    return std::unexpected(std::move(written.error()));
 
   auto dungeonArgument = options.arguments.first();
   if (!dungeonArgument)
@@ -193,7 +196,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto configuration = root->configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
-  auto fidelity = options.parameters.maybe("fidelity").and_then([](StringList const& p) { return p.maybeFirst(); });
+  auto fidelity = options.parameters.maybe("fidelity").and_then([](StringList const& p) { return p.front_value(); });
   auto configuredFidelity = (*configuration)->set("serverFidelity", fidelity.value_or("high"));
   if (!configuredFidelity)
     return std::unexpected(std::move(configuredFidelity.error()));
@@ -226,7 +229,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 
   std::chrono::duration<double> sumTime = std::chrono::duration<double>::zero();
   for (std::uint64_t i = 0; i < *times; ++i) {
-    auto storage = File::ephemeralFile(root->random());
+    auto storage = File::ephemeral_file(root->random());
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     auto server = WorldServer::create(*root, *worldTemplate, *storage);
@@ -234,7 +237,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(server.error()));
     auto& worldServer = **server;
 
-    coutf("Starting world simulation for {} steps\n", *steps);
+    if (auto written = Star::print("Starting world simulation for {} steps\n", *steps); !written)
+      return std::unexpected(std::move(written.error()));
     auto start = std::chrono::steady_clock::now();
     auto lastReport = std::chrono::steady_clock::now();
     std::uint64_t entityCount = 0;
@@ -255,30 +259,35 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       if (*reportEvery != 0 && j % *reportEvery == 0) {
         float fps = *reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
         lastReport = std::chrono::steady_clock::now();
-        coutf("[{}] {}s | FPS: {} | Entities: {}\n", j, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), fps, entityCount);
+        if (auto written = Star::print("[{}] {}s | FPS: {} | Entities: {}\n", j, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), fps, entityCount); !written)
+          return std::unexpected(std::move(written.error()));
       }
       auto updated = worldServer.update(root->timing().serverTimestep * root->timing().timescale);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
     std::chrono::duration<double> totalTime = std::chrono::steady_clock::now() - start;
-    coutf("Finished run of running dungeon world '{}' with seed {} for {} steps in {} seconds, average FPS: {}\n",
-          dungeon, *worldSeed, *steps, totalTime.count(), *steps / totalTime.count());
+    if (auto written = Star::print("Finished run of running dungeon world '{}' with seed {} for {} steps in {} seconds, average FPS: {}\n",
+          dungeon, *worldSeed, *steps, totalTime.count(), *steps / totalTime.count()); !written)
+      return std::unexpected(std::move(written.error()));
     sumTime += totalTime;
     auto closed = worldServer.close();
     if (!closed)
       return std::unexpected(std::move(closed.error()));
   }
 
-  if (*times != 1)
-    coutf("Average of all runs - time: {}, FPS: {}\n", (sumTime / *times).count(), *steps / (sumTime / *times).count());
+  if (*times != 1) {
+    if (auto written = Star::print("Average of all runs - time: {}, FPS: {}\n", (sumTime / *times).count(), *steps / (sumTime / *times).count()); !written)
+      return std::unexpected(std::move(written.error()));
+  }
   return {};
 }
 
 int main(int argc, char** argv) {
   auto result = run(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return 0;

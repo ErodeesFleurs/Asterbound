@@ -28,7 +28,7 @@ public:
 
   // CommandHandler is passed the origin connection, the command portion
   // excluding the '/' character, and the remaining command line in full.
-  typedef std::function<std::expected<ServerCommandResult, StarException>(ConnectionId, String, String)> CommandHandler;
+  using CommandHandler = std::function<std::expected<ServerCommandResult, StarException>(ConnectionId, String, String)>;
 
   [[nodiscard]] std::expected<String, StarException> connectClient(ConnectionId clientId, String nick = "");
   // Returns any pending messages.

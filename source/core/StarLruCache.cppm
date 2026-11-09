@@ -12,8 +12,8 @@ namespace Star {
 template <typename OrderedMapType>
 class LruCacheBase {
 public:
-  typedef typename OrderedMapType::key_type Key;
-  typedef typename OrderedMapType::mapped_type Value;
+  using Key = typename OrderedMapType::key_type;
+  using Value = typename OrderedMapType::mapped_type;
 
   LruCacheBase();
   LruCacheBase(std::size_t maxSize);
@@ -29,8 +29,8 @@ public:
   List<Value> values() const;
 
   // A mutable lookup marks the entry as accessed; const lookup only observes it.
-  std::optional<std::reference_wrapper<Value>> maybeRef(Key const& key);
-  std::optional<std::reference_wrapper<Value const>> maybeRef(Key const& key) const;
+  std::optional<std::reference_wrapper<Value>> find_ref(Key const& key);
+  std::optional<std::reference_wrapper<Value const>> find_ref(Key const& key) const;
 
   // Put the given value into the cache.
   void set(Key const& key, Value value);
@@ -102,17 +102,18 @@ auto LruCacheBase<OrderedMapType>::values() const -> List<Value> {
 }
 
 template <typename OrderedMapType>
-auto LruCacheBase<OrderedMapType>::maybeRef(Key const& key) -> std::optional<std::reference_wrapper<Value>> {
+auto LruCacheBase<OrderedMapType>::find_ref(Key const& key) -> std::optional<std::reference_wrapper<Value>> {
   auto i = m_map.find(key);
   if (i == m_map.end())
     return std::nullopt;
-  i = m_map.toBack(i);
+  i = m_map.move_to_back(i);
   return std::reference_wrapper<Value>(i->second);
 }
 
 template <typename OrderedMapType>
-auto LruCacheBase<OrderedMapType>::maybeRef(Key const& key) const -> std::optional<std::reference_wrapper<Value const>> {
-  return m_map.maybeRef(key);
+auto LruCacheBase<OrderedMapType>::find_ref(Key const& key) const
+  -> std::optional<std::reference_wrapper<Value const>> {
+  return m_map.find_ref(key);
 }
 
 template <typename OrderedMapType>
@@ -122,7 +123,7 @@ void LruCacheBase<OrderedMapType>::set(Key const& key, Value value) {
     m_map.insert({key, std::move(value)});
   } else {
     i->second = std::move(value);
-    m_map.toBack(i);
+    m_map.move_to_back(i);
   }
 }
 
@@ -161,7 +162,7 @@ template <typename Producer>
       i = m_map.insert({key, std::invoke(producer, key)}).first;
     }
   } else {
-    i = m_map.toBack(i);
+    i = m_map.move_to_back(i);
   }
 
   return std::reference_wrapper<Value>(i->second);

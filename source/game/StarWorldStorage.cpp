@@ -164,12 +164,16 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = metadataKey();
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    auto operationResult2 = writeWorldMetadata(WorldMetadataStore{worldSize, VersionedJson()});
-    if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-    auto operationResult3 = db.insert((*operationResult1), (*operationResult2));
-    if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
+    auto metadataRecordKey = metadataKey();
+    if (!metadataRecordKey)
+      return std::unexpected(std::move(metadataRecordKey.error()));
+    auto serializedMetadata =
+      writeWorldMetadata(WorldMetadataStore{.worldSize = worldSize, .userMetadata = VersionedJson()});
+    if (!serializedMetadata)
+      return std::unexpected(std::move(serializedMetadata.error()));
+    auto metadataInserted = db.insert((*metadataRecordKey), (*serializedMetadata));
+    if (!metadataInserted)
+      return std::unexpected(std::move(metadataInserted.error()));
   }
   {
     auto operationResult1 = db.commit();
@@ -212,10 +216,12 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   result->m_generatorFacade = generatorFacade;
   result->m_floatingDungeonWorld = false;
   {
-    auto operationResult1 = File::ephemeralFile(root.random());
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    auto operationResult2 = openDatabase(db, (*operationResult1));
-    if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
+    auto storage_file = File::ephemeral_file(root.random());
+    if (!storage_file)
+      return std::unexpected(std::move(storage_file.error()));
+    auto database_opened = openDatabase(db, (*storage_file));
+    if (!database_opened)
+      return std::unexpected(std::move(database_opened.error()));
   }
   for (auto const& pair : chunks) {
     if (pair.second) {
@@ -265,12 +271,15 @@ std::expected<VersionedJson, StarException> WorldStorage::worldMetadata() {
 }
 
 std::expected<void, StarException> WorldStorage::setWorldMetadata(VersionedJson const& metadata) {
-  auto operationResult1 = metadataKey();
-  if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  auto operationResult2 = writeWorldMetadata({Vec2U(m_tileArray->size()), metadata});
-  if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-  auto operationResult3 = m_db.insert((*operationResult1), (*operationResult2));
-  if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
+  auto metadataRecordKey = metadataKey();
+  if (!metadataRecordKey)
+    return std::unexpected(std::move(metadataRecordKey.error()));
+  auto serializedMetadata = writeWorldMetadata({.worldSize = Vec2U(m_tileArray->size()), .userMetadata = metadata});
+  if (!serializedMetadata)
+    return std::unexpected(std::move(serializedMetadata.error()));
+  auto metadataInserted = m_db.insert((*metadataRecordKey), (*serializedMetadata));
+  if (!metadataInserted)
+    return std::unexpected(std::move(metadataInserted.error()));
   return {};
 }
 
@@ -304,13 +313,13 @@ SectorLoadLevel WorldStorage::sectorLoadLevel(Sector sector) const {
 }
 
 std::optional<SectorGenerationLevel> WorldStorage::sectorGenerationLevel(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector))
+  if (auto p = m_sectorMetadata.find_ref(sector))
     return p->get().generationLevel;
   return {};
 }
 
 bool WorldStorage::sectorActive(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     if (p->get().loadLevel == SectorLoadLevel::Loaded && p->get().generationLevel == SectorGenerationLevel::Complete)
       return true;
   }
@@ -329,7 +338,7 @@ std::expected<void, StarException> WorldStorage::loadSector(Sector sector) {
     setSectorTimeToLive(sector, ttl);
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to load sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to load sector {}", sector)));
   return result;
 }
 
@@ -345,12 +354,12 @@ std::expected<void, StarException> WorldStorage::activateSector(Sector sector) {
     setSectorTimeToLive(sector, ttl);
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to load sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to load sector {}", sector)));
   return result;
 }
 
 std::expected<void, StarException> WorldStorage::queueSectorActivation(Sector sector) {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     auto ptimeToLiveResult1 = randomizedSectorTTL();
     if (!ptimeToLiveResult1) return std::unexpected(std::move(ptimeToLiveResult1.error()));
     p->get().timeToLive = std::move((*ptimeToLiveResult1));
@@ -360,7 +369,7 @@ std::expected<void, StarException> WorldStorage::queueSectorActivation(Sector se
   }
 
   auto p = m_generationQueue.insert(sector, m_generationQueueTimeToLive);
-  m_generationQueue.toFront(p.first);
+  m_generationQueue.move_to_front(p.first);
   return {};
 }
 
@@ -370,7 +379,7 @@ std::expected<void, StarException> WorldStorage::triggerTerraformSector(Sector s
       auto operationResult1 = loadSectorToLevel(sector, SectorLoadLevel::Loaded);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
-    if (auto p = m_sectorMetadata.maybeRef(sector)) {
+    if (auto p = m_sectorMetadata.find_ref(sector)) {
       if (p->get().generationLevel < SectorGenerationLevel::Complete)
         {
           auto operationResult1 = generateSectorToLevel(sector, SectorGenerationLevel::Complete);
@@ -379,11 +388,11 @@ std::expected<void, StarException> WorldStorage::triggerTerraformSector(Sector s
 
       p->get().generationLevel = SectorGenerationLevel::Terraform;
     } else {
-      return std::unexpected(WorldStorageException(strf("Couldn't flag sector {} for terraforming; metadata unavailable", sector)));
+      return std::unexpected(WorldStorageException(Star::format("Couldn't flag sector {} for terraforming; metadata unavailable", sector)));
     }
     return {};
   }();
-  if (!result) return std::unexpected(invalidate(std::move(result.error()), strf("Failed to terraform sector {}", sector)));
+  if (!result) return std::unexpected(invalidate(std::move(result.error()), Star::format("Failed to terraform sector {}", sector)));
   return result;
 }
 
@@ -392,13 +401,13 @@ std::expected<RpcPromise<Vec2I>, StarException> WorldStorage::enqueuePlacement(L
 }
 
 std::optional<float> WorldStorage::sectorTimeToLive(Sector sector) const {
-  if (auto p = m_sectorMetadata.maybeRef(sector))
+  if (auto p = m_sectorMetadata.find_ref(sector))
     return p->get().timeToLive;
   return {};
 }
 
 bool WorldStorage::setSectorTimeToLive(Sector sector, float newTimeToLive) {
-  if (auto p = m_sectorMetadata.maybeRef(sector)) {
+  if (auto p = m_sectorMetadata.find_ref(sector)) {
     p->get().timeToLive = newTimeToLive;
     return true;
   }
@@ -450,7 +459,7 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
       if (sectorGenerationLevelLimit && *sectorGenerationLevelLimit == 0)
         break;
 
-      auto first = m_generationQueue.firstKey();
+      auto first = m_generationQueue.first_key();
       if (!first) return std::unexpected(std::move(first.error()));
       auto autopResult1 = generateSectorToLevel(first->get(), SectorGenerationLevel::Complete, sectorGenerationLevelLimit.value_or(NPos));
       if (!autopResult1) return std::unexpected(std::move(autopResult1.error()));
@@ -458,8 +467,9 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
 
       if (p.first)
         {
-          auto removed = m_generationQueue.removeFirst();
-          if (!removed) return std::unexpected(std::move(removed.error()));
+        auto removed = m_generationQueue.erase_front();
+        if (!removed)
+          return std::unexpected(std::move(removed.error()));
         }
       if (sectorGenerationLevelLimit)
         *sectorGenerationLevelLimit -= p.second;
@@ -514,7 +524,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
               }
             }
             if (metadata.loadLevel < SectorLoadLevel::Entities)
-              zombieEntities.append(entity);
+              zombieEntities.push_back(entity);
           }
           return {};
         });
@@ -538,9 +548,9 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
           if (!autopersistentResult1) return std::unexpected(std::move(autopersistentResult1.error()));
           auto persistent = std::move((*autopersistentResult1));
           if (persistent)
-            zombiesToStore.append(entity);
+            zombiesToStore.push_back(entity);
           else
-            zombiesToRemove.append(entity);
+            zombiesToRemove.push_back(entity);
         }
 
         for (auto const& entity : zombiesToRemove) {
@@ -578,7 +588,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
             auto autostoredResult1 = entityFactory->storeVersionedEntity(entity);
             if (!autostoredResult1) return std::unexpected(std::move(autostoredResult1.error()));
             auto stored = std::move((*autostoredResult1));
-            sectorStore.append(std::move(stored));
+            sectorStore.push_back(std::move(stored));
           }
           {
             auto operationResult1 = entitySectorKey(sector);
@@ -596,8 +606,8 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
       }
     }
     if (worldId) {
-      this->root().logMap().set(strf("server_{}_storage", worldId->get()),
-        strf("{} active, {}/{} unloaded ({} held)", m_sectorMetadata.size(), unloaded, skipped + unloaded, skipped));
+      this->root().logMap().set(Star::format("server_{}_storage", worldId->get()),
+        Star::format("{} active, {}/{} unloaded ({} held)", m_sectorMetadata.size(), unloaded, skipped + unloaded, skipped));
     }
     return {};
   }();
@@ -900,7 +910,7 @@ std::expected<ByteArray, StarException> WorldStorage::writeTileSector(TileSector
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((store.tiles));
+    Star::star_assert_failed((store.tiles));
   }
   for (std::size_t y = 0; y < WorldSectorSize; ++y) {
     for (std::size_t x = 0; x < WorldSectorSize; ++x)
@@ -919,8 +929,9 @@ std::expected<ByteArray, StarException> WorldStorage::uniqueIndexKey(String cons
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = ds.write(xxHash32(uniqueId));
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
+    auto index_written = ds.write(xx_hash32(uniqueId));
+    if (!index_written)
+      return std::unexpected(std::move(index_written.error()));
   }
   return ds.takeData();
 }
@@ -1060,10 +1071,10 @@ std::expected<void, StarException> WorldStorage::initialize() {
 StarException WorldStorage::invalidate(StarException error, std::string context) {
   auto rollback = m_db.rollback();
   if (!rollback) {
-    error = rollback.error().withContext(strf("Rollback failed after {}", error.what()));
+    error = rollback.error().with_context(Star::format("Rollback failed after {}", error.what()));
   } else {
     auto closed = m_db.close();
-    if (!closed) error = closed.error().withContext(strf("Close failed after {}", error.what()));
+    if (!closed) error = closed.error().with_context(Star::format("Close failed after {}", error.what()));
   }
   return WorldStorageException(std::move(context), ExceptionDiagnostic(error));
 }
@@ -1107,9 +1118,10 @@ std::expected<std::pair<bool, std::size_t>, StarException> WorldStorage::generat
   metadata.timeToLive = std::move((*metadatatimeToLiveResult1));
 
   std::size_t totalGeneratedLevels = 0;
-  for (std::uint8_t i = (std::uint8_t)metadata.generationLevel + 1; i <= (std::uint8_t)targetGenerationLevel; ++i) {
-    SectorGenerationLevel currentGeneration = (SectorGenerationLevel)i;
-    SectorGenerationLevel stepDownGeneration = (SectorGenerationLevel)(i - 1);
+  for (std::uint8_t i = static_cast<std::uint8_t>(metadata.generationLevel) + 1;
+       i <= static_cast<std::uint8_t>(targetGenerationLevel); ++i) {
+    auto currentGeneration = static_cast<SectorGenerationLevel>(i);
+    auto stepDownGeneration = static_cast<SectorGenerationLevel>(i - 1);
 
     if (stepDownGeneration != SectorGenerationLevel::None) {
       auto autoadjacentResult1 = adjacentSectors(sector);
@@ -1148,9 +1160,10 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
   auto metadatatimeToLiveResult1 = randomizedSectorTTL();
   if (!metadatatimeToLiveResult1) return std::unexpected(std::move(metadatatimeToLiveResult1.error()));
   metadata.timeToLive = std::move((*metadatatimeToLiveResult1));
-  for (std::uint8_t i = (std::uint8_t)metadata.loadLevel + 1; i <= (std::uint8_t)targetLoadLevel; ++i) {
-    auto currentLoad = (SectorLoadLevel)i;
-    auto stepDownLoad = (SectorLoadLevel)(i - 1);
+  for (std::uint8_t i = static_cast<std::uint8_t>(metadata.loadLevel) + 1;
+       i <= static_cast<std::uint8_t>(targetLoadLevel); ++i) {
+    auto currentLoad = static_cast<SectorLoadLevel>(i);
+    auto stepDownLoad = static_cast<SectorLoadLevel>(i - 1);
     if (stepDownLoad != SectorLoadLevel::None) {
       auto autoadjacentResult1 = adjacentSectors(sector);
       if (!autoadjacentResult1) return std::unexpected(std::move(autoadjacentResult1.error()));
@@ -1196,9 +1209,9 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
         for (auto const& entityStore : sectorStore) {
           auto entity = entityFactory->loadVersionedEntity(entityStore);
           if (entity) {
-            addedEntities.append(std::move(*entity));
+            addedEntities.push_back(std::move(*entity));
           } else {
-            auto logged = this->root().logger().warnException(strf("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
+            auto logged = this->root().logger().warnException(Star::format("Failed to deserialize entity in sector {}", sector), ExceptionDiagnostic(entity.error()));
             if (!logged) return std::unexpected(std::move(logged.error()));
             if (this->root().logger().loggable(LogLevel::Debug)) {
               auto stored = entityStore.toJson().repr();
@@ -1263,7 +1276,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
       auto position = entity->position();
       if (!belongsInSector(sector, position)) {
         if (auto entitySector = sectorForPosition(Vec2I(position))) {
-          if (auto p = m_sectorMetadata.maybeRef(*entitySector))
+          if (auto p = m_sectorMetadata.find_ref(*entitySector))
             entitiesOverlap |= p->get().timeToLive > 0.0f;
         }
         continue;
@@ -1279,9 +1292,9 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
       auto persistent = std::move((*autopersistentResult1));
 
       if (persistent)
-        entitiesToStore.append(std::move(entity));
+        entitiesToStore.push_back(std::move(entity));
       else
-        entitiesToRemove.append(std::move(entity));
+        entitiesToRemove.push_back(std::move(entity));
     }
 
     for (auto const& entity : entitiesToRemove) {
@@ -1325,7 +1338,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
         auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
-        sectorStore.append(std::move(storedEntity));
+        sectorStore.push_back(std::move(storedEntity));
       }
       {
         auto operationResult1 = entitySectorKey(sector);
@@ -1415,7 +1428,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
         auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
-        sectorStore.append(std::move(storedEntity));
+        sectorStore.push_back(std::move(storedEntity));
       }
     }
     {

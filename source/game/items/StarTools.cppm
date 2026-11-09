@@ -243,7 +243,7 @@ public:
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> drawables() const override;
 
-  virtual void setEnd(EndType type) override;
+  void setEnd(EndType type) override;
   [[nodiscard]]
   std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
   bool beamActive() const override;

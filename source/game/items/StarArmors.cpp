@@ -135,7 +135,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
   if (m_techModule->empty())
     m_techModule = {};
   else
-    m_techModule = AssetPath::relativeTo(directory, *m_techModule);
+    m_techModule = AssetPath::relative_to(directory, *m_techModule);
   auto directives = instanceValue("directives", "").and_then([](Json const& value) { return value.toString(); });
   if (!directives)
     return std::unexpected(std::move(directives.error()));
@@ -168,7 +168,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
     if (!flipDirectives)
       return std::unexpected(std::move(flipDirectives.error()));
     auto directivesStr = m_directives.maybeString();
-    auto append = flipDirectives->beginsWith('+');
+    auto append = flipDirectives->starts_with('+');
     if (!append)
       return std::unexpected(std::move(append.error()));
     if (*append && directivesStr) {
@@ -204,7 +204,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
         return std::unexpected(std::move(name.error()));
       if (!ArmorTypeNames)
         return std::unexpected(ArmorTypeNames.error());
-      auto type = ArmorTypeNames->maybeLeftRef(*name);
+      auto type = ArmorTypeNames->find_left_ref(*name);
       if (!type)
         return std::unexpected(std::move(type.error()));
       if (*type)
@@ -326,7 +326,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      target.get().append(std::move(*effect));
+      target.get().push_back(std::move(*effect));
     }
   }
   auto leveled = instanceValue("leveledStatusEffects", Json());
@@ -364,7 +364,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
         auto& modifier = std::get<StatEffectiveMultiplier>(*statModifier);
         modifier.effectiveMultiplier = 1 + (modifier.effectiveMultiplier - 1) * *factor;
       }
-      m_statusEffects.append(std::move(*statModifier));
+      m_statusEffects.push_back(std::move(*statModifier));
     }
   }
   auto augment = instanceValue("currentAugment", Json());
@@ -378,7 +378,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       auto effect = jsonToPersistentStatusEffect(value);
       if (!effect)
         return std::unexpected(std::move(effect.error()));
-      m_statusEffects.append(std::move(*effect));
+      m_statusEffects.push_back(std::move(*effect));
     }
   }
   return {};
@@ -392,11 +392,11 @@ std::expected<std::shared_ptr<HeadArmor>, StarException> HeadArmor::create(Root&
   auto male = config.getString("maleFrames");
   if (!male)
     return std::unexpected(std::move(male.error()));
-  item->m_maleImage = AssetPath::relativeTo(directory, *male);
+  item->m_maleImage = AssetPath::relative_to(directory, *male);
   auto female = config.getString("femaleFrames");
   if (!female)
     return std::unexpected(std::move(female.error()));
-  item->m_femaleImage = AssetPath::relativeTo(directory, *female);
+  item->m_femaleImage = AssetPath::relative_to(directory, *female);
   auto mask = item->instanceValue("mask").and_then([](Json const& value) { return value.toString(); });
   if (!mask)
     return std::unexpected(std::move(mask.error()));
@@ -405,7 +405,7 @@ std::expected<std::shared_ptr<HeadArmor>, StarException> HeadArmor::create(Root&
     if (!contains)
       return std::unexpected(std::move(contains.error()));
     if (!*contains)
-      item->m_maskDirectives = "?addmask=" + AssetPath::relativeTo(directory, *mask) + ";0;0";
+      item->m_maskDirectives = "?addmask=" + AssetPath::relative_to(directory, *mask) + ";0;0";
     else
       item->m_maskDirectives = *mask;
   } else {
@@ -456,7 +456,7 @@ std::expected<std::shared_ptr<ChestArmor>, StarException> ChestArmor::create(Roo
     auto path = male->getString(key);
     if (!path)
       return std::unexpected(std::move(path.error()));
-    target.get() = AssetPath::relativeTo(directory, *path);
+    target.get() = AssetPath::relative_to(directory, *path);
   }
   auto female = config.get("femaleFrames");
   if (!female)
@@ -468,7 +468,7 @@ std::expected<std::shared_ptr<ChestArmor>, StarException> ChestArmor::create(Roo
     auto path = female->getString(key);
     if (!path)
       return std::unexpected(std::move(path.error()));
-    target.get() = AssetPath::relativeTo(directory, *path);
+    target.get() = AssetPath::relative_to(directory, *path);
   }
   return item;
 }
@@ -518,11 +518,11 @@ std::expected<std::shared_ptr<LegsArmor>, StarException> LegsArmor::create(Root&
   auto male = config.getString("maleFrames");
   if (!male)
     return std::unexpected(std::move(male.error()));
-  item->m_maleImage = AssetPath::relativeTo(directory, *male);
+  item->m_maleImage = AssetPath::relative_to(directory, *male);
   auto female = config.getString("femaleFrames");
   if (!female)
     return std::unexpected(std::move(female.error()));
-  item->m_femaleImage = AssetPath::relativeTo(directory, *female);
+  item->m_femaleImage = AssetPath::relative_to(directory, *female);
   return item;
 }
 
@@ -557,11 +557,11 @@ std::expected<std::shared_ptr<BackArmor>, StarException> BackArmor::create(Root&
   auto male = config.getString("maleFrames");
   if (!male)
     return std::unexpected(std::move(male.error()));
-  item->m_maleImage = AssetPath::relativeTo(directory, *male);
+  item->m_maleImage = AssetPath::relative_to(directory, *male);
   auto female = config.getString("femaleFrames");
   if (!female)
     return std::unexpected(std::move(female.error()));
-  item->m_femaleImage = AssetPath::relativeTo(directory, *female);
+  item->m_femaleImage = AssetPath::relative_to(directory, *female);
   return item;
 }
 

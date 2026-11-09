@@ -66,21 +66,6 @@ import star.image_metadata_database;
 
 namespace Star {
 
-extern std::expected<EnumMap<MainInterfacePanes>, StarException> const MainInterfacePanesNames = EnumMap<MainInterfacePanes>::create({
-  {MainInterfacePanes::Inventory, "Inventory"},
-  {MainInterfacePanes::Cockpit, "Cockpit"},
-  {MainInterfacePanes::Tech, "Tech"},
-  {MainInterfacePanes::Ai, "Ai"},
-  {MainInterfacePanes::Confirmation, "Confirmation"},
-  {MainInterfacePanes::HttpTrustDialog, "HttpTrustDialog"},
-  {MainInterfacePanes::JoinRequest, "JoinRequest"},
-  {MainInterfacePanes::Options, "Options"},
-  {MainInterfacePanes::WireInterface, "WireInterface"},
-  {MainInterfacePanes::CraftingPlain, "CraftingPlain"},
-  {MainInterfacePanes::MmUpgrade, "MmUpgrade"},
-  {MainInterfacePanes::Collections, "Collections"},
-  {MainInterfacePanes::CharacterSwap, "CharacterSwap"}
-});
 std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterfaceConfig::loadFromAssets(GuiContext& context) {
   auto& root = context.root();
   auto assets = root.assets();

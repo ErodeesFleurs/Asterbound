@@ -57,27 +57,17 @@ constexpr std::uint16_t VOICE_VERSION = 1;
 import star.math_common;
 namespace Star {
 
-extern std::expected<EnumMap<VoiceInputMode>, StarException> const VoiceInputModeNames = EnumMap<VoiceInputMode>::create({
-  {VoiceInputMode::VoiceActivity, "VoiceActivity"},
-  {VoiceInputMode::PushToTalk, "PushToTalk"}
-});
-
-extern std::expected<EnumMap<VoiceChannelMode>, StarException> const VoiceChannelModeNames = EnumMap<VoiceChannelMode>::create({
-  {VoiceChannelMode::Mono, "Mono"},
-  {VoiceChannelMode::Stereo, "Stereo"}
-});
-
 inline float getAudioChunkLoudness(std::span<std::int16_t const> data, float volume) {
   if (data.empty())
     return 0.f;
 
   double rms = 0.;
   for (std::size_t i = 0; i != data.size(); ++i) {
-    float sample = ((float)data[i] / 32767.f) * volume;
-    rms += (double)(sample * sample);
+    float sample = (static_cast<float>(data[i]) / 32767.f) * volume;
+    rms += static_cast<double>(sample * sample);
   }
 
-  float fRms = std::sqrtf((float)(rms / data.size()));
+  float fRms = std::sqrtf(static_cast<float>(rms / data.size()));
 
   if (fRms > 0)
     return std::clamp<float>(20.f * std::log10f(fRms), -127.f, 0.f);
@@ -170,16 +160,14 @@ std::expected<std::shared_ptr<Voice::Speaker>, StarException> Voice::Speaker::cr
 }
 
 Json Voice::Speaker::toJson() const {
-  return JsonObject{
-    {"speakerId",      speakerId},
-    {"entityId",       entityId },
-    {"name",           name     },
-    {"playing",        (bool)playing},
-    {"muted",          (bool)muted  },
-    {"decibels",       (float)decibelLevel},
-    {"smoothDecibels", (float)smoothDb    },
-    {"position",       jsonFromVec2F(position)}
-  };
+  return JsonObject{{"speakerId", speakerId},
+                    {"entityId", entityId},
+                    {"name", name},
+                    {"playing", static_cast<bool>(playing)},
+                    {"muted", static_cast<bool>(muted)},
+                    {"decibels", static_cast<float>(decibelLevel)},
+                    {"smoothDecibels", static_cast<float>(smoothDb)},
+                    {"position", jsonFromVec2F(position)}};
 }
 
 Voice::Voice(Root& root, std::shared_ptr<ApplicationController> appController)
@@ -187,8 +175,7 @@ Voice::Voice(Root& root, std::shared_ptr<ApplicationController> appController)
 
   m_inputMode = VoiceInputMode::PushToTalk;
   m_channelMode = VoiceChannelMode::Mono;
-  m_applicationController = appController;
-
+  m_applicationController = std::move(appController);
 }
 
 std::expected<std::shared_ptr<Voice>, StarException> Voice::create(Root& root, std::shared_ptr<ApplicationController> appController) {
@@ -267,17 +254,15 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   if (!channelModeName) return std::unexpected(std::move(channelModeName.error()));
   auto inputMode = m_inputMode;
   if (*inputModeName) {
-    if (!VoiceInputModeNames) return std::unexpected(VoiceInputModeNames.error());
-    auto parsed = VoiceInputModeNames->getLeft(**inputModeName);
+    auto parsed = enumValue<VoiceInputModeNames>(**inputModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    inputMode = parsed->get();
+    inputMode = *parsed;
   }
   auto channelMode = m_channelMode;
   if (*channelModeName) {
-    if (!VoiceChannelModeNames) return std::unexpected(VoiceChannelModeNames.error());
-    auto parsed = VoiceChannelModeNames->getLeft(**channelModeName);
+    auto parsed = enumValue<VoiceChannelModeNames>(**channelModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    channelMode = parsed->get();
+    channelMode = *parsed;
   }
   auto bitrate = config.opt("bitrate");
   if (!bitrate) return std::unexpected(std::move(bitrate.error()));
@@ -287,7 +272,7 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
     if ((**bitrate).canConvert(Json::Type::Int)) {
       auto value = (**bitrate).toUInt();
       if (!value) return std::unexpected(std::move(value.error()));
-      newBitrate = std::clamp((unsigned)*value, 6000u, 510000u);
+      newBitrate = std::clamp(static_cast<unsigned>(*value), 6000u, 510000u);
     }
   }
   bool changed = false;
@@ -367,7 +352,7 @@ std::shared_ptr<Voice::Speaker> Voice::localSpeaker() {
 std::expected<std::shared_ptr<Voice::Speaker>, StarException> Voice::speaker(SpeakerId speakerId) {
   if (m_speakerId == speakerId)
     return m_clientSpeaker;
-  if (auto speaker = m_speakers.maybeRef(speakerId))
+  if (auto speaker = m_speakers.find_ref(speakerId))
     return speaker->get();
   auto created = Speaker::create(speakerId);
   if (!created)
@@ -389,9 +374,9 @@ List<std::shared_ptr<Voice::Speaker>> Voice::sortedSpeakers(bool onlyPlaying) {
       return a->speakerId < b->speakerId;
   };
 
-  for (auto& p : m_speakers) {
+  for (auto&& p : m_speakers) {
     if (!onlyPlaying || p.second->playing)
-      result.insertSorted(p.second, sorter);
+      result.insert_sorted(p.second, sorter);
   }
 
   return result;
@@ -481,10 +466,10 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
           std::array<float, 2> levels;
           {
             std::lock_guard locker(speaker->mutex);
-            levels = speaker->channelVolumes;
+            std::ranges::copy(speaker->channelVolumes, levels.begin());
           }
           for (std::size_t i = 0; i != samples; ++i)
-            sharedBuffer[i] += (std::int32_t)(speakerBuffer[i]) * levels[i % 2] * volume;
+            sharedBuffer[i] += static_cast<std::int32_t>(speakerBuffer[i]) * levels[i % 2] * volume;
         }
         ++it;
       }
@@ -502,7 +487,7 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
 
     float vol = m_outputAmplitude;
     for (std::size_t i = 0; i != sharedBuffer.size(); ++i)
-      finalBuffer[i] = (std::int16_t)std::clamp<int>(sharedBuffer[i] * vol, INT16_MIN, INT16_MAX);
+      finalBuffer[i] = static_cast<std::int16_t>(std::clamp<int>(sharedBuffer[i] * vol, INT16_MIN, INT16_MAX));
 
     SDL_MixAudio(reinterpret_cast<Uint8*>(buffer.data()), reinterpret_cast<Uint8 const*>(finalBuffer.data()), SDL_AUDIO_S16LE, finalBuffer.size() * sizeof(std::int16_t), 1.0f);
     std::memset(sharedBuffer.data(), 0, sharedBuffer.size() * sizeof(std::int32_t));
@@ -510,7 +495,7 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
 }
 
 std::expected<void, StarException> Voice::update(float, PositionalAttenuationFunction positionalAttenuationFunction) {
-  for (auto& entry : m_speakers) {
+  for (auto&& entry : m_speakers) {
     if (std::shared_ptr<Speaker>& speaker = entry.second) {
       Vec2F newChannelVolumes{1.0f, 1.0f};
       if (positionalAttenuationFunction) {
@@ -584,7 +569,7 @@ std::expected<int, StarException> Voice::send(DataStreamBuffer& out, std::size_t
   for (auto& chunk : encodedChunks) {
     if (auto result = out.write<std::uint32_t>(chunk.size()); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = out.writeBytes(chunk); !result)
+    if (auto result = out.write_bytes(chunk); !result)
       return std::unexpected(std::move(result.error()));
     if (budget && (budget -= std::min<std::size_t>(budget, chunk.size())) == 0)
       break;
@@ -619,7 +604,7 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
     if (*version > VOICE_VERSION)
       return false;
     while (true) {
-      auto atEnd = reader.atEnd();
+      auto atEnd = reader.at_end();
       if (!atEnd) return std::unexpected(std::move(atEnd.error()));
       if (*atEnd) break;
       auto opusLength = reader.read<std::uint32_t>();
@@ -642,14 +627,16 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
       if (samples < 0)
         return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(samples)));
 
-      m_decodeBuffer.resize(samples * (std::size_t)channels);
+      m_decodeBuffer.resize(samples * static_cast<std::size_t>(channels));
 
       int decodedSamples = opus_decode(decoder, reinterpret_cast<unsigned char const*>(packet.data()), packet.size(), m_decodeBuffer.data(), samples, 0);
       if (decodedSamples < 0)
         return std::unexpected(VoiceException::format("Decoder error: {}", opus_strerror(decodedSamples)));
       if (!decodedSamples)
         return true;
-      auto resampled = speaker->audioStream->resample(std::span<std::int16_t const>(m_decodeBuffer).first((std::size_t)decodedSamples * channels), m_resampleBuffer, mono);
+      auto resampled = speaker->audioStream->resample(
+        std::span<std::int16_t const>(m_decodeBuffer).first(static_cast<std::size_t>(decodedSamples) * channels),
+        m_resampleBuffer, mono);
       if (!resampled)
         return std::unexpected(std::move(resampled.error()));
 
@@ -659,7 +646,7 @@ std::expected<bool, StarException> Voice::decode(std::shared_ptr<Speaker> const&
 
         auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
         if (now - speaker->lastReceiveTime < std::chrono::milliseconds(1000)) {
-          auto limit = (std::size_t)speaker->minimumPlaySamples + 22050;
+          auto limit = static_cast<std::size_t>(speaker->minimumPlaySamples) + 22050;
           if (samples.size() > limit) { // skip ahead if we're getting too far
             for (std::size_t i = samples.size(); i >= limit; --i)
               samples.pop();
@@ -714,7 +701,7 @@ std::expected<void, StarException> Voice::resetEncoder() {
   auto created = createEncoder(channels);
   if (!created) return std::unexpected(std::move(created.error()));
   auto encoder = std::move(*created);
-  int bitrate = m_bitrate > 0 ? (int)m_bitrate : (channels == 2 ? 50000 : 24000);
+  int bitrate = m_bitrate > 0 ? static_cast<int>(m_bitrate) : (channels == 2 ? 50000 : 24000);
   int error = opus_encoder_ctl(encoder.get(), OPUS_SET_BITRATE(bitrate));
   if (error != OPUS_OK)
     return std::unexpected(VoiceException::format("Could not configure encoder: {}", opus_strerror(error)));
@@ -799,7 +786,7 @@ std::expected<void, StarException> Voice::thread(std::stop_token stopToken) {
     {
       std::lock_guard locker(m_captureMutex);
       ByteArray encoded(VOICE_MAX_PACKET_SIZE, 0);
-      std::size_t frameSamples = VOICE_FRAME_SIZE * (std::size_t)m_deviceChannels;
+      std::size_t frameSamples = VOICE_FRAME_SIZE * static_cast<std::size_t>(m_deviceChannels);
       while (m_capturedChunksFrames >= VOICE_FRAME_SIZE) {
         std::vector<opus_int16> samples;
         samples.reserve(frameSamples);

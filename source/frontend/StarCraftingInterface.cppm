@@ -82,7 +82,7 @@ private:
 
   [[nodiscard]] std::expected<List<ItemRecipe>, StarException> determineRecipes();
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
   [[nodiscard]] std::expected<void, StarException> updateCraftButtons();
   [[nodiscard]] std::expected<void, StarException> updateAvailableRecipes();
   [[nodiscard]] std::expected<bool, StarException> consumeIngredients(ItemRecipe& recipe, int count);

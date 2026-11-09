@@ -232,7 +232,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
           if (!canvas)
             return std::unexpected(std::move(canvas.error()));
           if (*canvas)
-            return std::optional<LuaCanvas>(LuaCanvas{std::move(*canvas), engine.promiseLifetime(), lifetime, {}});
+            return std::optional<LuaCanvas>(LuaCanvas{.canvas = std::move(*canvas),
+                                                      .lifetime = engine.promiseLifetime(),
+                                                      .hostLifetime = lifetime,
+                                                      .owner = {}});
           return std::optional<LuaCanvas>{};
         });
       !r)
@@ -355,12 +358,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     ChatSendMode mode = ChatSendMode::Broadcast;
     if (modeName) {
-      if (!ChatSendModeNames) return std::unexpected(ChatSendModeNames.error());
-      auto parsed = ChatSendModeNames->getLeft(*modeName);
+      auto parsed = enumValue<ChatSendModeNames>(*modeName);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      mode = parsed->get();
+      mode = *parsed;
     }
-    return client.sendChat(message, mode, speak, data);
+    return client.sendChat(message, mode, speak, std::move(data));
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
     auto parsed = Json::parseSequence(args);
@@ -381,10 +383,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
       auto mode = config->optString("mode");
       if (!mode) return std::unexpected(std::move(mode.error()));
       if (*mode) {
-        if (!MessageContextModeNames) return std::unexpected(MessageContextModeNames.error());
-        auto parsed = MessageContextModeNames->getLeft(**mode);
+        auto parsed = enumValue<MessageContextModeNames>(**mode);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
-        message.context.mode = parsed->get();
+        message.context.mode = *parsed;
       }
       auto channel = config->optString("channelName");
       if (!channel) return std::unexpected(std::move(channel.error()));

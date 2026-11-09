@@ -57,7 +57,7 @@ import star.liquids_database;
 
 namespace Star {
 
-EntitySplashConfig::EntitySplashConfig() {}
+EntitySplashConfig::EntitySplashConfig() = default;
 
 std::expected<EntitySplashConfig, StarException> EntitySplashConfig::create(Root& root, Json const& config) {
   EntitySplashConfig splash;
@@ -112,7 +112,7 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::doSplash(Vec2F 
       LiquidId liquidType;
       auto bottomLiquid = world.liquidLevel(bottom);
       auto topLiquid = world.liquidLevel(top);
-      if (bottomLiquid.level > 0 && (int)bottomLiquid.liquid)
+      if (bottomLiquid.level > 0 && static_cast<int>(bottomLiquid.liquid))
         liquidType = bottomLiquid.liquid;
       else
         liquidType = topLiquid.liquid;
@@ -123,7 +123,7 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::doSplash(Vec2F 
         newSplashParticle.velocity[1] = std::fabs(velocity[1]) * splashYVelocityFactor;
         newSplashParticle.color = particleColor;
         newSplashParticle.applyVariance(world.root(), splashParticleVariance);
-        particles.append(newSplashParticle);
+        particles.push_back(newSplashParticle);
       }
     }
   }

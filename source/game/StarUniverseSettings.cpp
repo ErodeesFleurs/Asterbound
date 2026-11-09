@@ -111,7 +111,7 @@ std::expected<void, StarException> UniverseSettings::setFlag(String const& flag)
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     if (auto flagActions = m_flagActions.maybe(flag)) {
-      m_pendingFlagActions.appendAll(*flagActions);
+      m_pendingFlagActions.append_range(*flagActions);
     } else {
       auto logged = m_root.logger().info("No actions configured for universe flag {}", flag);
       if (!logged)
@@ -123,25 +123,25 @@ std::expected<void, StarException> UniverseSettings::setFlag(String const& flag)
 
 std::optional<List<UniverseFlagAction>> UniverseSettings::pullPendingFlagActions() {
   if (!m_pendingFlagActions.empty())
-    return take(m_pendingFlagActions);
+    return std::exchange(m_pendingFlagActions, {});
   return {};
 }
 
 List<UniverseFlagAction> UniverseSettings::currentFlagActions() const {
   List<UniverseFlagAction> res;
-  for (String flag : m_flags) {
+  for (String const& flag : m_flags) {
     if (auto flagActions = m_flagActions.maybe(flag))
-      res.appendAll(*flagActions);
+      res.append_range(*flagActions);
   }
   return res;
 }
 
 List<UniverseFlagAction> UniverseSettings::currentFlagActionsForInstanceWorld(String const& instanceName) const {
   List<UniverseFlagAction> res;
-  for (String flag : m_flags) {
+  for (String const& flag : m_flags) {
     for (auto flagAction : m_flagActions.maybe(flag).value_or(List<UniverseFlagAction>{})) {
       if (std::holds_alternative<PlaceDungeonFlagAction>(flagAction) && std::get<PlaceDungeonFlagAction>(flagAction).targetInstance == instanceName)
-        res.append(flagAction);
+        res.push_back(flagAction);
     }
   }
   return res;
@@ -174,7 +174,7 @@ std::expected<void, StarException> UniverseSettings::loadFlagActions() {
       auto action = parseUniverseFlagAction(actionConfig);
       if (!action)
         return std::unexpected(std::move(action.error()));
-      actions.append(std::move(*action));
+      actions.push_back(std::move(*action));
     }
     actionsByFlag[entry.first] = std::move(actions);
   }

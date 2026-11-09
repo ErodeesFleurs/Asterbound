@@ -52,7 +52,7 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<ConfirmationDialog>, StarException> create(GuiContext& guiContext);
 
-  virtual ~ConfirmationDialog() {}
+  ~ConfirmationDialog() override = default;
 
   [[nodiscard]] std::expected<void, StarException> displayConfirmation(Json const& dialogConfig, RpcPromiseKeeper<Json> resultPromise);
   [[nodiscard]] std::expected<void, StarException> displayConfirmation(Json const& dialogConfig, WidgetCallbackFunc okCallback, WidgetCallbackFunc cancelCallback);

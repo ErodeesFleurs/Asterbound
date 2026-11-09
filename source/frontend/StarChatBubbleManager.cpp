@@ -322,20 +322,16 @@ std::expected<void, StarException> ChatBubbleManager::setCamera(WorldCamera cons
   m_cachedInterfaceScale = m_guiContext.get().interfaceScale();
   if (m_camera.pixelRatio() != oldPixelRatio || m_cachedInterfaceScale != oldInterfaceScale) {
     List<ChatAction> actions;
-    auto collected = m_bubbles.forEach([&actions](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
-        actions.append(SayChatAction{bubble.entity, bubble.text, state.idealDestination, bubble.config});
+    auto collected = m_bubbles.forEach(
+      [&actions](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
+        actions.push_back(SayChatAction{bubble.entity, bubble.text, state.idealDestination, bubble.config});
         return {};
       });
     if (!collected) return std::unexpected(std::move(collected.error()));
     m_bubbles.clear();
     for (auto& portraitBubble : m_portraitBubbles)
-      actions.append(PortraitChatAction{
-          portraitBubble.entity,
-          portraitBubble.portrait,
-          portraitBubble.text,
-          portraitBubble.position,
-          portraitBubble.config
-        });
+      actions.push_back(PortraitChatAction{portraitBubble.entity, portraitBubble.portrait, portraitBubble.text,
+                                           portraitBubble.position, portraitBubble.config});
     m_portraitBubbles.clear();
     return addChatActions(std::move(actions), true);
   }
@@ -407,7 +403,7 @@ std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAl
 
   auto evaluated = fadeFunction->evaluate(distanceFactor);
   if (!evaluated) return std::unexpected(std::move(evaluated.error()));
-  return std::clamp((int)*evaluated, 0, 255);
+  return std::clamp(static_cast<int>(*evaluated), 0, 255);
 }
 std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   if (m_bubbles.empty() && m_portraitBubbles.empty())
@@ -444,7 +440,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
     });
   if (!rendered) return std::unexpected(std::move(rendered.error()));
 
-  for (auto portraitBubble : m_portraitBubbles) {
+  for (auto const& portraitBubble : m_portraitBubbles) {
     if (portraitBubble.onscreen) {
       auto position = portraitBubble.position;
       if (auto entity = world.entity(portraitBubble.entity))
@@ -452,10 +448,10 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
       Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
       int frame = 0;
       if (portraitBubble.age <= m_portraitChatterDuration)
-        frame = int((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
+        frame = static_cast<int>((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
       // 255 here because portrait bubbles are always full opacity
       for (auto const& bubbleImage : portraitBubble.backgroundImages) {
-        auto frameImage = std::get<0>(bubbleImage).replace("<frame>", toString(frame));
+        auto frameImage = std::get<0>(bubbleImage).replace("<frame>", Star::to_string(frame));
         if (!frameImage) return std::unexpected(std::move(frameImage.error()));
         auto drawn = drawBubbleImage(screenPos, std::make_tuple(std::move(*frameImage), std::get<1>(bubbleImage)), pixelRatio, 255);
         if (!drawn) return std::unexpected(std::move(drawn.error()));
@@ -530,29 +526,32 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
             };
             if (y == 0) {
               if (x == 0) {
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/cornerBottomLeft.png", partPosition(x, y)});
+                backgroundImages.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerBottomLeft.png", partPosition(x, y)});
               } else if (x == innerTiles[0] - 1) {
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/cornerBottomRight.png", partPosition(x, y)});
+                backgroundImages.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerBottomRight.png", partPosition(x, y)});
               } else {
                 if (middleIdx == x)
-                  backgroundImages.append(BubbleImage{"/interface/chatbubbles/point.png", partPosition(x, y - 1)});
+                  backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/point.png", partPosition(x, y - 1)});
                 else
-                  backgroundImages.append(BubbleImage{"/interface/chatbubbles/sideDown.png", partPosition(x, y)});
+                  backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideDown.png", partPosition(x, y)});
               }
             } else if (y == innerTiles[1] - 1) {
               if (x == 0)
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/cornerTopLeft.png", partPosition(x, y)});
+                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/cornerTopLeft.png", partPosition(x, y)});
               else if (x == innerTiles[0] - 1)
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/cornerTopRight.png", partPosition(x, y)});
+                backgroundImages.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerTopRight.png", partPosition(x, y)});
               else
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/sideUp.png", partPosition(x, y)});
+                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideUp.png", partPosition(x, y)});
             } else {
               if (x == 0)
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/sideLeft.png", partPosition(x, y)});
+                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideLeft.png", partPosition(x, y)});
               else if (x == innerTiles[0] - 1)
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/sideRight.png", partPosition(x, y)});
+                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideRight.png", partPosition(x, y)});
               else
-                backgroundImages.append(BubbleImage{"/interface/chatbubbles/center.png", partPosition(x, y)});
+                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/center.png", partPosition(x, y)});
             }
           }
         }
@@ -564,7 +563,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       Vec2F position = Vec2F(horizontalCenter, verticalShift);
       List<BubbleText> bubbleTexts;
 
-      bubbleTexts.append(std::make_tuple(sayAction.text, textStyle, true, position));
+      bubbleTexts.push_back(std::make_tuple(sayAction.text, textStyle, true, position));
 
       for (auto& backgroundImage : backgroundImages)
         std::get<1>(backgroundImage) += Vec2F(-horizontalCenter, partSize);
@@ -578,7 +577,13 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         if (!bounds) return std::unexpected(std::move(bounds.error()));
         boundBox.combine(*bounds);
       }
-      Bubble bubble = {sayAction.entity, sayAction.text, sayAction.config, 0, std::move(backgroundImages), std::move(bubbleTexts), false};
+      Bubble bubble = {.entity = sayAction.entity,
+                       .text = sayAction.text,
+                       .config = sayAction.config,
+                       .age = 0,
+                       .backgroundImages = std::move(backgroundImages),
+                       .bubbleText = std::move(bubbleTexts),
+                       .onscreen = false};
       List<BubbleState<Bubble>> oldBubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
           return bubble.entity == sayAction.entity;
         });
@@ -596,31 +601,29 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       position = portraitAction.position;
 
       List<BubbleImage> backgroundImages;
-      backgroundImages.append(std::make_tuple(m_portraitBackgroundImage, Vec2F()));
+      backgroundImages.push_back(std::make_tuple(m_portraitBackgroundImage, Vec2F()));
       auto more = config.getBool("drawMoreIndicator", false);
       if (!more) return std::unexpected(std::move(more.error()));
       if (*more)
-        backgroundImages.append(std::make_tuple(m_portraitMoreImage, Vec2F(m_portraitMorePosition)));
-      backgroundImages.append(std::make_tuple(portraitAction.portrait, Vec2F(m_portraitPosition)));
+        backgroundImages.push_back(std::make_tuple(m_portraitMoreImage, Vec2F(m_portraitMorePosition)));
+      backgroundImages.push_back(std::make_tuple(portraitAction.portrait, Vec2F(m_portraitPosition)));
       List<BubbleText> bubbleTexts;
-      bubbleTexts.append(std::make_tuple(portraitAction.text, m_textStyle, false, Vec2F(m_portraitTextPosition)));
+      bubbleTexts.push_back(std::make_tuple(portraitAction.text, m_textStyle, false, Vec2F(m_portraitTextPosition)));
 
       for (auto& backgroundImage : backgroundImages)
         std::get<1>(backgroundImage) += Vec2F(-m_portraitBackgroundSize[0] / 2, 0);
       for (auto& bubbleText : bubbleTexts)
         std::get<3>(bubbleText) += Vec2F(-m_portraitBackgroundSize[0] / 2, 0);
 
-      m_portraitBubbles.prepend({
-          portraitAction.entity,
-          portraitAction.portrait,
-          portraitAction.text,
-          portraitAction.position,
-          portraitAction.config,
-          0,
-          std::move(backgroundImages),
-          std::move(bubbleTexts),
-          false
-        });
+      m_portraitBubbles.push_front({.entity = portraitAction.entity,
+                                    .portrait = portraitAction.portrait,
+                                    .text = portraitAction.text,
+                                    .position = portraitAction.position,
+                                    .config = portraitAction.config,
+                                    .age = 0,
+                                    .backgroundImages = std::move(backgroundImages),
+                                    .bubbleText = std::move(bubbleTexts),
+                                    .onscreen = false});
     }
 
     if (!silent) {
@@ -664,7 +667,7 @@ std::expected<void, StarException> ChatBubbleManager::drawBubbleImage(Vec2F scre
 
 std::expected<void, StarException> ChatBubbleManager::drawBubbleText(Vec2F screenPos, BubbleText const& text, float pixelRatio, int alpha, bool isPortrait) {
   TextStyle style = std::get<1>(text);
-  style.color[3] *= ((float)alpha / 255.f);
+  style.color[3] *= (static_cast<float>(alpha) / 255.f);
   auto styled = m_guiContext.get().setTextStyle(style, pixelRatio);
   if (!styled) return std::unexpected(std::move(styled.error()));
   TextPositioning tp = isPortrait ? m_portraitTextTemplate : m_textTemplate;

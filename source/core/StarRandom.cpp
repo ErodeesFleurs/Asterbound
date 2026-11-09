@@ -67,13 +67,9 @@ std::uint64_t RandomSource::randu64() {
   return r;
 }
 
-std::int32_t RandomSource::randi32() {
-  return (std::int32_t)(randu32());
-}
+std::int32_t RandomSource::randi32() { return static_cast<std::int32_t>((randu32())); }
 
-std::int64_t RandomSource::randi64() {
-  return (std::int64_t)(randu64());
-}
+std::int64_t RandomSource::randi64() { return static_cast<std::int64_t>((randu64())); }
 
 float RandomSource::randf() {
   return (randu32() & 0x7fffffff) / 2147483648.0f;
@@ -88,7 +84,7 @@ std::int64_t RandomSource::randInt(std::int64_t max) {
 }
 
 std::uint64_t RandomSource::randUInt(std::uint64_t max) {
-  std::uint64_t denom = (std::uint64_t)(-1) / ((std::uint64_t)max + 1);
+  std::uint64_t denom = static_cast<std::uint64_t>((-1)) / (static_cast<std::uint64_t>(max) + 1);
   return randu64() / denom;
 }
 
@@ -125,7 +121,7 @@ void RandomSource::randBytes(std::span<char> bytes) {
   while (offset < bytes.size()) {
     std::uint32_t ui = gen32();
     for (std::size_t i = 0; i < 4 && offset < bytes.size(); ++i)
-      bytes[offset++] = (char)(ui >> (i * 8));
+      bytes[offset++] = static_cast<char>((ui >> (i * 8)));
   }
 }
 
@@ -184,7 +180,7 @@ std::expected<std::uint64_t, StarException> produceRandomSeed() {
   if (!entropy)
     return std::unexpected(std::move(entropy.error()));
   std::uint64_t random;
-  std::memcpy(&random, entropy->ptr(), sizeof(random));
+  std::memcpy(&random, entropy->data(), sizeof(random));
   return static_cast<std::uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count())
       * 1099511628211ULL ^ random;
 }

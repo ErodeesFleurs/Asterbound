@@ -5,6 +5,10 @@ import std;
 import star.format;
 import star.algorithm;
 import star.actor_movement_controller;
+import star.behavior_database;
+import star.chat_types;
+import star.collection_database;
+import star.collision_block;
 import star.file;
 import star.game_test;
 import star.game_types;
@@ -190,26 +194,28 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   EXPECT_EQ(*unchanged, saved);
 }
 
-const GameTestRegistration persistentStorage("LuaComponentLifecycle", "PersistentHostsPreserveStorageAcrossContexts", [](GameTest& fixture) {
-  auto storage = File::ephemeralFile(fixture.root().random());
-  ASSERT_TRUE(storage) << storage.error().what();
-  auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
-  ASSERT_TRUE(created) << created.error().what();
-  auto world = *created;
-  auto close = finally([&] { EXPECT_TRUE(world->close()); });
-  {
-    SCOPED_TRACE("LuaStoredEntityScript");
-    expectStorageLifecycle<LuaStoredEntityScript>(fixture.root(), *world);
-  }
-  {
-    SCOPED_TRACE("LuaActorScript");
-    expectStorageLifecycle<LuaActorScript>(fixture.root(), *world);
-  }
-  {
-    SCOPED_TRACE("LuaActionScript");
-    expectStorageLifecycle<LuaActionScript>(fixture.root(), *world);
-  }
-});
+const GameTestRegistration persistentStorage("LuaComponentLifecycle", "PersistentHostsPreserveStorageAcrossContexts",
+                                             [](GameTest& fixture) {
+                                               auto storage = File::ephemeral_file(fixture.root().random());
+                                               ASSERT_TRUE(storage) << storage.error().what();
+                                               auto created =
+                                                 WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+                                               ASSERT_TRUE(created) << created.error().what();
+                                               auto world = *created;
+                                               auto close = finally([&] { EXPECT_TRUE(world->close()); });
+                                               {
+                                                 SCOPED_TRACE("LuaStoredEntityScript");
+                                                 expectStorageLifecycle<LuaStoredEntityScript>(fixture.root(), *world);
+                                               }
+                                               {
+                                                 SCOPED_TRACE("LuaActorScript");
+                                                 expectStorageLifecycle<LuaActorScript>(fixture.root(), *world);
+                                               }
+                                               {
+                                                 SCOPED_TRACE("LuaActionScript");
+                                                 expectStorageLifecycle<LuaActionScript>(fixture.root(), *world);
+                                               }
+                                             });
 
 const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArgumentsAndHandlersFollowContextLifetime", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
@@ -560,7 +566,7 @@ const GameTestRegistration workerStartupFailure(
 const GameTestRegistration
   deferredWorldShutdown("LuaComponentLifecycle", "DeferredWorldShutdownKeepsCapabilitiesThroughLuaHooks",
                         [](GameTest& fixture) {
-                          auto storage = File::ephemeralFile(fixture.root().random());
+                          auto storage = File::ephemeral_file(fixture.root().random());
                           ASSERT_TRUE(storage);
                           auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
                           ASSERT_TRUE(world);
@@ -713,7 +719,7 @@ const GameTestRegistration
                         parameters.pathExploreRate = 23.5f;
                         auto controller = ActorMovementController::create(fixture.root(), parameters);
                         ASSERT_TRUE(controller) << controller.error().what();
-                        auto storage = File::ephemeralFile(fixture.root().random());
+                        auto storage = File::ephemeral_file(fixture.root().random());
                         ASSERT_TRUE(storage);
                         auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
                         ASSERT_TRUE(world);
@@ -861,7 +867,7 @@ const GameTestRegistration inputModifierPresence("InputNameSerialization",
                                                  });
 const GameTestRegistration luaEntityIdentifiers(
   "LuaEntityBindings", "EmbeddedNullIdentifiersSurviveFreshAndRestartedEngines", [](GameTest& fixture) {
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world);
@@ -1166,20 +1172,20 @@ const GameTestRegistration closedWorkerMessages(
 
 const GameTestRegistration workerChainedReplyClosure(
   "LuaComponentLifecycle", "ActualWorkerClosureCancelsDelegatedReplyWithoutCancellingProducer", [](GameTest& fixture) {
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto removeDirectory = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
-    auto overlay = File::relativeTo(*directory, "assets");
-    ASSERT_TRUE(File::makeDirectory(overlay));
-    ASSERT_TRUE(File::writeFile(String(R"LUA(
+    auto removeDirectory = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::write_file(String(R"LUA(
       function init()
         message.setHandler("pending", function() return host.promise() end)
       end
     )LUA"),
-                                File::relativeTo(overlay, "p6-worker.lua")));
+                                 File::relative_to(overlay, "p6-worker.lua")));
     auto settings = fixture.rootSettings();
-    settings.assetSources.append(overlay);
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = String("p6-worker.config");
     settings.logDirectory = {};
     settings.logFile = {};
@@ -1329,7 +1335,7 @@ const GameTestRegistration
 const GameTestRegistration scopedPathFinder("LuaComponentBindings",
                                             "PathFinderCannotExploreRetiredWorldButKeepsResultSnapshot",
                                             [](GameTest& fixture) {
-                                              auto storage = File::ephemeralFile(fixture.root().random());
+                                              auto storage = File::ephemeral_file(fixture.root().random());
                                               ASSERT_TRUE(storage);
                                               auto world =
                                                 WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
@@ -1467,4 +1473,80 @@ const GameTestRegistration
                                    EXPECT_FALSE(escaped->invoke<int>());
                                    EXPECT_EQ(calls, 0);
                                  });
+const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBehaviorJsonBoundaries", [](GameTest&) {
+  auto message = ChatReceivedMessage::create(JsonObject{{"context", JsonObject{{"mode", "rAdIoMeSsAgE"}}}});
+  ASSERT_TRUE(message);
+  EXPECT_EQ(message->context.mode, MessageContext::RadioMessage);
+  EXPECT_TRUE(message->context.channelName.empty());
+  EXPECT_EQ(message->fromConnection, 0u);
+  auto encoded = message->toJson();
+  ASSERT_TRUE(encoded);
+  auto context = encoded->get("context");
+  ASSERT_TRUE(context);
+  EXPECT_EQ(context->getString("mode"), "RadioMessage");
+
+  for (auto const& name : {String("unknown"), String(std::string("RadioMessage\0", 13)),
+                           String(std::string(1, static_cast<char>(0xff)))}) {
+    auto rejected = ChatReceivedMessage::create(JsonObject{{"context", JsonObject{{"mode", name}}}});
+    EXPECT_FALSE(rejected);
+  }
+  EXPECT_FALSE(ChatReceivedMessage::create(JsonObject{{"context", JsonObject{}}}));
+  message->context.mode = static_cast<MessageContext::Mode>(255);
+  EXPECT_FALSE(message->toJson());
+
+  auto parameter = jsonToNodeParameter(JsonObject{{"type", "nUmBeR"}});
+  ASSERT_TRUE(parameter);
+  EXPECT_EQ(parameter->first, NodeParameterType::Number);
+  ASSERT_TRUE(std::holds_alternative<Json>(parameter->second));
+  EXPECT_TRUE(std::get<Json>(parameter->second).isNull());
+  auto serialized = jsonFromNodeParameter(*parameter);
+  ASSERT_TRUE(serialized);
+  EXPECT_EQ(serialized->getString("type"), "number");
+  auto output = jsonToNodeOutput(JsonObject{{"type", "BoOl"}, {"key", Json()}});
+  ASSERT_TRUE(output);
+  EXPECT_EQ(output->first, NodeParameterType::Bool);
+  EXPECT_FALSE(output->second.first);
+  EXPECT_FALSE(output->second.second);
+  for (auto const& name :
+       {String("unknown"), String(std::string("number\0", 7)), String(std::string(1, static_cast<char>(0xff)))}) {
+    EXPECT_FALSE(jsonToNodeParameter(JsonObject{{"type", name}}));
+    EXPECT_FALSE(jsonToNodeOutput(JsonObject{{"type", name}, {"key", Json()}}));
+  }
+  EXPECT_FALSE(jsonToNodeParameter(JsonObject{}));
+  parameter->first = static_cast<NodeParameterType>(255);
+  EXPECT_FALSE(jsonFromNodeParameter(*parameter));
+  output->first = static_cast<NodeParameterType>(255);
+  EXPECT_FALSE(jsonFromNodeOutput(*output));
+});
+
+const GameTestRegistration
+  fixedEnumLuaBoundaries("GameEnumNames", "CollisionAndCollectionLuaBoundaries", [](GameTest&) {
+    auto engine = LuaEngine::create();
+    ASSERT_TRUE(engine);
+    auto context = (*engine)->createContext();
+    ASSERT_TRUE(context);
+    CollisionSet collisions{CollisionKind::Block, CollisionKind::Null, CollisionKind::Platform};
+    ASSERT_TRUE(context->set("collisions", collisions));
+    auto names = context->eval<Json>("collisions");
+    ASSERT_TRUE(names);
+    EXPECT_EQ(*names, Json(JsonArray{"Null", "Platform", "Block"}));
+    auto mixed = context->eval<CollisionSet>("{'bLoCk', 'NULL', 'pLaTfOrM'}");
+    ASSERT_TRUE(mixed);
+    EXPECT_TRUE(mixed->contains(CollisionKind::Block));
+    EXPECT_TRUE(mixed->contains(CollisionKind::Null));
+    EXPECT_TRUE(mixed->contains(CollisionKind::Platform));
+    EXPECT_FALSE(mixed->contains(CollisionKind::Dynamic));
+    EXPECT_FALSE(context->eval<CollisionSet>("{'unknown'}"));
+    EXPECT_FALSE(context->eval<CollisionSet>("{string.char(255)}"));
+    EXPECT_FALSE(context->eval<CollisionSet>("{'Block' .. string.char(0)}"));
+
+    auto collection = context->eval<Collection>("{name='test', type='mOnStEr', title='Title'}");
+    ASSERT_TRUE(collection);
+    EXPECT_EQ(collection->type, CollectionType::Monster);
+    ASSERT_TRUE(context->set("collection", *collection));
+    EXPECT_EQ(context->eval<String>("collection.type"), "monster");
+    EXPECT_FALSE(context->eval<Collection>("{name='test', type='unknown', title='Title'}"));
+    EXPECT_FALSE(context->eval<Collection>("{name='test', type=string.char(255), title='Title'}"));
+    EXPECT_FALSE(context->eval<Collection>("{name='test', title='Title'}"));
+  });
 }

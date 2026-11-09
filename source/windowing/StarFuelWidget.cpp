@@ -145,8 +145,9 @@ std::expected<void, StarException> FuelWidget::renderImpl() {
     color = m_requested != 0 && m_requested == m_fuelLevel ? Color::Orange : Color::Red;
   auto font = guiContext.setFontColor(color.toRgba());
   if (!font) return std::unexpected(std::move(font.error()));
-  auto text = guiContext.renderInterfaceText(strf("Fuel {}/{}", std::min(m_fuelLevel + m_potential, m_maxLevel), (int)m_maxLevel),
-      {textPosition, HorizontalAnchor::HMidAnchor, VerticalAnchor::VMidAnchor});
+  auto text = guiContext.renderInterfaceText(
+    Star::format("Fuel {}/{}", std::min(m_fuelLevel + m_potential, m_maxLevel), static_cast<int>(m_maxLevel)),
+    {textPosition, HorizontalAnchor::HMidAnchor, VerticalAnchor::VMidAnchor});
   if (!text) return std::unexpected(std::move(text.error()));
   return {};
 }

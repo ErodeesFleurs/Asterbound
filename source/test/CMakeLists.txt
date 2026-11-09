@@ -4,6 +4,7 @@ set (star_core_tests_SOURCES
       core_tests_main.cpp
 
       algorithm_test.cpp
+      array_test.cpp
       block_allocator_test.cpp
       blocks_along_line_test.cpp
       btree_database_test.cpp
@@ -16,6 +17,7 @@ set (star_core_tests_SOURCES
       exception_test.cpp
       file_test.cpp
       hash_test.cpp
+      hash_append_test.cpp
       host_address_test.cpp
       image_directive_pipeline_test.cpp
       image_processing_test.cpp
@@ -28,6 +30,8 @@ set (star_core_tests_SOURCES
       formatted_json_test.cpp
       line_test.cpp
       lexical_cast_test.cpp
+      list_contract_test.cpp
+      list_slice_test.cpp
       lua_test.cpp
       lua_json_test.cpp
       lua_syntax_test.cpp
@@ -43,16 +47,21 @@ set (star_core_tests_SOURCES
       rect_test.cpp
       rpc_promise_test.cpp
       serialization_test.cpp
+      set_test.cpp
+      set_storage_test.cpp
       static_vector_test.cpp
       small_vector_test.cpp
       sha_test.cpp
       shell_parse.cpp
       string_test.cpp
+      string_view_storage_test.cpp
+      string_contract_test.cpp
       strong_typedef_test.cpp
       thread_test.cpp
       worker_pool_test.cpp
       variant_test.cpp
       vlq_test.cpp
+      vector_test.cpp
     )
 add_executable (core_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
@@ -74,7 +83,7 @@ target_include_directories (core_tests PRIVATE
 # The star libraries are referenced by their objects, which carries no usage
 # requirements, so the module target has to be linked in explicitly wherever a
 # source imports it.
-target_link_libraries (core_tests PRIVATE star_base_modules star_build_config star_vorbis_dependencies star_lua
+target_link_libraries (core_tests PRIVATE star_base_modules star_build_config star_vorbis_dependencies star_lua zlib-ng::zlib
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 set_target_properties (core_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAND core_tests)
@@ -181,6 +190,7 @@ set (star_game_tests_SOURCES
       movement_controller_test.cpp
       particle_presentation_test.cpp
       physics_object_test.cpp
+      player_storage_test.cpp
       root_test.cpp
       server_test.cpp
       spawn_test.cpp

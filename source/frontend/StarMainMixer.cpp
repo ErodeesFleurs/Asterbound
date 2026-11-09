@@ -244,10 +244,13 @@ std::expected<void, StarException> MainMixer::update(float dt, bool muteSfx, boo
     currentWorld = m_universeClient->worldClient();
 
   if (currentWorld) {
-    for (auto audioInstance : currentWorld->pullPendingAudio())
-      { auto played = m_mixer->play(audioInstance); if (!played) return std::unexpected(std::move(played.error())); }
+    for (auto const& audioInstance : currentWorld->pullPendingAudio()) {
+      auto played = m_mixer->play(audioInstance);
+      if (!played)
+        return std::unexpected(std::move(played.error()));
+    }
 
-    for (auto audioInstance : currentWorld->pullPendingMusic()) {
+    for (auto const& audioInstance : currentWorld->pullPendingMusic()) {
       audioInstance->setMixerGroup(MixerGroup::Music);
       { auto played = m_mixer->play(audioInstance); if (!played) return std::unexpected(std::move(played.error())); }
     }
@@ -286,8 +289,8 @@ std::expected<void, StarException> MainMixer::update(float dt, bool muteSfx, boo
     Mixer::PositionalAttenuationFunction attenuationFunction = [&](unsigned channel, Vec2F pos, float rangeMultiplier) -> std::expected<float, StarException> {
       Vec2F playerDiff = worldGeometry.diff(pos, playerPos);
       Vec2F cameraDiff = worldGeometry.diff(pos, cameraPos);
-      float playerMagSq = playerDiff.magnitudeSquared();
-      float cameraMagSq = cameraDiff.magnitudeSquared();
+      float playerMagSq = playerDiff.magnitude_squared();
+      float cameraMagSq = cameraDiff.magnitude_squared();
 
       Vec2F diff;
       float diffMagnitude;

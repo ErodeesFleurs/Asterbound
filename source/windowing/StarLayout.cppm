@@ -58,7 +58,7 @@ public:
   }
 
   Layout(GuiContext& context);
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 };
 
 }

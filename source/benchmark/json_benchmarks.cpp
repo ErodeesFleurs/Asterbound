@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -46,7 +47,7 @@ void label(benchmark::State& state, String const& input, std::size_t batch) {
     fingerprint *= 1099511628211ull;
   }
   state.SetLabel(std::format("fixture-fnv1a={:016x}; bytes={}; batch={}; includes destruction", fingerprint,
-                             input.utf8Size(), batch));
+                             input.utf8_size(), batch));
 }
 
 struct Fixture {
@@ -66,18 +67,18 @@ template <ParseKind Kind> Fixture parseFixture(std::size_t count) {
     if constexpr (Kind == ParseKind::Numbers) {
       constexpr std::array<std::string_view, 6> spelling{"0", "-17", "1.25", "6.25e2", "-0.0", "9223372036854775807"};
       std::array<Json, 6> values{Json(0),     Json(-17),  Json(1.25),
-                                 Json(625.0), Json(-0.0), Json(std::int64_t(9223372036854775807ll))};
+                                 Json(625.0), Json(-0.0), Json(static_cast<std::int64_t>(9223372036854775807ll))};
       text += spelling[i % spelling.size()];
-      expected.append(values[i % values.size()]);
+      expected.push_back(values[i % values.size()]);
     } else if constexpr (Kind == ParseKind::Unicode) {
       constexpr std::array<std::string_view, 3> spelling{"\"日本語🌟\"", "\"caf\\u00e9\\n\\t\\\"\\\\\"",
                                                          "\"\\ud83d\\ude80\""};
       std::array<Json, 3> values{Json(String("日本語🌟")), Json(String("café\n\t\"\\")), Json(String("🚀"))};
       text += spelling[i % spelling.size()];
-      expected.append(values[i % values.size()]);
+      expected.push_back(values[i % values.size()]);
     } else {
       text += " /* config 注釈 */ " + std::to_string(i) + " // setting\n";
-      expected.append(Json(i));
+      expected.push_back(Json(i));
     }
   }
   text += ']';
@@ -113,7 +114,7 @@ template <ParseKind Kind> void BM_ParseDestroy(benchmark::State& state) {
     }
   }
   state.SetItemsProcessed(state.iterations() * Batch);
-  state.SetBytesProcessed(state.iterations() * Batch * fixture.text.utf8Size());
+  state.SetBytesProcessed(state.iterations() * Batch * fixture.text.utf8_size());
 }
 
 // Padded keys make independently generated compact object text lexically sorted.
@@ -142,7 +143,7 @@ Fixture flatFixture(bool object, std::size_t count, bool preserve) {
     if (object)
       entries[String(key)] = std::move(value);
     else
-      array.append(std::move(value));
+      array.push_back(std::move(value));
   }
   text += object ? '}' : ']';
   return {String(std::move(text)), object ? Json(std::move(entries)) : Json(std::move(array))};
@@ -265,8 +266,8 @@ Json searchDocument(std::size_t count, bool changed) {
   rows.reserve(count);
   for (std::size_t i = 0; i < count; ++i) {
     bool target = changed && i + 1 == count;
-    rows.append(JsonObject{{"id", Json(i)},
-                           {"config", JsonObject{{"enabled", target}, {"keep", 23}, {"level", target ? 9 : 1}}}});
+    rows.push_back(JsonObject{{"id", Json(i)},
+                              {"config", JsonObject{{"enabled", target}, {"keep", 23}, {"level", target ? 9 : 1}}}});
   }
   return JsonObject{{"rows", std::move(rows)}, {"untouched", "snapshot"}};
 }
@@ -426,7 +427,8 @@ public:
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    std::cerr << nativeRuntime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);

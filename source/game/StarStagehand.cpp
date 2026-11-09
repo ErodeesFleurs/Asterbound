@@ -142,7 +142,7 @@ std::expected<void, StarException> Stagehand::init(World& world, EntityId entity
   if (!initialize) {
     auto cleanup = uninit();
     if (!cleanup)
-      return std::unexpected(initialize.error().withContext(std::string("Stagehand initialization rollback also failed: ") + cleanup.error().what()));
+      return std::unexpected(initialize.error().with_context(std::string("Stagehand initialization rollback also failed: ") + cleanup.error().what()));
   }
   return initialize;
 }
@@ -258,7 +258,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
     return std::unexpected(std::move(clientModeName.error()));
   if (!ClientEntityModeNames)
     return std::unexpected(ClientEntityModeNames.error());
-  auto clientMode = ClientEntityModeNames->getLeft(*clientModeName);
+  auto clientMode = ClientEntityModeNames->get_left(*clientModeName);
   if (!clientMode)
     return std::unexpected(std::move(clientMode.error()));
   m_clientEntityMode = clientMode->get();

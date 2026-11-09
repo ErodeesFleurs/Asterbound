@@ -86,8 +86,8 @@ public:
   std::optional<std::reference_wrapper<Right>> maybeRightRef();
 
 private:
-  typedef EitherLeftValue<Left> LeftType;
-  typedef EitherRightValue<Right> RightType;
+  using LeftType = EitherLeftValue<Left>;
+  using RightType = EitherRightValue<Right>;
 
   std::variant<LeftType, RightType> m_value;
 };
@@ -102,8 +102,7 @@ EitherRightValue<Value> makeRight(Value value) {
   return {std::move(value)};
 }
 
-template <typename Left, typename Right>
-Either<Left, Right>::Either() {}
+template <typename Left, typename Right> Either<Left, Right>::Either() = default;
 
 template <typename Left, typename Right>
 Either<Left, Right>::Either(EitherLeftValue<Left> left)
@@ -137,10 +136,7 @@ Either<Left, Right>::Either(Either&& rhs)
 }
 
 template <typename Left, typename Right>
-Either<Left, Right>& Either<Left, Right>::operator=(Either const& rhs) {
-  m_value = rhs.m_value;
-  return *this;
-}
+Either<Left, Right>& Either<Left, Right>::operator=(Either const& rhs) = default;
 
 template <typename Left, typename Right>
 Either<Left, Right>& Either<Left, Right>::operator=(Either&& rhs) {

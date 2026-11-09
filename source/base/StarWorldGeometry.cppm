@@ -197,9 +197,7 @@ inline bool WorldGeometry::equal(Vec2I const& p1, Vec2I const& p2) const {
   return index(p1) == index(p2);
 }
 
-inline unsigned WorldGeometry::index(int x) const {
-  return (unsigned)xwrap(x);
-}
+inline unsigned WorldGeometry::index(int x) const { return static_cast<unsigned>(xwrap(x)); }
 
 inline Vec2U WorldGeometry::index(Vec2I const& i) const {
   return Vec2U(xwrap(i[0]), i[1]);
@@ -241,14 +239,14 @@ inline Vec2F WorldGeometry::midpoint(Vec2F const& p1, Vec2F const& p2) const {
 }
 
 inline int WorldGeometry::nearestTo(int source, int target) const {
-  if (std::abs(target - source) < (int)(m_size[0] / 2))
+  if (std::abs(target - source) < static_cast<int>((m_size[0] / 2)))
     return target;
   else
     return diff(target, source) + source;
 }
 
 inline float WorldGeometry::nearestTo(float source, float target) const {
-  if (std::abs(target - source) < (float)(m_size[0] / 2))
+  if (std::abs(target - source) < static_cast<float>((m_size[0] / 2)))
     return target;
   else
     return diff(target, source) + source;

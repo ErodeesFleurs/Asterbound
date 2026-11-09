@@ -73,8 +73,8 @@ private:
   std::optional<Deque<std::pair<float, T>>> m_interpolationDataPoints;
 };
 
-typedef NetElementFloating<float> NetElementFloat;
-typedef NetElementFloating<double> NetElementDouble;
+using NetElementFloat = NetElementFloating<float>;
+using NetElementDouble = NetElementFloating<double>;
 
 template <typename T>
 NetElementFloating<T>::NetElementFloating(NetElementFloating&& other)
@@ -125,7 +125,7 @@ void NetElementFloating<T>::set(T value) {
 
     if (m_interpolationDataPoints) {
       m_interpolationDataPoints->clear();
-      m_interpolationDataPoints->append({0.0f, m_value});
+      m_interpolationDataPoints->push_back({0.0f, m_value});
     }
   }
 }
@@ -151,7 +151,7 @@ template <typename T>
   m_extrapolation = extrapolationHint;
   if (!m_interpolationDataPoints) {
     m_interpolationDataPoints.emplace();
-    m_interpolationDataPoints->append({0.0f, m_value});
+    m_interpolationDataPoints->push_back({0.0f, m_value});
   }
   return {};
 }
@@ -197,7 +197,7 @@ template <typename T>
   m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if (m_interpolationDataPoints) {
     m_interpolationDataPoints->clear();
-    m_interpolationDataPoints->append({0.0f, m_value});
+    m_interpolationDataPoints->push_back({0.0f, m_value});
   }
   return {};
 }
@@ -226,7 +226,7 @@ template <typename T>
   if (m_interpolationDataPoints) {
     if (interpolationTime < m_interpolationDataPoints->back().first)
       m_interpolationDataPoints->clear();
-    m_interpolationDataPoints->append({interpolationTime, t});
+    m_interpolationDataPoints->push_back({interpolationTime, t});
     m_value = interpolate();
   } else {
     m_value = t;
@@ -243,7 +243,7 @@ template <typename T>
     if (interpolationTime < lastTime)
       *m_interpolationDataPoints = {lastPoint};
     else
-      m_interpolationDataPoints->append(lastPoint);
+      m_interpolationDataPoints->push_back(lastPoint);
 
     m_value = interpolate();
   }

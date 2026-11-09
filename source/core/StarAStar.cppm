@@ -17,7 +17,7 @@ namespace AStar {
     Score();
 
     double gScore;
-    double hScore;
+    double hScore = 0;
     double fScore;
   };
 
@@ -148,7 +148,7 @@ namespace AStar {
     std::optional<Path<Edge>> m_result;
   };
 
-  inline Score::Score() : gScore(std::numeric_limits<double>::max()), hScore(0), fScore(std::numeric_limits<double>::max()) {}
+  inline Score::Score() : gScore(std::numeric_limits<double>::max()), fScore(std::numeric_limits<double>::max()) {}
 
   template <class Edge, class Node>
   Search<Edge, Node>::Search(HeuristicFunction heuristicCost,
@@ -337,7 +337,7 @@ namespace AStar {
       auto const& incomingEdge = m_nodeMeta[currentNode].cameFrom;
       if (!incomingEdge)
         break;
-      path.append(*incomingEdge);
+      path.push_back(*incomingEdge);
       currentNode = incomingEdge->source;
     }
     std::reverse(path.begin(), path.end());

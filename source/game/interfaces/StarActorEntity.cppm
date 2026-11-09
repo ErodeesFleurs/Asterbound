@@ -32,7 +32,7 @@ public:
   }
 
   // Successfully constructed actors always own both controllers.
-  virtual ActorMovementController& movementController() override = 0;
+  ActorMovementController& movementController() override = 0;
   virtual StatusController& statusController() = 0;
 };
 }

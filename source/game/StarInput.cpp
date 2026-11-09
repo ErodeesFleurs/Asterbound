@@ -60,19 +60,31 @@ inline bool compareKeyMod(KeyMod input, KeyMod test) {
 
 Json keyModsToJson(KeyMod mod) {
   JsonArray array;
-  
-  if (bool(mod & KeyMod::LShift)) array.emplace_back("LShift");
-  if (bool(mod & KeyMod::RShift)) array.emplace_back("RShift");
-  if (bool(mod & KeyMod::LCtrl )) array.emplace_back("LCtrl" );
-  if (bool(mod & KeyMod::RCtrl )) array.emplace_back("RCtrl" );
-  if (bool(mod & KeyMod::LAlt  )) array.emplace_back("LAlt"  );
-  if (bool(mod & KeyMod::RAlt  )) array.emplace_back("RAlt"  );
-  if (bool(mod & KeyMod::LGui  )) array.emplace_back("LGui"  );
-  if (bool(mod & KeyMod::RGui  )) array.emplace_back("RGui"  );
-  if (bool(mod & KeyMod::Num   )) array.emplace_back("Num"   );
-  if (bool(mod & KeyMod::Caps  )) array.emplace_back("Caps"  );
-  if (bool(mod & KeyMod::AltGr )) array.emplace_back("AltGr" );
-  if (bool(mod & KeyMod::Scroll)) array.emplace_back("Scroll");
+
+  if (static_cast<bool>(mod & KeyMod::LShift))
+    array.emplace_back("LShift");
+  if (static_cast<bool>(mod & KeyMod::RShift))
+    array.emplace_back("RShift");
+  if (static_cast<bool>(mod & KeyMod::LCtrl))
+    array.emplace_back("LCtrl");
+  if (static_cast<bool>(mod & KeyMod::RCtrl))
+    array.emplace_back("RCtrl");
+  if (static_cast<bool>(mod & KeyMod::LAlt))
+    array.emplace_back("LAlt");
+  if (static_cast<bool>(mod & KeyMod::RAlt))
+    array.emplace_back("RAlt");
+  if (static_cast<bool>(mod & KeyMod::LGui))
+    array.emplace_back("LGui");
+  if (static_cast<bool>(mod & KeyMod::RGui))
+    array.emplace_back("RGui");
+  if (static_cast<bool>(mod & KeyMod::Num))
+    array.emplace_back("Num");
+  if (static_cast<bool>(mod & KeyMod::Caps))
+    array.emplace_back("Caps");
+  if (static_cast<bool>(mod & KeyMod::AltGr))
+    array.emplace_back("AltGr");
+  if (static_cast<bool>(mod & KeyMod::Scroll))
+    array.emplace_back("Scroll");
 
   return array.empty() ? Json() : std::move(array);
 }
@@ -107,13 +119,13 @@ Json keyModsToJson(KeyMod mod) {
 }
 
 std::size_t hash<InputVariant>::operator()(InputVariant const& v) const {
-  std::size_t indexHash = hashOf(static_cast<std::uint8_t>(v.index()));
+  std::size_t indexHash = hash_of(static_cast<std::uint8_t>(v.index()));
   if (std::holds_alternative<Key>(v))
-    hashCombine(indexHash, hashOf(std::get<Key>(v)));
+    hash_combine(indexHash, hash_of(std::get<Key>(v)));
   else if (std::holds_alternative<MouseButton>(v))
-    hashCombine(indexHash, hashOf(std::get<MouseButton>(v)));
+    hash_combine(indexHash, hash_of(std::get<MouseButton>(v)));
   else if (std::holds_alternative<ControllerButton>(v))
-    hashCombine(indexHash, hashOf(std::get<ControllerButton>(v)));
+    hash_combine(indexHash, hash_of(std::get<ControllerButton>(v)));
 
   return indexHash;
 }
@@ -321,7 +333,7 @@ std::expected<Input::BindEntry, StarException> Input::BindEntry::create(Input& i
     auto bind = bindFromJson(jBind);
     if (!bind) {
       if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-      auto logged = input.m_root.logger().errorException(strf("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id), ExceptionDiagnostic(bind.error()));
+      auto logged = input.m_root.logger().errorException(Star::format("Binds: Error loading default bind in {}.{}", parentCategory.id, result.id), ExceptionDiagnostic(bind.error()));
       if (!logged) return std::unexpected(std::move(logged.error()));
     } else result.defaultBinds.emplace_back(std::move(*bind));
   }
@@ -342,13 +354,13 @@ std::expected<void, StarException> Input::BindEntry::updated() {
   if (!root->isType(Json::Type::Object)) {
     if (auto r = (*config)->set(InputBindingConfigRoot, JsonObject()); !r) return std::unexpected(std::move(r.error()));
   }
-  String path = strf("{}.{}", InputBindingConfigRoot, category.get().id);
+  String path = Star::format("{}.{}", InputBindingConfigRoot, category.get().id);
   auto category = (*config)->getPath(path);
   if (!category) return std::unexpected(std::move(category.error()));
   if (!category->isType(Json::Type::Object)) {
     if (auto r = (*config)->setPath(path, JsonObject{{id, std::move(array)}}); !r) return std::unexpected(std::move(r.error()));
   } else {
-    path = strf("{}.{}", path, id);
+    path = Star::format("{}.{}", path, id);
     if (auto r = (*config)->setPath(path, array); !r) return std::unexpected(std::move(r.error()));
   }
   owner.rebuildMappings();
@@ -385,21 +397,19 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
   if (!userBindings) return std::unexpected(std::move(userBindings.error()));
   auto configured = config.getObject("binds", {});
   if (!configured) return std::unexpected(std::move(configured.error()));
-  for (auto const& pair : *configured) {
-    String const& bindId = pair.first;
-    Json const& bindConfig = pair.second;
+  for (auto const& [bindId, bindConfig] : *configured) {
     if (!bindConfig.isType(Json::Type::Object)) continue;
     auto built = BindEntry::create(owner, bindId, bindConfig, *this);
     if (!built) return std::unexpected(std::move(built.error()));
     auto& entry = entries.try_emplace(bindId, std::move(*built)).first->second;
     if (userBindings->isType(Json::Type::Object)) {
-      auto bindings = userBindings->queryArray(strf("{}.{}", id, bindId), {});
+      auto bindings = userBindings->queryArray(Star::format("{}.{}", id, bindId), {});
       if (!bindings) return std::unexpected(std::move(bindings.error()));
       for (auto const& jBind : *bindings) {
         auto bind = bindFromJson(jBind);
         if (!bind) {
           if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-          auto logged = owner.m_root.logger().errorException(strf("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
+          auto logged = owner.m_root.logger().errorException(Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
           if (!logged) return std::unexpected(std::move(logged.error()));
         } else entry.customBinds.emplace_back(std::move(*bind));
       }
@@ -424,8 +434,8 @@ List<std::reference_wrapper<Input::BindEntry>> Input::filterBindEntries(List<Inp
 }
 
 std::optional<std::reference_wrapper<Input::BindEntry>> Input::maybeBindEntry(String const& categoryId, String const& bindId) {
-  if (auto category = m_bindCategories.maybeRef(categoryId))
-    return category->get().entries.maybeRef(bindId);
+  if (auto category = m_bindCategories.find_ref(categoryId))
+    return category->get().entries.find_ref(bindId);
   return std::nullopt;
 }
 
@@ -438,7 +448,7 @@ std::expected<std::reference_wrapper<Input::BindEntry>, StarException> Input::bi
 
 std::optional<std::reference_wrapper<Input::InputState>> Input::maybeBindState(String const& categoryId, String const& bindId) {
   if (auto entry = maybeBindEntry(categoryId, bindId)) {
-    if (auto state = m_bindStates.maybeRef(entry->get().stateId))
+    if (auto state = m_bindStates.find_ref(entry->get().stateId))
       return std::ref(static_cast<InputState&>(state->get()));
   }
   return std::nullopt;
@@ -483,7 +493,7 @@ void Input::reset(bool clear) {
     m_controllerStates.clear();
     m_bindStates.clear();
   } else {
-    auto eraseCond = [](auto& p) {
+    auto eraseCond = [](auto&& p) {
       if (p.second.held)
         p.second.reset();
       return !p.second.held;
@@ -492,14 +502,14 @@ void Input::reset(bool clear) {
     eraseWhere(m_keyStates,        eraseCond);
     eraseWhere(m_mouseStates,      eraseCond);
     eraseWhere(m_controllerStates, eraseCond);
-    eraseWhere(m_bindStates, [&](auto& p) {
+    eraseWhere(m_bindStates, [&](auto&& p) {
       if (p.second.held)
         p.second.reset();
       else {
         for (auto& tag : p.second.entry.get().tags) {
           auto find = m_activeTags.find(tag);
           if (find != m_activeTags.end() && !--find->second)
-              m_activeTags.erase(find);
+            m_activeTags.erase(find);
         }
         return true;
       }
@@ -517,7 +527,7 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
   m_inputEvents.emplace_back(input, gameProcessed);
   if (std::holds_alternative<KeyDownEvent>(input)) {
     auto const& keyDown = std::get<KeyDownEvent>(input);
-    auto keyToMod = KeysToMods->maybeRightRef(keyDown.key);
+    auto keyToMod = KeysToMods->find_right_ref(keyDown.key);
     if (keyToMod)
       m_pressedMods |= keyToMod->get();
 
@@ -526,8 +536,8 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
       if (keyToMod)
         state.mods |= keyToMod->get();
       state.press();
-      
-      if (auto binds = m_bindMappings.maybeRef(keyDown.key)) {
+
+      if (auto binds = m_bindMappings.find_ref(keyDown.key)) {
         for (auto bind : filterBindEntries(binds->get(), keyDown.mods))
           addBindState(bind.get()).press();
       }
@@ -535,20 +545,20 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
   }
   else if (std::holds_alternative<KeyUpEvent>(input)) {
     auto const& keyUp = std::get<KeyUpEvent>(input);
-    auto keyToMod = KeysToMods->maybeRightRef(keyUp.key);
+    auto keyToMod = KeysToMods->find_right_ref(keyUp.key);
     if (keyToMod)
       m_pressedMods &= ~keyToMod->get();
 
     // We need to be able to release input even when gameProcessed is true, but only if it's already down.
-    if (auto state = m_keyStates.maybeRef(keyUp.key)) {
+    if (auto state = m_keyStates.find_ref(keyUp.key)) {
       if (keyToMod)
         state->get().mods &= ~keyToMod->get();
       state->get().release();
     }
 
-    if (auto binds = m_bindMappings.maybeRef(keyUp.key)) {
+    if (auto binds = m_bindMappings.find_ref(keyUp.key)) {
       for (auto& bind : binds->get()) {
-        if (auto state = m_bindStates.maybeRef(bind.entry.get().stateId))
+        if (auto state = m_bindStates.find_ref(bind.entry.get().stateId))
           state->get().release();
       }
     }
@@ -558,10 +568,10 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
     m_mousePosition = mouseDown.mousePosition;
     if (!gameProcessed) {
       auto& state = m_mouseStates[mouseDown.mouseButton];
-      state.pressPositions.append(mouseDown.mousePosition);
+      state.pressPositions.push_back(mouseDown.mousePosition);
       state.press();
 
-      if (auto binds = m_bindMappings.maybeRef(mouseDown.mouseButton)) {
+      if (auto binds = m_bindMappings.find_ref(mouseDown.mouseButton)) {
         for (auto bind : filterBindEntries(binds->get(), m_pressedMods))
           addBindState(bind.get()).press();
       }
@@ -570,14 +580,14 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
   else if (std::holds_alternative<MouseButtonUpEvent>(input)) {
     auto const& mouseUp = std::get<MouseButtonUpEvent>(input);
     m_mousePosition = mouseUp.mousePosition;
-    if (auto state = m_mouseStates.maybeRef(mouseUp.mouseButton)) {
-      state->get().releasePositions.append(mouseUp.mousePosition);
+    if (auto state = m_mouseStates.find_ref(mouseUp.mouseButton)) {
+      state->get().releasePositions.push_back(mouseUp.mousePosition);
       state->get().release();
     }
 
-    if (auto binds = m_bindMappings.maybeRef(mouseUp.mouseButton)) {
+    if (auto binds = m_bindMappings.find_ref(mouseUp.mouseButton)) {
       for (auto& bind : binds->get()) {
-        if (auto state = m_bindStates.maybeRef(bind.entry.get().stateId))
+        if (auto state = m_bindStates.find_ref(bind.entry.get().stateId))
           state->get().release();
       }
     }
@@ -592,7 +602,7 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
       auto& state = m_controllerStates[controllerDown.controllerButton];
       state.press();
 
-      if (auto binds = m_bindMappings.maybeRef(controllerDown.controllerButton)) {
+      if (auto binds = m_bindMappings.find_ref(controllerDown.controllerButton)) {
         for (auto bind : filterBindEntries(binds->get(), m_pressedMods))
           addBindState(bind.get()).press();
       }
@@ -600,12 +610,12 @@ std::expected<bool, StarException> Input::handleInput(InputEvent const& input, b
   }
   else if (std::holds_alternative<ControllerButtonUpEvent>(input)) {
     auto const& controllerUp = std::get<ControllerButtonUpEvent>(input);
-    if (auto state = m_controllerStates.maybeRef(controllerUp.controllerButton))
+    if (auto state = m_controllerStates.find_ref(controllerUp.controllerButton))
       state->get().release();
 
-    if (auto binds = m_bindMappings.maybeRef(controllerUp.controllerButton)) {
+    if (auto binds = m_bindMappings.find_ref(controllerUp.controllerButton)) {
       for (auto& bind : binds->get()) {
-        if (auto state = m_bindStates.maybeRef(bind.entry.get().stateId))
+        if (auto state = m_bindStates.find_ref(bind.entry.get().stateId))
           state->get().release();
       }
     }
@@ -636,7 +646,7 @@ void Input::rebuildMappings() {
     }
   }
 
-  for (auto& pair : m_bindMappings) {
+  for (auto&& pair : m_bindMappings) {
     pair.second.sort([](BindRef const& a, BindRef const& b)
       { return a.priority > b.priority; });
   }
@@ -696,7 +706,7 @@ std::optional<unsigned> Input::bindUp(String const& categoryId, String const& bi
 }
 
 std::optional<unsigned> Input::keyDown(Key key, std::optional<KeyMod> keyMod) {
-  if (auto state = m_keyStates.maybeRef(key)) {
+  if (auto state = m_keyStates.find_ref(key)) {
     if (state->get().presses && (!keyMod || compareKeyMod(*keyMod, state->get().mods)))
       return state->get().presses;
   }
@@ -704,12 +714,12 @@ std::optional<unsigned> Input::keyDown(Key key, std::optional<KeyMod> keyMod) {
 }
 
 bool Input::keyHeld(Key key) {
-  auto state = m_keyStates.maybeRef(key);
+  auto state = m_keyStates.find_ref(key);
   return state && state->get().held;
 }
 
 std::optional<unsigned> Input::keyUp(Key key) {
-  if (auto state = m_keyStates.maybeRef(key)) {
+  if (auto state = m_keyStates.find_ref(key)) {
     if (state->get().releases)
       return state->get().releases;
   }
@@ -717,7 +727,7 @@ std::optional<unsigned> Input::keyUp(Key key) {
 }
 
 std::optional<List<Vec2F>> Input::mouseDown(MouseButton button) {
-  if (auto state = m_mouseStates.maybeRef(button)) {
+  if (auto state = m_mouseStates.find_ref(button)) {
     if (state->get().presses)
       return state->get().pressPositions;
   }
@@ -725,12 +735,12 @@ std::optional<List<Vec2F>> Input::mouseDown(MouseButton button) {
 }
 
 bool Input::mouseHeld(MouseButton button) {
-  auto state = m_mouseStates.maybeRef(button);
+  auto state = m_mouseStates.find_ref(button);
   return state && state->get().held;
 }
 
 std::optional<List<Vec2F>> Input::mouseUp(MouseButton button) {
-  if (auto state = m_mouseStates.maybeRef(button)) {
+  if (auto state = m_mouseStates.find_ref(button)) {
     if (state->get().releases)
       return state->get().releasePositions;
   }
@@ -788,7 +798,7 @@ std::expected<void, StarException> Input::setBinds(String const& categoryId, Str
 }
 
 unsigned Input::getTag(String const& tagName) const {
-  if (auto tag = m_activeTags.maybeRef(tagName))
+  if (auto tag = m_activeTags.find_ref(tagName))
     return tag->get();
   else
     return 0;

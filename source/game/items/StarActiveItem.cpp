@@ -184,7 +184,8 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto scripts = instanceValue("scripts").and_then(jsonToStringList);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    auto configured = m_script.setScripts(scripts->transformed(std::bind(&AssetPath::relativeTo, directory(), std::placeholders::_1)));
+    auto configured = m_script.setScripts(scripts->transformed(
+      [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -206,7 +207,11 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto itemCallbacks = LuaBindings::makeItemCallbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("item", std::move(callbacks)); });
     if (!itemCallbacks)
       return std::unexpected(std::move(itemCallbacks.error()));
-    auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2)).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("config", std::move(callbacks)); });
+    auto configCallbacks =
+      LuaBindings::makeConfigCallbacks([this](String const& name,
+                                              Json const& defaultValue) -> std::expected<Json, StarException> {
+        return instanceValue(name, defaultValue);
+      }).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("config", std::move(callbacks)); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     auto animatorCallbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("animator", std::move(callbacks)); });
@@ -245,7 +250,8 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto scripts = jsonToStringList(*animationScripts);
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
-      auto configured = m_scriptedAnimator.setScripts(scripts->transformed(std::bind(&AssetPath::relativeTo, directory(), std::placeholders::_1)));
+      auto configured = m_scriptedAnimator.setScripts(scripts->transformed(
+        [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
@@ -260,7 +266,13 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto activeCallbacks = makeScriptedAnimationCallbacks().and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("activeItemAnimation", std::move(callbacks)); });
       if (!activeCallbacks)
         return std::unexpected(std::move(activeCallbacks.error()));
-      auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(*this), std::placeholders::_1, std::placeholders::_2)).and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("config", std::move(callbacks)); });
+      auto configCallbacks =
+        LuaBindings::makeConfigCallbacks([this](String const& name,
+                                                Json const& defaultValue) -> std::expected<Json, StarException> {
+          return instanceValue(name, defaultValue);
+        }).and_then([&](LuaCallbacks callbacks) {
+          return m_scriptedAnimator.addCallbacks("config", std::move(callbacks));
+        });
       if (!configCallbacks)
         return std::unexpected(std::move(configCallbacks.error()));
       auto animationInitialized = m_scriptedAnimator.init(itemWorld->get());
@@ -435,7 +447,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
         return std::unexpected(std::move(position.error()));
       line.translate(*position);
     }
-    damageSources.append(std::move(ds));
+    damageSources.push_back(std::move(ds));
   }
   return damageSources;
 }
@@ -453,7 +465,7 @@ std::expected<List<PolyF>, StarException> ActiveItem::shieldPolys() const {
     if (!position)
       return std::unexpected(std::move(position.error()));
     sp.translate(*position);
-    shieldPolys.append(std::move(sp));
+    shieldPolys.push_back(std::move(sp));
   }
   return shieldPolys;
 }
@@ -486,7 +498,7 @@ std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::forceRegions(
         return std::unexpected(std::move(position.error()));
       rfr.center += itemOwner->get().position() + *position;
     }
-    forceRegions.append(std::move(fr));
+    forceRegions.push_back(std::move(fr));
   }
   return forceRegions;
 }
@@ -562,9 +574,9 @@ std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpo
       else
         light.beamAngle = -std::numbers::pi / 2 - constrainAngle(light.beamAngle + std::numbers::pi / 2);
     }
-    result.append(std::move(light));
+    result.push_back(std::move(light));
   }
-  result.appendAll(m_scriptedAnimator.lightSources());
+  result.append_range(m_scriptedAnimator.lightSources());
   return result;
 }
 
@@ -586,9 +598,9 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
     if (!position)
       return std::unexpected(std::move(position.error()));
     audio->setPosition(itemOwner->get().position() + *position);
-    result.append(std::move(audio));
+    result.push_back(std::move(audio));
   }
-  result.appendAll(m_scriptedAnimator.pullNewAudios());
+  result.append_range(m_scriptedAnimator.pullNewAudios());
   return result;
 }
 
@@ -608,9 +620,9 @@ std::expected<List<Particle>, StarException> ActiveItem::pullNewParticles() {
       particle.velocity[0] *= -1;
       particle.flip = !particle.flip;
     }
-    result.append(std::move(particle));
+    result.push_back(std::move(particle));
   }
-  result.appendAll(m_scriptedAnimator.pullNewParticles());
+  result.append_range(m_scriptedAnimator.pullNewParticles());
   return result;
 }
 
@@ -772,7 +784,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto source = DamageSource::create(value);
           if (!source)
             return std::unexpected(std::move(source.error()));
-          sources.append(std::move(*source));
+          sources.push_back(std::move(*source));
         }
       }
       m_damageSources.set(std::move(sources));
@@ -786,7 +798,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto source = DamageSource::create(value);
           if (!source)
             return std::unexpected(std::move(source.error()));
-          sources.append(std::move(*source));
+          sources.push_back(std::move(*source));
         }
       }
       m_itemDamageSources.set(std::move(sources));
@@ -804,7 +816,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto region = jsonToPhysicsForceRegion(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
-          regions.append(std::move(*region));
+          regions.push_back(std::move(*region));
         }
       }
       m_forceRegions.set(std::move(regions));
@@ -818,7 +830,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
           auto region = jsonToPhysicsForceRegion(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
-          regions.append(std::move(*region));
+          regions.push_back(std::move(*region));
         }
       }
       m_itemForceRegions.set(std::move(regions));
@@ -844,7 +856,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         if (*image) {
-          auto updated = config.set("image", AssetPath::relativeTo(directory(), **image));
+          auto updated = config.set("image", AssetPath::relative_to(directory(), **image));
           if (!updated)
             return std::unexpected(std::move(updated.error()));
           config = std::move(*updated);
@@ -852,7 +864,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         auto drawable = Drawable::create(**metadata, config);
         if (!drawable)
           return std::unexpected(std::move(drawable.error()));
-        drawables.append(std::move(*drawable));
+        drawables.push_back(std::move(*drawable));
       }
     } else {
       auto image = icon.toString();
@@ -861,10 +873,10 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto drawable = Drawable::makeImage(**metadata, AssetPath::relativeTo(directory(), *image), 1.0f, true, Vec2F());
+      auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
-      drawables.append(std::move(*drawable));
+      drawables.push_back(std::move(*drawable));
     }
     return drawables;
   };
@@ -895,7 +907,9 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(itemHand.error()));
       if (auto otherHandItem = itemOwner->get().handItem(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
         if (auto otherActiveItem = as<ActiveItem>(otherHandItem))
-          return otherActiveItem->m_script.invoke(function, args).transform([](std::optional<LuaValue> value) { return value.value_or(LuaValue{}); });
+          return otherActiveItem->m_script.invoke(function, args).transform([](std::optional<LuaValue> value) {
+            return std::move(value).value_or(LuaValue{});
+          });
       }
       return LuaValue{};
     }); !added)
@@ -913,7 +927,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
   if (auto added = callbacks.registerCallback("emote", [this](String const& name) -> std::expected<void, StarException> {
       if (!HumanoidEmoteNames)
         return std::unexpected(HumanoidEmoteNames.error());
-      auto emote = HumanoidEmoteNames->getLeft(name);
+      auto emote = HumanoidEmoteNames->get_left(name);
       if (!emote)
         return std::unexpected(std::move(emote.error()));
       auto itemOwner = owner();

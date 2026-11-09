@@ -21,9 +21,9 @@ public:
 private:
   EmoteProcessor() = default;
   struct EmoteBinding {
-    EmoteBinding() : emote() {}
+    EmoteBinding() = default;
     String text;
-    HumanoidEmote emote;
+    HumanoidEmote emote{};
   };
   List<EmoteBinding> m_emoteBindings;
 };

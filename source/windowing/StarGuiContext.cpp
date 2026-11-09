@@ -409,7 +409,7 @@ std::expected<void, StarException> GuiContext::drawImageStretchSet(ImageStretchS
   bool horizontal = direction == GuiDirection::Horizontal;
   unsigned axis = horizontal ? 0 : 1;
   int offset = beginSize[axis];
-  int length = std::max(0, int(screenPos.size()[axis]) - offset - int(endSize[axis]));
+  int length = std::max(0, static_cast<int>(screenPos.size()[axis]) - offset - static_cast<int>(endSize[axis]));
   RectF begin = RectF::withSize(screenPos.min(), horizontal ? Vec2F(offset, screenPos.height()) : Vec2F(screenPos.width(), offset));
   RectF inner = RectF::withSize(screenPos.min() + (horizontal ? Vec2F(offset, 0) : Vec2F(0, offset)),
       horizontal ? Vec2F(length, screenPos.height()) : Vec2F(screenPos.width(), length));
@@ -429,7 +429,7 @@ std::expected<void, StarException> GuiContext::drawImageStretchSet(ImageStretchS
       return std::unexpected(GuiContextException("Cannot repeat an empty stretch-set texture"));
     int position = 0;
     while (position < length) {
-      float partLength = std::min(float(length - position), texSize[axis]);
+      float partLength = std::min(static_cast<float>(length - position), texSize[axis]);
       RectF partial = horizontal ? RectF::withSize(Vec2F(), Vec2F(partLength, texSize[1]))
           : RectF::withSize(Vec2F(0, std::max(0.0f, texSize[1] - (length - position))), Vec2F(texSize[0], partLength));
       auto drawn = drawInterfaceQuad(imageSet.inner, partial,
@@ -465,8 +465,12 @@ std::expected<RectF, StarException> GuiContext::renderText(String const& s, Text
 }
 
 std::expected<RectF, StarException> GuiContext::renderInterfaceText(String const& s, TextPositioning const& position) {
-  auto res = renderText(s, {position.pos * interfaceScale(), position.hAnchor, position.vAnchor,
-      position.wrapWidth.transform(std::bind(std::multiplies<int>(), std::placeholders::_1, interfaceScale())), position.charLimit});
+  auto res = renderText(s,
+                        {position.pos * interfaceScale(), position.hAnchor, position.vAnchor,
+                         position.wrapWidth.transform([scale = interfaceScale()](unsigned width) {
+                           return static_cast<int>(width) * static_cast<int>(scale);
+                         }),
+                         position.charLimit});
   if (!res)
     return std::unexpected(std::move(res.error()));
   return res->scaled(1.0f / interfaceScale());
@@ -480,8 +484,12 @@ std::expected<RectF, StarException> GuiContext::determineTextSize(String const& 
 }
 
 std::expected<RectF, StarException> GuiContext::determineInterfaceTextSize(String const& s, TextPositioning const& positioning) {
-  auto res = determineTextSize(s, {positioning.pos * interfaceScale(), positioning.hAnchor, positioning.vAnchor,
-      positioning.wrapWidth.transform(std::bind(std::multiplies<int>(), std::placeholders::_1, interfaceScale())), positioning.charLimit});
+  auto res = determineTextSize(s,
+                               {positioning.pos * interfaceScale(), positioning.hAnchor, positioning.vAnchor,
+                                positioning.wrapWidth.transform([scale = interfaceScale()](unsigned width) {
+                                  return static_cast<int>(width) * static_cast<int>(scale);
+                                }),
+                                positioning.charLimit});
   if (!res)
     return std::unexpected(std::move(res.error()));
   return res->scaled(1.0f / interfaceScale());

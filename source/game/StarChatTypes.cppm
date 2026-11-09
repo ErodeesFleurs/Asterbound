@@ -16,7 +16,8 @@ enum class ChatSendMode : std::uint8_t {
   Party
 };
 
-extern std::expected<EnumMap<ChatSendMode>, StarException> const ChatSendModeNames;
+inline constexpr auto ChatSendModeNames = sortedEnumNames(std::to_array<std::pair<ChatSendMode, std::string_view>>(
+  {{ChatSendMode::Broadcast, "Broadcast"}, {ChatSendMode::Local, "Local"}, {ChatSendMode::Party, "Party"}}));
 
 struct MessageContext {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MessageContext& messageContext);
@@ -41,7 +42,15 @@ struct MessageContext {
   String channelName;
 };
 
-extern std::expected<EnumMap<MessageContext::Mode>, StarException> const MessageContextModeNames;
+inline constexpr auto MessageContextModeNames =
+  sortedEnumNames(std::to_array<std::pair<MessageContext::Mode, std::string_view>>(
+    {{MessageContext::Mode::Local, "Local"},
+     {MessageContext::Mode::Party, "Party"},
+     {MessageContext::Mode::Broadcast, "Broadcast"},
+     {MessageContext::Mode::Whisper, "Whisper"},
+     {MessageContext::Mode::CommandResult, "CommandResult"},
+     {MessageContext::Mode::RadioMessage, "RadioMessage"},
+     {MessageContext::Mode::World, "World"}}));
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MessageContext& messageContext);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MessageContext const& messageContext);

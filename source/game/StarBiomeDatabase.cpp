@@ -83,17 +83,21 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
     if (!queued) return std::unexpected(std::move(queued.error()));
     for (auto const& file : files->get()) {
       auto const& path = file.string();
-      auto readFile = [&]() -> std::expected<void, StarException> {
+      auto read_file = [&]() -> std::expected<void, StarException> {
         auto parameters = (*assets)->json(path);
-        if (!parameters) return std::unexpected(std::move(parameters.error()));
-        if (parameters->isNull()) return {};
+        if (!parameters)
+          return std::unexpected(std::move(parameters.error()));
+        if (parameters->isNull())
+          return {};
         auto name = parameters->getString("name");
-        if (!name) return std::unexpected(std::move(name.error()));
-        if (map.contains(*name)) return std::unexpected(BiomeException(strf("Duplicate {} generator name '{}'", type, *name)));
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        if (map.contains(*name))
+          return std::unexpected(BiomeException(Star::format("Duplicate {} generator name '{}'", type, *name)));
         map[*name] = {path, *name, std::move(*parameters)};
         return {};
       };
-      auto loaded = readFile();
+      auto loaded = read_file();
       if (!loaded) return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), path, "Loading biome or weather"));
     }
     return {};
@@ -133,7 +137,7 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
   auto weatherList = bin->optArray();
   if (!weatherList) return std::unexpected(std::move(weatherList.error()));
   if (*weatherList && !(*weatherList)->empty()) {
-    auto path = staticRandomFrom(**weatherList, seed, "WeatherPool");
+    auto path = static_random_from(**weatherList, seed, "WeatherPool");
     if (!path) return std::unexpected(std::move(path.error()));
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
@@ -157,7 +161,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
   auto options = config->get().parameters.optArray("skyOptions");
   if (!options) return std::unexpected(std::move(options.error()));
   if (*options) {
-    auto option = staticRandomFrom(**options, seed, "BiomeSkyOption");
+    auto option = static_random_from(**options, seed, "BiomeSkyOption");
     if (!option) return std::unexpected(std::move(option.error()));
     {
       auto colorConfig = option->get().get("mainColor");
@@ -316,7 +320,7 @@ std::expected<StringList, StarException> BiomeDatabase::biomeOres(String const& 
       if (*density > 0) {
         auto name = entry.getString(0);
         if (!name) return std::unexpected(std::move(name.error()));
-        result.append(std::move(*name));
+        result.push_back(std::move(*name));
       }
     }
   }
@@ -328,17 +332,17 @@ StringList BiomeDatabase::weatherNames() const {
 }
 
 std::expected<WeatherType, StarException> BiomeDatabase::weatherType(String const& name) const {
-  if (!m_weathers.contains(name)) return std::unexpected(BiomeException(strf("No such weather type '{}'", name)));
+  if (!m_weathers.contains(name)) return std::unexpected(BiomeException(Star::format("No such weather type '{}'", name)));
   auto config = m_weathers.get(name);
   if (!config) return std::unexpected(std::move(config.error()));
   auto result = WeatherType::create(m_root, config->get().parameters, config->get().path);
   if (!result && result.error().is<MapException>())
-    return std::unexpected(BiomeException(strf("Required key not found in weather config {}", config->get().path), result.error()));
+    return std::unexpected(BiomeException(Star::format("Required key not found in weather config {}", config->get().path), result.error()));
   return result;
 }
 
 std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(String const& biomeName, std::uint64_t seed, float verticalMidPoint, float threatLevel) const {
-  if (!m_biomes.contains(biomeName)) return std::unexpected(BiomeException(strf("No such biome '{}'", biomeName)));
+  if (!m_biomes.contains(biomeName)) return std::unexpected(BiomeException(Star::format("No such biome '{}'", biomeName)));
   auto materials = m_root.materialDatabase();
   if (!materials) return std::unexpected(std::move(materials.error()));
   auto parse = [&]() -> std::expected<std::shared_ptr<Biome>, StarException> {
@@ -371,7 +375,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
       if (!name) return std::unexpected(std::move(name.error()));
       auto id = (*materials)->materialId(*name);
       if (!id) return std::unexpected(std::move(id.error()));
-      biome->subBlocks.append(*id);
+      biome->subBlocks.push_back(*id);
     }
     auto oreConfig = parameters.get("ores", {});
     if (!oreConfig) return std::unexpected(std::move(oreConfig.error()));
@@ -399,7 +403,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     auto parallax = parameters.optString("parallax");
     if (!parallax) return std::unexpected(std::move(parallax.error()));
     if (*parallax) {
-      auto path = AssetPath::relativeTo(config->get().path, **parallax);
+      auto path = AssetPath::relative_to(config->get().path, **parallax);
       {
         auto value = Parallax::create(m_root, path, seed, verticalMidPoint, *hue, biome->surfacePlaceables.firstTreeType());
         if (!value) return std::unexpected(std::move(value.error()));
@@ -434,7 +438,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     return biome;
   };
   auto result = parse();
-  if (!result) return std::unexpected(BiomeException(strf("Failed to parse biome: '{}'", biomeName), result.error()));
+  if (!result) return std::unexpected(BiomeException(Star::format("Failed to parse biome: '{}'", biomeName), result.error()));
   return result;
 }
 
@@ -449,7 +453,7 @@ std::expected<float, StarException> BiomeDatabase::pickHueShiftFromJson(Json sou
   auto options = jsonToFloatList(source);
   if (!options) return std::unexpected(std::move(options.error()));
   if (options->empty()) return 0;
-  auto t = staticRandomU32(seed, key);
+  auto t = static_random_u32(seed, key);
   return (*options)[t % options->size()];
 }
 
@@ -505,7 +509,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
   for (auto const& item : *items) {
     auto distribution = BiomeItemDistribution::create(m_root, item, rand.randu64(), biomeHueShift);
     if (!distribution) return std::unexpected(std::move(distribution.error()));
-    result.itemDistributions.append(std::move(*distribution));
+    result.itemDistributions.push_back(std::move(*distribution));
   }
   return result;
 }
@@ -531,7 +535,7 @@ std::expected<List<std::pair<ModId, float>>, StarException> BiomeDatabase::readO
         if (!name) return std::unexpected(std::move(name.error()));
         auto id = (*materials)->modId(*name);
         if (!id) return std::unexpected(std::move(id.error()));
-        result.append({*id, *density});
+        result.push_back({*id, *density});
       }
     }
   }

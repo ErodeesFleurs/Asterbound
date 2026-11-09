@@ -62,7 +62,7 @@ public:
   }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScrollThumb>, StarException> create(GuiContext& context, GuiDirection direction);
-  virtual ~ScrollThumb() {}
+  ~ScrollThumb() override = default;
 
   void setDirection(GuiDirection direction);
   void setImages(ImageStretchSet const& base,
@@ -82,7 +82,7 @@ public:
   [[nodiscard]] std::expected<Vec2U, StarException> baseSize() const;
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> renderImpl() override;
+  [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
 private:
   ScrollThumb(GuiContext& context, GuiDirection direction);
@@ -112,7 +112,7 @@ public:
 
   [[nodiscard]] std::expected<int, StarException> trackSize() const;
   [[nodiscard]] std::expected<float, StarException> sizeRatio() const;
-  virtual Vec2I size() const override;
+  Vec2I size() const override;
   [[nodiscard]] std::expected<float, StarException> scrollRatio() const;
   [[nodiscard]] std::expected<Vec2I, StarException> offsetFromThumbPosition(Vec2I const& thumbPosition) const;
 
@@ -167,8 +167,8 @@ public:
 
   void setUpdatesChildren(bool slop);
 
-  [[nodiscard]] virtual std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> drawChildren() override;

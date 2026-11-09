@@ -65,13 +65,13 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<ButtonWidget>, StarException> create(GuiContext& context, WidgetCallbackFunc callback,
       String const& baseImage, String const& hoverImage = "",
       String const& pressedImage = "", String const& disabledImage = "");
-  virtual ~ButtonWidget();
+  ~ButtonWidget() override;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
-  [[nodiscard]] virtual std::expected<void, StarException> mouseOver() override;
-  [[nodiscard]] virtual std::expected<void, StarException> mouseOut() override;
-  [[nodiscard]] virtual std::expected<void, StarException> mouseReturnStillDown() override;
-  [[nodiscard]] virtual std::expected<void, StarException> hide() override;
+  [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
+  [[nodiscard]] std::expected<void, StarException> mouseOver() override;
+  [[nodiscard]] std::expected<void, StarException> mouseOut() override;
+  [[nodiscard]] std::expected<void, StarException> mouseReturnStillDown() override;
+  [[nodiscard]] std::expected<void, StarException> hide() override;
 
   // Callback is called when the checked / pressed state is changed.
   void setCallback(WidgetCallbackFunc callback);
@@ -128,7 +128,7 @@ public:
   void setFontColorDisabled(Color color);
   void setFontColorChecked(Color color);
 
-  virtual std::shared_ptr<Widget> getChildAt(Vec2I const& pos) override;
+  std::shared_ptr<Widget> getChildAt(Vec2I const& pos) override;
 
   void disable();
   void enable();
@@ -137,8 +137,8 @@ public:
   void setInvisible(bool invisible);
 
 protected:
-  virtual RectI getScissorRect() const override;
-  [[nodiscard]] virtual std::expected<void, StarException> renderImpl() override;
+  RectI getScissorRect() const override;
+  [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
   [[nodiscard]] std::expected<void, StarException> drawButtonPart(String const& image, Vec2F const& position);
   [[nodiscard]] std::expected<void, StarException> updateSize();

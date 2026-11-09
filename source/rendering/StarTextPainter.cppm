@@ -86,7 +86,7 @@ public:
   [[nodiscard]] std::expected<int, StarException> glyphWidth(String::Char c);
   [[nodiscard]] std::expected<int, StarException> stringWidth(StringView s, unsigned charLimit = 0);
 
-  typedef std::function<std::expected<bool, StarException>(StringView, unsigned)> WrapTextCallback;
+  using WrapTextCallback = std::function<std::expected<bool, StarException>(StringView, unsigned)>;
   [[nodiscard]] std::expected<bool, StarException> processWrapText(StringView s, std::optional<std::reference_wrapper<unsigned>> wrapWidth, WrapTextCallback textFunc);
 
   [[nodiscard]] std::expected<List<StringView>, StarException> wrapTextViews(StringView s, std::optional<unsigned> wrapWidth);

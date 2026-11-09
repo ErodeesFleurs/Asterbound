@@ -35,8 +35,7 @@ struct PortraitChatAction {
   Json config;
 };
 
-typedef std::variant<std::monostate, SayChatAction, PortraitChatAction> ChatAction;
-
+using ChatAction = std::variant<std::monostate, SayChatAction, PortraitChatAction>;
 }
 
 export module star.chat_action;

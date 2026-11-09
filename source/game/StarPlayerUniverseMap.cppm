@@ -61,12 +61,11 @@ struct Bookmark {
   bool operator<(Bookmark<T> const& rhs) const;
 };
 
-typedef std::variant<CelestialCoordinate, Uuid> OrbitTarget;
-typedef std::pair<WorldId, SpawnTarget> TeleportTarget;
+using OrbitTarget = std::variant<CelestialCoordinate, Uuid>;
+using TeleportTarget = std::pair<WorldId, SpawnTarget>;
 
-typedef Bookmark<OrbitTarget> OrbitBookmark;
-typedef Bookmark<TeleportTarget> TeleportBookmark;
-
+using OrbitBookmark = Bookmark<OrbitTarget>;
+using TeleportBookmark = Bookmark<TeleportTarget>;
 
 class PlayerUniverseMap {
 public:

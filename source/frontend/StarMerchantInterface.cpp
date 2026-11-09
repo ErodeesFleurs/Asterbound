@@ -203,7 +203,7 @@ std::expected<std::shared_ptr<MerchantPane>, StarException> MerchantPane::create
   auto base = pane->initializePane();
   if (!base)
     return std::unexpected(std::move(base.error()));
-  auto initialized = pane->initialize(worldClient, std::move(player), settings, sourceEntityId);
+  auto initialized = pane->initialize(std::move(worldClient), std::move(player), settings, sourceEntityId);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   return pane;
@@ -666,7 +666,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         if (!optArrayResult645)
           return std::unexpected(std::move(optArrayResult645.error()));
         if (auto quests = std::move(*optArrayResult645)) {
-          for (auto quest : *quests) {
+          for (auto const& quest : *quests) {
             {
               auto toStringResult646 = quest.toString();
               if (!toStringResult646)
@@ -703,7 +703,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
     if (!available)
       return std::unexpected(std::move(available.error()));
     if (*available)
-      availableItems.append(itemConfig);
+      availableItems.push_back(itemConfig);
   }
   m_itemList = std::move(availableItems);
 
@@ -741,7 +741,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
 
   String name = item->friendlyName();
   if (item->count() > 1)
-    name = strf("{} (x{})", name, item->count());
+    name = Star::format("{} (x{})", name, item->count());
 
   auto fetchChildResult656 = widget->fetchChild<LabelWidget>("itemName");
   if (!fetchChildResult656)
@@ -755,7 +755,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
   if (!getIntResult658)
     return std::unexpected(std::move(getIntResult658.error()));
   unsigned price = std::ceil(std::move(*getIntResult658) * m_buyFactor);
-  auto setLabelResult659 = widget->setLabel("priceLabel", toString(price));
+  auto setLabelResult659 = widget->setLabel("priceLabel", Star::to_string(price));
   if (!setLabelResult659)
     return std::unexpected(std::move(setLabelResult659.error()));
   widget->setData(price);
@@ -848,7 +848,7 @@ std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   else
     m_buyTotal = 0;
 
-  auto setTextResult675 = m_buyTotalLabel->setText(toString(m_buyTotal));
+  auto setTextResult675 = m_buyTotalLabel->setText(Star::to_string(m_buyTotal));
   if (!setTextResult675)
     return std::unexpected(std::move(setTextResult675.error()));
 
@@ -857,7 +857,7 @@ std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   else
     m_buyButton->disable();
 
-  if (m_buyTotal > (int)m_player->inventory()->currency("money")) {
+  if (m_buyTotal > static_cast<int>(m_player->inventory()->currency("money"))) {
     m_buyTotalLabel->setColor(Color::Red);
     m_buyButton->disable();
   } else {
@@ -926,7 +926,7 @@ std::expected<void, StarException> MerchantPane::updateSellTotal() {
     if (item)
       m_sellTotal += std::round(item->price() * m_sellFactor);
   }
-  auto setTextResult686 = m_sellTotalLabel->setText(toString(m_sellTotal));
+  auto setTextResult686 = m_sellTotalLabel->setText(Star::to_string(m_sellTotal));
   if (!setTextResult686)
     return std::unexpected(std::move(setTextResult686.error()));
   if (m_sellTotal > 0)
@@ -983,14 +983,14 @@ std::expected<int, StarException> MerchantPane::maxBuyCount() {
     auto unitPrice = std::move(*toUIntResult696);
     if (unitPrice == 0)
       return m_maxBuyCount;
-    return std::min(m_maxBuyCount, (int)std::floor(m_player->currency("money") / unitPrice));
+    return std::min(m_maxBuyCount, static_cast<int>(std::floor(m_player->currency("money") / unitPrice)));
   } else {
     return 0;
   }
 }
 
 std::expected<void, StarException> MerchantPane::countChanged() {
-  auto setTextResult697 = m_countTextBox->setText(strf("x{}", m_buyCount));
+  auto setTextResult697 = m_countTextBox->setText(Star::format("x{}", m_buyCount));
   if (!setTextResult697)
     return std::unexpected(std::move(setTextResult697.error()));
   auto updateBuyTotalResult698 = updateBuyTotal();
@@ -1012,7 +1012,7 @@ std::expected<void, StarException> MerchantPane::countTextChanged() {
       return std::unexpected(std::move(replaceResult700.error()));
     auto countString = std::move(*replaceResult700);
     if (!countString.empty()) {
-      auto parsed = lexicalCast<int>(countString);
+      auto parsed = lexical_cast<int>(countString);
       if (!parsed) {
         if (!parsed.error().is<BadLexicalCast>())
           return std::unexpected(std::move(parsed.error()));

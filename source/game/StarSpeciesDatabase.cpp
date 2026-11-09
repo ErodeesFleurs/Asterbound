@@ -98,7 +98,7 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
     if (!definition) return std::unexpected(std::move(definition.error()));
     if (result->m_species.contains((*definition)->kind()))
       return std::unexpected(StarException::format("Duplicate species asset with kind {}. configfile {}", (*definition)->kind(), file.string()));
-    auto kind = (*definition)->kind().toLower();
+    auto kind = (*definition)->kind().to_lower();
     if (!kind) return std::unexpected(std::move(kind.error()));
     result->m_species[*kind] = std::move(*definition);
     return {};
@@ -110,7 +110,7 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
 }
 
 std::expected<std::shared_ptr<SpeciesDefinition>, StarException> SpeciesDatabase::species(String const& kind) const {
-  auto key = kind.toLower();
+  auto key = kind.to_lower();
   if (!key) return std::unexpected(std::move(key.error()));
   auto found = m_species.find(*key);
   if (found == m_species.end())
@@ -284,9 +284,9 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
     result.identity.personality = personalityResult->get();
 
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto chestSlot = EquipmentSlotNames->getRight(EquipmentSlot::Chest);
+    auto chestSlot = EquipmentSlotNames->get_right(EquipmentSlot::Chest);
     if (!chestSlot) return std::unexpected(std::move(chestSlot.error()));
-    auto legSlot = EquipmentSlotNames->getRight(EquipmentSlot::Legs);
+    auto legSlot = EquipmentSlotNames->get_right(EquipmentSlot::Legs);
     if (!legSlot) return std::unexpected(std::move(legSlot.error()));
     auto chest = ItemDescriptor::create(shirt->get(), 1, JsonObject{{"colorIndex", shirtColor}});
     if (!chest) return std::unexpected(std::move(chest.error()));
@@ -310,22 +310,10 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::generateH
   if (!generator) return std::unexpected(std::move(generator.error()));
   auto name = (*generator)->generateName((*definition)->nameGen(chosenGender), randSource);
   if (!name) return std::unexpected(std::move(name.error()));
-  return createHumanoid(
-    std::move(*name),
-    speciesChoice,
-    (unsigned)chosenGender,
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    randSource.randu32(),
-    {},
-    itemCatalog
-  );
+  return createHumanoid(std::move(*name), speciesChoice, static_cast<unsigned>(chosenGender), randSource.randu32(),
+                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(),
+                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(), {},
+                        itemCatalog);
 }
 
 std::expected<std::shared_ptr<SpeciesDefinition>, StarException> SpeciesDefinition::create(Root& root, Json const& config) {
@@ -393,7 +381,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *items) {
     auto item = ItemDescriptor::create(value);
     if (!item) return std::unexpected(std::move(item.error()));
-    m_defaultItems.append(std::move(*item));
+    m_defaultItems.push_back(std::move(*item));
   }
   auto blueprints = config.get("defaultBlueprints", JsonObject{});
   if (!blueprints) return std::unexpected(std::move(blueprints.error()));
@@ -402,7 +390,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *tier) {
     auto item = ItemDescriptor::create(value);
     if (!item) return std::unexpected(std::move(item.error()));
-    m_defaultBlueprints.append(std::move(*item));
+    m_defaultBlueprints.push_back(std::move(*item));
   }
   auto personalitiesLoaded = [&]() -> std::expected<void, StarException> {
   auto humanoid = humanoidConfig();
@@ -426,7 +414,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   for (auto const& value : *effects) {
     auto effect = jsonToPersistentStatusEffect(value);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    m_statusEffects.append(std::move(*effect));
+    m_statusEffects.push_back(std::move(*effect));
   }
   auto directives = config.getString("effectDirectives", "");
   if (!directives) return std::unexpected(std::move(directives.error()));
@@ -518,7 +506,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
     if (!facialMaskRead) return std::unexpected(std::move(facialMaskRead.error()));
     auto facialMask = readOptions("facialMask", gender.facialMaskOptions);
     if (!facialMask) return std::unexpected(std::move(facialMask.error()));
-    species.genderOptions.append(std::move(gender));
+    species.genderOptions.push_back(std::move(gender));
   }
   m_options = std::move(species);
   return {};
@@ -532,13 +520,9 @@ String SpeciesDefinition::kind() const {
   return m_kind;
 }
 
-String SpeciesDefinition::nameGen(Gender gender) const {
-  return m_nameGen[(unsigned)gender];
-}
+String SpeciesDefinition::nameGen(Gender gender) const { return m_nameGen[static_cast<unsigned>(gender)]; }
 
-String SpeciesDefinition::ouchNoise(Gender gender) const {
-  return m_ouchNoises[(unsigned)gender];
-}
+String SpeciesDefinition::ouchNoise(Gender gender) const { return m_ouchNoises[static_cast<unsigned>(gender)]; }
 
 SpeciesOption const& SpeciesDefinition::options() const {
   return m_options;

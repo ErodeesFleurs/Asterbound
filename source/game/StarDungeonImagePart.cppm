@@ -47,13 +47,15 @@ class ImageTileset;
 class ImagePartReader : public PartReader {
   Root& m_root;
 public:
-  ImagePartReader(Root& root, std::shared_ptr<ImageTileset const> tileset) : m_root(root), m_tileset(tileset) {}
+  ImagePartReader(Root& root, std::shared_ptr<ImageTileset const> tileset)
+      : m_root(root), m_tileset(std::move(tileset)) {}
 
-  [[nodiscard]] virtual std::expected<void, StarException> readAsset(String const& asset) override;
-  virtual Vec2U size() const override;
+  [[nodiscard]] std::expected<void, StarException> readAsset(String const& asset) override;
+  Vec2U size() const override;
 
-  [[nodiscard]] virtual std::expected<void, StarException> forEachTile(TileCallback const& callback) const override;
-  [[nodiscard]] virtual std::expected<void, StarException> forEachTileAt(Vec2I pos, TileCallback const& callback) const override;
+  [[nodiscard]] std::expected<void, StarException> forEachTile(TileCallback const& callback) const override;
+  [[nodiscard]] std::expected<void, StarException> forEachTileAt(Vec2I pos,
+                                                                 TileCallback const& callback) const override;
 
 private:
   List<std::pair<String, std::shared_ptr<Image const>>> m_images;
@@ -134,7 +136,7 @@ namespace Dungeon {
   }
 
   String connectorColorValue(Vec4B const& color) {
-    return strf("{},{},{},{}", color[0], color[1], color[2], color[3]);
+    return Star::format("{},{},{},{}", color[0], color[1], color[2], color[3]);
   }
 
   [[nodiscard]] std::expected<Tile, StarException> variantMapToTile(Root& root, JsonObject const& tile) {
@@ -177,10 +179,9 @@ namespace Dungeon {
         if (auto direction = tile.maybe("direction")) {
           auto text = direction->toString();
           if (!text) return std::unexpected(std::move(text.error()));
-          if (!DungeonDirectionNames) return std::unexpected(DungeonDirectionNames.error());
-          auto parsed = DungeonDirectionNames->getLeft(*text);
+          auto parsed = enumValue<DungeonDirectionNames>(*text);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
-          connector.direction = parsed->get();
+          connector.direction = *parsed;
         }
         result.connector = std::move(connector);
       }
@@ -219,13 +220,14 @@ namespace Dungeon {
   unsigned ImageTileset::colorAsInt(Vec4B color) const {
     if ((color[3] != 0) && (color[3] != 255)) {
       if constexpr (Star::DebugEnabled) {
-        Star::starAssertFailed((false));
+        Star::star_assert_failed((false));
       }
       return 0;
     }
     if (color[3] == 0)
       color = Vec4B(255, 255, 255, 0);
-    return (((unsigned)color[2]) << 16) | (((unsigned)color[1]) << 8) | ((unsigned)color[0]);
+    return (static_cast<unsigned>(color[2]) << 16) | (static_cast<unsigned>(color[1]) << 8)
+      | static_cast<unsigned>(color[0]);
   }
 }
 

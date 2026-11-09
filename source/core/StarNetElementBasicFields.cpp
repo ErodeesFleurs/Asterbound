@@ -37,7 +37,7 @@ void NetElementEvent::trigger() {
 std::uint64_t NetElementEvent::pullOccurrences() {
   std::uint64_t occurrences = get();
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((occurrences >= m_pulledOccurrences));
+    Star::star_assert_failed((occurrences >= m_pulledOccurrences));
   }
   std::uint64_t unchecked = occurrences - m_pulledOccurrences;
   m_pulledOccurrences = occurrences;

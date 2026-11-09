@@ -13,8 +13,8 @@ namespace Star {
 template <typename Item>
 struct WeightedPool {
 public:
-  typedef std::pair<double, Item> ItemsType;
-  typedef List<ItemsType> ItemsList;
+  using ItemsType = std::pair<double, Item>;
+  using ItemsList = List<ItemsType>;
 
   WeightedPool();
 
@@ -74,7 +74,7 @@ void WeightedPool<Item>::add(double weight, Item item) {
   if (weight <= 0.0)
     return;
 
-  m_items.append({weight, std::move(item)});
+  m_items.push_back({weight, std::move(item)});
   m_totalWeight += weight;
 }
 
@@ -89,10 +89,7 @@ auto WeightedPool<Item>::items() const -> ItemsList const & {
   return m_items;
 }
 
-template <typename Item>
-std::size_t WeightedPool<Item>::size() const {
-  return m_items.count();
-}
+template <typename Item> std::size_t WeightedPool<Item>::size() const { return m_items.size(); }
 
 template <typename Item>
 std::expected<std::reference_wrapper<std::pair<double, Item> const>, StarException> WeightedPool<Item>::at(std::size_t index) const {
@@ -157,7 +154,7 @@ List<Item> WeightedPool<Item>::selectUniques(std::size_t desiredCount, std::uint
     indices.add(selectIndex(++seed));
   List<Item> result;
   for (std::size_t i : indices)
-    result.append(m_items[i].second);
+    result.push_back(m_items[i].second);
   return result;
 }
 
@@ -173,7 +170,7 @@ std::size_t WeightedPool<Item>::selectIndex(RandomService& rand) const {
 
 template <typename Item>
 std::size_t WeightedPool<Item>::selectIndex(std::uint64_t seed) const {
-  return selectIndex(staticRandomDouble(seed));
+  return selectIndex(static_random_double(seed));
 }
 
 template <typename Item>

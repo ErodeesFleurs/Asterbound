@@ -223,7 +223,7 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
     auto packets = client.receiver->pull();
     if (!packets)
       return std::unexpected(std::move(packets.error()));
-    delivered.appendAll(std::move(*packets));
+    delivered.append_range(std::move(*packets));
     if ((std::chrono::steady_clock::now() - start).count()
         > std::chrono::steady_clock::duration(std::chrono::seconds(2)).count())
       return std::unexpected(StarException("Snapshot benchmark TCP delivery timed out"));
@@ -302,7 +302,7 @@ std::expected<void, StarException> moveSnapshotWindow(SnapshotFixture& fixture, 
 
 std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root, unsigned clientCount) {
   SnapshotFixture fixture;
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   auto worldTemplate = WorldTemplate::create(root, Vec2U(2048, 2048));

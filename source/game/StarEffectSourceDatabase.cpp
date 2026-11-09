@@ -60,8 +60,8 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (result->m_sourceConfigs.contains((*config)->kind()))
-        return std::unexpected(StarException(strf("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
-      auto key = (*config)->kind().toLower();
+        return std::unexpected(StarException(Star::format("Duplicate effect source asset kind Name {}. configfile {}", (*config)->kind(), file.string())));
+      auto key = (*config)->kind().to_lower();
       if (!key)
         return std::unexpected(std::move(key.error()));
       result->m_sourceConfigs[*key] = std::move(*config);
@@ -74,12 +74,12 @@ std::expected<std::shared_ptr<EffectSourceDatabase>, StarException> EffectSource
 }
 
 std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceDatabase::effectSourceConfig(String const& kind) const {
-  auto key = kind.toLower();
+  auto key = kind.to_lower();
   if (!key)
     return std::unexpected(std::move(key.error()));
-  if (auto config = m_sourceConfigs.maybeRef(*key))
+  if (auto config = m_sourceConfigs.find_ref(*key))
     return config->get();
-  return std::unexpected(StarException(strf("Unknown effect source definition with kind '{}'.", kind)));
+  return std::unexpected(StarException(Star::format("Unknown effect source definition with kind '{}'.", kind)));
 }
 
 std::expected<std::shared_ptr<EffectSourceConfig>, StarException> EffectSourceConfig::create(Root& root, Json const& config) {
@@ -183,7 +183,7 @@ std::expected<List<String>, StarException> EffectSource::particles() {
         return std::unexpected(std::move(selected.error()));
       decoded = std::move(*selected);
     }
-    result.appendAll(*decoded);
+    result.append_range(*decoded);
     return {};
   };
   if (m_initialTick) {
@@ -224,7 +224,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> EffectSource:
     auto initial = soundsFromDefinition(m_root, *config, offset);
     if (!initial)
       return std::unexpected(std::move(initial.error()));
-    result.appendAll(*initial);
+    result.append_range(*initial);
     auto mainConfig = m_config.get("sounds", Json());
     if (!mainConfig)
       return std::unexpected(std::move(mainConfig.error()));
@@ -232,7 +232,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> EffectSource:
     if (!main)
       return std::unexpected(std::move(main.error()));
     m_mainSounds = std::move(*main);
-    result.appendAll(m_mainSounds);
+    result.append_range(m_mainSounds);
   }
   if (m_finalTick) {
     for (auto& sound : m_mainSounds)
@@ -246,7 +246,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> EffectSource:
     auto final = soundsFromDefinition(m_root, *config, offset);
     if (!final)
       return std::unexpected(std::move(final.error()));
-    result.appendAll(*final);
+    result.append_range(*final);
   }
   return result;
 }
@@ -297,7 +297,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
       auto particle = (*database)->particle(*name);
       if (!particle)
         return std::unexpected(std::move(particle.error()));
-      result.append(std::move(*particle));
+      result.push_back(std::move(*particle));
     } else {
       auto particle = Particle::create(root, entry);
       if (!particle)
@@ -310,7 +310,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
         return std::unexpected(std::move(variance.error()));
       particle->applyVariance(root, *variance);
       particle->position += position;
-      result.append(std::move(*particle));
+      result.push_back(std::move(*particle));
     }
   }
   return result;
@@ -372,7 +372,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
       return std::unexpected(std::move(range.error()));
     (*sample)->setRangeMultiplier(*range);
     (*sample)->setPosition(position);
-    result.append(std::move(*sample));
+    result.push_back(std::move(*sample));
   }
   return result;
 }

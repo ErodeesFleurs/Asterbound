@@ -63,10 +63,7 @@ std::expected<std::reference_wrapper<TextStyle>, StarException> TextStyle::loadJ
 }
 
 namespace Text {
-  extern std::string const AllEsc = strf("{:c}{:c}", CmdEsc, StartEsc);
-  extern std::string const AllEscEnd = strf("{:c}{:c}{:c}", CmdEsc, StartEsc, EndEsc);
-
-  static RE2 stripEscapeRegex = strf("\\{:c}[^;{:c}]*{:c}", CmdEsc, CmdEsc, EndEsc);
+  static RE2 stripEscapeRegex = Star::format("\\{:c}[^;{:c}]*{:c}", CmdEsc, CmdEsc, EndEsc);
   String stripEscapeCodes(String const& s) {
     if (s.empty())
       return s;

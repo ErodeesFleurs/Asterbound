@@ -52,7 +52,7 @@ void expectConnection(Object const& object, WireDirection direction, WireConnect
 }
 
 void exerciseNetwork(GameTest& fixture, bool cycle) {
-  auto storage = File::ephemeralFile(fixture.root().random());
+  auto storage = File::ephemeral_file(fixture.root().random());
   ASSERT_TRUE(storage) << storage.error().what();
   auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(created) << created.error().what();

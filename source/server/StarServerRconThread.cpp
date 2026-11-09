@@ -46,7 +46,7 @@ ServerRconClient::~ServerRconClient() {
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON client shutdown failed: {}", joined.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy an RCON client with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy an RCON client with an unjoined native worker", false);
 }
 
 std::expected<ServerCommandResult, StarException> ServerRconClient::handleCommand(String commandLine) {
@@ -60,21 +60,21 @@ std::expected<ServerCommandResult, StarException> ServerRconClient::handleComman
     auto broadcast = m_universe.get().adminBroadcast(commandLine);
     if (!broadcast)
       return std::unexpected(std::move(broadcast.error()));
-    return ServerCommandResult(String(strf("OK: said {}", commandLine)));
+    return ServerCommandResult(String(Star::format("OK: said {}", commandLine)));
   } else if (command == "stop") {
     auto stopped = m_universe.get().stop();
     if (!stopped)
       return std::unexpected(std::move(stopped.error()));
     return ServerCommandResult(String("OK: shutting down"));
   }
-  return m_universe.get().adminCommand(strf("{} {}", command, commandLine));
+  return m_universe.get().adminCommand(Star::format("{} {}", command, commandLine));
 }
 
 std::expected<void, StarException> ServerRconClient::receive(std::size_t size) {
   // Refuse client-controlled allocation sizes before resizing.
   if (size > MaxReceivePacketSize)
     return std::unexpected(
-      OversizedPacket(strf("RCON packet of {} bytes is above the {} byte limit", size, MaxReceivePacketSize)));
+      OversizedPacket(Star::format("RCON packet of {} bytes is above the {} byte limit", size, MaxReceivePacketSize)));
   m_packetBuffer.reset(size);
   auto remaining = m_packetBuffer.span();
   while (!remaining.empty()) {
@@ -205,7 +205,7 @@ std::expected<void, StarException> ServerRconClient::processRequest() {
       if (!result) {
         auto response = sendCmdResponse(
           requestId,
-          strf("RCON: Error executing: {}: {}", command, outputException(ExceptionDiagnostic(result.error()), true)));
+          Star::format("RCON: Error executing: {}: {}", command, Star::output_exception(ExceptionDiagnostic(result.error()), true)));
         if (!response)
           return std::unexpected(std::move(response.error()));
       } else if (std::holds_alternative<String>(*result)) {
@@ -222,7 +222,7 @@ std::expected<void, StarException> ServerRconClient::processRequest() {
     }
     break;
   default: {
-    auto response = sendCmdResponse(requestId, strf("Unknown request {:06x}", cmd));
+    auto response = sendCmdResponse(requestId, Star::format("Unknown request {:06x}", cmd));
     if (!response)
       return std::unexpected(std::move(response.error()));
   }
@@ -251,7 +251,7 @@ std::expected<void, StarException> ServerRconClient::processRequest() {
         return std::unexpected(std::move(error.error()));
       if (!*error)
         return std::unexpected(StarException("RCON command promise failed without an error"));
-      response = sendCmdResponse(requestId, strf("RCON: Command promise failed: {}", **error));
+      response = sendCmdResponse(requestId, Star::format("RCON: Command promise failed: {}", **error));
     }
     if (!response)
       return std::unexpected(std::move(response.error()));
@@ -267,7 +267,7 @@ std::expected<void, StarException> ServerRconClient::run() {
     if (!request) {
       if (!request.error().is<NoMoreRequests>()) {
         auto logged = m_universe.get().root().logger().error(
-          "ServerRconClient error: {}", outputException(ExceptionDiagnostic(request.error()), false));
+          "ServerRconClient error: {}", Star::output_exception(ExceptionDiagnostic(request.error()), false));
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       }
@@ -308,7 +308,7 @@ ServerRconThread::~ServerRconThread() {
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON server shutdown failed: {}", joined.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy an RCON server with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy an RCON server with an unjoined native worker", false);
 }
 
 void ServerRconThread::clearClients(bool all) {

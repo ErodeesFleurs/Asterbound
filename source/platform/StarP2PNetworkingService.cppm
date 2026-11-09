@@ -59,15 +59,16 @@ struct P2PNetworkingPeerIdWrapper : BaseType {
 
   template <class Arg>
   P2PNetworkingPeerIdWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<P2PNetworkingPeerIdWrapper, typename std::decay<Arg>::type>::value,
-        "P2PNetworkingPeerId can not implicitly be assigned from String-derived classes or strong String typedefs");
+    static_assert(
+      std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+        || std::is_same_v<P2PNetworkingPeerIdWrapper, std::decay_t<Arg>>,
+      "P2PNetworkingPeerId can not implicitly be assigned from String-derived classes or strong String typedefs");
 
     BaseType::operator=(std::forward<Arg>(other));
     return *this;
   }
 };
-typedef P2PNetworkingPeerIdWrapper<String> P2PNetworkingPeerId;
+using P2PNetworkingPeerId = P2PNetworkingPeerIdWrapper<String>;
 
 // API for platform specific peer to peer multiplayer services.
 class P2PNetworkingService {

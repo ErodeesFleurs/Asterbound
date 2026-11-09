@@ -37,13 +37,13 @@ bool StatSet::isBaseStat(String const& statName) const {
 }
 
 std::expected<float, StarException> StatSet::statBaseValue(String const& statName) const {
-  if (auto s = m_baseStats.maybeRef(statName))
+  if (auto s = m_baseStats.find_ref(statName))
     return s->get();
   return std::unexpected(StatusException::format("No such base stat '{}' in StatSet", statName));
 }
 
 std::expected<void, StarException> StatSet::setStatBaseValue(String const& statName, float value) {
-  if (auto s = m_baseStats.maybeRef(statName)) {
+  if (auto s = m_baseStats.find_ref(statName)) {
     if (s->get() != value) {
       s->get() = value;
       update(0.0f);
@@ -130,7 +130,7 @@ bool StatSet::isEffectiveStat(String const& statName) const {
 float StatSet::statEffectiveValue(String const& statName) const {
   // All stat values will be added to m_effectiveStats regardless of whether a
   // modifier is applied for it.
-  if (auto modified = m_effectiveStats.maybeRef(statName))
+  if (auto modified = m_effectiveStats.find_ref(statName))
     return modified->get().effectiveModifiedValue;
   else
     return 0.0f;
@@ -171,7 +171,7 @@ bool StatSet::isResource(String const& resourceName) const {
 }
 
 float StatSet::resourceValue(String const& resourceName) const {
-  if (auto r = m_resources.maybeRef(resourceName))
+  if (auto r = m_resources.find_ref(resourceName))
     return r->get().value;
   return 0.0f;
 }
@@ -189,7 +189,7 @@ std::expected<float, StarException> StatSet::modifyResourceValue(String const& r
 }
 
 float StatSet::giveResourceValue(String const& resourceName, float amount) {
-  if (auto r = m_resources.maybeRef(resourceName)) {
+  if (auto r = m_resources.find_ref(resourceName)) {
     float previousValue = r->get().value;
     r->get().setValue(r->get().value + amount);
     return r->get().value - previousValue;
@@ -263,7 +263,7 @@ void StatSet::update(float dt) {
   // Then we do all the StatValueModifiers and StatBaseMultipliers and
   // compute the baseModifiedValue
 
-  for (auto& p : m_baseStats) {
+  for (auto&& p : m_baseStats) {
     auto& stat = m_effectiveStats[p.first];
     stat.baseValue = p.second;
     stat.baseModifiedValue = stat.baseValue;
@@ -286,7 +286,7 @@ void StatSet::update(float dt) {
   // Then we do all the StatEffectiveMultipliers and compute the
   // final effectiveModifiedValue
 
-  for (auto& p : m_effectiveStats)
+  for (auto&& p : m_effectiveStats)
     p.second.effectiveModifiedValue = p.second.baseModifiedValue;
 
   for (auto const& p : m_statModifierGroups) {
@@ -302,7 +302,7 @@ void StatSet::update(float dt) {
   // Then update all the resources due to charging and percentage tracking,
   // after updating the stats.
 
-  for (auto& p : m_resources) {
+  for (auto&& p : m_resources) {
     std::optional<float> newMaxValue;
     if (std::holds_alternative<String>(p.second.max))
       newMaxValue = statEffectiveValue(std::get<String>(p.second.max));
@@ -339,13 +339,13 @@ float StatSet::Resource::setValue(float v) {
 }
 
 std::expected<std::reference_wrapper<StatSet::Resource const>, StarException> StatSet::getResource(String const& resourceName) const {
-  if (auto r = m_resources.maybeRef(resourceName))
+  if (auto r = m_resources.find_ref(resourceName))
     return *r;
   return std::unexpected(StatusException::format("No such resource '{}' in StatSet", resourceName));
 }
 
 std::expected<std::reference_wrapper<StatSet::Resource>, StarException> StatSet::getResource(String const& resourceName) {
-  if (auto r = m_resources.maybeRef(resourceName))
+  if (auto r = m_resources.find_ref(resourceName))
     return *r;
   return std::unexpected(StatusException::format("No such resource '{}' in StatSet", resourceName));
 }
@@ -354,7 +354,7 @@ std::expected<bool, StarException> StatSet::consumeResourceValue(String const& r
   if (amount < 0.0f)
     return std::unexpected(StatusException::format("StatSet, consumeResource called with negative amount '{}' {}", resourceName, amount));
 
-  if (auto r = m_resources.maybeRef(resourceName)) {
+  if (auto r = m_resources.find_ref(resourceName)) {
     if (r->get().locked)
       return false;
 

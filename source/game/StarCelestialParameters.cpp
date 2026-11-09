@@ -63,13 +63,13 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
   if (!worldType)
     return std::unexpected(std::move(worldType.error()));
   if (*worldType) {
-    auto terrestrial = (**worldType).equalsIgnoreCase("Terrestrial");
+    auto terrestrial = (**worldType).equals_ignore_case("Terrestrial");
     if (!terrestrial)
       return std::unexpected(std::move(terrestrial.error()));
-    auto asteroids = *terrestrial ? std::expected<bool, StarException>(false) : (**worldType).equalsIgnoreCase("Asteroids");
+    auto asteroids = *terrestrial ? std::expected<bool, StarException>(false) : (**worldType).equals_ignore_case("Asteroids");
     if (!asteroids)
       return std::unexpected(std::move(asteroids.error()));
-    auto dungeon = (*terrestrial || *asteroids) ? std::expected<bool, StarException>(false) : (**worldType).equalsIgnoreCase("FloatingDungeon");
+    auto dungeon = (*terrestrial || *asteroids) ? std::expected<bool, StarException>(false) : (**worldType).equals_ignore_case("FloatingDungeon");
     if (!dungeon)
       return std::unexpected(std::move(dungeon.error()));
     if (*terrestrial) {
@@ -211,7 +211,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterList(S
   auto array = parameter->toArray();
   if (!array)
     return std::unexpected(std::move(array.error()));
-  auto selected = staticRandomFrom(*array, mix, m_seed, name);
+  auto selected = static_random_from(*array, mix, m_seed, name);
   if (!selected)
     return std::unexpected(std::move(selected.error()));
   return selected->get();
@@ -228,7 +228,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     return std::unexpected(std::move(list.error()));
   if (list->size() != 2)
     return std::unexpected(CelestialException(
-        strf("Parameter '{}' does not appear to be a range in CelestialParameters::randomizeRange", name)));
+        Star::format("Parameter '{}' does not appear to be a range in CelestialParameters::randomizeRange", name)));
   return randomizeParameterRange(*list, mix, name);
 }
 
@@ -241,7 +241,7 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     auto max = range[1].toInt();
     if (!max)
       return std::unexpected(std::move(max.error()));
-    return Json(staticRandomU64(mix, m_seed, name.value_or("")) % (*max - *min + 1) + *min);
+    return Json(static_random_u64(mix, m_seed, name.value_or("")) % (*max - *min + 1) + *min);
   } else {
     auto min = range[0].toDouble();
     if (!min)
@@ -249,13 +249,11 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     auto max = range[1].toDouble();
     if (!max)
       return std::unexpected(std::move(max.error()));
-    return Json(staticRandomDouble(mix, m_seed, name.value_or("")) * (*max - *min) + *min);
+    return Json(static_random_double(mix, m_seed, name.value_or("")) * (*max - *min) + *min);
   }
 }
 
-bool CelestialParameters::isVisitable() const {
-  return (bool)m_visitableParameters;
-}
+bool CelestialParameters::isVisitable() const { return static_cast<bool>(m_visitableParameters); }
 
 std::shared_ptr<VisitableWorldParameters const> CelestialParameters::visitableParameters() const {
   return m_visitableParameters;

@@ -89,7 +89,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!statuses)
       return std::unexpected(std::move(statuses.error()));
     for (auto const& pair : *statuses) {
-      auto level = lexicalCast<unsigned>(pair.first);
+      auto level = lexical_cast<unsigned>(pair.first);
       if (!level)
         return std::unexpected(std::move(level.error()));
       auto speech = parseSpeech(pair.second);
@@ -149,7 +149,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
       auto animation = Animation::create(root, pair.second, "/ai/");
       if (!animation)
         return std::unexpected(std::move(animation.error()));
-      auto existing = result->m_animationConfig.aiAnimations.maybeRef(pair.first);
+      auto existing = result->m_animationConfig.aiAnimations.find_ref(pair.first);
       if (!existing)
         return std::unexpected(AiException("AI animation publication failed"));
       existing->get() = std::move(*animation);
@@ -189,7 +189,7 @@ std::expected<String, StarException> AiDatabase::portraitImage(String const& spe
   auto parameters = m_speciesParameters.get(species);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  return strf("/ai/{}:{}", parameters->get().portraitFrames, frame);
+  return Star::format("/ai/{}:{}", parameters->get().portraitFrames, frame);
 }
 
 std::expected<Animation, StarException> AiDatabase::animation(String const& species, String const& animationName) const {
@@ -291,7 +291,7 @@ std::expected<AiMission, StarException> AiDatabase::parseMission(Json const& vm)
   mission.missionUniqueWorld = std::move(*world);
   mission.warpAnimation = std::move(*warpAnimation);
   mission.warpDeploy = *warpDeploy;
-  mission.icon = AssetPath::relativeTo("/ai/", *icon);
+  mission.icon = AssetPath::relative_to("/ai/", *icon);
   auto texts = vm.get("speciesText").and_then([](Json const& value) { return value.iterateObject(); });
   if (!texts)
     return std::unexpected(std::move(texts.error()));

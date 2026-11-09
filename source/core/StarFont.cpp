@@ -49,7 +49,7 @@ struct FontImpl {
 };
 
 std::expected<std::shared_ptr<Font>, StarException> Font::loadFont(FontLibrary const& library, String const& fileName, unsigned pixelSize) {
-  auto bytes = File::readFile(fileName);
+  auto bytes = File::read_file(fileName);
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   return loadFont(library, std::make_shared<ByteArray>(std::move(*bytes)), pixelSize);
@@ -94,7 +94,7 @@ std::expected<void, StarException> Font::setPixelSize(unsigned pixelSize) {
     return {};
 
   if (m_fontImpl && FT_Set_Pixel_Sizes(m_fontImpl->face, pixelSize, 0))
-    return std::unexpected(FontException(strf("Cannot set font pixel size to: {}", pixelSize)));
+    return std::unexpected(FontException(Star::format("Cannot set font pixel size to: {}", pixelSize)));
   m_pixelSize = pixelSize;
   return {};
 }

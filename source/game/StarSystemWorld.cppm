@@ -70,7 +70,7 @@ struct CelestialOrbit {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialOrbit const& orbit);
 
 // in transit, at a planet, orbiting a planet,, at a system object, or at a vector position
-typedef std::variant<std::monostate, CelestialCoordinate, CelestialOrbit, Uuid, Vec2F> SystemLocation;
+using SystemLocation = std::variant<std::monostate, CelestialCoordinate, CelestialOrbit, Uuid, Vec2F>;
 Json jsonFromSystemLocation(SystemLocation const& location);
 [[nodiscard]] std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& json);
 

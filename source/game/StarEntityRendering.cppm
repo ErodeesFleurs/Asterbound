@@ -43,7 +43,7 @@ struct PresentationPosition {
   void reset(Vec2F position) { previous = current = position; }
   void advance(Vec2F position) { previous = current; current = position; }
   bool finish(Vec2F position, WorldGeometry const& geometry, float maximumContinuousDistance) {
-    if (geometry.diff(position, previous).magnitudeSquared() > maximumContinuousDistance * maximumContinuousDistance) {
+    if (geometry.diff(position, previous).magnitude_squared() > maximumContinuousDistance * maximumContinuousDistance) {
       reset(position);
       return false;
     }
@@ -94,7 +94,7 @@ public:
   std::expected<void, StarException> addParticle(Particle) override { return {}; }
   std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
     if (m_deferredLoops && audio->loops() != 0)
-      m_deferredLoops->append(std::move(audio));
+      m_deferredLoops->push_back(std::move(audio));
     return {};
   }
   std::expected<void, StarException> addTilePreview(PreviewTile) override { return {}; }

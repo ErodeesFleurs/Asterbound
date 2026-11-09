@@ -214,7 +214,7 @@ std::expected<void, StarException> OpenGlRenderer::initialize() {
 }
 
 OpenGlRenderer::~OpenGlRenderer() {
-  for (auto& effect : m_effects)
+  for (auto&& effect : m_effects)
     glDeleteProgram(effect.second.program);
 
   m_frameBuffers.clear();
@@ -378,8 +378,8 @@ std::expected<void, StarException> OpenGlRenderer::loadConfig(Json const& config
   }
   m_currentFrameBuffer.reset();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  for (auto& effect : m_effects)
-    for (auto& texture : effect.second.textures)
+  for (auto&& effect : m_effects)
+    for (auto&& texture : effect.second.textures)
       texture.second.textureValue.reset();
   m_config = config;
   return {};
@@ -421,8 +421,8 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     }
     return std::pair{*vertex, *fragment};
   };
-  auto vertexSource = shaders.maybeRef("vertex");
-  auto fragmentSource = shaders.maybeRef("fragment");
+  auto vertexSource = shaders.find_ref("vertex");
+  auto fragmentSource = shaders.find_ref("fragment");
   auto compiled = compilePair(
       vertexSource ? std::optional<std::string_view>{vertexSource->get().utf8()} : std::nullopt,
       fragmentSource ? std::optional<std::string_view>{fragmentSource->get().utf8()} : std::nullopt);
@@ -471,7 +471,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.getString("uniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectParameter parameter;
-    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8Ptr());
+    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8_data());
     if (parameter.parameterUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' in effect '{}' has no associated uniform, skipping", entry.first, name);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -535,7 +535,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.getString("textureUniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectTexture texture;
-    texture.textureUniform = glGetUniformLocation(program, uniform->utf8Ptr());
+    texture.textureUniform = glGetUniformLocation(program, uniform->utf8_data());
     if (texture.textureUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has no associated uniform, skipping", entry.first);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -555,7 +555,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto sizeUniform = entry.second.optString("textureSizeUniform");
     if (!sizeUniform) return std::unexpected(std::move(sizeUniform.error()));
     if (*sizeUniform) {
-      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8Ptr());
+      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8_data());
       if (texture.textureSizeUniform == -1) {
         auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has textureSizeUniform '{}' with no associated uniform", entry.first, **sizeUniform);
         if (!logged) return std::unexpected(std::move(logged.error()));
@@ -597,7 +597,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     }
     return std::unexpected(std::move(glStatus.error()));
   }
-  if (auto old = m_effects.maybeRef(name))
+  if (auto old = m_effects.find_ref(name))
     glDeleteProgram(old->get().program);
   m_effects[name] = std::move(effect);
   m_currentEffect = std::ref(m_effects[name]);
@@ -607,7 +607,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
 }
 
 std::expected<void, StarException> OpenGlRenderer::setEffectParameter(String const& parameterName, RenderEffectParameter const& value) {
-  auto parameter = m_currentEffect->get().parameters.maybeRef(parameterName);
+  auto parameter = m_currentEffect->get().parameters.find_ref(parameterName);
   if (!parameter || (parameter->get().parameterValue && *parameter->get().parameterValue == value))
     return {};
 
@@ -631,8 +631,8 @@ std::expected<void, StarException> OpenGlRenderer::setEffectScriptableParameter(
     return {};
 
   Effect& effect = find->second;
-  
-  auto parameter = effect.scriptables.maybeRef(parameterName);
+
+  auto parameter = effect.scriptables.find_ref(parameterName);
   if (!parameter)
     return {};
 
@@ -656,7 +656,7 @@ std::optional<RenderEffectParameter> OpenGlRenderer::getEffectScriptableParamete
 
   Effect& effect = find->second;
 
-  auto parameter = effect.scriptables.maybeRef(parameterName);
+  auto parameter = effect.scriptables.find_ref(parameterName);
   if (!parameter)
     return {};
   
@@ -664,7 +664,7 @@ std::optional<RenderEffectParameter> OpenGlRenderer::getEffectScriptableParamete
 }
 
 std::expected<void, StarException> OpenGlRenderer::setEffectTexture(String const& textureName, ImageView const& image) {
-  auto textureParameter = m_currentEffect->get().textures.maybeRef(textureName);
+  auto textureParameter = m_currentEffect->get().textures.find_ref(textureName);
   if (!textureParameter)
     return {};
   auto& parameter = textureParameter->get();
@@ -724,7 +724,7 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
       if (!*framebuffer) continue;
       auto textureName = input.getString("texture");
       if (!textureName) return std::unexpected(std::move(textureName.error()));
-      if (auto texture = effect.textures.maybeRef(*textureName)) {
+      if (auto texture = effect.textures.find_ref(*textureName)) {
         auto buffer = getGlFrameBuffer(**framebuffer);
         if (!buffer) return std::unexpected(std::move(buffer.error()));
         inputBuffers.emplace_back(*texture, *buffer);
@@ -935,7 +935,7 @@ std::expected<std::shared_ptr<TextureGroup>, StarException> OpenGlRenderer::crea
 
   auto glTextureGroup = std::make_shared<GlTextureGroup>(atlasNumCells);
   glTextureGroup->textureAtlasSet.textureFiltering = filtering;
-  m_liveTextureGroups.append(glTextureGroup);
+  m_liveTextureGroups.push_back(glTextureGroup);
   return glTextureGroup;
 }
 
@@ -949,9 +949,7 @@ List<RenderPrimitive>& OpenGlRenderer::immediatePrimitives() {
   return m_immediatePrimitives;
 }
 
-void OpenGlRenderer::render(RenderPrimitive primitive) {
-  m_immediatePrimitives.append(std::move(primitive));
-}
+void OpenGlRenderer::render(RenderPrimitive primitive) { m_immediatePrimitives.push_back(std::move(primitive)); }
 
 std::expected<void, StarException> OpenGlRenderer::appendImmediate(DetachedRenderGeometry const& geometry) {
   auto legacy = m_immediateRenderBuffer->append(m_immediatePrimitives);
@@ -1014,7 +1012,7 @@ std::expected<void, StarException> OpenGlRenderer::setScreenSize(Vec2U screenSiz
   GlTextureBindingGuard textureBinding;
   GlFramebufferBindingGuard framebufferBinding;
 
-  for (auto& frameBuffer : m_frameBuffers) {
+  for (auto&& frameBuffer : m_frameBuffers) {
     if (frameBuffer.second->overrideSize) {
       continue; // don't resize this one
     }
@@ -1069,8 +1067,8 @@ std::expected<void, StarException> OpenGlRenderer::setScreenSize(Vec2U screenSiz
 std::expected<void, StarException> OpenGlRenderer::startFrame() {
   if (m_scissorRect)
     glDisable(GL_SCISSOR_TEST);
-  
-  for (auto& frameBuffer : m_frameBuffers) {
+
+  for (auto&& frameBuffer : m_frameBuffers) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer.second->id);
     if (frameBuffer.second->clear)
       glClear(GL_COLOR_BUFFER_BIT);
@@ -1244,7 +1242,7 @@ void OpenGlRenderer::GlGroupedTexture::incrementBufferUseCount() {
 
 void OpenGlRenderer::GlGroupedTexture::decrementBufferUseCount() {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((bufferUseCount != 0));
+    Star::star_assert_failed((bufferUseCount != 0));
   }
   if (bufferUseCount == 1)
     parentAtlasTexture->setLocked(false);
@@ -1688,13 +1686,17 @@ std::expected<void, StarException> OpenGlRenderer::renderGlBuffer(GlRenderBuffer
       glEnableVertexAttribArray(m_dataAttribute);
 
     if (m_positionAttribute != -1)
-      glVertexAttribPointer(m_positionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, pos));
+      glVertexAttribPointer(m_positionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, pos)));
     if (m_texCoordAttribute != -1)
-      glVertexAttribPointer(m_texCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, uv));
+      glVertexAttribPointer(m_texCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, uv)));
     if (m_colorAttribute != -1)
-      glVertexAttribPointer(m_colorAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, color));
+      glVertexAttribPointer(m_colorAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(GlRenderVertex),
+                            reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, color)));
     if (m_dataAttribute != -1)
-      glVertexAttribIPointer(m_dataAttribute, 1, GL_INT, sizeof(GlRenderVertex), (GLvoid*)offsetof(GlRenderVertex, pack));
+      glVertexAttribIPointer(m_dataAttribute, 1, GL_INT, sizeof(GlRenderVertex),
+                             reinterpret_cast<GLvoid*>(offsetof(GlRenderVertex, pack)));
 
     glDrawArrays(GL_TRIANGLES, 0, vb.vertexCount);
   }
@@ -1712,8 +1714,8 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
   m_textureSizeUniforms.clear();
   if (effect.includeVBTextures) {
     for (std::size_t i = 0; i < MultiTextureCount; ++i) {
-      m_textureUniforms.append(effect.getUniform(strf("texture{}", i)));
-      m_textureSizeUniforms.append(effect.getUniform(strf("textureSize{}", i)));
+      m_textureUniforms.push_back(effect.getUniform(Star::format("texture{}", i)));
+      m_textureSizeUniforms.push_back(effect.getUniform(Star::format("textureSize{}", i)));
     }
   }
   m_screenSizeUniform = effect.getUniform("screenSize");
@@ -1741,7 +1743,7 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
 }
 
 std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> OpenGlRenderer::getGlFrameBuffer(String const& id) {
-  if (auto framebuffer = m_frameBuffers.maybeRef(id))
+  if (auto framebuffer = m_frameBuffers.find_ref(id))
     return framebuffer->get();
   else
     return std::unexpected(RendererException::format("Frame buffer '{}' does not exist", id));
@@ -1772,7 +1774,7 @@ std::expected<void, StarException> OpenGlRenderer::switchGlFrameBuffer(RefPtr<Gl
 GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
   auto find = attributes.find(name);
   if (find == attributes.end()) {
-    GLuint attrib = glGetAttribLocation(program, name.utf8Ptr());
+    GLuint attrib = glGetAttribLocation(program, name.utf8_data());
     attributes[name] = attrib;
     return attrib;
   }
@@ -1782,7 +1784,7 @@ GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
 GLuint OpenGlRenderer::Effect::getUniform(String const& name) {
   auto find = uniforms.find(name);
   if (find == uniforms.end()) {
-    GLuint uniform = glGetUniformLocation(program, name.utf8Ptr());
+    GLuint uniform = glGetUniformLocation(program, name.utf8_data());
     uniforms[name] = uniform;
     return uniform;
   }

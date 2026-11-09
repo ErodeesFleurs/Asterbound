@@ -231,7 +231,7 @@ namespace {
   if (!planetName) return std::unexpected(std::move(planetName.error()));
   auto iconWidget = entry.fetchChild<ImageWidget>("icon");
   if (!iconWidget) return std::unexpected(std::move(iconWidget.error()));
-  auto icon = (*iconWidget)->setImage(strf("/interface/bookmarks/icons/{}.png", bookmark.icon));
+  auto icon = (*iconWidget)->setImage(Star::format("/interface/bookmarks/icons/{}.png", bookmark.icon));
   if (!icon) return std::unexpected(std::move(icon.error()));
   auto editButton = entry.fetchChild<ButtonWidget>("editButton");
   if (!editButton) return std::unexpected(std::move(editButton.error()));
@@ -297,7 +297,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
     auto iconName = dest.optString("icon");
     if (!iconName) return std::unexpected(std::move(iconName.error()));
     std::optional<String> icon;
-    if (*iconName) icon = strf("/interface/bookmarks/icons/{}.png", **iconName);
+    if (*iconName) icon = Star::format("/interface/bookmarks/icons/{}.png", **iconName);
     auto setup = setupTeleportEntry(**entry, *name, *planet, icon);
     if (!setup) return std::unexpected(std::move(setup.error()));
     auto mission = dest.getBool("mission", false);
@@ -312,7 +312,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
         }
       }
     }
-    m_destinations.append({std::move(*warpAction), *deploy});
+    m_destinations.push_back({std::move(*warpAction), *deploy});
   }
   auto beamLabelConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:beamPartyMemberLabel");
   if (!beamLabelConfig) return std::unexpected(std::move(beamLabelConfig.error()));
@@ -340,7 +340,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
       bool deploy = member.warpMode == WarpMode::DeployOnly;
       auto setup = setupTeleportEntry(**entry, member.name, deploy ? *deployPartyMember : *beamPartyMember, deploy ? *deployPartyMemberIcon : *beamPartyMemberIcon);
       if (!setup) return std::unexpected(std::move(setup.error()));
-      m_destinations.append({WarpToPlayer(member.uuid), deploy});
+      m_destinations.push_back({WarpToPlayer(member.uuid), deploy});
     }
   }
   auto includeBookmarks = config.getBool("includePlayerBookmarks", false);
@@ -348,7 +348,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   if (*includeBookmarks) {
     auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
-    auto sorted = sortByComputedValue(*bookmarks, [](TeleportBookmark const& bookmark) { return bookmark.bookmarkName.toLower(); });
+    auto sorted = sortByComputedValue(*bookmarks, [](TeleportBookmark const& bookmark) { return bookmark.bookmarkName.to_lower(); });
     if (!sorted) return std::unexpected(std::move(sorted.error()));
     for (auto const& bookmark : *bookmarks) {
       auto entry = (*destList)->addItem();
@@ -362,7 +362,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
         if (!editButton) return std::unexpected(std::move(editButton.error()));
         (*editButton)->setEnabled(false);
       }
-      m_destinations.append({WarpToWorld(bookmark.target.first, bookmark.target.second), false});
+      m_destinations.push_back({WarpToWorld(bookmark.target.first, bookmark.target.second), false});
     }
   }
   return selectDestination();
@@ -391,13 +391,13 @@ std::expected<void, StarException> TeleportDialog::teleport() {
     auto destination = m_destinations.at((*destList)->selectedItem());
     if (!destination) return std::unexpected(std::move(destination.error()));
     auto& selected = destination->get();
-    auto text = printWarpAction(selected.first);
+    auto text = Star::print_warp_action(selected.first);
     if (!text) return std::unexpected(std::move(text.error()));
     auto message = m_client->worldClient()->sendEntityMessage(m_sourceEntityId, "onTeleport", {*text});
     if (!message) return std::unexpected(std::move(message.error()));
     bool deploy = selected.second;
     bool beam = std::holds_alternative<WarpAlias>(selected.first) && std::get<WarpAlias>(selected.first) == WarpAlias::OrbitedWorld;
-    auto action = take(selected).first;
+    auto action = std::exchange(selected, {}).first;
     auto warped = deploy ? m_client->warpPlayer(action, true, "deploy", true) : m_client->warpPlayer(action, true, beam ? String("beam") : String("default"));
     if (!warped) return std::unexpected(std::move(warped.error()));
     dismiss();

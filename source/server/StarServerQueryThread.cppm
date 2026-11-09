@@ -18,7 +18,7 @@ export namespace Star {
 class ServerQueryThread : public Thread {
 public:
   [[nodiscard]] static std::expected<std::unique_ptr<ServerQueryThread>, StarException> create(UniverseServer& universe, HostAddressWithPort const& bindAddress);
-  ~ServerQueryThread();
+  ~ServerQueryThread() override;
 
   [[nodiscard]] std::expected<void, StarException> start();
   void stop();
@@ -54,8 +54,8 @@ private:
   static constexpr std::uint8_t A2S_VAC_OFF = 0x00;
   static constexpr std::uint8_t A2S_VAC_ON = 0x01;
   static constexpr std::string_view A2S_INFO_REQUEST_STRING = "Source Engine Query";
-  static constexpr std::uint16_t A2S_APPID = (std::uint16_t)0xfffe;
-  static constexpr std::uint16_t A2S_PACKET_SIZE = (std::uint16_t)0x4e0;
+  static constexpr std::uint16_t A2S_APPID = static_cast<std::uint16_t>(0xfffe);
+  static constexpr std::uint16_t A2S_PACKET_SIZE = static_cast<std::uint16_t>(0x4e0);
   static constexpr std::uint32_t A2S_HEAD_INT = 0xffffffff;
   static constexpr std::string_view GAME_DIR = "starbound";
   static constexpr std::string_view GAME_DESC = "Starbound";

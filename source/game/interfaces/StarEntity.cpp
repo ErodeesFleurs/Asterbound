@@ -44,7 +44,7 @@ extern std::expected<EnumMap<EntityType>, StarException> const EntityTypeNames =
   {EntityType::Player, "player"}
 });
 
-Entity::~Entity() {}
+Entity::~Entity() = default;
 
 std::expected<void, StarException> Entity::init(World& world, EntityId entityId, EntityMode mode) {
   if (entityId == NullEntityId)
@@ -176,12 +176,12 @@ EntityDamageTeam Entity::getTeam() const {
 bool Entity::inWorld() const {
   if (m_world) {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((m_world && m_entityId != NullEntityId && m_entityMode));
+      Star::star_assert_failed((m_world && m_entityId != NullEntityId && m_entityMode));
     }
     return true;
   } else {
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((!m_world && m_entityId == NullEntityId && !m_entityMode));
+      Star::star_assert_failed((!m_world && m_entityId == NullEntityId && !m_entityMode));
     }
     return false;
   }
@@ -241,9 +241,7 @@ void Entity::setKeepAlive(bool keepAlive) {
   m_keepAlive = keepAlive;
 }
 
-void Entity::setUniqueId(std::optional<String> uniqueId) {
-  m_uniqueId = uniqueId;
-}
+void Entity::setUniqueId(std::optional<String> uniqueId) { m_uniqueId = std::move(uniqueId); }
 
 void Entity::setTeam(EntityDamageTeam newTeam) {
   m_team = newTeam;

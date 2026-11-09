@@ -260,21 +260,21 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     return {};
 
   List<LightSource> lights;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
       auto sources = active->lights(interpolation);
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
     if (auto flashlight = as<Flashlight>(item)) {
       auto sources = flashlight->lightSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
     if (auto inspection = as<InspectionTool>(item)) {
       auto sources = inspection->lightSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.appendAll(*sources);
+      lights.append_range(*sources);
     }
   }
 
@@ -303,7 +303,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
       if (auto source = as<StatusEffectItem>(item)) {
         auto status = source->statusEffects();
         if (!status) return std::unexpected(std::move(status.error()));
-        effects.appendAll(*status);
+        effects.append_range(*status);
       }
     }
   }
@@ -578,7 +578,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
 
 [[nodiscard]] std::expected<bool, StarException> ToolUser::queryShieldHit(DamageSource const& source) const {
   if (m_suppress.get() || !m_user) return false;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto tool = as<ToolUserItem>(item)) {
       auto polygons = tool->shieldPolys();
       if (!polygons) return std::unexpected(std::move(polygons.error()));
@@ -762,11 +762,11 @@ bool ToolUser::firingAlt() const {
     return {};
 
   List<DamageSource> ds;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto sources = toolItem->damageSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      ds.appendAll(*sources);
+      ds.append_range(*sources);
     }
   }
   return ds;
@@ -777,11 +777,11 @@ bool ToolUser::firingAlt() const {
     return {};
 
   List<PhysicsForceRegion> ds;
-  for (auto item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto toolItem = as<ToolUserItem>(item)) {
       auto regions = toolItem->forceRegions();
       if (!regions) return std::unexpected(std::move(regions.error()));
-      ds.appendAll(*regions);
+      ds.append_range(*regions);
     }
   }
   return ds;
@@ -967,7 +967,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
     deltaWritten = true;
     auto code = ds.write<std::uint8_t>(1);
     if (!code) return std::unexpected(std::move(code.error()));
-    auto bytes = ds.writeBytes(m_buffer.data());
+    auto bytes = ds.write_bytes(m_buffer.data());
     if (!bytes) return std::unexpected(std::move(bytes.error()));
     if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
       auto code = ds.write<std::uint8_t>(2);
@@ -984,7 +984,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
       deltaWritten = true;
       auto code = ds.write<std::uint8_t>(3);
       if (!code) return std::unexpected(std::move(code.error()));
-      auto bytes = ds.writeBytes(m_buffer.data());
+      auto bytes = ds.write_bytes(m_buffer.data());
       if (!bytes) return std::unexpected(std::move(bytes.error()));
     }
   }
@@ -1054,9 +1054,7 @@ std::shared_ptr<Item> const& ToolUser::NetItem::get() const {
   return {};
 }
 
-bool ToolUser::NetItem::pullNewItem() {
-  return take(m_newItem);
-}
+bool ToolUser::NetItem::pullNewItem() { return std::exchange(m_newItem, false); }
 
 void ToolUser::NetItem::updateItemDescriptor() {
   if (m_item)

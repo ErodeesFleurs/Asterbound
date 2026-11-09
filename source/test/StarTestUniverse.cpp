@@ -160,21 +160,22 @@ TestUniverse::TestUniverse(Vec2U clientWindowSize)
 
 std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create(Root& root, Vec2U clientWindowSize) {
   auto fixture = std::unique_ptr<TestUniverse>(new TestUniverse(clientWindowSize));
-  auto storagePath = File::temporaryDirectory(root.random());
+  auto storagePath = File::temporary_directory(root.random());
   if (!storagePath)
     return std::unexpected(std::move(storagePath.error()));
   fixture->m_storagePath = std::move(*storagePath);
-  auto playerStorage = PlayerStorage::create(root, File::relativeTo(fixture->m_storagePath, "player"));
+  auto playerStorage = PlayerStorage::create(root, File::relative_to(fixture->m_storagePath, "player"));
   if (!playerStorage)
     return std::unexpected(std::move(playerStorage.error()));
-  auto statistics = Statistics::create(root, File::relativeTo(fixture->m_storagePath, "statistics"));
+  auto statistics = Statistics::create(root, File::relative_to(fixture->m_storagePath, "statistics"));
   if (!statistics)
     return std::unexpected(std::move(statistics.error()));
-  auto server = UniverseServer::create(root, File::relativeTo(fixture->m_storagePath, "universe"));
+  auto server = UniverseServer::create(root, File::relative_to(fixture->m_storagePath, "universe"));
   if (!server)
     return std::unexpected(std::move(server.error()));
   fixture->m_server = std::move(*server);
-  auto client = UniverseClient::create(root, *playerStorage, *statistics, File::relativeTo(fixture->m_storagePath, "universeclient"));
+  auto client = UniverseClient::create(root, *playerStorage, *statistics,
+                                       File::relative_to(fixture->m_storagePath, "universeclient"));
   if (!client)
     return std::unexpected(std::move(client.error()));
   fixture->m_client = std::move(*client);
@@ -282,7 +283,7 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   if (!connected)
     return std::unexpected(std::move(connected.error()));
   if (*connected)
-    return std::unexpected(StarException(strf("Test universe login rejected: {}", **connected)));
+    return std::unexpected(StarException(Star::format("Test universe login rejected: {}", **connected)));
   return fixture;
 }
 
@@ -311,7 +312,7 @@ std::expected<void, StarException> TestUniverse::close() {
   }
   m_mainPlayer.reset();
   if (!m_storagePath.empty()) {
-    auto removed = File::removeDirectoryRecursive(m_storagePath);
+    auto removed = File::remove_all(m_storagePath);
     if (removed)
       m_storagePath.clear();
     else if (!error)
@@ -394,7 +395,7 @@ std::expected<List<Drawable>, StarException> TestUniverse::currentClientDrawable
   List<Drawable> drawables;
   for (auto& ed : renderData.entityDrawables) {
     for (auto& p : ed.layers)
-      drawables.appendAll(std::move(p.second));
+      drawables.append_range(std::move(p.second));
   }
 
   return drawables;
@@ -436,7 +437,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
       return std::unexpected(std::move(updated.error()));
     if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - start >= timeout)
       return std::unexpected(TestUniverseTimeoutException(
-        strf("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
+        Star::format("Timed out waiting for test world readiness (server steps {}..{}, scripted NPCs {}, coordinators {})",
              ready.firstServerStep, ready.readyServerStep, ready.observedScriptedNpcs, ready.observedCoordinators)));
     if (currentPlayerWorld() != worldId)
       return std::unexpected(StarException("Test player left the world while waiting for readiness"));
@@ -450,7 +451,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         if (!error)
           return std::unexpected(std::move(error.error()));
         if (*error)
-          return std::unexpected(StarException(strf("Test world readiness message failed: {}", **error)));
+          return std::unexpected(StarException(Star::format("Test world readiness message failed: {}", **error)));
         continue;
       }
       // WorldServerThread settles messages only after WorldServer::update
@@ -498,7 +499,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         for (auto const& [name, scripts] : *configuredContexts) {
           auto context = world.scriptContext(name);
           if (!context || context->error() || !context->context())
-            return std::unexpected(StarException(strf("Test world script context is not healthy: {}", name)));
+            return std::unexpected(StarException(Star::format("Test world script context is not healthy: {}", name)));
           auto& observation = observedWorldScripts.try_emplace(name.utf8(), Observation{step}).first->second;
           settled(observation, context->updateDt());
         }

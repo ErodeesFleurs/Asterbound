@@ -12,7 +12,7 @@ import star.player_blueprints;
 import star.algorithm;
 namespace Star {
 
-PlayerBlueprints::PlayerBlueprints() {}
+PlayerBlueprints::PlayerBlueprints() = default;
 
 std::expected<PlayerBlueprints, StarException> PlayerBlueprints::create(Json const& json) {
   PlayerBlueprints blueprints;

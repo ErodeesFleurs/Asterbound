@@ -75,7 +75,7 @@ std::expected<EntityRenderLayer, StarException> parseRenderLayer(String renderLa
     auto amount = parts->at(1);
     if (!amount)
       return std::unexpected(std::move(amount.error()));
-    auto parsed = lexicalCast<int>(amount->get());
+    auto parsed = lexical_cast<int>(amount->get());
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     renderLayer = name->get();
@@ -189,13 +189,5 @@ std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) 
 
 OverheadBar::OverheadBar(std::optional<String> icon, float percentage, Color color, bool detailOnly)
   : icon(std::move(icon)), percentage(percentage), color(std::move(color)), detailOnly(detailOnly) {}
-
-extern std::expected<EnumMap<EntityHighlightEffectType>, StarException> const EntityHighlightEffectTypeNames = EnumMap<EntityHighlightEffectType>::create({
-  {EntityHighlightEffectType::None, "none"},
-  {EntityHighlightEffectType::Interactive, "interactive"},
-  {EntityHighlightEffectType::Inspectable, "inspectable"},
-  {EntityHighlightEffectType::Interesting, "interesting"},
-  {EntityHighlightEffectType::Inspected, "inspected"}
-});
 
 }

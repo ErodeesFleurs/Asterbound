@@ -55,7 +55,7 @@ ImageMetadataDatabase::ImageMetadataDatabase(Root& root)
 
 std::expected<Vec2U, StarException> ImageMetadataDatabase::imageSize(AssetPath const& path) const {
   std::unique_lock locker(m_mutex);
-  auto cached = m_sizeCache.maybeRef(path);
+  auto cached = m_sizeCache.find_ref(path);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -75,7 +75,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   SpacesEntry key = std::make_tuple(path, Vec2I::round(position), fillLimit, flip);
 
   std::unique_lock locker(m_mutex);
-  auto cached = m_spacesCache.maybeRef(key);
+  auto cached = m_spacesCache.find_ref(key);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -84,7 +84,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   auto filteredPath = filterProcessing(path);
   SpacesEntry filteredKey = std::make_tuple(filteredPath, Vec2I::round(position), fillLimit, flip);
 
-  auto filteredCached = m_spacesCache.maybeRef(filteredKey);
+  auto filteredCached = m_spacesCache.find_ref(filteredKey);
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
@@ -114,13 +114,13 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
     for (int xspace = min[0]; xspace < max[0]; ++xspace) {
       float fillRatio = 0.0f;
 
-      for (int y = 0; y < (int)TilePixels; ++y) {
-        int ypixel = std::round(yspace * (int)TilePixels + y - position[1]);
+      for (int y = 0; y < static_cast<int>(TilePixels); ++y) {
+        int ypixel = std::round(yspace * static_cast<int>(TilePixels) + y - position[1]);
         if (ypixel < 0 || ypixel >= imageHeight)
           continue;
 
-        for (int x = 0; x < (int)TilePixels; ++x) {
-          int xpixel = std::round(xspace * (int)TilePixels + x - position[0]);
+        for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
+          int xpixel = std::round(xspace * static_cast<int>(TilePixels) + x - position[0]);
           if (flip)
             xpixel = imageWidth - 1 - xpixel;
 
@@ -136,7 +136,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
       }
 
       if (fillRatio >= fillLimit)
-        spaces.append(Vec2I(xspace, yspace));
+        spaces.push_back(Vec2I(xspace, yspace));
     }
   }
 
@@ -153,15 +153,15 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
 
 std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetPath const& path) const {
   std::unique_lock locker(m_mutex);
-  
-  auto cached = m_regionCache.maybeRef(path);
+
+  auto cached = m_regionCache.find_ref(path);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
     return (*cached)->get();
 
   auto filteredPath = filterProcessing(path);
-  auto filteredCached = m_regionCache.maybeRef(filteredPath);
+  auto filteredCached = m_regionCache.find_ref(filteredPath);
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
@@ -257,7 +257,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return fallback();
   } else {
     std::unique_lock locker(m_mutex);
-    auto size = m_sizeCache.maybeRef(path.basePath);
+    auto size = m_sizeCache.find_ref(path.basePath);
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size) {
@@ -290,9 +290,9 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
 
   struct OperationSizeAdjust {
     Vec2U& imageSize;
-    bool hasError;
+    bool hasError = false;
 
-    OperationSizeAdjust(Vec2U& size) : imageSize(size), hasError(false) {};
+    OperationSizeAdjust(Vec2U& size) : imageSize(size) {};
 
     void operator()(NullImageOperation const&) {}
 
@@ -334,11 +334,9 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
     }
 
     void operator()(CropImageOperation const& cio) {
-      if (cio.subset.isEmpty() ||
-          cio.subset.xMin() < 0 ||
-          cio.subset.yMin() < 0 ||
-          (unsigned)cio.subset.xMax() > imageSize[0] ||
-          (unsigned)cio.subset.yMax() > imageSize[1]) {
+      if (cio.subset.isEmpty() || cio.subset.xMin() < 0 || cio.subset.yMin() < 0
+          || static_cast<unsigned>(cio.subset.xMax()) > imageSize[0]
+          || static_cast<unsigned>(cio.subset.yMax()) > imageSize[1]) {
         hasError = true;
       } else {
         imageSize = Vec2U(cio.subset.size());

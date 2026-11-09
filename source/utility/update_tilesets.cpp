@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.tileset_database;
 import star.native_runtime;
 import star.json_extra;
@@ -134,7 +135,7 @@ std::expected<void, StarException> scanMaterials(Root& root, TilesetUpdater& upd
       return std::unexpected(std::move(description.error()));
     Json properties = JsonObject{{"material", materialName}, {"//name", materialName},
         {"//shortdescription", *shortDescription}, {"//description", *description}};
-    auto category = tileset->toLower();
+    auto category = tileset->to_lower();
     if (!category)
       return std::unexpected(std::move(category.error()));
     updater.defineTile(std::make_shared<Tile>(Tile{*source, "materials", *category, materialName, *image, properties}));
@@ -197,7 +198,7 @@ std::expected<StringSet, StarException> categorizeObject(Root& root, String cons
     categories.insert("objects-uncategorized");
   StringSet result;
   for (auto const& entry : categories) {
-    auto lowered = entry.toLower();
+    auto lowered = entry.to_lower();
     if (!lowered)
       return std::unexpected(std::move(lowered.error()));
     result.insert(std::move(*lowered));
@@ -245,12 +246,12 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   unsigned width = 0, height = 0;
   for (auto const& imageLayer : orientation->imageLayers) {
     auto path = AssetPath::join(imageLayer.imagePart().image);
-    String imageName = path.replaceTags(StringMap<String>{}, true, "default");
+    String imageName = path.replace_tags(StringMap<String>{}, true, "default");
     auto loaded = assets->image(imageName);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     auto image = *loaded;
-    layers.append(image);
+    layers.push_back(image);
     width = std::max(width, image->width());
     height = std::max(height, image->height());
   }
@@ -296,8 +297,8 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   if (!description)
     return std::unexpected(std::move(description.error()));
   JsonObject properties{{"object", objectName},
-      {"imagePositionX", toString(imagePosition.x())},
-      {"imagePositionY", toString(imagePosition.y())},
+      {"imagePositionX", Star::to_string(imagePosition.x())},
+      {"imagePositionY", Star::to_string(imagePosition.y())},
       {"//shortdescription", *shortDescription}, {"//description", *description}};
   if (orientation->directionAffinity.has_value()) {
     Direction direction = *orientation->directionAffinity;
@@ -318,7 +319,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   // for each orientation.
   String tileName = objectName;
   if (orientationIndex != 0)
-    tileName += "_orientation" + toString(orientationIndex);
+    tileName += "_orientation" + Star::to_string(orientationIndex);
   properties["//name"] = tileName;
   auto source = assets->assetSource((*objectConfig)->path);
   if (!source)
@@ -369,7 +370,7 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   Vec2U imageSize(TilePixels, TilePixels);
-  for (auto liquid : (*liquids)->allLiquidSettings()) {
+  for (auto const& liquid : (*liquids)->allLiquidSettings()) {
     auto image = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
     image->fill(liquid->liquidColor);
     auto assetSource = (*assets)->assetSource(liquid->path);
@@ -399,7 +400,8 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto run = [&]() -> std::expected<int, StarException> {
@@ -415,7 +417,7 @@ int main(int argc, char** argv) {
     auto assets = root->assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    for (String source : (*assets)->assetSources()) {
+    for (String const& source : (*assets)->assetSources()) {
       auto logged = root->logger().info("Assets source: \"{}\"", source);
       if (!logged)
         return std::unexpected(std::move(logged.error()));
@@ -439,7 +441,8 @@ int main(int argc, char** argv) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

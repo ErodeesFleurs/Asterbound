@@ -26,7 +26,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<String, StarException> printJson(Json const& arg, std::optional<int> pretty);
     [[nodiscard]] std::expected<String, StarException> print(LuaValue const& arg);
     [[nodiscard]] std::expected<LuaValue, StarException> interpolateSinEase(LuaEngine& engine, double offset, LuaValue const& value1, LuaValue const& value2);
-    String replaceTags(String const& str, StringMap<String> const& tags);
+    String replace_tags(String const& str, StringMap<String> const& tags);
   }
 }
 }
@@ -49,5 +49,5 @@ export namespace Star::LuaBindings::UtilityCallbacks {
   using ::Star::LuaBindings::UtilityCallbacks::printJson;
   using ::Star::LuaBindings::UtilityCallbacks::print;
   using ::Star::LuaBindings::UtilityCallbacks::interpolateSinEase;
-  using ::Star::LuaBindings::UtilityCallbacks::replaceTags;
+  using ::Star::LuaBindings::UtilityCallbacks::replace_tags;
 }

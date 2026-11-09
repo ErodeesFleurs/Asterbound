@@ -73,12 +73,12 @@ std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksA
 }
 
 std::expected<void, StarException> FallingBlocksAgent::update() {
-  HashSet<Vec2I> processing = take(m_pending);
+  HashSet<Vec2I> processing = std::exchange(m_pending, {});
 
   while (!processing.empty()) {
     List<Vec2I> positions;
-    for (auto const& pos : take(processing))
-      positions.append(pos);
+    for (auto const& pos : std::exchange(processing, {}))
+      positions.push_back(pos);
 
     m_random.shuffle(positions);
 

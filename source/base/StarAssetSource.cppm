@@ -40,6 +40,22 @@ public:
   // Does not probe the filesystem or copy the asset path collection.
   virtual bool contains(String const& path) const = 0;
 
+  // Fresh checked length without constructing a payload reader.
+  [[nodiscard]] virtual std::expected<StreamOffset, StarException> file_size(String const& path) = 0;
+
+  // Results correspond exactly to input order, including duplicates and errors.
+  // The default checks each entry freshly via file_size. Packed sources capture
+  // one checked backing extent for this call, not immutable file contents; no
+  // snapshot or result is cached across calls. Empty input performs no I/O.
+  [[nodiscard]] virtual std::vector<std::expected<StreamOffset, StarException>>
+  file_sizes(std::span<std::reference_wrapper<String const> const> paths) {
+    std::vector<std::expected<StreamOffset, StarException>> sizes;
+    sizes.reserve(paths.size());
+    for (auto path : paths)
+      sizes.push_back(file_size(path.get()));
+    return sizes;
+  }
+
   // Open the given path in this source and return an IODevicePtr to it.
   [[nodiscard]] virtual std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) = 0;
 

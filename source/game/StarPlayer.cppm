@@ -618,8 +618,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<PlayerConfig> config, Uuid uuid);
   [[nodiscard]] std::expected<void, StarException> netLoad(ByteArray const& store, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> installHumanoid();
-  typedef LuaActorScript GenericScriptComponent;
-
+  using GenericScriptComponent = LuaActorScript;
 
   // handle input and other events (master only) that happen BEFORE movement/tech controller updates
   [[nodiscard]] std::expected<void, StarException> processControls();

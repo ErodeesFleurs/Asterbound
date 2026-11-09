@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
@@ -32,7 +33,7 @@ public:
 
 std::expected<void, Star::StarException> requirePrivateStorage(Star::String const& storage) {
   for (std::string_view name : {"player", "universe"}) {
-    auto exists = Star::File::exists(Star::File::relativeTo(storage, name));
+    auto exists = Star::File::exists(Star::File::relative_to(storage, name));
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (*exists)
@@ -46,31 +47,36 @@ std::expected<void, Star::StarException> requirePrivateStorage(Star::String cons
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    std::fprintf(stderr, "%s\n", nativeRuntime.error().what());
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);
   BenchmarkLifetime lifetime;
   auto loader = Star::RootLoader::create({{}, {}, {}, Star::LogLevel::Error, true, {}});
   if (!loader) {
-    std::fprintf(stderr, "%s\n", loader.error().what());
+    if (!Star::print(stderr, "{}\n", loader.error().what()))
+      return 1;
     return 1;
   }
   auto parsed = loader->commandParseOrDie(argc, argv);
   if (!parsed) {
-    std::fprintf(stderr, "%s\n", parsed.error().what());
+    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+      return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto privateStorage = requirePrivateStorage(settings.storageDirectory); !privateStorage) {
-    std::fprintf(stderr, "%s\n", privateStorage.error().what());
+    if (!Star::print(stderr, "{}\n", privateStorage.error().what()))
+      return 1;
     return 1;
   }
   settings.runtimeConfigFile.reset();
   settings.logFile.reset();
   auto root = Star::Root::create(std::move(settings));
   if (!root) {
-    std::fprintf(stderr, "%s\n", root.error().what());
+    if (!Star::print(stderr, "{}\n", root.error().what()))
+      return 1;
     return 1;
   }
   Star::PerformanceBenchmarkSession session{**root};
@@ -80,7 +86,8 @@ int main(int argc, char** argv) {
                       .and_then([&] { return Star::registerLiquidPerformanceBenchmarks(session); })
                       .and_then([&] { return Star::registerAssetsPerformanceBenchmarks(session); });
   if (!registered) {
-    std::fprintf(stderr, "%s\n", registered.error().what());
+    if (!Star::print(stderr, "{}\n", registered.error().what()))
+      return 1;
     benchmark::ClearRegisteredBenchmarks();
     return 1;
   }

@@ -59,7 +59,7 @@ inline constexpr auto TeamTypeNames = sortedEnumNames(std::to_array<std::pair<Te
   {TeamType::Assistant, "assistant"},
 }));
 
-typedef std::uint16_t TeamNumber;
+using TeamNumber = std::uint16_t;
 
 struct EntityDamageTeam {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, EntityDamageTeam& value);

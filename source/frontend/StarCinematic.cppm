@@ -107,11 +107,11 @@ private:
   };
 
   struct AudioCue {
-    AudioCue() : timecode(), endTimecode() {}
+    AudioCue() {}
     String resource;
     int loops;
-    float timecode;
-    float endTimecode;
+    float timecode = 0;
+    float endTimecode = 0;
   };
 
   [[nodiscard]] std::expected<void, StarException> drawDrawable(Drawable const& drawable, float drawableScale, Vec2F const& drawableTranslation);

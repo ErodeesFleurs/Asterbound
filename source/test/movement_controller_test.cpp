@@ -25,7 +25,7 @@ using namespace Star;
 const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
   "MovementController", "TerrainContactPreservesPositionAndVelocity", [](GameTest& fixture) {
     auto& root = fixture.root();
-    auto storage = File::ephemeralFile(root.random());
+    auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();

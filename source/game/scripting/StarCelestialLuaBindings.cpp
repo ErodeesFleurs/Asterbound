@@ -15,10 +15,10 @@ import star.byte_array;
 import star.data_stream_devices;
 
 import std;
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
+using ZSTD_CCtx = struct ZSTD_CCtx_s;
+using ZSTD_DCtx = struct ZSTD_DCtx_s;
+using ZSTD_DStream = ZSTD_DCtx;
+using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import std;
@@ -219,7 +219,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       auto ores = (*biomeDatabase)->biomeOres(biomeName, threatLevel);
       if (!ores)
         return std::unexpected(std::move(ores.error()));
-      planetOres.addAll(*ores);
+      planetOres.insert_range(*ores);
       return {};
     };
     if (auto terrestrial = as<TerrestrialWorldParameters>(visitableParameters)) {
@@ -339,7 +339,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (auto registration = callbacks.registerCallback("skyFlyingType", [client]() -> std::expected<String, StarException> {
     if (!FlyingTypeNames)
       return std::unexpected(FlyingTypeNames.error());
-    auto name = FlyingTypeNames->getRight(client->get().currentSky()->flyingType());
+    auto name = FlyingTypeNames->get_right(client->get().currentSky()->flyingType());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();
@@ -348,7 +348,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (auto registration = callbacks.registerCallback("skyWarpPhase", [client]() -> std::expected<String, StarException> {
     if (!WarpPhaseNames)
       return std::unexpected(WarpPhaseNames.error());
-    auto name = WarpPhaseNames->getRight(client->get().currentSky()->warpPhase());
+    auto name = WarpPhaseNames->get_right(client->get().currentSky()->warpPhase());
     if (!name)
       return std::unexpected(std::move(name.error()));
     return name->get();
@@ -459,7 +459,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       return std::unexpected(std::move(action.error()));
     if (*action)
       if (std::holds_alternative<WarpToWorld>(**action))
-        return printWorldId(std::get<WarpToWorld>(**action).world);
+        return Star::print_world_id(std::get<WarpToWorld>(**action).world);
     return {};
   }); !registration)
       return std::unexpected(std::move(registration.error()));

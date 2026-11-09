@@ -89,11 +89,11 @@ TEST(StatTest, Set) {
 
   EXPECT_FALSE(stats.isEffectiveStat("TempStat"));
   EXPECT_TRUE(withinAmount(stats.statEffectiveValue("TempStat"), 0.0f, 0.0001f));
-  auto nextId = stats.addStatModifierGroup({StatValueModifier{"TempStat", 20}});
-  ASSERT_TRUE(nextId);
+  auto next_id = stats.addStatModifierGroup({StatValueModifier{"TempStat", 20}});
+  ASSERT_TRUE(next_id);
   EXPECT_TRUE(withinAmount(stats.statEffectiveValue("TempStat"), 20.0f, 0.0001f));
   EXPECT_TRUE(stats.isEffectiveStat("TempStat"));
-  stats.removeStatModifierGroup(*nextId);
+  stats.removeStatModifierGroup(*next_id);
   EXPECT_TRUE(withinAmount(stats.statEffectiveValue("TempStat"), 0.0f, 0.0001f));
   EXPECT_FALSE(stats.isEffectiveStat("TempStat"));
 }

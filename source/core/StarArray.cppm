@@ -4,79 +4,244 @@ import star.memory;
 import std;
 import star.hash;
 import star.optional;
+import star.text_formatter;
 import star.format;
 
 namespace Star {
 
-// Somewhat nicer form of std::array, always initializes values, uses nicer
-// constructor pattern.
-template <typename ElementT, std::size_t SizeN>
-class Array : public std::array<ElementT, SizeN> {
+// These concepts describe the expressions Array actually evaluates, rather than
+// imposing regularity or implicit-bool conversion on element types.
+template <typename Element, typename Source>
+concept array_assignable = requires(Element& element, Source const& source) { element = source; };
+
+template <typename Element>
+concept array_unequal = requires(Element const& left, Element const& right) { (left != right) ? true : false; };
+
+template <typename Element>
+concept array_less = requires(Element const& left, Element const& right) { (left < right) ? true : false; };
+
+template <typename Element, typename Iterator>
+concept array_copy_iterator = requires(Iterator iterator, std::size_t count, Element* output) {
+  std::ranges::copy_n(std::move(iterator), count, output);
+};
+
+template <typename Element>
+concept array_hashable = requires(Star::hash<Element> const& hasher, Element const& element, std::size_t& seed) {
+  hash_combine(seed, hasher(element));
+};
+
+template <typename Element>
+concept array_text_writable = requires(TextBuffer& output, Element const& element) {
+  append_text(output, optional_diagnostic_value(element));
+} && (std::same_as<optional_diagnostic_result<Element>, void>
+      || std::same_as<optional_diagnostic_result<Element>, std::expected<void, StarException>>);
+
+// Value-initialized by default; element constructors deliberately default-
+// construct storage, then assign in order with the historical narrowing rules.
+template <typename ElementT, std::size_t SizeN> class Array {
+  using Storage = std::array<ElementT, SizeN>;
+
 public:
-  using Base = std::array<ElementT, SizeN>;
-
   using Element = ElementT;
-  static std::size_t const ArraySize = SizeN;
-
-  using iterator = Element*;
-  using const_iterator = Element const*;
-
-  using reference = Element&;
-  using const_reference = Element const&;
-
   using value_type = Element;
+  using size_type = typename Storage::size_type;
+  using difference_type = typename Storage::difference_type;
+  using reference = typename Storage::reference;
+  using const_reference = typename Storage::const_reference;
+  using pointer = typename Storage::pointer;
+  using const_pointer = typename Storage::const_pointer;
+  using iterator = typename Storage::iterator;
+  using const_iterator = typename Storage::const_iterator;
+  using reverse_iterator = typename Storage::reverse_iterator;
+  using const_reverse_iterator = typename Storage::const_reverse_iterator;
 
-  static Array filled(Element const& e);
+  static constexpr Array filled(Element const& element) noexcept(std::is_nothrow_default_constructible_v<Storage>
+                                                                 && std::is_nothrow_move_constructible_v<Storage>
+                                                                 && noexcept(std::declval<Array&>().fill(element)))
+    requires(std::is_default_constructible_v<Storage> && std::is_move_constructible_v<Storage>
+             && (SizeN == 0 || array_assignable<Element, Element>))
+  {
+    Array result;
+    result.fill(element);
+    return result;
+  }
 
   template <typename Iterator>
-  static Array copyFrom(Iterator p, std::size_t n = NPos);
+  static constexpr Array copy_from(Iterator iterator, std::size_t count = NPos)
+      noexcept(std::is_nothrow_default_constructible_v<Storage>
+          && std::is_nothrow_move_constructible_v<Storage>
+          && std::is_nothrow_destructible_v<Iterator>
+          && (SizeN == 0 || requires(Iterator& input, Element* output) {
+            { std::ranges::copy_n(std::move(input), count, output) } noexcept;
+          }))
+      requires (std::is_default_constructible_v<Storage>
+          && std::is_move_constructible_v<Storage>
+          && (SizeN == 0 || array_copy_iterator<Element, Iterator>)) {
+    Array result;
+    if constexpr (SizeN != 0)
+      std::ranges::copy_n(std::move(iterator), std::min(count, SizeN), result.begin());
+    return result;
+  }
 
-  Array();
+  constexpr Array() noexcept(std::is_nothrow_default_constructible_v<Storage>)
+    requires std::is_default_constructible_v<Storage>
+      : m_storage() {}
 
-  explicit Array(Element const& e1);
+  explicit constexpr Array(Element const& first)
+      noexcept(std::is_nothrow_default_constructible_v<Storage>
+          && requires(Element& element, Element const& source) {
+            { element = source } noexcept;
+          })
+      requires (SizeN == 1 && std::is_default_constructible_v<Storage>
+          && array_assignable<Element, Element>) {
+    set(first);
+  }
 
   template <typename... T>
-  Array(Element const& e1, T const&... rest);
+  constexpr Array(Element const& first, T const&... rest)
+      noexcept(std::is_nothrow_default_constructible_v<Storage>
+          && requires(Element& element, Element const& source) {
+            { element = source } noexcept;
+          }
+          && (requires(Element& element, T const& source) {
+            { element = source } noexcept;
+          } && ...))
+      requires (sizeof...(T) + 1 == SizeN && std::is_default_constructible_v<Storage>
+          && array_assignable<Element, Element> && (array_assignable<Element, T> && ...)) {
+    set(first, rest...);
+  }
 
-  template <typename Element2>
-  explicit Array(Array<Element2, SizeN> const& a);
+  template <typename Source>
+  explicit constexpr Array(Array<Source, SizeN> const& source)
+      noexcept(std::is_nothrow_default_constructible_v<Storage>
+          && (SizeN == 0 || requires(Element& element, Source const& value) {
+            { element = value } noexcept;
+          }))
+      requires (std::is_default_constructible_v<Storage>
+          && (SizeN == 0 || array_assignable<Element, Source>)) {
+    if constexpr (SizeN != 0)
+      std::copy(source.begin(), source.end(), begin());
+  }
 
-  template <std::size_t i>
-  reference get();
+  constexpr iterator begin() noexcept { return m_storage.begin(); }
+  constexpr const_iterator begin() const noexcept { return m_storage.begin(); }
+  constexpr const_iterator cbegin() const noexcept { return m_storage.cbegin(); }
+  constexpr iterator end() noexcept { return m_storage.end(); }
+  constexpr const_iterator end() const noexcept { return m_storage.end(); }
+  constexpr const_iterator cend() const noexcept { return m_storage.cend(); }
+  constexpr reverse_iterator rbegin() noexcept { return m_storage.rbegin(); }
+  constexpr const_reverse_iterator rbegin() const noexcept { return m_storage.rbegin(); }
+  constexpr const_reverse_iterator crbegin() const noexcept { return m_storage.crbegin(); }
+  constexpr reverse_iterator rend() noexcept { return m_storage.rend(); }
+  constexpr const_reverse_iterator rend() const noexcept { return m_storage.rend(); }
+  constexpr const_reverse_iterator crend() const noexcept { return m_storage.crend(); }
 
-  template <std::size_t i>
-  const_reference get() const;
+  constexpr pointer data() noexcept { return m_storage.data(); }
+  constexpr const_pointer data() const noexcept { return m_storage.data(); }
+  constexpr size_type size() const noexcept { return m_storage.size(); }
+  constexpr size_type max_size() const noexcept { return m_storage.max_size(); }
+  constexpr bool empty() const noexcept { return m_storage.empty(); }
+  constexpr reference front() noexcept { return m_storage.front(); }
+  constexpr const_reference front() const noexcept { return m_storage.front(); }
+  constexpr reference back() noexcept { return m_storage.back(); }
+  constexpr const_reference back() const noexcept { return m_storage.back(); }
+  constexpr reference operator[](size_type i) noexcept { return m_storage[i]; }
+  constexpr const_reference operator[](size_type i) const noexcept { return m_storage[i]; }
+
+  template <std::size_t I>
+  constexpr reference get() noexcept
+    requires(I < SizeN)
+  {
+    return m_storage[I];
+  }
+
+  template <std::size_t I>
+  constexpr const_reference get() const noexcept
+    requires(I < SizeN)
+  {
+    return m_storage[I];
+  }
 
   [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(std::size_t i);
   [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(std::size_t i) const;
 
-  template <typename T2>
-  Array& operator=(Array<T2, SizeN> const& array);
+  constexpr void fill(Element const& element) noexcept(SizeN == 0 || noexcept(std::declval<Storage&>().fill(element)))
+    requires(SizeN == 0 || array_assignable<Element, Element>)
+  {
+    if constexpr (SizeN != 0)
+      m_storage.fill(element);
+  }
 
-  Element* ptr();
-  Element const* ptr() const;
+  constexpr void swap(Array& other) noexcept(SizeN == 0 || std::is_nothrow_swappable_v<Element>)
+    requires(SizeN == 0 || std::is_swappable_v<Element>)
+  {
+    if constexpr (SizeN != 0)
+      m_storage.swap(other.m_storage);
+  }
 
-  bool operator==(Array const& a) const;
-  // Lexicographic, and deliberately weak: the elements only provide <, so an
-  // element pair that is neither less nor greater is not necessarily equal
-  // (floats with NaN).
-  std::weak_ordering operator<=>(Array const& a) const;
+  template <typename Source>
+  constexpr Array& operator=(Array<Source, SizeN> const& source)
+      noexcept(SizeN == 0 || requires(Element& element, Source const& value) {
+        { element = value } noexcept;
+      })
+      requires (SizeN == 0 || array_assignable<Element, Source>) {
+    if constexpr (SizeN != 0)
+      std::copy(source.begin(), source.end(), begin());
+    return *this;
+  }
+
+  constexpr bool operator==(Array const& other) const
+      noexcept(SizeN == 0 || requires(ElementT const& left, ElementT const& right) {
+        { (left != right) ? true : false } noexcept;
+      })
+      requires (SizeN == 0 || array_unequal<ElementT>);
+  // Deliberately weak: neither less nor greater does not imply element equality
+  // (notably for floating-point NaN).
+  constexpr std::weak_ordering operator<=>(Array const& other) const
+      noexcept(SizeN == 0 || requires(ElementT const& left, ElementT const& right) {
+        { (left < right) ? true : false } noexcept;
+      })
+      requires (SizeN == 0 || array_less<ElementT>);
 
   template <std::size_t Size2>
-  Array<ElementT, Size2> toSize() const;
+  constexpr Array<Element, Size2> to_size() const
+      noexcept(std::is_nothrow_default_constructible_v<std::array<Element, Size2>>
+          && std::is_nothrow_move_constructible_v<std::array<Element, Size2>>
+          && (SizeN == 0 || Size2 == 0 || requires(Element const* input, Element* output, std::size_t count) {
+            { std::ranges::copy_n(input, count, output) } noexcept;
+          }))
+      requires (std::is_default_constructible_v<std::array<Element, Size2>>
+          && std::is_move_constructible_v<std::array<Element, Size2>>
+          && (SizeN == 0 || Size2 == 0 || array_copy_iterator<Element, Element const*>)) {
+    Array<Element, Size2> result;
+    if constexpr (SizeN != 0 && Size2 != 0)
+      std::ranges::copy_n(begin(), std::min(Size2, SizeN), result.begin());
+    return result;
+  }
 
 private:
-  // Instead of {} array initialization, use recursive assignment to mimic old
-  // C++ style construction with less strict narrowing rules.
-  template <typename T, typename... TL>
-  void set(T const& e, TL const&... rest);
-  void set();
+  template <typename... T>
+  constexpr void set(T const&... values) noexcept((requires(Element& element, T const& source) {
+    { element = source } noexcept;
+  } && ...))
+    requires(array_assignable<Element, T> && ...)
+  {
+    std::size_t i = 0;
+    (static_cast<void>(m_storage[i++] = values), ...);
+  }
+
+  Storage m_storage;
 };
 
 template <typename DataT, std::size_t SizeT>
 struct hash<Array<DataT, SizeT>> {
-  std::size_t operator()(Array<DataT, SizeT> const& a) const;
-  Star::hash<DataT> dataHasher;
+  constexpr std::size_t operator()(Array<DataT, SizeT> const& array) const
+      noexcept(SizeT == 0 || requires(Star::hash<DataT> const& hasher, DataT const& value, std::size_t& seed) {
+        { hash_combine(seed, hasher(value)) } noexcept;
+      })
+      requires (SizeT == 0 || array_hashable<DataT>);
+  // Empty arrays do not need a usable element hasher.
+  std::conditional_t<SizeT == 0, std::tuple<>, Star::hash<DataT>> dataHasher;
 };
 
 using Array2I = Array<int, 2>;
@@ -97,149 +262,112 @@ using Array4U = Array<unsigned, 4>;
 using Array4F = Array<float, 4>;
 using Array4D = Array<double, 4>;
 
-template <typename Element, std::size_t Size>
-Array<Element, Size> Array<Element, Size>::filled(Element const& e) {
-  Array a;
-  a.fill(e);
-  return a;
-}
-
-template <typename Element, std::size_t Size>
-template <typename Iterator>
-Array<Element, Size> Array<Element, Size>::copyFrom(Iterator p, std::size_t n) {
-  Array a;
-  std::ranges::copy_n(std::move(p), std::min(n, Size), a.begin());
-  return a;
-}
-
-template <typename Element, std::size_t Size>
-Array<Element, Size>::Array()
-  : Base() {}
-
-template <typename Element, std::size_t Size>
-Array<Element, Size>::Array(Element const& e1) {
-  static_assert(Size == 1, "Incorrect size in Array constructor");
-  set(e1);
-}
-
-template <typename Element, std::size_t Size>
-template <typename... T>
-Array<Element, Size>::Array(Element const& e1, T const&... rest) {
-  static_assert(sizeof...(rest) == Size - 1, "Incorrect size in Array constructor");
-  set(e1, rest...);
-}
-
-template <typename Element, std::size_t Size>
-template <typename Element2>
-Array<Element, Size>::Array(Array<Element2, Size> const& a) {
-  std::copy(a.begin(), a.end(), Base::begin());
-}
-
-template <typename Element, std::size_t Size>
-template <std::size_t i>
-auto Array<Element, Size>::get() -> reference {
-  static_assert(i < Size, "Incorrect size in Array::at");
-  return Base::operator[](i);
-}
-
-template <typename Element, std::size_t Size>
-template <std::size_t i>
-auto Array<Element, Size>::get() const -> const_reference {
-  static_assert(i < Size, "Incorrect size in Array::at");
-  return Base::operator[](i);
-}
 
 template <typename Element, std::size_t Size>
 std::expected<std::reference_wrapper<Element>, StarException> Array<Element, Size>::at(std::size_t i) {
   if (i >= Size)
     return std::unexpected(OutOfRangeException::format("out of range in Array::at({})", i));
-  return std::reference_wrapper<Element>(Base::operator[](i));
+  return std::reference_wrapper<Element>(m_storage[i]);
 }
 
 template <typename Element, std::size_t Size>
 std::expected<std::reference_wrapper<Element const>, StarException> Array<Element, Size>::at(std::size_t i) const {
   if (i >= Size)
     return std::unexpected(OutOfRangeException::format("out of range in Array::at({})", i));
-  return std::reference_wrapper<Element const>(Base::operator[](i));
+  return std::reference_wrapper<Element const>(m_storage[i]);
 }
 
 template <typename Element, std::size_t Size>
-template <typename T2>
-Array<Element, Size>& Array<Element, Size>::operator=(Array<T2, Size> const& array) {
-  std::copy(array.begin(), array.end(), Base::begin());
-  return *this;
-}
-
-template <typename Element, std::size_t Size>
-Element* Array<Element, Size>::ptr() {
-  return Base::data();
-}
-
-template <typename Element, std::size_t Size>
-Element const* Array<Element, Size>::ptr() const {
-  return Base::data();
-}
-
-template <typename Element, std::size_t Size>
-bool Array<Element, Size>::operator==(Array const& a) const {
-  for (std::size_t i = 0; i < Size; ++i)
-    if ((*this)[i] != a[i])
-      return false;
-  return true;
-}
-
-template <typename Element, std::size_t Size>
-std::weak_ordering Array<Element, Size>::operator<=>(Array const& a) const {
-  for (std::size_t i = 0; i < Size; ++i) {
-    if ((*this)[i] < a[i])
-      return std::weak_ordering::less;
-    if (a[i] < (*this)[i])
-      return std::weak_ordering::greater;
+constexpr bool Array<Element, Size>::operator==(Array const& a) const
+    noexcept(Size == 0 || requires(Element const& left, Element const& right) {
+      { (left != right) ? true : false } noexcept;
+    })
+    requires (Size == 0 || array_unequal<Element>) {
+  if constexpr (Size == 0) {
+    return true;
+  } else if constexpr (std::is_floating_point_v<Element>) {
+    // Preserve the original comparison form under production fast-math.
+    for (std::size_t i = 0; i < Size; ++i)
+      if ((*this)[i] != a[i])
+        return false;
+    return true;
+  } else {
+    return std::equal(begin(), end(), a.begin(), a.end(), [](Element const& left, Element const& right) {
+      if (left != right)
+        return false;
+      return true;
+    });
   }
-  return std::weak_ordering::equivalent;
 }
 
 template <typename Element, std::size_t Size>
-template <std::size_t Size2>
-Array<Element, Size2> Array<Element, Size>::toSize() const {
-  Array<Element, Size2> r;
-  std::ranges::copy_n(this->begin(), std::min(Size2, Size), r.begin());
-  return r;
-}
-
-template <typename Element, std::size_t Size>
-void Array<Element, Size>::set() {}
-
-template <typename Element, std::size_t Size>
-template <typename T, typename... TL>
-void Array<Element, Size>::set(T const& e, TL const&... rest) {
-  Base::operator[](Size - 1 - sizeof...(rest)) = e;
-  set(rest...);
-}
-
-template <typename Element, std::size_t Size>
-std::ostream& operator<<(std::ostream& os, Array<Element, Size> const& a) {
-  os << '[';
-  for (std::size_t i = 0; i < Size; ++i) {
-    if constexpr (requires { outputOptional(a[i]); })
-      os << outputOptional(a[i]);
-    else
-      os << a[i];
-    if (i != Size - 1)
-      os << ", ";
+constexpr std::weak_ordering Array<Element, Size>::operator<=>(Array const& a) const
+    noexcept(Size == 0 || requires(Element const& left, Element const& right) {
+      { (left < right) ? true : false } noexcept;
+    })
+    requires (Size == 0 || array_less<Element>) {
+  if constexpr (Size == 0) {
+    return std::weak_ordering::equivalent;
+  } else if constexpr (std::is_floating_point_v<Element>) {
+    // Standard lexicographic dispatch changes infinity/NaN results with fast-math.
+    for (std::size_t i = 0; i < Size; ++i) {
+      if ((*this)[i] < a[i])
+        return std::weak_ordering::less;
+      if (a[i] < (*this)[i])
+        return std::weak_ordering::greater;
+    }
+    return std::weak_ordering::equivalent;
+  } else {
+    return std::lexicographical_compare_three_way(begin(), end(), a.begin(), a.end(),
+                                                  [](Element const& left, Element const& right) {
+                                                    if (left < right)
+                                                      return std::weak_ordering::less;
+                                                    if (right < left)
+                                                      return std::weak_ordering::greater;
+                                                    return std::weak_ordering::equivalent;
+                                                  });
   }
-  os << ']';
-  return os;
+}
+
+template <typename Element, std::size_t Size>
+auto write_text(TextBuffer& output, Array<Element, Size> const& array)
+  requires(Size == 0 || array_text_writable<Element>)
+{
+  output.push_back('[');
+  if constexpr (Size == 0) {
+    output.push_back(']');
+  } else {
+    using Result = optional_diagnostic_result<Element>;
+    for (std::size_t i = 0; i < Size; ++i) {
+      if constexpr (std::same_as<Result, void>) {
+        append_text(output, optional_diagnostic_value(array[i]));
+      } else {
+        auto written = append_text(output, optional_diagnostic_value(array[i]));
+        if (!written)
+          return Result(std::unexpected(std::move(written.error())));
+      }
+      if (i != Size - 1)
+        output.append(", ");
+    }
+    output.push_back(']');
+    if constexpr (!std::same_as<Result, void>)
+      return Result{};
+  }
 }
 
 template <typename DataT, std::size_t SizeT>
-std::size_t hash<Array<DataT, SizeT>>::operator()(Array<DataT, SizeT> const& a) const {
+constexpr std::size_t hash<Array<DataT, SizeT>>::operator()(Array<DataT, SizeT> const& a) const
+    noexcept(SizeT == 0 || requires(Star::hash<DataT> const& hasher, DataT const& value, std::size_t& seed) {
+      { hash_combine(seed, hasher(value)) } noexcept;
+    })
+    requires (SizeT == 0 || array_hashable<DataT>) {
   std::size_t hashval = 0;
-  for (std::size_t i = 0; i < SizeT; ++i)
-    hashCombine(hashval, dataHasher(a[i]));
+  if constexpr (SizeT != 0) {
+    for (std::size_t i = 0; i < SizeT; ++i)
+      hash_combine(hashval, dataHasher(a[i]));
+  }
   return hashval;
 }
-
 }
 
 export module star.array;
@@ -251,22 +379,28 @@ export namespace Star {
 
 
 export namespace Star {
-  using ::Star::Array;
-  using ::Star::Array2I;
-  using ::Star::Array2S;
-  using ::Star::Array2U;
-  using ::Star::Array2F;
-  using ::Star::Array2D;
-  using ::Star::Array3I;
-  using ::Star::Array3S;
-  using ::Star::Array3U;
-  using ::Star::Array3F;
-  using ::Star::Array3D;
-  using ::Star::Array4I;
-  using ::Star::Array4S;
-  using ::Star::Array4U;
-  using ::Star::Array4F;
-  using ::Star::Array4D;
-  using ::Star::hash;
-  using ::Star::operator<<;
+using ::Star::Array;
+using ::Star::Array2D;
+using ::Star::Array2F;
+using ::Star::Array2I;
+using ::Star::Array2S;
+using ::Star::Array2U;
+using ::Star::Array3D;
+using ::Star::Array3F;
+using ::Star::Array3I;
+using ::Star::Array3S;
+using ::Star::Array3U;
+using ::Star::Array4D;
+using ::Star::Array4F;
+using ::Star::Array4I;
+using ::Star::Array4S;
+using ::Star::Array4U;
+using ::Star::array_assignable;
+using ::Star::array_copy_iterator;
+using ::Star::array_hashable;
+using ::Star::array_less;
+using ::Star::array_text_writable;
+using ::Star::array_unequal;
+using ::Star::hash;
+using ::Star::write_text;
 }

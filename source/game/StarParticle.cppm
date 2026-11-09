@@ -37,7 +37,13 @@ struct Particle {
     Streak,
     Text
   };
-  static std::expected<EnumMap<Type>, StarException> const TypeNames;
+  inline static constexpr auto TypeNames =
+    sortedEnumNames(std::to_array<std::pair<Type, std::string_view>>({{Type::Variance, "variance"},
+                                                                      {Type::Ember, "ember"},
+                                                                      {Type::Textured, "textured"},
+                                                                      {Type::Animated, "animated"},
+                                                                      {Type::Streak, "streak"},
+                                                                      {Type::Text, "text"}}));
 
   enum class DestructionAction {
     None,
@@ -45,14 +51,19 @@ struct Particle {
     Fade,
     Shrink
   };
-  static std::expected<EnumMap<DestructionAction>, StarException> const DestructionActionNames;
+  inline static constexpr auto DestructionActionNames = sortedEnumNames(
+    std::to_array<std::pair<DestructionAction, std::string_view>>({{DestructionAction::None, "none"},
+                                                                   {DestructionAction::Image, "image"},
+                                                                   {DestructionAction::Fade, "fade"},
+                                                                   {DestructionAction::Shrink, "shrink"}}));
 
   enum class Layer {
     Back,
     Middle,
     Front
   };
-  static std::expected<EnumMap<Layer>, StarException> const LayerNames;
+  inline static constexpr auto LayerNames = sortedEnumNames(std::to_array<std::pair<Layer, std::string_view>>(
+    {{Layer::Back, "back"}, {Layer::Middle, "middle"}, {Layer::Front, "front"}}));
 
   Particle();
   // If particle is type Textured, then the image name is considered relative
@@ -160,7 +171,7 @@ struct Particle {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Particle const& particle);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Particle& particle);
 
-typedef std::function<Particle()> ParticleVariantCreator;
+using ParticleVariantCreator = std::function<Particle()>;
 ParticleVariantCreator makeParticleVariantCreator(Root& root, Particle particle, Particle variance);
 
 }

@@ -8,18 +8,18 @@ namespace Star {
 
 template <typename MultiArrayT, typename PositionT>
 struct MultiArrayInterpolator2 {
-  typedef MultiArrayT MultiArray;
-  typedef PositionT Position;
+  using MultiArray = MultiArrayT;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = MultiArray::Rank;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 2> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 2>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -68,18 +68,18 @@ struct MultiArrayInterpolator2 {
 
 template <typename MultiArrayT, typename PositionT>
 struct MultiArrayInterpolator4 {
-  typedef MultiArrayT MultiArray;
-  typedef PositionT Position;
+  using MultiArray = MultiArrayT;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = MultiArray::Rank;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 4> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 4>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -142,18 +142,18 @@ struct MultiArrayInterpolator4 {
 
 template <typename MultiArrayT, typename PositionT>
 struct MultiArrayPiecewiseInterpolator {
-  typedef MultiArrayT MultiArray;
-  typedef PositionT Position;
+  using MultiArray = MultiArrayT;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = MultiArray::Rank;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 2> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 2>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   struct PiecewiseRange {
     std::size_t dim;
@@ -163,7 +163,7 @@ struct MultiArrayPiecewiseInterpolator {
       return pr.offset < offset;
     }
   };
-  typedef Array<PiecewiseRange, Rank> PiecewiseRangeList;
+  using PiecewiseRangeList = Array<PiecewiseRange, Rank>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -216,18 +216,18 @@ struct MultiArrayPiecewiseInterpolator {
 
 template <typename ElementT, typename PositionT>
 struct MultiArrayInterpolator2<MultiArray<ElementT, 2>, PositionT> {
-  typedef Star::MultiArray<ElementT, 2> MultiArray;
-  typedef PositionT Position;
+  using MultiArray = Star::MultiArray<ElementT, 2>;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = 2;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 2> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 2>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -259,18 +259,18 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 2>, PositionT> {
 
 template <typename ElementT, typename PositionT>
 struct MultiArrayInterpolator4<MultiArray<ElementT, 2>, PositionT> {
-  typedef Star::MultiArray<ElementT, 2> MultiArray;
-  typedef PositionT Position;
+  using MultiArray = Star::MultiArray<ElementT, 2>;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = 2;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 4> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 4>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -330,18 +330,18 @@ struct MultiArrayInterpolator4<MultiArray<ElementT, 2>, PositionT> {
 
 template <typename ElementT, typename PositionT>
 struct MultiArrayInterpolator2<MultiArray<ElementT, 3>, PositionT> {
-  typedef Star::MultiArray<ElementT, 3> MultiArray;
-  typedef PositionT Position;
+  using MultiArray = Star::MultiArray<ElementT, 3>;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = 3;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 2> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 2>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;
@@ -392,18 +392,18 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 3>, PositionT> {
 
 template <typename ElementT, typename PositionT>
 struct MultiArrayInterpolator4<MultiArray<ElementT, 3>, PositionT> {
-  typedef Star::MultiArray<ElementT, 3> MultiArray;
-  typedef PositionT Position;
+  using MultiArray = Star::MultiArray<ElementT, 3>;
+  using Position = PositionT;
 
-  typedef typename MultiArray::Element Element;
+  using Element = typename MultiArray::Element;
   static std::size_t const Rank = 3;
 
-  typedef Array<std::size_t, Rank> IndexList;
-  typedef Array<std::size_t, Rank> SizeList;
-  typedef Array<Position, Rank> PositionList;
-  typedef Array<Position, 4> WeightList;
+  using IndexList = Array<std::size_t, Rank>;
+  using SizeList = Array<std::size_t, Rank>;
+  using PositionList = Array<Position, Rank>;
+  using WeightList = Array<Position, 4>;
 
-  typedef std::function<WeightList(Position)> WeightFunction;
+  using WeightFunction = std::function<WeightList(Position)>;
 
   WeightFunction weightFunction;
   BoundMode boundMode;

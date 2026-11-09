@@ -10,6 +10,7 @@ import star.map;
 import star.set;
 import star.optional;
 import star.format;
+import star.text_formatter;
 import star.output_proxy;
 import star.array;
 import star.thread;
@@ -220,54 +221,57 @@ std::expected<LuaInt, StarException> LuaStackValue::length() const {
   return static_cast<LuaInt>(lua_tointeger(state, -1));
 }
 
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& os, LuaValue const& value) {
+std::expected<void, StarException> write_text(TextBuffer& output, LuaValue const& value) {
   if (std::holds_alternative<LuaBoolean>(value)) {
-    os << (std::get<LuaBoolean>(value) ? "true" : "false");
+    output.append(std::get<LuaBoolean>(value) ? "true" : "false");
   } else if (std::holds_alternative<LuaInt>(value)) {
-    os << std::get<LuaInt>(value);
+    append_text(output, std::get<LuaInt>(value));
   } else if (std::holds_alternative<LuaFloat>(value)) {
-    os << std::get<LuaFloat>(value);
+    append_text(output, std::get<LuaFloat>(value));
   } else if (std::holds_alternative<LuaString>(value)) {
     auto text = std::get<LuaString>(value).view().utf8();
-    os << text.substr(0, text.find('\0'));
+    output.append(text.substr(0, text.find('\0')));
   } else if (std::holds_alternative<LuaTable>(value)) {
-    os << "{";
+    output.push_back('{');
     bool first = true;
-    auto result = std::get<LuaTable>(value).iterate([&os, &first](LuaValue const& key, LuaValue const& value) -> std::expected<void, StarException> {
+    auto result = std::get<LuaTable>(value).iterate([&output, &first](LuaValue const& key, LuaValue const& value) -> std::expected<void, StarException> {
       if (first)
         first = false;
       else
-        os << ", ";
-      auto keyResult = operator<<(os, key);
-      if (!keyResult)
-        return std::unexpected(std::move(keyResult.error()));
-      os << ": ";
-      auto valueResult = operator<<(os, value);
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      return {};
+        output.append(", ");
+      auto key_result = write_text(output, key);
+      if (!key_result)
+        return std::unexpected(std::move(key_result.error()));
+      output.append(": ");
+      return write_text(output, value);
     });
     if (!result)
       return std::unexpected(std::move(result.error()));
-    os << "}";
+    output.push_back('}');
   } else if (std::holds_alternative<LuaFunction>(value)) {
-    os << "<function reg:" << std::get<LuaFunction>(value).handleIndex() << ">";
+    output.append("<function reg:");
+    append_text(output, std::get<LuaFunction>(value).handleIndex());
+    output.push_back('>');
   } else if (std::holds_alternative<LuaThread>(value)) {
-    os << "<thread reg:" << std::get<LuaThread>(value).handleIndex() << ">";
+    output.append("<thread reg:");
+    append_text(output, std::get<LuaThread>(value).handleIndex());
+    output.push_back('>');
   } else if (std::holds_alternative<LuaUserData>(value)) {
-    os << "<userdata reg:" << std::get<LuaUserData>(value).handleIndex() << ">";
+    output.append("<userdata reg:");
+    append_text(output, std::get<LuaUserData>(value).handleIndex());
+    output.push_back('>');
   } else {
-    os << "nil";
+    output.append("nil");
   }
-  return std::ref(os);
+  return {};
 }
 
-std::expected<String, StarException> printLuaValue(LuaValue const& value) {
-  std::ostringstream stream;
-  auto result = operator<<(stream, value);
+std::expected<String, StarException> print_lua_value(LuaValue const& value) {
+  TextBuffer output;
+  auto result = write_text(output, value);
   if (!result)
     return std::unexpected(std::move(result.error()));
-  return String(stream.str());
+  return String(std::move(output).str());
 }
 
 std::expected<bool, StarException> LuaTable::contains(std::string_view key) const {
@@ -318,7 +322,7 @@ std::expected<void, StarException> LuaCallbacks::merge(LuaCallbacks const& callb
   for (auto const& pair : callbacks.m_callbacks) {
     auto added = m_callbacks.add(pair.first, pair.second);
     if (!added)
-      return std::unexpected(LuaException(strf("Failed to merge LuaCallbacks: {}", outputException(ExceptionDiagnostic(added.error()), true))));
+      return std::unexpected(LuaException(Star::format("Failed to merge LuaCallbacks: {}", Star::output_exception(ExceptionDiagnostic(added.error()), true))));
   }
   return {};
 }
@@ -518,7 +522,8 @@ std::expected<LuaEnginePtr, StarException> LuaEngine::create(bool safe) {
     auto& self = *static_cast<LuaEngine*>(userdata);
     self.m_warningMessage += message;
     if (!continued) {
-      std::fprintf(stderr, "Lua warning: %s\n", self.m_warningMessage.c_str());
+      if (auto written = Star::print(stderr, "Lua warning: {}\n", self.m_warningMessage); !written)
+        std::_Exit(1);
       self.m_warningMessage.clear();
     }
   }, self.get());
@@ -738,7 +743,7 @@ LuaEngine::~LuaEngine() {
     return;
   // If we've had a stack space leak, this will not be zero
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((lua_gettop(m_state) == 0));
+    Star::star_assert_failed((lua_gettop(m_state) == 0));
   }
   lua_close(m_state);
 }
@@ -769,7 +774,7 @@ bool LuaEngine::profilingEnabled() const {
 List<LuaProfileEntry> LuaEngine::getProfile() {
   List<LuaProfileEntry> profileEntries;
   for (auto const& p : m_profileEntries) {
-    profileEntries.append(*p.second);
+    profileEntries.push_back(*p.second);
   }
 
   return profileEntries;
@@ -920,7 +925,7 @@ std::expected<void, StarException> LuaEngine::threadPushFunction(int threadIndex
   int status = lua_status(thread);
   lua_Debug ar;
   if (status != LUA_OK || lua_getstack(thread, 0, &ar) > 0 || lua_gettop(thread) > 0)
-    return std::unexpected(LuaException(strf("Cannot push function to active or errored thread with status {}", status)));
+    return std::unexpected(LuaException(Star::format("Cannot push function to active or errored thread with status {}", status)));
   if (!lua_checkstack(thread, 1))
     return std::unexpected(LuaException("Exhausted the Lua thread stack"));
 
@@ -964,7 +969,7 @@ std::expected<LuaContext, StarException> LuaEngine::createContext() {
   // Add loadstring
   auto handleIndex = context.handleIndex();
   auto loadstring = createFunction([&engine = *this, handleIndex](String const& source, std::optional<String> const& name, std::optional<LuaTable> const& env) -> std::expected<LuaFunction, StarException> {
-    String functionName = name ? strf("loadstring: {}", *name) : "loadstring";
+    String functionName = name ? Star::format("loadstring: {}", *name) : "loadstring";
     return engine.createFunctionFromSource(env ? env->handleIndex() : handleIndex, std::span(source.utf8()), functionName);
   });
   if (!loadstring)
@@ -1043,7 +1048,7 @@ LuaEngine& LuaEngine::luaEngine(lua_State* state) {
 
 void LuaEngine::countHook(lua_State* state, lua_Debug* ar) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((ar->event == LUA_HOOKCOUNT));
+    Star::star_assert_failed((ar->event == LUA_HOOKCOUNT));
   }
   lua_checkstack(state, 4);
 
@@ -1124,7 +1129,7 @@ void LuaEngine::pushCallbackError(lua_State* state, StarException const& error) 
   } else if (error.is<LuaRecursionLimitReached>()) {
     lua_pushlightuserdata(state, &s_luaRecursionLimitExceptionKey);
   } else {
-    auto diagnostic = printException(ExceptionDiagnostic(error), true);
+    auto diagnostic = Star::print_exception(ExceptionDiagnostic(error), true);
     lua_pushcfunction(state, [](lua_State* state) {
       auto diagnostic = static_cast<char const*>(lua_touserdata(state, 1));
       luaL_where(state, 2);
@@ -1137,7 +1142,7 @@ void LuaEngine::pushCallbackError(lua_State* state, StarException const& error) 
     if (lua_pcall(state, 1, 1, 0) != LUA_OK)
       return;
   }
-  rememberDiagnostic(state, -1, error.diagnosticSummary());
+  rememberDiagnostic(state, -1, error.diagnostic_summary());
 }
 
 std::shared_ptr<ExceptionSummary const> LuaEngine::findDiagnostic(lua_State* state, int index) const {
@@ -1250,7 +1255,7 @@ ExceptionSummary LuaEngine::captureDiagnostic(lua_State* from, lua_State* state,
           return location.source == source && location.line == frame.currentline;
         }))
       continue;
-    auto provider = existing != summary.locations.end() ? existing->provider : sourceDiagnostic(String(source)).takeUtf8();
+    auto provider = existing != summary.locations.end() ? existing->provider : sourceDiagnostic(String(source)).take_utf8();
     summary.locations.push_back({std::move(source), frame.currentline, std::move(provider)});
   }
   return summary;
@@ -1290,11 +1295,11 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
     void* error = lua_touserdata(state, -1);
     if (error == &s_luaInstructionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaInstructionLimitReached().withSummary(std::move(summary)));
+      return std::unexpected(LuaInstructionLimitReached().with_summary(std::move(summary)));
     }
     if (error == &s_luaRecursionLimitExceptionKey) {
       lua_pop(state, 1);
-      return std::unexpected(LuaRecursionLimitReached().withSummary(std::move(summary)));
+      return std::unexpected(LuaRecursionLimitReached().with_summary(std::move(summary)));
     }
   }
   if (lua_type(state, -1) == LUA_TNUMBER) {
@@ -1312,24 +1317,24 @@ std::expected<void, StarException> LuaEngine::handleError(lua_State* state, int 
     summary = captureDiagnostic(state, state, -1, ExceptionSummaryKind::ScriptRuntime);
   }
   String error = lua_type(state, -1) == LUA_TSTRING
-      ? strf("Error code {}, {}", res, lua_tostring(state, -1))
-      : strf("Error code {}, <unknown error>", res);
+      ? Star::format("Error code {}, {}", res, lua_tostring(state, -1))
+      : Star::format("Error code {}, <unknown error>", res);
   lua_pop(state, 1);
   if (error.utf8().ends_with("<eof>"))
-    return std::unexpected(LuaIncompleteStatementException(error.takeUtf8()).withSummary(std::move(summary)));
-  return std::unexpected(LuaException(error.takeUtf8()).withSummary(std::move(summary)));
+    return std::unexpected(LuaIncompleteStatementException(error.take_utf8()).with_summary(std::move(summary)));
+  return std::unexpected(LuaException(error.take_utf8()).with_summary(std::move(summary)));
 }
 
 std::expected<void, StarException> LuaEngine::handleSourceError(lua_State* state, int res, String const& source) {
   auto result = handleError(state, res);
   if (!result) {
-    auto summary = *result.error().diagnosticSummary();
+    auto summary = *result.error().diagnostic_summary();
     auto diagnostic = sourceDiagnostic(source);
     if (std::ranges::none_of(summary.locations, [&](auto const& location) { return location.source == source.utf8(); }))
       summary.locations.insert(summary.locations.begin(), {source.utf8(), -1, diagnostic.utf8()});
-    auto error = std::move(result.error()).withSummary(std::move(summary));
+    auto error = std::move(result.error()).with_summary(std::move(summary));
     if (!diagnostic.empty())
-      error = std::move(error).withContext(strf("Lua source '{}': {}", source, diagnostic));
+      error = std::move(error).with_context(Star::format("Lua source '{}': {}", source, diagnostic));
     return std::unexpected(std::move(error));
   }
   return result;
@@ -1577,10 +1582,11 @@ std::expected<int, StarException> LuaEngine::contextEval(int handleIndex, String
   int top = lua_gettop(m_state);
   if (!lua_checkstack(m_state, nresults == LUA_MULTRET ? 2 : std::max(2, nresults + 1)))
     return std::unexpected(LuaException("Exhausted the Lua stack while evaluating a script"));
-  int loadRes = luaL_loadstring(m_state, ("return " + lua).utf8Ptr());
+  auto expression = "return " + lua;
+  int loadRes = luaL_loadstring(m_state, expression.utf8_data());
   if (loadRes == LUA_ERRSYNTAX) {
     lua_pop(m_state, 1);
-    loadRes = luaL_loadstring(m_state, lua.utf8Ptr());
+    loadRes = luaL_loadstring(m_state, lua.utf8_data());
   }
   if (auto loaded = handleError(m_state, loadRes); !loaded)
     return std::unexpected(std::move(loaded.error()));
@@ -1638,7 +1644,7 @@ std::expected<void, StarException> LuaEngine::contextSetPath(int handleIndex, St
   LuaStackRestore stack(m_state);
   if (!lua_checkstack(m_state, 5))
     return std::unexpected(LuaException("Exhausted the Lua stack while setting a context path"));
-  auto utf8Path = path.takeUtf8();
+  auto utf8Path = path.take_utf8();
   std::span<char> pathData(utf8Path);
   lua_pushcfunction(m_state, [](lua_State* state) {
     auto& path = *static_cast<std::span<char>*>(lua_touserdata(state, 2));
@@ -1817,7 +1823,7 @@ std::expected<LuaValue, StarException> LuaEngine::popLuaValue(lua_State* state) 
 
   LuaValue result;
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!lua_isnone(state, -1)));
+    Star::star_assert_failed((!lua_isnone(state, -1)));
   }
   switch (lua_type(state, -1)) {
     case LUA_TNIL: {
@@ -1904,7 +1910,7 @@ std::expected<void, StarException> LuaEngine::incrementRecursionLevel() {
 
 void LuaEngine::decrementRecursionLevel() {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((m_recursionLevel != 0));
+    Star::star_assert_failed((m_recursionLevel != 0));
   }
   --m_recursionLevel;
 }
@@ -2063,7 +2069,7 @@ std::expected<std::optional<Json>, StarException> LuaEngine::stackToJson(lua_Sta
             ordered = false;
           intEntries.push_back({keyIndex, intEntries.size(), std::move(value)});
         } else {
-          stringEntries[String(toString(lua_tonumber(state, cursor)))] = std::move(value);
+          stringEntries[String(Star::to_string(lua_tonumber(state, cursor)))] = std::move(value);
         }
       } else if (keyType == LUA_TSTRING) {
         std::size_t size;
@@ -2114,7 +2120,7 @@ std::expected<std::optional<Json>, StarException> LuaEngine::stackToJson(lua_Sta
     return Json(std::move(list));
   }
   for (auto& entry : intEntries)
-    stringEntries[toString(entry.index)] = std::move(entry.value);
+    stringEntries[Star::to_string(entry.index)] = std::move(entry.value);
   return Json(std::move(stringEntries));
 }
 

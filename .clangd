@@ -1,7 +1,7 @@
 # Regenerate after changing CMake sources or the Nix toolchain (no game build):
 # nix develop -c bash scripts/ide/configure-clangd.sh
 # clangd needs --experimental-modules-support for importers and --query-driver
-# for Nix system headers (with LC_ALL=C, LANGUAGE=C); see .zed/settings.json.
+# for Nix system headers (with LC_ALL=C, LANGUAGE=C); see README.md.
 CompileFlags:
   CompilationDatabase: build/clangd
 

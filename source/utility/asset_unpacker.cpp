@@ -1,3 +1,4 @@
+#include <cstdio>
 import star.memory;
 import star.io_device;
 import star.json;
@@ -53,15 +54,15 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
   if (!assetsPack)
     return std::unexpected(std::move(assetsPack.error()));
 
-  auto outputIsDirectory = File::isDirectory(outputFolderPath);
+  auto outputIsDirectory = File::is_directory(outputFolderPath);
   if (!outputIsDirectory)
     return std::unexpected(std::move(outputIsDirectory.error()));
   if (!*outputIsDirectory) {
-    auto madeDirectory = File::makeDirectory(outputFolderPath);
+    auto madeDirectory = File::create_directory(outputFolderPath);
     if (!madeDirectory)
       return std::unexpected(std::move(madeDirectory.error()));
   }
-  auto changedDirectory = File::changeDirectory(outputFolderPath);
+  auto changedDirectory = File::change_directory(outputFolderPath);
   if (!changedDirectory)
     return std::unexpected(std::move(changedDirectory.error()));
 
@@ -82,31 +83,34 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
           unsafeName = true;
       }
       if (unsafeName) {
-        cerrf("Skipping entry with unsafe path: {}\n", file);
-        return {};
+        return Star::print(stderr, "Skipping entry with unsafe path: {}\n", file);
       }
 
       auto fileData = (*assetsPack)->read(file);
       if (!fileData)
         return std::unexpected(std::move(fileData.error()));
       auto relativePath = "." + file;
-      auto relativeDir = File::dirName(relativePath);
-      auto madeDirectory = File::makeDirectoryRecursive(relativeDir);
+      auto relativeDir = File::dir_name(relativePath);
+      auto madeDirectory = File::create_directories(relativeDir);
       if (!madeDirectory)
         return std::unexpected(std::move(madeDirectory.error()));
-      auto written = File::writeFile(*fileData, relativePath);
+      auto written = File::write_file(*fileData, relativePath);
       if (!written)
         return std::unexpected(std::move(written.error()));
-      if (verbose)
-        coutf("Extracting file '{}' to the output directory as '{}'\n", file, relativePath);
+      if (verbose) {
+        if (auto written = Star::print("Extracting file '{}' to the output directory as '{}'\n", file, relativePath); !written)
+          return std::unexpected(std::move(written.error()));
+      }
       return {};
     };
     auto extracted = extractEntry();
     if (!extracted) {
       if (!extracted.error().is<AssetSourceException>())
         return std::unexpected(std::move(extracted.error()));
-      cerrf("Could not open file: {}\n", file);
-      cerrf("Reason: {}\n", outputException(ExceptionDiagnostic(extracted.error()), false));
+      if (auto written = Star::print(stderr, "Could not open file: {}\n", file); !written)
+        return std::unexpected(std::move(written.error()));
+      if (auto written = Star::print(stderr, "Reason: {}\n", Star::output_exception(ExceptionDiagnostic(extracted.error()), false)); !written)
+        return std::unexpected(std::move(written.error()));
     }
   }
 
@@ -115,24 +119,27 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
     auto printed = Json(std::move(metadata)).printJson(2);
     if (!printed)
       return std::unexpected(std::move(printed.error()));
-    auto written = File::writeFile(*printed, "_metadata");
+    auto written = File::write_file(*printed, "_metadata");
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
 
-  coutf("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count());
+  if (auto written = Star::print("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+    return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(nativeRuntime.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+      return 1;
     return 1;
   }
   auto result = unpackAssets(argc, argv);
   if (!result) {
-    cerrf("Exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

@@ -406,7 +406,7 @@ std::expected<void, StarException> OptionsMenu::updateVolume(String const& key, 
     return std::unexpected(std::move(configuration.error()));
   if (auto result = (*configuration)->set(key, slider.val()); !result)
     return std::unexpected(std::move(result.error()));
-  return label.setText(toString(slider.val()));
+  return label.setText(Star::to_string(slider.val()));
 }
 
 std::expected<void, StarException> OptionsMenu::updateBool(String const& key, ButtonWidget& button) {
@@ -440,7 +440,7 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
       return std::unexpected(std::move(value.error()));
     if (auto result = slider.get().setVal(*value, false); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = label.get().setText(toString(slider.get().val())); !result)
+    if (auto result = label.get().setText(Star::to_string(slider.get().val())); !result)
       return std::unexpected(std::move(result.error()));
   }
   for (auto const& [key, button] : {

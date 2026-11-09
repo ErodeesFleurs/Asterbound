@@ -1,6 +1,7 @@
 import std;
 import star.memory;
 import star.format;
+import star.text_formatter;
 import star.string;
 import star.ordered_map;
 import star.ordered_set;
@@ -21,19 +22,27 @@ void OptionParser::setAdditionalHelp(String help) {
 }
 
 std::expected<void, StarException> OptionParser::addSwitch(String const& flag, String description) {
-  if (!m_options.insert(flag, Switch{flag, std::move(description)}).second)
+  if (!m_options.insert(flag, Switch{.flag = flag, .description = std::move(description)}).second)
     return std::unexpected(OptionParserException::format("Duplicate switch '-{}' added", flag));
   return {};
 }
 
 std::expected<void, StarException> OptionParser::addParameter(String const& flag, String argument, RequirementMode requirementMode, String description) {
-  if (!m_options.insert(flag, Parameter{flag, std::move(argument), requirementMode, std::move(description)}).second)
+  if (!m_options
+         .insert(flag,
+                 Parameter{.flag = flag,
+                           .argument = std::move(argument),
+                           .requirementMode = requirementMode,
+                           .description = std::move(description)})
+         .second)
     return std::unexpected(OptionParserException::format("Duplicate flag '-{}' added", flag));
   return {};
 }
 
 void OptionParser::addArgument(String argument, RequirementMode requirementMode, String description) {
-  m_arguments.append(Argument{std::move(argument), requirementMode, std::move(description)});
+  m_arguments.push_back(Argument{.argumentName = std::move(argument),
+                                 .requirementMode = requirementMode,
+                                 .description = std::move(description)});
 }
 
 std::expected<std::pair<OptionParser::Options, StringList>, StarException> OptionParser::parseOptions(StringList const& arguments) const {
@@ -56,7 +65,7 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       String flag = std::move(*parsedFlag);
       auto option = m_options.maybe(flag);
       if (!option) {
-        errors.append(strf("No such option '-{}'", flag));
+        errors.push_back(Star::format("No such option '-{}'", flag));
         continue;
       }
 
@@ -65,19 +74,19 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       } else {
         auto const& parameter = std::get<Parameter>(*option);
         if (it == arguments.end()) {
-          errors.append(strf("Option '-{}' must be followed by an argument", flag));
+          errors.push_back(Star::format("Option '-{}' must be followed by an argument", flag));
           continue;
         }
         String val = *it++;
         if (parameter.requirementMode != Multiple && result.parameters.contains(flag)) {
-          errors.append(strf("Option with argument '-{}' specified multiple times", flag));
+          errors.push_back(Star::format("Option with argument '-{}' specified multiple times", flag));
           continue;
         }
-        result.parameters[std::move(flag)].append(std::move(val));
+        result.parameters[std::move(flag)].push_back(std::move(val));
       }
 
     } else {
-      result.arguments.append(arg);
+      result.arguments.push_back(arg);
     }
   }
 
@@ -85,7 +94,7 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
     if (std::holds_alternative<Parameter>(pair.second)) {
       auto const& na = std::get<Parameter>(pair.second);
       if (na.requirementMode == Required && !result.parameters.contains(pair.first))
-        errors.append(strf("Missing required flag with argument '-{}'", pair.first));
+        errors.push_back(Star::format("Missing required flag with argument '-{}'", pair.first));
     }
   }
 
@@ -100,73 +109,75 @@ std::expected<std::pair<OptionParser::Options, StringList>, StarException> Optio
       maximumArguments = NPos;
   }
   if (result.arguments.size() < minimumArguments)
-    errors.append(strf(
-        "Too few positional arguments given, expected at least {} got {}", minimumArguments, result.arguments.size()));
+    errors.push_back(Star::format("Too few positional arguments given, expected at least {} got {}", minimumArguments,
+                          result.arguments.size()));
   if (result.arguments.size() > maximumArguments)
-    errors.append(strf(
-        "Too many positional arguments given, expected at most {} got {}", maximumArguments, result.arguments.size()));
+    errors.push_back(Star::format("Too many positional arguments given, expected at most {} got {}", maximumArguments,
+                          result.arguments.size()));
 
   return std::pair{std::move(result), std::move(errors)};
 }
 
-void OptionParser::printHelp(std::ostream& os) const {
+std::expected<void, StarException> OptionParser::print_help(std::FILE* output) const {
+  TextBuffer help;
   if (!m_commandName.empty() && !m_summary.empty())
-    format(os, "{}: {}\n\n", m_commandName, m_summary);
+    std::format_to(std::back_inserter(help), "{}: {}\n\n", m_commandName, m_summary);
   else if (!m_commandName.empty())
-    format(os, "{}:\n\n", m_commandName);
+    std::format_to(std::back_inserter(help), "{}:\n\n", m_commandName);
   else if (!m_summary.empty())
-    format(os, "{}\n\n", m_summary);
+    std::format_to(std::back_inserter(help), "{}\n\n", m_summary);
 
   String cmdLineText;
 
   for (auto const& p : m_options) {
     if (std::holds_alternative<Switch>(p.second)) {
-      cmdLineText += strf(" [-{}]", p.first);
+      cmdLineText += Star::format(" [-{}]", p.first);
     } else {
       auto const& parameter = std::get<Parameter>(p.second);
       if (parameter.requirementMode == Optional)
-        cmdLineText += strf(" [-{} <{}>]", parameter.flag, parameter.argument);
+        cmdLineText += Star::format(" [-{} <{}>]", parameter.flag, parameter.argument);
       else if (parameter.requirementMode == Required)
-        cmdLineText += strf(" -{} <{}>", parameter.flag, parameter.argument);
+        cmdLineText += Star::format(" -{} <{}>", parameter.flag, parameter.argument);
       else if (parameter.requirementMode == Multiple)
-        cmdLineText += strf(" [-{} <{}>]...", parameter.flag, parameter.argument);
+        cmdLineText += Star::format(" [-{} <{}>]...", parameter.flag, parameter.argument);
     }
   }
 
   for (auto const& p : m_arguments) {
     if (p.requirementMode == Optional)
-      cmdLineText += strf(" [<{}>]", p.argumentName);
+      cmdLineText += Star::format(" [<{}>]", p.argumentName);
     else if (p.requirementMode == Required)
-      cmdLineText += strf(" <{}>", p.argumentName);
+      cmdLineText += Star::format(" <{}>", p.argumentName);
     else
-      cmdLineText += strf(" [<{}>...]", p.argumentName);
+      cmdLineText += Star::format(" [<{}>...]", p.argumentName);
   }
 
   if (m_commandName.empty())
-    format(os, "Command Line Usage:{}\n", cmdLineText);
+    std::format_to(std::back_inserter(help), "Command Line Usage:{}\n", cmdLineText);
   else
-    format(os, "Command Line Usage: {}{}\n", m_commandName, cmdLineText);
+    std::format_to(std::back_inserter(help), "Command Line Usage: {}{}\n", m_commandName, cmdLineText);
 
   for (auto const& p : m_options) {
     if (std::holds_alternative<Switch>(p.second)) {
       auto const& sw = std::get<Switch>(p.second);
       if (!sw.description.empty())
-        format(os, "  -{}\t- {}\n", sw.flag, sw.description);
+        std::format_to(std::back_inserter(help), "  -{}\t- {}\n", sw.flag, sw.description);
     }
     if (std::holds_alternative<Parameter>(p.second)) {
       auto const& parameter = std::get<Parameter>(p.second);
       if (!parameter.description.empty())
-        format(os, "  -{} <{}>\t- {}\n", parameter.flag, parameter.argument, parameter.description);
+        std::format_to(std::back_inserter(help), "  -{} <{}>\t- {}\n", parameter.flag, parameter.argument, parameter.description);
     }
   }
 
   for (auto const& p : m_arguments) {
     if (!p.description.empty())
-      format(os, "  <{}>\t- {}\n", p.argumentName, p.description);
+      std::format_to(std::back_inserter(help), "  <{}>\t- {}\n", p.argumentName, p.description);
   }
 
   if (!m_additionalHelp.empty())
-    format(os, "\n{}\n", m_additionalHelp);
+    std::format_to(std::back_inserter(help), "\n{}\n", m_additionalHelp);
+  return Star::print(output, "{}", help.view());
 }
 
 }

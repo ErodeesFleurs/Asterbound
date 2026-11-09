@@ -59,7 +59,7 @@ std::expected<std::shared_ptr<TenantDatabase>, StarException> TenantDatabase::cr
       return config->getString("name");
     }();
     if (!name) {
-      auto logged = root.logger().errorException(strf("Error loading tenant file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading tenant")));
+      auto logged = root.logger().errorException(Star::format("Error loading tenant file {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading tenant")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;
@@ -82,15 +82,16 @@ void TenantDatabase::cleanup() {
 
 std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::getTenant(String const& name) const {
   std::lock_guard locker(m_cacheMutex);
-  auto result = m_tenantCache.get(name, [&database = *this](String const& name) -> std::expected<std::shared_ptr<Tenant>, StarException> {
-    auto path = database.m_paths.maybeRef(name);
-    if (!path)
-      return std::unexpected(TenantException::format("No such tenant named '{}'", name));
-    auto assets = database.m_root.assets();
-    if (!assets)
-      return std::unexpected(std::move(assets.error()));
-    return readTenant(**assets, path->get());
-  });
+  auto result = m_tenantCache.get(
+    name, [&database = *this](String const& name) -> std::expected<std::shared_ptr<Tenant>, StarException> {
+      auto path = database.m_paths.find_ref(name);
+      if (!path)
+        return std::unexpected(TenantException::format("No such tenant named '{}'", name));
+      auto assets = database.m_root.assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      return readTenant(**assets, path->get());
+    });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return result->get();
@@ -103,7 +104,7 @@ std::expected<List<std::shared_ptr<Tenant>>, StarException> TenantDatabase::getM
     if (!tenant)
       return std::unexpected(std::move(tenant.error()));
     if ((*tenant)->criteriaSatisfied(colonyTags))
-      matchingTenants.append(std::move(*tenant));
+      matchingTenants.push_back(std::move(*tenant));
   }
   return matchingTenants;
 }
@@ -147,7 +148,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
       if (!overrides)
         return std::unexpected(std::move(overrides.error()));
       if (*spawn == "monster") {
-        tenants.append(TenantMonsterSpawnable{*type, *level, *overrides});
+        tenants.push_back(TenantMonsterSpawnable{*type, *level, *overrides});
       } else {
         if (*spawn != "npc")
           return std::unexpected(TenantException::format("Unknown tenant spawn type '{}'", *spawn));
@@ -163,15 +164,15 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
             auto value = entry.toString();
             if (!value)
               return std::unexpected(std::move(value.error()));
-            species.append(std::move(*value));
+            species.push_back(std::move(*value));
           }
         } else {
           auto value = speciesConfig->toString();
           if (!value)
             return std::unexpected(std::move(value.error()));
-          species.append(std::move(*value));
+          species.push_back(std::move(*value));
         }
-        tenants.append(TenantNpcSpawnable{std::move(species), *type, *level, *overrides});
+        tenants.push_back(TenantNpcSpawnable{std::move(species), *type, *level, *overrides});
       }
     }
     auto rentConfig = config->opt("rent");
@@ -193,7 +194,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
     return std::make_shared<Tenant>(Tenant{*name, *priority, std::move(criteria), std::move(tenants), std::move(rent), *config});
   }();
   if (!parsed)
-    return std::unexpected(TenantException(strf("Error loading tenant '{}'", path), assets.withAssetContext(std::move(parsed.error()), path, "Loading tenant")));
+    return std::unexpected(TenantException(Star::format("Error loading tenant '{}'", path), assets.withAssetContext(std::move(parsed.error()), path, "Loading tenant")));
   return parsed;
 }
 

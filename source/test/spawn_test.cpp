@@ -222,11 +222,11 @@ const GameTestRegistration presentationRemovalLifecycle(
   "SpawnTest", "PresentationRemovalCollectsOnceAndIsolatesSlaveFailures", [](GameTest& fixture) {
     // Failure isolation is the subject here; use a private Root rather than
     // the shared fixture's sink that fails on every expected Error record.
-    auto directory = File::temporaryDirectory(fixture.root().random());
+    auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::removeDirectoryRecursive(*directory)); });
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
-    settings.storageDirectory = File::relativeTo(*directory, "storage");
+    settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};

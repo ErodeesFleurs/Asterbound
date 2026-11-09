@@ -100,7 +100,7 @@ struct GradientForceRegion {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, GradientForceRegion& rfr);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, GradientForceRegion const& rfr);
 
-typedef std::variant<DirectionalForceRegion, RadialForceRegion, GradientForceRegion> PhysicsForceRegion;
+using PhysicsForceRegion = std::variant<DirectionalForceRegion, RadialForceRegion, GradientForceRegion>;
 
 [[nodiscard]] std::expected<PhysicsForceRegion, StarException> jsonToPhysicsForceRegion(Json const& json);
 

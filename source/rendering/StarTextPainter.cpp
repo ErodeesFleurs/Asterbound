@@ -95,14 +95,14 @@ std::expected<TextPositioning, StarException> TextPositioning::create(Json const
   auto horizontal = v.getString("horizontalAnchor", "left");
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
-  auto hAnchor = HorizontalAnchorNames->getLeft(*horizontal);
+  auto hAnchor = HorizontalAnchorNames->get_left(*horizontal);
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   result.hAnchor = hAnchor->get();
   auto vertical = v.getString("verticalAnchor", "top");
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
-  auto vAnchor = VerticalAnchorNames->getLeft(*vertical);
+  auto vAnchor = VerticalAnchorNames->get_left(*vertical);
   if (!vAnchor)
     return std::unexpected(std::move(vAnchor.error()));
   result.vAnchor = vAnchor->get();
@@ -122,10 +122,10 @@ std::expected<Json, StarException> TextPositioning::toJson() const {
     return std::unexpected(HorizontalAnchorNames.error());
   if (!VerticalAnchorNames)
     return std::unexpected(VerticalAnchorNames.error());
-  auto horizontal = HorizontalAnchorNames->getRight(hAnchor);
+  auto horizontal = HorizontalAnchorNames->get_right(hAnchor);
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
-  auto vertical = VerticalAnchorNames->getRight(vAnchor);
+  auto vertical = VerticalAnchorNames->get_right(vAnchor);
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   return JsonObject{
@@ -141,13 +141,8 @@ TextPositioning TextPositioning::translated(Vec2F translation) const {
 }
 
 TextPainter::TextPainter(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup)
-  : m_root(root),
-    m_renderer(renderer),
-    m_fontTextureGroup(root, textureGroup),
-    m_defaultRenderSettings(),
-    m_renderSettings(),
-    m_savedRenderSettings() {
-}
+    : m_root(root), m_renderer(std::move(renderer)), m_fontTextureGroup(root, std::move(textureGroup)),
+      m_defaultRenderSettings(), m_renderSettings(), m_savedRenderSettings() {}
 
 std::expected<std::shared_ptr<TextPainter>, StarException> TextPainter::create(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup) {
   auto painter = std::shared_ptr<TextPainter>(new TextPainter(root, std::move(renderer), std::move(textureGroup)));
@@ -221,7 +216,7 @@ std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigne
   int width = 0;
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
@@ -252,7 +247,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
     return std::unexpected(std::move(switched.error()));
   Utf8Cursor cursor(text.utf8());
   std::size_t cursorBase = 0;
-  std::size_t iterator = 0, end = text.utf8Size();
+  std::size_t iterator = 0, end = text.utf8_size();
 
   unsigned lines = 0;
   auto lineStartIterator = iterator, splitIterator = end;
@@ -290,7 +285,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
             !changed)
           return std::unexpected(std::move(changed.error()));
         iterator = cursorBase = commandEnd + 1;
-        cursor = Utf8Cursor(text.utf8().substr(cursorBase));
+        cursor = Utf8Cursor(std::string_view(text.utf8()).substr(cursorBase));
         commandStart = commandEnd = NPos;
         continue;
       }
@@ -391,7 +386,7 @@ std::expected<StringList, StarException> TextPainter::wrapText(StringView s, std
   unsigned lastLine = 0;
   TextPainter::WrapTextCallback textCallback = [&](StringView text, unsigned line) {
     if (lastLine != line) {
-      result.append(std::move(current));
+      result.push_back(std::move(current));
       lastLine = line;
     }
     current += text;
@@ -403,7 +398,7 @@ std::expected<StringList, StarException> TextPainter::wrapText(StringView s, std
     return std::unexpected(std::move(wrapped.error()));
 
   if (!current.empty())
-    result.append(std::move(current));
+    result.push_back(std::move(current));
 
   return result;
 };
@@ -550,7 +545,7 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
         auto color = Color::create(StringView(command));
         if (!color)
           return std::unexpected(std::move(color.error()));
-        color->setAlphaF(color->alphaF() * ((float)m_savedRenderSettings.color[3]) / 255);
+        color->setAlphaF(color->alphaF() * (static_cast<float>(m_savedRenderSettings.color[3])) / 255);
         m_renderSettings.color = color->toRgba();
       }
       return {};
@@ -603,7 +598,7 @@ std::expected<RectF, StarException> TextPainter::doRenderText(StringView s, Text
       m_renderSettings = std::move(backup);
       auto restored = m_fontTextureGroup.switchFont(m_renderSettings.font);
       if (!restored)
-        return std::unexpected(restored.error().withContext(line.error().what()));
+        return std::unexpected(restored.error().with_context(line.error().what()));
       return std::unexpected(std::move(line.error()));
     }
     bounds.combine(*line);
@@ -639,7 +634,8 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
     auto measured = stringWidth(trimmedString, 0);
     if (!measured)
       return std::unexpected(std::move(measured.error()));
-    pos.pos[0] -= pos.hAnchor == HorizontalAnchor::RightAnchor ? (float)*measured : std::floor((float)*measured / 2);
+    pos.pos[0] -= pos.hAnchor == HorizontalAnchor::RightAnchor ? static_cast<float>(*measured)
+                                                               : std::floor(static_cast<float>(*measured) / 2);
     pos.hAnchor = HorizontalAnchor::LeftAnchor;
   }
 
@@ -647,7 +643,7 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
   RectF bounds = RectF::withSize(pos.pos, Vec2F());
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
@@ -700,13 +696,13 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
   if (position.hAnchor == HorizontalAnchor::RightAnchor)
     hOffset = -width;
   else if (position.hAnchor == HorizontalAnchor::HMidAnchor)
-    hOffset = -std::floor((float)width / 2);
+    hOffset = -std::floor(static_cast<float>(width) / 2);
 
   float vOffset = 0;
   if (position.vAnchor == VerticalAnchor::VMidAnchor)
-    vOffset = -std::floor((float)m_renderSettings.fontSize / 2);
+    vOffset = -std::floor(static_cast<float>(m_renderSettings.fontSize) / 2);
   else if (position.vAnchor == VerticalAnchor::TopAnchor)
-    vOffset = -(float)m_renderSettings.fontSize;
+    vOffset = -static_cast<float>(m_renderSettings.fontSize);
 
   std::optional<std::reference_wrapper<Directives const>> directives;
   if (m_renderSettings.directives)
@@ -744,7 +740,7 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
       return std::unexpected(std::move(rendered.error()));
   }
 
-  return RectF::withSize(pos, {(float)width, (int)m_renderSettings.fontSize});
+  return RectF::withSize(pos, {static_cast<float>(width), static_cast<int>(m_renderSettings.fontSize)});
 }
 
 void TextPainter::renderPrimitives() {

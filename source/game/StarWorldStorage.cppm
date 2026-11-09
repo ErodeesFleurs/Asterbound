@@ -84,7 +84,7 @@ using WorldStorageException = StarError<WorldStorageExceptionTag, StarException>
 class EntityMap;
 class WorldStorage;
 
-typedef HashMap<ByteArray, std::optional<ByteArray>> WorldChunks;
+using WorldChunks = HashMap<ByteArray, std::optional<ByteArray>>;
 
 enum class SectorLoadLevel : std::uint8_t {
   None = 0,
@@ -107,10 +107,10 @@ enum class SectorGenerationLevel : std::uint8_t {
 };
 
 struct WorldGeneratorFacade {
-  typedef ServerTileSectorArray::Sector Sector;
+  using Sector = ServerTileSectorArray::Sector;
 
-  WorldGeneratorFacade() {}
-  virtual ~WorldGeneratorFacade() {}
+  WorldGeneratorFacade() = default;
+  virtual ~WorldGeneratorFacade() = default;
 
   // Should bring a given sector from generationLevel - 1 to generationLevel.
   [[nodiscard]] virtual std::expected<void, StarException> generateSectorLevel(WorldStorage& storage, Sector const& sector, SectorGenerationLevel generationLevel) = 0;
@@ -157,8 +157,8 @@ class WorldStorage {
   Root& m_root;
   Root& root() const { return m_root; }
 public:
-  typedef ServerTileSectorArray::Sector Sector;
-  typedef ServerTileSectorArray::Array TileArray;
+  using Sector = ServerTileSectorArray::Sector;
+  using TileArray = ServerTileSectorArray::Array;
 
   static WorldChunks getWorldChunksUpdate(WorldChunks const& oldChunks, WorldChunks const& newChunks);
   [[nodiscard]] static std::expected<void, StarException> applyWorldChunksUpdateToFile(Logger& logger, String const& file, WorldChunks const& update);
@@ -261,18 +261,18 @@ private:
     SectorUniques = 4
   };
 
-  typedef std::pair<Sector, Vec2F> SectorAndPosition;
+  using SectorAndPosition = std::pair<Sector, Vec2F>;
 
   struct WorldMetadataStore {
     Vec2U worldSize;
     VersionedJson userMetadata;
   };
 
-  typedef List<VersionedJson> EntitySectorStore;
+  using EntitySectorStore = List<VersionedJson>;
   // Map of uuid to entity's position and sector they were stored in.
-  typedef HashMap<String, SectorAndPosition> UniqueIndexStore;
+  using UniqueIndexStore = HashMap<String, SectorAndPosition>;
   // Set of unique ids that are stored in a given sector
-  typedef HashSet<String> SectorUniqueStore;
+  using SectorUniqueStore = HashSet<String>;
 
   struct TileSectorStore {
     TileSectorStore();

@@ -3,10 +3,12 @@
 import std;
 import star.animation;
 import star.asset_path;
+import star.bi_map;
 import star.color;
 import star.game_test;
 import star.json;
 import star.list;
+import star.map;
 import star.particle;
 import star.particle_manager;
 import star.rect;
@@ -14,6 +16,7 @@ import star.root;
 import star.string;
 import star.vector;
 import star.world_geometry;
+import star.unicode;
 import star.world_tiles;
 
 using namespace Star;
@@ -33,6 +36,71 @@ Particle movingParticle() {
   particle.collidesForeground = particle.collidesLiquid = false;
   return particle;
 }
+
+const GameTestRegistration
+  particleJsonNames("ParticleConfig", "EnumNamesPreserveDefaultsCaseAndJsonRoundTrip", [](GameTest& fixture) {
+    auto defaults = Particle::create(fixture.root(), JsonObject{});
+    ASSERT_TRUE(defaults) << defaults.error().what();
+    EXPECT_EQ(defaults->type, Particle::Type::Variance);
+    EXPECT_EQ(defaults->destructionAction, Particle::DestructionAction::None);
+    EXPECT_EQ(defaults->layer, Particle::Layer::Middle);
+    auto defaultJson = defaults->toJson();
+    ASSERT_TRUE(defaultJson) << defaultJson.error().what();
+    EXPECT_EQ(defaultJson->getString("type"), String("variance"));
+    EXPECT_EQ(defaultJson->getString("destructionAction"), String("none"));
+    EXPECT_EQ(defaultJson->getString("layer"), String("middle"));
+
+    auto configured = Particle::create(fixture.root(),
+                                       JsonObject{{"type", "EmBeR"},
+                                                  {"destructionAction", "ShRiNk"},
+                                                  {"layer", "FrOnT"},
+                                                  {"size", 2.0},
+                                                  {"timeToLive", 3.0},
+                                                  {"destructionTime", 1.0}});
+    ASSERT_TRUE(configured) << configured.error().what();
+    EXPECT_EQ(configured->type, Particle::Type::Ember);
+    EXPECT_EQ(configured->destructionAction, Particle::DestructionAction::Shrink);
+    EXPECT_EQ(configured->layer, Particle::Layer::Front);
+    EXPECT_FALSE(configured->collidesForeground);
+    EXPECT_TRUE(configured->collidesLiquid);
+    auto stored = configured->toJson();
+    ASSERT_TRUE(stored) << stored.error().what();
+    EXPECT_EQ(stored->getString("type"), String("ember"));
+    EXPECT_EQ(stored->getString("destructionAction"), String("shrink"));
+    EXPECT_EQ(stored->getString("layer"), String("front"));
+    auto restored = Particle::create(fixture.root(), *stored);
+    ASSERT_TRUE(restored) << restored.error().what();
+    auto restoredJson = restored->toJson();
+    ASSERT_TRUE(restoredJson) << restoredJson.error().what();
+    EXPECT_EQ(*restoredJson, *stored);
+  });
+
+const GameTestRegistration
+  particleJsonNameErrors("ParticleConfig", "EnumNamesRejectUnknownUnicodeAndInvalidEnumValues", [](GameTest& fixture) {
+    for (String const& key : {String("type"), String("destructionAction"), String("layer")}) {
+      for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("none\0", 5))}) {
+        auto parsed = Particle::create(fixture.root(), JsonObject{{key, name}});
+        ASSERT_FALSE(parsed);
+        EXPECT_TRUE(parsed.error().is<MapException>());
+      }
+      auto invalid = Particle::create(fixture.root(), JsonObject{{key, String(std::string_view("none\xff", 5))}});
+      ASSERT_FALSE(invalid);
+      EXPECT_TRUE(invalid.error().is<UnicodeException>());
+    }
+
+    for (unsigned field = 0; field < 3; ++field) {
+      Particle invalid;
+      if (field == 0)
+        invalid.type = static_cast<Particle::Type>(-1);
+      else if (field == 1)
+        invalid.destructionAction = static_cast<Particle::DestructionAction>(-1);
+      else
+        invalid.layer = static_cast<Particle::Layer>(-1);
+      auto stored = invalid.toJson();
+      ASSERT_FALSE(stored);
+      EXPECT_TRUE(stored.error().is<MapException>());
+    }
+  });
 
 const GameTestRegistration particleSampling(
   "ParticlePresentation", "RepeatedSamplesDoNotAdvanceSimulationAndResetSnaps", [](GameTest& fixture) {
@@ -185,7 +253,7 @@ const GameTestRegistration particleTrailSampling(
     particle.trail = true;
     List<Particle> batch;
     batch.reserve(8);
-    batch.append(particle);
+    batch.push_back(particle);
     auto capacity = batch.capacity();
     auto* allocation = batch.data();
     manager.addParticles(std::move(batch));

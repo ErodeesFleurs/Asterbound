@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  item->m_image = AssetPath::relativeTo(directory, *image);
+  item->m_image = AssetPath::relative_to(directory, *image);
   auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.toInt(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
@@ -157,11 +157,11 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
-  for (std::size_t i = 0; i < (std::size_t)item->m_frames; i++) {
-    auto frame = item->m_image.replace("{frame}", toString(i));
+  for (std::size_t i = 0; i < static_cast<std::size_t>(item->m_frames); i++) {
+    auto frame = item->m_image.replace("{frame}", Star::to_string(i));
     if (!frame)
       return std::unexpected(std::move(frame.error()));
-    item->m_animationFrame.append(std::move(*frame));
+    item->m_animationFrame.push_back(std::move(*frame));
   }
   auto idle = item->m_image.replace("{frame}", "idle");
   if (!idle)
@@ -191,8 +191,10 @@ std::expected<List<Drawable>, StarException> TillingTool::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto const& image = m_frameTiming == 0 ? m_idleFrame :
-      m_animationFrame[std::max(0, std::min(m_frames - 1, (int)std::floor((m_frameTiming / m_frameCycle) * m_frames)))];
+  auto const& image = m_frameTiming == 0
+    ? m_idleFrame
+    : m_animationFrame[std::max(
+        0, std::min(m_frames - 1, static_cast<int>(std::floor((m_frameTiming / m_frameCycle) * m_frames))))];
   auto drawable = Drawable::makeImage(**metadata, image, 1.0f / TilePixels, true, -handPosition() / TilePixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
@@ -242,7 +244,8 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
       if (!tilledMod)
         return std::unexpected(std::move(tilledMod.error()));
       if (*tilledMod != NoModId && currentMod == NoModId) {
-        auto modified = itemWorld->get().modifyTile(pos, PlaceMod{layer, *tilledMod, MaterialHue()}, true);
+        auto modified = itemWorld->get().modifyTile(
+          pos, PlaceMod{.layer = layer, .mod = *tilledMod, .modHueShift = MaterialHue()}, true);
         if (!modified)
           return std::unexpected(std::move(modified.error()));
         if (*modified)

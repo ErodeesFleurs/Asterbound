@@ -66,7 +66,7 @@ ServerQueryThread::~ServerQueryThread() {
   if (auto joined = join(); !joined)
     EmergencyLog::error("Query server shutdown failed: {}", joined.error().what());
   if (!isJoined())
-    fatalError("Cannot destroy a query server with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy a query server with an unjoined native worker", false);
 }
 
 std::expected<void, StarException> ServerQueryThread::start() {
@@ -111,10 +111,10 @@ std::expected<String, StarException> ServerQueryThread::serverWorldNames() {
     return String("Unknown");
   StringList names;
   for (auto const& world : *activeWorlds) {
-    auto name = printWorldId(world);
+    auto name = Star::print_world_id(world);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    names.append(std::move(*name));
+    names.push_back(std::move(*name));
   }
   return names.join(",");
 }
@@ -150,8 +150,8 @@ std::expected<bool, StarException> ServerQueryThread::processPacket(HostAddressW
     auto response = m_generalResponse << A2S_HEAD_INT << A2S_INFO_REPLY << A2S_VERSION << m_serverName << *worlds
                                       << GAME_DIR << GAME_DESC
                                       << A2S_APPID// Should be SteamAppId but this isn't a short :(
-                                      << serverPlayerCount() << m_maxPlayers << (std::uint8_t)0x00// bots
-                                      << A2S_TYPE_DEDICATED                                       // dedicated
+                                      << serverPlayerCount() << m_maxPlayers << static_cast<std::uint8_t>(0x00)// bots
+                                      << A2S_TYPE_DEDICATED// dedicated
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
                                       << A2S_ENV_WINDOWS// os
 #elif defined(STAR_SYSTEM_MACOS)
@@ -226,7 +226,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
   auto clientIds = m_universe.get().clientIdsAndCreationTime();
   if (!clientIds)
     return std::unexpected(std::move(clientIds.error()));
-  std::uint8_t count = static_cast<std::uint8_t>(clientIds->count());
+  std::uint8_t count = static_cast<std::uint8_t>(clientIds->size());
   std::int32_t kills = 0;
   m_playersResponse.clear();
   auto header = m_playersResponse << A2S_HEAD_INT << A2S_PLAYER_REPLY << count;
@@ -237,7 +237,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
     auto name = m_universe.get().clientNick(pair.first);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto timeConnected = float((now - pair.second).count()) / 1000.f;
+    auto timeConnected = static_cast<float>((now - pair.second).count()) / 1000.f;
     auto player = m_playersResponse << i++ << *name << kills << timeConnected;
     if (!player)
       return std::unexpected(std::move(player.error()));
@@ -292,7 +292,7 @@ std::expected<void, StarException> ServerQueryThread::run() {
   auto report = [this](StarException const& error) -> std::expected<void, StarException> {
     if (!error.is<SocketClosedException>())
       return m_universe.get().root().logger().error("ServerQueryThread error: {}",
-                                                    outputException(ExceptionDiagnostic(error), true));
+                                                    Star::output_exception(ExceptionDiagnostic(error), true));
     return {};
   };
   while (!stopToken.stop_requested()) {
@@ -329,14 +329,15 @@ bool ServerQueryThread::validChallenge(HostAddressWithPort const& address, std::
     return false;
   }
 
-  auto knownChallenge = m_validChallenges.maybeRef(address.address());
+  auto knownChallenge = m_validChallenges.find_ref(address.address());
   if (!knownChallenge) {
     // Don't know this source address ignore
     return false;
   }
 
-  std::int32_t challenge = ((std::int32_t)b[8] & 0xff) << 24 | ((std::int32_t)b[7] & 0xff) << 16
-    | ((std::int32_t)b[6] & 0xff) << 8 | ((std::int32_t)b[5] & 0xff);
+  std::int32_t challenge = (static_cast<std::int32_t>(b[8]) & 0xff) << 24
+    | (static_cast<std::int32_t>(b[7]) & 0xff) << 16 | (static_cast<std::int32_t>(b[6]) & 0xff) << 8
+    | (static_cast<std::int32_t>(b[5]) & 0xff);
   // Note: No byte order swapping needed as protcol performs no conversion
   if (knownChallenge->get()->getChallenge() != challenge) {
     // Challenges didnt match ignore

@@ -30,7 +30,8 @@ import star.spawn_type_database;
 
 namespace Star {
 
-SpawnParameters::SpawnParameters(Set<Area> areas, Region region, Time time) : areas(areas), region(region), time(time) {}
+SpawnParameters::SpawnParameters(Set<Area> areas, Region region, Time time)
+    : areas(std::move(areas)), region(region), time(time) {}
 
 SpawnParameters::SpawnParameters()
   : areas{Area::Surface, Area::Ceiling, Area::Air, Area::Liquid, Area::Solid}, region(Region::All), time(Time::All) {}
@@ -49,7 +50,7 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
     if (**areaName == "all")
       result.areas = {Area::Surface, Area::Ceiling, Area::Air, Area::Liquid, Area::Solid};
     else {
-      auto area = AreaNames->getLeft(**areaName);
+      auto area = AreaNames->get_left(**areaName);
       if (!area) return std::unexpected(std::move(area.error()));
       result.areas.add(area->get());
     }
@@ -60,7 +61,7 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
       for (auto const& entry : **areaNames) {
         auto name = entry.toString();
         if (!name) return std::unexpected(std::move(name.error()));
-        auto area = AreaNames->getLeft(*name);
+        auto area = AreaNames->get_left(*name);
         if (!area) return std::unexpected(std::move(area.error()));
         result.areas.add(area->get());
       }
@@ -68,19 +69,19 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
   }
   auto regionName = config.getString("region");
   if (!regionName) return std::unexpected(std::move(regionName.error()));
-  auto region = RegionNames->getLeft(*regionName);
+  auto region = RegionNames->get_left(*regionName);
   if (!region) return std::unexpected(std::move(region.error()));
   result.region = region->get();
   auto timeName = config.getString("time");
   if (!timeName) return std::unexpected(std::move(timeName.error()));
-  auto time = TimeNames->getLeft(*timeName);
+  auto time = TimeNames->get_left(*timeName);
   if (!time) return std::unexpected(std::move(time.error()));
   result.time = time->get();
   return result;
 }
 
 bool SpawnParameters::compatible(SpawnParameters const& parameters) const {
-  return areas.hasIntersection(parameters.areas)
+  return areas.has_intersection(parameters.areas)
       && (region == Region::All || parameters.region == Region::All || region == parameters.region)
       && (time == Time::All || parameters.time == Time::All || time == parameters.time);
 }
@@ -142,7 +143,7 @@ std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
   return result;
 }
 
-SpawnProfile::SpawnProfile() {}
+SpawnProfile::SpawnProfile() = default;
 
 std::expected<SpawnProfile, StarException> SpawnProfile::create(Json const& config) {
   auto typesConfig = config.get("spawnTypes", JsonArray());
@@ -190,7 +191,7 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
     }
     auto count = group.getUInt("select");
     if (!count) return std::unexpected(std::move(count.error()));
-    result.spawnTypes.addAll(pool->selectUniques(*count, ++seed));
+    result.spawnTypes.insert_range(pool->selectUniques(*count, ++seed));
   }
   auto parameters = config.getObject("monsterParameters", JsonObject());
   if (!parameters) return std::unexpected(std::move(parameters.error()));
@@ -207,27 +208,31 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
   std::uint64_t seedMix = 0;
   for (auto const& path : files->get()) {
     auto const& file = path.string();
-    auto readFile = [&]() -> std::expected<void, StarException> {
+    auto read_file = [&]() -> std::expected<void, StarException> {
       auto config = assets->json(file);
-      if (!config) return std::unexpected(std::move(config.error()));
+      if (!config)
+        return std::unexpected(std::move(config.error()));
       auto entries = config->iterateArray();
-      if (!entries) return std::unexpected(std::move(entries.error()));
+      if (!entries)
+        return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {
         auto type = spawnTypeFromJson(entry);
-        if (!type) return std::unexpected(std::move(type.error()));
+        if (!type)
+          return std::unexpected(std::move(type.error()));
         if (result->m_spawnTypes.contains(type->typeName))
           return std::unexpected(SpawnTypeDatabaseException::format("Duplicate spawnType named '{}' in config file '{}'", type->typeName, file));
         auto hasSeedMix = entry.contains("seedMix");
-        if (!hasSeedMix) return std::unexpected(std::move(hasSeedMix.error()));
+        if (!hasSeedMix)
+          return std::unexpected(std::move(hasSeedMix.error()));
         if (!*hasSeedMix)
           type->seedMix = ++seedMix;
         result->m_spawnTypes[type->typeName] = std::move(*type);
       }
       return {};
     };
-    auto loaded = readFile();
+    auto loaded = read_file();
     if (!loaded)
-      return std::unexpected(SpawnTypeDatabaseException(strf("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
+      return std::unexpected(SpawnTypeDatabaseException(Star::format("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
   }
   return result;
 }

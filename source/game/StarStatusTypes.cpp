@@ -53,15 +53,16 @@ std::expected<StatModifier, StarException> jsonToStatModifier(Json const& config
   auto baseMultiplier = config.optFloat("baseMultiplier");
   if (!baseMultiplier) return std::unexpected(std::move(baseMultiplier.error()));
   if (*baseMultiplier)
-    return StatModifier(StatBaseMultiplier{std::move(*statName), **baseMultiplier});
+    return StatModifier(StatBaseMultiplier{.statName = std::move(*statName), .baseMultiplier = **baseMultiplier});
   auto amount = config.optFloat("amount");
   if (!amount) return std::unexpected(std::move(amount.error()));
   if (*amount)
-    return StatModifier(StatValueModifier{std::move(*statName), **amount});
+    return StatModifier(StatValueModifier{.statName = std::move(*statName), .value = **amount});
   auto effectiveMultiplier = config.optFloat("effectiveMultiplier");
   if (!effectiveMultiplier) return std::unexpected(std::move(effectiveMultiplier.error()));
   if (*effectiveMultiplier)
-    return StatModifier(StatEffectiveMultiplier{std::move(*statName), **effectiveMultiplier});
+    return StatModifier(
+      StatEffectiveMultiplier{.statName = std::move(*statName), .effectiveMultiplier = **effectiveMultiplier});
   return std::unexpected(JsonException("Could not find 'baseMultiplier' or 'effectiveMultiplier' or 'amount' element in stat effect config"));
 }
 
@@ -119,14 +120,14 @@ std::expected<EphemeralStatusEffect, StarException> jsonToEphemeralStatusEffect(
   if (config.isType(Json::Type::String)) {
     auto name = config.toString();
     if (!name) return std::unexpected(std::move(name.error()));
-    return EphemeralStatusEffect{std::move(*name), {}};
+    return EphemeralStatusEffect{.uniqueEffect = std::move(*name), .duration = {}};
   }
   if (config.isType(Json::Type::Object)) {
     auto name = config.getString("effect");
     if (!name) return std::unexpected(std::move(name.error()));
     auto duration = config.optFloat("duration");
     if (!duration) return std::unexpected(std::move(duration.error()));
-    return EphemeralStatusEffect{std::move(*name), *duration};
+    return EphemeralStatusEffect{.uniqueEffect = std::move(*name), .duration = *duration};
   }
   return std::unexpected(JsonException("Json is wrong type for ephemeral stat effect config"));
 }

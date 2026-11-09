@@ -56,7 +56,7 @@ RenderQuad::RenderQuad(RectF const& rect, Vec4B color, float param1)
 RenderPoly::RenderPoly(List<Vec2F> const& verts, Vec4B color, float param1) {
   vertexes.reserve(verts.size());
   for (Vec2F const& v : verts)
-    vertexes.append({ v, { 0, 0 }, color, param1 });
+    vertexes.push_back({v, {0, 0}, color, param1});
 }
 
 RenderTriangle::RenderTriangle(Vec2F posA, Vec2F posB, Vec2F posC, Vec4B color, float param1) : texture() {

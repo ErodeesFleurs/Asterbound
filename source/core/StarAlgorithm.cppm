@@ -19,10 +19,6 @@ struct AlgorithmResultInfo<std::expected<T, StarException>> {
   static constexpr bool Fallible = true;
 };
 
-// Function that does nothing and takes any number of arguments
-template <typename... T>
-void nothing(T&&...) {}
-
 // Functional constructor call / casting.
 template <typename ToType>
 struct construct {
@@ -32,38 +28,8 @@ struct construct {
   }
 };
 
-template <typename Func>
-struct SwallowReturn {
-  template <typename... T>
-  [[nodiscard]] auto operator()(T&&... args) {
-    using Result = std::remove_cvref_t<std::invoke_result_t<Func&, T...>>;
-    constexpr bool nullable = requires { func == nullptr; };
-    if constexpr (nullable) {
-      if (func == nullptr)
-        return std::expected<void, StarException>(std::unexpected(StarException("Cannot invoke an empty callback")));
-    }
-    if constexpr (AlgorithmResultInfo<Result>::Fallible) {
-      auto result = std::invoke(func, std::forward<T>(args)...);
-      if (!result)
-        return std::expected<void, StarException>(std::unexpected(std::move(result.error())));
-      return std::expected<void, StarException>();
-    } else {
-      std::invoke(func, std::forward<T>(args)...);
-      if constexpr (nullable)
-        return std::expected<void, StarException>();
-    }
-  }
-
-  Func func;
-};
-
-template <typename Func>
-SwallowReturn<Func> swallow(Func f) {
-  return SwallowReturn<Func>{std::move(f)};
-}
-
 template <typename MapType1, typename MapType2>
-[[nodiscard]] auto mapMerge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
+[[nodiscard]] auto map_merge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
   using Insertion = std::remove_cvref_t<decltype(targetMap.insert(*sourceMap.begin()))>;
   constexpr bool fallible = AlgorithmResultInfo<Insertion>::Fallible;
   using Result = std::conditional_t<fallible, std::expected<bool, StarException>, bool>;
@@ -89,8 +55,7 @@ template <typename MapType1, typename MapType2>
   return Result(noCommonKeys);
 }
 
-template <typename MapType1, typename MapType2>
-bool mapsEqual(MapType1 const& m1, MapType2 const& m2) {
+template <typename MapType1, typename MapType2> bool maps_equal(MapType1 const& m1, MapType2 const& m2) {
   if (&m1 == &m2)
     return true;
 
@@ -344,11 +309,10 @@ template <typename OutContainer, typename InContainer, typename Function>
   }
 }
 
-// Moves the given value and into an rvalue.  Works whether or not the type has
-// a valid move constructor or not.  Always leaves the given value in its
-// default constructed state.
-// Default construction follows the move; std::exchange constructs its
-// replacement first, which differs if default construction throws.
+// Moves the value out, then resets it to its default-constructed state.
+// Unlike std::exchange, default construction follows the move. Keep this
+// sequencing for replacements with observable construction side effects,
+// including allocation; no-exceptions builds do not make those effects inert.
 template <typename T>
 T take(T& t) {
   T t2 = std::move(t);
@@ -359,7 +323,7 @@ T take(T& t) {
 template <typename Functor>
 class FinallyGuard {
 public:
-  FinallyGuard(Functor functor) : functor(std::move(functor)), dismiss(false) {}
+  FinallyGuard(Functor functor) : functor(std::move(functor)) {}
 
   FinallyGuard(FinallyGuard&& o) : functor(std::move(o.functor)), dismiss(o.dismiss) {
     o.cancel();
@@ -385,11 +349,10 @@ public:
 
 private:
   Functor functor;
-  bool dismiss;
+  bool dismiss = false;
 };
 
-template <typename Functor>
-FinallyGuard<typename std::decay<Functor>::type> finally(Functor&& f) {
+template <typename Functor> FinallyGuard<std::decay_t<Functor>> finally(Functor&& f) {
   return FinallyGuard<Functor>(std::forward<Functor>(f));
 }
 
@@ -449,22 +412,19 @@ export module star.algorithm;
 
 export namespace Star {
   using ::Star::AlgorithmResultInfo;
-  using ::Star::nothing;
   using ::Star::construct;
-  using ::Star::SwallowReturn;
-  using ::Star::swallow;
-  using ::Star::mapMerge;
-  using ::Star::mapsEqual;
+  using ::Star::eraseWhere;
   using ::Star::filter;
   using ::Star::filtered;
-  using ::Star::eraseWhere;
-  using ::Star::sorted;
-  using ::Star::sortByComputedValue;
-  using ::Star::stableSortByComputedValue;
-  using ::Star::transformInto;
-  using ::Star::transform;
-  using ::Star::take;
-  using ::Star::FinallyGuard;
   using ::Star::finally;
+  using ::Star::FinallyGuard;
   using ::Star::FunctionTraits;
+  using ::Star::map_merge;
+  using ::Star::maps_equal;
+  using ::Star::sortByComputedValue;
+  using ::Star::sorted;
+  using ::Star::stableSortByComputedValue;
+  using ::Star::take;
+  using ::Star::transform;
+  using ::Star::transformInto;
 }

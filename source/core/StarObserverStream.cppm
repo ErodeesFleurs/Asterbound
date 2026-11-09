@@ -65,7 +65,7 @@ void ObserverStream<T>::setHistoryLimit(std::uint64_t historyLimit) {
 
 template <typename T>
 void ObserverStream<T>::add(T value) {
-  m_values.append({m_nextStep, std::move(value)});
+  m_values.push_back({m_nextStep, std::move(value)});
   tick(1);
 }
 
@@ -85,7 +85,7 @@ std::pair<List<T>, std::uint64_t> ObserverStream<T>::query(std::uint64_t since) 
       since,
       [](std::pair<std::uint64_t, T> const& p, std::uint64_t step) { return p.first < step; });
   while (i != m_values.end()) {
-    res.append(i->second);
+    res.push_back(i->second);
     ++i;
   }
   return {res, m_nextStep};

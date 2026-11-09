@@ -22,7 +22,7 @@ struct ThreadImpl {
     SetThreadStackGuarantee(&exceptionStackSize);
     auto result = state.function();
     if (!result)
-      EmergencyLog::error("Thread {} failed: {}", state.name, outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Thread {} failed: {}", state.name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
     state.stopped = true;
     return 0;
   }
@@ -42,7 +42,7 @@ struct ThreadImpl {
       thread = INVALID_HANDLE_VALUE;
     if (thread == INVALID_HANDLE_VALUE) {
       stopped = true;
-      return std::unexpected(StarException(strf("Failed to create thread, error {}", GetLastError())));
+      return std::unexpected(StarException(Star::format("Failed to create thread, error {}", GetLastError())));
     }
     return true;
   }
@@ -52,9 +52,9 @@ struct ThreadImpl {
     if (thread == INVALID_HANDLE_VALUE)
       return false;
     if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0)
-      return std::unexpected(StarException(strf("Failed to join thread, error {}", GetLastError())));
+      return std::unexpected(StarException(Star::format("Failed to join thread, error {}", GetLastError())));
     if (!CloseHandle(thread))
-      return std::unexpected(StarException(strf("Failed to close joined thread, error {}", GetLastError())));
+      return std::unexpected(StarException(Star::format("Failed to close joined thread, error {}", GetLastError())));
     thread = INVALID_HANDLE_VALUE;
     return true;
   }
@@ -115,7 +115,7 @@ Thread::Thread(Thread&&) = default;
 Thread::~Thread() {
   if (m_impl && !isJoined()) {
     EmergencyLog::error("Thread {} destroyed without joining", name());
-    fatalError("Cannot destroy an unjoined thread", false);
+    Star::fatal_error("Cannot destroy an unjoined thread", false);
   }
 }
 
@@ -123,7 +123,7 @@ Thread& Thread::operator=(Thread&& other) {
   if (this != &other) {
     if (m_impl && !isJoined()) {
       EmergencyLog::error("Thread {} overwritten without joining", name());
-      fatalError("Cannot overwrite an unjoined thread", false);
+      Star::fatal_error("Cannot overwrite an unjoined thread", false);
     }
     m_impl = std::move(other.m_impl);
   }
@@ -167,18 +167,18 @@ std::expected<ThreadFunction<void>, StarException> ThreadFunction<void>::create(
 ThreadFunction<void>::~ThreadFunction() {
   auto result = finish();
   if (!result)
-    EmergencyLog::error("Thread function {} failed during destruction: {}", name(), outputException(ExceptionDiagnostic(result.error()), true));
+    EmergencyLog::error("Thread function {} failed during destruction: {}", name(), Star::output_exception(ExceptionDiagnostic(result.error()), true));
   if (!isFinished())
-    fatalError("Cannot destroy an unjoined thread function", false);
+    Star::fatal_error("Cannot destroy an unjoined thread function", false);
 }
 
 ThreadFunction<void>& ThreadFunction<void>::operator=(ThreadFunction&& other) {
   if (this != &other) {
     auto result = finish();
     if (!result)
-      EmergencyLog::error("Thread function {} failed during reassignment: {}", name(), outputException(ExceptionDiagnostic(result.error()), true));
+      EmergencyLog::error("Thread function {} failed during reassignment: {}", name(), Star::output_exception(ExceptionDiagnostic(result.error()), true));
     if (!isFinished())
-      fatalError("Cannot overwrite an unjoined thread function", false);
+      Star::fatal_error("Cannot overwrite an unjoined thread function", false);
     m_impl = std::move(other.m_impl);
   }
   return *this;

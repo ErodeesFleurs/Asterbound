@@ -229,7 +229,12 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
       if (!name) return std::unexpected(std::move(name.error()));
       auto color = entity->nametagColor();
       if (!color) return std::unexpected(std::move(color.error()));
-      Nametag nametag = {std::move(*name), entity->statusText(), *color, 1.0f, entity->entityId(), {}};
+      Nametag nametag = {.name = std::move(*name),
+                         .statusText = entity->statusText(),
+                         .color = *color,
+                         .opacity = 1.0f,
+                         .entityId = entity->entityId(),
+                         .origin = {}};
       auto bounds = determineBoundBox(Vec2F(), nametag);
       if (!bounds) return std::unexpected(std::move(bounds.error()));
       m_nametags.addBubble(Vec2F(), *bounds, std::move(nametag));

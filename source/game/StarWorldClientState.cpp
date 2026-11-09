@@ -113,17 +113,17 @@ List<RectI> WorldClientState::monitoringRegions(std::function<std::optional<Rect
   auto windowRegion = window().padded(m_windowMonitoringBorder);
 
   if (window() != RectI())
-    regions.append(windowRegion);
+    regions.push_back(windowRegion);
 
   if (auto playerBounds = entityBounds(m_playerId.get())) {
     // add an extra region the size of the window centered on the player's position to prevent nearby sectors
     // being unloaded due to camera panning or centering on other entities
-    regions.append(RectI::withCenter(playerBounds->center(), windowRegion.size()));
+    regions.push_back(RectI::withCenter(playerBounds->center(), windowRegion.size()));
   }
 
   for (auto entityId : m_clientPresenceEntities.get()) {
     if (auto bounds = entityBounds(entityId))
-      regions.append(bounds->padded(m_presenceEntityMonitoringBorder));
+      regions.push_back(bounds->padded(m_presenceEntityMonitoringBorder));
   }
 
   return regions;

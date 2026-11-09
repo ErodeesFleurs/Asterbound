@@ -93,55 +93,108 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& item) {
   LuaCallbacks callbacks;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("name", std::bind(ItemCallbacks::name, std::ref(item))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<String>("name", [&item]() { return ItemCallbacks::name(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t>("count", std::bind(ItemCallbacks::count, std::ref(item))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<std::size_t>("count", [&item]() { return ItemCallbacks::count(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t, std::size_t>("setCount", std::bind(ItemCallbacks::setCount, std::ref(item), std::placeholders::_1)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t, std::size_t>(
+        "setCount", [&item](std::size_t count) { return ItemCallbacks::setCount(item, count); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t>("maxStack", std::bind(ItemCallbacks::maxStack, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t>(
+        "maxStack", [&item]() { return ItemCallbacks::maxStack(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, Json, std::optional<bool>>("matches", std::bind(ItemCallbacks::matches, std::ref(item), std::placeholders::_1, std::placeholders::_2)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool, Json, std::optional<bool>>(
+        "matches",
+        [&item](Json const& descriptor, std::optional<bool> exactMatch) {
+          return ItemCallbacks::matches(item, descriptor, exactMatch);
+        });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, std::size_t>("consume", std::bind(ItemCallbacks::consume, std::ref(item), std::placeholders::_1)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool, std::size_t>(
+        "consume", [&item](std::size_t count) { return ItemCallbacks::consume(item, count); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>("empty", std::bind(ItemCallbacks::empty, std::ref(item))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<bool>("empty", [&item]() { return ItemCallbacks::empty(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("descriptor", std::bind(ItemCallbacks::descriptor, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "descriptor", [&item]() { return ItemCallbacks::descriptor(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("description", std::bind(ItemCallbacks::description, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "description", [&item]() { return ItemCallbacks::description(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("friendlyName", std::bind(ItemCallbacks::friendlyName, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "friendlyName", [&item]() { return ItemCallbacks::friendlyName(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<int>("rarity", std::bind(ItemCallbacks::rarity, std::ref(item))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<int>("rarity", [&item]() { return ItemCallbacks::rarity(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("rarityString", std::bind(ItemCallbacks::rarityString, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "rarityString", [&item]() { return ItemCallbacks::rarityString(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::size_t>("price", std::bind(ItemCallbacks::price, std::ref(item))); !registration)
+  if (auto registration =
+        callbacks.registerCallbackWithSignature<std::size_t>("price", [&item]() { return ItemCallbacks::price(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("fuelAmount", std::bind(ItemCallbacks::fuelAmount, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "fuelAmount", [&item]() { return ItemCallbacks::fuelAmount(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("iconDrawables", std::bind(ItemCallbacks::iconDrawables, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "iconDrawables", [&item]() { return ItemCallbacks::iconDrawables(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("dropDrawables", std::bind(ItemCallbacks::dropDrawables, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "dropDrawables", [&item]() { return ItemCallbacks::dropDrawables(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("largeImage", std::bind(ItemCallbacks::largeImage, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "largeImage", [&item]() { return ItemCallbacks::largeImage(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("tooltipKind", std::bind(ItemCallbacks::tooltipKind, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "tooltipKind", [&item]() { return ItemCallbacks::tooltipKind(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("category", std::bind(ItemCallbacks::category, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "category", [&item]() { return ItemCallbacks::category(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>("pickupSound", std::bind(ItemCallbacks::pickupSound, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+        "pickupSound", [&item]() { return ItemCallbacks::pickupSound(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>("twoHanded", std::bind(ItemCallbacks::twoHanded, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+        "twoHanded", [&item]() { return ItemCallbacks::twoHanded(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<float>("timeToLive", std::bind(ItemCallbacks::timeToLive, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<float>(
+        "timeToLive", [&item]() { return ItemCallbacks::timeToLive(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("learnBlueprintsOnPickup", std::bind(ItemCallbacks::learnBlueprintsOnPickup, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "learnBlueprintsOnPickup", [&item]() { return ItemCallbacks::learnBlueprintsOnPickup(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, String>("hasItemTag", std::bind(ItemCallbacks::hasItemTag, std::ref(item), std::placeholders::_1)); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<bool, String>(
+        "hasItemTag", [&item](String const& tag) { return ItemCallbacks::hasItemTag(item, tag); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json>("pickupQuestTemplates", std::bind(ItemCallbacks::pickupQuestTemplates, std::ref(item))); !registration)
+  if (auto registration = callbacks.registerCallbackWithSignature<Json>(
+        "pickupQuestTemplates", [&item]() { return ItemCallbacks::pickupQuestTemplates(item); });
+      !registration)
     return std::unexpected(std::move(registration.error()));
 
   return callbacks;
@@ -240,9 +293,7 @@ String LuaBindings::ItemCallbacks::friendlyName(Item& item) {
 // Essential = 4
 //
 // @return an integer representing the rarity of the item
-int LuaBindings::ItemCallbacks::rarity(Item& item) {
-  return (int)item.rarity();
-}
+int LuaBindings::ItemCallbacks::rarity(Item& item) { return static_cast<int>(item.rarity()); }
 
 // Returns the rarity of the item as a string
 //

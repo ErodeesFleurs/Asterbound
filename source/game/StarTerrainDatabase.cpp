@@ -84,7 +84,7 @@ TerrainSelectorParameters TerrainSelectorParameters::withCommonality(float commo
 TerrainSelector::TerrainSelector(String type, Json config, TerrainSelectorParameters parameters)
   : type(std::move(type)), config(std::move(config)), parameters(std::move(parameters)) {}
 
-TerrainSelector::~TerrainSelector() {}
+TerrainSelector::~TerrainSelector() = default;
 
 TerrainDatabase::TerrainDatabase(ConstructionKey, RandomService& random) : m_random(random) {}
 
@@ -115,7 +115,7 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
           selectorType = std::move(*configuredType);
         }
         if (result->m_terrainSelectors.contains(*name))
-          return std::unexpected(TerrainException(strf("Duplicate {}terrain generator name '{}'", composed ? "composed " : "", *name)));
+          return std::unexpected(TerrainException(Star::format("Duplicate {}terrain generator name '{}'", composed ? "composed " : "", *name)));
         result->m_terrainSelectors[*name] = {std::move(selectorType), std::move(*parameters)};
         return {};
       }();
@@ -136,9 +136,9 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
 }
 
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::createNamedSelector(String const& name, TerrainSelectorParameters const& parameters) const {
-  if (auto config = m_terrainSelectors.maybeRef(name))
+  if (auto config = m_terrainSelectors.find_ref(name))
     return createSelectorType(config->get().type, config->get().parameters, parameters);
-  return std::unexpected(TerrainException(strf("No such terrain selector '{}'", name)));
+  return std::unexpected(TerrainException(Star::format("No such terrain selector '{}'", name)));
 }
 
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::constantSelector(float value) {
@@ -201,7 +201,7 @@ std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainData
     return RidgeBlocksSelector::create(config, parameters);
   else if (type == CacheSelector::Name)
     return CacheSelector::create(config, parameters, *this);
-  return std::unexpected(TerrainException(strf("Unknown terrain selector type '{}'", type)));
+  return std::unexpected(TerrainException(Star::format("Unknown terrain selector type '{}'", type)));
 }
 
 }

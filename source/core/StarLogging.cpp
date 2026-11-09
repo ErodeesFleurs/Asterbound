@@ -22,7 +22,7 @@ namespace Star {
 LogSink::LogSink()
   : m_level(LogLevel::Info) {}
 
-LogSink::~LogSink() {}
+LogSink::~LogSink() = default;
 
 void LogSink::setLevel(LogLevel level) {
   m_level = level;
@@ -37,8 +37,7 @@ std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogL
   auto name = enumName<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  coutf("[{}] {}\n", *name, msg);
-  return {};
+  return Star::print("[{}] {}\n", *name, msg);
 }
 
 std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
@@ -61,7 +60,7 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
   auto name = enumName<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto line = strf("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
+  auto line = Star::format("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
   auto written = m_output->write(line);
   if (!written)
     return std::unexpected(std::move(written.error()));
@@ -95,7 +94,7 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
       if (l->level() <= level) {
         auto result = l->log(msg, level);
         if (!result)
-          return std::unexpected(std::move(result.error()).withContext(strf("While writing log message: {}", msg)));
+          return std::unexpected(std::move(result.error()).with_context(Star::format("While writing log message: {}", msg)));
       }
     }
   }
@@ -105,11 +104,11 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
 std::expected<void, StarException> Logger::logException(
     LogLevel level, std::string_view operation, ExceptionDiagnostic const& diagnostic) {
   if (loggable(level)) {
-    if (auto result = logf(level, "{}: {}", operation, exceptionSummary(diagnostic)); !result)
+    if (auto result = logf(level, "{}: {}", operation, Star::exception_summary(diagnostic)); !result)
       return std::unexpected(std::move(result.error()));
   }
   if (loggable(LogLevel::Debug))
-    return debug("{} details:\n{}", operation, outputException(diagnostic, true));
+    return debug("{} details:\n{}", operation, Star::output_exception(diagnostic, true));
   return {};
 }
 
@@ -136,8 +135,8 @@ bool Logger::loggable(LogLevel level) {
 }
 
 void EmergencyLog::log(LogLevel, std::string_view message) {
-  std::fwrite(message.data(), 1, message.size(), stderr);
-  std::fputc('\n', stderr);
+  if (!Star::println(stderr, "{}", message))
+    std::_Exit(1);
 }
 
 String LogMap::getValue(String const& key) {
@@ -173,7 +172,7 @@ void SpatialLogger::logPoly(std::string_view space, PolyF const& poly, Vec4B con
 
   for (std::size_t i = 0; i < poly.sides(); ++i) {
     auto side = poly.side(i);
-    lines.append(Line{side.min(), side.max(), color});
+    lines.push_back(Line{.begin = side.min(), .end = side.max(), .color = color});
   }
 
   while (lines.size() > MaximumLines)
@@ -186,7 +185,7 @@ void SpatialLogger::logLine(std::string_view space, Line2F const& line, Vec4B co
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
 
-  lines.append(Line{line.min(), line.max(), color});
+  lines.push_back(Line{.begin = line.min(), .end = line.max(), .color = color});
 
   while (lines.size() > MaximumLines)
     lines.erase(lines.begin());
@@ -198,7 +197,7 @@ void SpatialLogger::logLine(std::string_view space, Vec2F const& begin, Vec2F co
   std::lock_guard locker(s_mutex);
   auto& lines = s_lines[space];
 
-  lines.append(Line{begin, end, color});
+  lines.push_back(Line{.begin = begin, .end = end, .color = color});
 
   while (lines.size() > MaximumLines)
     lines.erase(lines.begin());
@@ -210,7 +209,7 @@ void SpatialLogger::logPoint(std::string_view space, Vec2F const& position, Vec4
   std::lock_guard locker(s_mutex);
   auto& points = s_points[space];
 
-  points.append(Point{position, color});
+  points.push_back(Point{.position = position, .color = color});
   while (points.size() > MaximumPoints)
     points.erase(points.begin());
 }
@@ -221,7 +220,7 @@ void SpatialLogger::logText(std::string_view space, String text, Vec2F const& po
   std::lock_guard locker(s_mutex);
   auto& texts = s_logText[space];
 
-  texts.append(LogText{text, position, color});
+  texts.push_back(LogText{.text = std::move(text), .position = position, .color = color});
 
   while (texts.size() > MaximumText)
     texts.erase(texts.begin());
@@ -230,7 +229,7 @@ void SpatialLogger::logText(std::string_view space, String text, Vec2F const& po
 Deque<SpatialLogger::Line> SpatialLogger::getLines(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_lines[space]);
+    return std::exchange(s_lines[space], {});
   else
     return s_lines[space];
 }
@@ -238,7 +237,7 @@ Deque<SpatialLogger::Line> SpatialLogger::getLines(std::string_view space, bool 
 Deque<SpatialLogger::Point> SpatialLogger::getPoints(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_points[space]);
+    return std::exchange(s_points[space], {});
   else
     return s_points[space];
 }
@@ -246,7 +245,7 @@ Deque<SpatialLogger::Point> SpatialLogger::getPoints(std::string_view space, boo
 Deque<SpatialLogger::LogText> SpatialLogger::getText(std::string_view space, bool andClear) {
   std::lock_guard locker(s_mutex);
   if (andClear)
-    return take(s_logText[space]);
+    return std::exchange(s_logText[space], {});
   else
     return s_logText[space];
 }

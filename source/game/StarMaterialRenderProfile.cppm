@@ -28,7 +28,9 @@ struct MaterialRenderProfileExceptionTag {
 using MaterialRenderProfileException = StarError<MaterialRenderProfileExceptionTag, StarException>;
 
 enum class MaterialJoinType : std::uint8_t { All, Any };
-extern std::expected<EnumMap<MaterialJoinType>, StarException> const MaterialJoinTypeNames;
+inline constexpr auto MaterialJoinTypeNames =
+  sortedEnumNames(std::to_array<std::pair<MaterialJoinType, std::string_view>>(
+    {{MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}}));
 
 struct MaterialRule {
   struct RuleEmpty {};
@@ -56,7 +58,7 @@ struct MaterialRule {
   MaterialJoinType join;
   List<RuleEntry> entries;
 };
-typedef StringMap<std::shared_ptr<MaterialRule const>> RuleMap;
+using RuleMap = StringMap<std::shared_ptr<MaterialRule const>>;
 
 struct MaterialMatchPoint {
   Vec2I position;
@@ -73,7 +75,7 @@ struct MaterialRenderPiece {
 
 struct MaterialRenderMatch;
 
-typedef List<std::shared_ptr<MaterialRenderMatch const>> MaterialRenderMatchList;
+using MaterialRenderMatchList = List<std::shared_ptr<MaterialRenderMatch const>>;
 
 struct MaterialRenderMatch {
   List<MaterialMatchPoint> matchPoints;
@@ -88,8 +90,8 @@ struct MaterialRenderMatch {
   bool haltOnSubMatch;
 };
 
-typedef StringMap<std::shared_ptr<MaterialRenderPiece const>> PieceMap;
-typedef StringMap<MaterialRenderMatchList> MatchMap;
+using PieceMap = StringMap<std::shared_ptr<MaterialRenderPiece const>>;
+using MatchMap = StringMap<MaterialRenderMatchList>;
 
 // This is the maximum distance in either X or Y that material neighbor rules
 // are limited to.  This can be used as a maximum limit on the "sphere of

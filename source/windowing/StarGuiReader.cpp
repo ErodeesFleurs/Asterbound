@@ -116,7 +116,7 @@ std::expected<WidgetConstructResult, StarException> GuiReader::paneFeatureHandle
     return std::unexpected(std::move(anchorName.error()));
   if (!PaneAnchorNames)
     return std::unexpected(PaneAnchorNames.error());
-  auto anchor = PaneAnchorNames->getLeft(*anchorName);
+  auto anchor = PaneAnchorNames->get_left(*anchorName);
   if (!anchor)
     return std::unexpected(std::move(anchor.error()));
   pane->setAnchor(anchor->get());

@@ -16,7 +16,7 @@ namespace JsonPath {
     Object
   };
 
-  typedef std::function<std::expected<TypeHint, StarException>(String&, String const&, Utf8Cursor&)> PathParser;
+  using PathParser = std::function<std::expected<TypeHint, StarException>(String&, String const&, Utf8Cursor&)>;
 
   struct ParsingExceptionTag {
     static constexpr std::string_view name() { return "ParsingException"; }
@@ -156,16 +156,16 @@ namespace JsonPath {
     if (!parser)
       return std::unexpected(ParsingException("Cannot invoke an empty Json path parser"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     Utf8Cursor cursor(path.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto parsed = parser(buffer, path, cursor);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       if (value.type() == Json::Type::Array) {
         if (buffer == "-")
           return std::unexpected(TraversalException::format("Tried to get key '{}' in non-object type in pathGet(\"{}\")", buffer, path));
-        auto i = maybeLexicalCast<std::size_t>(buffer);
+        auto i = maybe_lexical_cast<std::size_t>(buffer);
         if (!i)
           return std::unexpected(TraversalException::format("Cannot parse '{}' as index in pathGet(\"{}\")", buffer, path));
         auto size = value.size();
@@ -210,16 +210,16 @@ namespace JsonPath {
     if (!parser)
       return std::unexpected(ParsingException("Cannot invoke an empty Json path parser"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     Utf8Cursor cursor(path.utf8());
-    while (!cursor.atEnd()) {
+    while (!cursor.at_end()) {
       auto parsed = parser(buffer, path, cursor);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       if (value.type() == Json::Type::Array) {
         if (buffer == "-")
           return std::optional<Jsonlike>{};
-        auto i = maybeLexicalCast<std::size_t>(buffer);
+        auto i = maybe_lexical_cast<std::size_t>(buffer);
         if (!i)
           return std::optional<Jsonlike>{};
         auto size = value.size();
@@ -252,16 +252,16 @@ namespace JsonPath {
   std::expected<Jsonlike, StarException> pathApply(String& buffer, Jsonlike const& value, PathParser const& parser,
                                                    String const& path, Utf8Cursor const current,
                                                    JsonOp<Jsonlike> const& op) {
-    if (current.atEnd())
+    if (current.at_end())
       return op(value, {});
     auto cursor = current;
     auto parsed = parser(buffer, path, cursor);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     if (value.type() == Json::Type::Array) {
-      if (cursor.atEnd())
+      if (cursor.at_end())
         return op(value, buffer);
-      auto i = maybeLexicalCast<std::size_t>(buffer);
+      auto i = maybe_lexical_cast<std::size_t>(buffer);
       if (!i)
         return std::unexpected(TraversalException::format("Cannot parse '{}' as index in pathApply(\"{}\")", buffer, path));
       if constexpr (std::same_as<Jsonlike, Json>) {
@@ -291,7 +291,7 @@ namespace JsonPath {
         return value.set(*i, std::move(*changed));
       }
     } else if (value.type() == Json::Type::Object) {
-      if (cursor.atEnd())
+      if (cursor.at_end())
         return op(value, buffer);
       if constexpr (std::same_as<Jsonlike, Json>) {
         auto child = value.find(buffer);
@@ -330,7 +330,7 @@ namespace JsonPath {
     if (!op)
       return std::unexpected(TraversalException("Cannot invoke an empty Json path operation"));
     String buffer;
-    buffer.reserve(path.utf8Size());
+    buffer.reserve(path.utf8_size());
     return pathApply(buffer, base, parser, path, Utf8Cursor(path.utf8()), op);
   }
 
@@ -347,7 +347,7 @@ namespace JsonPath {
           return std::unexpected(TraversalException("Cannot invoke an empty Json array operation"));
         if (*key == "-")
           return arrayOp(parent, {});
-        auto i = maybeLexicalCast<std::size_t>(*key);
+        auto i = maybe_lexical_cast<std::size_t>(*key);
         if (!i)
           return std::unexpected(TraversalException::format("Cannot parse '{}' as index in Json path \"{}\"", *key, path));
         auto size = parent.size();

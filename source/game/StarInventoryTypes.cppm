@@ -1,6 +1,7 @@
 module;
 import std;
 import star.format;
+import star.text_formatter;
 import star.string;
 import star.json;
 
@@ -34,9 +35,9 @@ enum class EquipmentSlot : std::uint8_t {
 };
 extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotNames;
 
-typedef std::pair<String, std::uint8_t> BagSlot;
+using BagSlot = std::pair<String, std::uint8_t>;
 
-// Keep native wrappers so SwapSlot can declare precise stream ADL.
+// Keep native wrappers so SwapSlot can declare precise text ADL.
 template <typename BaseType> struct TrashSlotWrapper;
   template <typename BaseType>
   struct SwapSlotWrapper : BaseType {
@@ -64,84 +65,80 @@ template <typename BaseType> struct TrashSlotWrapper;
 
     template <class Arg>
     SwapSlotWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-              || std::is_same<SwapSlotWrapper, typename std::decay<Arg>::type>::value,
-          "SwapSlot can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<SwapSlotWrapper, std::decay_t<Arg>>,
+                    "SwapSlot can not implicitly be assigned from std::monostate-derived classes or strong "
+                    "std::monostate typedefs");
 
       BaseType::operator=(std::forward<Arg>(other));
       return *this;
     }
-    friend std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& ostream,
+    friend std::expected<void, StarException> write_text(TextBuffer& output,
         std::variant<EquipmentSlot, BagSlot, SwapSlotWrapper<std::monostate>, TrashSlotWrapper<std::monostate>> const& slot);
   };
-  typedef SwapSlotWrapper<std::monostate> SwapSlot;
-template <typename BaseType>
-struct TrashSlotWrapper : BaseType {
-  using BaseType::BaseType;
+  using SwapSlot = SwapSlotWrapper<std::monostate>;
+  template <typename BaseType> struct TrashSlotWrapper : BaseType {
+    using BaseType::BaseType;
 
-  TrashSlotWrapper() : BaseType() {}
+    TrashSlotWrapper() : BaseType() {}
 
-  TrashSlotWrapper(TrashSlotWrapper const& nt) : BaseType(nt) {}
+    TrashSlotWrapper(TrashSlotWrapper const& nt) : BaseType(nt) {}
 
-  TrashSlotWrapper(TrashSlotWrapper&& nt) : BaseType(std::move(nt)) {}
+    TrashSlotWrapper(TrashSlotWrapper&& nt) : BaseType(std::move(nt)) {}
 
-  explicit TrashSlotWrapper(BaseType const& bt) : BaseType(bt) {}
+    explicit TrashSlotWrapper(BaseType const& bt) : BaseType(bt) {}
 
-  explicit TrashSlotWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
+    explicit TrashSlotWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
 
-  TrashSlotWrapper& operator=(TrashSlotWrapper const& rhs) {
-    BaseType::operator=(rhs);
-    return *this;
-  }
+    TrashSlotWrapper& operator=(TrashSlotWrapper const& rhs) {
+      BaseType::operator=(rhs);
+      return *this;
+    }
 
-  TrashSlotWrapper& operator=(TrashSlotWrapper&& rhs) {
-    BaseType::operator=(std::move(rhs));
-    return *this;
-  }
+    TrashSlotWrapper& operator=(TrashSlotWrapper&& rhs) {
+      BaseType::operator=(std::move(rhs));
+      return *this;
+    }
 
-  template <class Arg>
-  TrashSlotWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of<BaseType, typename std::decay<Arg>::type>::value == false
-            || std::is_same<TrashSlotWrapper, typename std::decay<Arg>::type>::value,
-        "TrashSlot can not implicitly be assigned from std::monostate-derived classes or strong std::monostate typedefs");
+    template <class Arg> TrashSlotWrapper& operator=(Arg&& other) {
+      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
+                      || std::is_same_v<TrashSlotWrapper, std::decay_t<Arg>>,
+                    "TrashSlot can not implicitly be assigned from std::monostate-derived classes or strong "
+                    "std::monostate typedefs");
 
-    BaseType::operator=(std::forward<Arg>(other));
-    return *this;
-  }
-};
-typedef TrashSlotWrapper<std::monostate> TrashSlot;
+      BaseType::operator=(std::forward<Arg>(other));
+      return *this;
+    }
+  };
+  using TrashSlot = TrashSlotWrapper<std::monostate>;
 
-// Any manageable location in the player inventory can be pointed to by an
-// InventorySlot
-typedef std::variant<EquipmentSlot, BagSlot, SwapSlot, TrashSlot> InventorySlot;
+  // Any manageable location in the player inventory can be pointed to by an
+  // InventorySlot
+  using InventorySlot = std::variant<EquipmentSlot, BagSlot, SwapSlot, TrashSlot>;
 
-[[nodiscard]] std::expected<InventorySlot, StarException> jsonToInventorySlot(Json const& json);
-[[nodiscard]] std::expected<Json, StarException> jsonFromInventorySlot(InventorySlot const& slot);
+  [[nodiscard]] std::expected<InventorySlot, StarException> jsonToInventorySlot(Json const& json);
+  [[nodiscard]] std::expected<Json, StarException> jsonFromInventorySlot(InventorySlot const& slot);
 
-[[nodiscard]] std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& ostream, InventorySlot const& slot);
+  [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, InventorySlot const& slot);
 
-// Special items in the player inventory that are not generally manageable
-enum class EssentialItem : std::uint8_t {
-  BeamAxe = 0,
-  WireTool = 1,
-  PaintTool = 2,
-  InspectionTool = 3
-};
-extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemNames;
+  // Special items in the player inventory that are not generally manageable
+  enum class EssentialItem : std::uint8_t { BeamAxe = 0, WireTool = 1, PaintTool = 2, InspectionTool = 3 };
+  extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemNames;
 
-// A player's action bar is a collection of custom item shortcuts, and special
-// hard coded shortcuts to the essential items.  There is one location selected
-// at a time, which is either an entry on the custom bar, or one of the
-// essential items, or nothing.
-typedef std::uint8_t CustomBarIndex;
-typedef std::variant<std::monostate, CustomBarIndex, EssentialItem> SelectedActionBarLocation;
+  // A player's action bar is a collection of custom item shortcuts, and special
+  // hard coded shortcuts to the essential items.  There is one location selected
+  // at a time, which is either an entry on the custom bar, or one of the
+  // essential items, or nothing.
+  using CustomBarIndex = std::uint8_t;
+  using SelectedActionBarLocation = std::variant<std::monostate, CustomBarIndex, EssentialItem>;
 
-[[nodiscard]] std::expected<SelectedActionBarLocation, StarException> jsonToSelectedActionBarLocation(Json const& json);
-[[nodiscard]] std::expected<Json, StarException> jsonFromSelectedActionBarLocation(SelectedActionBarLocation const& location);
+  [[nodiscard]] std::expected<SelectedActionBarLocation, StarException>
+  jsonToSelectedActionBarLocation(Json const& json);
+  [[nodiscard]] std::expected<Json, StarException>
+  jsonFromSelectedActionBarLocation(SelectedActionBarLocation const& location);
 
-inline constexpr std::uint8_t EquipmentSize = 8;
-inline constexpr std::uint8_t EssentialItemCount = 4;
-
+  inline constexpr std::uint8_t EquipmentSize = 8;
+  inline constexpr std::uint8_t EssentialItemCount = 4;
 }
 
 export module star.inventory_types;
@@ -165,4 +162,5 @@ export namespace Star {
   using ::Star::jsonFromSelectedActionBarLocation;
   using ::Star::EquipmentSize;
   using ::Star::EssentialItemCount;
+  using ::Star::write_text;
 }

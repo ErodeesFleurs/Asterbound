@@ -23,7 +23,7 @@ unsigned DataStream::streamCompatibilityVersion() const { return m_streamCompati
 void DataStream::setStreamCompatibilityVersion(unsigned version) { m_streamCompatibilityVersion = version; }
 void DataStream::setStreamCompatibilityVersion(NetCompatibilityRules const& rules) { m_streamCompatibilityVersion = rules.version(); }
 
-std::expected<ByteArray, StarException> DataStream::readBytes(std::size_t len) {
+std::expected<ByteArray, StarException> DataStream::read_bytes(std::size_t len) {
   if (len > std::size_t(std::numeric_limits<std::ptrdiff_t>::max()))
     return std::unexpected(DataStreamException("Byte stream request exceeds addressable size"));
   ByteArray bytes;
@@ -32,9 +32,7 @@ std::expected<ByteArray, StarException> DataStream::readBytes(std::size_t len) {
   if (!result) return std::unexpected(std::move(result.error()));
   return bytes;
 }
-std::expected<void, StarException> DataStream::writeBytes(ByteArray const& bytes) {
-  return writeData(bytes.span());
-}
+std::expected<void, StarException> DataStream::write_bytes(ByteArray const& bytes) { return writeData(bytes.span()); }
 
 namespace {
 template <typename T>
@@ -55,7 +53,9 @@ std::expected<std::reference_wrapper<DataStream>, StarException> readNumber(Data
 }
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(bool value) { return writeNumber(*this, (std::uint8_t)value); }
+std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(bool value) {
+  return writeNumber(*this, static_cast<std::uint8_t>(value));
+}
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(char value) { return writeNumber(*this, value); }
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(std::int8_t value) { return writeNumber(*this, value); }
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator<<(std::uint8_t value) { return writeNumber(*this, value); }
@@ -195,7 +195,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::ope
   if (!length) return std::unexpected(std::move(length.error()));
   if (*length > std::uint64_t(std::numeric_limits<std::ptrdiff_t>::max()))
     return std::unexpected(DataStreamException("Serialized byte array exceeds addressable size"));
-  auto decoded = readBytes(std::size_t(*length));
+  auto decoded = read_bytes(std::size_t(*length));
   if (!decoded) return std::unexpected(std::move(decoded.error()));
   value = std::move(*decoded);
   return std::ref(*this);

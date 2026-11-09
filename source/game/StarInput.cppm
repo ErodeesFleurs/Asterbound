@@ -21,7 +21,7 @@ struct InputExceptionTag {
 };
 using InputException = StarError<InputExceptionTag, StarException>;
 
-typedef std::variant<Key, MouseButton, ControllerButton> InputVariant;
+using InputVariant = std::variant<Key, MouseButton, ControllerButton>;
 
 template <>
 struct hash<InputVariant> {
@@ -58,7 +58,7 @@ public:
     ControllerButton button = ControllerButton::Invalid;
   };
 
-  typedef std::variant<std::monostate, KeyBind, MouseBind, ControllerBind> Bind;
+  using Bind = std::variant<std::monostate, KeyBind, MouseBind, ControllerBind>;
 
   [[nodiscard]] static std::expected<Bind, StarException> bindFromJson(Json const& json);
   [[nodiscard]] static std::expected<Json, StarException> bindToJson(Bind const& bind);
@@ -143,7 +143,7 @@ public:
     List<Vec2F> releasePositions;
   };
 
-  typedef InputState ControllerInputState;
+  using ControllerInputState = InputState;
 
   [[nodiscard]] static std::expected<std::shared_ptr<Input>, StarException> create(Root& root);
   ~Input();

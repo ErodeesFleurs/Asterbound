@@ -69,8 +69,8 @@ private:
       return std::unexpected(std::move(audio.error()));
     (*audio)->setLoops(loops.value_or(0));
     (*audio)->setVolume(volume.value_or(1.0f));
-    self.m_pendingAudios.append(*audio);
-    self.m_activeAudio.append(*audio);
+    self.m_pendingAudios.push_back(*audio);
+    self.m_activeAudio.push_back(*audio);
     return audio;
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -82,7 +82,7 @@ private:
     if (!particle)
       return std::unexpected(std::move(particle.error()));
     particle->translate(position.value_or(Vec2F{}));
-    self.m_pendingParticles.append(std::move(*particle));
+    self.m_pendingParticles.push_back(std::move(*particle));
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -98,7 +98,7 @@ private:
     }
     if (std::holds_alternative<Drawable::ImagePart>(drawable.part))
       std::get<Drawable::ImagePart>(drawable.part).transformation.scale(0.125f);
-    self.m_drawables.append({std::move(drawable), layer});
+    self.m_drawables.push_back({std::move(drawable), layer});
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -118,7 +118,7 @@ private:
     }
     if (std::holds_alternative<Drawable::ImagePart>(drawable->part))
       std::get<Drawable::ImagePart>(drawable->part).transformation.scale(0.125f);
-    self.m_drawables.append({std::move(*drawable), layer});
+    self.m_drawables.push_back({std::move(*drawable), layer});
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -143,7 +143,12 @@ private:
     auto ambience = table.get<std::optional<float>>("beamAmbience");
     if (!ambience)
       return std::unexpected(std::move(ambience.error()));
-    self.m_lightSources.append({*position, color->toRgbF(), (LightType)point->value_or(false), beam->value_or(float{}), angle->value_or(float{}), ambience->value_or(float{})});
+    self.m_lightSources.push_back({.position = *position,
+                                   .color = color->toRgbF(),
+                                   .type = static_cast<LightType>(point->value_or(false)),
+                                   .pointBeam = beam->value_or(float{}),
+                                   .beamAngle = angle->value_or(float{}),
+                                   .beamAmbience = ambience->value_or(float{})});
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -154,11 +159,11 @@ inline List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& LuaScr
 
 inline List<LightSource> const& LuaScriptAnimation::lightSources() { return m_lightSources; }
 
-inline List<Particle> LuaScriptAnimation::pullNewParticles() { return take(m_pendingParticles); }
+inline List<Particle> LuaScriptAnimation::pullNewParticles() { return std::exchange(m_pendingParticles, {}); }
 
 inline List<std::shared_ptr<AudioInstance>> LuaScriptAnimation::pullNewAudios() {
   m_activeAudio.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
-  return take(m_pendingAudios);
+  return std::exchange(m_pendingAudios, {});
 }
 
 inline void LuaScriptAnimation::contextShutdown() {

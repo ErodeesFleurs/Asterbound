@@ -55,14 +55,6 @@ std::size_t const DefinitionsCacheSize = 20;
 
 namespace Dungeon {
 
-  extern std::expected<EnumMap<Dungeon::Direction>, StarException> const DungeonDirectionNames = EnumMap<Dungeon::Direction>::create({
-      {Dungeon::Direction::Left, "left"},
-      {Dungeon::Direction::Right, "right"},
-      {Dungeon::Direction::Up, "up"},
-      {Dungeon::Direction::Down, "down"},
-      {Dungeon::Direction::Unknown, "unknown"},
-      {Dungeon::Direction::Any, "any"},
-  });
 
   [[nodiscard]] std::expected<Direction, StarException> flipDirection(Direction direction) {
     if (direction == Direction::Left) return Direction::Right;
@@ -85,7 +77,7 @@ namespace Dungeon {
     if (variant == 4)
       return Biome4MaterialId;
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((variant == 5));
+      Star::star_assert_failed((variant == 5));
     }
     return Biome5MaterialId;
   }
@@ -97,10 +89,11 @@ namespace Dungeon {
     float pick = rnd.randf() * distribution;
     for (std::size_t i = 0; i < options.size(); i++) {
       pick -= options[i]->part().chance();
-      if (pick <= 0) return options.takeAt(i);
+      if (pick <= 0)
+        return options.take_at(i);
     }
     // Preserve the final-option float rounding fallback.
-    return options.takeAt(options.size() - 1);
+    return options.take_at(options.size() - 1);
   }
 
   std::expected<std::shared_ptr<MaxSpawnCountRule>, StarException> MaxSpawnCountRule::create(Json const& rule) {
@@ -421,7 +414,7 @@ namespace Dungeon {
     for (auto const& option : *options) {
       auto parsed = Brush::parse(root, option);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      result->m_brushes.append(std::move(*parsed));
+      result->m_brushes.push_back(std::move(*parsed));
     }
     result->m_seed = root.random().randi64();
     return result;
@@ -429,7 +422,7 @@ namespace Dungeon {
 
   std::expected<void, StarException> RandomBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (m_brushes.empty()) return std::unexpected(DungeonException("Random brush has no options"));
-    std::size_t rnd = (std::size_t)staticRandomI32(m_seed, position[0], position[1]);
+    std::size_t rnd = static_cast<std::size_t>(static_random_i32(m_seed, position[0], position[1]));
     return m_brushes[rnd % m_brushes.size()]->paint(position, phase, writer);
   }
 
@@ -448,7 +441,7 @@ namespace Dungeon {
 
   FrontBrush::FrontBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
     m_material = material;
-    m_mod = mod;
+    m_mod = std::move(mod);
     m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
     m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
     m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
@@ -476,7 +469,7 @@ namespace Dungeon {
 
   BackBrush::BackBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
     m_material = material;
-    m_mod = mod;
+    m_mod = std::move(mod);
     m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
     m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
     m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
@@ -603,7 +596,7 @@ namespace Dungeon {
 
   SurfaceBrush::SurfaceBrush(std::optional<int> variant, std::optional<String> mod) {
     m_variant = variant.value_or(0);
-    m_mod = mod;
+    m_mod = std::move(mod);
   }
 
   std::expected<void, StarException> SurfaceBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
@@ -627,7 +620,7 @@ namespace Dungeon {
 
   SurfaceBackgroundBrush::SurfaceBackgroundBrush(std::optional<int> variant, std::optional<String> mod) {
     m_variant = variant.value_or(0);
-    m_mod = mod;
+    m_mod = std::move(mod);
   }
 
   std::expected<void, StarException> SurfaceBackgroundBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
@@ -673,7 +666,7 @@ namespace Dungeon {
     return {};
   }
 
-  InvalidBrush::InvalidBrush(std::optional<String> nameHint) : m_nameHint(nameHint) {}
+  InvalidBrush::InvalidBrush(std::optional<String> nameHint) : m_nameHint(std::move(nameHint)) {}
 
   std::expected<void, StarException> InvalidBrush::paint(Vec2I, Phase, DungeonGeneratorWriter& writer) const {
     if (m_nameHint) return writer.root().logger().error("Invalid tile '{}'", *m_nameHint);
@@ -701,7 +694,7 @@ namespace Dungeon {
   }
 
   bool Tile::usesPlaces() const {
-    if (brushes.size() == 0)
+    if (brushes.empty())
       return false;
     for (std::size_t i = 0; i < rules.size(); i++)
       if (rules[i]->overdrawable())
@@ -709,9 +702,7 @@ namespace Dungeon {
     return true;
   }
 
-  bool Tile::modifiesPlaces() const {
-    return brushes.size() != 0;
-  }
+  bool Tile::modifiesPlaces() const { return !brushes.empty(); }
 
   bool Tile::collidesWithPlaces() const {
     return usesPlaces();
@@ -794,7 +785,7 @@ namespace Dungeon {
     if (assetDefinitions->type() == Json::Type::String) {
       auto asset = assetDefinitions->toString();
       if (!asset) return std::unexpected(std::move(asset.error()));
-      auto loaded = reader->readAsset(AssetPath::relativeTo(dungeon.directory(), *asset));
+      auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
       if (!loaded) return std::unexpected(std::move(loaded.error()));
     } else {
       auto assets = assetDefinitions->iterateArray();
@@ -802,7 +793,7 @@ namespace Dungeon {
       for (auto const& definition : *assets) {
         auto asset = definition.toString();
         if (!asset) return std::unexpected(std::move(asset.error()));
-        auto loaded = reader->readAsset(AssetPath::relativeTo(dungeon.directory(), *asset));
+        auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
         if (!loaded) return std::unexpected(std::move(loaded.error()));
       }
     }
@@ -988,7 +979,7 @@ namespace Dungeon {
     int dya = position[1];
     int dyb = size[1] - position[1];
 
-    int m = std::min(std::min(dxa, dxb), std::min(dya, dyb));
+    int m = std::min({dxa, dxb, dya, dyb});
     if (dxa == m)
       return Direction::Left;
     if (dxb == m)
@@ -1003,9 +994,11 @@ namespace Dungeon {
   std::expected<Direction, StarException> Part::pickByNeighbours(Vec2I pos) const {
     int x = pos.x(), y = pos.y();
     if (x == 0) return Direction::Left;
-    if (x == (int)size().x() - 1) return Direction::Right;
+    if (x == static_cast<int>(size().x()) - 1)
+      return Direction::Right;
     if (y == 0) return Direction::Down;
-    if (y == (int)size().y() - 1) return Direction::Up;
+    if (y == static_cast<int>(size().y()) - 1)
+      return Direction::Up;
     // Preserve the directional scan order and short-circuit tile inspection.
     for (auto const& check : {std::pair{Vec2I{1, 0}, Direction::Left}, std::pair{Vec2I{-1, 0}, Direction::Right},
         std::pair{Vec2I{0, 1}, Direction::Down}, std::pair{Vec2I{0, -1}, Direction::Up}}) {
@@ -1034,13 +1027,15 @@ namespace Dungeon {
           if (!picked) return std::unexpected(std::move(picked.error()));
           direction = *picked;
         }
-        auto logged = this->root().logger().debug("Found connector on {} at {} group {} direction {}", m_name, position, tile.connector->value, (int)direction);
+        auto logged = this->root().logger().debug("Found connector on {} at {} group {} direction {}", m_name, position,
+                                                  tile.connector->value, static_cast<int>(direction));
         if (!logged) return std::unexpected(std::move(logged.error()));
-        m_connections.append(std::make_shared<Connector>(*this, tile.connector->value, tile.connector->forwardOnly, direction, position));
+        m_connections.push_back(
+          std::make_shared<Connector>(*this, tile.connector->value, tile.connector->forwardOnly, direction, position));
       }
       return false;
     });
-    if (!visited) return std::unexpected(DungeonException(strf("Exception in connector {}", m_name), ExceptionDiagnostic(visited.error())));
+    if (!visited) return std::unexpected(DungeonException(Star::format("Exception in connector {}", m_name), ExceptionDiagnostic(visited.error())));
     return {};
   }
 
@@ -1058,26 +1053,26 @@ namespace Dungeon {
           cc++;
         }
         if (tile.requiresOpen()) {
-          if ((int)y < lowestAir)
+          if (y < lowestAir)
             lowestAir = y;
         }
         if (tile.requiresSolid()) {
-          if ((int)y > highestGound)
+          if (y > highestGound)
             highestGound = y;
         }
         if (tile.requiresLiquid()) {
-          if ((int)y > highestLiquid)
+          if (y > highestLiquid)
             highestLiquid = y;
         }
         return false;
       });
-    if (!visited) return std::unexpected(DungeonException(strf("Exception in part {}", m_name), ExceptionDiagnostic(visited.error())));
+    if (!visited) return std::unexpected(DungeonException(Star::format("Exception in part {}", m_name), ExceptionDiagnostic(visited.error())));
 
     highestGound = std::max(highestGound, highestLiquid);
     if (highestGound == -1)
       highestGound = lowestAir - 1;
 
-    if (lowestAir == (int)m_size[1])
+    if (lowestAir == static_cast<int>(m_size[1]))
       lowestAir = highestGound + 1;
 
     if (cc == 0) {
@@ -1114,7 +1109,7 @@ namespace Dungeon {
   }
 
   Connector::Connector(Part const& part, String value, bool forwardOnly, Direction direction, Vec2I offset)
-    : m_value(value), m_forwardOnly(forwardOnly), m_direction(direction), m_offset(offset), m_part(part) {}
+      : m_value(std::move(value)), m_forwardOnly(forwardOnly), m_direction(direction), m_offset(offset), m_part(part) {}
 
   std::expected<bool, StarException> Connector::connectsTo(std::shared_ptr<Connector const> connector) const {
     if (m_forwardOnly)
@@ -1144,7 +1139,7 @@ namespace Dungeon {
     if (m_direction == Direction::Up)
       return Vec2I(0, 1);
     if constexpr (Star::DebugEnabled) {
-      Star::starAssertFailed((m_direction == Direction::Down));
+      Star::star_assert_failed((m_direction == Direction::Down));
     }
     return Vec2I(0, -1);
   }
@@ -1157,8 +1152,11 @@ namespace Dungeon {
     return m_offset;
   }
 
-  DungeonGeneratorWriter::DungeonGeneratorWriter(Root& root, std::shared_ptr<DungeonGeneratorWorldFacade> facade, std::optional<int> terrainMarkingSurfaceLevel, std::optional<int> terrainSurfaceSpaceExtends)
-    : m_root(root), m_facade(facade), m_terrainMarkingSurfaceLevel(terrainMarkingSurfaceLevel), m_terrainSurfaceSpaceExtends(terrainSurfaceSpaceExtends) {
+  DungeonGeneratorWriter::DungeonGeneratorWriter(Root& root, std::shared_ptr<DungeonGeneratorWorldFacade> facade,
+                                                 std::optional<int> terrainMarkingSurfaceLevel,
+                                                 std::optional<int> terrainSurfaceSpaceExtends)
+      : m_root(root), m_facade(std::move(facade)), m_terrainMarkingSurfaceLevel(terrainMarkingSurfaceLevel),
+        m_terrainSurfaceSpaceExtends(terrainSurfaceSpaceExtends) {
     m_currentBounds.setMin(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
     m_currentBounds.setMax(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
   }
@@ -1314,8 +1312,8 @@ namespace Dungeon {
   }
 
   void DungeonGeneratorWriter::finishPart() {
-    for (auto& entries : m_openLocalWires)
-      m_localWires.append(entries.second);
+    for (auto&& entries : m_openLocalWires)
+      m_localWires.push_back(entries.second);
     m_openLocalWires.clear();
 
     if (m_currentBounds.xMin() > m_currentBounds.xMax())
@@ -1337,7 +1335,7 @@ namespace Dungeon {
       auto& unpressurized = liquidPair.second;
       while (!unpressurized.empty()) {
         // Start with the first unpressurized block as the open set.
-        auto first = unpressurized.takeFirst();
+        auto first = unpressurized.take_first();
         if (!first) return std::unexpected(std::move(first.error()));
         Vec2I firstBlock = *first;
         List<Vec2I> openSet = {firstBlock};
@@ -1348,13 +1346,13 @@ namespace Dungeon {
         // the unpressurized set to the new open set and to the total contiguous
         // region, taking them from the unpressurized set.
         while (!openSet.empty()) {
-          auto oldOpenSet = take(openSet);
+          auto oldOpenSet = std::exchange(openSet, {});
           for (auto const& p : oldOpenSet) {
             for (auto dir : {Vec2I(1, 0), Vec2I(-1, 0), Vec2I(0, 1), Vec2I(0, -1)}) {
               Vec2I pos = p + dir;
               if (unpressurized.remove(pos)) {
                 contiguousRegion.add(pos);
-                openSet.append(pos);
+                openSet.push_back(pos);
               }
             }
           }
@@ -1394,19 +1392,19 @@ namespace Dungeon {
         if (bb.yMin() < *m_terrainMarkingSurfaceLevel) {
           RectI lower = bb;
           lower.setYMax(std::min(lower.yMax(), *m_terrainMarkingSurfaceLevel));
-          terrainBlendingVertexes.append(Vec2F(lower.xMin(), lower.yMin()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMax(), lower.yMin()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMin(), lower.yMax()));
-          terrainBlendingVertexes.append(Vec2F(lower.xMax(), lower.yMax()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMin()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMin()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMax()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMax()));
         }
 
         if (bb.yMax() > *m_terrainMarkingSurfaceLevel) {
           RectI upper = bb;
           upper.setYMin(std::max(upper.yMin(), *m_terrainMarkingSurfaceLevel));
-          spaceBlendingVertexes.append(Vec2F(upper.xMin(), upper.yMin()));
-          spaceBlendingVertexes.append(Vec2F(upper.xMax(), upper.yMin()));
-          spaceBlendingVertexes.append(Vec2F(upper.xMin(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
-          spaceBlendingVertexes.append(Vec2F(upper.xMax(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMin()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMin()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
         }
       }
     }
@@ -1432,7 +1430,7 @@ namespace Dungeon {
       if (auto applied = m_facade->placeObject(displace(pos), object.objectName, object.direction, object.parameters); !applied) return std::unexpected(std::move(applied.error()));
     }
 
-    for (auto entry : m_vehicles) {
+    for (auto const& entry : m_vehicles) {
       String vehicleName;
       Json parameters;
       std::tie(vehicleName, parameters) = entry.second;
@@ -1459,16 +1457,16 @@ namespace Dungeon {
       if (auto applied = m_facade->spawnStagehand(displaceF(stagehand.first), stagehand.second); !applied) return std::unexpected(std::move(applied.error()));
     }
 
-    for (auto& wires : m_globalWires) {
+    for (auto&& wires : m_globalWires) {
       List<Vec2I> wireGroup;
       for (auto& pos : wires.second)
-        wireGroup.append(displace(pos));
+        wireGroup.push_back(displace(pos));
       if (auto applied = m_facade->connectWireGroup(wireGroup); !applied) return std::unexpected(std::move(applied.error()));
     }
     for (auto& wires : m_localWires) {
       List<Vec2I> wireGroup;
       for (auto& pos : wires)
-        wireGroup.append(displace(pos));
+        wireGroup.push_back(displace(pos));
       if (auto applied = m_facade->connectWireGroup(wireGroup); !applied) return std::unexpected(std::move(applied.error()));
     }
 
@@ -1557,7 +1555,7 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     return DungeonDefinition::create(this->root(), *definition, AssetPath::directory(path));
   };
   auto result = load();
-  if (!result) return std::unexpected(DungeonException(strf("Error loading dungeon '{}'", path), ExceptionDiagnostic(result.error())));
+  if (!result) return std::unexpected(DungeonException(Star::format("Error loading dungeon '{}'", path), ExceptionDiagnostic(result.error())));
   return result;
 }
 
@@ -1731,7 +1729,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
     return std::optional<std::pair<List<RectI>, Set<Vec2I>>>();
   };
   auto result = generate();
-  if (!result) return std::unexpected(DungeonException(strf("Error generating dungeon named '{}'", name), ExceptionDiagnostic(result.error())));
+  if (!result) return std::unexpected(DungeonException(Star::format("Error generating dungeon named '{}'", name), ExceptionDiagnostic(result.error())));
   return result;
 }
 
@@ -1774,7 +1772,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
         });
 
       if (!marked) return std::unexpected(std::move(marked.error()));
-      openSet.append({std::cref(part), placePos});
+      openSet.push_back({std::cref(part), placePos});
 
       placementCounter[part.name()]++;
       piecesPlaced++;
@@ -1789,8 +1787,8 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
   Vec2I origin = basePos + Vec2I(anchor->size()) / 2;
 
   Set<Vec2I> closedConnectors;
-  while (openSet.size()) {
-    auto next = openSet.takeFirst();
+  while (!openSet.empty()) {
+    auto next = openSet.take_front();
     if (!next) return std::unexpected(std::move(next.error()));
     Dungeon::Part const& parentPart = next->first.get();
     Vec2I parentPos = next->second;
@@ -1803,7 +1801,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
       auto foundOptions = findConnectablePart(connector);
       if (!foundOptions) return std::unexpected(std::move(foundOptions.error()));
       auto options = std::move(*foundOptions);
-      while (options.size()) {
+      while (!options.empty()) {
         auto chosenOption = chooseOption(options, m_rand);
         if (!chosenOption) return std::unexpected(std::move(chosenOption.error()));
         auto option = std::move(*chosenOption);
@@ -1875,7 +1873,7 @@ std::expected<std::shared_ptr<Dungeon::Part const>, StarException> DungeonGenera
     auto const& anchor = part->get();
     if ((!anchor->minimumThreatLevel() || m_threatLevel >= *anchor->minimumThreatLevel())
         && (!anchor->maximumThreatLevel() || m_threatLevel <= *anchor->maximumThreatLevel()))
-      validAnchors.append(name);
+      validAnchors.push_back(name);
   }
   if (validAnchors.empty()) return std::shared_ptr<Dungeon::Part const>();
   auto name = m_rand.randFrom(validAnchors);
@@ -1892,7 +1890,8 @@ std::expected<List<std::shared_ptr<Dungeon::Connector const>>, StarException> Du
     for (auto const& connection : partPair.second->connections()) {
       auto connects = connection->connectsTo(connector);
       if (!connects) return std::unexpected(std::move(connects.error()));
-      if (*connects) result.append(connection);
+      if (*connects)
+        result.push_back(connection);
     }
   }
   return result;

@@ -43,7 +43,7 @@ bool settingModeValue(BoolSettingMode const& mode, bool const& setting);
 class OpenGlRenderer : public Renderer {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<OpenGlRenderer>, StarException> create(Logger& logger);
-  ~OpenGlRenderer();
+  ~OpenGlRenderer() override;
 
   String rendererId() const override;
   Vec2U screenSize() const override;
@@ -99,7 +99,7 @@ private:
 
   struct GlTextureGroup : std::enable_shared_from_this<GlTextureGroup>, public TextureGroup {
     GlTextureGroup(unsigned atlasNumCells);
-    ~GlTextureGroup();
+    ~GlTextureGroup() override;
 
     TextureFiltering filtering() const override;
     [[nodiscard]] std::expected<TexturePtr, StarException> create(Image const& texture) override;
@@ -128,7 +128,7 @@ private:
       return Star::typeName<GlGroupedTexture>();
     }
 
-    ~GlGroupedTexture();
+    ~GlGroupedTexture() override;
 
     Vec2U size() const override;
     TextureFiltering filtering() const override;
@@ -154,7 +154,7 @@ private:
       return Star::typeName<GlLoneTexture>();
     }
 
-    ~GlLoneTexture();
+    ~GlLoneTexture() override;
 
     Vec2U size() const override;
     TextureFiltering filtering() const override;
@@ -210,7 +210,7 @@ private:
     };
 
     GlRenderBuffer() = default;
-    ~GlRenderBuffer();
+    ~GlRenderBuffer() override;
 
     [[nodiscard]] std::expected<void, StarException> set(List<RenderPrimitive>& primitives) override;
     [[nodiscard]] std::expected<void, StarException> set(DetachedRenderGeometry const& geometry);
@@ -279,7 +279,7 @@ private:
 
     [[nodiscard]] static std::expected<RefPtr<GlFrameBuffer>, StarException> create(Json const& config);
     GlFrameBuffer() = default;
-    ~GlFrameBuffer();
+    ~GlFrameBuffer() override;
   };
 
   class Effect {

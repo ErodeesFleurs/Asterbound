@@ -99,82 +99,259 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeStatusControllerCall
   LuaCallbacks callbacks;
 
   if (auto result = callbacks.registerCallbackWithSignature<Json, String, Json>(
-      "statusProperty", std::bind(StatusControllerCallbacks::statusProperty, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "statusProperty",
+        [&statController](String const& name, Json const& def) {
+          return StatusControllerCallbacks::statusProperty(statController, name, def);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, Json>(
-      "setStatusProperty", std::bind(StatusControllerCallbacks::setStatusProperty, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setStatusProperty",
+        [&statController](String const& name, Json const& value) {
+          return StatusControllerCallbacks::setStatusProperty(statController, name, value);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String>(
-      "stat", std::bind(StatusControllerCallbacks::stat, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "stat",
+        [&statController](String const& name) { return StatusControllerCallbacks::stat(statController, name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "statPositive", std::bind(StatusControllerCallbacks::statPositive, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "statPositive",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::statPositive(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<StringList>(
-      "resourceNames", std::bind(StatusControllerCallbacks::resourceNames, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
+        "resourceNames", [&statController]() { return StatusControllerCallbacks::resourceNames(statController); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "isResource", std::bind(StatusControllerCallbacks::isResource, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "isResource",
+        [&statController](String const& name) { return StatusControllerCallbacks::isResource(statController, name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String>(
-      "resource", std::bind(StatusControllerCallbacks::resource, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resource",
+        [&statController](String const& name) { return StatusControllerCallbacks::resource(statController, name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "resourcePositive", std::bind(StatusControllerCallbacks::resourcePositive, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resourcePositive",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::resourcePositive(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, float>(
-      "setResource", std::bind(StatusControllerCallbacks::setResource, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setResource",
+        [&statController](String const& name, float value) {
+          return StatusControllerCallbacks::setResource(statController, name, value);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, float>(
-      "modifyResource", std::bind(StatusControllerCallbacks::modifyResource, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "modifyResource",
+        [&statController](String const& name, float value) {
+          return StatusControllerCallbacks::modifyResource(statController, name, value);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String, float>(
-      "giveResource", std::bind(StatusControllerCallbacks::giveResource, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "giveResource",
+        [&statController](String const& name, float amount) {
+          return StatusControllerCallbacks::giveResource(statController, name, amount);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String, float>(
-      "consumeResource", std::bind(StatusControllerCallbacks::consumeResource, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "consumeResource",
+        [&statController](String const& name, float amount) {
+          return StatusControllerCallbacks::consumeResource(statController, name, amount);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String, float>(
-      "overConsumeResource", std::bind(StatusControllerCallbacks::overConsumeResource, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "overConsumeResource",
+        [&statController](String const& name, float amount) {
+          return StatusControllerCallbacks::overConsumeResource(statController, name, amount);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
-      "resourceLocked", std::bind(StatusControllerCallbacks::resourceLocked, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resourceLocked",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::resourceLocked(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, bool>(
-      "setResourceLocked", std::bind(StatusControllerCallbacks::setResourceLocked, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setResourceLocked",
+        [&statController](String const& name, bool locked) {
+          return StatusControllerCallbacks::setResourceLocked(statController, name, locked);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String>(
-      "resetResource", std::bind(StatusControllerCallbacks::resetResource, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resetResource",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::resetResource(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void>(
-      "resetAllResources", std::bind(StatusControllerCallbacks::resetAllResources, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
+        "resetAllResources",
+        [&statController]() { return StatusControllerCallbacks::resetAllResources(statController); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<std::optional<float>, String>(
-      "resourceMax", std::bind(StatusControllerCallbacks::resourceMax, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resourceMax",
+        [&statController](String const& name) { return StatusControllerCallbacks::resourceMax(statController, name); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<std::optional<float>, String>(
-      "resourcePercentage", std::bind(StatusControllerCallbacks::resourcePercentage, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "resourcePercentage",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::resourcePercentage(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String, float>(
-      "setResourcePercentage", std::bind(StatusControllerCallbacks::setResourcePercentage, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setResourcePercentage",
+        [&statController](String const& name, float value) {
+          return StatusControllerCallbacks::setResourcePercentage(statController, name, value);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<float, String, float>(
-      "modifyResourcePercentage", std::bind(StatusControllerCallbacks::modifyResourcePercentage, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "modifyResourcePercentage",
+        [&statController](String const& name, float value) {
+          return StatusControllerCallbacks::modifyResourcePercentage(statController, name, value);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<JsonArray, String>(
-      "getPersistentEffects", std::bind(StatusControllerCallbacks::getPersistentEffects, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "getPersistentEffects",
+        [&statController](String const& group) {
+          return StatusControllerCallbacks::getPersistentEffects(statController, group);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, Json>(
-      "addPersistentEffect", std::bind(StatusControllerCallbacks::addPersistentEffect, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "addPersistentEffect",
+        [&statController](String const& group, Json const& effect) {
+          return StatusControllerCallbacks::addPersistentEffect(statController, group, effect);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, JsonArray>(
-      "addPersistentEffects", std::bind(StatusControllerCallbacks::addPersistentEffects, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "addPersistentEffects",
+        [&statController](String const& group, JsonArray const& effects) {
+          return StatusControllerCallbacks::addPersistentEffects(statController, group, effects);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String, JsonArray>(
-      "setPersistentEffects", std::bind(StatusControllerCallbacks::setPersistentEffects, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "setPersistentEffects",
+        [&statController](String const& group, JsonArray const& effects) {
+          return StatusControllerCallbacks::setPersistentEffects(statController, group, effects);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String>(
-      "clearPersistentEffects", std::bind(StatusControllerCallbacks::clearPersistentEffects, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "clearPersistentEffects",
+        [&statController](String const& group) {
+          return StatusControllerCallbacks::clearPersistentEffects(statController, group);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void>(
-      "clearAllPersistentEffects", std::bind(StatusControllerCallbacks::clearAllPersistentEffects, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<void, String, std::optional<float>, std::optional<EntityId>>(
-      "addEphemeralEffect", std::bind(StatusControllerCallbacks::addEphemeralEffect, std::ref(statController), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)); !result) return std::unexpected(std::move(result.error()));
+        "clearAllPersistentEffects",
+        [&statController]() { return StatusControllerCallbacks::clearAllPersistentEffects(statController); });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result =
+        callbacks.registerCallbackWithSignature<void, String, std::optional<float>, std::optional<EntityId>>(
+          "addEphemeralEffect",
+          [&statController](String const& effect, std::optional<float> duration, std::optional<EntityId> source) {
+            return StatusControllerCallbacks::addEphemeralEffect(statController, effect, duration, source);
+          });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, JsonArray, std::optional<EntityId>>(
-      "addEphemeralEffects", std::bind(StatusControllerCallbacks::addEphemeralEffects, std::ref(statController), std::placeholders::_1, std::placeholders::_2)); !result) return std::unexpected(std::move(result.error()));
+        "addEphemeralEffects",
+        [&statController](JsonArray const& effects, std::optional<EntityId> source) {
+          return StatusControllerCallbacks::addEphemeralEffects(statController, effects, source);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void, String>(
-      "removeEphemeralEffect", std::bind(StatusControllerCallbacks::removeEphemeralEffect, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "removeEphemeralEffect",
+        [&statController](String const& effect) {
+          return StatusControllerCallbacks::removeEphemeralEffect(statController, effect);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallbackWithSignature<void>(
-      "clearEphemeralEffects", std::bind(StatusControllerCallbacks::clearEphemeralEffects, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
-      "damageTakenSince", std::bind(StatusControllerCallbacks::damageTakenSince, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
-      "inflictedHitsSince", std::bind(StatusControllerCallbacks::inflictedHitsSince, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
-      "inflictedDamageSince", std::bind(StatusControllerCallbacks::inflictedDamageSince, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<List<JsonArray>>("activeUniqueStatusEffectSummary",
-      std::bind(&StatusControllerCallbacks::activeUniqueStatusEffectSummary, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallbackWithSignature<bool, String>("uniqueStatusEffectActive",
-      std::bind(&StatusControllerCallbacks::uniqueStatusEffectActive, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+        "clearEphemeralEffects",
+        [&statController]() { return StatusControllerCallbacks::clearEphemeralEffects(statController); });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result =
+        callbacks
+          .registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
+            "damageTakenSince",
+            [&statController](std::optional<std::uint64_t> timestep) {
+              return StatusControllerCallbacks::damageTakenSince(statController, timestep);
+            });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result =
+        callbacks
+          .registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
+            "inflictedHitsSince",
+            [&statController](std::optional<std::uint64_t> timestep) {
+              return StatusControllerCallbacks::inflictedHitsSince(statController, timestep);
+            });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result =
+        callbacks
+          .registerCallbackWithSignature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
+            "inflictedDamageSince",
+            [&statController](std::optional<std::uint64_t> timestep) {
+              return StatusControllerCallbacks::inflictedDamageSince(statController, timestep);
+            });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<List<JsonArray>>(
+        "activeUniqueStatusEffectSummary",
+        [&statController]() { return StatusControllerCallbacks::activeUniqueStatusEffectSummary(statController); });
+      !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
+        "uniqueStatusEffectActive",
+        [&statController](String const& name) {
+          return StatusControllerCallbacks::uniqueStatusEffectActive(statController, name);
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<Directives>("primaryDirectives", std::bind(&StatusController::primaryDirectives, std::ref(statController))); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<Directives>(
+        "primaryDirectives", [&statController]() -> Directives const& { return statController.primaryDirectives(); });
+      !result)
+    return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("setPrimaryDirectives", [&statController](std::optional<String> const& directives) { statController.setPrimaryDirectives(directives.value_or(String{})); }); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<void, DamageRequest>("applySelfDamageRequest", std::bind(&StatusController::applySelfDamageRequest, std::ref(statController), std::placeholders::_1)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallbackWithSignature<void, DamageRequest>(
+        "applySelfDamageRequest",
+        [&statController](DamageRequest&& request) {
+          return statController.applySelfDamageRequest(std::move(request));
+        });
+      !result)
+    return std::unexpected(std::move(result.error()));
 
   return callbacks;
 }
@@ -280,7 +457,7 @@ std::expected<JsonArray, StarException> LuaBindings::StatusControllerCallbacks::
   for (auto const& effect : statController.getPersistentEffects(arg1)) {
     auto json = jsonFromPersistentStatusEffect(effect);
     if (!json) return std::unexpected(std::move(json.error()));
-    result.append(std::move(*json));
+    result.push_back(std::move(*json));
   }
   return result;
 }
@@ -296,7 +473,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addPe
   for (auto const& json : arg2) {
     auto effect = jsonToPersistentStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.addPersistentEffects(arg1, effects);
 }
@@ -307,7 +484,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::setPe
   for (auto const& json : arg2) {
     auto effect = jsonToPersistentStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.setPersistentEffects(arg1, effects);
 }
@@ -323,7 +500,8 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::clear
 
 std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addEphemeralEffect(
     StatusController& statController, String const& arg1, std::optional<float> arg2, std::optional<EntityId> sourceEntityId) {
-  return statController.addEphemeralEffect(EphemeralStatusEffect{UniqueStatusEffect{arg1}, arg2}, sourceEntityId);
+  return statController.addEphemeralEffect(
+    EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect{arg1}, .duration = arg2}, sourceEntityId);
 }
 
 std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addEphemeralEffects(
@@ -332,7 +510,7 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::addEp
   for (auto const& json : arg1) {
     auto effect = jsonToEphemeralStatusEffect(json);
     if (!effect) return std::unexpected(std::move(effect.error()));
-    effects.append(std::move(*effect));
+    effects.push_back(std::move(*effect));
   }
   return statController.addEphemeralEffects(effects, sourceEntityId);
 }
@@ -355,7 +533,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
   for (auto const& notification : pair.first) {
     auto json = notification.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    notifications.append(std::move(*json));
+    notifications.push_back(std::move(*json));
   }
   return luaTupleReturn(std::move(notifications), pair.second);
 }
@@ -369,7 +547,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
     if (!json) return std::unexpected(std::move(json.error()));
     auto tagged = json->set("targetEntityId", hit.first);
     if (!tagged) return std::unexpected(std::move(tagged.error()));
-    hits.append(std::move(*tagged));
+    hits.push_back(std::move(*tagged));
   }
   return luaTupleReturn(std::move(hits), pair.second);
 }
@@ -381,7 +559,7 @@ std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindi
   for (auto const& notification : pair.first) {
     auto json = notification.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    notifications.append(std::move(*json));
+    notifications.push_back(std::move(*json));
   }
   return luaTupleReturn(std::move(notifications), pair.second);
 }
@@ -392,7 +570,7 @@ List<JsonArray> LuaBindings::StatusControllerCallbacks::activeUniqueStatusEffect
   return summary.transformed([](std::pair<UniqueStatusEffect, std::optional<float>> effect) {
     JsonArray effectJson = {effect.first};
     if (effect.second)
-      effectJson.append(*effect.second);
+      effectJson.push_back(*effect.second);
     return effectJson;
   });
 }

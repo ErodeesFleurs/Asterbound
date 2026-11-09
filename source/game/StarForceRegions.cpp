@@ -27,7 +27,7 @@ PhysicsCategoryFilter::PhysicsCategoryFilter(Type type, StringSet categories)
   : type(type), categories(std::move(categories)) {}
 
 bool PhysicsCategoryFilter::check(StringSet const& otherCategories) const {
-  bool intersection = categories.hasIntersection(otherCategories);
+  bool intersection = categories.has_intersection(otherCategories);
   if (type == Whitelist)
     return intersection;
   else
@@ -228,21 +228,21 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 std::expected<PhysicsForceRegion, StarException> jsonToPhysicsForceRegion(Json const& json) {
   auto type = json.getString("type");
   if (!type) return std::unexpected(std::move(type.error()));
-  auto directional = type->equalsIgnoreCase("DirectionalForceRegion");
+  auto directional = type->equals_ignore_case("DirectionalForceRegion");
   if (!directional) return std::unexpected(std::move(directional.error()));
   if (*directional) {
     auto region = DirectionalForceRegion::fromJson(json);
     if (!region) return std::unexpected(std::move(region.error()));
     return PhysicsForceRegion(std::move(*region));
   }
-  auto radial = type->equalsIgnoreCase("RadialForceRegion");
+  auto radial = type->equals_ignore_case("RadialForceRegion");
   if (!radial) return std::unexpected(std::move(radial.error()));
   if (*radial) {
     auto region = RadialForceRegion::fromJson(json);
     if (!region) return std::unexpected(std::move(region.error()));
     return PhysicsForceRegion(std::move(*region));
   }
-  auto gradient = type->equalsIgnoreCase("GradientForceRegion");
+  auto gradient = type->equals_ignore_case("GradientForceRegion");
   if (!gradient) return std::unexpected(std::move(gradient.error()));
   if (*gradient) {
     auto region = GradientForceRegion::fromJson(json);

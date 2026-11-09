@@ -30,7 +30,7 @@ const GameTestRegistration
     // The empty world is sparse: no sectors or terrain need to be generated to
     // initialize an anchor-free object and index its physics bounds.
     Vec2U worldSize(32768, 32768);
-    auto storage = File::ephemeralFile(fixture.root().random());
+    auto storage = File::ephemeral_file(fixture.root().random());
     ASSERT_TRUE(storage) << storage.error().what();
     auto created = WorldServer::create(fixture.root(), worldSize, *storage);
     ASSERT_TRUE(created) << created.error().what();
@@ -50,7 +50,7 @@ const GameTestRegistration
     orientation->config = JsonObject();
     orientation->boundBox = RectI(0, 0, 0, 0);
     orientation->metaBoundBox = RectF(-1, -1, 1, 1);
-    config->orientations.append(orientation);
+    config->orientations.push_back(orientation);
 
     auto forceConfig = Json::parse(R"({
     "directional": {
@@ -76,7 +76,7 @@ const GameTestRegistration
       SCOPED_TRACE(enabled ? "enabled" : "disabled");
       auto forces = forceConfig->toObject();
       ASSERT_TRUE(forces) << forces.error().what();
-      for (auto& pair : *forces) {
+      for (auto&& pair : *forces) {
         auto changed = pair.second.set("enabled", enabled);
         ASSERT_TRUE(changed) << changed.error().what();
         pair.second = std::move(*changed);
@@ -90,7 +90,7 @@ const GameTestRegistration
       // Reinitialize the same object at two translations, including coordinates
       // that made the old local/world union exceed MaximumEntityBoundBox.
       for (auto const& tilePosition : {Vec2I(512, 256), farPosition}) {
-        SCOPED_TRACE(strf("position {}", tilePosition));
+        SCOPED_TRACE(Star::format("position {}", tilePosition));
         ASSERT_TRUE(object->setTilePosition(tilePosition));
         auto id = entities.reserveEntityId();
         ASSERT_TRUE(id) << id.error().what();

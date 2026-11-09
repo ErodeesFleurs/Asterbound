@@ -44,7 +44,7 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     for (auto const& spec : *specs) {
       auto item = ItemDescriptor::create(spec);
       if (!item) return std::unexpected(std::move(item.error()));
-      items.append(std::move(*item));
+      items.push_back(std::move(*item));
     }
     return QuestParamDetail(std::move(items));
   } else if (*type == "entity") {
@@ -125,7 +125,7 @@ std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) 
   for (auto const& spec : *specs) {
     auto item = ItemDescriptor::loadStore(**database, spec);
     if (!item) return std::unexpected(std::move(item.error()));
-    items.append(std::move(*item));
+    items.push_back(std::move(*item));
   }
   return QuestParamDetail(std::move(items));
 }
@@ -148,7 +148,8 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
   } else if (std::holds_alternative<QuestItemTag>(detail)) return JsonObject{{"type", "itemTag"}, {"tag", std::get<QuestItemTag>(detail)}};
   else if (std::holds_alternative<QuestItemList>(detail)) {
     JsonArray array;
-    for (auto const& item : std::get<QuestItemList>(detail)) array.append(item.toJson());
+    for (auto const& item : std::get<QuestItemList>(detail))
+      array.push_back(item.toJson());
     return JsonObject{{"type", "itemList"}, {"items", std::move(array)}};
   } else if (std::holds_alternative<QuestEntity>(detail)) {
     auto const& entity = std::get<QuestEntity>(detail);
@@ -187,7 +188,7 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
   for (auto const& item : std::get<QuestItemList>(detail)) {
     auto store = item.diskStore(**database);
     if (!store) return std::unexpected(std::move(store.error()));
-    array.append(std::move(*store));
+    array.push_back(std::move(*store));
   }
   return JsonObject{{"type", "itemList"}, {"items", std::move(array)}};
 }
@@ -275,7 +276,7 @@ std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::fromJson(Ro
       for (auto const& entry : *array) {
         auto quest = QuestDescriptor::fromJson(root, entry);
         if (!quest) return std::unexpected(std::move(quest.error()));
-        arc.quests.append(std::move(*quest));
+        arc.quests.push_back(std::move(*quest));
       }
       auto id = json.optString("stagehandUniqueId");
       if (!id) return std::unexpected(std::move(id.error()));
@@ -300,7 +301,7 @@ std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::diskLoad(Ro
   for (auto const& entry : *array) {
     auto quest = QuestDescriptor::diskLoad(root, entry);
     if (!quest) return std::unexpected(std::move(quest.error()));
-    arc.quests.append(std::move(*quest));
+    arc.quests.push_back(std::move(*quest));
   }
   auto id = json->optString("stagehandUniqueId");
   if (!id) return std::unexpected(std::move(id.error()));
@@ -312,7 +313,7 @@ std::expected<Json, StarException> QuestArcDescriptor::toJson() const {
   for (auto const& quest : quests) {
     auto json = quest.toJson();
     if (!json) return std::unexpected(std::move(json.error()));
-    array.append(std::move(*json));
+    array.push_back(std::move(*json));
   }
   return JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", jsonFromOptional(stagehandUniqueId)}};
 }
@@ -323,7 +324,7 @@ std::expected<Json, StarException> QuestArcDescriptor::diskStore(Root& root) con
   for (auto const& quest : quests) {
     auto json = quest.diskStore(root);
     if (!json) return std::unexpected(std::move(json.error()));
-    array.append(std::move(*json));
+    array.push_back(std::move(*json));
   }
   auto result = (*database)->makeCurrentVersionedJson("QuestArcDescriptor", JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", jsonFromOptional(stagehandUniqueId)}});
   if (!result) return std::unexpected(std::move(result.error()));
@@ -345,7 +346,7 @@ std::expected<String, StarException> questParamText(Root& root, QuestParam const
     for (auto const& descriptor : std::get<QuestItemList>(parameter.detail)) {
       auto item = (*database)->itemShared(descriptor);
       if (!item) return std::unexpected(std::move(item.error()));
-      strings.append(strf("{} {}", descriptor.count(), (*item)->friendlyName()));
+      strings.push_back(Star::format("{} {}", descriptor.count(), (*item)->friendlyName()));
     }
     return strings.join(", ");
   }

@@ -1,6 +1,7 @@
 module;
 
 import std;
+import star.text_formatter;
 import star.list;
 
 import star.math_common;
@@ -15,9 +16,9 @@ namespace Star {
 template <typename DataType>
 class Polygon {
 public:
-  typedef Vector<DataType, 2> Vertex;
-  typedef Star::Line<DataType, 2> Line;
-  typedef Star::Box<DataType, 2> Rect;
+  using Vertex = Vector<DataType, 2>;
+  using Line = Star::Line<DataType, 2>;
+  using Rect = Star::Box<DataType, 2>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -37,9 +38,9 @@ public:
     std::optional<std::size_t> intersectedSide;
   };
 
-  typedef List<Vertex> VertexList;
-  typedef typename VertexList::iterator iterator;
-  typedef typename VertexList::const_iterator const_iterator;
+  using VertexList = List<Vertex>;
+  using iterator = typename VertexList::iterator;
+  using const_iterator = typename VertexList::const_iterator;
 
   static Polygon convexHull(VertexList points);
   static Polygon clip(Polygon inputPoly, Polygon convexClipPoly);
@@ -158,11 +159,12 @@ private:
 };
 
 template <typename DataType>
-std::ostream& operator<<(std::ostream& os, Polygon<DataType> const& poly);
+  requires nonfallible_text_writable<Vector<DataType, 2>>
+void write_text(TextBuffer& output, Polygon<DataType> const& poly);
 
-typedef Polygon<int> PolyI;
-typedef Polygon<float> PolyF;
-typedef Polygon<double> PolyD;
+using PolyI = Polygon<int>;
+using PolyF = Polygon<float>;
+using PolyD = Polygon<double>;
 
 template <typename DataType>
 Polygon<DataType> Polygon<DataType>::convexHull(VertexList points) {
@@ -178,19 +180,19 @@ Polygon<DataType> Polygon<DataType>::convexHull(VertexList points) {
   for (auto const& point : points) {
     while (lower.size() >= 2 && cross(lower[lower.size() - 2], lower[lower.size() - 1], point) <= 0)
       lower.erase(lower.end() - 1);
-    lower.append(point);
+    lower.push_back(point);
   }
 
   VertexList upper;
   for (auto const& point : std::views::reverse(points)) {
     while (upper.size() >= 2 && cross(upper[upper.size() - 2], upper[upper.size() - 1], point) <= 0)
       upper.erase(upper.end() - 1);
-    upper.append(point);
+    upper.push_back(point);
   }
 
   upper.erase(upper.end() - 1);
   lower.erase(lower.end() - 1);
-  lower.appendAll(take(upper));
+  lower.append_range(std::exchange(upper, {}));
   return Polygon<DataType>(std::move(lower));
 }
 
@@ -203,21 +205,21 @@ Polygon<DataType> Polygon<DataType>::clip(Polygon inputPoly, Polygon convexClipP
     return ((edge.max() - edge.min()) ^ (p - edge.min())) > 0;
   };
 
-  VertexList outputVertexes = take(inputPoly.m_vertexes);
+  VertexList outputVertexes = std::exchange(inputPoly.m_vertexes, {});
   for (std::size_t i = 0; i < convexClipPoly.sides(); ++i) {
     if (outputVertexes.empty())
       break;
 
     Line clipEdge = convexClipPoly.sideAt(i);
-    VertexList inputVertexes = take(outputVertexes);
+    VertexList inputVertexes = std::exchange(outputVertexes, {});
     Vertex s = inputVertexes[inputVertexes.size() - 1];
     for (Vertex e : inputVertexes) {
       if (insideEdge(clipEdge, e)) {
         if (!insideEdge(clipEdge, s))
-          outputVertexes.append(clipEdge.intersection(Line(s, e)).point);
-        outputVertexes.append(e);
+          outputVertexes.push_back(clipEdge.intersection(Line(s, e)).point);
+        outputVertexes.push_back(e);
       } else if (insideEdge(clipEdge, s)) {
-        outputVertexes.append(clipEdge.intersection(Line(s, e)).point);
+        outputVertexes.push_back(clipEdge.intersection(Line(s, e)).point);
       }
       s = e;
     }
@@ -226,8 +228,7 @@ Polygon<DataType> Polygon<DataType>::clip(Polygon inputPoly, Polygon convexClipP
   return Polygon(std::move(outputVertexes));
 }
 
-template <typename DataType>
-Polygon<DataType>::Polygon() {}
+template <typename DataType> Polygon<DataType>::Polygon() = default;
 
 template <typename DataType>
 Polygon<DataType>::Polygon(Polygon const& rhs)
@@ -301,11 +302,11 @@ void Polygon<DataType>::deduplicateVertexes(float maxDistance) {
   float distSquared = square(maxDistance);
   VertexList newVertexes = {m_vertexes[0]};
   for (std::size_t i = 1; i < m_vertexes.size(); ++i) {
-    if (vmagSquared(m_vertexes[i] - newVertexes[newVertexes.size() - 1]) > distSquared)
-      newVertexes.append(m_vertexes[i]);
+    if (vmag_squared(m_vertexes[i] - newVertexes[newVertexes.size() - 1]) > distSquared)
+      newVertexes.push_back(m_vertexes[i]);
   }
 
-  if (vmagSquared(newVertexes[0] - newVertexes[newVertexes.size() - 1]) <= distSquared)
+  if (vmag_squared(newVertexes[0] - newVertexes[newVertexes.size() - 1]) <= distSquared)
     newVertexes.erase(newVertexes.end() - 1);
 
   m_vertexes = std::move(newVertexes);
@@ -423,11 +424,7 @@ bool Polygon<DataType>::operator==(Polygon<DataType> const& rhs) const {
   return m_vertexes == rhs.m_vertexes;
 }
 
-template <typename DataType>
-Polygon<DataType>& Polygon<DataType>::operator=(Polygon const& rhs) {
-  m_vertexes = rhs.m_vertexes;
-  return *this;
-}
+template <typename DataType> Polygon<DataType>& Polygon<DataType>::operator=(Polygon const& rhs) = default;
 
 template <typename DataType>
 Polygon<DataType>& Polygon<DataType>::operator=(Polygon&& rhs) {
@@ -739,25 +736,29 @@ auto Polygon<DataType>::sideAt(std::size_t i) const -> Line {
 }
 
 template <typename DataType>
-std::ostream& operator<<(std::ostream& os, Polygon<DataType> const& poly) {
-  os << "[Poly: ";
+  requires nonfallible_text_writable<Vector<DataType, 2>>
+void write_text(TextBuffer& output, Polygon<DataType> const& poly) {
+  output.append("[Poly: ");
   for (auto i = poly.begin(); i != poly.end(); ++i) {
     if (i != poly.begin())
-      os << ", ";
-    os << *i;
+      output.append(", ");
+    append_text(output, *i);
   }
-  os << "]";
-  return os;
+  output.push_back(']');
 }
 
 }
 
 export module star.poly;
 
+export template <typename DataType>
+  requires Star::nonfallible_text_writable<Star::Vector<DataType, 2>>
+struct std::formatter<Star::Polygon<DataType>> : Star::TextFormatter {};
+
 export namespace Star {
   using ::Star::Polygon;
   using ::Star::PolyI;
   using ::Star::PolyF;
   using ::Star::PolyD;
-  using ::Star::operator<<;
+  using ::Star::write_text;
 }

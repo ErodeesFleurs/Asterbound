@@ -75,14 +75,7 @@ bool ServerTile::isColliding(CollisionSet const& collisionSet) const {
   return Star::isColliding(getCollision(), collisionSet);
 }
 
-ServerTile& ServerTile::operator=(ServerTile const& serverTile) {
-  WorldTile::operator=(serverTile);
-
-  liquid = serverTile.liquid;
-  rootSource = serverTile.rootSource;
-  objectCollision = serverTile.objectCollision;
-  return *this;
-}
+ServerTile& ServerTile::operator=(ServerTile const& serverTile) = default;
 
 std::expected<void, StarException> ServerTile::write(DataStream& ds) const {
   auto result = ds << foreground << foregroundHueShift << foregroundColorVariant
@@ -115,7 +108,7 @@ std::expected<void, StarException> ServerTile::read(DataStream& ds, VersionNumbe
       return std::unexpected(std::move(transition.error()));
   }
   if (serializationVersion < 418) {
-    auto legacyRoot = ds.readBytes(1);
+    auto legacyRoot = ds.read_bytes(1);
     if (!legacyRoot)
       return std::unexpected(std::move(legacyRoot.error()));
     rootSource = {};

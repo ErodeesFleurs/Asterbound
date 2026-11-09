@@ -101,7 +101,7 @@ import star.algorithm;
 namespace Star {
 
 SystemWorldServerThread::SystemWorldServerThread(Vec3I const& location, std::shared_ptr<SystemWorldServer> systemWorld, String storageFile)
-  : Thread(strf("SystemWorldServer: {}", location))
+  : Thread(Star::format("SystemWorldServer: {}", location))
   , m_systemLocation(location)
   , m_systemWorld(std::move(systemWorld))
   , m_storageFile(std::move(storageFile))
@@ -112,10 +112,10 @@ SystemWorldServerThread::~SystemWorldServerThread() {
   m_stopSource.request_stop();
   auto joined = join();
   if (!joined)
-    EmergencyLog::error("System world thread cleanup failed: {}", outputException(joined.error(), true));
+    EmergencyLog::error("System world thread cleanup failed: {}", Star::output_exception(joined.error(), true));
   if (!isJoined()) {
     EmergencyLog::error("System world thread {} remains unjoined during owner destruction", name());
-    fatalError("Cannot destroy a system world thread with an unjoined native worker", false);
+    Star::fatal_error("Cannot destroy a system world thread with an unjoined native worker", false);
   }
 }
 
@@ -176,7 +176,7 @@ std::expected<void, StarException> SystemWorldServerThread::run() {
   auto stopToken = m_stopSource.get_token();
   TickRateApproacher tickApproacher(1.0 / SystemWorldTimestep, 0.5);
   while (!stopToken.stop_requested()) {
-    m_systemWorld->root().logMap().set(strf("system_{}_update_rate", m_systemLocation), strf("{:4.2f}Hz", tickApproacher.rate()));
+    m_systemWorld->root().logMap().set(Star::format("system_{}_update_rate", m_systemLocation), Star::format("{:4.2f}Hz", tickApproacher.rate()));
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));
@@ -203,12 +203,12 @@ void SystemWorldServerThread::stop() {
 std::expected<void, StarException> SystemWorldServerThread::update() {
   std::unique_lock queueLocker(m_queueMutex);
   std::unique_lock locker(m_mutex);
-  for (auto const& packet : take(m_incomingPacketQueue)) {
+  for (auto const& packet : std::exchange(m_incomingPacketQueue, {})) {
     auto handled = m_systemWorld->handleIncomingPacket(packet.first, packet.second);
     if (!handled)
       return std::unexpected(std::move(handled.error()));
   }
-  for (auto const& entry : take(m_clientShipActions)) {
+  for (auto const& entry : std::exchange(m_clientShipActions, {})) {
     auto ship = m_systemWorld->clientShip(entry.first);
     auto acted = entry.second(optionalRef(ship));
     if (!acted)
@@ -220,7 +220,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
       return std::unexpected(std::move(updated.error()));
   }
   m_triggerStorage = m_systemWorld->triggeredStorage();
-  for (auto const& destination : take(m_clientShipDestinations)) {
+  for (auto const& destination : std::exchange(m_clientShipDestinations, {})) {
     auto set = m_systemWorld->setClientDestination(destination.first, destination.second);
     if (!set)
       return std::unexpected(std::move(set.error()));
@@ -230,7 +230,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
     return std::unexpected(std::move(active.error()));
   m_activeInstanceWorlds = std::move(*active);
   for (auto clientId : m_clients) {
-    m_outgoingPacketQueue[clientId].appendAll(m_systemWorld->pullOutgoingPackets(clientId));
+    m_outgoingPacketQueue[clientId].append_range(m_systemWorld->pullOutgoingPackets(clientId));
     auto location = m_systemWorld->clientShipLocation(clientId);
     if (!location)
       return std::unexpected(std::move(location.error()));
@@ -265,7 +265,7 @@ std::expected<void, StarException> SystemWorldServerThread::executeClientShipAct
   if (!action)
     return std::unexpected(StarException("System client ship action cannot be empty"));
   std::unique_lock locker(m_queueMutex);
-  m_clientShipActions.append({clientId, std::move(action)});
+  m_clientShipActions.push_back({clientId, std::move(action)});
   return {};
 }
 
@@ -299,17 +299,17 @@ List<InstanceWorldId> SystemWorldServerThread::activeInstanceWorlds() const {
 }
 
 void SystemWorldServerThread::setUpdateAction(std::function<std::expected<void, StarException>(SystemWorldServerThread&)> updateAction) {
-  m_updateAction = updateAction;
+  m_updateAction = std::move(updateAction);
 }
 
 void SystemWorldServerThread::pushIncomingPacket(ConnectionId clientId, std::shared_ptr<Packet> packet) {
   std::unique_lock locker(m_queueMutex);
-  m_incomingPacketQueue.append({std::move(clientId), std::move(packet)});
+  m_incomingPacketQueue.push_back({std::move(clientId), std::move(packet)});
 }
 
 List<std::shared_ptr<Packet>> SystemWorldServerThread::pullOutgoingPackets(ConnectionId clientId) {
   std::unique_lock locker(m_queueMutex);
-  return take(m_outgoingPacketQueue[clientId]);
+  return std::exchange(m_outgoingPacketQueue[clientId], {});
 }
 
 std::expected<void, StarException> SystemWorldServerThread::store() {
@@ -327,7 +327,7 @@ std::expected<void, StarException> SystemWorldServerThread::store() {
   auto versioned = (*versioning)->makeCurrentVersionedJson("System", *data);
   if (!versioned)
     return std::unexpected(std::move(versioned.error()));
-  return VersionedJson::writeFile(*versioned, m_storageFile);
+  return VersionedJson::write_file(*versioned, m_storageFile);
 }
 
 }

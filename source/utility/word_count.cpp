@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.format;
 import star.output_proxy;
@@ -20,7 +21,7 @@ std::expected<int, StarException> countWords(String const& text) {
   auto words = text.split(" ");
   if (!words)
     return std::unexpected(std::move(words.error()));
-  return static_cast<int>(words->count());
+  return static_cast<int>(words->size());
 }
 
 [[nodiscard]]
@@ -65,7 +66,7 @@ std::expected<int, StarException> countOnlyStrings(Json const& json) {
     auto text = json.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto assetPath = text->beginsWith("/");
+    auto assetPath = text->starts_with("/");
     if (!assetPath)
       return std::unexpected(std::move(assetPath.error()));
     if (!*assetPath)
@@ -107,7 +108,7 @@ int main(int argc, char** argv) {
           if (!*include)
             continue;
         }
-        files.append(path);
+        files.push_back(path);
       }
       auto queued = (*assets)->queueJsons(files);
       if (!queued)
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
         auto count = countFunction(*json);
         if (!count)
           return std::unexpected(std::move(count.error()));
-        String countKey = wordCountKey ? *wordCountKey : String(strf(".{} files", type));
+        String countKey = wordCountKey ? *wordCountKey : String(Star::format(".{} files", type));
         wordCounts[countKey] += *count;
       }
       return {};
@@ -178,7 +179,7 @@ int main(int argc, char** argv) {
     });
     if (!counted)
       return std::unexpected(std::move(counted.error()));
-    FilterFunction dialogFilter = [](String const& path) { return path.beginsWith("/dialog/"); };
+    FilterFunction dialogFilter = [](String const& path) { return path.starts_with("/dialog/"); };
     counted = countWordsInType("config", countOnlyStrings, dialogFilter, String("NPC dialog (.config files)"));
     if (!counted)
       return std::unexpected(std::move(counted.error()));
@@ -305,15 +306,18 @@ int main(int argc, char** argv) {
     wordCounts["planet descriptions (cockpit.config)"] = cockpitCount;
     int total = 0;
     for (auto const& count : wordCounts) {
-      coutf("{} words in {}\n", count.second, count.first);
+      if (auto written = Star::print("{} words in {}\n", count.second, count.first); !written)
+        return std::unexpected(std::move(written.error()));
       total += count.second;
     }
-    coutf("approximately {} words total\n", total);
+    if (auto written = Star::print("approximately {} words total\n", total); !written)
+      return std::unexpected(std::move(written.error()));
     return 0;
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

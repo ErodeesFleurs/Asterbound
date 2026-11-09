@@ -242,7 +242,7 @@ private:
 
   // Maps category name -> part type -> part name -> MonsterPart.  part name ->
   // MonsterPart needs to be be in a predictable order.
-  typedef StringMap<StringMap<Map<String, MonsterPart>>> PartDirectory;
+  using PartDirectory = StringMap<StringMap<Map<String, MonsterPart>>>;
 
   [[nodiscard]] std::expected<MonsterVariant, StarException> produceMonster(String const& typeName, std::uint64_t seed, Json const& uniqueParameters) const;
 

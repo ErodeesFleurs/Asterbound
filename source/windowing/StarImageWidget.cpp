@@ -168,8 +168,8 @@ RectI ImageWidget::screenBoundRect() const {
 
 std::expected<void, StarException> ImageWidget::transformDrawables() {
   m_drawables.clear();
-  for (auto drawable : m_baseDrawables)
-    m_drawables.append(Drawable(drawable));
+  for (auto const& drawable : m_baseDrawables)
+    m_drawables.push_back(Drawable(drawable));
 
   if (m_rotation != 0)
     Drawable::rotateAll(m_drawables, m_rotation);
@@ -185,7 +185,7 @@ std::expected<void, StarException> ImageWidget::transformDrawables() {
 
   auto boundBox = Drawable::boundBoxAll(**metadata, m_drawables, m_trim);
   if (!boundBox) return std::unexpected(std::move(boundBox.error()));
-  auto size = boundBox->size().piecewiseMax({0, 0});
+  auto size = boundBox->size().piecewise_max({0, 0});
   if (size[0] && size[1]) {
     if ((size[0] > m_maxSize[0]) || (size[1] > m_maxSize[1])) {
       m_scale = std::min(m_maxSize[0] / size[0], m_maxSize[1] / size[1]);

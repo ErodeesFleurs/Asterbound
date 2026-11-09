@@ -61,9 +61,23 @@ enum class MainInterfacePanes {
   CharacterSwap
 };
 
-extern std::expected<EnumMap<MainInterfacePanes>, StarException> const MainInterfacePanesNames;
+inline constexpr auto MainInterfacePanesNames =
+  sortedEnumNames(std::to_array<std::pair<MainInterfacePanes, std::string_view>>(
+    {{MainInterfacePanes::Inventory, "Inventory"},
+     {MainInterfacePanes::Cockpit, "Cockpit"},
+     {MainInterfacePanes::Tech, "Tech"},
+     {MainInterfacePanes::Ai, "Ai"},
+     {MainInterfacePanes::Confirmation, "Confirmation"},
+     {MainInterfacePanes::HttpTrustDialog, "HttpTrustDialog"},
+     {MainInterfacePanes::JoinRequest, "JoinRequest"},
+     {MainInterfacePanes::Options, "Options"},
+     {MainInterfacePanes::WireInterface, "WireInterface"},
+     {MainInterfacePanes::CraftingPlain, "CraftingPlain"},
+     {MainInterfacePanes::MmUpgrade, "MmUpgrade"},
+     {MainInterfacePanes::Collections, "Collections"},
+     {MainInterfacePanes::CharacterSwap, "CharacterSwap"}}));
 
-typedef RegisteredPaneManager<MainInterfacePanes> MainInterfacePaneManager;
+using MainInterfacePaneManager = RegisteredPaneManager<MainInterfacePanes>;
 
 struct MainInterfaceConfig {
   [[nodiscard]] static std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> loadFromAssets(GuiContext& context);

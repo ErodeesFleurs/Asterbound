@@ -79,7 +79,7 @@ public:
     return Star::typeName<LoungeableEntity>();
   }
 
-  virtual std::size_t anchorCount() const override = 0;
+  std::size_t anchorCount() const override = 0;
   [[nodiscard]] std::expected<std::shared_ptr<EntityAnchor const>, StarException> anchor(std::size_t anchorPositionIndex) const override;
   [[nodiscard]] virtual std::expected<std::shared_ptr<LoungeAnchor const>, StarException> loungeAnchor(std::size_t anchorPositionIndex) const = 0;
 

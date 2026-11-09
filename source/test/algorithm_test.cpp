@@ -15,6 +15,37 @@ import star.vector;
 import star.static_vector;
 using namespace Star;
 
+TEST(Take, DefaultConstructionFollowsOwnershipTransfer) {
+  struct Value {
+    static int& sequence() {
+      static int value = 0;
+      return value;
+    }
+
+    Value() : defaultOrder(++sequence()) {}
+    explicit Value(int value) : owner(std::make_unique<int>(value)) {}
+    Value(Value&& rhs)
+        : owner(std::move(rhs.owner)), defaultOrder(rhs.defaultOrder),
+          moveOrder(rhs.moveOrder ? rhs.moveOrder : ++sequence()) {}
+    Value& operator=(Value&&) = default;
+
+    std::unique_ptr<int> owner;
+    int defaultOrder = 0;
+    int moveOrder = 0;
+  };
+
+  Value::sequence() = 0;
+  Value source(42);
+  auto* identity = source.owner.get();
+  auto taken = take(source);
+  EXPECT_EQ(taken.owner.get(), identity);
+  ASSERT_TRUE(taken.owner);
+  EXPECT_EQ(*taken.owner, 42);
+  EXPECT_FALSE(source.owner);
+  EXPECT_EQ(taken.moveOrder, 1);
+  EXPECT_EQ(source.defaultOrder, 2);
+}
+
 TEST(ListPredicates, MembershipConvertsToElementType) {
   auto expectMembership = [](auto const& values) {
     EXPECT_TRUE(values.contains(1));
@@ -129,9 +160,9 @@ TEST(ListPredicates, NoncopyableExplicitBoolShortCircuit) {
 
   int visits = 0;
   LinkedList<Truth> values;
-  EXPECT_FALSE(values.emplaceAppend(false, visits).value);
-  EXPECT_TRUE(values.emplaceAppend(true, visits).value);
-  EXPECT_FALSE(values.emplaceAppend(false, visits).value);
+  EXPECT_FALSE(values.emplace_back(false, visits).value);
+  EXPECT_TRUE(values.emplace_back(true, visits).value);
+  EXPECT_FALSE(values.emplace_back(false, visits).value);
   EXPECT_TRUE(values.any());
   EXPECT_EQ(visits, 2);
   visits = 0;
@@ -174,7 +205,7 @@ TEST(TupleSerialization, OrderedWireAndEnumWidths) {
   decltype(values) restored{};
   ASSERT_TRUE(stream >> restored);
   EXPECT_EQ(restored, values);
-  auto atEnd = stream.atEnd();
+  auto atEnd = stream.at_end();
   ASSERT_TRUE(atEnd);
   EXPECT_TRUE(*atEnd);
 
@@ -191,7 +222,7 @@ TEST(TupleSerialization, OrderedWireAndEnumWidths) {
 TEST(ListFiltering, MoveOnlyValuesKeepStableOrder) {
   List<std::unique_ptr<int>> values;
   for (int value = 0; value < 8; ++value)
-    values.append(std::make_unique<int>(value));
+    values.push_back(std::make_unique<int>(value));
   values.filter([](std::unique_ptr<int>& value) { return *value % 2 != 0; });
   ASSERT_EQ(values.size(), 4u);
   for (std::size_t i = 0; i < values.size(); ++i)
@@ -235,7 +266,7 @@ TEST(ComputedSort, MoveOnlyNonDefaultKeysAndStableTies) {
   List<int> values{21, 10, 22, 11, 20};
   List<int> visited;
   stableSortByComputedValue(values, [&](int value) {
-    visited.append(value);
+    visited.push_back(value);
     return Key(value / 10);
   });
   EXPECT_EQ(visited, (List<int>{21, 10, 22, 11, 20}));
@@ -252,7 +283,7 @@ TEST(ComputedSort, FirstKeyFailureLeavesInputUnreordered) {
     auto values = original;
     List<int> visited;
     auto result = stableSortByComputedValue(values, [&](int value) -> std::expected<int, StarException> {
-      visited.append(value);
+      visited.push_back(value);
       if (visited.size() == failure + 1)
         return std::unexpected(OutOfRangeException("sort key boundary", false));
       return value;
@@ -336,7 +367,7 @@ TEST(ContainerTransform, BoundedOutputStopsAtInsertionFailure) {
   EXPECT_EQ(calls, 3);
 
   StaticList<int, 2> output;
-  ASSERT_TRUE(output.append(99));
+  ASSERT_TRUE(output.push_back(99));
   calls = 0;
   auto appended = transformInto(output, values, [&](int value) {
     ++calls;
@@ -371,15 +402,81 @@ TEST(ByteOrder, FloatingPayloadAndIntegerRepresentations) {
 
 TEST(FixedContainerCopy, PreservesSinglePassInputPosition) {
   std::istringstream arrayInput("1 2 3 4 5");
-  auto array = Array<int, 3>::copyFrom(std::istream_iterator<int>(arrayInput), 2);
+  auto array = Array<int, 3>::copy_from(std::istream_iterator<int>(arrayInput), 2);
   EXPECT_EQ(array, (Array<int, 3>{1, 2, 0}));
   int next = 0;
   arrayInput >> next;
   EXPECT_EQ(next, 4);
 
   std::istringstream vectorInput("1 2 3 4 5");
-  auto vector = Vector<int, 2>::copyFrom(std::istream_iterator<int>(vectorInput));
+  auto vector = Vector<int, 2>::copy_from(std::istream_iterator<int>(vectorInput));
   EXPECT_EQ(vector, (Vector<int, 2>{1, 2}));
   vectorInput >> next;
   EXPECT_EQ(next, 4);
+}
+
+TEST(ArrayComparison, EqualityUsesContextualInequalityAndStopsAtFirstDifference) {
+  struct Truth {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  struct Value {
+    int value = 0;
+    std::vector<int>* visited = nullptr;
+    Truth operator!=(Value const& other) const {
+      visited->push_back(value);
+      return {value != other.value};
+    }
+    bool operator==(Value const&) const = delete;
+  };
+  std::vector<int> visited;
+  Array<Value, 3> left{Value{1, &visited}, Value{2, &visited}, Value{3, &visited}};
+  Array<Value, 3> equal{Value{1, &visited}, Value{2, &visited}, Value{3, &visited}};
+  EXPECT_TRUE(left == equal);
+  EXPECT_EQ(visited, (std::vector<int>{1, 2, 3}));
+  visited.clear();
+  Array<Value, 3> different{Value{1, &visited}, Value{9, &visited}, Value{3, &visited}};
+  EXPECT_FALSE(left == different);
+  EXPECT_EQ(visited, (std::vector<int>{1, 2}));
+  visited.clear();
+  EXPECT_TRUE((Array<Value, 0>{} == Array<Value, 0>{}));
+  EXPECT_TRUE(visited.empty());
+}
+
+TEST(ArrayComparison, WeakOrderingUsesOnlyLessAndContinuesPastEquivalentElements) {
+  struct Value {
+    int value = 0;
+    std::vector<std::pair<int, int>>* visited = nullptr;
+    bool operator<(Value const& other) const {
+      visited->emplace_back(value, other.value);
+      return value / 10 < other.value / 10;
+    }
+  };
+  std::vector<std::pair<int, int>> visited;
+  Array<Value, 2> left{Value{7, &visited}, Value{20, &visited}};
+  Array<Value, 2> right{Value{9, &visited}, Value{30, &visited}};
+  static_assert(std::same_as<decltype(left <=> right), std::weak_ordering>);
+  EXPECT_TRUE((left <=> right) == std::weak_ordering::less);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{7, 9}, {9, 7}, {20, 30}}));
+  visited.clear();
+  EXPECT_TRUE((right <=> left) == std::weak_ordering::greater);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{9, 7}, {7, 9}, {30, 20}, {20, 30}}));
+  visited.clear();
+  EXPECT_TRUE((left <=> left) == std::weak_ordering::equivalent);
+  EXPECT_EQ(visited, (std::vector<std::pair<int, int>>{{7, 7}, {7, 7}, {20, 20}, {20, 20}}));
+  visited.clear();
+  EXPECT_TRUE((Array<Value, 0>{} <=> Array<Value, 0>{}) == std::weak_ordering::equivalent);
+  EXPECT_TRUE(visited.empty());
+}
+
+TEST(ArrayComparison, FloatingInfinityNanKeepsLegacyLexicographicContinuation) {
+  auto compare = [] [[gnu::noinline]] (Array<double, 2> const& left, Array<double, 2> const& right) {
+    return left <=> right;
+  };
+  volatile std::uint64_t infinityBits = 0x7ff0000000000000ull;
+  volatile std::uint64_t nanBits = 0x7ff8000000000001ull;
+  Array<double, 2> left{std::bit_cast<double>(std::uint64_t(infinityBits)), 2.0};
+  Array<double, 2> right{std::bit_cast<double>(std::uint64_t(nanBits)), 3.0};
+  EXPECT_TRUE(compare(left, right) == std::weak_ordering::less);
 }

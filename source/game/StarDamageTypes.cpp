@@ -89,8 +89,5 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   return std::ref(ds);
 }
 
-TeamNumber soloPvpTeam(ConnectionId clientId) {
-  return (TeamNumber)clientId;
-}
-
+TeamNumber soloPvpTeam(ConnectionId clientId) { return clientId; }
 }

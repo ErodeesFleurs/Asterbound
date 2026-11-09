@@ -45,7 +45,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeVoiceCallbacks(Voice
   if (auto r = callbacks.registerCallback("speakerMuted", [&voice](SpeakerId id) -> std::expected<bool, StarException> {
     auto speaker = voice.speaker(id);
     if (!speaker) return std::unexpected(std::move(speaker.error()));
-    return (bool)(*speaker)->muted;
+    return static_cast<bool>((*speaker)->muted);
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("setSpeakerVolume", [&voice](SpeakerId id, float volume) -> std::expected<void, StarException> {
     auto speaker = voice.speaker(id);
@@ -56,7 +56,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeVoiceCallbacks(Voice
   if (auto r = callbacks.registerCallback("speakerVolume", [&voice](SpeakerId id) -> std::expected<float, StarException> {
     auto speaker = voice.speaker(id);
     if (!speaker) return std::unexpected(std::move(speaker.error()));
-    return (float)(*speaker)->volume;
+    return static_cast<float>((*speaker)->volume);
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("speakerPosition", [&voice](SpeakerId id) -> std::expected<Vec2F, StarException> {
     auto speaker = voice.speaker(id);
@@ -72,7 +72,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeVoiceCallbacks(Voice
   if (auto r = callbacks.registerCallback("speakers", [&voice](std::optional<bool> onlyPlaying) -> List<Json> {
     List<Json> list;
     for (auto& speaker : voice.sortedSpeakers(onlyPlaying.value_or(true)))
-      list.append(speaker->toJson());
+      list.push_back(speaker->toJson());
     return list;
   }); !r) return std::unexpected(std::move(r.error()));
   return callbacks;

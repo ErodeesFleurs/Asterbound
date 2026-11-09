@@ -41,12 +41,13 @@ namespace Star {
 
 struct Packet;
 
-typedef std::function<std::expected<void, StarException>(std::optional<std::reference_wrapper<SystemClientShip>>)> ClientShipAction;
+using ClientShipAction =
+  std::function<std::expected<void, StarException>(std::optional<std::reference_wrapper<SystemClientShip>>)>;
 
 class SystemWorldServerThread : public Thread {
 public:
   SystemWorldServerThread(Vec3I const& location, std::shared_ptr<SystemWorldServer> systemWorld, String storageFile);
-  ~SystemWorldServerThread();
+  ~SystemWorldServerThread() override;
 
   Vec3I location() const;
 

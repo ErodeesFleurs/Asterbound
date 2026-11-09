@@ -216,12 +216,13 @@ namespace Dungeon {
     Root& m_root;
   public:
     explicit TMXPartReader(Root& root) : m_root(root) {}
-    [[nodiscard]] virtual std::expected<void, StarException> readAsset(String const& asset) override;
+    [[nodiscard]] std::expected<void, StarException> readAsset(String const& asset) override;
 
-    virtual Vec2U size() const override;
+    Vec2U size() const override;
 
-    [[nodiscard]] virtual std::expected<void, StarException> forEachTile(TileCallback const& callback) const override;
-    [[nodiscard]] virtual std::expected<void, StarException> forEachTileAt(Vec2I pos, TileCallback const& callback) const override;
+    [[nodiscard]] std::expected<void, StarException> forEachTile(TileCallback const& callback) const override;
+    [[nodiscard]] std::expected<void, StarException> forEachTileAt(Vec2I pos,
+                                                                   TileCallback const& callback) const override;
 
   private:
 

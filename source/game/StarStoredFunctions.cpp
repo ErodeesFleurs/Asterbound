@@ -78,9 +78,9 @@ std::expected<StoredFunction::SearchResult, StarException> StoredFunction::searc
   auto firstIndex = m_function.index(0);
   if (!firstIndex)
     return std::unexpected(std::move(firstIndex.error()));
-  auto firstValue = m_function.value(0);
-  if (!firstValue)
-    return std::unexpected(std::move(firstValue.error()));
+  auto first_value = m_function.value(0);
+  if (!first_value)
+    return std::unexpected(std::move(first_value.error()));
   auto lastIndex = m_function.index(m_function.size() - 1);
   if (!lastIndex)
     return std::unexpected(std::move(lastIndex.error()));
@@ -88,7 +88,7 @@ std::expected<StoredFunction::SearchResult, StarException> StoredFunction::searc
   if (!lastValue)
     return std::unexpected(std::move(lastValue.error()));
   double minIndex = firstIndex->get();
-  double minValue = firstValue->get();
+  double minValue = first_value->get();
   double maxIndex = lastIndex->get();
   double maxValue = lastValue->get();
   if (maxValue < minValue) {
@@ -179,7 +179,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_functions.contains(entry.first))
-        return std::unexpected(StarException(strf("Named Function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named Function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = parametricFunctionFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -199,7 +199,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_functions2.contains(entry.first))
-        return std::unexpected(StarException(strf("Named 2-ary Function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named 2-ary Function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = multiTable2DFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -216,7 +216,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       if (result->m_configFunctions.contains(entry.first))
-        return std::unexpected(StarException(strf("Named config function '{}' defined twice, second time from {}", entry.first, file)));
+        return std::unexpected(StarException(Star::format("Named config function '{}' defined twice, second time from {}", entry.first, file)));
       auto data = parametricTableFromConfig(entry.second);
       if (!data)
         return std::unexpected(std::move(data.error()));
@@ -289,41 +289,41 @@ std::expected<std::shared_ptr<StoredConfigFunction>, StarException> FunctionData
 namespace {
 
 [[nodiscard]] std::expected<InterpolationMode, StarException> storedInterpolationMode(String const& name) {
-  auto halfStep = name.equalsIgnoreCase("HalfStep");
+  auto halfStep = name.equals_ignore_case("HalfStep");
   if (!halfStep)
     return std::unexpected(std::move(halfStep.error()));
   if (*halfStep)
     return InterpolationMode::HalfStep;
-  auto linear = name.equalsIgnoreCase("Linear");
+  auto linear = name.equals_ignore_case("Linear");
   if (!linear)
     return std::unexpected(std::move(linear.error()));
   if (*linear)
     return InterpolationMode::Linear;
-  auto cubic = name.equalsIgnoreCase("Cubic");
+  auto cubic = name.equals_ignore_case("Cubic");
   if (!cubic)
     return std::unexpected(std::move(cubic.error()));
   if (*cubic)
     return InterpolationMode::Cubic;
-  return std::unexpected(StoredFunctionException(strf("Unrecognized InterpolationMode '{}'", name)));
+  return std::unexpected(StoredFunctionException(Star::format("Unrecognized InterpolationMode '{}'", name)));
 }
 
 [[nodiscard]] std::expected<BoundMode, StarException> storedBoundMode(String const& name) {
-  auto clamp = name.equalsIgnoreCase("Clamp");
+  auto clamp = name.equals_ignore_case("Clamp");
   if (!clamp)
     return std::unexpected(std::move(clamp.error()));
   if (*clamp)
     return BoundMode::Clamp;
-  auto extrapolate = name.equalsIgnoreCase("Extrapolate");
+  auto extrapolate = name.equals_ignore_case("Extrapolate");
   if (!extrapolate)
     return std::unexpected(std::move(extrapolate.error()));
   if (*extrapolate)
     return BoundMode::Extrapolate;
-  auto wrap = name.equalsIgnoreCase("Wrap");
+  auto wrap = name.equals_ignore_case("Wrap");
   if (!wrap)
     return std::unexpected(std::move(wrap.error()));
   if (*wrap)
     return BoundMode::Wrap;
-  return std::unexpected(StoredFunctionException(strf("Unrecognized BoundMode '{}'", name)));
+  return std::unexpected(StoredFunctionException(Star::format("Unrecognized BoundMode '{}'", name)));
 }
 
 }
@@ -352,7 +352,7 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
       auto value = (**pair)[1].toDouble();
       if (!value)
         return std::unexpected(std::move(value.error()));
-      points.append({*index, *value});
+      points.push_back({*index, *value});
     }
     auto interpolation = storedInterpolationMode(*interpolationName);
     if (!interpolation)
@@ -382,7 +382,7 @@ std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::param
       auto index = (**pair)[0].toInt();
       if (!index)
         return std::unexpected(std::move(index.error()));
-      points.append({*index, (**pair)[1]});
+      points.push_back({*index, (**pair)[1]});
     }
     return ParametricTable<int, Json>::create(std::move(points));
   }();
@@ -418,7 +418,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
           auto value = (**row)[x].toFloat();
           if (!value)
             return std::unexpected(std::move(value.error()));
-          xaxis.append(*value);
+          xaxis.push_back(*value);
         }
         points.resize({(*row)->size() - 1, (*grid)->size() - 1});
       } else {
@@ -427,7 +427,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
         auto axis = (**row)[0].toFloat();
         if (!axis)
           return std::unexpected(std::move(axis.error()));
-        yaxis.append(*axis);
+        yaxis.push_back(*axis);
         auto cells = (**row)[1].arrayPtr();
         if (!cells)
           return std::unexpected(std::move(cells.error()));

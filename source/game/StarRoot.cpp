@@ -193,28 +193,30 @@ std::expected<void, StarException> Root::initialize() {
   if (m_settings.runtimeConfigFile)
     m_runtimeConfigFile = toStoragePath(*m_settings.runtimeConfigFile);
 
-  auto storageExists = File::isDirectory(m_settings.storageDirectory);
+  auto storageExists = File::is_directory(m_settings.storageDirectory);
   if (!storageExists)
     return std::unexpected(std::move(storageExists.error()));
   if (!*storageExists) {
-    auto made = File::makeDirectory(m_settings.storageDirectory);
+    auto made = File::create_directory(m_settings.storageDirectory);
     if (!made)
       return std::unexpected(std::move(made.error()));
   }
 
   if (m_settings.logFile) {
-    String logFile = File::relativeTo(m_settings.logDirectory.value_or(m_settings.storageDirectory), *m_settings.logFile);
-    String oldLogDirectory = m_settings.logDirectory.value_or(File::relativeTo(m_settings.storageDirectory, "logs"));
-    auto logDirectoryExists = File::isDirectory(oldLogDirectory);
+    String logFile =
+      File::relative_to(m_settings.logDirectory.value_or(m_settings.storageDirectory), *m_settings.logFile);
+    String oldLogDirectory = m_settings.logDirectory.value_or(File::relative_to(m_settings.storageDirectory, "logs"));
+    auto logDirectoryExists = File::is_directory(oldLogDirectory);
     if (!logDirectoryExists)
       return std::unexpected(std::move(logDirectoryExists.error()));
     if (!*logDirectoryExists) {
-      auto made = File::makeDirectory(oldLogDirectory);
+      auto made = File::create_directory(oldLogDirectory);
       if (!made)
         return std::unexpected(std::move(made.error()));
     }
 
-    auto backup = File::backupFileInSequence(logFile, File::relativeTo(oldLogDirectory, *m_settings.logFile), m_settings.logFileBackups);
+    auto backup = File::backup_file_in_sequence(logFile, File::relative_to(oldLogDirectory, *m_settings.logFile),
+                                                m_settings.logFileBackups);
     if (!backup)
       return std::unexpected(std::move(backup.error()));
     auto sink = FileLogSink::create(logFile, m_settings.logLevel, true);
@@ -304,7 +306,7 @@ std::expected<void, StarException> Root::initialize() {
 
 Root::~Root() {
   if (auto logged = m_logger.info("Root: Shutting down Root"); !logged)
-    EmergencyLog::error("Root: Shutdown log failed: {}", outputException(logged.error(), true));
+    EmergencyLog::error("Root: Shutdown log failed: {}", Star::output_exception(logged.error(), true));
 
   {
     std::lock_guard locker(m_maintenanceStopMutex);
@@ -313,15 +315,15 @@ Root::~Root() {
   }
   if (m_maintenanceThread) {
     if (auto finished = m_maintenanceThread.finish(); !finished)
-      EmergencyLog::error("Root: Maintenance failed during shutdown: {}", outputException(finished.error(), true));
+      EmergencyLog::error("Root: Maintenance failed during shutdown: {}", Star::output_exception(finished.error(), true));
   }
   if (auto finished = m_workers.finish(); !finished)
-    EmergencyLog::error("Root: Worker shutdown failed: {}", outputException(finished.error(), true));
+    EmergencyLog::error("Root: Worker shutdown failed: {}", Star::output_exception(finished.error(), true));
 
   m_reloadListeners.clearAllListeners();
 
   if (auto written = writeConfig(); !written)
-    EmergencyLog::error("Root: Could not write configuration during shutdown: {}", outputException(written.error(), true));
+    EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
 
 }
 
@@ -475,7 +477,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   loaders.reserve(40);
 
   auto add = [&](auto method) {
-    loaders.append(workerPool.addWork([this, method]() -> std::expected<void, StarException> {
+    loaders.push_back(workerPool.addWork([this, method]() -> std::expected<void, StarException> {
       auto loaded = (this->*method)();
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
@@ -561,13 +563,13 @@ std::expected<void, StarException> Root::hotReload() {
 }
 
 String Root::toStoragePath(String const& path) const {
-  return File::relativeTo(m_settings.storageDirectory, File::convertDirSeparators(path));
+  return File::relative_to(m_settings.storageDirectory, File::convert_dir_separators(path));
 }
 
 std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
   return loadMemberFunction<Assets>(m_assets, m_assetsMutex, "Assets", [this]() -> std::expected<std::shared_ptr<Assets>, StarException> {
       StringList assetDirectories = m_settings.assetDirectories;
-      assetDirectories.appendAll(m_modDirectories);
+      assetDirectories.append_range(m_modDirectories);
       auto assetSources = scanForAssetSources(assetDirectories, m_settings.assetSources);
       if (!assetSources)
         return std::unexpected(std::move(assetSources.error()));
@@ -586,7 +588,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
     [this]() -> std::expected<std::shared_ptr<Configuration>, StarException> {
       Json currentConfig = m_settings.defaultConfiguration;
       if (m_runtimeConfigFile) {
-        auto exists = File::isFile(*m_runtimeConfigFile);
+        auto exists = File::is_regular_file(*m_runtimeConfigFile);
         if (!exists)
           return std::unexpected(std::move(exists.error()));
         if (!*exists) {
@@ -595,7 +597,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
             return std::unexpected(std::move(logged.error()));
         } else {
           auto readConfiguration = [this]() -> std::expected<Json, StarException> {
-            auto contents = File::readFileString(*m_runtimeConfigFile);
+            auto contents = File::read_file_string(*m_runtimeConfigFile);
             if (!contents)
               return std::unexpected(std::move(contents.error()));
             auto parsed = Json::parseJson(*contents);
@@ -627,7 +629,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
           if (loaded) {
             currentConfig = std::move(*loaded);
           } else {
-            auto logged = m_logger.warnException(strf("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
+            auto logged = m_logger.warnException(Star::format("Root: Failed to load user configuration file {}, resetting user config", *m_runtimeConfigFile), ExceptionDiagnostic(loaded.error()));
             if (!logged)
               return std::unexpected(std::move(logged.error()));
             auto backup = File::rename(*m_runtimeConfigFile, *m_runtimeConfigFile + ".old");
@@ -851,11 +853,11 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
 
   auto processEntry = [&](String const& sourcePath, bool isDirectory) -> std::expected<bool, StarException> {
     std::shared_ptr<Star::AssetSource> source;
-    auto name = File::baseName(sourcePath);
-    auto hidden = name.beginsWith(".");
+    auto name = File::base_name(sourcePath);
+    auto hidden = name.starts_with(".");
     if (!hidden) return std::unexpected(std::move(hidden.error()));
     if (!*hidden) {
-      hidden = name.beginsWith("_");
+      hidden = name.starts_with("_");
       if (!hidden) return std::unexpected(std::move(hidden.error()));
     }
     if (*hidden) {
@@ -866,7 +868,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
       if (!created) return std::unexpected(std::move(created.error()));
       source = std::move(*created);
     } else {
-      auto packed = sourcePath.endsWith(".pak");
+      auto packed = sourcePath.ends_with(".pak");
       if (!packed) return std::unexpected(std::move(packed.error()));
       if (*packed) {
         auto created = PackedAssetSource::create(sourcePath);
@@ -906,7 +908,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     assetSource->includes = std::move(*included);
 
     if (assetSource->name.value_or(String{}) == "opensb_base" && assetSource->version.value_or(String{}) != OpenStarVersionString) {
-      return std::unexpected(AssetSourceException(strf("\n\nOpenStarbound assets version mismatch!\nOpenStarbound v{}, but opensb.pak is v{}\n",
+      return std::unexpected(AssetSourceException(Star::format("\n\nOpenStarbound assets version mismatch!\nOpenStarbound v{}, but opensb.pak is v{}\n",
         OpenStarVersionString, assetSource->version.value_or(String{})), false));
     }
 
@@ -924,10 +926,10 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
         }
       } else {
         namedSources[*assetSource->name] = assetSource;
-        assetSources.append(std::move(assetSource));
+        assetSources.push_back(std::move(assetSource));
       }
     } else {
-      assetSources.append(std::move(assetSource));
+      assetSources.push_back(std::move(assetSource));
     }
 
     return true;
@@ -938,7 +940,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
   // file / directory name
 
   for (auto const& directory : directories) {
-    auto directoryExists = File::isDirectory(directory);
+    auto directoryExists = File::is_directory(directory);
     if (!directoryExists) return std::unexpected(std::move(directoryExists.error()));
     if (!*directoryExists) {
       auto logged = m_logger.info("Root: Skipping asset directory '{}', directory not found", directory);
@@ -948,11 +950,11 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
 
     auto logged = m_logger.info("Root: Scanning for asset sources in directory '{}'", directory);
     if (!logged) return std::unexpected(std::move(logged.error()));
-    auto entries = File::dirList(directory, true);
+    auto entries = File::directory_entries(directory, true);
     if (!entries) return std::unexpected(std::move(entries.error()));
     entries->sort();
     for (auto& entry : *entries) {
-      auto processed = processEntry(File::relativeTo(directory, entry.first), entry.second);
+      auto processed = processEntry(File::relative_to(directory, entry.first), entry.second);
       if (!processed) return std::unexpected(std::move(processed.error()));
     }
   }
@@ -960,7 +962,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
   // Take in any manual asset source paths
 
   for (auto& path : manual) {
-    auto directory = File::isDirectory(path);
+    auto directory = File::is_directory(path);
     if (!directory) return std::unexpected(std::move(directory.error()));
     auto processed = processEntry(path, *directory);
     if (!processed) return std::unexpected(std::move(processed.error()));
@@ -993,18 +995,18 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     workingSet.add(source);
 
     for (auto const& includeName : source->includes) {
-      if (auto include = namedSources.maybeRef(includeName)) {
+      if (auto include = namedSources.find_ref(includeName)) {
         auto visited = dependencySortVisit(include->get());
         if (!visited) return std::unexpected(std::move(visited.error()));
       }
     }
 
     for (auto const& requirementName : source->requires_) {
-      if (auto requirement = namedSources.maybeRef(requirementName)) {
+      if (auto requirement = namedSources.find_ref(requirementName)) {
         auto visited = dependencySortVisit(requirement->get());
         if (!visited) return std::unexpected(std::move(visited.error()));
       } else {
-        return std::unexpected(AssetSourceException(strf("Asset source '{}' is missing dependency '{}'{}", source->name ? *source->name : "<unnamed>", requirementName,
+        return std::unexpected(AssetSourceException(Star::format("Asset source '{}' is missing dependency '{}'{}", source->name ? *source->name : "<unnamed>", requirementName,
           requirementName != "base" ? "" :
             "\n\nThe base Starbound asset package could not be found, please copy it from another Starbound install!\n"
             "(Locate 'packed.pak' in vanilla Starbound's assets folder, then copy it to OpenStarbound's assets folder.)\n"), false));
@@ -1024,12 +1026,12 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
 
   StringList sourcePaths;
   for (auto const& source : dependencySortedSources) {
-    auto path = File::convertDirSeparators(source->path);
+    auto path = File::convert_dir_separators(source->path);
     auto logged = source->name
-      ? m_logger.info("Root: Detected asset source named '{}'{} at '{}'", *source->name, source->version ? strf(" version '{}'", *source->version) : "", path)
+      ? m_logger.info("Root: Detected asset source named '{}'{} at '{}'", *source->name, source->version ? Star::format(" version '{}'", *source->version) : "", path)
       : m_logger.info("Root: Detected unnamed asset source at '{}'", path);
     if (!logged) return std::unexpected(std::move(logged.error()));
-    sourcePaths.append(path);
+    sourcePaths.push_back(path);
   }
 
   return sourcePaths;
@@ -1044,7 +1046,7 @@ std::expected<void, StarException> Root::writeConfig() {
         if (!logged) return std::unexpected(std::move(logged.error()));
         auto contents = m_configuration->printConfiguration();
         if (!contents) return std::unexpected(std::move(contents.error()));
-        auto written = File::overwriteFileWithRename(*contents, *m_runtimeConfigFile);
+        auto written = File::overwrite_file_with_rename(*contents, *m_runtimeConfigFile);
         if (!written) return std::unexpected(std::move(written.error()));
       }
       m_lastRuntimeConfig = std::move(currentConfig);

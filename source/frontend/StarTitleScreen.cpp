@@ -230,7 +230,7 @@ TitleScreen::TitleScreen(GuiContext& context, std::shared_ptr<PlayerStorage> pla
 
 TitleScreen::~TitleScreen() {
   if (auto r = close(); !r)
-    EmergencyLog::error("Error closing title screen: {}", outputException(ExceptionDiagnostic(r.error()), true));
+    EmergencyLog::error("Error closing title screen: {}", Star::output_exception(ExceptionDiagnostic(r.error()), true));
 }
 
 std::expected<void, StarException> TitleScreen::close() {
@@ -246,8 +246,8 @@ std::expected<void, StarException> TitleScreen::close() {
   if (m_celestialDatabase) {
     if (auto r = m_celestialDatabase->close(); !r) {
       if (error)
-        error = StarException(strf("Title celestial cleanup failed: {}",
-            printException(ExceptionDiagnostic(r.error()), true)), ExceptionDiagnostic(*error));
+        error = StarException(Star::format("Title celestial cleanup failed: {}",
+            Star::print_exception(ExceptionDiagnostic(r.error()), true)), ExceptionDiagnostic(*error));
       else
         error = std::move(r.error());
     }
@@ -265,8 +265,8 @@ std::expected<std::shared_ptr<TitleScreen>, StarException> TitleScreen::create(G
   if (!initialized) {
     auto closed = screen->close();
     if (!closed)
-      return std::unexpected(StarException(strf("Title initialization cleanup failed: {}",
-          printException(ExceptionDiagnostic(closed.error()), true)), ExceptionDiagnostic(initialized.error())));
+      return std::unexpected(StarException(Star::format("Title initialization cleanup failed: {}",
+          Star::print_exception(ExceptionDiagnostic(closed.error()), true)), ExceptionDiagnostic(initialized.error())));
     return std::unexpected(std::move(initialized.error()));
   }
   return screen;
@@ -575,7 +575,7 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
     if (!button) return std::unexpected(std::move(button.error()));
     (*button)->setPosition(*offset);
     if (*rightAnchored)
-      m_rightAnchoredButtons.append({*button, *offset});
+      m_rightAnchoredButtons.push_back({*button, *offset});
     if (auto r = (*key == "back" ? *backMenu : m_mainMenu)->addChild(*key, *button); !r)
       return std::unexpected(std::move(r.error()));
   }

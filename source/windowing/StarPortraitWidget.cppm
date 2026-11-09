@@ -63,7 +63,7 @@ public:
   }
 
   [[nodiscard]] static std::expected<std::shared_ptr<PortraitWidget>, StarException> create(GuiContext& context, std::shared_ptr<PortraitEntity> entity = {}, PortraitMode mode = PortraitMode::Full);
-  virtual ~PortraitWidget() {}
+  ~PortraitWidget() override = default;
 
   [[nodiscard]] std::expected<void, StarException> setEntity(std::shared_ptr<PortraitEntity> entity);
   [[nodiscard]] std::expected<void, StarException> setMode(PortraitMode mode);
@@ -73,7 +73,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
 
 protected:
-  virtual RectI getScissorRect() const;
+  RectI getScissorRect() const override;
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
 private:

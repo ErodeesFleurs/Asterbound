@@ -1,3 +1,4 @@
+#include <cstdio>
 import std;
 import star.json;
 import star.native_runtime;
@@ -24,7 +25,7 @@ using MatchCriteria = std::variant<TileName, TileProperty>;
 struct SearchParameters {
   MatchCriteria criteria;
 };
-using MatchReporter = std::function<void(String const&, Vec2I const&)>;
+using MatchReporter = std::function<std::expected<void, StarException>(String const&, Vec2I const&)>;
 String const MapFilenameSuffix = ".json";
 
 [[nodiscard]]
@@ -36,7 +37,7 @@ std::expected<std::optional<String>, StarException> matchTile(SearchParameters c
     if (!tileName)
       return std::unexpected(std::move(tileName.error()));
     if (*tileName) {
-      auto matches = (**tileName).regexMatch(namePattern);
+      auto matches = (**tileName).regex_match(namePattern);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)
@@ -48,7 +49,7 @@ std::expected<std::optional<String>, StarException> matchTile(SearchParameters c
     if (!value)
       return std::unexpected(std::move(value.error()));
     if (*value) {
-      auto matches = (**value).regexMatch(property.second);
+      auto matches = (**value).regex_match(property.second);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches) {
@@ -68,8 +69,11 @@ std::expected<void, StarException> grepTileLayer(SearchParameters const& search,
     auto name = matchTile(search, static_cast<Tiled::Tile const&>(tile));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (*name)
-      callback(**name, pos);
+    if (*name) {
+      auto reported = callback(**name, pos);
+      if (!reported)
+        return std::unexpected(std::move(reported.error()));
+    }
     return false;
   });
   if (!visited)
@@ -83,15 +87,18 @@ std::expected<void, StarException> grepObjectGroup(SearchParameters const& searc
     auto name = matchTile(search, object->tile());
     if (!name)
       return std::unexpected(std::move(name.error()));
-    if (*name)
-      callback(**name, object->pos());
+    if (*name) {
+      auto reported = callback(**name, object->pos());
+      if (!reported)
+        return std::unexpected(std::move(reported.error()));
+    }
   }
   return {};
 }
 
 [[nodiscard]]
 std::expected<void, StarException> grepMap(Root& root, SearchParameters const& search, String const& file) {
-  auto contents = File::readFileString(file);
+  auto contents = File::read_file_string(file);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
   auto json = Json::parseJson(*contents);
@@ -102,14 +109,14 @@ std::expected<void, StarException> grepMap(Root& root, SearchParameters const& s
     return std::unexpected(std::move(map.error()));
   for (auto const& layer : (*map)->tileLayers()) {
     auto searched = grepTileLayer(search, **map, *layer, [&](String const& name, Vec2I const& pos) {
-      coutf("{}: {}: {} @ {}\n", file, layer->name(), name, pos);
+      return Star::print("{}: {}: {} @ {}\n", file, layer->name(), name, pos);
     });
     if (!searched)
       return std::unexpected(std::move(searched.error()));
   }
   for (auto const& group : (*map)->objectGroups()) {
     auto searched = grepObjectGroup(search, *group, [&](String const& name, Vec2I const& pos) {
-      coutf("{}: {}: {} @ {}\n", file, group->name(), name, pos);
+      return Star::print("{}: {}: {} @ {}\n", file, group->name(), name, pos);
     });
     if (!searched)
       return std::unexpected(std::move(searched.error()));
@@ -119,14 +126,14 @@ std::expected<void, StarException> grepMap(Root& root, SearchParameters const& s
 
 [[nodiscard]]
 std::expected<void, StarException> grepDirectory(Root& root, SearchParameters const& search, String const& directory) {
-  auto entries = File::dirList(directory);
+  auto entries = File::directory_entries(directory);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    String path = File::relativeTo(directory, entry.first);
+    String path = File::relative_to(directory, entry.first);
     // A symlinked directory may escape the tree or revisit a parent.
     if (entry.second) {
-      auto symlink = File::isSymlink(path);
+      auto symlink = File::is_symlink(path);
       if (!symlink)
         return std::unexpected(std::move(symlink.error()));
       if (*symlink) {
@@ -141,7 +148,7 @@ std::expected<void, StarException> grepDirectory(Root& root, SearchParameters co
       if (!searched)
         return std::unexpected(std::move(searched.error()));
     } else {
-      auto matches = entry.first.endsWith(MapFilenameSuffix);
+      auto matches = entry.first.ends_with(MapFilenameSuffix);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches) {
@@ -156,12 +163,12 @@ std::expected<void, StarException> grepDirectory(Root& root, SearchParameters co
 
 [[nodiscard]]
 std::expected<void, StarException> grepPath(Root& root, SearchParameters const& search, String const& path) {
-  auto file = File::isFile(path);
+  auto file = File::is_regular_file(path);
   if (!file)
     return std::unexpected(std::move(file.error()));
   if (*file)
     return grepMap(root, search, path);
-  auto directory = File::isDirectory(path);
+  auto directory = File::is_directory(path);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (*directory)
@@ -211,7 +218,8 @@ int main(int argc, char* argv[]) {
   };
   auto result = run();
   if (!result) {
-    cerrf("exception caught: {}\n", outputException(ExceptionDiagnostic(result.error()), true));
+    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+      return 1;
     return 1;
   }
   return *result;

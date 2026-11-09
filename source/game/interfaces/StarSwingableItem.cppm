@@ -85,7 +85,7 @@ public:
   }
 
   SwingableItem();
-  virtual ~SwingableItem() {}
+  ~SwingableItem() override = default;
 
   // These can be different
   // Default implementation is the same though

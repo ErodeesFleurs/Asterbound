@@ -12,7 +12,7 @@ namespace Star {
 
 class Json;
 class StringView;
-typedef List<Json> JsonArray;
+using JsonArray = List<Json>;
 
 class Image;
 
@@ -80,7 +80,7 @@ struct SetColorImageOperation {
   Vec3B color;
 };
 
-typedef HashMap<Vec4B, Vec4B> ColorReplaceMap;
+using ColorReplaceMap = HashMap<Vec4B, Vec4B>;
 
 struct ColorReplaceImageOperation {
   ColorReplaceMap colorReplaceMap;
@@ -144,9 +144,12 @@ struct FlipImageOperation {
   Mode mode;
 };
 
-typedef std::variant<NullImageOperation, ErrorImageOperation, HueShiftImageOperation, SaturationShiftImageOperation, BrightnessMultiplyImageOperation, FadeToColorImageOperation,
-  ScanLinesImageOperation, SetColorImageOperation, ColorReplaceImageOperation, AlphaMaskImageOperation, BlendImageOperation,
-  MultiplyImageOperation, BorderImageOperation, ScaleImageOperation, CropImageOperation, FlipImageOperation> ImageOperation;
+using ImageOperation =
+  std::variant<NullImageOperation, ErrorImageOperation, HueShiftImageOperation, SaturationShiftImageOperation,
+               BrightnessMultiplyImageOperation, FadeToColorImageOperation, ScanLinesImageOperation,
+               SetColorImageOperation, ColorReplaceImageOperation, AlphaMaskImageOperation, BlendImageOperation,
+               MultiplyImageOperation, BorderImageOperation, ScaleImageOperation, CropImageOperation,
+               FlipImageOperation>;
 
 ImageOperation imageOperationFromString(StringView string);
 String imageOperationToString(ImageOperation const& operation);
@@ -164,7 +167,9 @@ void addImageOperationReferences(ImageOperation const& operation, StringList& ou
 
 StringList imageOperationReferences(List<ImageOperation> const& operations);
 
-typedef std::function<std::expected<std::optional<std::reference_wrapper<Image const>>, StarException>(String const& refName)> ImageReferenceCallback;
+using ImageReferenceCallback =
+  std::function<std::expected<std::optional<std::reference_wrapper<Image const>>, StarException>(
+    String const& refName)>;
 
 [[nodiscard]] std::expected<void, StarException> processImageOperation(ImageOperation const& operation, Image& input, ImageReferenceCallback refCallback = {});
 

@@ -180,7 +180,7 @@ private:
   explicit StatusController(Root& root);
   [[nodiscard]] std::expected<void, StarException> configure(Json const& config);
   Root& m_root;
-  typedef LuaStatusScript StatScript;
+  using StatScript = LuaStatusScript;
 
   struct EffectAnimator : public NetElement {
     explicit EffectAnimator(Root& root);
@@ -204,7 +204,7 @@ private:
     std::shared_ptr<NetworkedAnimator> animator;
     NetworkedAnimator::DynamicTarget dynamicTarget;
   };
-  typedef NetElementDynamicGroup<EffectAnimator> EffectAnimatorGroup;
+  using EffectAnimatorGroup = NetElementDynamicGroup<EffectAnimator>;
 
   struct UniqueEffectMetadata : public NetElementSyncGroup {
     UniqueEffectMetadata();
@@ -222,7 +222,7 @@ private:
     // the unique effect was the owning entity.
     NetElementData<std::optional<EntityId>> sourceEntityId;
   };
-  typedef NetElementDynamicGroup<UniqueEffectMetadata> UniqueEffectMetadataGroup;
+  using UniqueEffectMetadataGroup = NetElementDynamicGroup<UniqueEffectMetadata>;
 
   struct PersistentEffectCategory {
     std::optional<StatModifierGroupId> modifierEffectsGroupId;

@@ -109,7 +109,7 @@ std::expected<BiomeItem, StarException> variantToBiomeItem(Assets const& assets,
   }
   auto text = type->repr();
   if (!text) return std::unexpected(std::move(text.error()));
-  return std::unexpected(BiomeException(strf("Unrecognized biome item type '{}'", *text)));
+  return std::unexpected(BiomeException(Star::format("Unrecognized biome item type '{}'", *text)));
 }
 
 std::expected<Json, StarException> variantFromBiomeItem(BiomeItem const& item) {
@@ -152,7 +152,7 @@ bool BiomeItemPlacement::operator<(BiomeItemPlacement const& rhs) const {
 std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::createItem(Root& root, Json const& config, RandomSource& rand, float biomeHueShift) {
   auto type = config.getString("type");
   if (!type) return std::unexpected(std::move(type.error()));
-  if (auto match = type->equalsIgnoreCase("grass"); !match) return std::unexpected(std::move(match.error()));
+  if (auto match = type->equals_ignore_case("grass"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto grassConfig = config.get("grasses");
     if (!grassConfig) return std::unexpected(std::move(grassConfig.error()));
@@ -165,7 +165,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     auto variant = (*plants)->buildGrassVariant(grass->get(), biomeHueShift);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
-  } else if (auto match = type->equalsIgnoreCase("bush"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("bush"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto bushes = config.getArray("bushes", {});
     if (!bushes) return std::unexpected(std::move(bushes.error()));
@@ -190,7 +190,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     auto variant = (*plants)->buildBushVariant(*name, baseHue, mod, modHue);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
-  } else if (auto match = type->equalsIgnoreCase("tree"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("tree"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto stemConfig = config.get("treeStemList", JsonArray());
     if (!stemConfig) return std::unexpected(std::move(stemConfig.error()));
@@ -213,7 +213,8 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
           if (!foliageShape) return std::unexpected(std::move(foliageShape.error()));
           matches = *stemShape == *foliageShape;
         }
-        if (matches) matchingPairs.append({stem, foliage});
+        if (matches)
+          matchingPairs.push_back({stem, foliage});
       }
     }
     if (matchingPairs.empty() && !stems->empty() && !foliages->empty()) {
@@ -266,7 +267,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       }
       return BiomeItem{TreePair{std::move(primary), std::move(alternate)}};
     }
-  } else if (auto match = type->equalsIgnoreCase("object"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("object"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto sets = config.getArray("objectSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
@@ -287,14 +288,14 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       pool.add(*weight, {std::move(*name), *parameters});
     }
     return BiomeItem{std::move(pool)};
-  } else if (auto match = type->equalsIgnoreCase("treasureBox"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("treasureBox"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto sets = config.getArray("treasureBoxSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
     auto name = rand.randValueFrom(*sets).toString();
     if (!name) return std::unexpected(std::move(name.error()));
     return BiomeItem{TreasureBoxSet(std::move(*name))};
-  } else if (auto match = type->equalsIgnoreCase("microdungeon"); !match) return std::unexpected(std::move(match.error()));
+  } else if (auto match = type->equals_ignore_case("microdungeon"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
     auto namesConfig = config.get("microdungeons", JsonArray());
     if (!namesConfig) return std::unexpected(std::move(namesConfig.error()));
@@ -302,7 +303,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     if (!names) return std::unexpected(std::move(names.error()));
     return BiomeItem{MicroDungeonNames(std::move(*names))};
   } else {
-    return std::unexpected(BiomeException(strf("No such item type '{}' in item distribution", *type)));
+    return std::unexpected(BiomeException(Star::format("No such item type '{}' in item distribution", *type)));
   }
   return std::optional<BiomeItem>();
 }
@@ -360,7 +361,8 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
-      if (*item) result.m_randomItems.append(std::move(**item));
+      if (*item)
+        result.m_randomItems.push_back(std::move(**item));
     }
   } else if (result.m_distribution == DistributionType::Periodic) {
     auto octaves = settings->getInt("octaves", 1);
@@ -387,14 +389,16 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
       if (!value) return std::unexpected(std::move(value.error()));
       result.m_modulusOffset = std::move(*value);
     }
-    result.m_densityFunction = PerlinF((unsigned)*octaves, 1.0f / *densityPeriod, 1.0, *densityOffset, *alpha, *beta, rand.randu64());
-    result.m_modulusDistortion = PerlinF((unsigned)*octaves, 1.0f / result.m_modulus, *modulusVariance, *modulusVariance * 2, *alpha, *beta, rand.randu64());
+    result.m_densityFunction = PerlinF(static_cast<unsigned>(*octaves), 1.0f / *densityPeriod, 1.0, *densityOffset,
+                                       *alpha, *beta, rand.randu64());
+    result.m_modulusDistortion = PerlinF(static_cast<unsigned>(*octaves), 1.0f / result.m_modulus, *modulusVariance,
+                                         *modulusVariance * 2, *alpha, *beta, rand.randu64());
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
       if (*item) {
-        PerlinF weight((unsigned)*octaves, 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
-        result.m_weightedItems.append({std::move(**item), weight});
+        PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
+        result.m_weightedItems.push_back({std::move(**item), weight});
       }
     }
   }
@@ -433,7 +437,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   for (auto const& entry : *randomItems) {
     auto item = variantToBiomeItem(assets, entry);
     if (!item) return std::unexpected(std::move(item.error()));
-    result.m_randomItems.append(std::move(*item));
+    result.m_randomItems.push_back(std::move(*item));
   }
   auto densityFunctionConfig = store.get("densityFunction");
   if (!densityFunctionConfig) return std::unexpected(std::move(densityFunctionConfig.error()));
@@ -470,7 +474,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     if (!weightConfig) return std::unexpected(std::move(weightConfig.error()));
     auto weight = PerlinF::create(*weightConfig);
     if (!weight) return std::unexpected(std::move(weight.error()));
-    result.m_weightedItems.append({std::move(*item), std::move(*weight)});
+    result.m_weightedItems.push_back({std::move(*item), std::move(*weight)});
   }
   return result;
 }
@@ -484,7 +488,7 @@ std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
   for (auto const& item : m_randomItems) {
     auto json = variantFromBiomeItem(item);
     if (!json) return std::unexpected(std::move(json.error()));
-    randomItems.append(std::move(*json));
+    randomItems.push_back(std::move(*json));
   }
   auto density = m_densityFunction.toJson();
   if (!density) return std::unexpected(std::move(density.error()));
@@ -496,7 +500,7 @@ std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
     if (!item) return std::unexpected(std::move(item.error()));
     auto weight = pair.second.toJson();
     if (!weight) return std::unexpected(std::move(weight.error()));
-    weightedItems.append(JsonArray{std::move(*item), std::move(*weight)});
+    weightedItems.push_back(JsonArray{std::move(*item), std::move(*weight)});
   }
   return JsonObject{{"mode", String(*mode)}, {"distribution", String(*distribution)}, {"priority", m_priority},
       {"blockProbability", m_blockProbability}, {"blockSeed", m_blockSeed}, {"randomItems", std::move(randomItems)},
@@ -514,7 +518,7 @@ List<BiomeItem> BiomeItemDistribution::allItems() const {
   } else if (m_distribution == DistributionType::Periodic) {
     List<BiomeItem> items;
     for (auto const& pair : m_weightedItems)
-      items.append(pair.first);
+      items.push_back(pair.first);
     return items;
   } else {
     return {};
@@ -523,8 +527,8 @@ List<BiomeItem> BiomeItemDistribution::allItems() const {
 
 std::expected<std::optional<BiomeItemPlacement>, StarException> BiomeItemDistribution::itemToPlace(int x, int y) const {
   if (m_distribution == DistributionType::Random) {
-    if (staticRandomFloat(x, y, m_blockSeed) <= m_blockProbability) {
-      auto item = staticRandomValueFrom(m_randomItems, x, y, m_blockSeed);
+    if (static_random_float(x, y, m_blockSeed) <= m_blockProbability) {
+      auto item = static_random_value_from(m_randomItems, x, y, m_blockSeed);
       return BiomeItemPlacement{std::move(item), Vec2I(x, y), m_priority};
     }
 
@@ -535,7 +539,7 @@ std::expected<std::optional<BiomeItemPlacement>, StarException> BiomeItemDistrib
     if (*density > 0) {
       auto distortion = m_modulusDistortion.get(x, y);
       if (!distortion) return std::unexpected(std::move(distortion.error()));
-      if ((int)(x + m_modulusOffset + *distortion) % m_modulus == 0) {
+      if (static_cast<int>(x + m_modulusOffset + *distortion) % m_modulus == 0) {
         float maxWeight = std::numeric_limits<float>::lowest();
         for (auto const& weightedItem : m_weightedItems) {
           auto weightResult = weightedItem.second.get(x, y);

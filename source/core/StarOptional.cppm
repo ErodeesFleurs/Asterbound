@@ -1,6 +1,6 @@
 module;
 import std;
-import star.stream_formatter;
+import star.text_formatter;
 import star.format;
 
 namespace Star {
@@ -48,7 +48,7 @@ auto optionalRef(Owner&& owner)
   return std::nullopt;
 }
 
-// Explicit diagnostic view: std::optional itself has no ostream/formatter hook.
+// Explicit diagnostic view: std::optional itself has no formatter hook.
 // The referenced optional must outlive the view, including deferred formatting.
 template <typename T>
 struct OptionalOutput {
@@ -56,44 +56,48 @@ struct OptionalOutput {
 };
 
 template <typename T>
-OptionalOutput<T> outputOptional(std::optional<T> const& value) {
+OptionalOutput<T> output_optional(std::optional<T> const& value) {
   return {value};
 }
 
 template <typename T>
-decltype(auto) optionalDiagnosticValue(T const& value) {
-  if constexpr (requires { outputOptional(value); })
-    return outputOptional(value);
+decltype(auto) optional_diagnostic_value(T const& value) {
+  if constexpr (requires { output_optional(value); })
+    return output_optional(value);
   else
     return (value);
 }
 
 template <typename T>
-using OptionalDiagnosticResult = decltype(std::declval<std::ostream&>() << optionalDiagnosticValue(std::declval<T const&>()));
+using optional_diagnostic_result = decltype(append_text(std::declval<TextBuffer&>(),
+    optional_diagnostic_value(std::declval<T const&>())));
 
 template <typename T>
-std::ostream& operator<<(std::ostream& output, OptionalOutput<T> value)
-    requires std::same_as<OptionalDiagnosticResult<T>, std::ostream&> {
-  if (!value.value)
-    return output << "Nothing";
-  output << "Just (" << optionalDiagnosticValue(*value.value);
-  return output << ")";
+void write_text(TextBuffer& output, OptionalOutput<T> const& value)
+    requires std::same_as<optional_diagnostic_result<T>, void> {
+  if (!value.value) {
+    output.append("Nothing");
+    return;
+  }
+  output.append("Just (");
+  append_text(output, optional_diagnostic_value(*value.value));
+  output.push_back(')');
 }
 
 template <typename T>
 [[nodiscard]]
-std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(std::ostream& output, OptionalOutput<T> value)
-    requires std::same_as<OptionalDiagnosticResult<T>, std::expected<std::reference_wrapper<std::ostream>, StarException>> {
+std::expected<void, StarException> write_text(TextBuffer& output, OptionalOutput<T> const& value)
+    requires std::same_as<optional_diagnostic_result<T>, std::expected<void, StarException>> {
   if (!value.value) {
-    output << "Nothing";
-    return std::ref(output);
+    output.append("Nothing");
+    return {};
   }
-  output << "Just (";
-  auto written = output << optionalDiagnosticValue(*value.value);
+  output.append("Just (");
+  auto written = append_text(output, optional_diagnostic_value(*value.value));
   if (!written)
     return std::unexpected(std::move(written.error()));
-  output << ")";
-  return std::ref(output);
+  output.push_back(')');
+  return {};
 }
 
 }
@@ -101,13 +105,15 @@ std::expected<std::reference_wrapper<std::ostream>, StarException> operator<<(st
 export module star.optional;
 
 export template <typename T>
-  requires std::same_as<decltype(std::declval<std::ostream&>() << std::declval<Star::OptionalOutput<T>>()), std::ostream&>
-struct std::formatter<Star::OptionalOutput<T>> : Star::StreamFormatter {};
+  requires Star::nonfallible_text_writer<Star::OptionalOutput<T>>
+struct std::formatter<Star::OptionalOutput<T>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::takeOptional;
   using ::Star::optionalRef;
   using ::Star::OptionalOutput;
-  using ::Star::outputOptional;
-  using ::Star::operator<<;
+  using ::Star::output_optional;
+  using ::Star::optional_diagnostic_value;
+  using ::Star::optional_diagnostic_result;
+  using ::Star::write_text;
 }

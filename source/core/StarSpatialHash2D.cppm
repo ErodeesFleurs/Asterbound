@@ -20,11 +20,11 @@ namespace Star {
 template <typename KeyT, typename ScalarT, typename ValueT, typename IntT = int, std::size_t AllocatorBlockSize = 4096>
 class SpatialHash2D {
 public:
-  typedef KeyT Key;
-  typedef ScalarT Scalar;
-  typedef Box<ScalarT, 2> Rect;
-  typedef typename Rect::Coord Coord;
-  typedef ValueT Value;
+  using Key = KeyT;
+  using Scalar = ScalarT;
+  using Rect = Box<ScalarT, 2>;
+  using Coord = typename Rect::Coord;
+  using Value = ValueT;
 
   struct Entry {
     Entry();
@@ -33,7 +33,8 @@ public:
     Value value;
   };
 
-  typedef StableHashMap<Key, Entry, hash<Key>, std::equal_to<Key>, BlockAllocator<std::pair<Key const, Entry>, AllocatorBlockSize>> EntryMap;
+  using EntryMap = StableHashMap<Key, Entry, hash<Key>, std::equal_to<Key>,
+                                 BlockAllocator<std::pair<Key const, Entry>, AllocatorBlockSize>>;
 
   SpatialHash2D(Scalar const& sectorSize);
 
@@ -47,13 +48,13 @@ public:
 
   [[nodiscard]] std::expected<std::reference_wrapper<Value const>, StarException> get(Key const& key) const;
   [[nodiscard]] std::expected<std::reference_wrapper<Value>, StarException> get(Key const& key);
-  std::optional<std::reference_wrapper<Value const>> maybeRef(Key const& key) const {
-    auto entry = m_entryMap.maybeRef(key);
+  std::optional<std::reference_wrapper<Value const>> find_ref(Key const& key) const {
+    auto entry = m_entryMap.find_ref(key);
     if (entry) return std::reference_wrapper<Value const>(entry->get().value);
     return std::nullopt;
   }
-  std::optional<std::reference_wrapper<Value>> maybeRef(Key const& key) {
-    auto entry = m_entryMap.maybeRef(key);
+  std::optional<std::reference_wrapper<Value>> find_ref(Key const& key) {
+    auto entry = m_entryMap.find_ref(key);
     if (entry) return std::reference_wrapper<Value>(entry->get().value);
     return std::nullopt;
   }
@@ -92,11 +93,11 @@ public:
   void setSectorSize(Scalar const& sectorSize);
 
 private:
-  typedef Vector<IntT, 2> Sector;
-  typedef Box<IntT, 2> SectorRange;
+  using Sector = Vector<IntT, 2>;
+  using SectorRange = Box<IntT, 2>;
   // Stable entry addresses identify nodes in this secondary container index.
-  typedef HashSet<Entry const*, hash<Entry const*>, std::equal_to<Entry const*>> SectorEntrySet;
-  typedef HashMap<Sector, SectorEntrySet> SectorMap;
+  using SectorEntrySet = HashSet<Entry const*, hash<Entry const*>, std::equal_to<Entry const*>>;
+  using SectorMap = HashMap<Sector, SectorEntrySet>;
 
   SectorRange getSectors(Rect const& r) const;
 
@@ -128,7 +129,7 @@ template <typename KeyT, typename ScalarT, typename ValueT, typename IntT, std::
 List<typename SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::Value> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::values() const {
   List<Value> values;
   for (auto const& pair : m_entryMap)
-    values.append(pair.second.value);
+    values.push_back(pair.second.value);
 
   return values;
 }
@@ -187,9 +188,9 @@ template <typename RectCollection>
 std::expected<List<ValueT>, StarException> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::queryValues(RectCollection const& rects) const {
   List<Value> values;
   auto result = forEach(rects, [&values](Value const& value) -> std::expected<void, StarException> {
-      values.append(value);
-      return {};
-    });
+    values.push_back(value);
+    return {};
+  });
   if (!result)
     return std::unexpected(std::move(result.error()));
   return values;
@@ -219,7 +220,7 @@ std::expected<void, StarException> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, Al
           for (auto e : i->second) {
             for (Rect const& r : e->rects) {
               if (r.intersects(rect)) {
-                foundEntries.append(e);
+                foundEntries.push_back(e);
                 break;
               }
             }
@@ -357,7 +358,7 @@ template <typename RectCollection>
 void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::updateSpatial(Entry& entry, RectCollection const& rects) {
   removeSpatial(entry);
   entry.rects.clear();
-  entry.rects.appendAll(rects);
+  entry.rects.append_range(rects);
   addSpatial(entry);
 }
 

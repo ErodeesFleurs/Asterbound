@@ -50,7 +50,7 @@ std::expected<std::unique_ptr<ModUploader>, StarException> ModUploader::create(L
 }
 
 void ModUploader::showError(StarException const& error) {
-  QMessageBox::critical(this, "Error", toQString(String(strf("{}", outputException(ExceptionDiagnostic(error), true)))));
+  QMessageBox::critical(this, "Error", toQString(String(Star::format("{}", Star::output_exception(ExceptionDiagnostic(error), true)))));
 }
 
 
@@ -203,7 +203,7 @@ void ModUploader::loadDirectory() {
 
 std::expected<void, StarException> ModUploader::loadDirectoryImpl() {
   if (m_modDirectory) {
-    auto directory = File::isDirectory(*m_modDirectory);
+    auto directory = File::is_directory(*m_modDirectory);
     if (!directory)
       return std::unexpected(std::move(directory.error()));
     if (!*directory)
@@ -228,7 +228,7 @@ std::expected<void, StarException> ModUploader::loadDirectoryImpl() {
   for (std::size_t i = 0; i < keys.size(); ++i) {
     auto field = metadata.value(keys[i], "").toString();
     if (!field)
-      return std::unexpected(StarException(strf("Invalid mod metadata field '{}'", keys[i]), ExceptionDiagnostic(field.error())));
+      return std::unexpected(StarException(Star::format("Invalid mod metadata field '{}'", keys[i]), ExceptionDiagnostic(field.error())));
     fields[i] = std::move(*field);
   }
   auto tags = fields[5].split('|');
@@ -249,9 +249,9 @@ std::expected<void, StarException> ModUploader::loadDirectoryImpl() {
     pair.second->setChecked(*selected);
   }
 
-  m_modIdLabel->setText(toQString(String(strf("<a href=\"https://steamcommunity.com/sharedfiles/filedetails/?id={}\">{}</a>", fields[6], fields[6]))));
-  String previewFile = File::relativeTo(*m_modDirectory, "_previewimage");
-  auto previewExists = File::isFile(previewFile);
+  m_modIdLabel->setText(toQString(String(Star::format("<a href=\"https://steamcommunity.com/sharedfiles/filedetails/?id={}\">{}</a>", fields[6], fields[6]))));
+  String previewFile = File::relative_to(*m_modDirectory, "_previewimage");
+  auto previewExists = File::is_regular_file(previewFile);
   if (!previewExists)
     return std::unexpected(std::move(previewExists.error()));
   if (*previewExists) {
@@ -312,7 +312,7 @@ std::expected<void, StarException> ModUploader::writeMetadataImpl() {
   StringList tags;
   for (auto const& pair : m_categorySelectors) {
     if (pair.second->isChecked())
-      tags.append(pair.first);
+      tags.push_back(pair.first);
   }
   setMetadata("tags", tags.join("|"));
   return m_assetSource->setMetadata(std::move(metadata));
@@ -327,8 +327,8 @@ std::expected<void, StarException> ModUploader::savePreview(QImage const& previe
   if (!buffer.open(QIODevice::WriteOnly) || !preview.save(&buffer, "PNG"))
     return std::unexpected(StarException("Could not encode preview image"));
   buffer.close();
-  return File::overwriteFileWithRename(std::span(encoded.constData(), static_cast<std::size_t>(encoded.size())),
-      File::relativeTo(*m_modDirectory, "_previewimage"));
+  return File::overwrite_file_with_rename(std::span(encoded.constData(), static_cast<std::size_t>(encoded.size())),
+                                          File::relative_to(*m_modDirectory, "_previewimage"));
 }
 
 void ModUploader::resetModId() {
@@ -411,34 +411,35 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     if (result.m_eResult == k_EResultInsufficientPrivilege)
       return std::unexpected(StarException("Insufficient privileges to create a new Steam UGC item"));
     if (result.m_eResult != k_EResultOK)
-      return std::unexpected(StarException(strf("Error creating new Steam UGC Item ({})", static_cast<int>(result.m_eResult))));
+      return std::unexpected(StarException(Star::format("Error creating new Steam UGC Item ({})", static_cast<int>(result.m_eResult))));
 
-    modIdString = toString(static_cast<PublishedFileId_t>(result.m_nPublishedFileId));
-    String modUrl = strf("https://steamcommunity.com/sharedfiles/filedetails/?id={}", modIdString);
+    modIdString = Star::to_string(static_cast<PublishedFileId_t>(result.m_nPublishedFileId));
+    String modUrl = Star::format("https://steamcommunity.com/sharedfiles/filedetails/?id={}", modIdString);
     metadata.set("steamContentId", modIdString);
     metadata.set("link", modUrl);
     auto written = m_assetSource->setMetadata(std::move(metadata));
     if (!written)
       return std::unexpected(std::move(written.error()));
-    m_modIdLabel->setText(toQString(String(strf("<a href=\"{}\">{}</a>", modUrl, modIdString))));
+    m_modIdLabel->setText(toQString(String(Star::format("<a href=\"{}\">{}</a>", modUrl, modIdString))));
   }
 
-  auto modId = lexicalCast<PublishedFileId_t>(modIdString);
+  auto modId = lexical_cast<PublishedFileId_t>(modIdString);
   if (!modId)
     return std::unexpected(std::move(modId.error()));
-  auto temporary = File::temporaryDirectory(m_random);
+  auto temporary = File::temporary_directory(m_random);
   if (!temporary)
     return std::unexpected(std::move(temporary.error()));
   String steamUploadDir = std::move(*temporary);
   auto upload = [&]() -> std::expected<void, StarException> {
-    auto progressCallback = [&progress](std::size_t i, std::size_t total, String, String assetPath) {
-      progress.setLabelText(toQString(String(strf("Packing '{}'", assetPath))));
+    auto progressCallback = [&progress](std::size_t i, std::size_t total, String, String assetPath) -> std::expected<void, StarException> {
+      progress.setLabelText(toQString(String(Star::format("Packing '{}'", assetPath))));
       progress.setMaximum(static_cast<int>(std::min(total, static_cast<std::size_t>(std::numeric_limits<int>::max()))));
       progress.setValue(static_cast<int>(std::min(i, static_cast<std::size_t>(std::numeric_limits<int>::max()))));
       QApplication::processEvents();
+      return {};
     };
-    auto packed = PackedAssetSource::build(*m_assetSource,
-        File::relativeTo(steamUploadDir, "contents.pak"), {}, progressCallback);
+    auto packed =
+      PackedAssetSource::build(*m_assetSource, File::relative_to(steamUploadDir, "contents.pak"), {}, progressCallback);
     if (!packed)
       return std::unexpected(std::move(packed.error()));
     if (m_closing)
@@ -448,25 +449,29 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
         SteamAPI_ISteamUtils_GetAppID(SteamAPI_SteamUtils()), *modId);
     if (updateHandle == k_UGCUpdateHandleInvalid)
       return std::unexpected(StarException("Could not start Steam UGC item update"));
-    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, toSString(m_titleEditor->text()).utf8Ptr()))
+    auto title = toSString(m_titleEditor->text());
+    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, title.utf8_data()))
       return std::unexpected(StarException("Steam rejected the item title"));
-    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, toSString(m_descriptionEditor->toPlainText()).utf8Ptr()))
+    auto description = toSString(m_descriptionEditor->toPlainText());
+    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, description.utf8_data()))
       return std::unexpected(StarException("Steam rejected the item description"));
-    if (!m_modPreview.isNull() && !SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle,
-        File::relativeTo(*m_modDirectory, "_previewimage").utf8Ptr()))
-      return std::unexpected(StarException("Steam rejected the preview image"));
-    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8Ptr()))
+    if (!m_modPreview.isNull()) {
+      auto preview_path = File::relative_to(*m_modDirectory, "_previewimage");
+      if (!SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle, preview_path.utf8_data()))
+        return std::unexpected(StarException("Steam rejected the preview image"));
+    }
+    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8_data()))
       return std::unexpected(StarException("Steam rejected the packed mod content"));
 
     StringList tags;
     for (auto const& entry : m_categorySelectors) {
       if (entry.second->isChecked())
-        tags.append(entry.first);
+        tags.push_back(entry.first);
     }
     List<char const*> tagStrings(tags.size(), nullptr);
     for (std::size_t i = 0; i < tags.size(); ++i)
-      tagStrings[i] = tags[i].utf8Ptr();
-    SteamParamStringArray_t itemTags = {tagStrings.ptr(), static_cast<std::int32_t>(tags.size())};
+      tagStrings[i] = tags[i].utf8_data();
+    SteamParamStringArray_t itemTags = {tagStrings.data(), static_cast<std::int32_t>(tags.size())};
     if (!SteamAPI_ISteamUGC_SetItemTags(SteamAPI_SteamUGC(), updateHandle, &itemTags, false))
       return std::unexpected(StarException("Steam rejected the item tags"));
 
@@ -499,15 +504,15 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     if (result.m_bUserNeedsToAcceptWorkshopLegalAgreement)
       return std::unexpected(StarException("The current Steam user has not agreed to the workshop legal agreement"));
     if (result.m_eResult != k_EResultOK)
-      return std::unexpected(StarException(strf("Error submitting changes to the Steam UGC item ({})", static_cast<int>(result.m_eResult))));
+      return std::unexpected(StarException(Star::format("Error submitting changes to the Steam UGC item ({})", static_cast<int>(result.m_eResult))));
     return {};
   }();
-  auto cleanup = File::removeDirectoryRecursive(steamUploadDir);
+  auto cleanup = File::remove_all(steamUploadDir);
   if (!cleanup) {
     if (!upload)
-      return std::unexpected(StarException(strf("{}\nAdditionally failed to remove upload directory '{}': {}",
+      return std::unexpected(StarException(Star::format("{}\nAdditionally failed to remove upload directory '{}': {}",
           upload.error().what(), steamUploadDir, cleanup.error().what()), ExceptionDiagnostic(upload.error())));
-    return std::unexpected(StarException(strf("Failed to remove upload directory '{}'", steamUploadDir),
+    return std::unexpected(StarException(Star::format("Failed to remove upload directory '{}'", steamUploadDir),
         ExceptionDiagnostic(cleanup.error())));
   }
   return upload;

@@ -216,7 +216,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
           if (!positionResult)
             return std::unexpected(std::move(positionResult.error()));
           auto position = std::move(*positionResult);
-          m_sitPositions.append(position / TilePixels);
+          m_sitPositions.push_back(position / TilePixels);
         }
       }
     }
@@ -302,7 +302,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     auto orientationName = std::move(*orientationNameResult);
     if (!LoungeOrientationNames)
       return std::unexpected(LoungeOrientationNames.error());
-    auto orientationResult = LoungeOrientationNames->getLeft(orientationName);
+    auto orientationResult = LoungeOrientationNames->get_left(orientationName);
     if (!orientationResult)
       return std::unexpected(std::move(orientationResult.error()));
     auto orientation = std::move(*orientationResult);
@@ -321,7 +321,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
       if (!parsedResult)
         return std::unexpected(std::move(parsedResult.error()));
       auto parsed = std::move(*parsedResult);
-      parsedEffects.append(std::move(parsed));
+      parsedEffects.push_back(std::move(parsed));
     }
     m_sitStatusEffects = std::move(parsedEffects);
     auto emittersConfigResult = configValue("sitEffectEmitters", JsonArray());

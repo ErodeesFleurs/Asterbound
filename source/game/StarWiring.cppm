@@ -50,7 +50,7 @@ struct hash<WireConnection> {
 
 class WireCoordinator {
 public:
-  virtual ~WireCoordinator() {}
+  virtual ~WireCoordinator() = default;
 
   [[nodiscard]] virtual std::expected<bool, StarException> readInputConnection(WireConnection const& connection) = 0;
 };
@@ -64,7 +64,7 @@ public:
     Nothing
   };
 
-  virtual ~WireConnector() {}
+  virtual ~WireConnector() = default;
 
   [[nodiscard]] virtual std::expected<SwingResult, StarException> swing(WorldGeometry const& geometry, Vec2F position, FireMode mode) = 0;
   virtual bool connecting() = 0;

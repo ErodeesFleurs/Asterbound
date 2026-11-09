@@ -163,7 +163,7 @@ struct WorldServerTestAccess {
 
 namespace {
 std::expected<std::shared_ptr<WorldServer>, StarException> createSchedulingWorld(Root& root) {
-  auto storage = File::ephemeralFile(root.random());
+  auto storage = File::ephemeral_file(root.random());
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   return WorldServer::create(root, Vec2U(2048, 2048), *storage);

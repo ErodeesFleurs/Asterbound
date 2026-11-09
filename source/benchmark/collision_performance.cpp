@@ -95,15 +95,15 @@ struct MovementCollisionBenchmarkAccess {
     slope.name = "Slope";
     slope.body = PolyF(RectF(-0.25f, 0.5f, 0.25f, 1.25f));
     slope.movement = Vec2F(0.5f, -0.25f);
-    slope.candidates.append(candidate(PolyF{{-2, -1}, {2, -1}, {2, 1}}));
+    slope.candidates.push_back(candidate(PolyF{{-2, -1}, {2, -1}, {2, 1}}));
     fixtures.push_back(std::move(slope));
 
     Fixture corner;
     corner.name = "Corner";
     corner.body = PolyF(RectF(-0.25f, 0.25f, 0.25f, 0.75f));
     corner.movement = Vec2F(0.5f, -0.5f);
-    corner.candidates.append(candidate(PolyF(RectF(-4, -1, 4, 0))));
-    corner.candidates.append(candidate(PolyF(RectF(0.5f, 0, 1.5f, 4))));
+    corner.candidates.push_back(candidate(PolyF(RectF(-4, -1, 4, 0))));
+    corner.candidates.push_back(candidate(PolyF(RectF(0.5f, 0, 1.5f, 4))));
     fixtures.push_back(std::move(corner));
 
     // Concentric moving rectangles have genuinely identical sort positions.
@@ -117,8 +117,8 @@ struct MovementCollisionBenchmarkAccess {
       for (unsigned i = 0; i < count; ++i) {
         float halfWidth = 1.0f + 0.125f * (i % 3);
         float halfHeight = 1.0f + 0.125f * (i % 5);
-        ties.candidates.append(candidate(PolyF(RectF(-halfWidth, -halfHeight, halfWidth, halfHeight)),
-                                         CollisionKind::Platform, MovingCollisionId(400 + i, i)));
+        ties.candidates.push_back(candidate(PolyF(RectF(-halfWidth, -halfHeight, halfWidth, halfHeight)),
+                                            CollisionKind::Platform, MovingCollisionId(400 + i, i)));
       }
       fixtures.push_back(std::move(ties));
 
@@ -130,8 +130,8 @@ struct MovementCollisionBenchmarkAccess {
         float center = i % 2 ? 1.0f : -1.0f;
         // Binary fractions keep both centers and their squared distances exact.
         float halfWidth = 0.875f + 0.03125f * (i % 3);
-        multiPassTies.candidates.append(candidate(PolyF(RectF(center - halfWidth, -2, center + halfWidth, 2)),
-                                                  CollisionKind::Block, MovingCollisionId(800 + i, i)));
+        multiPassTies.candidates.push_back(candidate(PolyF(RectF(center - halfWidth, -2, center + halfWidth, 2)),
+                                                     CollisionKind::Block, MovingCollisionId(800 + i, i)));
       }
       fixtures.push_back(std::move(multiPassTies));
     }
@@ -141,8 +141,8 @@ struct MovementCollisionBenchmarkAccess {
     corridor.body = PolyF(RectF(-3.25f, -0.25f, -2.75f, 0.25f));
     corridor.movement = Vec2F(3, 0);
     corridor.slopeCorrection = false;
-    corridor.candidates.append(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
-    corridor.candidates.append(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
+    corridor.candidates.push_back(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
+    corridor.candidates.push_back(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
     fixtures.push_back(std::move(corridor));
 
     Fixture correctionLimit;
@@ -153,7 +153,7 @@ struct MovementCollisionBenchmarkAccess {
     // The normal correction is 0.75, and restoring the original body requires
     // correction 1. Both must exceed the limit, including the fallback attempt.
     correctionLimit.maximumCorrection = 0.5f;
-    correctionLimit.candidates.append(candidate(PolyF(RectF(0.5f, -10, 10, 10))));
+    correctionLimit.candidates.push_back(candidate(PolyF(RectF(0.5f, -10, 10, 10))));
     fixtures.push_back(std::move(correctionLimit));
 
     Fixture highVelocity;
@@ -162,7 +162,7 @@ struct MovementCollisionBenchmarkAccess {
     highVelocity.movement = Vec2F(4, -4);
     for (int x = -8; x <= 8; ++x) {
       for (int y = -4; y <= 0; ++y)
-        highVelocity.candidates.append(candidate(PolyF(RectF(x, y, x + 1, y + 1))));
+        highVelocity.candidates.push_back(candidate(PolyF(RectF(x, y, x + 1, y + 1))));
     }
     fixtures.push_back(std::move(highVelocity));
 
@@ -171,11 +171,11 @@ struct MovementCollisionBenchmarkAccess {
     unique.body = PolyF(RectF(-3.25f, -0.25f, -2.75f, 0.25f));
     unique.movement = Vec2F(3, 0);
     unique.slopeCorrection = false;
-    unique.candidates.append(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
-    unique.candidates.append(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
+    unique.candidates.push_back(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
+    unique.candidates.push_back(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
     for (int i = 0; i < 127; ++i) {
       float x = 16.0f + i * 1.25f;
-      unique.candidates.append(candidate(PolyF(RectF(x, 4, x + 1, 5))));
+      unique.candidates.push_back(candidate(PolyF(RectF(x, 4, x + 1, 5))));
     }
     fixtures.push_back(std::move(unique));
 
@@ -185,7 +185,7 @@ struct MovementCollisionBenchmarkAccess {
     // Keep the corrected movement shallower than the 60-degree slope-cheat
     // limit, so the upward contact (and its moving identity) is accepted.
     platform.movement = Vec2F(0.5f, -0.5f);
-    platform.candidates.append(
+    platform.candidates.push_back(
       candidate(PolyF(RectF(-2, -0.25f, 2, 0)), CollisionKind::Platform, MovingCollisionId(42, 3)));
     fixtures.push_back(platform);
     platform.name = "IgnoredPlatform";
@@ -196,8 +196,8 @@ struct MovementCollisionBenchmarkAccess {
     stuck.name = "ZeroMovementStuck";
     stuck.body = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
     stuck.slopeCorrection = false;
-    stuck.candidates.append(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
-    stuck.candidates.append(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
+    stuck.candidates.push_back(candidate(PolyF(RectF(-2, -2, -0.1f, 2))));
+    stuck.candidates.push_back(candidate(PolyF(RectF(0.1f, -2, 2, 2))));
     fixtures.push_back(std::move(stuck));
 
     Fixture overflow;
@@ -206,7 +206,7 @@ struct MovementCollisionBenchmarkAccess {
     overflow.movement = Vec2F(1, 0);
     for (unsigned i = 1; i <= 32; ++i) {
       float x = 1.0e30f * i;
-      overflow.candidates.append(candidate(PolyF(RectF(x, 4, x + 1.0e25f, 5))));
+      overflow.candidates.push_back(candidate(PolyF(RectF(x, 4, x + 1.0e25f, 5))));
     }
     fixtures.push_back(std::move(overflow));
 

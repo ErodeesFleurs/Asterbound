@@ -15,16 +15,16 @@ using StaticVectorSizeException = StarError<StaticVectorSizeExceptionTag, StarEx
 template <typename Element, std::size_t MaxSize>
 class StaticVector {
 public:
-  typedef Element* iterator;
-  typedef Element const* const_iterator;
+  using iterator = Element*;
+  using const_iterator = Element const*;
 
-  typedef std::reverse_iterator<iterator> reverse_iterator;
-  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  typedef Element value_type;
+  using value_type = Element;
 
-  typedef Element& reference;
-  typedef Element const& const_reference;
+  using reference = Element&;
+  using const_reference = Element const&;
 
   static constexpr std::size_t MaximumSize = MaxSize;
 
@@ -117,13 +117,11 @@ private:
     --m_size;
     std::destroy_at(ptr() + m_size);
   }
-  std::size_t m_size;
+  std::size_t m_size = 0;
   alignas(Element) std::byte m_elements[MaxSize ? MaxSize * sizeof(Element) : alignof(Element)];
 };
 
-template <typename Element, std::size_t MaxSize>
-StaticVector<Element, MaxSize>::StaticVector()
-  : m_size(0) {}
+template <typename Element, std::size_t MaxSize> StaticVector<Element, MaxSize>::StaticVector() {}
 
 template <typename Element, std::size_t MaxSize>
 StaticVector<Element, MaxSize>::~StaticVector() {
@@ -180,8 +178,7 @@ auto StaticVector<Element, MaxSize>::operator=(StaticVector const& other) -> Sta
     return *this;
 
   auto overlap = std::min(m_size, other.size());
-  for (std::size_t i = 0; i < overlap; ++i)
-    operator[](i) = other[i];
+  std::copy_n(other.begin(), overlap, begin());
   while (m_size < other.size())
     appendKnown(other[m_size]);
   while (m_size > other.size())
@@ -196,8 +193,7 @@ auto StaticVector<Element, MaxSize>::operator=(StaticVector&& other) -> StaticVe
     return *this;
 
   auto overlap = std::min(m_size, other.size());
-  for (std::size_t i = 0; i < overlap; ++i)
-    operator[](i) = std::move(other[i]);
+  std::move(other.begin(), other.begin() + overlap, begin());
   while (m_size < other.size())
     appendKnown(std::move(other[m_size]));
   while (m_size > other.size())
@@ -211,8 +207,7 @@ auto StaticVector<Element, MaxSize>::assign(std::initializer_list<Element> list)
   if (list.size() > MaxSize)
     return std::unexpected(StaticVectorSizeException::format("StaticVector assignment size {} out of range {}", list.size(), MaxSize));
   auto overlap = std::min(m_size, list.size());
-  for (std::size_t i = 0; i < overlap; ++i)
-    operator[](i) = list.begin()[i];
+  std::copy_n(list.begin(), overlap, begin());
   while (m_size < list.size())
     appendKnown(list.begin()[m_size]);
   while (m_size > list.size())
@@ -258,7 +253,7 @@ auto StaticVector<Element, MaxSize>::at(std::size_t i) const -> std::expected<st
 template <typename Element, std::size_t MaxSize>
 auto StaticVector<Element, MaxSize>::operator[](std::size_t i) -> reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return ptr()[i];
 }
@@ -266,7 +261,7 @@ auto StaticVector<Element, MaxSize>::operator[](std::size_t i) -> reference {
 template <typename Element, std::size_t MaxSize>
 auto StaticVector<Element, MaxSize>::operator[](std::size_t i) const -> const_reference {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((i < m_size));
+    Star::star_assert_failed((i < m_size));
   }
   return ptr()[i];
 }
@@ -404,6 +399,7 @@ void StaticVector<Element, MaxSize>::clear() {
 template <typename Element, std::size_t MaxSize>
 auto StaticVector<Element, MaxSize>::erase(iterator pos) -> iterator {
   std::size_t index = pos - ptr();
+  // Move assignments may change m_size; keep the live bound for each shift.
   for (std::size_t i = index; i < m_size - 1; ++i)
     operator[](i) = std::move(operator[](i + 1));
   discardBack();
@@ -417,6 +413,7 @@ auto StaticVector<Element, MaxSize>::erase(iterator begin, iterator end) -> iter
   std::size_t toRemove = endIndex - startIndex;
   if (toRemove == 0)
     return begin;
+  // Move assignments may append elements that must also be shifted.
   for (std::size_t i = endIndex; i < m_size; ++i)
     operator[](startIndex + (i - endIndex)) = std::move(operator[](i));
   while (toRemove--)
@@ -431,11 +428,20 @@ bool StaticVector<Element, MaxSize>::operator==(StaticVector const& other) const
 
   if (m_size != other.m_size)
     return false;
-  for (std::size_t i = 0; i < m_size; ++i) {
-    if (operator[](i) != other[i])
-      return false;
+  // Preserve the original nonfinite comparison behavior under fast-math.
+  if constexpr (std::is_floating_point_v<Element>) {
+    for (std::size_t i = 0; i < m_size; ++i) {
+      if (operator[](i) != other[i])
+        return false;
+    }
+    return true;
+  } else {
+    return std::equal(begin(), end(), other.begin(), [](Element const& left, Element const& right) {
+      if (left != right)
+        return false;
+      return true;
+    });
   }
-  return true;
 }
 
 template <typename Element, std::size_t MaxSize>
@@ -445,20 +451,30 @@ bool StaticVector<Element, MaxSize>::operator!=(StaticVector const& other) const
 
 template <typename Element, std::size_t MaxSize>
 bool StaticVector<Element, MaxSize>::operator<(StaticVector const& other) const {
-  for (std::size_t i = 0; i < m_size; ++i) {
-    if (i >= other.size())
-      return false;
+  // Preserve the original nonfinite comparison behavior under fast-math.
+  if constexpr (std::is_floating_point_v<Element>) {
+    for (std::size_t i = 0; i < m_size; ++i) {
+      if (i >= other.size())
+        return false;
 
-    Element const& a = operator[](i);
-    Element const& b = other[i];
+      Element const& a = operator[](i);
+      Element const& b = other[i];
 
-    if (a < b)
-      return true;
-    else if (b < a)
-      return false;
+      if (a < b)
+        return true;
+      else if (b < a)
+        return false;
+    }
+
+    return m_size < other.size();
+  } else {
+    return std::lexicographical_compare(begin(), end(), other.begin(), other.end(),
+                                        [](Element const& left, Element const& right) {
+                                          if (left < right)
+                                            return true;
+                                          return false;
+                                        });
   }
-
-  return m_size < other.size();
 }
 
 }

@@ -59,9 +59,9 @@ void WorldCamera::updateRenderPosition(Vec2F position, bool force) {
   // outside of the y coordinate bounds.
   m_worldCenter = m_worldGeometry.xwrap(position);
   if (!m_worldGeometry.isNull())
-    m_worldCenter[1] = clamp(m_worldCenter[1],
-        (float)m_screenSize[1] / (TilePixels * m_renderPixelRatio * 2),
-        m_worldGeometry.height() - (float)m_screenSize[1] / (TilePixels * m_renderPixelRatio * 2));
+    m_worldCenter[1] =
+      clamp(m_worldCenter[1], static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2),
+            m_worldGeometry.height() - static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2));
 
   // Then, position the camera center position so that the tile grid is as
   // close as possible aligned to whole pixel boundaries.  This is incredibly

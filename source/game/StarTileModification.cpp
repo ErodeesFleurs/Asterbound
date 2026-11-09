@@ -15,10 +15,10 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (auto r = ds.read(layer); !r) return std::unexpected(std::move(r.error()));
   if (layer > 1) {
     tileMaterialPlacement.layer = TileLayer::Foreground;
-    tileMaterialPlacement.collisionOverride = (TileCollisionOverride)(layer - 1);
+    tileMaterialPlacement.collisionOverride = static_cast<TileCollisionOverride>(layer - 1);
   }
   else {
-    tileMaterialPlacement.layer = (TileLayer)layer;
+    tileMaterialPlacement.layer = static_cast<TileLayer>(layer);
     tileMaterialPlacement.collisionOverride = TileCollisionOverride::None;
   }
   if (auto r = ds.read(tileMaterialPlacement.material); !r) return std::unexpected(std::move(r.error()));
@@ -29,7 +29,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, PlaceMaterial const& tileMaterialPlacement) {
   if (tileMaterialPlacement.collisionOverride != TileCollisionOverride::None
     && tileMaterialPlacement.layer == TileLayer::Foreground) {
-    std::uint8_t layer = (std::uint8_t)tileMaterialPlacement.collisionOverride;
+    std::uint8_t layer = static_cast<std::uint8_t>(tileMaterialPlacement.collisionOverride);
     if (auto r = ds.write(++layer); !r) return std::unexpected(std::move(r.error()));
   } else {
     if (auto r = ds.write(tileMaterialPlacement.layer); !r) return std::unexpected(std::move(r.error()));

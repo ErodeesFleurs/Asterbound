@@ -1,6 +1,7 @@
 import std;
 import star.string;
 import star.format;
+import star.text_formatter;
 import star.hash;
 import star.json;
 import star.json_extra;
@@ -51,7 +52,7 @@ template <>
   return WarpToPlayer(std::move(*uuid));
 }
 
-InstanceWorldId::InstanceWorldId() {}
+InstanceWorldId::InstanceWorldId() = default;
 
 InstanceWorldId::InstanceWorldId(String instance, std::optional<Uuid> uuid, std::optional<float> level)
   : instance(std::move(instance)), uuid(std::move(uuid)), level(std::move(level)) {}
@@ -65,7 +66,7 @@ bool InstanceWorldId::operator<(InstanceWorldId const& rhs) const {
 }
 
 std::size_t hash<InstanceWorldId>::operator()(InstanceWorldId const& id) const {
-  return hashOf(id.instance, id.uuid, id.level);
+  return hash_of(id.instance, id.uuid, id.level);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, InstanceWorldId& instanceWorldId) {
@@ -94,7 +95,7 @@ bool ClientCustomWorldId::operator<(ClientCustomWorldId const& rhs) const {
 }
 
 std::size_t hash<ClientCustomWorldId>::operator()(ClientCustomWorldId const& id) const {
-  return hashOf(id.uuid, id.name);
+  return hash_of(id.uuid, id.name);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ClientCustomWorldId& clientWorldId) {
@@ -112,27 +113,50 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return ds << clientWorldId.uuid << clientWorldId.name;
 }
 
-std::expected<String, StarException> printWorldId(WorldId const& worldId) {
-  if (std::holds_alternative<InstanceWorldId>(worldId)) {
-    auto const& instanceWorldId = std::get<InstanceWorldId>(worldId);
-    if (instanceWorldId.level && *instanceWorldId.level < 0.0f)
-      return std::unexpected(StarException::format("InstanceWorldId level component cannot be negative"));
+std::expected<void, StarException> write_text(TextBuffer& output, InstanceWorldId const& worldId) {
+  if (worldId.level && *worldId.level < 0.0f)
+    return std::unexpected(StarException::format("InstanceWorldId level component cannot be negative"));
+  output.append("InstanceWorld:");
+  append_text(output, worldId.instance);
+  output.push_back(':');
+  if (worldId.uuid)
+    append_text(output, worldId.uuid->hex());
+  else
+    output.push_back('-');
+  output.push_back(':');
+  if (worldId.level)
+    std::format_to(std::back_inserter(output), "{}", *worldId.level);
+  else
+    output.push_back('-');
+  return {};
+}
 
-    String uuidPart = instanceWorldId.uuid ? instanceWorldId.uuid->hex() : "-";
-    String levelPart = instanceWorldId.level ? toString(*instanceWorldId.level) : "-";
-    return strf("InstanceWorld:{}:{}:{}", instanceWorldId.instance, uuidPart, levelPart);
+std::expected<void, StarException> write_text(TextBuffer& output, WorldId const& worldId) {
+  if (std::holds_alternative<InstanceWorldId>(worldId)) {
+    return write_text(output, std::get<InstanceWorldId>(worldId));
   } else if (std::holds_alternative<CelestialWorldId>(worldId)) {
-    return strf("CelestialWorld:{}", std::get<CelestialWorldId>(worldId));
+    output.append("CelestialWorld:");
+    write_text(output, std::get<CelestialWorldId>(worldId));
   } else if (std::holds_alternative<ClientShipWorldId>(worldId)) {
-    return strf("ClientShipWorld:{}", std::get<ClientShipWorldId>(worldId).hex());
+    output.append("ClientShipWorld:");
+    write_text(output, std::get<ClientShipWorldId>(worldId));
   } else if (std::holds_alternative<CustomWorldId>(worldId)) {
-    return strf("CustomWorld:{}", std::get<CustomWorldId>(worldId));
+    output.append("CustomWorld:");
+    write_text(output, std::get<CustomWorldId>(worldId));
   } else if (std::holds_alternative<ClientCustomWorldId>(worldId)) {
-    auto const& clientCustomWorldId = std::get<ClientCustomWorldId>(worldId);
-    return strf("ClientCustomWorld:{}:{}", clientCustomWorldId.uuid.hex(), clientCustomWorldId.name);
+    write_text(output, std::get<ClientCustomWorldId>(worldId));
   } else {
-    return "Nowhere";
+    output.append("Nowhere");
   }
+  return {};
+}
+
+std::expected<String, StarException> print_world_id(WorldId const& worldId) {
+  TextBuffer output;
+  auto written = write_text(output, worldId);
+  if (!written)
+    return std::unexpected(std::move(written.error()));
+  return String(std::move(output).str());
 }
 
 std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
@@ -149,7 +173,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
         {"ClientShipWorld", Kind::Ship}, {"CustomWorld", Kind::Custom},
         {"ClientCustomWorld", Kind::ClientCustom}, {"Nowhere", Kind::Nowhere}};
     for (auto const& [name, value] : names) {
-      auto matches = type.equalsIgnoreCase(name);
+      auto matches = type.equals_ignore_case(name);
       if (!matches)
         return std::unexpected(std::move(matches.error()));
       if (*matches)
@@ -178,7 +202,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
       result.uuid = std::move(*uuid);
     }
     if (rest->size() > 2 && !(*rest)[2].empty() && (*rest)[2] != "-") {
-      auto level = lexicalCast<float>((*rest)[2]);
+      auto level = lexical_cast<float>((*rest)[2]);
       if (!level)
         return std::unexpected(std::move(level.error()));
       if (*level < 0)
@@ -211,26 +235,23 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
   }
 }
 
-std::ostream& operator<<(std::ostream& os, CelestialWorldId const& worldId) {
-  os << (CelestialCoordinate)worldId;
-  return os;
+void write_text(TextBuffer& output, CelestialWorldId const& worldId) {
+  append_text(output, static_cast<CelestialCoordinate const&>(worldId));
 }
 
-
-std::ostream& operator<<(std::ostream& os, ClientShipWorldId const& worldId) {
-  os << ((Uuid)worldId).hex();
-  return os;
+void write_text(TextBuffer& output, ClientShipWorldId const& worldId) {
+  append_text(output, static_cast<Uuid const&>(worldId).hex());
 }
 
-
-std::ostream& operator<<(std::ostream& os, CustomWorldId const& worldId) {
-  os << (String)worldId;
-  return os;
+void write_text(TextBuffer& output, CustomWorldId const& worldId) {
+  append_text(output, static_cast<String const&>(worldId));
 }
 
-std::ostream& operator<<(std::ostream& os, ClientCustomWorldId const& worldId) {
-  format(os, "ClientCustomWorld:{}:{}", worldId.uuid.hex(), worldId.name);
-  return os;
+void write_text(TextBuffer& output, ClientCustomWorldId const& worldId) {
+  output.append("ClientCustomWorld:");
+  append_text(output, worldId.uuid.hex());
+  output.push_back(':');
+  append_text(output, worldId.name);
 }
 
 Json spawnTargetToJson(SpawnTarget spawnTarget) {
@@ -265,19 +286,19 @@ std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v) {
   }
 }
 
-String printSpawnTarget(SpawnTarget spawnTarget) {
+String print_spawn_target(SpawnTarget spawnTarget) {
   if (std::holds_alternative<SpawnTargetUniqueEntity>(spawnTarget))
     return std::get<SpawnTargetUniqueEntity>(spawnTarget);
   else if (std::holds_alternative<SpawnTargetPosition>(spawnTarget)) {
     auto const& pos = std::get<SpawnTargetPosition>(spawnTarget);
-    return strf("{}.{}", pos[0], pos[1]);
+    return Star::format("{}.{}", pos[0], pos[1]);
   } else if (std::holds_alternative<SpawnTargetX>(spawnTarget))
-    return toString(std::get<SpawnTargetX>(spawnTarget).t);
+    return Star::to_string(std::get<SpawnTargetX>(spawnTarget).t);
   else
     return "";
 }
 
-WarpToWorld::WarpToWorld() {}
+WarpToWorld::WarpToWorld() = default;
 
 WarpToWorld::WarpToWorld(WorldId world, SpawnTarget target) : world(std::move(world)), target(std::move(target)) {}
 
@@ -311,29 +332,29 @@ WarpToWorld::operator bool() const {
 }
 
 std::expected<Json, StarException> WarpToWorld::toJson() const {
-  auto printed = printWorldId(world);
+  auto printed = print_world_id(world);
   if (!printed)
     return std::unexpected(std::move(printed.error()));
   return JsonObject{{"world", std::move(*printed)}, {"target", spawnTargetToJson(target)}};
 }
 
 std::expected<WarpAction, StarException> parseWarpAction(String const& warpString) {
-  auto isReturn = warpString.equalsIgnoreCase("Return");
+  auto isReturn = warpString.equals_ignore_case("Return");
   if (!isReturn)
     return std::unexpected(std::move(isReturn.error()));
   if (*isReturn)
     return WarpAlias::Return;
-  auto isOrbited = warpString.equalsIgnoreCase("OrbitedWorld");
+  auto isOrbited = warpString.equals_ignore_case("OrbitedWorld");
   if (!isOrbited)
     return std::unexpected(std::move(isOrbited.error()));
   if (*isOrbited)
     return WarpAlias::OrbitedWorld;
-  auto isShip = warpString.equalsIgnoreCase("OwnShip");
+  auto isShip = warpString.equals_ignore_case("OwnShip");
   if (!isShip)
     return std::unexpected(std::move(isShip.error()));
   if (*isShip)
     return WarpAlias::OwnShip;
-  auto isPlayer = warpString.beginsWith("Player:", String::CaseSensitivity::CaseInsensitive);
+  auto isPlayer = warpString.starts_with("Player:", String::CaseSensitivity::CaseInsensitive);
   if (!isPlayer)
     return std::unexpected(std::move(isPlayer.error()));
   if (*isPlayer) {
@@ -356,7 +377,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
   SpawnTarget target;
   if (parts->size() == 2) {
     auto const& targetPart = (*parts)[1];
-    auto positionMatch = targetPart.regexMatch("\\d+.\\d+");
+    auto positionMatch = targetPart.regex_match("\\d+.\\d+");
     if (!positionMatch)
       return std::unexpected(std::move(positionMatch.error()));
     if (*positionMatch) {
@@ -365,19 +386,19 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
         return std::unexpected(std::move(pos.error()));
       if (pos->size() != 2)
         return std::unexpected(StarException("Malformed positional warp target"));
-      auto x = lexicalCast<int>((*pos)[0]);
+      auto x = lexical_cast<int>((*pos)[0]);
       if (!x)
         return std::unexpected(std::move(x.error()));
-      auto y = lexicalCast<int>((*pos)[1]);
+      auto y = lexical_cast<int>((*pos)[1]);
       if (!y)
         return std::unexpected(std::move(y.error()));
       target = SpawnTargetPosition(Vec2F(*x, *y));
     } else {
-      auto xMatch = targetPart.regexMatch("\\d+");
+      auto xMatch = targetPart.regex_match("\\d+");
       if (!xMatch)
         return std::unexpected(std::move(xMatch.error()));
       if (*xMatch) {
-        auto x = lexicalCast<int>(targetPart);
+        auto x = lexical_cast<int>(targetPart);
         if (!x)
           return std::unexpected(std::move(x.error()));
         target = SpawnTargetX(*x);
@@ -389,7 +410,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
   return WarpToWorld(std::move(*world), std::move(target));
 }
 
-std::expected<String, StarException> printWarpAction(WarpAction const& warpAction) {
+std::expected<String, StarException> print_warp_action(WarpAction const& warpAction) {
   if (std::holds_alternative<WarpAlias>(warpAction)) {
     auto warpAlias = std::get<WarpAlias>(warpAction);
     if (warpAlias == WarpAlias::Return)
@@ -399,14 +420,14 @@ std::expected<String, StarException> printWarpAction(WarpAction const& warpActio
     else if (warpAlias == WarpAlias::OwnShip)
       return "OwnShip";
   } else if (std::holds_alternative<WarpToPlayer>(warpAction)) {
-    return strf("Player:{}", std::get<WarpToPlayer>(warpAction).hex());
+    return Star::format("Player:{}", std::get<WarpToPlayer>(warpAction).hex());
   } else if (std::holds_alternative<WarpToWorld>(warpAction)) {
     auto const& warpToWorld = std::get<WarpToWorld>(warpAction);
-    auto toWorldString = printWorldId(warpToWorld.world);
+    auto toWorldString = print_world_id(warpToWorld.world);
     if (!toWorldString)
       return std::unexpected(std::move(toWorldString.error()));
     if (!std::holds_alternative<std::monostate>(warpToWorld.target))
-      return strf("{}={}", *toWorldString, printSpawnTarget(warpToWorld.target));
+      return Star::format("{}={}", *toWorldString, print_spawn_target(warpToWorld.target));
     return std::move(*toWorldString);
   }
 
@@ -433,7 +454,7 @@ std::expected<JsonObject, StarException> warpActionToJson(WarpAction const& warp
     };
   } else if (std::holds_alternative<WarpToWorld>(warpAction)) {
     auto const& warpToWorld = std::get<WarpToWorld>(warpAction);
-    auto printed = printWorldId(warpToWorld.world);
+    auto printed = print_world_id(warpToWorld.world);
     if (!printed)
       return std::unexpected(std::move(printed.error()));
     auto out = JsonObject{

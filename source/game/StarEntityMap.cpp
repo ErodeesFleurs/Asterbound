@@ -74,7 +74,7 @@ EntityMap::EntityMap(Vec2U const& worldSize, EntityId beginIdSpace, EntityId end
     m_endIdSpace(endIdSpace) {}
 
 std::expected<EntityId, StarException> EntityMap::reserveEntityId() {
-  if (m_spatialMap.size() >= (std::size_t)(m_endIdSpace - m_beginIdSpace))
+  if (m_spatialMap.size() >= static_cast<std::size_t>(m_endIdSpace - m_beginIdSpace))
     return std::unexpected(EntityMapException("No more entity id space in EntityMap::reserveEntityId"));
 
   EntityId id = m_nextId;
@@ -86,7 +86,7 @@ std::expected<EntityId, StarException> EntityMap::reserveEntityId() {
 }
 
 std::expected<std::optional<EntityId>, StarException> EntityMap::maybeReserveEntityId(EntityId entityId) {
-  if (m_spatialMap.size() >= (std::size_t)(m_endIdSpace - m_beginIdSpace))
+  if (m_spatialMap.size() >= static_cast<std::size_t>(m_endIdSpace - m_beginIdSpace))
     return std::unexpected(EntityMapException("No more entity id space in EntityMap::reserveEntityId"));
 
   if (entityId == NullEntityId || m_spatialMap.contains(entityId))
@@ -118,14 +118,15 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
     return std::unexpected(EntityMapException::format("Duplicate entity id '{}' in EntityMap::addEntity", entityId));
 
   if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
-    return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the maximum entity bound box size in EntityMap::addEntity",
-        entity->entityId(), (int)entity->entityType()));
+    return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
+                                                      "maximum entity bound box size in EntityMap::addEntity",
+                                                      entity->entityId(), static_cast<int>(entity->entityType())));
   }
 
   if (entityId == NullEntityId)
     return std::unexpected(EntityMapException::format("Null entity id in EntityMap::addEntity"));
 
-  if (uniqueId && m_uniqueMap.hasLeftValue(*uniqueId))
+  if (uniqueId && m_uniqueMap.contains_left(*uniqueId))
     return std::unexpected(EntityMapException::format("Duplicate entity unique id ({}) on entity id ({}) in EntityMap::addEntity", *uniqueId, entityId));
 
   auto rects = m_geometry.splitRect(boundBox, position);
@@ -140,7 +141,7 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
 
 std::shared_ptr<Entity> EntityMap::removeEntity(EntityId entityId) {
   if (auto entity = m_spatialMap.remove(entityId)) {
-    m_uniqueMap.removeRight(entityId);
+    m_uniqueMap.erase_right(entityId);
     return std::move(*entity);
   }
   return {};
@@ -162,8 +163,9 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
     auto boundBox = entity->metaBoundBox();
 
     if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
-      return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the maximum entity bound box size in EntityMap::addEntity",
-          entity->entityId(), (int)entity->entityType()));
+      return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
+                                                        "maximum entity bound box size in EntityMap::addEntity",
+                                                        entity->entityId(), static_cast<int>(entity->entityType())));
     }
 
     auto entityId = entity->entityId();
@@ -179,16 +181,16 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
 
     auto uniqueId = entity->uniqueId();
     if (uniqueId) {
-      if (auto existingEntityId = m_uniqueMap.maybeRight(*uniqueId)) {
+      if (auto existingEntityId = m_uniqueMap.maybe_right(*uniqueId)) {
         if (entityId != *existingEntityId)
           return std::unexpected(EntityMapException::format("Duplicate entity unique id on entity ids ({}) and ({})", *existingEntityId, entityId));
       } else {
-        m_uniqueMap.removeRight(entityId);
+        m_uniqueMap.erase_right(entityId);
         auto result = m_uniqueMap.add(*uniqueId, entityId);
         if (!result) return std::unexpected(std::move(result.error()));
       }
     } else {
-      m_uniqueMap.removeRight(entityId);
+      m_uniqueMap.erase_right(entityId);
     }
     return {};
   };
@@ -197,7 +199,7 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
   // Removing entities during callbacks remains unsupported.
   m_entrySortBuffer.clear();
   for (auto const& entry : m_spatialMap.entries())
-    m_entrySortBuffer.append(std::cref(entry.second));
+    m_entrySortBuffer.push_back(std::cref(entry.second));
 
   if (sortOrder) {
     m_entrySortBuffer.sort([&sortOrder](auto a, auto b) {
@@ -217,13 +219,13 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
 }
 
 EntityId EntityMap::uniqueEntityId(String const& uniqueId) const {
-  return m_uniqueMap.maybeRight(uniqueId).value_or(NullEntityId);
+  return m_uniqueMap.maybe_right(uniqueId).value_or(NullEntityId);
 }
 
 std::shared_ptr<Entity> EntityMap::entity(EntityId entityId) const {
   auto entity = m_spatialMap.value(entityId);
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!entity || entity->entityId() == entityId));
+    Star::star_assert_failed((!entity || entity->entityId() == entityId));
   }
   return entity;
 }
@@ -240,7 +242,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityQue
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));
@@ -251,7 +253,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entitiesA
   auto entityList = entityQuery(RectF::withCenter(pos, {0, 0}), filter);
   if (!entityList) return std::unexpected(std::move(entityList.error()));
   sortByComputedValue(*entityList, [&](std::shared_ptr<Entity> const& entity) -> float {
-    return vmagSquared(entity->position() - pos);
+    return vmag_squared(entity->position() - pos);
   });
   return std::move(*entityList);
 }
@@ -264,7 +266,7 @@ std::expected<List<std::shared_ptr<TileEntity>>, StarException> EntityMap::entit
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));
@@ -316,7 +318,7 @@ std::expected<void, StarException> EntityMap::forAllEntities(EntityCallback cons
   List<std::reference_wrapper<std::shared_ptr<Entity> const>> allEntities;
   allEntities.reserve(m_spatialMap.size());
   for (auto const& entry : m_spatialMap.entries())
-    allEntities.append(std::cref(entry.second.value));
+    allEntities.push_back(std::cref(entry.second.value));
 
   if (sortOrder) {
     allEntities.sort([&sortOrder](auto a, auto b) {
@@ -329,7 +331,7 @@ std::expected<void, StarException> EntityMap::forAllEntities(EntityCallback cons
     auto result = callback(entity);
     if (!result) {
       if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-      auto type = EntityTypeNames->getRight(entity->entityType());
+      auto type = EntityTypeNames->get_right(entity->entityType());
       if (!type) return std::unexpected(std::move(type.error()));
       auto name = entity->name();
       if (!name) return std::unexpected(std::move(name.error()));
@@ -394,7 +396,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityLin
       if (!accepted) return std::unexpected(std::move(accepted.error()));
       if (!*accepted) return {};
     }
-    values.append(entity);
+    values.push_back(entity);
     return {};
   });
   if (!result) return std::unexpected(std::move(result.error()));
@@ -407,7 +409,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityMap::closestEntity(V
   RectF boundBox(center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius);
   auto result = forEachEntity(boundBox, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     Vec2F pos = entity->position();
-    float thisDistSquared = m_geometry.diff(center, pos).magnitudeSquared();
+    float thisDistSquared = m_geometry.diff(center, pos).magnitude_squared();
     if (distSquared > thisDistSquared) {
       if (filter) {
         auto accepted = filter(entity);

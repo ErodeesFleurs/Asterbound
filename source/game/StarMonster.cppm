@@ -208,9 +208,9 @@ public:
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
 
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition() const override;
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
-  virtual List<ChatAction> pullPendingChatActions() override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
+  List<ChatAction> pullPendingChatActions() override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
 

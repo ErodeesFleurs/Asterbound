@@ -66,7 +66,7 @@ bool TechDatabase::contains(String const& techName) const {
 }
 
 std::expected<TechConfig, StarException> TechDatabase::tech(String const& techName) const {
-  if (auto tech = m_tech.maybeRef(techName))
+  if (auto tech = m_tech.find_ref(techName))
     return tech->get();
   return std::unexpected(TechDatabaseException::format("No such tech '{}'", techName));
 }
@@ -85,7 +85,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto typeName = config.getString("type");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
-    auto type = TechTypeNames->maybeLeftRef(*typeName);
+    auto type = TechTypeNames->find_left_ref(*typeName);
     if (!type)
       return std::unexpected(std::move(type.error()));
     if (!*type)
@@ -98,13 +98,13 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
       auto scriptName = script.toString();
       if (!scriptName)
         return std::unexpected(std::move(scriptName.error()));
-      tech.scripts.append(AssetPath::relativeTo(path, *scriptName));
+      tech.scripts.push_back(AssetPath::relative_to(path, *scriptName));
     }
     auto animator = config.optString("animator");
     if (!animator)
       return std::unexpected(std::move(animator.error()));
     if (*animator)
-      tech.animationConfig = AssetPath::relativeTo(path, **animator);
+      tech.animationConfig = AssetPath::relative_to(path, **animator);
     auto description = config.getString("description");
     if (!description)
       return std::unexpected(std::move(description.error()));
@@ -125,11 +125,11 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto icon = config.getString("icon");
     if (!icon)
       return std::unexpected(std::move(icon.error()));
-    tech.icon = AssetPath::relativeTo(path, *icon);
+    tech.icon = AssetPath::relative_to(path, *icon);
     return tech;
   }();
   if (!parsed)
-    return std::unexpected(TechDatabaseException(strf("Error reading tech config {}", path), parsed.error()));
+    return std::unexpected(TechDatabaseException(Star::format("Error reading tech config {}", path), parsed.error()));
   return parsed;
 }
 

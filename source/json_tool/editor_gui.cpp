@@ -123,7 +123,7 @@ void JsonEditor::updatePreview(QString const& valueStr) {
     m_errorDialog->showMessage(repr.error().what());
     return;
   }
-  m_jsonDocument->setPlainText(repr->utf8Ptr());
+  m_jsonDocument->setPlainText(repr->utf8_data());
 }
 
 bool JsonEditor::saveChanges() {
@@ -142,7 +142,7 @@ bool JsonEditor::saveChanges() {
     m_errorDialog->showMessage(repr.error().what());
     return false;
   }
-  auto saved = File::overwriteFileWithRename(*repr, m_files[m_fileIndex]);
+  auto saved = File::overwrite_file_with_rename(*repr, m_files[m_fileIndex]);
   if (!saved) {
     m_errorDialog->showMessage(saved.error().what());
     return false;
@@ -155,13 +155,14 @@ void JsonEditor::displayCurrentFile() {
   String const& file = m_files[m_fileIndex];
 
   std::size_t progress = (m_fileIndex + 1) * 100 / m_files.size();
-  String status = strf("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
-  m_statusLabel->setText(status.utf8Ptr());
+  String status = Star::format("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
+  m_statusLabel->setText(status.utf8_data());
 
   m_backButton->setEnabled(m_fileIndex != 0);
   m_nextButton->setText(m_fileIndex == m_files.size() - 1 ? "Done" : "Next »");
 
-  m_pathLabel->setText(m_path->path().utf8Ptr());
+  auto const& document_path = m_path->path();
+  m_pathLabel->setText(document_path.utf8_data());
 
   m_imageLabel->setText("No preview");
   m_jsonDocument->setPlainText("");
@@ -169,7 +170,7 @@ void JsonEditor::displayCurrentFile() {
   m_valueEditor->setText("");
 
   auto load = [&]() -> std::expected<void, StarException> {
-    auto contents = File::readFileString(file);
+    auto contents = File::read_file_string(file);
     if (!contents)
       return std::unexpected(std::move(contents.error()));
     auto parsed = FormattedJson::parse(*contents);
@@ -179,7 +180,7 @@ void JsonEditor::displayCurrentFile() {
     if (!repr)
       return std::unexpected(std::move(repr.error()));
     m_currentJson = std::move(*parsed);
-    m_jsonDocument->setPlainText(repr->utf8Ptr());
+    m_jsonDocument->setPlainText(repr->utf8_data());
     updateValueEditor();
     updateImagePreview();
     return {};
@@ -223,7 +224,7 @@ void JsonEditor::updateValueEditor() {
       return;
     }
   }
-  m_valueEditor->setText(text->utf8Ptr());
+  m_valueEditor->setText(text->utf8_data());
   m_valueEditor->setEnabled(true);
 }
 
@@ -247,8 +248,8 @@ void JsonEditor::updateImagePreview() {
       m_errorDialog->showMessage(imageFile.error().what());
       return;
     }
-    String imageName = File::relativeTo(File::dirName(file), *imageFile);
-    QPixmap pixmap = QPixmap(imageName.utf8Ptr()).scaledToWidth(ImagePreviewWidth);
+    String imageName = File::relative_to(File::dir_name(file), *imageFile);
+    QPixmap pixmap = QPixmap(imageName.utf8_data()).scaledToWidth(ImagePreviewWidth);
     if (pixmap.height() > ImagePreviewHeight)
       pixmap = pixmap.scaledToHeight(ImagePreviewHeight);
     m_imageLabel->setPixmap(pixmap);
@@ -265,9 +266,9 @@ std::expected<int, StarException> Star::edit(Logger& logger, int argc, char* arg
       auto found = findFiles(logger, std::get<FindInput>(input));
       if (!found)
         return std::unexpected(std::move(found.error()));
-      files.appendAll(std::move(*found));
+      files.append_range(std::move(*found));
     } else {
-      files.append(std::get<FileInput>(input).filename);
+      files.push_back(std::get<FileInput>(input).filename);
     }
   }
   if (files.empty())

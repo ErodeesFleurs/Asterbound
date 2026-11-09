@@ -464,7 +464,7 @@ String ThreadedRenderer::rendererId() const { return m_state->id; }
 Vec2U ThreadedRenderer::screenSize() const { return m_state->screen; }
 std::optional<RectI> ThreadedRenderer::scissorRect() const { return m_state->scissor; }
 List<RenderPrimitive>& ThreadedRenderer::immediatePrimitives() { return m_state->immediate; }
-void ThreadedRenderer::render(RenderPrimitive primitive) { m_state->immediate.append(std::move(primitive)); }
+void ThreadedRenderer::render(RenderPrimitive primitive) { m_state->immediate.push_back(std::move(primitive)); }
 
 std::expected<void, StarException> ThreadedRenderer::startFrame() {
   if (m_state->preparing || m_state->outstanding)

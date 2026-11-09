@@ -39,7 +39,7 @@ namespace Star {
       return Star::typeName<RenderableItem>();
     }
 
-    virtual ~RenderableItem() {}
+    virtual ~RenderableItem() = default;
 
     [[nodiscard]]
     virtual std::expected<void, StarException> render(RenderCallback& renderCallback, EntityRenderLayer renderLayer) = 0;

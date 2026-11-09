@@ -232,7 +232,8 @@ std::shared_ptr<SystemClientShip> SystemWorldClient::getShip(Uuid const & uuid) 
 
 Uuid SystemWorldClient::spawnObject(String typeName, std::optional<Vec2F> position, std::optional<Uuid> const& uuid, JsonObject overrides) {
   Uuid objectUuid = uuid.value_or(Uuid(this->root().random()));
-  m_outgoingPackets.append(std::make_shared<SystemObjectSpawnPacket>(std::move(typeName), objectUuid, std::move(position), std::move(overrides)));
+  m_outgoingPackets.push_back(std::make_shared<SystemObjectSpawnPacket>(std::move(typeName), objectUuid,
+                                                                        std::move(position), std::move(overrides)));
   return objectUuid;
 }
 
@@ -307,9 +308,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
   return true;
 }
 
-List<std::shared_ptr<Packet>> SystemWorldClient::pullOutgoingPackets() {
-  return take(m_outgoingPackets);
-}
+List<std::shared_ptr<Packet>> SystemWorldClient::pullOutgoingPackets() { return std::exchange(m_outgoingPackets, {}); }
 
 std::expected<std::shared_ptr<SystemObject>, StarException> SystemWorldClient::netLoadObject(ByteArray netStore) {
   DataStreamBuffer ds(std::move(netStore));

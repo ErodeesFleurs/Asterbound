@@ -57,13 +57,14 @@ public:
   }
 
   [[nodiscard]] static std::expected<std::shared_ptr<WirePane>, StarException> create(GuiContext& guiContext, std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, std::shared_ptr<WorldPainter> worldPainter);
-  virtual ~WirePane() {}
+  ~WirePane() override = default;
 
-  [[nodiscard]] virtual std::expected<void, StarException> update(float dt) override;
-  [[nodiscard]] virtual std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
+  [[nodiscard]] std::expected<void, StarException> update(float dt) override;
+  [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
 
-  [[nodiscard]] virtual std::expected<SwingResult, StarException> swing(WorldGeometry const& geometry, Vec2F position, FireMode mode) override;
-  virtual bool connecting() override;
+  [[nodiscard]] std::expected<SwingResult, StarException> swing(WorldGeometry const& geometry, Vec2F position,
+                                                                FireMode mode) override;
+  bool connecting() override;
 
   virtual void reset();
 

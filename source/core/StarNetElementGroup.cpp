@@ -12,7 +12,7 @@ namespace Star {
 
 std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& element, bool propagateInterpolation) {
   if constexpr (Star::DebugEnabled) {
-    Star::starAssertFailed((!m_elements.any([&element](auto p) { return &p.first.get() == &element; })));
+    Star::star_assert_failed((!m_elements.any([&element](auto p) { return &p.first.get() == &element; })));
   }
 
   element.initNetVersion(m_version);
@@ -20,8 +20,7 @@ std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& el
     auto result = element.enableNetInterpolation(m_extrapolationHint);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  m_elements.append(std::pair<std::reference_wrapper<NetElement>, bool>(std::ref(element), propagateInterpolation));
-
+  m_elements.push_back(std::pair<std::reference_wrapper<NetElement>, bool>(std::ref(element), propagateInterpolation));
 
   for (VersionNumber i = 0; i < (CurrentStreamVersion + 1); i++) {
     if (element.checkWithRules(NetCompatibilityRules(i)))
@@ -130,7 +129,7 @@ std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds
         deltaWritten = true;
         auto indexResult = ds.writeVlqU(i);
         if (!indexResult) { m_buffer.clear(); return std::unexpected(std::move(indexResult.error())); }
-        auto bytesResult = ds.writeBytes(m_buffer.data());
+        auto bytesResult = ds.write_bytes(m_buffer.data());
         m_buffer.clear();
         if (!bytesResult) return std::unexpected(std::move(bytesResult.error()));
       }

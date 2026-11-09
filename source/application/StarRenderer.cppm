@@ -22,7 +22,7 @@ struct RendererExceptionTag {
 using RendererException = StarError<RendererExceptionTag, StarException>;
 
 class Texture;
-typedef RefPtr<Texture> TexturePtr;
+using TexturePtr = RefPtr<Texture>;
 
 enum class TextureAddressing {
   Clamp,
@@ -99,7 +99,7 @@ RenderQuad renderTexturedRect(TexturePtr texture, RectF const& screenCoords, Vec
 RenderQuad renderFlatRect(RectF const& rect, Vec4B color, float param1 = 0.0f);
 RenderPoly renderFlatPoly(PolyF const& poly, Vec4B color, float param1 = 0.0f);
 
-typedef std::variant<RenderTriangle, RenderQuad, RenderPoly> RenderPrimitive;
+using RenderPrimitive = std::variant<RenderTriangle, RenderQuad, RenderPoly>;
 
 // Thread transport owns the indexed vertices and numeric texture handles.
 // The backend borrows these spans and its main-owned texture table only during
@@ -118,7 +118,7 @@ struct DetachedRenderGeometry {
 
 class Texture : public RefCounter {
 public:
-  virtual ~Texture() = default;
+  ~Texture() override = default;
 
   void const* queryType(TypeKey key) const noexcept override {
     return queryTypeOf<Texture, RefCounter>(this, key);
@@ -161,7 +161,7 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> set(List<RenderPrimitive>& primitives) = 0;
 };
 
-typedef std::variant<float, int, Vec4F, Vec3F, Vec2F, bool> RenderEffectParameter;
+using RenderEffectParameter = std::variant<float, int, Vec4F, Vec3F, Vec2F, bool>;
 
 class Renderer {
 public:

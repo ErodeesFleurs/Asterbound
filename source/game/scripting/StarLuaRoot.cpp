@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> LuaRoot::create(Root& roo
 LuaRoot::~LuaRoot() {
   if (auto result = shutdown(); !result) {
     if (auto logged = m_root.logger().errorException("Error while shutting down Lua root", ExceptionDiagnostic(result.error())); !logged)
-      EmergencyLog::error("Could not log Lua root shutdown failure: {}; original failure: {}", outputException(logged.error(), true), outputException(result.error(), true));
+      EmergencyLog::error("Could not log Lua root shutdown failure: {}; original failure: {}", Star::output_exception(logged.error(), true), Star::output_exception(result.error(), true));
   }
 }
 
@@ -94,7 +94,7 @@ std::expected<void, StarException> LuaRoot::restart() {
   (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(m_root));
   auto sourceDiagnostics = std::make_shared<StringMap<String>>();
   (*engine)->setSourceResolver([sourceDiagnostics](String const& source) -> std::expected<String, StarException> {
-    if (auto diagnostic = sourceDiagnostics->maybeRef(source))
+    if (auto diagnostic = sourceDiagnostics->find_ref(source))
       return diagnostic->get();
     return String();
   });
@@ -154,7 +154,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     JsonObject value;
     value.set("function", entry.name.value_or("<function>"));
     value.set("scope", entry.nameScope.value_or("?"));
-    value.set("source", strf("{}:{}", entry.source, entry.sourceLine));
+    value.set("source", Star::format("{}:{}", entry.source, entry.sourceLine));
     value.set("self", entry.selfTime);
     value.set("total", entry.totalTime);
     // The detached engine and profile retain the entire call tree during export.
@@ -173,13 +173,13 @@ std::expected<void, StarException> LuaRoot::shutdown() {
   auto summary = Json(profile.transformed(jsonFromProfileEntry)).repr(1);
   if (!summary)
     return std::unexpected(std::move(summary.error()));
-  auto directory = File::isDirectory(m_storageDirectory);
+  auto directory = File::is_directory(m_storageDirectory);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
   if (!*directory) {
     if (auto logged = m_root.logger().info("Creating lua storage directory"); !logged)
       return std::unexpected(std::move(logged.error()));
-    if (auto result = File::makeDirectory(m_storageDirectory); !result)
+    if (auto result = File::create_directory(m_storageDirectory); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto timestamp = Time::localTime(std::chrono::system_clock::now());
@@ -187,15 +187,15 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     return std::unexpected(std::move(timestamp.error()));
   auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(*timestamp);
   auto millis = *timestamp - wholeSeconds;
-  String filename = strf("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
-  String path = File::relativeTo(m_storageDirectory, filename);
+  String filename = Star::format("{:%Y-%m-%d-%H-%M-%S}-{:03d}.luaprofile", wholeSeconds, millis.count());
+  String path = File::relative_to(m_storageDirectory, filename);
   if (auto logged = m_root.logger().info("Writing lua profile {}", filename); !logged)
     return std::unexpected(std::move(logged.error()));
-  return File::writeFile(*summary, path);
+  return File::write_file(*summary, path);
 }
 
 std::expected<LuaContext, StarException> LuaRoot::createContext(String const& script, std::stop_token loadLifetime) {
-  return createContext(StringList{script}, loadLifetime);
+  return createContext(StringList{script}, std::move(loadLifetime));
 }
 
 std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const& scriptPaths,
@@ -315,7 +315,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
     std::lock_guard locker(mutex);
     if (m_revision != revision)
       return std::unexpected(stale());
-    if (auto cached = scripts.maybeRef(path))
+    if (auto cached = scripts.find_ref(path))
       return cached->get();
   }
   auto assets = m_root.assets();
@@ -336,8 +336,8 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   }
   auto bytes = (*assets)->bytes(path);
   if (!bytes) {
-    if (auto diagnostic = sourceDiagnostics.maybeRef(path)) {
-      auto summary = *bytes.error().diagnosticSummary();
+    if (auto diagnostic = sourceDiagnostics.find_ref(path)) {
+      auto summary = *bytes.error().diagnostic_summary();
       bool found = false;
       for (auto& location : summary.locations) {
         if (location.source == path.utf8()) {
@@ -347,9 +347,9 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
         }
       }
       if (!found)
-        summary.locations.push_back({path.utf8(), -1, diagnostic->get().utf8()});
-      return std::unexpected(std::move(bytes.error()).withSummary(std::move(summary)).withContext(
-          strf("Lua source '{}': {}", path, diagnostic->get())));
+        summary.locations.push_back({.source = path.utf8(), .line = -1, .provider = diagnostic->get().utf8()});
+      return std::unexpected(std::move(bytes.error()).with_summary(std::move(summary)).with_context(
+          Star::format("Lua source '{}': {}", path, diagnostic->get())));
     }
     return std::unexpected(std::move(bytes.error()));
   }

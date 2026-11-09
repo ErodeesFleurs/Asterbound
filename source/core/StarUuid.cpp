@@ -16,9 +16,9 @@ Uuid::Uuid(RandomService& random) {
 
 std::expected<Uuid, StarException> Uuid::create(ByteArray const& bytes) {
   if (bytes.size() != UuidSize)
-    return std::unexpected(UuidException(strf("Size mismatch in reading Uuid from ByteArray: {} vs {}", bytes.size(), UuidSize)));
+    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from ByteArray: {} vs {}", bytes.size(), UuidSize)));
   auto uuid = nil();
-  bytes.copyTo({uuid.m_data.data(), UuidSize});
+  bytes.copy_to({uuid.m_data.data(), UuidSize});
   return uuid;
 }
 
@@ -68,7 +68,7 @@ bool Uuid::operator>=(Uuid const& u) const {
 std::size_t hash<Uuid>::operator()(Uuid const& u) const {
   std::size_t hashval = 0;
   for (std::size_t i = 0; i < UuidSize; ++i)
-    hashCombine(hashval, u.span()[i]);
+    hash_combine(hashval, u.span()[i]);
   return hashval;
 }
 
@@ -82,7 +82,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 
 template <>
 std::expected<Uuid, StarException> DataStream::read<Uuid>() {
-  auto bytes = readBytes(UuidSize);
+  auto bytes = read_bytes(UuidSize);
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   return Uuid::create(*bytes);

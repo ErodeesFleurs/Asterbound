@@ -29,8 +29,8 @@ public:
   using GlyphDescriptor = std::tuple<String::Char, unsigned, std::size_t, std::reference_wrapper<Font>>;
   struct GlyphDescriptorHash {
     std::size_t operator()(GlyphDescriptor const& descriptor) const {
-      return hashOf(std::get<0>(descriptor), std::get<1>(descriptor), std::get<2>(descriptor),
-          std::addressof(std::get<3>(descriptor).get()));
+      return hash_of(std::get<0>(descriptor), std::get<1>(descriptor), std::get<2>(descriptor),
+                     std::addressof(std::get<3>(descriptor).get()));
     }
   };
   struct GlyphDescriptorEqual {

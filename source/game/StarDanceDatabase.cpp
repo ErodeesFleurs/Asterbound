@@ -36,7 +36,7 @@ std::expected<std::shared_ptr<DanceDatabase>, StarException> DanceDatabase::crea
   for (auto const& file : files->get()) {
     auto dance = readDance(*assets, file.string());
     if (!dance) {
-      auto logged = logger.errorException(strf("Error loading dance file {}", file.string()), ExceptionDiagnostic(dance.error()));
+      auto logged = logger.errorException(Star::format("Error loading dance file {}", file.string()), ExceptionDiagnostic(dance.error()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;
@@ -47,12 +47,12 @@ std::expected<std::shared_ptr<DanceDatabase>, StarException> DanceDatabase::crea
 }
 
 std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::getDance(String const& name) const {
-  if (auto dance = m_dances.maybeRef(name))
+  if (auto dance = m_dances.find_ref(name))
     return dance->get();
   auto logged = m_logger.error("Invalid dance '{}', using default", name);
   if (!logged)
     return std::unexpected(std::move(logged.error()));
-  if (auto fallback = m_dances.maybeRef("assetmissing"))
+  if (auto fallback = m_dances.find_ref("assetmissing"))
     return fallback->get();
   return std::unexpected(StarException("Missing fallback dance 'assetmissing'"));
 }
@@ -74,7 +74,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
     auto value = state.toString();
     if (!value)
       return std::unexpected(std::move(value.error()));
-    dance->states.append(std::move(*value));
+    dance->states.push_back(std::move(*value));
   }
   auto cycle = config->getFloat("cycle");
   if (!cycle)
@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
       result.frontArmRotation = rotation->value_or(0.0f);
       result.backArmRotation = rotation->value_or(0.0f);
     }
-    dance->steps.append(std::move(result));
+    dance->steps.push_back(std::move(result));
   }
   return dance;
   }();

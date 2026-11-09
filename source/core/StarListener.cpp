@@ -53,7 +53,7 @@ struct ListenerRegistration {
   }
 };
 
-Listener::~Listener() {}
+Listener::~Listener() = default;
 
 CallbackListener::CallbackListener(std::function<std::expected<void, StarException>()> callback)
   : callback(std::move(callback)) {}

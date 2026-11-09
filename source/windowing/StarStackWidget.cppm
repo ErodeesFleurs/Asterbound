@@ -64,7 +64,8 @@ public:
 
   Either<std::size_t, String> currentPage() const;
 
-  [[nodiscard]] virtual std::expected<void, StarException> addChild(String const& name, std::shared_ptr<Widget> member) override;
+  [[nodiscard]] std::expected<void, StarException> addChild(String const& name,
+                                                            std::shared_ptr<Widget> member) override;
 
 private:
   std::shared_ptr<Widget> m_shownPage;

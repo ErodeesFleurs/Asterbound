@@ -69,7 +69,7 @@ std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread
 
 ScriptableThread::~ScriptableThread() {
   if (auto result = stop(); !result)
-    EmergencyLog::error("Error stopping ScriptableThread: {}", outputException(result.error(), true));
+    EmergencyLog::error("Error stopping ScriptableThread: {}", Star::output_exception(result.error(), true));
   m_scriptContexts.clear();
 }
 
@@ -83,26 +83,26 @@ std::expected<void, StarException> ScriptableThread::addCallbacks(String const& 
       result = p.second->addThreadCallbacks(group, callbacks);
       if (!result) {
         if (auto rollback = p.second->removeCallbacks(group); !rollback)
-          EmergencyLog::error("Error rolling back script thread callbacks: {}", outputException(rollback.error(), true));
+          EmergencyLog::error("Error rolling back script thread callbacks: {}", Star::output_exception(rollback.error(), true));
       }
     }
     if (!result) {
       for (auto const& component : changed) {
         if (auto rollback = component->removeCallbacks(group); !rollback)
-          EmergencyLog::error("Error rolling back script thread callbacks: {}", outputException(rollback.error(), true));
+          EmergencyLog::error("Error rolling back script thread callbacks: {}", Star::output_exception(rollback.error(), true));
         if (auto rollback = component->removeThreadCallbacks(group); !rollback)
-          EmergencyLog::error("Error rolling back nested thread callbacks: {}", outputException(rollback.error(), true));
+          EmergencyLog::error("Error rolling back nested thread callbacks: {}", Star::output_exception(rollback.error(), true));
       }
       return std::unexpected(std::move(result.error()));
     }
-    changed.append(p.second);
+    changed.push_back(p.second);
   }
   m_threadCallbacks.insert(group, callbacks);
   return {};
 }
 
 std::expected<void, StarException> ScriptableThread::removeCallbacks(String const& group) {
-  auto callbacks = m_threadCallbacks.maybeRef(group);
+  auto callbacks = m_threadCallbacks.find_ref(group);
   if (!callbacks)
     return {};
   struct RemovedCallbacks {
@@ -115,11 +115,11 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
     for (auto const& removed : changed) {
       if (removed.callbacks) {
         if (auto restored = removed.component->addCallbacks(group, callbacks->get()); !restored)
-          error = restored.error().withRelated(error, "Original script callback removal failure");
+          error = restored.error().with_related(error, "Original script callback removal failure");
       }
       if (removed.threadCallbacks) {
         if (auto restored = removed.component->addThreadCallbacks(group, callbacks->get()); !restored)
-          error = restored.error().withRelated(error, "Original script callback removal failure");
+          error = restored.error().with_related(error, "Original script callback removal failure");
       }
     }
     return std::unexpected(std::move(error));
@@ -128,7 +128,7 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
     auto removed = p.second->removeCallbacks(group);
     if (!removed)
       return rollback(std::move(removed.error()));
-    changed.append({p.second, *removed, false});
+    changed.push_back({.component = p.second, .callbacks = *removed, .threadCallbacks = false});
     auto removedThread = p.second->removeThreadCallbacks(group);
     if (!removedThread)
       return rollback(std::move(removedThread.error()));
@@ -153,7 +153,7 @@ std::expected<bool, StarException> ScriptableThread::start() {
     requestStop();
     m_errorOccurred = true;
     if (auto stopped = stop(); !stopped)
-      started.error() = started.error().withRelated(stopped.error(), "Error settling failed worker startup");
+      started.error() = started.error().with_related(stopped.error(), "Error settling failed worker startup");
     m_shouldExpire.store(true, std::memory_order_release);
   }
   return started;
@@ -186,7 +186,7 @@ std::expected<void, StarException> ScriptableThread::stop() {
       if (!error)
         error = std::move(failed.error());
       else
-        EmergencyLog::error("Error failing stopped thread message: {}", outputException(failed.error(), true));
+        EmergencyLog::error("Error failing stopped thread message: {}", Star::output_exception(failed.error(), true));
     }
   }
   if (error)
@@ -205,7 +205,7 @@ std::expected<void, StarException> ScriptableThread::passMessage(Message&& messa
     return message.promise.fail("Thread failed");
   if (m_stopSource.stop_requested() || m_shouldExpire)
     return message.promise.cancel("Thread is stopped").transform([](bool) {});
-  m_messages.append(std::move(message));
+  m_messages.push_back(std::move(message));
   return {};
 }
 
@@ -247,7 +247,7 @@ std::expected<void, StarException> ScriptableThread::run() {
     TickRateApproacher approacher(1.0f / m_timestep, *window);
     while (!stopToken.stop_requested() && !m_errorOccurred) {
       if (m_logMapped)
-        m_luaRoot->root().logMap().set(strf("lua_{}_update", m_name), strf("{:4.2f}Hz", approacher.rate()));
+        m_luaRoot->root().logMap().set(Star::format("lua_{}_update", m_name), Star::format("{:4.2f}Hz", approacher.rate()));
       if (auto updated = update(); !updated)
         return std::unexpected(std::move(updated.error()));
       approacher.setTargetTickRate(1.0f / m_timestep);
@@ -268,7 +268,7 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (result)
         result = std::unexpected(std::move(uninitialized.error()));
       else
-        result.error() = result.error().withRelated(uninitialized.error(), "Error uninitializing ScriptableThread");
+        result.error() = result.error().with_related(uninitialized.error(), "Error uninitializing ScriptableThread");
     }
   }
   m_scriptContexts.clear();
@@ -286,14 +286,14 @@ std::expected<void, StarException> ScriptableThread::run() {
       if (result)
         result = std::unexpected(std::move(failed.error()));
       else
-        result.error() = result.error().withRelated(failed.error(), "Error settling ScriptableThread message");
+        result.error() = result.error().with_related(failed.error(), "Error settling ScriptableThread message");
     }
   }
   if (!result) {
     m_errorOccurred = true;
     if (auto logged = m_luaRoot->root().logger().errorException("ScriptableThread exception caught", ExceptionDiagnostic(result.error()));
         !logged)
-      result.error() = result.error().withRelated(logged.error(), "Could not log ScriptableThread failure");
+      result.error() = result.error().with_related(logged.error(), "Could not log ScriptableThread failure");
     else
       // This boundary handled the failure; Thread must not log it a second time.
       result = {};
@@ -328,7 +328,7 @@ std::expected<void, StarException> ScriptableThread::update() {
         if (!error)
           error = std::move(updated.error());
         else
-          EmergencyLog::error("Error updating ScriptableThread context: {}", outputException(updated.error(), true));
+          EmergencyLog::error("Error updating ScriptableThread context: {}", Star::output_exception(updated.error(), true));
       }
     }
   }
@@ -342,7 +342,7 @@ std::expected<void, StarException> ScriptableThread::update() {
     auto response = receiveMessage(message.message, message.args);
     std::expected<void, StarException> settled;
     if (!response) {
-      settled = message.promise.fail(printException(response.error(), false));
+      settled = message.promise.fail(Star::print_exception(response.error(), false));
       if (!error)
         error = std::move(response.error());
     } else if (!*response) {
@@ -356,11 +356,11 @@ std::expected<void, StarException> ScriptableThread::update() {
       if (!error)
         error = std::move(settled.error());
       else
-        EmergencyLog::error("Error settling ScriptableThread message: {}", outputException(settled.error(), true));
+        EmergencyLog::error("Error settling ScriptableThread message: {}", Star::output_exception(settled.error(), true));
     }
   }
   if (m_logMapped)
-    m_luaRoot->root().logMap().set(strf("lua_{}_lua_mem", m_name), m_luaRoot->luaMemoryUsage());
+    m_luaRoot->root().logMap().set(Star::format("lua_{}_lua_mem", m_name), m_luaRoot->luaMemoryUsage());
   if (error)
     return std::unexpected(std::move(*error));
   return {};

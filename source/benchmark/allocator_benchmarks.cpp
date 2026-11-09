@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <benchmark/benchmark.h>
 
 import std;
+import star.format;
 import star.block_allocator;
 import star.hash;
 import star.json;
@@ -55,7 +57,7 @@ struct Statistics {
     for (std::size_t i = 0; i < Capacity; ++i) {
       auto& entry = entries[(start + i) & (Capacity - 1)];
       if (!entry.occupied) {
-        entry = {pointer, bytes, true, true};
+        entry = {.pointer = pointer, .bytes = bytes, .occupied = true, .used = true};
         return;
       }
     }
@@ -281,7 +283,7 @@ constexpr std::pmr::pool_options poolOptions() {
     static_assert(sizeof(StatisticsPair) + 2 * sizeof(void*) <= 128);
     // Cap chunk growth, not total retained bytes: the resource may retain
     // multiple chunks until destruction. Never describe this as a hard limit.
-    return {32, 128};
+    return {.max_blocks_per_chunk = 32, .largest_required_pool_block = 128};
   } else {
     return {};
   }
@@ -676,7 +678,8 @@ public:
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    std::cerr << nativeRuntime.error().what() << '\n';
+    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+      return 1;
     return 1;
   }
   benchmark::Initialize(&argc, argv);

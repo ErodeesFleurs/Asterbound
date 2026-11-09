@@ -136,7 +136,7 @@ std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseCompone
   auto cleaned = script.uninit();
   if (!cleaned) {
     if (!result)
-      return std::unexpected(cleaned.error().withContext(printException(result.error(), true)));
+      return std::unexpected(cleaned.error().with_context(Star::print_exception(result.error(), true)));
     return std::unexpected(std::move(cleaned.error()));
   }
   return result;
@@ -186,7 +186,7 @@ HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std:
   HashSet<ItemRecipe> res;
   for (auto const& recipe : subset) {
     // is it the right kind of recipe for this check ?
-    if (recipe.groups.hasIntersection(allowedTypes) || allowedTypes.empty() || recipe.groups.empty()) {
+    if (recipe.groups.has_intersection(allowedTypes) || allowedTypes.empty() || recipe.groups.empty()) {
       // do we have the ingredients to make it.
       if (canMakeRecipe(recipe, normalizedBag, availableCurrencies)) {
         res.add(recipe);
@@ -198,10 +198,10 @@ HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std:
 }
 
 std::expected<String, StarException> ItemDatabase::guiFilterString(std::shared_ptr<Item> const& item) {
-  auto lowered = (item->name() + item->friendlyName() + item->description()).toLower();
+  auto lowered = (item->name() + item->friendlyName() + item->description()).to_lower();
   if (!lowered)
     return std::unexpected(std::move(lowered.error()));
-  auto split = lowered->splitAny(" ,.?*\\+/|\t");
+  auto split = lowered->split_any(" ,.?*\\+/|\t");
   if (!split)
     return std::unexpected(std::move(split.error()));
   return split->join("");
@@ -399,7 +399,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::itemShared(Ite
     return std::shared_ptr<Item>();
   ItemCacheEntry entry{descriptor, level, seed};
   std::unique_lock locker(m_cacheMutex);
-  auto cached = m_itemCache.maybeRef(entry);
+  auto cached = m_itemCache.find_ref(entry);
   if (!cached)
     return std::unexpected(std::move(cached.error()));
   if (*cached)
@@ -437,7 +437,7 @@ bool ItemDatabase::hasRecipeToMake(ItemDescriptor const& item, StringSet const& 
   auto si = item.singular();
   for (auto const& recipe : m_recipes)
     if (recipe.output.singular() == si)
-      for (auto allowedType : allowedTypes)
+      for (auto const& allowedType : allowedTypes)
         if (recipe.groups.contains(allowedType))
           return true;
   return false;
@@ -555,7 +555,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
         auto currencyItem = as<CurrencyItem>(*shared);
         res.currencyInputs[currencyItem->currencyType()] += currencyItem->totalValue();
       } else {
-        res.inputs.append(std::move(*id));
+        res.inputs.push_back(std::move(*id));
       }
     }
     auto outputConfig = config.get("output");
@@ -613,7 +613,7 @@ HashSet<ItemRecipe> const& ItemDatabase::allRecipes() const {
 HashSet<ItemRecipe> ItemDatabase::allRecipes(StringSet const& types) const {
   HashSet<ItemRecipe> res;
   for (auto const& i : m_recipes) {
-    if (i.groups.hasIntersection(types))
+    if (i.groups.has_intersection(types))
       res.add(i);
   }
   return res;
@@ -646,7 +646,8 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
       return std::unexpected(std::move(itemCallbacks.error()));
     if (auto added = script.addCallbacks("item", std::move(*itemCallbacks)); !added)
       return std::unexpected(std::move(added.error()));
-    auto configCallbacks = LuaBindings::makeConfigCallbacks(std::bind(&Item::instanceValue, std::ref(augment), std::placeholders::_1, std::placeholders::_2));
+    auto configCallbacks = LuaBindings::makeConfigCallbacks(
+      [&augment](String const& name, Json const& def) { return augment.instanceValue(name, def); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     return script.addCallbacks("config", std::move(*configCallbacks));
@@ -746,7 +747,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::createItem(Ite
   case ItemType::UnlockItem: return UnlockItem::create(m_root, config.config, config.directory, config.parameters);
   case ItemType::ActiveItem: return ActiveItem::create(m_root, config.config, config.directory, config.parameters);
   case ItemType::AugmentItem: return AugmentItem::create(m_root, config.config, config.directory, config.parameters);
-  default: return std::unexpected(ItemException::format("Unknown item type {}", (int)type));
+  default: return std::unexpected(ItemException::format("Unknown item type {}", static_cast<int>(type)));
   }
 }
 
@@ -808,7 +809,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
   if (*rebuilt)
     return result;
   auto logged = m_root.logger().errorException(
-      strf("Could not {} item '{}' (count {})",
+      Star::format("Could not {} item '{}' (count {})",
           descriptor.name() == "perfectlygenericitem" ? "re-instantiate" : "instantiate", descriptor.name(), descriptor.count()),
       ExceptionDiagnostic(originalError));
   if (!logged)
@@ -849,7 +850,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
 }
 
 std::expected<std::reference_wrapper<ItemDatabase::ItemData const>, StarException> ItemDatabase::itemData(String const& name) const {
-  if (auto p = m_items.maybeRef(name))
+  if (auto p = m_items.find_ref(name))
     return *p;
   return std::unexpected(ItemException::format("No such item '{}'", name));
 }
@@ -907,11 +908,11 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       data.directory = AssetPath::directory(file);
       data.filename = AssetPath::filename(file);
       for (auto const& script : *scripts)
-        data.agingScripts.append(AssetPath::relativeTo(data.directory, script));
+        data.agingScripts.push_back(AssetPath::relative_to(data.directory, script));
       return data;
     }();
     if (!loaded)
-      return std::unexpected(ItemException(strf("Could not load item asset {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading item asset"))));
+      return std::unexpected(ItemException(Star::format("Could not load item asset {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading item asset"))));
     if (m_items.contains(loaded->name))
       return std::unexpected((*assets)->withAssetContext(ItemException::format("Duplicate item name '{}' found", loaded->name), file, "Loading item asset"));
     m_items[loaded->name] = std::move(*loaded);
@@ -1051,7 +1052,7 @@ std::expected<void, StarException> ItemDatabase::scanRecipes() {
     if (recipe) {
       m_recipes.add(std::move(*recipe));
     } else {
-      auto logged = m_root.logger().errorException(strf("Could not load recipe {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
+      auto logged = m_root.logger().errorException(Star::format("Could not load recipe {}", file), ExceptionDiagnostic((*assets)->withAssetContext(std::move(recipe.error()), file, "Loading recipe")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
@@ -1068,7 +1069,7 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
     auto baseItem = itemShared(baseDesc, {}, {});
     if (!baseItem)
       return std::unexpected(std::move(baseItem.error()));
-    String blueprintName = strf("{}-recipe", (*baseItem)->name());
+    String blueprintName = Star::format("{}-recipe", (*baseItem)->name());
     if (m_items.contains(blueprintName))
       continue;
     String sourcePath;
@@ -1145,7 +1146,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
   if (!codexDatabase)
     return std::unexpected(std::move(codexDatabase.error()));
   for (auto const& codexPair : (*codexDatabase)->codexes()) {
-    String codexItemName = strf("{}-codex", codexPair.second->id());
+    String codexItemName = Star::format("{}-codex", codexPair.second->id());
     if (m_items.contains(codexItemName)) {
       auto logged = m_root.logger().warn("Couldn't create codex item {} because an item with that name is already defined", codexItemName);
       if (!logged)
@@ -1176,7 +1177,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       return {};
     }();
     if (!created) {
-      auto logged = m_root.logger().errorException(strf("Could not create item for codex {}", codexPair.second->id()), ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item")));
+      auto logged = m_root.logger().errorException(Star::format("Could not create item for codex {}", codexPair.second->id()), ExceptionDiagnostic((*assets)->withAssetContext(std::move(created.error()), codexPair.second->directory() + codexPair.second->filename(), "Creating codex item")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }

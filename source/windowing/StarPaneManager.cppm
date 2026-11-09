@@ -78,7 +78,7 @@ extern std::expected<EnumMap<PaneLayer>, StarException> const PaneLayerNames;
 // layer contains a z-ordered list of panes to display.
 class PaneManager {
 public:
-  typedef std::function<std::expected<void, StarException>(std::shared_ptr<Pane> const&)> DismissCallback;
+  using DismissCallback = std::function<std::expected<void, StarException>(std::shared_ptr<Pane> const&)>;
 
   PaneManager(GuiContext& context);
   [[nodiscard]] static std::expected<std::shared_ptr<PaneManager>, StarException> create(GuiContext& context);

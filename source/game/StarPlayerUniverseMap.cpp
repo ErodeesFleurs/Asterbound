@@ -62,7 +62,7 @@ template<> [[nodiscard]] std::expected<OrbitTarget, StarException> jsonToBookmar
 }
 
 template<> [[nodiscard]] std::expected<Json, StarException> jsonFromBookmarkTarget<TeleportTarget>(TeleportTarget const& target) {
-  auto world = printWorldId(target.first);
+  auto world = Star::print_world_id(target.first);
   if (!world)
     return std::unexpected(std::move(world.error()));
   return JsonArray{std::move(*world), spawnTargetToJson(target.second)};
@@ -157,7 +157,7 @@ std::expected<List<std::pair<Vec3I, OrbitBookmark>>, StarException> PlayerUniver
     return std::unexpected(std::move(map.error()));
   for (auto const& pair : map->get().systems)
     for (auto const& bookmark : pair.second.bookmarks)
-      bookmarks.append({pair.first, bookmark});
+      bookmarks.push_back({pair.first, bookmark});
   return bookmarks;
 }
 
@@ -214,7 +214,7 @@ std::expected<std::optional<OrbitBookmark>, StarException> PlayerUniverseMap::wo
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto system = map->get().systems.maybeRef(world.location())) {
+  if (auto system = map->get().systems.find_ref(world.location())) {
     for (auto const& bookmark : system->get().bookmarks)
       if (std::holds_alternative<CelestialCoordinate>(bookmark.target) && std::get<CelestialCoordinate>(bookmark.target) == world)
         return bookmark;
@@ -226,7 +226,7 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::systemBookm
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto entry = map->get().systems.maybeRef(system.location()))
+  if (auto entry = map->get().systems.find_ref(system.location()))
     return entry->get().bookmarks.values();
   return List<OrbitBookmark>();
 }
@@ -236,7 +236,7 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::planetBookm
   if (!map)
     return std::unexpected(std::move(map.error()));
   List<OrbitBookmark> bookmarks;
-  if (auto system = map->get().systems.maybeRef(planet.location())) {
+  if (auto system = map->get().systems.find_ref(planet.location())) {
     for (auto const& bookmark : system->get().bookmarks) {
       if (std::holds_alternative<CelestialCoordinate>(bookmark.target)) {
         auto const& coordinate = std::get<CelestialCoordinate>(bookmark.target);
@@ -253,7 +253,7 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::planetBookm
         if (!targetOrbit)
           return std::unexpected(std::move(targetOrbit.error()));
         if (*bookmarkOrbit == *targetOrbit)
-          bookmarks.append(bookmark);
+          bookmarks.push_back(bookmark);
       }
     }
   }
@@ -266,7 +266,7 @@ std::expected<bool, StarException> PlayerUniverseMap::isMapped(CelestialCoordina
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto system = map->get().systems.maybeRef(coordinate.location())) {
+  if (auto system = map->get().systems.find_ref(coordinate.location())) {
     if (coordinate.isSystem())
       return true;
     auto planet = coordinate.planet();
@@ -281,7 +281,7 @@ std::expected<HashMap<Uuid, PlayerUniverseMap::MappedObject>, StarException> Pla
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto entry = map->get().systems.maybeRef(system.location()))
+  if (auto entry = map->get().systems.find_ref(system.location()))
     return entry->get().mappedObjects;
   return HashMap<Uuid, MappedObject>();
 }
@@ -315,7 +315,7 @@ std::expected<void, StarException> PlayerUniverseMap::removeMappedObject(Celesti
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto entry = map->get().systems.maybeRef(system.location()))
+  if (auto entry = map->get().systems.find_ref(system.location()))
     entry->get().mappedObjects.remove(uuid);
   return {};
 }
@@ -324,7 +324,7 @@ std::expected<void, StarException> PlayerUniverseMap::filterMappedObjects(Celest
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
-  if (auto entry = map->get().systems.maybeRef(system.location()))
+  if (auto entry = map->get().systems.find_ref(system.location()))
     for (auto const& uuid : entry->get().mappedObjects.keys())
       if (!allowed.contains(uuid))
         entry->get().mappedObjects.remove(uuid);
@@ -384,7 +384,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
 std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const {
   JsonArray planets;
   for (auto const& planet : mappedPlanets)
-    planets.append(planet.toJson());
+    planets.push_back(planet.toJson());
   JsonObject objects;
   for (auto const& pair : mappedObjects) {
     auto orbit = jsonFromOptional<CelestialOrbit>(pair.second.orbit, [](CelestialOrbit const& value) { return value.toJson(); });
@@ -398,7 +398,7 @@ std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const 
     auto stored = bookmark.toJson();
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    storedBookmarks.append(std::move(*stored));
+    storedBookmarks.push_back(std::move(*stored));
   }
   return JsonObject{{"mappedPlanets", std::move(planets)}, {"mappedObjects", std::move(objects)},
       {"bookmarks", std::move(storedBookmarks)}};
@@ -442,14 +442,14 @@ std::expected<Json, StarException> PlayerUniverseMap::UniverseMap::toJson() cons
     auto system = pair.second.toJson();
     if (!system)
       return std::unexpected(std::move(system.error()));
-    storedSystems.append(JsonArray{jsonFromVec3I(pair.first), std::move(*system)});
+    storedSystems.push_back(JsonArray{jsonFromVec3I(pair.first), std::move(*system)});
   }
   JsonArray bookmarks;
   for (auto const& bookmark : teleportBookmarks) {
     auto stored = bookmark.toJson();
     if (!stored)
       return std::unexpected(std::move(stored.error()));
-    bookmarks.append(std::move(*stored));
+    bookmarks.push_back(std::move(*stored));
   }
   return JsonObject{{"systems", std::move(storedSystems)}, {"teleportBookmarks", std::move(bookmarks)}};
 }

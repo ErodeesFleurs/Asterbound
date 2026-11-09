@@ -150,14 +150,14 @@ bool scaledCropFits(Image const& srcImage, Vec2F const& scale, RectI const& wind
 std::expected<Image, StarException> scaleNearestCropped(Image const& srcImage, Vec2F const& scale,
                                                         RectI const& window) {
   if (!scaledCropFits(srcImage, scale, window))
-    return std::unexpected(ImageException(strf("crop window {} out of scaled image bounds", window)));
+    return std::unexpected(ImageException(Star::format("crop window {} out of scaled image bounds", window)));
   return nearestWindow(srcImage, scale, Vec2U(window.min()), Vec2U(window.size()));
 }
 
 std::expected<Image, StarException> scaleBilinearCropped(Image const& srcImage, Vec2F const& scale,
                                                          RectI const& window) {
   if (!scaledCropFits(srcImage, scale, window))
-    return std::unexpected(ImageException(strf("crop window {} out of scaled image bounds", window)));
+    return std::unexpected(ImageException(Star::format("crop window {} out of scaled image bounds", window)));
   return bilinearWindow(srcImage, scale, Vec2U(window.min()), Vec2U(window.size()));
 }
 
