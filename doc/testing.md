@@ -209,6 +209,7 @@ The target list above also includes benchmarks outside this focused catalog.
 | Geometry | `./result/bin/line_benchmarks --benchmark_filter='Line/'` | 20 float/double complete/boolean intersection and point-distance cases. |
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | 24 cases: borrowed string deserialization, 1/5/10-byte VLQ reads through `DataStream&`, fixed-storage UUID decoding, one-shot file writes and complete directory/packed asset payload reads. Owning/function-backed VLQ adapters are generic-path controls. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Eleven cases: rejected/accepted raw/formatted messages, one/four sinks, four persistent native callers, real file lines and unobserved/observed/capacity-bound spatial logs. |
+| Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | 28 cases: new `try_emplace`/const-pair insertion, expensive duplicate map/set insertion, full-hash-collision rehash, hit/miss lookup, inline-value churn, retained-capacity clear/reuse and sparse iteration. |
 
 ### Batch accounting and correctness oracles
 
@@ -222,9 +223,10 @@ batch count for amortized per-item cost:
 | `line_benchmarks` | 64 operations and result writes. |
 | `io_benchmarks` | 64 decode/VLQ/UUID operations; one operation per file iteration. |
 | `logging_benchmarks` | Labels specify 64 messages, 256 concurrent messages or 192 mixed spatial objects. Concurrent timing uses process CPU time and includes wakeup/completion. |
+| `flat_hash_benchmarks` | Labels give N entries/queries; churn counts 2N erase/insert operations and rehash counts N relocated residents. Divide batch CPU time accordingly. |
 
-Fixture setup and complete-result validation are untimed for byte, line, I/O and
-logging benchmarks. Preserve their independent checks and labels:
+Fixture setup and complete-result validation are untimed for byte, line, I/O,
+logging and flat hash benchmarks. Preserve their independent checks and labels:
 
 - **Bytes:** deterministic input and complete-result fingerprints; independent
   byte oracles check signed zeros, NaN payloads, raw guards and post-loop results.
@@ -239,6 +241,7 @@ logging benchmarks. Preserve their independent checks and labels:
   Writes include open/truncate/write/close, without durability sync.
 - **Logging:** complete output checks; file lines are warm writes, without
   durability sync.
+- **Flat hash storage:** an independent ordered oracle checks complete key/value membership and duplicate iteration before/after timing, including embedded-NUL/UTF-8 keys. New-insertion cases include owner creation/destruction; duplicate, lookup, churn, clear/reuse and sparse iteration keep owners outside timing. Collision rehash pauses copy/setup and includes only reserve/rebuild. Full-hash collisions are a stress case, not representative default-hash throughput.
 
 ### Comparable measurements
 
@@ -253,6 +256,13 @@ For I/O, pin the CPU and alternate repeated original/current runs. Do not infer
 frame-rate or physical-storage gains from warm payload benchmarks. For logging,
 compare seven alternating original/current runs, pinning single-caller cases to
 one CPU and concurrent callers to a fixed four-CPU set.
+For flat hash storage, freeze the original table/map/set sources and build private
+original/current consumers from the same benchmark translation unit, changing
+only baseline module/namespace references. Pin one CPU, alternate seven
+original/current runs, retain raw JSON and compare per-item CPU medians. Include
+identical-binary A/A controls before attributing small changes; copy/move,
+allocation and hash/equality counters explain work but do not establish timing
+gains or frame-rate improvements.
 
 ## Runtime performance evidence
 

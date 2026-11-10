@@ -8,6 +8,23 @@ import star.hash;
 
 namespace Star {
 
+template <typename Key, typename Mapped, typename... Args>
+concept flat_map_value_constructible = flat_value_constructible<std::pair<Key, Mapped>, Args...>;
+
+// Only genuine pairs with an unchanged key can be probed before conversion.
+// Arbitrary converting inputs may produce a different key during construction.
+template <typename Pair, typename Key>
+concept flat_map_exact_key_pair = requires {
+  typename std::remove_cvref_t<Pair>::first_type;
+  typename std::remove_cvref_t<Pair>::second_type;
+} && std::same_as<std::remove_cvref_t<Pair>,
+    std::pair<typename std::remove_cvref_t<Pair>::first_type,
+        typename std::remove_cvref_t<Pair>::second_type>>
+  && std::same_as<std::remove_cvref_t<typename std::remove_cvref_t<Pair>::first_type>, Key>
+  && requires(Pair&& pair) {
+    { pair.first } -> std::convertible_to<Key const&>;
+  };
+
 template <typename Key, typename Mapped, typename Hash = hash<Key>, typename Equals = std::equal_to<>, typename Allocator = std::allocator<Key>>
 class FlatHashMap {
 public:
@@ -24,7 +41,9 @@ public:
   using reference = std::pair<key_type const&, mapped_type&>;
   using const_reference = std::pair<key_type const&, mapped_type const&>;
 
-  template <typename Reference> struct arrow_proxy {
+  template <typename Reference>
+    requires (std::same_as<Reference, reference> || std::same_as<Reference, const_reference>)
+  struct arrow_proxy {
     Reference entry;
     Reference const* operator->() const { return std::addressof(entry); }
   };
@@ -90,15 +109,38 @@ public:
   FlatHashMap(std::size_t bucketCount, hasher const& hash, allocator_type const& alloc);
   explicit FlatHashMap(allocator_type const& alloc);
 
-  template <typename InputIt>
-  FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount = 0,
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+  FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount = 0,
       hasher const& hash = hasher(), key_equal const& equal = key_equal(),
       allocator_type const& alloc = allocator_type());
-  template <typename InputIt>
-  FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount, allocator_type const& alloc);
-  template <typename InputIt>
-  FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount,
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+  FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount, allocator_type const& alloc);
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+  FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount,
       hasher const& hash, allocator_type const& alloc);
+
+  template <std::ranges::input_range Range>
+    requires flat_map_value_constructible<Key, Mapped, std::ranges::range_reference_t<Range>>
+  FlatHashMap(std::from_range_t, Range&& range, std::size_t bucketCount = 0,
+      hasher const& hash = hasher(), key_equal const& equal = key_equal(),
+      allocator_type const& alloc = allocator_type())
+    : FlatHashMap(bucketCount, hash, equal, alloc) {
+    if constexpr (std::ranges::sized_range<Range>)
+      m_table.reserve(std::ranges::size(range));
+    insert_range(std::forward<Range>(range));
+  }
+  template <std::ranges::input_range Range>
+    requires flat_map_value_constructible<Key, Mapped, std::ranges::range_reference_t<Range>>
+  FlatHashMap(std::from_range_t, Range&& range, std::size_t bucketCount, allocator_type const& alloc)
+    : FlatHashMap(std::from_range, std::forward<Range>(range), bucketCount, hasher(), key_equal(), alloc) {}
+  template <std::ranges::input_range Range>
+    requires flat_map_value_constructible<Key, Mapped, std::ranges::range_reference_t<Range>>
+  FlatHashMap(std::from_range_t, Range&& range, std::size_t bucketCount,
+      hasher const& hash, allocator_type const& alloc)
+    : FlatHashMap(std::from_range, std::forward<Range>(range), bucketCount, hash, key_equal(), alloc) {}
 
   FlatHashMap(FlatHashMap const& other);
   FlatHashMap(FlatHashMap const& other, allocator_type const& alloc);
@@ -125,26 +167,50 @@ public:
   const_iterator cbegin() const;
   const_iterator cend() const;
 
-  std::size_t empty() const;
+  bool empty() const noexcept;
   std::size_t size() const;
   void clear();
 
-  std::pair<iterator, bool> insert(value_type const& value);
-  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
+  std::pair<iterator, bool> insert(value_type const& value)
+    requires std::is_constructible_v<TableValue, value_type const&>;
+  template <typename T>
+    requires flat_map_value_constructible<Key, Mapped, T&&>
   std::pair<iterator, bool> insert(T&& value);
-  iterator insert(const_iterator hint, value_type const& value);
-  template <typename T, typename = std::enable_if_t<std::is_constructible_v<TableValue, T&&>>>
+  iterator insert(const_iterator hint, value_type const& value)
+    requires std::is_constructible_v<TableValue, value_type const&>;
+  template <typename T>
+    requires flat_map_value_constructible<Key, Mapped, T&&>
   iterator insert(const_iterator hint, T&& value);
-  template <typename InputIt>
-  void insert(InputIt first, InputIt last);
+  template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
+    requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+  void insert(InputIt first, Sentinel last);
+  template <std::ranges::input_range Range>
+    requires flat_map_value_constructible<Key, Mapped, std::ranges::range_reference_t<Range>>
+  void insert_range(Range&& range) {
+    insert(std::ranges::begin(range), std::ranges::end(range));
+  }
   void insert(std::initializer_list<value_type> init);
 
   template <typename... Args>
+    requires flat_map_value_constructible<Key, Mapped, Args&&...>
   std::pair<iterator, bool> emplace(Args&&... args);
+  template <typename KeyArg, typename ValueArg>
+    requires (flat_map_value_constructible<Key, Mapped, KeyArg&&, ValueArg&&>
+      && std::same_as<std::remove_cvref_t<KeyArg>, key_type>
+      && std::convertible_to<KeyArg&&, key_type const&>)
+  std::pair<iterator, bool> emplace(KeyArg&& key, ValueArg&& value) {
+    auto result = m_table.insert_with(key, [&] {
+      return TableValue(std::forward<KeyArg>(key), std::forward<ValueArg>(value));
+    });
+    return {iterator{result.first}, result.second};
+  }
   template <typename... Args>
+    requires flat_map_value_constructible<Key, Mapped, Args&&...>
   iterator emplace_hint(const_iterator hint, Args&&... args);
 
   template <typename... Args>
+    requires (flat_value_constructible<key_type, key_type const&>
+      && flat_value_constructible<mapped_type, Args&&...>)
   std::pair<iterator, bool> try_emplace(key_type const& key, Args&&... args) {
     auto result = m_table.insert_with(key, [&] {
       return TableValue(std::piecewise_construct, std::forward_as_tuple(key),
@@ -154,6 +220,8 @@ public:
   }
 
   template <typename... Args>
+    requires (flat_value_constructible<key_type, key_type&&>
+      && flat_value_constructible<mapped_type, Args&&...>)
   std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args) {
     auto result = m_table.insert_with(key, [&] {
       return TableValue(std::piecewise_construct, std::forward_as_tuple(std::move(key)),
@@ -163,6 +231,9 @@ public:
   }
 
   template <typename Value>
+    requires (flat_value_constructible<key_type, key_type const&>
+      && flat_value_constructible<mapped_type, Value&&>
+      && flat_value_assignable<mapped_type, Value&&>)
   std::pair<iterator, bool> insert_or_assign(key_type const& key, Value&& value) {
     auto result = try_emplace(key, std::forward<Value>(value));
     if (!result.second)
@@ -171,6 +242,9 @@ public:
   }
 
   template <typename Value>
+    requires (flat_value_constructible<key_type, key_type&&>
+      && flat_value_constructible<mapped_type, Value&&>
+      && flat_value_assignable<mapped_type, Value&&>)
   std::pair<iterator, bool> insert_or_assign(key_type&& key, Value&& value) {
     auto result = try_emplace(std::move(key), std::forward<Value>(value));
     if (!result.second)
@@ -317,24 +391,31 @@ FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(allocator_type co
   : FlatHashMap(0, hasher(), key_equal(), alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount,
+template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel>
+  requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount,
     hasher const& hash, key_equal const& equal, allocator_type const& alloc)
   : FlatHashMap(bucketCount, hash, equal, alloc) {
-  insert(first, last);
+  // Only fresh owners may reserve ahead of insertion: a borrowed self-range
+  // must remain valid when every input is already present.
+  if constexpr (std::sized_sentinel_for<Sentinel, InputIt>)
+    m_table.reserve(static_cast<size_type>(last - first));
+  insert(std::move(first), std::move(last));
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount,
+template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel>
+  requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount,
     allocator_type const& alloc)
-  : FlatHashMap(first, last, bucketCount, hasher(), key_equal(), alloc) {}
+  : FlatHashMap(std::move(first), std::move(last), bucketCount, hasher(), key_equal(), alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, InputIt last, std::size_t bucketCount,
+template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel>
+  requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(InputIt first, Sentinel last, std::size_t bucketCount,
     hasher const& hash, allocator_type const& alloc)
-  : FlatHashMap(first, last, bucketCount, hash, key_equal(), alloc) {}
+  : FlatHashMap(std::move(first), std::move(last), bucketCount, hash, key_equal(), alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap const& other) : m_table(other.m_table) {}
@@ -354,9 +435,7 @@ FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(FlatHashMap&& oth
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(std::initializer_list<value_type> init, std::size_t bucketCount, hasher const& hash,
     key_equal const& equal, allocator_type const& alloc)
-  : FlatHashMap(bucketCount, hash, equal, alloc) {
-  operator=(init);
-}
+  : FlatHashMap(init.begin(), init.end(), bucketCount, hash, equal, alloc) {}
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::FlatHashMap(std::initializer_list<value_type> init, std::size_t bucketCount,
@@ -418,7 +497,7 @@ auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::cend() const -> const_it
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-std::size_t FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::empty() const {
+bool FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::empty() const noexcept {
   return m_table.empty();
 }
 
@@ -433,34 +512,47 @@ void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::clear() {
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(value_type const& value) -> std::pair<iterator, bool> {
-  auto res = m_table.insert(TableValue(value));
-  return {iterator{res.first}, res.second};
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(value_type const& value) -> std::pair<iterator, bool>
+  requires std::is_constructible_v<TableValue, value_type const&> {
+  auto result = m_table.insert_with(value.first, [&] { return TableValue(value); });
+  return {iterator{result.first}, result.second};
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename T, typename>
+template <typename T>
+  requires flat_map_value_constructible<Key, Mapped, T&&>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(T&& value) -> std::pair<iterator, bool> {
-  auto res = m_table.insert(TableValue(std::forward<T&&>(value)));
-  return {iterator{res.first}, res.second};
+  if constexpr (flat_map_exact_key_pair<T, key_type>) {
+    auto result = m_table.insert_with(value.first, [&] { return TableValue(std::forward<T>(value)); });
+    return {iterator{result.first}, result.second};
+  } else {
+    // Conversion may change the key or expose no pair members at all.
+    auto result = m_table.insert(TableValue(std::forward<T>(value)));
+    return {iterator{result.first}, result.second};
+  }
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(const_iterator hint, value_type const& value) -> iterator {
-  return insert(hint, TableValue(value));
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(const_iterator, value_type const& value) -> iterator
+  requires std::is_constructible_v<TableValue, value_type const&> {
+  return insert(value).first;
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename T, typename>
+template <typename T>
+  requires flat_map_value_constructible<Key, Mapped, T&&>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(const_iterator, T&& value) -> iterator {
-  return insert(std::forward<T&&>(value)).first;
+  return insert(std::forward<T>(value)).first;
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
-template <typename InputIt>
-void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(InputIt first, InputIt last) {
-  for (auto i = first; i != last; ++i)
-    m_table.insert(*i);
+template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel>
+  requires flat_map_value_constructible<Key, Mapped, std::iter_reference_t<InputIt>>
+void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(InputIt first, Sentinel last) {
+  // Do not pre-count or reserve borrowed inputs. Exact-key proxy self-ranges
+  // contain only duplicates and must neither construct values nor invalidate.
+  for (; first != last; ++first)
+    insert(*first);
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
@@ -470,14 +562,21 @@ void FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::insert(std::initializer_
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 template <typename... Args>
+  requires flat_map_value_constructible<Key, Mapped, Args&&...>
 auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::emplace(Args&&... args) -> std::pair<iterator, bool> {
-  return insert(TableValue(std::forward<Args>(args)...));
+  if constexpr (sizeof...(Args) == 1) {
+    return insert(std::forward<Args>(args)...);
+  } else {
+    auto result = m_table.insert(TableValue(std::forward<Args>(args)...));
+    return {iterator{result.first}, result.second};
+  }
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>
 template <typename... Args>
-auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::emplace_hint(const_iterator hint, Args&&... args) -> iterator {
-  return insert(hint, TableValue(std::forward<Args>(args)...));
+  requires flat_map_value_constructible<Key, Mapped, Args&&...>
+auto FlatHashMap<Key, Mapped, Hash, Equals, Allocator>::emplace_hint(const_iterator, Args&&... args) -> iterator {
+  return emplace(std::forward<Args>(args)...).first;
 }
 
 template <typename Key, typename Mapped, typename Hash, typename Equals, typename Allocator>

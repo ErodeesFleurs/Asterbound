@@ -29,6 +29,10 @@ struct ParsedMapEntry {
     return input >> entry.key;
   }
 };
+struct RemappedMapEntry {
+  int first;
+  operator std::pair<int, int>() const { return {first + 100, first * 2}; }
+};
 struct CollisionHash {
   std::size_t operator()(int) const { return 0; }
 };
@@ -397,6 +401,36 @@ TEST(FlatHashTable, InsertWithDoesNotConsumeFactoryOnDuplicate) {
     EXPECT_EQ(value, key * 10);
 }
 
+TEST(FlatHashTable, FactoryMayGrowTableAndInsertTheSameKey) {
+  using Value = std::pair<int, int>;
+  using Table = FlatHashTable<Value, int, FlatPairKey, CollisionHash, std::equal_to<int>, std::allocator<Value>>;
+  Table values(0, {}, {}, {}, {});
+  for (int key = 0; key != 5; ++key)
+    values.insert({key, key * 10});
+
+  auto result = values.insert_with(7, [&] {
+    values.reserve(200);
+    values.insert({7, 70});
+    return Value{7, 999};
+  });
+  EXPECT_FALSE(result.second);
+  EXPECT_EQ(result.first->second, 70);
+  EXPECT_EQ(values.size(), 6u);
+  for (int key = 0; key != 5; ++key) {
+    auto found = values.find(key);
+    ASSERT_NE(found, values.end());
+    EXPECT_EQ(found->second, key * 10);
+  }
+}
+
+TEST(FlatHashMap, OversizedReserveTerminatesBeforeCapacityWraps) {
+  using MapType = FlatHashMap<int, int>;
+  EXPECT_DEATH({
+    MapType values;
+    values.reserve(std::numeric_limits<std::size_t>::max());
+  }, ".*");
+}
+
 TEST(FlatHashTable, LookupConstraintsMatchMutableCallsAndContextualEquality) {
   using Value = std::pair<int, int>;
   using Table = FlatHashTable<Value, int, FlatMutablePairKey, FlatMutableHash, FlatMutableEqual, std::allocator<Value>>;
@@ -430,6 +464,19 @@ TEST(FlatHashMap, SinglePassInputPreservesEveryElement) {
   EXPECT_EQ(keys.size(), 4u);
   for (int key = 1; key <= 4; ++key)
     EXPECT_NE(keys.find(key), keys.end());
+}
+
+TEST(FlatHashMap, ConvertingEntriesUseTheMaterializedKey) {
+  FlatHashMap<int, int, CollisionHash> values;
+  auto inserted = values.insert(RemappedMapEntry{7});
+  ASSERT_TRUE(inserted.second);
+  EXPECT_EQ(inserted.first->first, 107);
+  EXPECT_EQ(inserted.first->second, 14);
+  auto duplicate = values.insert(RemappedMapEntry{7});
+  EXPECT_FALSE(duplicate.second);
+  EXPECT_EQ(duplicate.first->second, 14);
+  EXPECT_EQ(values.find(7), values.end());
+  EXPECT_EQ(values.size(), 1u);
 }
 
 TEST(FlatHashMap, RemoveAllValuesAcrossCollisionShift) {
@@ -466,6 +513,36 @@ TEST(FlatHashMap, TryEmplaceKeepsOwnershipOnDuplicate) {
   EXPECT_FALSE(assigned.second);
   EXPECT_EQ(key, "present");
   EXPECT_EQ(assigned.first->second, 2);
+}
+
+TEST(FlatHashMap, ExactPairDuplicateInsertionPreservesMoveOnlyOwnership) {
+  FlatHashMap<int, std::unique_ptr<int>, CollisionHash> values;
+  values.try_emplace(1, std::make_unique<int>(42));
+  std::pair<int, std::unique_ptr<int>> candidate{1, std::make_unique<int>(99)};
+  auto identity = candidate.second.get();
+  auto duplicate = values.insert(std::move(candidate));
+  EXPECT_FALSE(duplicate.second);
+  EXPECT_EQ(candidate.second.get(), identity);
+  EXPECT_EQ(*duplicate.first->second, 42);
+
+  auto inserted = values.insert(std::pair<int, std::unique_ptr<int>>{2, std::move(candidate.second)});
+  ASSERT_TRUE(inserted.second);
+  EXPECT_EQ(inserted.first->second.get(), identity);
+  EXPECT_FALSE(candidate.second);
+}
+
+TEST(FlatHashSet, DuplicateInsertionPreservesMoveOnlyKeyOwnership) {
+  FlatHashSet<FlatMoveKey, FlatWrapHash, FlatMoveEqual> values;
+  values.insert(FlatMoveKey(3));
+  FlatMoveKey candidate(3);
+  auto identity = candidate.ownership.get();
+  auto duplicate = values.insert(std::move(candidate));
+  EXPECT_FALSE(duplicate.second);
+  EXPECT_EQ(candidate.ownership.get(), identity);
+  EXPECT_EQ(duplicate.first->id, 3);
+  ASSERT_TRUE(duplicate.first->ownership);
+  EXPECT_EQ(*duplicate.first->ownership, 3);
+  EXPECT_EQ(values.size(), 1u);
 }
 
 TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {

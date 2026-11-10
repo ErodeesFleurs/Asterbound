@@ -59,7 +59,7 @@ public:
     : FlatHashSet(0, hasher(), key_equal(), alloc) {}
 
   template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
-    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+    requires flat_value_constructible<value_type, std::iter_reference_t<InputIt>>
   FlatHashSet(InputIt first, Sentinel last, size_type bucket_count = 0,
       hasher const& hash = hasher(), key_equal const& equal = key_equal(),
       allocator_type const& alloc = allocator_type())
@@ -73,17 +73,17 @@ public:
     insert(std::move(first), std::move(last));
   }
   template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
-    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+    requires flat_value_constructible<value_type, std::iter_reference_t<InputIt>>
   FlatHashSet(InputIt first, Sentinel last, size_type bucket_count, allocator_type const& alloc)
     : FlatHashSet(std::move(first), std::move(last), bucket_count, hasher(), key_equal(), alloc) {}
   template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
-    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+    requires flat_value_constructible<value_type, std::iter_reference_t<InputIt>>
   FlatHashSet(InputIt first, Sentinel last, size_type bucket_count,
       hasher const& hash, allocator_type const& alloc)
     : FlatHashSet(std::move(first), std::move(last), bucket_count, hash, key_equal(), alloc) {}
 
   template <std::ranges::input_range Range>
-    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+    requires flat_value_constructible<value_type, std::ranges::range_reference_t<Range>>
   FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count = 0,
       hasher const& hash = hasher(), key_equal const& equal = key_equal(),
       allocator_type const& alloc = allocator_type())
@@ -95,11 +95,11 @@ public:
     insert_range(std::forward<Range>(range));
   }
   template <std::ranges::input_range Range>
-    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+    requires flat_value_constructible<value_type, std::ranges::range_reference_t<Range>>
   FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count, allocator_type const& alloc)
     : FlatHashSet(std::from_range, std::forward<Range>(range), bucket_count, hasher(), key_equal(), alloc) {}
   template <std::ranges::input_range Range>
-    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+    requires flat_value_constructible<value_type, std::ranges::range_reference_t<Range>>
   FlatHashSet(std::from_range_t, Range&& range, size_type bucket_count,
       hasher const& hash, allocator_type const& alloc)
     : FlatHashSet(std::from_range, std::forward<Range>(range), bucket_count, hash, key_equal(), alloc) {}
@@ -144,12 +144,12 @@ public:
 
   std::pair<iterator, bool> insert(value_type const& value)
     requires std::is_copy_constructible_v<value_type> {
-    auto result = m_table.insert(value);
+    auto result = m_table.insert_with(value, [&] { return value_type(value); });
     return {iterator{result.first}, result.second};
   }
   std::pair<iterator, bool> insert(value_type&& value)
     requires std::is_move_constructible_v<value_type> {
-    auto result = m_table.insert(std::move(value));
+    auto result = m_table.insert_with(value, [&] { return value_type(std::move(value)); });
     return {iterator{result.first}, result.second};
   }
   iterator insert(const_iterator, value_type const& value)
@@ -158,29 +158,41 @@ public:
     requires std::is_move_constructible_v<value_type> { return insert(std::move(value)).first; }
 
   template <std::input_iterator InputIt, std::sentinel_for<InputIt> Sentinel = InputIt>
-    requires std::is_constructible_v<value_type, std::iter_reference_t<InputIt>>
+    requires flat_value_constructible<value_type, std::iter_reference_t<InputIt>>
   void insert(InputIt first, Sentinel last) {
     // Do not pre-count or reserve: an input is single-pass, and a directly
     // aliased key range contains only duplicates and must remain valid.
     // Opaque projections producing new keys must not borrow this storage;
     // discovering that overlap would evaluate projections or require snapshots.
-    for (; first != last; ++first)
-      m_table.insert(value_type(*first));
+    for (; first != last; ++first) {
+      if constexpr (std::same_as<std::remove_cvref_t<std::iter_reference_t<InputIt>>, value_type>
+          && std::convertible_to<std::iter_reference_t<InputIt>, value_type const&>)
+        insert(*first);
+      else
+        m_table.insert(value_type(*first));
+    }
   }
   template <std::ranges::input_range Range>
-    requires std::is_constructible_v<value_type, std::ranges::range_reference_t<Range>>
+    requires flat_value_constructible<value_type, std::ranges::range_reference_t<Range>>
   void insert_range(Range&& range) {
     insert(std::ranges::begin(range), std::ranges::end(range));
   }
   void insert(std::initializer_list<value_type> init) { insert(init.begin(), init.end()); }
 
   template <typename... Args>
-    requires std::is_constructible_v<value_type, Args&&...>
+    requires flat_value_constructible<value_type, Args&&...>
   std::pair<iterator, bool> emplace(Args&&... args) {
-    return insert(value_type(std::forward<Args>(args)...));
+    if constexpr (sizeof...(Args) == 1
+        && (std::same_as<std::remove_cvref_t<Args>, value_type> && ...)
+        && (std::convertible_to<Args&&, value_type const&> && ...)) {
+      return insert(std::forward<Args>(args)...);
+    } else {
+      auto result = m_table.insert(value_type(std::forward<Args>(args)...));
+      return {iterator{result.first}, result.second};
+    }
   }
   template <typename... Args>
-    requires std::is_constructible_v<value_type, Args&&...>
+    requires flat_value_constructible<value_type, Args&&...>
   iterator emplace_hint(const_iterator, Args&&... args) { return emplace(std::forward<Args>(args)...).first; }
 
   iterator erase(const_iterator pos) { return iterator{m_table.erase(pos.inner)}; }

@@ -62,6 +62,8 @@ Worker cancellation uses `std::stop_source`/`std::stop_token`, with stable token
 - Payload-free alternatives use `std::monostate`. Preserve JSON/Lua nil, variant ordering, and network/inventory marker tags and zero-byte payloads; named inventory wrappers still distinguish swap and trash slots.
 - Use `auto(expr)` for owning traversal snapshots and `std::views::zip` for synchronous read-only iteration over retained ranges. Pane dismissal callbacks may modify the original collection, so these snapshots must not become borrowed views.
 - Typed sequence `contains` converts its argument to the element type before `std::ranges::contains`; replacing the member call with an untyped range query can change mixed-type membership.
+- Flat hash operations use method-local snake_case concepts; keep mapped-value construction checks out of class-level constraints so recursive records remain valid. Equality is contextually boolean and policies may be mutable. Exact-key pair/set inputs are constructed only after a miss; arbitrary converting inputs must materialize before hashing because conversion may change the key.
+- Flat hash growth uses bounded integer load limits and cached hashes; resident values are already unique, so rebuilding does not call the hasher or equality policy. Factory-based insertion constructs before growth and re-probes after the factory: callbacks may grow the table or insert the same key. Duplicate borrowed self-ranges must not allocate or invalidate their source. Do not pre-reserve general insertion ranges or remove moved-from bucket cleanup based only on the source's zero element count.
 
 ### Numeric and geometry contracts
 

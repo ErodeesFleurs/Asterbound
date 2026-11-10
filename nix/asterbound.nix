@@ -166,6 +166,7 @@ let
     "logging_benchmarks"
     "array_benchmarks"
     "hash_benchmarks"
+    "flat_hash_benchmarks"
     "list_benchmarks"
     "vector_benchmarks"
     "set_benchmarks"
