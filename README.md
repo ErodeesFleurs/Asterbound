@@ -26,14 +26,25 @@ Use `/help` in game or read the [command reference](assets/asterbound/help.confi
 
 ## Building
 
-On Linux with Nix, run from the repository root:
+### General Linux distributions
+
+Use the native xclang + vcpkg workflow on Ubuntu and other conventional Linux
+distributions; Nix is not required. See [Linux without Nix](doc/building.md#linux-without-nix)
+for system dependencies, vcpkg setup and configure/build/test commands.
+
+### NixOS / Linux with Nix
+
+Run from the repository root with Nix commands and flakes enabled:
 
 ```sh
 nix build
 ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result/bin/asterbound
 ```
 
-Native builds require C++23, CMake, Ninja and the pinned xclang toolchain. See [requirements and platform instructions](doc/building.md#requirements); GCC, Apple Clang and MSVC builds are unsupported.
+See [NixOS setup](doc/building.md#nixos) for feature configuration and development shells.
+Native builds on other platforms require C++23, CMake, Ninja and the pinned xclang
+toolchain; see [platform instructions](doc/building.md#native-cmake-presets).
+GCC, Apple Clang and MSVC builds are unsupported.
 
 ## Documentation
 

@@ -5,6 +5,7 @@
 Run commands from the repository root unless a step changes directories.
 
 - [Requirements](#requirements)
+- [Linux without Nix](#linux-without-nix)
 - [Nix on Linux](#nix-on-linux)
 - [Runtime paths and data import](#runtime-paths-and-data-import)
 - [Native CMake presets](#native-cmake-presets)
@@ -27,7 +28,90 @@ GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependenci
 
 Lua is fetched with a [version/hash lock](../cmake/dependencies/lua.json) and a [project patch](../cmake/patches/lua-openstarbound.patch). Git is required unless using Nix or supplying prepatched Lua sources.
 
+## Linux without Nix
+
+This is the native build route for conventional Linux distributions; it does not
+require Nix. Ubuntu 24.04 is the CI baseline on x86_64 and ARM64. Other
+distributions need equivalent development packages and the requirements above;
+their package names and runtime compatibility may differ.
+
+### System dependencies
+
+On Ubuntu 24.04, install the bootstrap tools and native libraries used by the
+[Linux CI job](../.github/workflows/build.yml):
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential git curl zip unzip tar python3 cmake ninja-build \
+  libc6-dev pkgconf libxmu-dev libgl-dev libglu1-mesa-dev libasound2-dev libpulse-dev \
+  libaudio-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
+  libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
+  libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+  libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libpipewire-0.3-dev \
+  libwayland-dev libdecor-0-dev liburing-dev '^libxcb.*-dev' libx11-xcb-dev \
+  libxrender-dev libxkbcommon-x11-dev autoconf autoconf-archive automake \
+  libtool libltdl-dev patchelf tarlz
+```
+
+The system compiler supplied by `build-essential` is for dependency bootstrap;
+the engine itself must use the pinned xclang toolchain, not GCC.
+
+### Configure, build and test
+
+From the Asterbound repository root, bootstrap vcpkg outside the source tree.
+If you already have a bootstrapped checkout, set `VCPKG_ROOT` to it and skip the
+clone/bootstrap commands:
+
+```sh
+export VCPKG_ROOT="$HOME/vcpkg"
+git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+"$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+export VCPKG_MAX_CONCURRENCY=4
+cmake -DXCLANG_INSTALL_DIR="$PWD/build/compiler-sdk" -P scripts/ci/install-xclang.cmake
+export XCLANG_ROOT="$PWD/build/compiler-sdk/xclang"
+cd source
+cmake --preset linux-release
+cmake --build --preset linux-release --parallel 4
+ctest --preset linux-release
+cd ..
+```
+
+On ARM64, replace `linux-release` in all three commands with
+`linux-arm-release`. Adjust both concurrency settings for available memory.
+The presets select the repository's vcpkg overlays/triplets and run asset-free
+tests; see [asset-backed tests](testing.md#native-ctest-suites) for owned assets.
+
+The compiler installer downloads the pinned xclang release; configuration
+downloads/builds vcpkg dependencies and Lua. First builds require network access.
+Outputs go to `dist/`, but this alone is not a runnable installation:
+follow [packaging](#packaging-and-version-metadata) to assemble the distribution,
+then add your owned `packed.pak`. `ASTERBOUND_ASSETS` configures the Nix launcher,
+not a bare native executable.
+
 ## Nix on Linux
+
+### NixOS
+
+Use the flake rather than the host-package/vcpkg instructions above. On NixOS,
+add this setting to your existing system configuration if the features are not
+already enabled, and rebuild that configuration using your normal workflow:
+
+```nix
+nix.settings.experimental-features = [ "nix-command" "flakes" ];
+```
+
+Alternatively, enable them for one invocation without changing the system:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' build
+```
+
+The commands below work on NixOS and on other Linux distributions with Nix
+installed. They do not require `nixos-rebuild`, a system package installation or
+an independently installed xclang/vcpkg toolchain.
+
+### Build and run
 
 Supports x86_64 and ARM64:
 
@@ -108,9 +192,9 @@ Bootstrap [vcpkg](https://github.com/microsoft/vcpkg#quick-start) outside this r
 | Windows x64 | `windows-release` | MSYS2 UCRT64 `make`; set `MSYS2_ROOT` and add `ucrt64/bin` to `PATH` |
 | macOS Apple Silicon | `macos-arm-release` | Xcode Command Line Tools, macOS 14-capable SDK, Homebrew `autoconf autoconf-archive automake libtool tarlz` |
 
-### Linux and macOS
+### macOS
 
-Replace `linux-release` with the target preset. On macOS, also export `SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"` before configuring.
+Export `SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"` and use `macos-arm-release`:
 
 ```sh
 export VCPKG_ROOT=/absolute/path/to/vcpkg
@@ -118,9 +202,9 @@ export VCPKG_MAX_CONCURRENCY=16
 cmake -DXCLANG_INSTALL_DIR="$PWD/build/compiler-sdk" -P scripts/ci/install-xclang.cmake
 export XCLANG_ROOT="$PWD/build/compiler-sdk/xclang"
 cd source
-cmake --preset linux-release
-cmake --build --preset linux-release --parallel 16
-ctest --preset linux-release
+cmake --preset macos-arm-release
+cmake --build --preset macos-arm-release --parallel 16
+ctest --preset macos-arm-release
 ```
 
 ### Windows PowerShell
