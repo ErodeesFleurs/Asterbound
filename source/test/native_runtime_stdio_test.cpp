@@ -81,10 +81,17 @@ int repairAbsent(unsigned missing) {
     return 10;
   if ((missing & 2) && !removeOutput(stderr))
     return 11;
-  // Repair must also clear the FILE error state left by an earlier attempt.
-  if ((missing & 1) && !checkedFailure(Star::print(stdout, "before repair")))
+  // Leave a real FILE error without constructing an IOException: its stack
+  // capture can open/cache object files and reuse the descriptors under test.
+  auto markOutputError = [](FILE* stream) {
+    constexpr char marker[] = "before repair";
+    auto written = fwrite(marker, 1, sizeof(marker) - 1, stream);
+    auto flushed = fflush(stream);
+    return (written != sizeof(marker) - 1 || flushed != 0) && ferror(stream);
+  };
+  if ((missing & 1) && !markOutputError(stdout))
     return 12;
-  if ((missing & 2) && !checkedFailure(Star::print(stderr, "before repair")))
+  if ((missing & 2) && !markOutputError(stderr))
     return 13;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   _set_invalid_parameter_handler(nullptr);
