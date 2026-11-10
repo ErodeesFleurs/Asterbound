@@ -39,7 +39,7 @@ import star.desktop_service_pc_steam;
 namespace Star {
 
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
-std::uint64_t const DiscordClientId = 467102538278109224;
+std::uint64_t const DiscordClientId = STAR_DISCORD_APPLICATION_ID;
 #endif
 
 PcPlatformServicesState::PcPlatformServicesState(Logger& logger)
@@ -308,7 +308,7 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   std::lock_guard discordLocker(services->m_state->discordMutex);
   if (services->m_state->discordAvailable) {
-    if (auto logged = logger.debug("Registering Starbound to Discord at path: {}", path); !logged)
+    if (auto logged = logger.debug("Registering Asterbound to Discord at path: {}", path); !logged)
       return std::unexpected(std::move(logged.error()));
     auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8_data());
     if (registered != discord::Result::Ok)

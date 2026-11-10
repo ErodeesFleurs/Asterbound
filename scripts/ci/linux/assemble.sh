@@ -4,8 +4,8 @@ mkdir client_distribution
 mkdir client_distribution/assets
 mkdir client_distribution/assets/user
 
-./dist/asset_packer -c scripts/packing.config assets/opensb client_distribution/assets/opensb.pak
-./dist/asset_packer -c scripts/packing.config assets/opensb-compat client_distribution/assets/opensb-compat.pak
+./dist/asset_packer -c scripts/packing.config assets/asterbound client_distribution/assets/asterbound.pak
+./dist/asset_packer -c scripts/packing.config assets/asterbound-compat client_distribution/assets/asterbound-compat.pak
 
 mkdir client_distribution/mods
 touch client_distribution/mods/mods_go_here
@@ -13,7 +13,7 @@ touch client_distribution/mods/mods_go_here
 mkdir client_distribution/linux
 cp \
   dist/OPENSOURCE.md \
-  dist/starbound \
+  dist/asterbound \
   dist/btree_repacker \
   dist/asset_packer \
   dist/asset_unpacker \
@@ -29,7 +29,7 @@ cp \
   
 mkdir client_distribution/linux/.icon
 cp \
-  source/client/openstarbound.png \
+  source/client/asterbound.png \
   client_distribution/linux/.icon/
 
 mkdir server_distribution
@@ -38,14 +38,14 @@ mkdir server_distribution/assets
 mkdir server_distribution/mods
 touch server_distribution/mods/mods_go_here
 
-./dist/asset_packer -c scripts/packing.config -s assets/opensb server_distribution/assets/opensb.pak
-./dist/asset_packer -c scripts/packing.config -s assets/opensb-compat server_distribution/assets/opensb-compat.pak
+./dist/asset_packer -c scripts/packing.config -s assets/asterbound server_distribution/assets/asterbound.pak
+./dist/asset_packer -c scripts/packing.config -s assets/asterbound-compat server_distribution/assets/asterbound-compat.pak
 
 mkdir server_distribution/linux
 
 cp \
   dist/OPENSOURCE.md \
-  dist/starbound_server \
+  dist/asterbound_server \
   dist/btree_repacker \
   scripts/ci/linux/run-server.sh \
   scripts/ci/linux/sbinit.config \

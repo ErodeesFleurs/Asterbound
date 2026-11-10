@@ -530,9 +530,9 @@ public:
       return std::unexpected(std::move(result.error()));
 
     auto nativeBase = m_dispatcher.invoke([&]() -> std::expected<void, StarException> {
-      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "OpenStarbound");
-      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "io.github.openstarbound.openstarbound");
-      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/OpenStarbound/OpenStarbound");
+      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Asterbound");
+      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "io.github.erodeesfleurs.asterbound");
+      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/ErodeesFleurs/OpenStarbound");
       SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
       EmergencyLog::info("Application: Initializing SDL");
@@ -630,11 +630,11 @@ public:
 #endif
     
 #ifdef STAR_SYSTEM_LINUX
-    auto iconExists = File::is_regular_file(".icon/openstarbound.png");
+    auto iconExists = File::is_regular_file(".icon/asterbound.png");
     if (!iconExists)
       return std::unexpected(std::move(iconExists.error()));
     if (*iconExists) {
-      auto device = File::open(".icon/openstarbound.png", IOMode::Read);
+      auto device = File::open(".icon/asterbound.png", IOMode::Read);
       if (!device)
         return std::unexpected(std::move(device.error()));
       auto isPng = Image::isPng(*device);
@@ -668,7 +668,7 @@ public:
         if (iconSurface) {
           SDL_SetWindowIcon(m_sdlWindow.get(), iconSurface.get());
         } else {
-          if (auto result = (*m_logger).warn("Could not create SDL surface for icon '{}': {}", ".icon/openstarbound.png", SDL_GetError()); !result)
+          if (auto result = (*m_logger).warn("Could not create SDL surface for icon '{}': {}", ".icon/asterbound.png", SDL_GetError()); !result)
             return std::unexpected(std::move(result.error()));
         }
       }
@@ -697,7 +697,7 @@ public:
       if (!iconsDirectoryExists)
         return std::unexpected(std::move(iconsDirectoryExists.error()));
       if (*iconsDirectoryExists) {
-        auto icon = String::join_with("", XdgIconsPath, "/openstarbound.png");
+        auto icon = String::join_with("", XdgIconsPath, "/asterbound.png");
         if (!icon)
           return std::unexpected(std::move(icon.error()));
         const String XdgIcon = std::move(*icon);
@@ -705,7 +705,7 @@ public:
         if (!installed)
           return std::unexpected(std::move(installed.error()));
         if (!*installed) {
-          if (auto result = File::copy(".icon/openstarbound.png", XdgIcon); !result)
+          if (auto result = File::copy(".icon/asterbound.png", XdgIcon); !result)
             return std::unexpected(std::move(result.error()));
           if (auto result = (*m_logger).info("Application: Installed Icon to XDG Icons Directory"); !result)
             return std::unexpected(std::move(result.error()));
@@ -713,7 +713,7 @@ public:
       }
     }
 
-    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_ICON_NAME, "openstarbound");
+    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_ICON_NAME, "asterbound");
 #endif
 
     if (auto result = (*m_logger).info("Application: Creating SDL OpenGL context"); !result)
@@ -2140,7 +2140,7 @@ private:
   Vec2U m_windowSize = {800, 600};
   WindowMode m_windowMode = WindowMode::Normal;
 
-  String m_windowTitle = "Starbound";
+  String m_windowTitle = "Asterbound";
   bool m_windowVSync = true;
   unsigned m_maxFrameSkip = 5;
   bool m_cursorVisible = true;

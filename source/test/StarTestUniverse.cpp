@@ -346,7 +346,7 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // expectations report the failure instead of hanging the test.  A ship flight
   // to a celestial world legitimately takes tens of seconds, and a sanitizer
   // build several times that, so the runner's per-case timeout
-  // (OPENSTARBOUND_TEST_TIMEOUT) is the practical limit.
+  // (ASTERBOUND_TEST_TIMEOUT) is the practical limit.
   auto startTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   while (m_mainPlayer->isTeleporting() || std::holds_alternative<std::monostate>(m_client->playerWorld())) {
     auto updated = m_client->update(0.016f);

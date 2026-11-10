@@ -3486,7 +3486,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         tooOld = *version < OpenProtocolVersion;
       }
       if (tooOld)
-        return fail(Star::format("OpenStarbound v{} or later is required.\nSource ID: {}...", OpenStarVersionString, StarSourceIdentifierString.substr(0, 8)));
+        return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, ProductVersionString, StarSourceIdentifierString.substr(0, 8)));
     }
     if (!m_speciesShips.contains(connect->shipSpecies))
       return fail("Unknown ship species");

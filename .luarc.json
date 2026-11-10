@@ -7,7 +7,7 @@
   ],
   "completion.requireSeparator": "/",
   "runtime.path": [
-    "assets/opensb/?"
+    "assets/asterbound/?"
   ],
   "runtime.pathStrict": true,
   "diagnostics.unusedLocalExclude": ["_*"],

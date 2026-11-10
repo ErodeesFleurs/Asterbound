@@ -21,6 +21,8 @@ on:
     paths:
       - 'assets/**'
       - 'source/**'
+      - 'version.json'
+      - 'scripts/inno/**'
       - 'cmake/**'
       - 'triplets/**'
       - 'ports/**'
@@ -32,6 +34,8 @@ on:
     paths:
       - 'assets/**'
       - 'source/**'
+      - 'version.json'
+      - 'scripts/inno/**'
       - 'cmake/**'
       - 'triplets/**'
       - 'ports/**'
@@ -44,7 +48,7 @@ on:
 
 jobs:
   build_windows:
-    name: Build OpenStarbound Windows x64
+    name: Build Asterbound Windows x64
     runs-on: windows-latest
     if: ${{ (github.event_name != 'pull_request') && ((github.event_name != 'workflow_dispatch') || (inputs.windows == true)) }}
     steps:
@@ -113,7 +117,7 @@ jobs:
         run: cmake -P scripts/ci/windows/audit-runtime.cmake
 
       - name: Smoke test client startup streams
-        run: python scripts/ci/smoke-client-startup.py dist/starbound.exe
+        run: python scripts/ci/smoke-client-startup.py dist/asterbound.exe
 
       - name: Run Tests
         working-directory: source
@@ -123,7 +127,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: Windows-Test-Failure-Logs
+          name: Asterbound-Windows-Test-Failure-Logs
           path: |
             build/windows-release/Testing/Temporary/
             build/windows-release/test-results.xml
@@ -133,34 +137,34 @@ jobs:
         shell: cmd
         run: |
           call scripts\ci\windows\assemble.bat
-          ren client.zip OpenStarbound-Windows-Client.zip
-          ren server.zip OpenStarbound-Windows-Server.zip
+          ren client.zip Asterbound-Windows-Client.zip
+          ren server.zip Asterbound-Windows-Server.zip
 
       - name: Prepare Artifacts
         shell: cmd
         run: |
           cmake -E tar cf dist.zip --format=zip dist
-          ren dist.zip OpenStarbound-Windows-All-DevOnly.zip
+          ren dist.zip Asterbound-Windows-All-DevOnly.zip
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-Windows-All-DevOnly
-          path: OpenStarbound-Windows-All-DevOnly.zip
+          name: Asterbound-Windows-All-DevOnly
+          path: Asterbound-Windows-All-DevOnly.zip
           archive: false
 
       - name: Upload Client
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-Windows-Client
-          path: OpenStarbound-Windows-Client.zip
+          name: Asterbound-Windows-Client
+          path: Asterbound-Windows-Client.zip
           archive: false
 
       - name: Upload Server
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-Windows-Server
-          path: OpenStarbound-Windows-Server.zip
+          name: Asterbound-Windows-Server
+          path: Asterbound-Windows-Server.zip
           archive: false
 
       - name: Install Inno Setup
@@ -175,18 +179,18 @@ jobs:
 
       - name: Create Installer
         shell: pwsh
-        run: '& "C:\Program Files\Inno Setup 7\iscc.exe" /Oinstaller scripts\inno\setup.iss'
+        run: scripts/ci/windows/create-installer.ps1
 
       - name: Upload Installer
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-Windows-Installer
-          path: installer/OpenStarbound-Windows-Installer.exe
+          name: Asterbound-Windows-Installer
+          path: installer/Asterbound-Windows-Installer.exe
           archive: true
           compression-level: 0
 
   build_linux:
-    name: Build OpenStarbound Linux ${{ matrix.arch }}
+    name: Build Asterbound Linux ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     if: ${{ (github.event_name != 'workflow_dispatch') || (inputs.linux == true) }}
     strategy:
@@ -196,11 +200,11 @@ jobs:
           - arch: x86_64
             runner: ubuntu-24.04
             preset: linux-release
-            artifact: OpenStarbound-Linux-xclang
+            artifact: Asterbound-Linux-xclang
           - arch: arm64
             runner: ubuntu-24.04-arm
             preset: linux-arm-release
-            artifact: OpenStarbound-Linux-ARM-xclang
+            artifact: Asterbound-Linux-ARM-xclang
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -266,8 +270,8 @@ jobs:
       - name: Smoke test Linux executables
         run: |
           ./dist/asset_packer -version
-          ./dist/starbound_server -version
-          python3 scripts/ci/smoke-client-startup.py dist/starbound
+          ./dist/asterbound_server -version
+          python3 scripts/ci/smoke-client-startup.py dist/asterbound
 
       - name: Prepare Artifacts
         run: tarlz -c9vf ${{ matrix.artifact }}.tar.lz dist
@@ -306,7 +310,7 @@ jobs:
           archive: false
 
   build_macos:
-    name: Build OpenStarbound macOS arm64
+    name: Build Asterbound macOS arm64
     runs-on: macos-15
     if: ${{ (github.event_name != 'pull_request') && ((github.event_name != 'workflow_dispatch') || (inputs.macOS == true)) }}
     env:
@@ -360,7 +364,7 @@ jobs:
         run: cp lib/osx/arm64/*.dylib lib/osx/libsteam_api.dylib dist/
 
       - name: Smoke test client startup streams
-        run: python3 scripts/ci/smoke-client-startup.py dist/starbound
+        run: python3 scripts/ci/smoke-client-startup.py dist/asterbound
 
       - name: Run Tests
         uses: lukka/run-cmake@v10
@@ -369,23 +373,23 @@ jobs:
           testPreset: 'macos-arm-release'
 
       - name: Prepare Artifacts
-        run: tarlz -c9vf OpenStarbound-macOS-Silicon.tar.lz dist
+        run: tarlz -c9vf Asterbound-macOS-Silicon.tar.lz dist
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-macOS-Silicon
-          path: OpenStarbound-macOS-Silicon.tar.lz
+          name: Asterbound-macOS-Silicon
+          path: Asterbound-macOS-Silicon.tar.lz
           archive: false
 
       - name: Assemble Files
         run: |
           scripts/ci/macos/assemble.sh
-          mv -v client.tar.lz OpenStarbound-macOS-Silicon-Client.tar.lz
+          mv -v client.tar.lz Asterbound-macOS-Silicon-Client.tar.lz
 
       - name: Upload Client Files
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: OpenStarbound-macOS-Silicon-Client
-          path: OpenStarbound-macOS-Silicon-Client.tar.lz
+          name: Asterbound-macOS-Silicon-Client
+          path: Asterbound-macOS-Silicon-Client.tar.lz
           archive: false

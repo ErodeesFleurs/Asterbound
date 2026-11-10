@@ -13,7 +13,7 @@ namespace Star {
 
 String VersionOptionParser::getVersionString() const {
   String displayName = m_versionName ? *m_versionName : String();
-  return Star::format("OpenStarbound{} v{} for v{} ({}) Source ID: {}", displayName.empty() ? "" : Star::format(" {}", displayName), OpenStarVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
+  return Star::format("Asterbound{} v{} for v{} ({}) Source ID: {}", displayName.empty() ? "" : Star::format(" {}", displayName), ProductVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
 }
 
 void VersionOptionParser::setVersionName(String const& name) {

@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
     #if defined STAR_SYSTEM_WINDOWS
     auto wideText = stringToUtf16(text);
     MessageBoxW(nullptr, wideText ? wideText->get() : L"Server startup failed; diagnostic conversion failed. See the log.",
-        L"OpenStarbound server error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+        L"Asterbound server error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
     #endif
     return 1;
   }

@@ -1,5 +1,5 @@
 {
-  description = "OpenStarbound — build the client, server and asset tools with Nix";
+  description = "Asterbound — build the client, server and asset tools with Nix";
 
   # Pinned to the revision the C++ reference build was validated against.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/c8d3b8cdb3959a35bb0af0de111b7d13caf79896";
@@ -54,10 +54,10 @@
             cc = sanitizedCompiler;
             stdenv = pkgs.overrideCC sanitizedBaseDependencies.stdenv sanitizedCompiler;
           };
-          openstarbound = pkgs.callPackage ./nix/openstarbound.nix {
+          asterbound = pkgs.callPackage ./nix/asterbound.nix {
             inherit dependencies;
             stdenv = dependencies.stdenv;
-            # The build inputs are source/, assets/, scripts/, cmake/ and lib/.
+            # Build inputs include version.json, source/, assets/, scripts/, cmake/ and lib/.
             # Keep the flake's own files out of the source tree so that editing
             # them does not force a rebuild of the ten minute C++ build, and
             # keep build outputs out: a hand build leaves a `build/` tree with a
@@ -66,7 +66,7 @@
             # every build and let stale absolute paths into the sandbox.
             src = nixpkgs.lib.cleanSourceWith {
               src = ./.;
-              name = "openstarbound-source";
+              name = "asterbound-source";
               filter =
                 path: type:
                 let
@@ -96,15 +96,14 @@
           };
         in
         {
-          inherit openstarbound;
-          default = openstarbound;
+          inherit asterbound;
+          default = asterbound;
           # Headless server: no SDL3/OpenGL/GLEW, no client.
-          server = openstarbound.override { guiSupport = false; };
-          # All optional tools and C-API vendor SDK integrations. The import
-          # permits only the vendored SDK's unfree package.
-          full = openstarbound.override {
+          server = asterbound.override { guiSupport = false; };
+          # Steam SDK and Qt tools. Discord requires an explicit override with
+          # the distributor's own discordApplicationId.
+          full = asterbound.override {
             steamSupport = true;
-            discordSupport = true;
             qtSupport = true;
           };
           # ASan + UBSan build: the checkPhase fails on the first sanitizer
@@ -113,19 +112,19 @@
           # world generation is much slower under ASan).
           # Note: `nix build .#sanitized` overwrites ./result -- pass
           # `-o result-sanitized` to keep the default package linked there.
-          sanitized = openstarbound.override {
+          sanitized = asterbound.override {
             sanitizers = true;
             dependencies = sanitizedDependencies;
             stdenv = sanitizedDependencies.stdenv;
           };
           # RelWithAsserts build: no -DNDEBUG, so the project's own invariants
           # (starAssert) and DebugEnabled paths are live while the tests run.
-          asserts = openstarbound.override { asserts = true; };
-          benchmarks = openstarbound.override {
+          asserts = asterbound.override { asserts = true; };
+          benchmarks = asterbound.override {
             guiSupport = false;
             withBenchmarks = true;
           };
-          benchmarks-gui = openstarbound.override { withBenchmarks = true; };
+          benchmarks-gui = asterbound.override { withBenchmarks = true; };
         };
     in
     {
@@ -138,30 +137,30 @@
         game-tests = {
           type = "app";
           program = "${(packagesFor pkgs).default}/bin/run-game-tests";
-          meta.description = "Run OpenStarbound's game_tests against your Starbound assets";
+          meta.description = "Run Asterbound's game_tests against your Starbound assets";
         };
         # Same sweep with ASan/UBSan halting on the first error and a 900s per
         # case timeout. LSan sees intercepted system allocations, not individual
         # mimalloc private-heap blocks (which use MI_TRACK_ASAN annotations).
         sanitized-tests = {
           type = "app";
-          program = "${pkgs.writeShellScript "openstarbound-sanitized-tests" ''
+          program = "${pkgs.writeShellScript "asterbound-sanitized-tests" ''
             export ASAN_OPTIONS="detect_leaks=1''${ASAN_OPTIONS:+:$ASAN_OPTIONS}"
             export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1''${UBSAN_OPTIONS:+:$UBSAN_OPTIONS}"
-            export OPENSTARBOUND_TEST_TIMEOUT="''${OPENSTARBOUND_TEST_TIMEOUT:-900}"
+            export ASTERBOUND_TEST_TIMEOUT="''${ASTERBOUND_TEST_TIMEOUT:-900}"
             exec ${(packagesFor pkgs).sanitized}/bin/run-game-tests "$@"
           ''}";
-          meta.description = "Run OpenStarbound's game_tests with ASan/UBSan and system-allocation leak checks";
+          meta.description = "Run Asterbound's game_tests with ASan/UBSan and system-allocation leak checks";
         };
         # Same sweep against the assert-enabled build, so a violated invariant
         # fails the run instead of being compiled out.
         asserts-tests = {
           type = "app";
-          program = "${pkgs.writeShellScript "openstarbound-asserts-tests" ''
-            export OPENSTARBOUND_TEST_TIMEOUT="''${OPENSTARBOUND_TEST_TIMEOUT:-900}"
+          program = "${pkgs.writeShellScript "asterbound-asserts-tests" ''
+            export ASTERBOUND_TEST_TIMEOUT="''${ASTERBOUND_TEST_TIMEOUT:-900}"
             exec ${(packagesFor pkgs).asserts}/bin/run-game-tests "$@"
           ''}";
-          meta.description = "Run OpenStarbound's game_tests with the project's own assertions enabled";
+          meta.description = "Run Asterbound's game_tests with the project's own assertions enabled";
         };
       });
 
@@ -181,7 +180,7 @@
                 inputsFrom = [ package ];
                 buildInputs = [ package.dependencies.gbenchmark ];
                 XCLANG_ROOT = package.dependencies.cc.bundledRuntime;
-                OPENSTARBOUND_BUILD_RPATH = nixpkgs.lib.makeLibraryPath package.runtimeLibraries;
+                ASTERBOUND_BUILD_RPATH = nixpkgs.lib.makeLibraryPath package.runtimeLibraries;
                 # Manual CMake invocations can pass $cmakeFlags, or use the
                 # exported source path as the standard FetchContent cache option.
                 FETCHCONTENT_SOURCE_DIR_STAR_LUA = "${package.luaSource}";

@@ -9,7 +9,7 @@ Run the commands below from the repository root unless noted otherwise.
 CTest presets select asset-free core tests. Native builds also register `game_tests` and, with `STAR_BUILD_GUI`, `frontend_tests`:
 
 ```sh
-OPENSTARBOUND_ASSETS=/path/to/Starbound/assets \
+ASTERBOUND_ASSETS=/path/to/Starbound/assets \
   ctest --test-dir build/linux-release -L '^Assets$' --output-on-failure
 ```
 
@@ -25,7 +25,7 @@ Windows engine fatal errors write their emergency diagnostic and abort without o
 
 Absent-output recovery sets the pre-existing `FILE` error using raw `fwrite`/`fflush`, without constructing a project exception before repair. Exception stack capture can open and cache object files (notably Mach-O files on macOS), reusing the closed standard descriptors and invalidating the test's absent-output precondition. Checked project-error behavior is exercised separately by the required-output and configured-error cases.
 
-Windows, Linux and macOS CI run `scripts/ci/smoke-client-startup.py` against the actual graphical client. Its no-assets `-version` path must succeed with redirected output, either output absent, and both absent; Windows uses detached native process creation with explicit NULL handles. This checks entry/bootstrap behavior, not asset loading or a rendered game session. Run it manually with `python3 scripts/ci/smoke-client-startup.py dist/starbound` (`python ... dist/starbound.exe` on Windows).
+Windows, Linux and macOS CI run `scripts/ci/smoke-client-startup.py` against the actual graphical client. Its no-assets `-version` path must succeed with redirected output, either output absent, and both absent; Windows uses detached native process creation with explicit NULL handles. This checks entry/bootstrap behavior, not asset loading or a rendered game session. Run it manually with `python3 scripts/ci/smoke-client-startup.py dist/asterbound` (`python ... dist/asterbound.exe` on Windows).
 
 `ImageProcessingTest.*` covers byte-preserving neutral directives, cached color conversions, replacement thresholds and ordered four-channel blends. Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState` cover catalog errors, sleeve lighting and blueprint state/error boundaries.
 
@@ -44,12 +44,12 @@ Frontend numeric boundary matrices run against fresh real panes without reloadin
 For real-asset tests:
 
 ```sh
-OPENSTARBOUND_ASSETS=/path/to/Starbound/assets nix run .#game-tests
-OPENSTARBOUND_ASSETS=/path/to/Starbound/assets nix run .#asserts-tests
-OPENSTARBOUND_ASSETS=/path/to/Starbound/assets OPENSTARBOUND_TEST_JOBS=4 nix run .#sanitized-tests
+ASTERBOUND_ASSETS=/path/to/Starbound/assets nix run .#game-tests
+ASTERBOUND_ASSETS=/path/to/Starbound/assets nix run .#asserts-tests
+ASTERBOUND_ASSETS=/path/to/Starbound/assets ASTERBOUND_TEST_JOBS=4 nix run .#sanitized-tests
 ```
 
-Each case gets a private runtime. `OPENSTARBOUND_TEST_JOBS` defaults to `1`; reports go to `./game-tests-report`, overridden by `OPENSTARBOUND_TEST_OUT`.
+Each case gets a private runtime. `ASTERBOUND_TEST_JOBS` defaults to `1`; reports go to `./game-tests-report`, overridden by `ASTERBOUND_TEST_OUT`.
 
 Sanitized builds enable mimalloc's `MI_TRACK_ASAN` and `MI_DEBUG`. Small overruns may be detected on free rather than at the write. LSan checks intercepted system allocations, **not individual mimalloc allocations**; passing it does not prove engine/Lua allocations are leak-free.
 

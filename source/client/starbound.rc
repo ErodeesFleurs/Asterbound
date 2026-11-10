@@ -1,19 +1,21 @@
+#include "AsterboundVersion.h"
+
 1 VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
+FILEVERSION     ASTERBOUND_VERSION_COMMA
+PRODUCTVERSION  ASTERBOUND_VERSION_COMMA
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName", "Chucklefish LTD"
-      VALUE "FileDescription", "OpenStarbound"
-      VALUE "FileVersion", "1.0"
-      VALUE "InternalName", "starbound"
+      VALUE "FileDescription", "Asterbound"
+      VALUE "FileVersion", ASTERBOUND_VERSION_STRING
+      VALUE "InternalName", "asterbound"
       VALUE "LegalCopyright", "Chucklefish LTD"
-      VALUE "OriginalFilename", "starbound.exe"
-      VALUE "ProductName", "OpenStarbound"
-      VALUE "ProductVersion", "1.4.4"
+      VALUE "OriginalFilename", "asterbound.exe"
+      VALUE "ProductName", "Asterbound"
+      VALUE "ProductVersion", ASTERBOUND_VERSION_STRING
     END
   END
 
@@ -22,5 +24,5 @@ BEGIN
     VALUE "Translation", 0x409, 1252
   END
 END
-icon ICON "openstarbound.ico"
+icon ICON "asterbound.ico"
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "starbound.exe.manifest"

@@ -1,7 +1,7 @@
 #!@python@
 """Run packaged game_tests with private per-case runtime state and reports.
 
-OPENSTARBOUND_TEST_JOBS defaults to 1: asset loading and sanitizer heaps are
+ASTERBOUND_TEST_JOBS defaults to 1: asset loading and sanitizer heaps are
 large. Opt in to bounded parallelism (e.g. 4) only with sufficient memory.
 Arguments select the existing single-process, streamed-output interface.
 """
@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 GAME_TESTS = "@gameTests@"
-BUNDLED_ASSETS = ("@bundledAssets@/opensb", "@bundledAssets@/opensb-compat")
+BUNDLED_ASSETS = ("@bundledAssets@/asterbound", "@bundledAssets@/asterbound-compat")
 # Only this test binds a fixed TCP port. TestUniverse/ServerTest leave TCP
 # listening disabled; the other connection tests bind ephemeral port 0.
 FIXED_PORT_CASE = "UniverseConnections.All"
@@ -33,7 +33,7 @@ def announce(message):
 def duration(value):
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([smhd]?)", value)
     if not match:
-        raise ValueError("OPENSTARBOUND_TEST_TIMEOUT must be a nonnegative duration (s/m/h/d)")
+        raise ValueError("ASTERBOUND_TEST_TIMEOUT must be a nonnegative duration (s/m/h/d)")
     return float(match[1]) * {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}[match[2]]
 
 
@@ -64,6 +64,7 @@ async def fixed_port_lease(required):
     # Stable across report directories and runner invocations of this uid. Do
     # not unlink: a waiter must never lock a different inode. This coordinates
     # runners, not unrelated programs already using port 55555 (which must fail).
+    # Retain OpenStarbound's lock so both products still serialize this port.
     path = f"/tmp/openstarbound-game-tests-{os.getuid()}-port-55555.lock"
     fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
@@ -129,9 +130,9 @@ async def run_process(arguments, log_path, timeout, environment, stream=False):
             except TimeoutError:
                 return 124
         except OSError as error:
-            log.write(f"openstarbound: could not run game_tests: {error}\n".encode())
+            log.write(f"asterbound: could not run game_tests: {error}\n".encode())
             if stream:
-                announce(f"openstarbound: could not run game_tests: {error}")
+                announce(f"asterbound: could not run game_tests: {error}")
             return 127
         finally:
             if process is not None:
@@ -196,7 +197,7 @@ async def sweep(out, vanilla, timeout, timeout_label, jobs):
             filename = quote(name, safe="._-")
             boot, environment = runtime(runtime_root / filename, vanilla)
             async with fixed_port_lease(name == FIXED_PORT_CASE):
-                announce(f"openstarbound: start [{index + 1}/{len(names)}] {name}")
+                announce(f"asterbound: start [{index + 1}/{len(names)}] {name}")
                 status = await run_process([
                     "-bootconfig", str(boot), "--gtest_filter=" + name,
                     "--gtest_output=json:" + str(out / "cases" / (filename + ".json")),
@@ -204,7 +205,7 @@ async def sweep(out, vanilla, timeout, timeout_label, jobs):
             verdict = ("pass" if status == 0 else f"timeout ({timeout_label}s)"
                        if status == 124 else f"fail (exit {status})")
             results[index] = (status, f"{name:<46} {verdict}\n")
-            announce(f"openstarbound: end   [{index + 1}/{len(names)}] {name}: {verdict}")
+            announce(f"asterbound: end   [{index + 1}/{len(names)}] {name}: {verdict}")
 
     workers = [asyncio.create_task(worker()) for _ in range(min(jobs, len(names)))]
     try:
@@ -226,20 +227,21 @@ async def sweep(out, vanilla, timeout, timeout_label, jobs):
 
 
 async def main(arguments):
-    timeout_label = os.environ.get("OPENSTARBOUND_TEST_TIMEOUT") or "300"
+    timeout_label = os.environ.get("ASTERBOUND_TEST_TIMEOUT") or "300"
     timeout = duration(timeout_label)
-    jobs = int(os.environ.get("OPENSTARBOUND_TEST_JOBS") or "1")
+    jobs = int(os.environ.get("ASTERBOUND_TEST_JOBS") or "1")
     if jobs < 1:
-        raise ValueError("OPENSTARBOUND_TEST_JOBS must be a positive integer")
-    assets = Path(os.environ.get("OPENSTARBOUND_ASSETS") or
-                  str(Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
-                      / "openstarbound/assets")).absolute()
+        raise ValueError("ASTERBOUND_TEST_JOBS must be a positive integer")
+    runtime_root = Path(os.environ.get("ASTERBOUND_RUNTIME_DIR") or
+                        str(Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+                            / "asterbound"))
+    assets = Path(os.environ.get("ASTERBOUND_ASSETS") or str(runtime_root / "assets")).absolute()
     vanilla = assets / "packed.pak" if (assets / "packed.pak").is_file() else assets
     if not assets.is_dir():
-        announce(f"openstarbound: no Starbound assets in {assets}")
-        announce("openstarbound: point OPENSTARBOUND_ASSETS at a Starbound assets directory")
+        announce(f"asterbound: no Starbound assets in {assets}")
+        announce("asterbound: point ASTERBOUND_ASSETS at a Starbound assets directory")
         return 2
-    out = Path(os.environ.get("OPENSTARBOUND_TEST_OUT") or "game-tests-report").absolute()
+    out = Path(os.environ.get("ASTERBOUND_TEST_OUT") or "game-tests-report").absolute()
     for directory in (out, out / "cases", out / "runtime"):
         directory.mkdir(parents=True, exist_ok=True)
     asset_identity = str(vanilla)
@@ -252,7 +254,7 @@ async def main(arguments):
     header_arguments = " ".join(arguments) if arguments else "<all cases, one process each>"
     header = (f"assets: {asset_identity}\narguments: {header_arguments}\n"
               f"timeout: {timeout_label}s\n")
-    announce("openstarbound: game_tests")
+    announce("asterbound: game_tests")
     announce(f"  assets : {asset_identity}\n  report : {out}\n  timeout: {timeout_label}s per run")
     if not arguments:
         announce(f"  jobs   : {jobs}")
@@ -274,7 +276,7 @@ async def main(arguments):
             start = next((i for i, line in enumerate(lines) if line.startswith("[  PASSED  ]")), len(lines))
             body = "".join(lines[start:])
             if status == 124:
-                announce(f"openstarbound: stopped after {timeout_label}s")
+                announce(f"asterbound: stopped after {timeout_label}s")
         else:
             status, body = await sweep(out, vanilla, timeout, timeout_label, jobs)
     except asyncio.CancelledError:
@@ -286,7 +288,7 @@ async def main(arguments):
     finally:
         summary = header + f"exit status: {status}\n\n" + body
         (out / "summary.txt").write_text(summary)
-        announce(f"openstarbound: summary in {out / 'summary.txt'}")
+        announce(f"asterbound: summary in {out / 'summary.txt'}")
         announce(summary.rstrip())
     return status
 
@@ -316,5 +318,5 @@ if __name__ == "__main__":
     try:
         sys.exit(asyncio.run(entry(sys.argv[1:])))
     except (OSError, ValueError) as error:
-        print(f"openstarbound: {error}", file=sys.stderr, flush=True)
+        print(f"asterbound: {error}", file=sys.stderr, flush=True)
         sys.exit(2)

@@ -51,5 +51,9 @@ target_link_libraries (starbound PRIVATE
   star_base_modules star_frontend_modules star_application_modules star_build_config star_client_dependencies
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
   $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
-set_target_properties (starbound PROPERTIES CXX_SCAN_FOR_MODULES ON)
+set_target_properties (starbound PROPERTIES
+  CXX_SCAN_FOR_MODULES ON
+  OUTPUT_NAME asterbound
+  PDB_NAME asterbound
+  COMPILE_PDB_NAME asterbound)
 

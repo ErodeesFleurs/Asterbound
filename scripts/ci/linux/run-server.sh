@@ -14,7 +14,7 @@ uxterm
 xterm"
 
 for term in $terms; do
-  $term -- ./starbound_server $@
+  $term -- ./asterbound_server $@
   if [ $? -eq 0 ]; then
     exit 0
   fi

@@ -188,7 +188,7 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
 
       discord::Activity activity = {};
       activity.SetType(discord::ActivityType::Playing);
-      activity.SetName("Starbound");
+      activity.SetName("Asterbound");
       String activityTitle(title);
       String activityDetails(details);
       activity.SetState(activityTitle.utf8_data());

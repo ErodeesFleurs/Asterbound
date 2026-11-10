@@ -1,4 +1,4 @@
-# Building OpenStarbound
+# Building Asterbound
 
 [Project overview](../README.md) · [Tests and benchmarks](testing.md) · [Development guide](development.md)
 
@@ -9,6 +9,23 @@ Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and [xclang](https://github
 All configurations use static mimalloc with `MI_OVERRIDE=OFF`; dependencies must not mix allocator heaps.
 
 Lua is fetched with a [version/hash lock](../cmake/dependencies/lua.json) and [project patch](../cmake/patches/lua-openstarbound.patch); Git is required unless using Nix or prepatched sources.
+
+Product metadata comes from root `version.json`: `version` is the four-part
+Asterbound product version, `assetVersion` must match `assets/asterbound/_metadata`,
+and `starboundVersion` remains the base-game compatibility identifier.
+Changing product versions does not require changing the wire protocol or asset
+version. CMake generates the C++ constants and Windows resource header; Nix and
+the Windows installer consume the same product version.
+
+macOS requires three-part version fields. Packaging maps `a.b.c.d` to
+short version `a.b.c`, build version `(a*100+b).c.d`, and retains the complete
+version in `CFBundleGetInfoString`. Each original component must be in `0..99`
+and the folded first component positive; unsupported values fail packaging.
+See Apple's [short-version](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring)
+and [build-version](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleversion)
+requirements. Windows/macOS native packaging and SDK interoperability still
+require their respective platform runners; Linux execution is not that proof.
+
 
 ## ThinLTO
 
@@ -22,18 +39,29 @@ Supports x86_64 and ARM64. From the repository root:
 
 ```sh
 nix build --cores 16 --max-jobs 1
-OPENSTARBOUND_ASSETS=/path/to/Starbound/assets ./result/bin/starbound
+ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result/bin/asterbound
 ```
 
-The default x86_64 GUI package enables Steam and Discord integration. Variants: `.#server` (headless, SDK-free), `.#full` (also includes Qt tools), `.#asserts` and `.#sanitized`. ARM64 remains SDK-free. Use `nix develop` or `nix develop .#full` for development.
+The default x86_64 GUI package enables Steam integration. Variants: `.#server` (headless, SDK-free), `.#full` (also includes Qt tools), `.#asserts` and `.#sanitized`. ARM64 remains SDK-free. Use `nix develop` or `nix develop .#full` for development.
 
-Writable data defaults to `$XDG_DATA_HOME/openstarbound` (`~/.local/share/openstarbound`). Override with `OPENSTARBOUND_RUNTIME_DIR`, `OPENSTARBOUND_MODS`, `OPENSTARBOUND_STORAGE` or `OPENSTARBOUND_LOGS`.
+Writable data defaults to `$XDG_DATA_HOME/asterbound` (`~/.local/share/asterbound`). Override with `ASTERBOUND_RUNTIME_DIR`, `ASTERBOUND_ASSETS`, `ASTERBOUND_MODS`, `ASTERBOUND_STORAGE` or `ASTERBOUND_LOGS`. Old `OPENSTARBOUND_*` variables are not aliases.
+
+To import an old Nix runtime, stop both games and servers, then run:
+
+```sh
+./result/bin/asterbound-import-openstarbound \
+  "$HOME/.local/share/openstarbound" "$HOME/.local/share/asterbound"
+```
+
+The target must be absent or completely empty. The tool copies `assets/`, `mods/` and `storage/` without modifying the source; links are copied as independent data. It does not import the old `sbinit.config` or logs. It refuses same/nested paths, cycles and populated targets. A failed copy can leave a partial target; it never deletes data automatically. For portable distributions, explicitly copy these directories into a separate installation instead.
 
 ## Steam and Discord SDKs
 
 Steam headers and redistributable libraries are from **Steamworks SDK 1.65(a)**, pinned to [SteamworksSDK mirror commit `df2baab`](https://github.com/rlabrecque/SteamworksSDK/commit/df2baabf574a738ef1ea90a7e89339107fc0a279). Valve's [official download](https://partner.steamgames.com/doc/sdk) requires a Steamworks account; the public mirror normalizes text line endings. Linux, Windows and macOS use matching headers and libraries. Local statistics use Steam's preloaded cache; the `RequestCurrentStats` startup API was removed in SDK 1.61.
 
 Discord binaries and C++ bindings use the official [Game SDK 3.2.1](https://dl-game-sdk.discordapp.net/3.2.1/discord_game_sdk.zip), with the existing local header portability fixes retained. Discord has [archived Game SDK](https://docs.discord.com/developers/developer-tools/game-sdk); this integration retains its existing presence, invitation and lobby APIs rather than migrating to Social SDK.
+
+Discord is disabled by default: Asterbound does not reuse another project's application registration. Native builds must provide `-DSTAR_ENABLE_DISCORD_INTEGRATION=ON -DSTAR_DISCORD_APPLICATION_ID=<your-registered-id>`. Nix overrides use `discordSupport = true; discordApplicationId = "<your-registered-id>";`. IDs must be positive decimal strings fitting an int64. Registering the application and validating its presence assets, invitations and lobbies are separate external steps.
 
 Rich Presence does not require a fetched Discord user, so presence-only RPC clients can publish status independently of lobby support. If the Discord client rejects `CREATE_LOBBY` as an unsupported command, OpenStarbound disables Discord lobby networking for that session, reports the capability loss, and keeps the game and Rich Presence running. It does not retry lobby creation on later world joins; Steam networking and direct-IP connections remain separate. Clients that support the lobby API retain the existing Discord P2P path.
 
@@ -82,7 +110,7 @@ Native Linux uses the host C SDK while retaining xclang's static C++ runtime. CI
 
 Binaries go to `dist/`. Before launching, supply assets, `sbinit.config` and vendor runtimes; see the [Linux](../scripts/ci/linux), [Windows](../scripts/ci/windows) and [macOS](../scripts/ci/macos) assembly scripts. macOS tests also need `libsteam_api.dylib` beside the executable. Distributions never include commercial `packed.pak`.
 
-Windows CI publishes separate `OpenStarbound-Windows-Client.zip` and `OpenStarbound-Windows-Server.zip` artifacts, plus the installer. ZIP archives are created with CMake; no separate archiver is required. Client and server packages include their matching `starbound.pdb` and `starbound_server.pdb`; the installer includes both. Keep each PDB beside its executable to enable symbolized Windows stack traces.
+Windows CI publishes separate `Asterbound-Windows-Client.zip` and `Asterbound-Windows-Server.zip` artifacts, plus the installer. ZIP archives are created with CMake; no separate archiver is required. Client and server packages include their matching `asterbound.pdb` and `asterbound_server.pdb`; the installer includes both. Keep each PDB beside its executable to enable symbolized Windows stack traces.
 
 ## Windows cross-builds
 

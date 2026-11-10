@@ -253,7 +253,7 @@ void print_stack(std::string_view message) {
 void fatal_error(std::string_view message, bool showStackTrace) {
   TextBuffer buffer;
   std::format_to(std::back_inserter(buffer), "v{} ({})\nFatal Error: {}\n",
-      OpenStarVersionString, StarSourceIdentifierString, message);
+      ProductVersionString, StarSourceIdentifierString, message);
   if (showStackTrace)
     buffer.append(capture_backtrace());
 

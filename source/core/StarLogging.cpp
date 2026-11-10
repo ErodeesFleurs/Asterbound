@@ -182,7 +182,7 @@ void EmergencyLog::log(LogLevel, std::string_view message) {
   // dialog. Keep the write failure and original message on a stdio-independent
   // system channel; ordinary Logger sinks still propagate their I/O errors.
   auto diagnostic =
-    Star::format("OpenStarbound emergency output failed: {}\n{}", Star::exception_summary(emitted.error()), message);
+    Star::format("Asterbound emergency output failed: {}\n{}", Star::exception_summary(emitted.error()), message);
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   String text(std::move(diagnostic));
   auto wide = text.wstring();

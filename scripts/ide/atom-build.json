@@ -1,6 +1,6 @@
 {
   "cmd": "cmake --build build/clangd",
-  "name": "starbound",
+  "name": "Asterbound",
   "args": [],
   "sh": true,
   "env": {},

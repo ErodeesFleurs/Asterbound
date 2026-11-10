@@ -28,10 +28,20 @@ if(NOT DEFINED CMAKE_CXX_COMPILER AND NOT DEFINED ENV{CXX})
   find_program(STAR_XCLANG_CXX_COMPILER NAMES clang++ REQUIRED)
   set(CMAKE_CXX_COMPILER "${STAR_XCLANG_CXX_COMPILER}" CACHE FILEPATH "xclang C++ compiler")
 endif()
-if(NOT DEFINED CMAKE_BUILD_RPATH AND DEFINED ENV{OPENSTARBOUND_BUILD_RPATH})
-  set(CMAKE_BUILD_RPATH "$ENV{OPENSTARBOUND_BUILD_RPATH}" CACHE STRING "Dependency runtime search paths")
+if(NOT DEFINED CMAKE_BUILD_RPATH AND DEFINED ENV{ASTERBOUND_BUILD_RPATH})
+  set(CMAKE_BUILD_RPATH "$ENV{ASTERBOUND_BUILD_RPATH}" CACHE STRING "Dependency runtime search paths")
 endif()
 project(starbound)
+
+set(asterbound_version_file "${PROJECT_SOURCE_DIR}/../version.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${asterbound_version_file}")
+file(READ "${asterbound_version_file}" asterbound_metadata)
+string(JSON ASTERBOUND_VERSION GET "${asterbound_metadata}" version)
+string(JSON ASTERBOUND_ASSET_VERSION GET "${asterbound_metadata}" assetVersion)
+string(JSON STARBOUND_VERSION GET "${asterbound_metadata}" starboundVersion)
+string(REPLACE "." "," ASTERBOUND_VERSION_COMMA "${ASTERBOUND_VERSION}")
+configure_file("${PROJECT_SOURCE_DIR}/../cmake/AsterboundVersion.h.in"
+  "${PROJECT_BINARY_DIR}/AsterboundVersion.h" @ONLY)
 
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/../cmake")
@@ -43,11 +53,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles("#include <version>
 #ifndef _LIBCPP_VERSION
-#error OpenStarbound requires xclang's bundled libc++
+#error Asterbound requires xclang's bundled libc++
 #endif
 int main() { return 0; }" STAR_USES_LIBCXX)
 if(NOT STAR_USES_LIBCXX)
-  message(FATAL_ERROR "OpenStarbound requires xclang's bundled libc++; use nix develop or the xclang presets.")
+  message(FATAL_ERROR "Asterbound requires xclang's bundled libc++; use nix develop or the xclang presets.")
 endif()
 # Only the targets that import modules opt into scanning; module file sets are
 # scanned regardless. Avoid scanning third-party translation units.
@@ -103,7 +113,7 @@ endif()
 
 foreach(language C CXX)
   if(NOT CMAKE_${language}_COMPILER_ID STREQUAL "Clang")
-    message(FATAL_ERROR "OpenStarbound requires xclang for both C and C++.")
+    message(FATAL_ERROR "Asterbound requires xclang for both C and C++.")
   endif()
   execute_process(COMMAND "${CMAKE_${language}_COMPILER}" --version
     OUTPUT_VARIABLE compiler_version RESULT_VARIABLE compiler_version_result)
@@ -117,7 +127,7 @@ find_program(STAR_XCLANG_COMMAND NAMES xclang
 execute_process(COMMAND "${STAR_XCLANG_COMMAND}" --version
   OUTPUT_VARIABLE xclang_version RESULT_VARIABLE xclang_version_result)
 if(NOT xclang_version_result EQUAL 0 OR NOT xclang_version MATCHES "^xclang 23\\.1\\.3\\.6[\r\n]")
-  message(FATAL_ERROR "OpenStarbound requires the pinned xclang release 23.1.3.6.")
+  message(FATAL_ERROR "Asterbound requires the pinned xclang release 23.1.3.6.")
 endif()
 set(STAR_COMPILER "clang")
 
@@ -129,6 +139,16 @@ if(STAR_BUILD_GUI)
   option(STAR_BUILD_QT_TOOLS "Build GUI utilities that require Qt" OFF)
   option(STAR_ENABLE_STEAM_INTEGRATION "Use Steam platform services" OFF)
   option(STAR_ENABLE_DISCORD_INTEGRATION "Use Discord platform services" OFF)
+endif()
+
+set(STAR_DISCORD_APPLICATION_ID "" CACHE STRING "Your registered Discord application ID")
+if(STAR_ENABLE_DISCORD_INTEGRATION)
+  string(LENGTH "${STAR_DISCORD_APPLICATION_ID}" discord_id_length)
+  if(NOT STAR_DISCORD_APPLICATION_ID MATCHES "^[1-9][0-9]*$"
+      OR discord_id_length GREATER 19
+      OR (discord_id_length EQUAL 19 AND STAR_DISCORD_APPLICATION_ID STRGREATER "9223372036854775807"))
+    message(FATAL_ERROR "Discord integration requires your own positive int64 STAR_DISCORD_APPLICATION_ID")
+  endif()
 endif()
 
 option(STAR_BUILD_DEV_TOOLS "Build the maintenance utilities (map_grep, tileset tools)" OFF)
@@ -147,6 +167,11 @@ endif()
 
 add_library(star_build_config INTERFACE)
 target_compile_definitions(star_build_config INTERFACE "$<$<PLATFORM_ID:Windows>:NOMINMAX>")
+target_include_directories(star_build_config INTERFACE "${PROJECT_BINARY_DIR}")
+if(STAR_ENABLE_DISCORD_INTEGRATION)
+  target_compile_definitions(star_build_config INTERFACE
+    "STAR_DISCORD_APPLICATION_ID=${STAR_DISCORD_APPLICATION_ID}ULL")
+endif()
 add_library(star_core_dependencies INTERFACE)
 add_library(star_module_dependencies INTERFACE)
 add_library(star_extern_dependencies INTERFACE)

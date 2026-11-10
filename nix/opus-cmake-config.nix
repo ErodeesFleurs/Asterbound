@@ -21,7 +21,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    description = "CMake package config for nixpkgs' opus, for OpenStarbound's find_package(Opus CONFIG)";
+    description = "CMake package config for nixpkgs' opus, for Asterbound's find_package(Opus CONFIG)";
     license = libopus.meta.license;
     platforms = libopus.meta.platforms;
   };

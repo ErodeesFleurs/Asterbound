@@ -1,9 +1,9 @@
 # Asset-backed tests must never inherit a user's storage or boot configuration.
 if(NOT TEST_ASSETS)
-  set(TEST_ASSETS "$ENV{OPENSTARBOUND_ASSETS}")
+  set(TEST_ASSETS "$ENV{ASTERBOUND_ASSETS}")
 endif()
 if(NOT TEST_ASSETS)
-  message("SKIP: set STAR_TEST_ASSETS or OPENSTARBOUND_ASSETS to owned Starbound assets")
+  message("SKIP: set STAR_TEST_ASSETS or ASTERBOUND_ASSETS to owned Starbound assets")
   return()
 endif()
 get_filename_component(TEST_ASSETS "${TEST_ASSETS}" ABSOLUTE)

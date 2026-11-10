@@ -19,5 +19,5 @@ cmake -S source --preset "$preset"
 if [ "$#" -ne 0 ]; then
   cmake --build "build/$preset" --parallel "$1"
   ./dist/asset_packer -version
-  ./dist/starbound_server -version
+  ./dist/asterbound_server -version
 fi

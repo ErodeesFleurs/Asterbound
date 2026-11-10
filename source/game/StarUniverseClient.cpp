@@ -375,7 +375,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     auto shipData = std::move(*shipDataResult);
     auto request = std::make_shared<ClientConnectPacket>(assets->digest(), allowAssetsMismatch, uuid, name,
         m_mainPlayer->shipSpecies(), std::move(shipData), m_mainPlayer->shipUpgrades(), m_mainPlayer->log()->introComplete(), account);
-    request->info = JsonObject{{"brand", "OpenStarbound"}, {"openProtocolVersion", OpenProtocolVersion}};
+    request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", OpenProtocolVersion}};
     auto operation8 = connection.pushSingle(std::move(request));
     if (!operation8)
       return std::unexpected(std::move(operation8.error()));
@@ -440,7 +440,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
         return std::unexpected(std::move(systemResult.error()));
       auto system = std::move(*systemResult);
       m_systemWorldClient = std::move(system);
-      auto operation15 = m_root.logger().info("UniverseClient: Joined {} server as client {}", legacyServer ? "Starbound" : "OpenStarbound", success->clientId);
+      auto operation15 = m_root.logger().info("UniverseClient: Joined {} server as client {}", legacyServer ? "Starbound" : "OpenStarbound-compatible", success->clientId);
       if (!operation15)
         return std::unexpected(std::move(operation15.error()));
       return {};

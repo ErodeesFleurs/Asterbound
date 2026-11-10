@@ -164,12 +164,12 @@ function(star_add_asset_test target)
       "-DTEST_EXECUTABLE=$<TARGET_FILE:${target}>"
       "-DTEST_EMULATOR=${emulator}"
       "-DTEST_ASSETS=${STAR_TEST_ASSETS}"
-      "-DTEST_BUNDLED_ASSETS=${PROJECT_SOURCE_DIR}/../assets/opensb"
+      "-DTEST_BUNDLED_ASSETS=${PROJECT_SOURCE_DIR}/../assets/asterbound"
       "-DTEST_RUNTIME_ROOT=${CMAKE_CURRENT_BINARY_DIR}/runtime/${target}"
       -P "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/run_asset_tests.cmake")
   set_tests_properties(${target} PROPERTIES
     LABELS "Assets"
-    SKIP_REGULAR_EXPRESSION "SKIP: set STAR_TEST_ASSETS or OPENSTARBOUND_ASSETS")
+    SKIP_REGULAR_EXPRESSION "SKIP: set STAR_TEST_ASSETS or ASTERBOUND_ASSETS")
 endfunction()
 
 set (star_game_tests_SOURCES

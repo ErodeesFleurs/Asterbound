@@ -6,9 +6,11 @@ A few additional utiliy callbacks are added by OpenStarbound.
 
 #### `Json` sb.buildInfo()
 
-Returns the engine build's version and architecture strings as
-`{version = String, architecture = String}`. These are build identifiers, not
-runtime configuration values.
+Returns `{version = String, architecture = String, product = String,
+productVersion = String, assetVersion = String}`. The existing `version` field
+remains the compatible Starbound base version; `productVersion` and `assetVersion`
+are Asterbound's independently versioned product and bundled resources.
+These are build identifiers, not runtime configuration values.
 
 ---
 

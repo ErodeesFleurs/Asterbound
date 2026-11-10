@@ -4,8 +4,8 @@ dist\dump_versioned_json.exe
 dist\make_versioned_json.exe
 dist\asset_unpacker.exe
 dist\asset_packer.exe
-dist\starbound.exe
-dist\starbound.pdb
+dist\asterbound.exe
+dist\asterbound.pdb
 dist\*.dll
 lib\windows\discord_game_sdk.dll
 lib\windows\steam_api64.dll

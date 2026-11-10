@@ -29,7 +29,7 @@ Add the entire stub directory, including `openstarbound/`, to that workspace's `
 }
 ```
 
-Configure asset import paths relative to your mod's own asset root. The repository's asset root is `assets/opensb`; external mods should not copy that path unchanged.
+Configure asset import paths relative to your mod's own asset root. The repository's asset root is `assets/asterbound`; external mods should not copy that path unchanged.
 
 ### Command-line diagnostics
 

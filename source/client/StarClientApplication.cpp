@@ -2501,7 +2501,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Star::EmergencyLog::log(Star::LogLevel::Error, diagnostic);
     auto text = Star::String(diagnostic).wstring();
     if (text) {
-      MessageBoxW(nullptr, text->c_str(), L"OpenStarbound startup error", MB_OK | MB_ICONERROR);
+      MessageBoxW(nullptr, text->c_str(), L"Asterbound startup error", MB_OK | MB_ICONERROR);
       return;
     }
     Star::EmergencyLog::error("Could not convert startup diagnostic to UTF-16: {}", Star::output_exception(Star::ExceptionDiagnostic(text.error()), true));
@@ -2517,7 +2517,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         escaped.push_back(digits[byte & 0xf]);
       }
     }
-    MessageBoxW(nullptr, escaped.c_str(), L"OpenStarbound startup error", MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, escaped.c_str(), L"Asterbound startup error", MB_OK | MB_ICONERROR);
   };
   if (IsDebuggerPresent() && AllocConsole()) {
     if ((::_fileno(stdout) < 0 && !std::freopen("CONOUT$", "w", stdout))
@@ -2559,7 +2559,7 @@ int main(int argc, char** argv) {
     auto diagnostic = Star::format("Client native initialization failed: {}",
                                    Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true));
     Star::EmergencyLog::error("{}", diagnostic);
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenStarbound startup error", diagnostic.c_str(), nullptr);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Asterbound startup error", diagnostic.c_str(), nullptr);
     return 1;
   }
   Star::StringList args;

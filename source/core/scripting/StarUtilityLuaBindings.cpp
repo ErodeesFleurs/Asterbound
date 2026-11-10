@@ -168,7 +168,9 @@ std::expected<String, StarException> LuaBindings::formatLua(String const& string
 std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(RandomService& random, Logger& logger, LogMap& logMap) {
   LuaCallbacks callbacks;
   if (auto result = callbacks.registerCallback("buildInfo", []() -> Json {
-        return JsonObject{{"version", StarVersionString}, {"architecture", StarArchitectureString}};
+        return JsonObject{{"version", StarVersionString}, {"architecture", StarArchitectureString},
+            {"product", "Asterbound"}, {"productVersion", ProductVersionString},
+            {"assetVersion", BundledAssetsVersionString}};
       }); !result)
     return std::unexpected(std::move(result.error()));
 

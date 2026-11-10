@@ -32,7 +32,11 @@ target_include_directories (starbound_server PRIVATE
     ${STAR_PLATFORM_INCLUDES}
     ${STAR_GAME_INCLUDES}
   )
-set_target_properties (starbound_server PROPERTIES CXX_SCAN_FOR_MODULES ON)
+set_target_properties (starbound_server PROPERTIES
+  CXX_SCAN_FOR_MODULES ON
+  OUTPUT_NAME asterbound_server
+  PDB_NAME asterbound_server
+  COMPILE_PDB_NAME asterbound_server)
 
 if(STAR_SYSTEM_MACOS)
   target_link_options (starbound_server PRIVATE "LINKER:-rpath,@executable_path")

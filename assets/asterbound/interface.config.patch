@@ -1,0 +1,235 @@
+{
+  "panes" : {
+    "chat" : {
+      "config" : "/interface/opensb/chat/chat.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 10,
+      "actions" : {
+        "ChatBegin" : "begin",
+        "ChatBeginCommand" : "command",
+        "ChatSendLine" : "send",
+        "ChatStop" : "stop",
+        "ChatPreviousLine" : "previous",
+        "ChatNextLine" : "next",
+        "ChatPageUp" : "pageUp",
+        "ChatPageDown" : "pageDown"
+      },
+      "events" : {"messages" : "receiveMessages"}
+    },
+    "status" : {
+      "config" : "/interface/opensb/status/status.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 20
+    },
+    "breath" : {
+      "config" : "/interface/opensb/breath/breath.config",
+      "layer" : "Background",
+      "scope" : "session",
+      "open" : true,
+      "order" : 30
+    },
+    "bookmarkEditor" : {
+      "config" : "/interface/opensb/bookmarks/bookmarkeditor.config",
+      "layer" : "ModalWindow",
+      "scope" : "world",
+      "open" : false,
+      "order" : 40,
+      "events" : {"edit" : "editBookmark"}
+    },
+    "popup" : {
+      "config" : "/interface/opensb/popup/popup.config",
+      "layer" : "Window",
+      "scope" : "player",
+      "open" : false,
+      "order" : 50,
+      "events" : {"show" : "showPopup"}
+    },
+    "songbook" : {
+      "config" : "/interface/opensb/songbook/songbook.config",
+      "layer" : "Window",
+      "scope" : "player",
+      "retain" : true,
+      "open" : false,
+      "order" : 60
+    },
+    "codex" : {
+      "config" : "/interface/opensb/codex/codex.config",
+      "layer" : "Window",
+      "scope" : "player",
+      "retain" : true,
+      "open" : false,
+      "order" : 70,
+      "globalActions" : {"InterfaceCodex" : "toggle"}
+    },
+    "QuestLog" : {
+      "config" : "/interface/opensb/questlog/questlog.config",
+      "layer" : "Window",
+      "scope" : "player",
+      "retain" : true,
+      "open" : false,
+      "order" : 75,
+      "globalActions" : {"InterfaceQuest" : "toggle"}
+    },
+    "QuestTracker" : {
+      "config" : "/interface/opensb/questtracker/questtracker.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 80
+    },
+    "PlanetText" : {
+      "config" : "/interface/opensb/planettext/planettext.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 90
+    },
+    "Notifications" : {
+      "config" : "/interface/opensb/notifications/notifications.config",
+      "layer" : "Background",
+      "scope" : "session",
+      "open" : true,
+      "order" : 110,
+      "events" : {"message" : "push", "pickup" : "pickup"}
+    },
+    "TargetHealth" : {
+      "config" : "/interface/opensb/targethealth/targethealth.config",
+      "layer" : "Background",
+      "scope" : "session",
+      "open" : true,
+      "order" : 120
+    },
+    "SpecialHealth" : {
+      "config" : "/interface/opensb/specialhealth/specialhealth.config",
+      "layer" : "Background",
+      "scope" : "session",
+      "open" : true,
+      "order" : 130
+    },
+    "MainBar" : {
+      "config" : "/interface/opensb/mainbar/mainbar.config",
+      "layer" : "Background",
+      "scope" : "session",
+      "open" : true,
+      "order" : 140
+    },
+    "MainBarTooltip" : {
+      "config" : "/interface/opensb/mainbar/tooltip.config",
+      "layer" : "Tooltip",
+      "scope" : "session",
+      "open" : true,
+      "order" : 141
+    },
+    "ActionBar" : {
+      "config" : "/interface/opensb/actionbar/actionbar.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 150
+    },
+    "TeamBar" : {
+      "config" : "/interface/opensb/team/teambar.config",
+      "layer" : "Hud", "scope" : "session", "open" : true, "order" : 160
+    },
+    "TeamInvite" : {
+      "config" : "/interface/opensb/team/teaminvite.config",
+      "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 161
+    },
+    "TeamInvitation" : {
+      "config" : "/interface/opensb/team/teaminvitation.config",
+      "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 162
+    },
+    "TeamMemberMenu" : {
+      "config" : "/interface/opensb/team/teammembermenu.config",
+      "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 163
+    },
+    "RadioMessagePopup" : {
+      "config" : "/interface/opensb/radio/radio.config",
+      "layer" : "Hud",
+      "scope" : "session",
+      "open" : true,
+      "order" : 170
+    },
+    "EscapeDialog" : {
+      "config" : "/interface/opensb/escapemenu/escapemenu.config",
+      "layer" : "ModalWindow",
+      "scope" : "session",
+      "open" : false,
+      "retain" : true,
+      "order" : 100,
+      "actions" : {"InterfaceEscapeMenu" : "close"},
+      "globalActions" : {"InterfaceEscapeMenu" : "toggle"}
+    }
+  },
+  "font" : {
+    "defaultFont" : "hobo",
+    "fallbackFont" : "unifont",
+    "emojiFont" : "twemoji"
+  },
+  "nametag" : {
+    "showMasterNames" : true,
+    // outline is double here as it otherwise fades out near the end
+    // (could just the end to opaque too, but then diagonals are more jaggy)
+    "textStyle" : { "backDirectives" : "border=1;fff;fff4?border=1;fff;fff4?multiply=222" },
+    "inspectOpacityRate" : 0.15,
+    "movementThreshold" : 0.5,
+    "offset" : [0, 13]
+  },
+  "specialDamageBar" : {
+    "nameStyle" : {
+      "fontSize" : 18
+    }
+  },
+  "textStyle" : {},
+  "buttonTextStyle" : {
+    "shadow" : "black"
+  },
+  "labelTextStyle" : {},
+  "paneTextStyle" : {},
+  "textBoxTextStyle" : {},
+  "itemSlotTextStyle" : {
+    "backDirectives" : "border=1;fff;fff4?multiply=444"
+  },
+  "teamBarNameStyle" : {},
+  "cursorTooltip" : { "textStyle" : {} },
+
+  "tooltip" : { "previewArmorWith" : "player" },
+  "debugTextStyle" : {
+    "font" : "iosevka-semibold",
+    "fontSize" : 7,
+    "backDirectives" : "border=1;fff;fff7?multiply=333a"
+  },
+  "debugSpatialClearTime" : 0.0,
+  "debugOffset" : [80, 130],
+
+  // Dynamic text uses named tags, not runtime standard format strings.
+  "planetNameFormatString" : "- <worldName> -",
+  "planetTextOffset" : [0, 120],
+  "planetTextStyle" : {
+    "backDirectives" : "border=5;fff;fff?border=1;fff;fff7?multiply=000",
+    "fontSize" : 24
+  },
+
+  // You can edit which panes they open. They default to their vanilla values if unset
+  /*
+  "mainBar" : {
+    "collections" : {
+      "scriptPane" : "/interface/scripted/collections/collectionsgui.config"
+    },
+    "mmUpgrade" : {
+      "scriptPane" : "/interface/scripted/mmupgrade/mmupgradegui.config"
+    }
+  },
+  */
+
+  "buttonClickSound" : [ "/sfx/interface/button/click.wav" ],
+  "buttonReleaseSound" : [ "/sfx/interface/button/release.wav" ],
+  "buttonHoverSound" : [ "/sfx/interface/button/hover.wav" ],
+  "buttonHoverOffSound" : [ "/sfx/interface/button/hover_off.wav" ],
+
+  "steamFlatpakWarning" : "Steam seems to be installed as a flatpak, which is not supported!\n\nIf you want to use workshop mods, you must either run Asterbound from Steam, or install Steam through your distribution's package manager instead."
+}

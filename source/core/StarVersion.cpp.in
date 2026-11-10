@@ -3,8 +3,9 @@ import star.version;
 
 namespace Star {
 
-extern std::string_view const OpenStarVersionString = "0.1.15.1";
-extern std::string_view const StarVersionString = "1.4.4";
+extern std::string_view const ProductVersionString = "@ASTERBOUND_VERSION@";
+extern std::string_view const BundledAssetsVersionString = "@ASTERBOUND_ASSET_VERSION@";
+extern std::string_view const StarVersionString = "@STARBOUND_VERSION@";
 extern std::string_view const StarSourceIdentifierString = "${STAR_SOURCE_IDENTIFIER}";
 extern std::string_view const StarArchitectureString = "${STAR_SYSTEM} ${STAR_ARCHITECTURE}";
 

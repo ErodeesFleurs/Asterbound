@@ -6,4 +6,4 @@ STEAM_INSTALL_DIR="$HOME/Library/Application Support/Steam/steamapps/common/Star
 
 ./asset_packer -c ../scripts/packing.config ../assets/packed ./packed.pak
 mv packed.pak "$STEAM_INSTALL_DIR/assets/packed.pak"
-cp starbound "$STEAM_INSTALL_DIR/osx/Starbound.app/Contents/MacOS/"
+cp asterbound "$STEAM_INSTALL_DIR/osx/Starbound.app/Contents/MacOS/starbound"

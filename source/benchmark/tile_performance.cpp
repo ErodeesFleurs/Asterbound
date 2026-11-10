@@ -491,7 +491,7 @@ public:
     auto base = Application::applicationInit(controller);
     if (!base)
       return base;
-    controller->setApplicationTitle("OpenStarbound TilePainter benchmark");
+    controller->setApplicationTitle("Asterbound TilePainter benchmark");
     controller->setNormalWindow({640, 360});
     return controller->setVSyncEnabled(false);
   }

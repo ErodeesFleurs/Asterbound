@@ -12,6 +12,23 @@
 nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/format-source.sh --check
 ```
 
+### Brand artwork
+
+`scripts/generate-branding.py` regenerates the ASCII A monogram, client/server
+ICO files, mod icon, installer bitmap and title wordmark. It requires Python,
+Pillow and DejaVu Sans Mono:
+
+```sh
+python3 scripts/generate-branding.py --font /path/to/DejaVuSansMono.ttf
+```
+
+The source strings use only ASCII characters; the font is rasterized, not bundled.
+Small ICO frames are drawn separately rather than reduced from the 1024px image.
+The client uses terminal green and the server terminal blue. macOS packaging
+derives ICNS from the same PNG. After changing artwork, inspect native-size
+16/24/32/48/64px icons and the real title screen at its configured image scale.
+
+
 ## Threading and cancellation
 
 Thread creation and joining retain a narrow native backend returning `std::expected`: project code disables exceptions, while `std::thread`/`std::jthread` report creation failures by throwing. Mutexes, condition variables and atomic waits use the standard library. The writer-preferring `ReadersWriterMutex` exposes standard locking operations for `std::shared_lock` and `std::unique_lock`; its multiple shared acquisitions by one thread and queued-writer priority are not replaced by `std::shared_mutex`.

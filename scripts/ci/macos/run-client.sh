@@ -2,4 +2,4 @@
 
 cd "`dirname \"$0\"`"
 
-DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:./" ./starbound "$@"
+DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:./" ./asterbound "$@"

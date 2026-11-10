@@ -4,6 +4,35 @@
 
 Many StarExtensions mods remain compatible; StarExtensions itself is deprecated. For render-hook timing and presentation behavior, see [independent simulation and rendering](engine-notes.md#independent-simulation-and-rendering).
 
+## Asterbound compatibility identity
+
+Asterbound retains Starbound protocol 747, OpenStarbound extension protocol 18,
+and stream version 18. The handshake reports `brand = "Asterbound"` but retains
+`openProtocolVersion`, compression negotiation, packet IDs and field layouts.
+The existing handshake does not negotiate a common minimum version; accepting
+a version number is not proof of compatibility with a future implementation.
+
+Keep `opensb_base`, `opensb_compat`, existing virtual asset paths, entity IDs,
+`OpenStarbound` script-context names, the `opensb` input group and public
+`clientOpenProtocolVersion` / `serverOpenProtocolVersion` Lua APIs unchanged.
+The `SBVJ01` save header and `World4` world identifier are also unchanged.
+New Asterbound-only assets should use their own namespace rather than rename
+resources referenced by existing mods, saves or remote clients.
+
+Brand artwork and scripts change the asset digest. A server requiring identical
+assets can reject an otherwise wire-compatible client. Do not disable this policy
+globally or advertise digest equality; deploy matching assets, or explicitly
+allow the difference on both endpoints when appropriate.
+
+The rebrand was smoke-tested with preserved local OpenStarbound binaries from
+source `90296aed875c749bdc465eb8b0ce1d74faa511a9`: real TCP in both directions,
+None and Zstd stream modes, world entry, reconnection and chat round trips.
+Both brands also connected concurrently to Asterbound. These checks used owned
+base assets and explicitly allowed differing extension assets. They are not a
+full extended-world/gameplay matrix, a test of every upstream release, or proof
+of Steam/Discord interoperability.
+
+
 ## Lua 5.5.1 migration
 
 Compound assignment, safe navigation, `math.round` and `math.copysign` remain available.
@@ -15,7 +44,16 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 
 ## Bundled mod compatibility
 
-`assets/opensb-compat` is a separate, optional-fix asset source, shipped as `opensb-compat.pak` beside `opensb.pak` in distributions and as a sibling directory in Nix packages. Normal asset-directory scanning loads it automatically; custom boot configurations using explicit `assetSources` must include it. It does not require any third-party mod to be installed.
+`assets/asterbound-compat` is a separate, optional-fix asset source, shipped as `asterbound-compat.pak` beside `asterbound.pak` in distributions and as a sibling directory in Nix packages. Normal asset-directory scanning loads it automatically; custom boot configurations using explicit `assetSources` must include it. It does not require any third-party mod to be installed.
+
+The physical source directories and distribution files use Asterbound names:
+`assets/asterbound`, `assets/asterbound-compat`, `asterbound.pak` and
+`asterbound-compat.pak`. Update explicit boot `assetSources` paths when upgrading;
+do not keep duplicate old/new bundles in the same scanned directory.
+Internal `opensb_base` / `opensb_compat` metadata names and `/scripts/opensb/`,
+`/interface/opensb/` and other virtual resource paths remain unchanged for mods
+and network peers.
+
 
 For [StarCore Simplified Chinese](https://steamcommunity.com/sharedfiles/filedetails/?id=807695810) (`SChinese`, version `V108_241106_09`), it removes four unused imports from `/scripts/replaceTags.lua` in memory, breaking `util.lua → replaceTags.lua → util.lua`. The replacement function body, utility functions and translations remain unchanged; the engine still rejects cyclic `require` calls. The repair applies only when the effective script provider is that known SChinese version and its import header matches the [verified upstream release](https://github.com/sffxzzp/Starbound-Chinese/releases/tag/UTC-241105-1953). Other providers, unknown versions and unrecognized headers are left untouched. No installed mod files or saves are rewritten; restart the game after installing the compatibility source.
 

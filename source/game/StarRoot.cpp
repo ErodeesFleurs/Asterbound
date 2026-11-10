@@ -910,9 +910,9 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     if (!included) return std::unexpected(std::move(included.error()));
     assetSource->includes = std::move(*included);
 
-    if (assetSource->name.value_or(String{}) == "opensb_base" && assetSource->version.value_or(String{}) != OpenStarVersionString) {
-      return std::unexpected(AssetSourceException(Star::format("\n\nOpenStarbound assets version mismatch!\nOpenStarbound v{}, but opensb.pak is v{}\n",
-        OpenStarVersionString, assetSource->version.value_or(String{})), false));
+    if (assetSource->name.value_or(String{}) == "opensb_base" && assetSource->version.value_or(String{}) != BundledAssetsVersionString) {
+      return std::unexpected(AssetSourceException(Star::format("\n\nAsterbound bundled assets version mismatch!\nAsterbound v{} requires opensb_base v{}, but the loaded assets are v{}\n",
+        ProductVersionString, BundledAssetsVersionString, assetSource->version.value_or(String{})), false));
     }
 
     if (assetSource->name) {
@@ -1012,7 +1012,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
         return std::unexpected(AssetSourceException(Star::format("Asset source '{}' is missing dependency '{}'{}", source->name ? *source->name : "<unnamed>", requirementName,
           requirementName != "base" ? "" :
             "\n\nThe base Starbound asset package could not be found, please copy it from another Starbound install!\n"
-            "(Locate 'packed.pak' in vanilla Starbound's assets folder, then copy it to OpenStarbound's assets folder.)\n"), false));
+            "(Locate 'packed.pak' in vanilla Starbound's assets folder, then copy it to Asterbound's assets folder.)\n"), false));
       }
     }
 

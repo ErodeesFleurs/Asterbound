@@ -61,7 +61,7 @@ let
           substituteInPlace CMakeLists.txt \
             --replace-fail \
               "message(WARNING \"Cannot find the 'sanitizer/asan_interface.h' -- install address sanitizer support first\")" \
-              'message(FATAL_ERROR "OpenStarbound requires mimalloc ASan tracking; sanitizer/asan_interface.h is missing")'
+              'message(FATAL_ERROR "Asterbound requires mimalloc ASan tracking; sanitizer/asan_interface.h is missing")'
         '';
     })
   );
@@ -166,7 +166,7 @@ let
         (prev.qtbase.override {
           inherit icu;
           # Avoid the translations -> qttools -> qtbase bootstrap cycle; the
-          # OpenStarbound widgets do not install or load Qt translation catalogs.
+          # Asterbound widgets do not install or load Qt translation catalogs.
           qttranslations = null;
         }).overrideAttrs
           (old: {
