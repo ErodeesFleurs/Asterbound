@@ -1,3 +1,7 @@
+# player
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/player.md) · [Modding guide](../modding.md)
+
 The player table contains functions with privileged access to the player which run in a few contexts on the client such as scripted interface panes, quests, and player companions.
 
 ---

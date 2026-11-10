@@ -6,7 +6,7 @@
   "requires" : ["base"],
   "version" : "0.1.15.1",
   "icon" : "/opensb/modicon.png",
-  "link" : "https://github.com/ErodeesFleurs/OpenStarbound",
+  "link" : "https://github.com/ErodeesFleurs/Asterbound",
   "scripts" : {
     //"onLoad" : ["/scripts/opensb/assets/onload.lua"],
     "postLoad" : ["/scripts/opensb/assets/postload.lua"]

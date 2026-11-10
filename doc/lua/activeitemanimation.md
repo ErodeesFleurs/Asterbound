@@ -1,3 +1,7 @@
+# activeItemAnimation
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The activeItemAnimation table contains bindings available to client-side animation scripts for active items.
 
 ---

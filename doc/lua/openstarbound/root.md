@@ -1,5 +1,7 @@
 # Root
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../root.md) · [Modding guide](../../modding.md)
+
 The `root` table now contains extra asset bindings and bindings to return the tile variant that is used for material and matmods at any position.
 
 ---

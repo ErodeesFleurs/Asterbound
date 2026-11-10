@@ -1,3 +1,7 @@
+# projectile
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The projectile table contains bindings specific to projectiles which are available in addition to their common tables.
 
 ---

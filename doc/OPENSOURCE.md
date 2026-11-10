@@ -32,7 +32,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
-[SDL - Simple DirectMedia Layer](libsdl.org)
+[SDL - Simple DirectMedia Layer](https://www.libsdl.org/)
 --------------------------------------------
 > Simple DirectMedia Layer
 > Copyright (C) 1997-2016 Sam Lantinga <slouken@libsdl.org>
@@ -53,7 +53,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > 	 misrepresented as being the original software.
 > 3. This notice may not be removed or altered from any source distribution.
 
-[libpng PNG reference library](libpng.org)
+[libpng PNG reference library](https://www.libpng.org/)
 ------------------------------------------
 > COPYRIGHT NOTICE, DISCLAIMER, and LICENSE:
 >
@@ -142,7 +142,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > source code in a product, acknowledgment is not required but would be
 > appreciated.
 
-[zlib compresison library](www.xiph.org)
+[zlib compression library](https://www.zlib.net/)
 ---------------------------------------------------------
 > Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler
 >
@@ -165,7 +165,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > Jean-loup Gailly        Mark Adler
 > jloup@gzip.org          madler@alumni.caltech.edu
 
-[libogg and libvorbis multimedia libraries](www.xiph.org)
+[libogg and libvorbis multimedia libraries](https://www.xiph.org/)
 ---------------------------------------------------------
 > Copyright (c) 2002-2015 Xiph.org Foundation
 >
@@ -196,7 +196,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 > OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-[FreeType Font Engine](www.freetype.org)
+[FreeType Font Engine](https://www.freetype.org/)
 ----------------------------------------
 > Portions of this software are copyright © 2015 The FreeType
 > Project (www.freetype.org).  All rights reserved.
@@ -225,7 +225,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
-[The xxHash algorithm implementation by Yann Collet](github.com/Cyan4973/xxHash)
+[The xxHash algorithm implementation by Yann Collet](https://github.com/Cyan4973/xxHash)
 --------------------------------------------------------------------------------
 > Copyright (c) 2012-2014, Yann Collet
 > All rights reserved.
@@ -251,7 +251,7 @@ The standalone interpreter/compiler and upstream build files are not built.
 > (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 > SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-[The OpenGL Extension Wrangler Library](glew.sourceforge.net)
+[The OpenGL Extension Wrangler Library](https://glew.sourceforge.net/)
 -------------------------------------------------------------
 > The OpenGL Extension Wrangler Library
 > Copyright (C) 2008-2015, Nigel Stewart <nigels[]users sourceforge net>
@@ -283,10 +283,10 @@ The standalone interpreter/compiler and upstream build files are not built.
 > ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 > THE POSSIBILITY OF SUCH DAMAGE.
 
-Open Source Software used by the Mod Upoading Tool
+Open Source Software used by the Mod Uploading Tool
 ==================================================
 
-[Qt GUI Toolkit](www.qt.io)
+[Qt GUI Toolkit](https://www.qt.io/)
 ---------------------------
 >                   GNU LESSER GENERAL PUBLIC LICENSE
 >                        Version 2.1, February 1999

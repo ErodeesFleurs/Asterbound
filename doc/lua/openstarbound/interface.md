@@ -1,5 +1,7 @@
 # Interface
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The `interface` table contains bindings which allow scripts to display a message at the bottom of the screen, among other things.
 
 ---
@@ -108,7 +110,7 @@ acknowledge or clear them and is not a second PlayerInventory change flag.
 
 #### `CanvasWidget` interface.bindCanvas(`String` name, [`bool` ignoreInterfaceScale = false])
 
-Binds the canvas widget on the main interface with the specified name as userdata for easy access. The `CanvasWidget` has the same methods as described in `widget.md`.
+Binds the canvas widget on the main interface with the specified name as userdata for easy access. The `CanvasWidget` has the same methods as described in the [base widget API](../widget.md).
 
 - **ignoreInterfaceScale** is used to ignore the current interface scaling and bind the canvas with the screen size.
 
@@ -452,7 +454,7 @@ menu constructor, enum registration or Escape-toggle branch.
 Lua owns the three buttons, version label and pause selection. Return dismisses
 the menu; Options dismisses it before opening the registered `"Options"` pane;
 Save and Quit requests `interface.returnToTitle()` before dismissing.
-`sb.buildInfo()` supplies the engine version and architecture.
+[`sb.buildInfo()`](utility.md#json-sbbuildinfo) supplies the base Starbound `version`, Asterbound `productVersion`, bundled `assetVersion`, `product` and `architecture`.
 
 The feature-owned layout builder reuses `/interface.config:escapeDialog`,
 including modded widgets. Unless an explicit wrapper size is supplied, it

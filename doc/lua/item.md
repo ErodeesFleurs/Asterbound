@@ -1,5 +1,7 @@
 # item
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The `item` table is available in all scripted items and contains functions relating to the item itself.
 
 ---
@@ -36,7 +38,7 @@ Returns whether the item matches the specified item. If exactMatch is `true` the
 
 #### `bool` item.consume(`size_t` count)
 
-Consumes items from the stack. Returns whether the full count was successfuly consumed.
+Consumes items from the stack. Returns whether the full count was successfully consumed.
 
 ---
 

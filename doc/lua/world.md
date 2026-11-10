@@ -1,4 +1,8 @@
-The `world` table contains functions that perform actions within a specified such as querying or modifying entities, tiles, etc. in that world.
+# world
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/world.md) · [Modding guide](../modding.md)
+
+The `world` table contains functions that query or modify entities, tiles and other data within a specified world.
 
 ---
 
@@ -520,9 +524,9 @@ Returns the specified player entity's stock of the specified currency type, or `
 
 #### `unsigned` world.entityHasCountOfItem(`EntityId` entityId, `Json` itemDescriptor, [`bool` exactMatch])
 
-Returns the nubmer of the specified item that the specified player entity is currently carrying, or `nil` if the entity is not a player. If exactMatch is `true` then parameters as well as item name must match.
+Returns the number of the specified item that the specified player entity is currently carrying, or `nil` if the entity is not a player. If exactMatch is `true` then parameters as well as item name must match.
 
-NOTE: This function currently does not work correctly over the network, making it inaccurate when not used from client side scripts such as status.
+NOTE: This function currently does not work correctly over the network, making it inaccurate when not used from client-side scripts such as status.
 
 ---
 

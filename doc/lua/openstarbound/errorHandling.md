@@ -1,20 +1,19 @@
 # Error Handling
 
-Error handling scripts are defined in the `_metadata` of a mod.
-They get access to `root` and `sb`
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
 
-- itemError
-- objectError
-- npcError
-- playerError
-- monsterError
-- vehicleError
+Saved-data recovery scripts are declared under `errorHandlers` in a mod's `_metadata`. Supported keys are `item`, `object`, `npc`, `player`, `monster` and `vehicle`; each value is an array of script paths.
 
-When an error occurs loading from disk, the `error(diskStore, e)` is invoked in each mod's scripts in reverse priority order until the error is entirely handled, or it isn't.
-This means that a mod with a high priority, such as opensb_base with a priority of -9999 will execute its error handling scripts *last* (as its scripts are now responsible for generic items)
+For example, this metadata fragment registers an item recovery script:
 
-`diskStore` being the stored data to be modified and returned to potentially handle the error. It will only try to reload if the output has actually been changed.
+```json
+"errorHandlers": {
+  "item": ["/scripts/example/itemRecovery.lua"]
+}
+```
 
-`e` being the string of the exception that occured.
+These scripts have access to `root` and `sb`. They define `error(diskStore, e)`, where `diskStore` is the stored data to repair and `e` is the exception string.
+
+Handlers are collected in asset-source order, then in each declared script array's order. A handler must return changed stored data to trigger another load attempt. Returning `nil` or unchanged data stops recovery; a handler failure propagates. If the changed data still fails to load, the next handler receives that data and the new exception.
 
 If none of the scripts handled the load errors fully, then the error will be thrown as normal.

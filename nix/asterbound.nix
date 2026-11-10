@@ -422,7 +422,7 @@ stdenv.mkDerivation {
 
   meta = {
     description = "Asterbound client and server, based on OpenStarbound";
-    homepage = "https://github.com/ErodeesFleurs/OpenStarbound";
+    homepage = "https://github.com/ErodeesFleurs/Asterbound";
     platforms = [
       "x86_64-linux"
       "aarch64-linux"

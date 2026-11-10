@@ -1,5 +1,7 @@
 # Assets
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 Accessible in onLoad scripts, postLoad scripts, and Lua asset patches. Lua asset patches receive only the read-only functions; `add`, `patch`, `patchReplace`, `loadScriptReplace`, and `erase` are exclusive to onLoad/postLoad scripts.
 
 onLoad scripts and postLoad scripts are defined under the `scripts` key of a mod's metadata, like so:

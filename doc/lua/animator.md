@@ -1,5 +1,7 @@
 # animator
 
+[Lua API](README.md#base-api) · [Extensions](openstarbound/animator.md) · [Modding guide](../modding.md)
+
 The *animator* table contains functions that relate to an attached networked animator. Networked animators are found in:
 
 * tech

@@ -1,59 +1,60 @@
 # Asterbound
 
-Asterbound is an independently maintained fork of [OpenStarbound](https://github.com/OpenStarbound/OpenStarbound), derived from the [Starbound 1.4.4 source code](https://archive.org/details/starbound_source_code). It retains OpenStarbound's networking and mod compatibility contracts while using its own application and distribution identity.
+Asterbound is an independently maintained fork of OpenStarbound, derived from [Starbound 1.4.4](https://archive.org/details/starbound_source_code). It adds engine fixes, Lua-driven interfaces and rendering improvements while retaining OpenStarbound's protocol and mod compatibility contracts.
+
+Upstream OpenStarbound repository: <https://github.com/OpenStarbound/OpenStarbound>.
 
 **You must own Starbound.** Commercial game assets are not included.
 
 ## Installation
 
-1. Build from this repository or obtain a release from its [releases page](https://github.com/ErodeesFleurs/OpenStarbound/releases). Install separately from Starbound and OpenStarbound.
-2. Copy `assets/packed.pak` from your owned Starbound installation into Asterbound's `assets/` directory.
-3. Explicitly copy saves and local mods into the new installation; do not share writable storage with a running OpenStarbound instance. Nix users can use `asterbound-import-openstarbound` to copy into an empty runtime. Keep Steam open to load subscribed Workshop mods.
+1. Obtain an available [release](https://github.com/ErodeesFleurs/Asterbound/releases), a [development build](https://github.com/ErodeesFleurs/Asterbound/actions), or [build from source](doc/building.md). Install separately from Starbound and OpenStarbound.
+2. Copy `assets/packed.pak` from your owned Starbound installation into the new installation's `assets/` directory. Nix users instead set `ASTERBOUND_ASSETS` as shown below.
+3. Import saves and local mods explicitly; never let two running installations write the same storage. See [runtime paths and data import](doc/building.md#runtime-paths-and-data-import). Keep Steam running to load subscribed Workshop mods when Steam integration is enabled.
 
-[Build workflows](https://github.com/ErodeesFleurs/OpenStarbound/actions) publish development artifacts; these are not a promise of a stable release.
+Development artifacts are not stable releases. Keep backups before importing saves.
 
 ## Features
 
-- Multithreaded, extended-color lighting and additive point lights.
-- Lua asset/image patches, Lua-managed chat and status-effect HUDs, scripted windows and custom keybindings.
+- Multithreaded lighting, extended colors and additive point lights.
+- Lua-managed interfaces, asset/image patches, custom keybindings and status HUDs.
 - Positional Opus voice chat, character swapping, multiple fonts and instrument volume control.
-- Improved mod compatibility, inventory recovery, world storage and client-side tile prediction. Custom tile collision requires an OpenStarbound server.
-- Independent simulation and rendering, with configurable FPS limits and interpolated world presentation.
+- Inventory recovery, mod compatibility fixes and client-side tile prediction. Custom tile collision requires Asterbound or a compatible OpenStarbound server.
+- Independent simulation and rendering, configurable FPS limits and interpolated world presentation.
 
-Use `/help` for commands or browse the [command reference](assets/asterbound/help.config.patch).
-
-## Documentation
-
-| Guide | Contents |
-|---|---|
-| [Building](doc/building.md) | Requirements, Nix, native CMake presets, cross-builds and SDKs |
-| [Tests and benchmarks](doc/testing.md) | CTest, isolated asset-backed tests, sanitizers and benchmarks |
-| [Development](doc/development.md) | Tooling, C++ conventions, threading, JSON, rendering and Lua embedding |
-| [Mod compatibility and diagnostics](doc/modding.md) | Lua 5.5 migration, bundled compatibility fixes, dependencies and error logs |
-| [Engine notes](doc/engine-notes.md) | Optimization details, networking, simulation/rendering ownership and presentation |
-| [Lua API](doc/lua/openstarbound) / [JSON extensions](doc/json/openstarbound) | Scripting and asset references |
+Use `/help` in game or read the [command reference](assets/asterbound/help.config.patch).
 
 ## Building
 
-Requires **C++23**, **CMake 3.28+**, **Ninja 1.11+** and **xclang 23.1.3.6**. GCC, Apple Clang and MSVC builds are unsupported. See the [build guide](doc/building.md) for platform setup and packaging.
-
-On Linux with Nix, from the repository root:
+On Linux with Nix, run from the repository root:
 
 ```sh
-nix build --cores 16 --max-jobs 1
+nix build
 ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result/bin/asterbound
 ```
 
-Nix supports x86_64 and ARM64. Writable data defaults to `$XDG_DATA_HOME/asterbound` (`~/.local/share/asterbound`); see [Nix options and runtime paths](doc/building.md#nix-on-linux) for overrides and package variants.
+Native builds require C++23, CMake, Ninja and the pinned xclang toolchain. See [requirements and platform instructions](doc/building.md#requirements); GCC, Apple Clang and MSVC builds are unsupported.
 
-## Community
+## Documentation
 
-[Issues and contributions](https://github.com/ErodeesFleurs/OpenStarbound/issues) are welcome. The repository URL retains its existing path; the product name is Asterbound.
+| Task | Guide |
+|---|---|
+| Install, build, configure SDKs or import saves | [Build and runtime guide](doc/building.md) |
+| Run tests, sanitizers or benchmarks | [Testing guide](doc/testing.md) |
+| Work on C++, Lua embedding or brand artwork | [Development guide](doc/development.md) |
+| Understand networking and simulation/render ownership | [Engine notes](doc/engine-notes.md) |
+| Migrate or diagnose mods | [Mod compatibility and diagnostics](doc/modding.md) |
+| Find script APIs and their available contexts | [Lua API index](doc/lua/README.md) |
+| Find asset configuration extensions | [JSON reference index](doc/json/README.md) |
 
 ## Compatibility and provenance
 
-The current wire baseline is Starbound protocol **747**, OpenStarbound extension protocol **18**, and stream version **18**. Existing `opensb` asset identities, public Lua API names and save-format identifiers remain compatibility contracts, not product branding. This does not guarantee compatibility with every older or future OpenStarbound release.
+The wire baseline is Starbound protocol **747**, OpenStarbound extension protocol **18**, and stream version **18**. Physical asset directories and packages use Asterbound names; existing `opensb` resource identities, public Lua names and save-format identifiers remain compatibility contracts. See [compatibility scope and verified boundaries](doc/modding.md#asterbound-compatibility-identity); this is not a guarantee for every older or future OpenStarbound release.
 
-Product, bundled-asset and base-game versions are independently recorded in [`version.json`](version.json). Bundled assets must match the engine's asset version.
+[`version.json`](version.json) records product, bundled-asset and base-game versions separately. Bundled assets must match the engine's asset version.
 
-Original attribution and copyright notices are retained. [`doc/OPENSOURCE.md`](doc/OPENSOURCE.md) documents third-party components; it is not a blanket license for the game source or assets. Renaming does not grant redistribution rights. Commercial `packed.pak` is never included.
+Original attribution and copyright notices are retained. [Third-party notices](doc/OPENSOURCE.md) are not a blanket license for the game source or assets; renaming does not grant redistribution rights.
+
+## Community
+
+[Issues and contributions](https://github.com/ErodeesFleurs/Asterbound/issues) are welcome.

@@ -1,18 +1,21 @@
 # animation
 
-These are json files that typically have the `.animation` extension in starbound's assets, however this is not required.
+[JSON reference](../README.md#openstarbound-compatible-extensions) · [Base format](../animation.md) · [Modding guide](../../modding.md)
 
-All changes that illicit new behavior in how the animator behaves are locked behind defining a `version` in the root of the config to enable them.
+This page documents extensions to the [base animation format](../animation.md).
 
-Retail is version 0
+Changes that introduce new animator behavior require a `version` field at the root of the config.
 
-Current OSB animator is version 1
+| Animator format | `version` |
+| --- | --- |
+| Retail Starbound | `0` |
+| Asterbound (OpenStarbound-compatible extensions) | `1` |
 
 ## includes
 
 In the root of the config, one can define an array `includes` which will contain the paths to other animation configs that will be merged underneath the current animation config when the animator is initialized.
 
-This is intended to allow `animationCustom` parameters on weapons or objects to include large modifications to the animation, without balooning out the parameter data that is stored in the item, but is also just useful for modular animations to not need to be copied.
+This allows `animationCustom` parameters on weapons or objects to include large modifications without bloating the parameter data stored in the item. It also allows modular animations to be reused without copying them.
 
 ## animation transform properties
 
@@ -25,7 +28,7 @@ If the transformation group is marked as interpolated, then it will interpolate 
 Transformation properties are defined as the name of the transformation group, and then an array of transformations to apply.
 
 Here is an example used in `frameProperties`
-```
+```json
 "transformGroupName" : [
     [["reset"],	["scale",[1, 1]],	["rotateDegrees", 0],	["translate",[0, 0]]],
     [["reset"],	["scale",[0, 0]],	["rotateDegrees", 180],	["translate",[0, -2]]]
@@ -34,7 +37,7 @@ Here is an example used in `frameProperties`
 If the transform group named `transformGroupName` is interpolated, then between frame 1 and frame 2, the transform group would be scaled down to 0, rotated upside down, and lowered two blocks. Do note the `reset` at the beginning of the array, if it were not there, the transformation would continually build on itself each frame.
 
 Here is another example that could be within `properties`
-```
+```json
 "transformGroupName" : [["rotateDegrees", 1]]
 ```
 With the lack of a `reset` this transformation would be applied for every update tick, which would make `transformGroupName` continually rotate by 1 degree every tick endlessly.

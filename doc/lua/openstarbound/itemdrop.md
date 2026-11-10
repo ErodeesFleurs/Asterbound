@@ -1,6 +1,8 @@
 
 # Item Drop
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The `itemDrop` table is accessible from scripted item drops.
 
 ---

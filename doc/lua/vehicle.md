@@ -1,3 +1,7 @@
+# vehicle
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The vehicle table contains bindings specific to vehicles which are available in addition to their common tables.
 
 ---

@@ -1,6 +1,8 @@
 # Player
 
-The `player` table now contains bindings which contains functions to save/load, access and modify the player's identity, mode, aim, emote and more.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../player.md) · [Modding guide](../../modding.md)
+
+The `player` table contains additional functions to save/load, access and modify the player's identity, mode, aim, emote and more.
 
 ---
 

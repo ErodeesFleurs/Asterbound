@@ -1,6 +1,8 @@
 # Script Pane
 
-OpenStarbound extends the vanilla `pane` bindings described in `doc/lua/scriptpane.md` with additional helpers for interacting
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../scriptpane.md) · [Modding guide](../../modding.md)
+
+Asterbound extends the [base `pane` bindings](../scriptpane.md) with additional helpers for interacting
 with scripted panes at runtime.
 
 ---
@@ -118,7 +120,7 @@ Hides the pane if it is currently shown.
 
 #### `LuaCallbacks` pane.addWidget(`Json` config, [`String` widgetName])
 
-In vanilla Starbound this function returns nothing. OpenStarbound now returns widget callbacks for the newly created widget,
+In vanilla Starbound this function returns nothing. Asterbound returns widget callbacks for the newly created widget,
 allowing scripts to immediately operate on it without a separate `widget` lookup.
 
 ---

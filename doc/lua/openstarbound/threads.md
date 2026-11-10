@@ -1,6 +1,8 @@
 
 # Threads
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The new `threads` table is accessible from every script and allows creating, communicating with, and destroying scriptable threads.
 Scriptable threads are stopped and joined when their parent script session shuts down or reloads. A lifecycle change requested inside a callback is deferred until the outermost callback returns, so its bindings remain valid during that call.
 
@@ -23,7 +25,7 @@ threads.create({
     updateMeasureWindow=0.5, -- Optional, defaults to 0.5, changing this is unnecessary unless you really care about an accurate tickrate for some reason.
     logMapped=true, -- Optional, defaults to true. If false, thread's lua memory and update rate won't be included in debug log map.
     someParameter="scungus" -- Parameters for the scripts, all parameters are accessible using config.getParameter in the script contexts.
-}),
+})
 ```
 
 ---

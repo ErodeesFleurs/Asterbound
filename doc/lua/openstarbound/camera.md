@@ -1,6 +1,8 @@
 # Camera
 
-The `camera` table provides functions to interact with the world camera in clientside scripts.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
+The `camera` table provides functions to interact with the world camera in client-side scripts.
 
 Camera queries and coordinate conversions describe the displayed camera,
 including presentation interpolation, zoom and pixel snapping. During rendering

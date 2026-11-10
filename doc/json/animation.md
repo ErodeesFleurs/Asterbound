@@ -1,3 +1,5 @@
 # animation
 
-These are json files that typically have the `.animation` extension in starbound's assets, however this is not required.
+[JSON reference](README.md#base-formats) · [Extensions](openstarbound/animation.md) · [Modding guide](../modding.md)
+
+These JSON files typically have the `.animation` extension in Starbound's assets, but this is not required.

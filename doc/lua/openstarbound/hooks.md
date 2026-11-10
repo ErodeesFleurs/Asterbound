@@ -1,6 +1,8 @@
 # Hooks
 
-OpenStarbound adds several new script contexts as well as Lua hooks for these contexts.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
+Asterbound provides additional script contexts and Lua hooks compatible with the OpenStarbound extensions.
 
 ---
 

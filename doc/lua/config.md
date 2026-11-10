@@ -1,6 +1,8 @@
 # config
 
-The `config` lua bindings relate to anything that has a configuration and needs to access configuration parameters.
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
+The `config` Lua bindings provide access to configuration parameters.
 
 ---
 

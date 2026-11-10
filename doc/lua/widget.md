@@ -1,11 +1,13 @@
 # widget
 
+[Lua API](README.md#base-api) · [Extensions](openstarbound/widget.md) · [Modding guide](../modding.md)
+
 The `widget` table contains functions to manipulate and get data about widgets in a scriptpane.
 
 The widgetName passed into most of these functions can contain period separators for getting children.
 
 Example:
-```
+```lua
 widget.getPosition("itemScrollArea.itemList.1.name")
 ```
 
@@ -174,7 +176,7 @@ Sets the baseImage of a ButtonWidget.
 
 Sets the full image set of a ButtonWidget.
 
-```
+```lua
 {
   base = "image.png",
   hover = "image.png",

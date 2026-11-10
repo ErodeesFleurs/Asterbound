@@ -1,5 +1,9 @@
+# Additional data types
 
-OpenStarbound includes some additional datatypes.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
+
+Asterbound provides these additional data types through its OpenStarbound-compatible Lua extensions.
 
 --- 
 #### AudioInstance

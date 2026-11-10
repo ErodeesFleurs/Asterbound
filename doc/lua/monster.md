@@ -1,3 +1,7 @@
+# monster
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The monster table contains bindings specific to monsters which are available in addition to their common tables.
 
 ---
@@ -48,7 +52,7 @@ Sets the monster's active damage sources (or clears them if unspecified).
 
 Sets the monster's active damage parts. Damage parts must be defined in the monster's configuration parameters. A damage part specifies a damage source and an animation part to anchor the damage source to. The anchor part's transformation will be applied to the damage source's damage poly, and if a vector, the damage source's knockback.
 
-```js
+```jsonc
 "animationDamageParts" : {
   "beam" : {
     "anchorPart" : "partName", // animation part to anchor the damage source to
@@ -169,4 +173,4 @@ Sets whether the monster is currently interactive.
 
 #### `void` monster.setAnimationParameter(`String` key, `Json` value)
 
-Sets a networked scripted animator parameter to be used in a client side rendering script using animationConfig.getParameter.
+Sets a networked scripted animator parameter to be used in a client-side rendering script using animationConfig.getParameter.

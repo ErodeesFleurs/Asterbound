@@ -1,6 +1,8 @@
 # animationConfig
 
-The `animationConfig` table contains functions for getting configuration options from the base entity and its networked animationConfig. It is available only in client side rendering scripts.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../scriptedanimator.md) · [Modding guide](../../modding.md)
+
+The `animationConfig` table contains functions for getting configuration options from the base entity and its networked animator. It is available only in client-side rendering scripts.
 
 ---
 
@@ -83,13 +85,13 @@ Returns the current state for a state type.
 
 #### `int` animationConfig.animationStateFrame(`String` stateType)
 
-Returns the current frame index of the sateType.
+Returns the current frame index of the stateType.
 
 ---
 
 #### `int` animationConfig.animationStateNextFrame(`String` stateType)
 
-Returns the next frame index of the sateType.
+Returns the next frame index of the stateType.
 
 ---
 

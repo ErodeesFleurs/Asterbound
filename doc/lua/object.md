@@ -1,3 +1,7 @@
+# object
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The object table contains bindings specific to objects which are available in addition to their common tables.
 
 ---

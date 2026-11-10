@@ -1,8 +1,10 @@
 # animationConfig
 
+[Lua API](README.md#base-api) · [Extensions](openstarbound/scriptedanimator.md) · [Modding guide](../modding.md)
+
 The `animationConfig` table contains functions for getting configuration options from the base entity and its networked animator.
 
-It is available only in client side rendering scripts.
+It is available only in client-side rendering scripts.
 
 ---
 

@@ -1,3 +1,7 @@
+# Shared item parameters
+
+[JSON reference](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 Not to be confused with generic items (items with the `.item` extension). This is for parameters shared amongst most or all item types.
 
 ## `String` rarityBorder (All item types)

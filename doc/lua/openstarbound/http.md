@@ -1,5 +1,7 @@
 # http
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The `http` table provides asynchronous HTTP request functionality for Lua scripts. All HTTP requests are executed
 asynchronously and return promises that can be checked for completion.
 

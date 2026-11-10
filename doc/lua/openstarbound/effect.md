@@ -1,7 +1,12 @@
 # Effect
 
-The effect table contains bindings specific to effect which are available in addition to their common tables.
-----------------------------------------------------------------------------------------------------------------------
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../statuseffect.md) · [Modding guide](../../modding.md)
+
+<a id="the-effect-table-contains-bindings-specific-to-effect-which-are-available-in-addition-to-their-common-tables"></a>
+
+The `effect` table contains additional bindings specific to status effects.
+
+---
 
 #### `String` effect.name()
 

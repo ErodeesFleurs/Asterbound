@@ -1,5 +1,7 @@
 # Widget
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../widget.md) · [Modding guide](../../modding.md)
+
 The `widget` table now contains extra bindings.
 
 ---

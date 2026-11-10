@@ -1,4 +1,8 @@
-The *localAnimator* table provides bindings used by client side animation scripts (e.g. on objects and active items) to set drawables/lights and perform rendering actions.
+# localAnimator
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/localanimator.md) · [Modding guide](../modding.md)
+
+The *localAnimator* table provides bindings used by client-side animation scripts (e.g. on objects and active items) to set drawables/lights and perform rendering actions.
 
 ---
 

@@ -1,6 +1,8 @@
 # quest
 
-The `quest` table contains functions relating directly to the quest whose script its run in.
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
+The `quest` table contains functions relating directly to the quest whose script it runs in.
 
 ---
 
@@ -100,7 +102,7 @@ Sets a quest parameter.
 Set a list of quest parameters to use as custom indicators.
 
 Example:
-```
+```lua
 -- define indicators
 local entityIndicator = {
   type = "entity",

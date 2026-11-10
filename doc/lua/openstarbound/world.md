@@ -1,5 +1,7 @@
 # World
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../world.md) · [Modding guide](../../modding.md)
+
 The `world` table now contains extra bindings.
 
 ---

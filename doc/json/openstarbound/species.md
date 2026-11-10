@@ -1,14 +1,16 @@
 # species
 
-These are json files that have the `.species` extension, which define a humanoid species for players/npcs.
+[JSON reference](../README.md#openstarbound-compatible-extensions) · [Base format](../species.md) · [Modding guide](../../modding.md)
+
+This page documents extensions to the [base species format](../species.md).
 
 
 ## `buildScripts`
-Is an optional array of paths to lua scripts that are used to dyncamically change the player/npc's humanoidConfig based on their identity and humanoidParameters, much like how items can modify their resulting config with a build script.
+An optional array of paths to Lua scripts used to dynamically change the player/NPC's humanoidConfig based on their identity and humanoidParameters, much like item build scripts modify an item's resulting config.
 
-see `assets/asterbound/humanoid/opensb/build.lua` for an example
+See [`assets/asterbound/humanoid/opensb/build.lua`](../../../assets/asterbound/humanoid/opensb/build.lua) for an example.
 
-`build(JsonObject identity, JsonObject humanoidParameters, JsonObject humanoidConfig, Variant<JsonObject, nil> npcHumanoidConfig)` will be invoked, and it must return a valid `JsonObject humanoidConfig` or the humanoid will fail to initalize correctly.
+`build(JsonObject identity, JsonObject humanoidParameters, JsonObject humanoidConfig, Variant<JsonObject, nil> npcHumanoidConfig)` is invoked and must return a valid `JsonObject humanoidConfig` or the humanoid will fail to initialize correctly.
 
 It is run whenever the player/npc initializes, changes species or imagePath in their identity, or the player/npc callback `refreshHumanoidParameters()` is used.
 
@@ -18,6 +20,6 @@ It is run whenever the player/npc initializes, changes species or imagePath in t
 - `npcHumanoidConfig` is an optional argument that will be supplied when a NPC variant has its own unique config, such as the story NPCs. In all other cases it will be `nil`
 
 ## `createScripts`
-Is an optional array of paths to lua scripts that are used to create a set of humanoidIdentity, humanoidParameters, and equipment during character creation.
+An optional array of paths to Lua scripts used to create humanoidIdentity, humanoidParameters and equipment during character creation.
 
-see `assets/asterbound/humanoid/opensb/create.lua` for an example
+See [`assets/asterbound/humanoid/opensb/create.lua`](../../../assets/asterbound/humanoid/opensb/create.lua) for an example.

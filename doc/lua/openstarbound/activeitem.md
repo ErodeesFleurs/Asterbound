@@ -1,14 +1,16 @@
 # activeitem
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../activeitem.md) · [Modding guide](../../modding.md)
+
 The `activeItem` table contains bindings which provide functionality for the ActiveItem and for the item's 'owner' (a ToolUser entity currently holding the item).
 
 ---
 
 #### `void` activeItem.setInventoryIcon(`Variant<String, List<Drawable>>` icon)
 
-If **icon** is a `String` it will set the item's icon to the image at it's path, this path can be local to the item's directory, or a global path.
+If **icon** is a `String`, the item's icon uses the image at that path. The path may be relative to the item's directory or absolute.
 
-If **icon** is a `List<Drawable>` it will use those drawbles as the item's icon. Any image drawables can have their path be local to the item's directory or global as well.
+If **icon** is a `List<Drawable>`, those drawables are used as the item's icon. Image paths may also be relative to the item's directory or absolute.
 
 This behavior now matches that of an item's build parameters.
 
@@ -16,9 +18,9 @@ This behavior now matches that of an item's build parameters.
 
 #### `void` activeItem.setSecondaryIcon(`Variant<String, List<Drawable>>` icon)
 
-If **icon** is a `String` it will set the item's secondary icon to the image at it's path, this path can be local to the item's directory, or a global path.
+If **icon** is a `String`, the item's secondary icon uses the image at that path. The path may be relative to the item's directory or absolute.
 
-If **icon** is a `List<Drawable>` it will use those drawbles as the item's secondary icon. Any image drawables can have their path be local to the item's directory or global as well.
+If **icon** is a `List<Drawable>`, those drawables are used as the item's secondary icon. Image paths may also be relative to the item's directory or absolute.
 
 Secondary icons are shown in the right hand slot of two handed items.
 

@@ -1,5 +1,7 @@
 # animator
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../animator.md) · [Modding guide](../../modding.md)
+
 The `animator` table contains functions that relate to an attached networked animator. Networked animators are found in:
 
 * tech
@@ -8,7 +10,7 @@ The `animator` table contains functions that relate to an attached networked ani
 * status effects
 * active items
 
-In OSB, If a player/npc's humanoid config contains an `animation`, then they will use that instead of the hardcoded humanoid animations.
+In Asterbound, if a player/NPC's humanoid config contains an `animation`, it is used instead of the hardcoded humanoid animations.
 
 * NPCs get the animator callbacks in their main scripts.
 * Players get access to the animator callbacks in their generic script contexts.
@@ -100,11 +102,11 @@ Does not trigger a networking update. This is intended to be used in client anim
 
 #### `int` animator.animationStateFrame(`String` stateType)
 
-Returns the current frame index of the sateType.
+Returns the current frame index of the stateType.
 
 #### `int` animator.animationStateNextFrame(`String` stateType)
 
-Returns the next frame index of the sateType.
+Returns the next frame index of the stateType.
 
 #### `float` animator.animationStateFrameProgress(`String` stateType)
 

@@ -1,3 +1,7 @@
+# sb
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/utility.md) · [Modding guide](../modding.md)
+
 The sb table contains miscellaneous utility functions that don't directly relate to any assets or content of the game.
 
 ---

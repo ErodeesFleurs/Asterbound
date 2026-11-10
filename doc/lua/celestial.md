@@ -1,5 +1,7 @@
 # celestial
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The *celestial* table contains functions that relate to the client sky, flying the player ship, system positions for planets, system objects, and the celestial database. It is available in the following contexts:
 
 * script pane
@@ -39,7 +41,7 @@ SystemLocation is either of the following types: Null, CelestialCoordinate, Obje
 
 The locations are specified as a pair of type and value
 
-```
+```lua
 local system = celestial.currentSystem().location
 local location = nil -- Null
 location = {"coordinate", {location = system, planet = 1, satellite = 0}} -- CelestialCoordinate
@@ -124,7 +126,7 @@ Returns the position of the specified location in the *current system*.
 
 Returns the calculated position of the provided orbit.
 
-```
+```lua
 local orbit = {
   target = planet, -- the orbit target
   direction = 1, -- orbit direction

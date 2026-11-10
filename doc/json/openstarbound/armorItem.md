@@ -1,3 +1,7 @@
+# Armor item parameters
+
+[JSON reference](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 ## `bool` statusEffectsInCosmeticSlots
 If true enables the armor to apply its status effects even when in cosmetic slots
 

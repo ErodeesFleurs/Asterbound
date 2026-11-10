@@ -1,3 +1,7 @@
+# stagehand
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The stagehand table contains bindings specific to stagehands which are available in addition to their common tables.
 
 ---

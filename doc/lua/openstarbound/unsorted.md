@@ -1,5 +1,7 @@
 # Unsorted
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 These are functions that aren't in any specific table.
 
 ---

@@ -1,5 +1,7 @@
 # actor mcontroller
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The `mcontroller` table sometimes contains functions relating to the actor movement controller.
 
 This section of mcontroller documentation refers to the ActorMovementController lua bindings. There is other documentation referring to the mcontroller table for base MovementControllers.

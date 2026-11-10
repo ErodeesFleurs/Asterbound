@@ -1,3 +1,7 @@
+# message
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The message table contains a single function, setHandler, which allows entities to receive messages sent using world.sendEntityMessage. Entities which can receive messages include:
 
 * monster

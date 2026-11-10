@@ -1,5 +1,7 @@
 # effect
 
+[Lua API](README.md#base-api) · [Extensions](openstarbound/effect.md) · [Modding guide](../modding.md)
+
 The `effect` table relates to functions specifically for status effects.
 
 ---

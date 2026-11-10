@@ -1,5 +1,7 @@
 # tech
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The `tech` table contains functions exclusively available in tech scripts.
 
 ---

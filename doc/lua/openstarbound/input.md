@@ -1,6 +1,8 @@
 # Input
 
-The new `input` table allows access to user input from most clientside Lua scripts.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
+The `input` table allows access to user input from most client-side Lua scripts.
 
 ---
 

@@ -1,5 +1,7 @@
 # Clipboard
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The `clipboard` table is available to client-side scripts (such as script panes and interface scripts) and exposes access to the
 system clipboard while the game window is focused.
 

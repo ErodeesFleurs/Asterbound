@@ -1,5 +1,7 @@
 # Universe
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 Server-side and client-side scripts gain access to a `universe` table that exposes helpers for worlds, as well as administrative helpers for connected clients on server-side scripts.
 
 ---
@@ -18,7 +20,7 @@ Sends a message to the given connectionId's universe.
 
 #### `RpcPromise<Json>` universe.sendOwnUniverseMessage(`String` messageName, [`Json` args ...])
 
-Sends a message to the main UniverseClient on clientside or UniverseServer on serverside. Useful for threads communicating with the primary universe thread.
+Sends a message to the main UniverseClient on the client side or UniverseServer on the server side. Useful for threads communicating with the primary universe thread.
 
 --- 
 

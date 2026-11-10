@@ -1,6 +1,8 @@
 # Utility
 
-A few additional utiliy callbacks are added by OpenStarbound.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../utility.md) · [Modding guide](../../modding.md)
+
+Asterbound provides these additional utility callbacks alongside the [base `sb` API](../utility.md).
 
 ---
 

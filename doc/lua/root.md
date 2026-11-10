@@ -1,3 +1,7 @@
+# root
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/root.md) · [Modding guide](../modding.md)
+
 The `root` table contains functions that reference the game's currently loaded assets and don't relate to any more specific context such as a particular world or universe.
 
 ---
@@ -190,13 +194,13 @@ Returns the configured health value for the specified material.
 
 #### `Json` root.materialConfig(`String` materialName)
 
-Returns a JSON object containing the `path` and base `config` for the specified material if it is a real material, or `nil` if it is a metamaterial or invalid. OpenStarbound allows to retrieve this by its ID as well.
+Returns a JSON object containing the `path` and base `config` for the specified material if it is a real material, or `nil` if it is a metamaterial or invalid. The OpenStarbound-compatible extension in Asterbound also accepts its ID.
 
 ---
 
 #### `Json` root.modConfig(`String` modName)
 
-Returns a JSON object containing the `path` and base `config` for the specified mod if it is a real mod, or `nil` if it is a metamod or invalid. OpenStarbound allows to retrieve this by its ID as well.
+Returns a JSON object containing the `path` and base `config` for the specified mod if it is a real mod, or `nil` if it is a metamod or invalid. The OpenStarbound-compatible extension in Asterbound also accepts its ID.
 
 ---
 

@@ -1,5 +1,7 @@
 # npc
 
+[Lua API](README.md#base-api) · [Extensions](openstarbound/npc.md) · [Modding guide](../modding.md)
+
 The `npc` table is for functions relating directly to the current npc. It is available only in NPC scripts.
 
 ---
@@ -77,7 +79,7 @@ Makes the npc say a string. Optionally pass in tags to replace text tags. Option
 Returns whether the chat message was successfully added.
 
 Available options:
-```
+```lua
 {
   drawBorder = true,
   fontSize = 8,
@@ -94,7 +96,7 @@ Makes the npc say a line, with a portrait chat bubble. Optionally pass in tags t
 Returns whether the chat message was successfully added.
 
 Available options:
-```
+```lua
 {
   drawMoreIndicator = true,
   sound = "/sfx/humanoid/avian_chatter_male1.ogg"

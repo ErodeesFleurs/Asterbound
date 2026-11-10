@@ -1,3 +1,7 @@
+# pane (scripted panes)
+
+[Lua API](README.md#base-api) · [Extensions](openstarbound/scriptpane.md) · [Modding guide](../modding.md)
+
 These pane bindings are available to scripted interface panes and include functions not specifically related to widgets within the pane.
 
 ---

@@ -1,5 +1,7 @@
 # Songbook
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 The `songbook` table is accessible from player and NPC scripts, and from managed interface panes bound to the current player.
 
 ---

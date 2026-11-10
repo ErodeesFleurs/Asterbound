@@ -1,3 +1,7 @@
+# playerCompanions
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The playerCompanions table contains bindings used to manage player companions such as pets and crew members.
 
 ---

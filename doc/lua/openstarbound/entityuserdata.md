@@ -1,3 +1,7 @@
+# Entity userdata
+
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 This is documentation on the Entity userdata object returned by world.entity(EntityId entity).
 
 This userdata only needs to be acquired once per entity; it updates with the entity.
@@ -81,9 +85,9 @@ Returns the entity's stock of the specified currency type, or `nil` if the entit
 
 #### `unsigned` entity:hasCountOfItem(`Json` itemDescriptor, [`bool` exactMatch])
 
-Returns the nubmer of the specified item that the entity is currently carrying, or `nil` if the entity is not a player. If exactMatch is `true` then parameters as well as item name must match.
+Returns the number of the specified item that the entity is currently carrying, or `nil` if the entity is not a player. If exactMatch is `true` then parameters as well as item name must match.
 
-NOTE: This function currently does not work correctly over the network, making it inaccurate when not used from client side scripts such as status.
+NOTE: This function currently does not work correctly over the network, making it inaccurate when not used from client-side scripts such as status.
 
 ---
 

@@ -1,3 +1,7 @@
+# physics
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The physics table is available to objects and used to control any collisions or force regions configured on those objects.
 
 ---

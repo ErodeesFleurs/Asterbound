@@ -1,3 +1,7 @@
+# objectAnimator
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The objectAnimator table contains bindings available to client-side animation scripts for objects.
 
 ---

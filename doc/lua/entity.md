@@ -1,5 +1,7 @@
 # entity
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The *entity* table contains functions that are common among all entities. Every function refers to the entity the script context is running on.
 
 Accessible in:

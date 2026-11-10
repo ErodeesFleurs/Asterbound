@@ -1,3 +1,7 @@
+# pane (container panes)
+
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 These pane bindings are available to container interface panes and include functions not specifically related to widgets within the pane.
 
 ---

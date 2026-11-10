@@ -1,5 +1,7 @@
 # LocalAnimator
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../localanimator.md) · [Modding guide](../../modding.md)
+
 The `localAnimator` table has had one binding changed.
 
 ---

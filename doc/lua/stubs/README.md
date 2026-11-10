@@ -1,11 +1,13 @@
 # Lua Stub Files
 
-This directory contains Lua stub files with EmmyLua/LuaLS annotations for OpenStarbound's Lua API.
+[Lua API index](../README.md) · [Modding guide](../../modding.md)
+
+This directory contains Lua stub files with EmmyLua/LuaLS annotations for Asterbound's Lua API, including its OpenStarbound-compatible extensions.
 
 ## Purpose
 
 These stub files provide:
-- IDE autocompletion support for OpenStarbound's Lua APIs
+- IDE autocompletion support for Asterbound's Lua APIs
 - Type checking and parameter validation
 - Function documentation directly in your editor
 - Better development experience when writing mods
@@ -14,7 +16,7 @@ These stub files provide:
 
 ### In this repository
 
-Open the repository root in an editor using a Lua Language Server (LuaLS) version supporting Lua 5.5, including Zed or VS Code's [Lua extension](https://marketplace.visualstudio.com/items?itemName=sumneko.lua). The root `.luarc.json` configures Lua 5.5, OpenStarbound's nonstandard operators and Starbound's `/path/to/script.lua` asset imports. Stubs are indexed automatically; do not execute or `require` them.
+Open the repository root in an editor using a Lua Language Server (LuaLS) version supporting Lua 5.5, including Zed or VS Code's [Lua extension](https://marketplace.visualstudio.com/items?itemName=sumneko.lua). The root [`.luarc.json`](../../../.luarc.json) configures Lua 5.5, the runtime's nonstandard operators and Starbound's `/path/to/script.lua` asset imports. Stubs are indexed automatically; do not execute or `require` them.
 
 Only known engine entrypoints and JSON-configured UI callbacks are listed as diagnostic globals. Unused callback parameters are explicitly named with an `_` prefix and excluded from unused-local reports. Undefined globals, missing fields and argument type checks remain enabled.
 
@@ -36,7 +38,7 @@ Configure asset import paths relative to your mod's own asset root. The reposito
 From the repository root, with `lua-language-server` installed:
 
 ```sh
-lua-language-server --check=. --checklevel=Hint --logpath=/tmp/openstarbound-luals
+lua-language-server --check=. --checklevel=Hint --logpath=/tmp/asterbound-luals
 ```
 
 On Nix, prefix the command with `nix shell nixpkgs#lua-language-server --command`.
@@ -50,5 +52,5 @@ Update the corresponding stub and Markdown API documentation when changing an en
 - `types.lua` defines shared value and userdata types; `runtime.lua` describes injected globals and the subset of commercial asset helpers used by the bundled scripts.
 - Annotations use LuaLS syntax: `T?`, `T[]`, unions, tuple tables and multiple returns, rather than C++ `Maybe<T>`, `List<T>` or `Tuple<T...>` spellings.
 - JSON input types remain constrained to JSON values. Scripts annotate known asset schemas and command argument contracts at their use sites; arbitrary JSON is not globally treated as `any`.
-- Base and OpenStarbound extension files describe one API table, not separate runtime implementations.
+- Base and OpenStarbound-compatible extension files describe one API table, not separate runtime implementations.
 - These declarations cover multiple script contexts. An API's presence in completion does not make it available in every context; consult its documentation.

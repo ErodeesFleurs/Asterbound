@@ -532,7 +532,7 @@ public:
     auto nativeBase = m_dispatcher.invoke([&]() -> std::expected<void, StarException> {
       SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Asterbound");
       SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "io.github.erodeesfleurs.asterbound");
-      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/ErodeesFleurs/OpenStarbound");
+      SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/ErodeesFleurs/Asterbound");
       SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
       EmergencyLog::info("Application: Initializing SDL");

@@ -1,6 +1,8 @@
 # Renderer
 
-The new `renderer` table is accessible from almost every clientside script and allows configuring shaders.
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
+The `renderer` table is accessible from almost every client-side script and allows configuring shaders.
 
 Calls belong to the client application owner. Graphics-state reads and scriptable parameter writes use an ordered main-thread barrier and may wait for pending presentation. Getters observe preceding writes. A scriptable parameter type mismatch raises an error in the setter itself: `pcall` can catch it without invalidating later frames.
 

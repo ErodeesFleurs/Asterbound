@@ -1,5 +1,7 @@
 # npc
 
+[Lua API](../README.md#openstarbound-compatible-extensions) · [Base API](../npc.md) · [Modding guide](../../modding.md)
+
 The `npc` table is for functions relating directly to the current npc. It is available only in NPC scripts.
 
 ---

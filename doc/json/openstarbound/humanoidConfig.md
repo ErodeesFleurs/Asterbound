@@ -1,5 +1,7 @@
 # humanoidConfig
 
+[JSON reference](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
+
 ---
 
 ## `Vec2F` headRotationCenter
@@ -43,12 +45,12 @@ The animation must contain these stateTypes and states for some hardcoded behavi
 
 All other animation data is entirely configurable.
 
-For example, in the hardcoded humanoid animations, things like `walkBob` and `armWalkSeq` must be used and always behave in the same way, but in `/humanoid/opensb/build.lua` They are used to generate animation frame properties that imitate how retail used them, though this it not required, as the build script could do anything with its output.
+For example, the hardcoded humanoid animations require fields such as `walkBob` and `armWalkSeq` to behave in a fixed way. The bundled [`/humanoid/opensb/build.lua`](../../../assets/asterbound/humanoid/opensb/build.lua) generates animation frame properties that imitate this behavior, but a custom build script can generate different output.
 
 ## `JsonObject` stateAnimations
 Each key must be a humanoid state `idle`, `walk`, `run`, `jump`, `fall`, `swim`, `swimIdle`, `duck`, `sit`, `lay` for a JsonObject that will control what animation states defined in the animation config are triggered when each state is triggered, this is so that when connecting to a retail server, these animations will trigger locally on your client.
-here is an example
-```
+Example:
+```json
 "stateAnimations" : {
     "idle" : {
         "body" : ["idle"]
@@ -62,9 +64,9 @@ here is an example
 
 ## `JsonObject` stateAnimationsBackwards
 Same as `stateAnimations` but for when the player is moving backwards.
-here is an example.
-```
-"stateAnimations" : {
+Example:
+```json
+"stateAnimationsBackwards" : {
     "idle" : {
         "body" : ["idle"]
     },
@@ -86,7 +88,7 @@ These are never triggered on the player/npc in world, but instead in the animato
 
 ## `JsonObject` identityFramesetTags
 Key Value pairs of strings where the key is an animation tag and value is a string containing tags that will be replaced with active animation tags, these are set after identity has been set, so you could for example do
-```
+```json
 "identityFramesetTags" : {
     "bodyFrameset" : "<gender>body.png"
 }

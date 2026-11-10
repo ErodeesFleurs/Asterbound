@@ -1,5 +1,7 @@
 # status
 
+[Lua API](README.md#base-api) · [Modding guide](../modding.md)
+
 The `status` table relates to the status controller attached to an entity. It is available in:
 
 * monsters
