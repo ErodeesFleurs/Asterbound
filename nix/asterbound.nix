@@ -168,6 +168,7 @@ let
     "hash_benchmarks"
     "flat_hash_benchmarks"
     "image_benchmarks"
+    "lru_benchmarks"
     "list_benchmarks"
     "vector_benchmarks"
     "set_benchmarks"

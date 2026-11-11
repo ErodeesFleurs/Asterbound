@@ -19,13 +19,13 @@ public:
   template <typename... T>
   Spline(PointT const& e1, T const&... rest)
     : PointData(e1, rest...) {
-    m_pointCache.setMaxSize(1000);
-    m_lengthCache.setMaxSize(1000);
+    m_pointCache.set_capacity(1000);
+    m_lengthCache.set_capacity(1000);
   }
 
   Spline() : PointData(PointData::filled(PointT())) {
-    m_pointCache.setMaxSize(1000);
-    m_lengthCache.setMaxSize(1000);
+    m_pointCache.set_capacity(1000);
+    m_lengthCache.set_capacity(1000);
   }
 
   PointT pointAt(float t) const {
@@ -47,7 +47,7 @@ public:
       intermediates = std::move(temp);
     }
 
-    m_pointCache.set(t, intermediates[0]);
+    m_pointCache.insert_or_assign(t, intermediates[0]);
     return intermediates[0];
   }
 
@@ -86,7 +86,7 @@ public:
     }
 
     if (!begin)
-      m_lengthCache.set(end, res);
+      m_lengthCache.insert_or_assign(end, res);
 
     return res;
   }

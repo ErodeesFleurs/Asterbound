@@ -215,6 +215,7 @@ The target list above also includes benchmarks outside this focused catalog.
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Eleven cases: rejected/accepted raw/formatted messages, one/four sinks, four persistent native callers, real file lines and unobserved/observed/capacity-bound spatial logs. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | 28 cases: new `try_emplace`/const-pair insertion, expensive duplicate map/set insertion, full-hash-collision rehash, hit/miss lookup, inline-value churn, retained-capacity clear/reuse and sparse iteration. |
 | Images | `./result/bin/image_benchmarks --benchmark_filter='Image/'` | 52 sprite/large cases: ownership, fill, clipped paste/source-over, crops, channel widths, full/windowed scalers, partial-alpha borders, aligned/offset/aliased masks and blends, color sequences, small directive outputs, traversal and libpng encode/decode. |
+| LRU/TTL caches | `./result/bin/lru_benchmarks --benchmark_filter='^(Lru|Ttl)/'` | 52 cases: ordered/hash LRU hit, const peek, full miss, duplicate update, insert-then-trim and capacity shrink at 64/256/1000/20000 entries; hash TTL refresh on/off and keep/drop cleanup at 256 entries. |
 
 ### Batch accounting and correctness oracles
 
@@ -230,9 +231,10 @@ batch count for amortized per-item cost:
 | `logging_benchmarks` | Labels specify 64 messages, 256 concurrent messages or 192 mixed spatial objects. Concurrent timing uses process CPU time and includes wakeup/completion. |
 | `flat_hash_benchmarks` | Labels give N entries/queries; churn counts 2N erase/insert operations and rehash counts N relocated residents. Divide batch CPU time accordingly. |
 | `image_benchmarks` | One operation/sequence per iteration; labels state timed ownership and retained reset work. Workload throughput counts processed pixels; the constant-foldable RGB alpha control counts reductions, not memory traffic or frames. |
+| `lru_benchmarks` | N operations/entries per sweep; `ShrinkHalf` counts N/2 evicted entries. Shrink/drop reset is untimed. String keys and shared immutable payloads are prebuilt; payload construction, FPS and single-call latency are not measured. |
 
 Fixture setup and complete-result validation are untimed for byte, line, I/O,
-logging, flat hash and image benchmarks. Preserve their independent checks and labels:
+logging, flat hash, image and LRU/TTL benchmarks. Preserve their independent checks and labels:
 
 - **Bytes:** deterministic input and complete-result fingerprints; independent
   byte oracles check signed zeros, NaN payloads, raw guards and post-loop results.
@@ -253,6 +255,7 @@ logging, flat hash and image benchmarks. Preserve their independent checks and l
   implicit alpha is always 255, so report reductions, not memory throughput or
   per-pixel traversal gains. The frozen comparison consumer retains its original
   labels/counters; normalize that control as one reduction per iteration.
+- **LRU/TTL caches:** validate complete ordered key snapshots and every payload field before/after timing, with content fingerprints and exact producer counts. Full-miss and insert/trim cases alternate disjoint windows, then normalize the untimed final state so labels do not depend on calibration parity. Preserve soft capacity and the production allocator. TTL uses seeded randomness, future-deadline hits and already-expired keep/drop cleanup; refresh/cleanup mutation is escaped through a compiler barrier. Run the same frozen consumer against isolated old/new modules, require matching labels on every row, and retain A/A drift and regressions.
 
 ### Comparable measurements
 

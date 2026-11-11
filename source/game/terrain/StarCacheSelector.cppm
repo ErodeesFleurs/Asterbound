@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<CacheSelector>, StarException> CacheSelector::crea
   auto cacheSize = config.getUInt("lruCacheSize", 20000);
   if (!cacheSize)
     return std::unexpected(std::move(cacheSize.error()));
-  result->m_cache.setMaxSize(*cacheSize);
+  result->m_cache.set_capacity(*cacheSize);
   return result;
 }
 

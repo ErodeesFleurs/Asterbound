@@ -45,11 +45,11 @@ struct TilePainterPerformanceAccess {
       TilePainter& painter, WorldCamera const& camera, WorldRenderData& data) {
     auto terrain = painter.m_pendingTerrainChunks;
     auto liquid = painter.m_pendingLiquidChunks;
-    auto textures = painter.m_textureCache.currentSize();
+    auto textures = painter.m_textureCache.size();
     auto failed = painter.setup(camera, data);
     if (failed)
       return std::unexpected(StarException("Tile failure fixture unexpectedly succeeded"));
-    if (painter.m_textureCache.currentSize() <= textures)
+    if (painter.m_textureCache.size() <= textures)
       return std::unexpected(StarException("Tile failure occurred before exercising a texture miss"));
     if (!painter.m_setupTextures.empty() || painter.m_pendingTerrainChunks != terrain
         || painter.m_pendingLiquidChunks != liquid)

@@ -255,7 +255,7 @@ std::expected<std::shared_ptr<WormCaveSelector>, StarException> WormCaveSelector
   auto cacheSize = config.getUInt("lruCacheSize", 16);
   if (!cacheSize)
     return std::unexpected(std::move(cacheSize.error()));
-  result->m_cache.setMaxSize(*cacheSize);
+  result->m_cache.set_capacity(*cacheSize);
   return result;
 }
 

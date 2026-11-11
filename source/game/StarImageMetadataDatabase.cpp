@@ -45,12 +45,12 @@ ImageMetadataDatabase::ImageMetadataDatabase(Root& root)
   std::lock_guard locker(m_mutex);
   std::chrono::milliseconds timeSmear(2000);
   std::chrono::milliseconds timeToLive(60000);
-  m_sizeCache.setTimeSmear(timeSmear);
-  m_spacesCache.setTimeSmear(timeSmear);
-  m_regionCache.setTimeSmear(timeSmear);
-  m_sizeCache.setTimeToLive(timeToLive);
-  m_spacesCache.setTimeToLive(timeToLive);
-  m_regionCache.setTimeToLive(timeToLive);
+  m_sizeCache.set_time_smear(timeSmear);
+  m_spacesCache.set_time_smear(timeSmear);
+  m_regionCache.set_time_smear(timeSmear);
+  m_sizeCache.set_time_to_live(timeToLive);
+  m_spacesCache.set_time_to_live(timeToLive);
+  m_regionCache.set_time_to_live(timeToLive);
 }
 
 std::expected<Vec2U, StarException> ImageMetadataDatabase::imageSize(AssetPath const& path) const {
@@ -65,7 +65,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::imageSize(AssetPath c
   if (!size)
     return std::unexpected(std::move(size.error()));
   locker.lock();
-  auto stored = m_sizeCache.set(path, *size);
+  auto stored = m_sizeCache.insert_or_assign(path, *size);
   if (!stored)
     return std::unexpected(std::move(stored.error()));
   return *size;
@@ -88,7 +88,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
-    auto stored = m_spacesCache.set(key, (*filteredCached)->get());
+    auto stored = m_spacesCache.insert_or_assign(key, (*filteredCached)->get());
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     return (*filteredCached)->get();
@@ -155,10 +155,10 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   }
 
   locker.lock();
-  auto stored = m_spacesCache.set(key, spaces);
+  auto stored = m_spacesCache.insert_or_assign(key, spaces);
   if (!stored)
     return std::unexpected(std::move(stored.error()));
-  auto filteredStored = m_spacesCache.set(filteredKey, spaces);
+  auto filteredStored = m_spacesCache.insert_or_assign(filteredKey, spaces);
   if (!filteredStored)
     return std::unexpected(std::move(filteredStored.error()));
 
@@ -179,7 +179,7 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
   if (!filteredCached)
     return std::unexpected(std::move(filteredCached.error()));
   if (*filteredCached) {
-    auto stored = m_regionCache.set(path, (*filteredCached)->get());
+    auto stored = m_regionCache.insert_or_assign(path, (*filteredCached)->get());
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     return (*filteredCached)->get();
@@ -224,10 +224,10 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
   }
 
   locker.lock();
-  auto stored = m_regionCache.set(path, region);
+  auto stored = m_regionCache.insert_or_assign(path, region);
   if (!stored)
     return std::unexpected(std::move(stored.error()));
-  auto filteredStored = m_regionCache.set(filteredPath, region);
+  auto filteredStored = m_regionCache.insert_or_assign(filteredPath, region);
   if (!filteredStored)
     return std::unexpected(std::move(filteredStored.error()));
 
@@ -321,7 +321,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
         imageSize = *size;
       }
       locker.lock();
-      auto stored = m_sizeCache.set(path.basePath, imageSize);
+      auto stored = m_sizeCache.insert_or_assign(path.basePath, imageSize);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }

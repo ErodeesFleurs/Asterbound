@@ -845,7 +845,7 @@ std::expected<void, StarException> WorldTemplate::initialize() {
   m_customTerrainBlendWeight = *weight;
   auto cacheSize = m_templateConfig.getInt("blockCacheSize");
   if (!cacheSize) return std::unexpected(std::move(cacheSize.error()));
-  m_blockCache.setMaxSize(*cacheSize);
+  m_blockCache.set_capacity(*cacheSize);
   m_geometry = Vec2U(2048, 2048);
   m_seed = this->root().random().randu64();
   return {};

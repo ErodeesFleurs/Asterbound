@@ -778,7 +778,7 @@ public:
       return std::unexpected(std::move(result.error()));
     m_renderer = std::make_shared<ThreadedRenderer>(m_glRenderer, m_dispatcher);
 
-    m_cursorCache.setTimeToLive(std::chrono::milliseconds(30000));
+    m_cursorCache.set_time_to_live(std::chrono::milliseconds(30000));
 
     IMGUI_CHECKVERSION();
     m_imguiContext.reset(ImGui::CreateContext());

@@ -127,10 +127,10 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
   auto chunkTimeout = chunkTimeoutJson->toInt();
   if (!chunkTimeout)
     return std::unexpected(std::move(chunkTimeout.error()));
-  painter->m_terrainChunkCache.setTimeToLive(std::chrono::milliseconds(*chunkTimeout));
-  painter->m_terrainChunkCache.setTimeSmear(std::chrono::milliseconds(static_cast<int>(*chunkTimeout / 4)));
-  painter->m_liquidChunkCache.setTimeToLive(std::chrono::milliseconds(*chunkTimeout));
-  painter->m_liquidChunkCache.setTimeSmear(std::chrono::milliseconds(static_cast<int>(*chunkTimeout / 4)));
+  painter->m_terrainChunkCache.set_time_to_live(std::chrono::milliseconds(*chunkTimeout));
+  painter->m_terrainChunkCache.set_time_smear(std::chrono::milliseconds(static_cast<int>(*chunkTimeout / 4)));
+  painter->m_liquidChunkCache.set_time_to_live(std::chrono::milliseconds(*chunkTimeout));
+  painter->m_liquidChunkCache.set_time_smear(std::chrono::milliseconds(static_cast<int>(*chunkTimeout / 4)));
 
   auto textureTimeoutJson = (*assets)->json("/rendering.config:textureTimeout");
   if (!textureTimeoutJson)
@@ -138,7 +138,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
   auto textureTimeout = textureTimeoutJson->toInt();
   if (!textureTimeout)
     return std::unexpected(std::move(textureTimeout.error()));
-  painter->m_textureCache.setTimeToLive(std::chrono::milliseconds(*textureTimeout));
+  painter->m_textureCache.set_time_to_live(std::chrono::milliseconds(*textureTimeout));
 
   auto liquids = root.liquidsDatabase();
   if (!liquids)

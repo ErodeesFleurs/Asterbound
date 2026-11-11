@@ -824,7 +824,7 @@ std::expected<void, StarException> CelestialMasterDatabase::updateParameters(
   auto stored = storeVersionedChunk(index, *versioned);
   if (!stored)
     return std::unexpected(std::move(stored.error()));
-  m_chunkCache.remove(index);
+  m_chunkCache.erase(index);
   return {};
 }
 
@@ -1248,7 +1248,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::pushResponses(List<Ce
   for (auto& response : responses) {
     if (auto chunk = response.maybeLeftRef()) {
       m_pendingChunkRequests.remove(chunk->get().chunkIndex);
-      auto stored = m_chunkCache.set(chunk->get().chunkIndex, std::move(chunk->get()));
+      auto stored = m_chunkCache.insert_or_assign(chunk->get().chunkIndex, std::move(chunk->get()));
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     } else if (auto objects = response.maybeRightRef()) {
@@ -1461,7 +1461,7 @@ void CelestialSlaveDatabase::invalidateCacheFor(CelestialCoordinate const& coord
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
 
-  m_chunkCache.remove(chunkIndexFor(coordinate));
+  m_chunkCache.erase(chunkIndexFor(coordinate));
 }
 
 }

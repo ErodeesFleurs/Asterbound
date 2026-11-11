@@ -30,7 +30,7 @@ namespace Star {
     m_headFreeIndexBlock = InvalidBlockIndex;
     m_keySize = 0;
     m_autoCommit = true;
-    m_indexCache.setMaxSize(64);
+    m_indexCache.set_capacity(64);
     m_root = InvalidBlockIndex;
     m_rootIsLeaf = false;
     m_usingAltRoot = false;
@@ -96,12 +96,12 @@ namespace Star {
 
   std::uint32_t BTreeDatabase::indexCacheSize() const {
     std::lock_guard lock(m_indexCacheSpinLock);
-    return m_indexCache.maxSize();
+    return m_indexCache.capacity();
   }
 
   void BTreeDatabase::setIndexCacheSize(std::uint32_t indexCacheSize) {
     std::lock_guard lock(m_indexCacheSpinLock);
-    m_indexCache.setMaxSize(indexCacheSize);
+    m_indexCache.set_capacity(indexCacheSize);
   }
 
   bool BTreeDatabase::autoCommit() const {
@@ -757,7 +757,7 @@ namespace Star {
     }
 
     lock.lock();
-    parent.m_indexCache.set(pointer, index);
+    parent.m_indexCache.insert_or_assign(pointer, index);
     return index;
   }
 
@@ -798,7 +798,7 @@ namespace Star {
       if (!parent.m_uncommitted.contains(index->self)) {
 
         parent.freeBlock(index->self);
-        parent.m_indexCache.remove(index->self);
+        parent.m_indexCache.erase(index->self);
         index->self = InvalidBlockIndex;
       }
     }
@@ -838,12 +838,12 @@ namespace Star {
     auto result246 = parent.updateBlock(index->self, buffer.data());
     if (!result246) return std::unexpected(std::move(result246.error()));
 
-    parent.m_indexCache.set(index->self, index);
+    parent.m_indexCache.insert_or_assign(index->self, index);
     return index->self;
   }
 
   void BTreeDatabase::BTreeImpl::deleteIndex(Index index) {
-    parent.m_indexCache.remove(index->self);
+    parent.m_indexCache.erase(index->self);
     parent.freeBlock(index->self);
   }
 

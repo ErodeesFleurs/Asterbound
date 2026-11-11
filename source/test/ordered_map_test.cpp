@@ -351,79 +351,201 @@ TEST(OrderedMap, FirstExtractionHandlesEmptyAndSingleEntry) {
   check.template operator()<OrderedHashMap<int, std::unique_ptr<int>>>();
 }
 
-TEST(LruCache, HitsRetainEntriesAndDoNotProduce) {
-  HashLruCache<int, int> cache(1);
-  unsigned calls = 0;
-  auto produce = [&](int const& key) { ++calls; return key * 10; };
-  auto first = cache.get(7, produce);
-  ASSERT_TRUE(first);
-  EXPECT_EQ(first->get(), 70);
-  auto hit = cache.get(7, produce);
-  ASSERT_TRUE(hit);
-  EXPECT_EQ(hit->get(), 70);
-  EXPECT_EQ(calls, 1u);
-  cache.setMaxSize(2);
-  cache.set(8, 80);
-  auto second = cache.get(8, produce);
-  ASSERT_TRUE(second);
-  EXPECT_EQ(second->get(), 80);
-  EXPECT_EQ(cache.currentSize(), 2u);
-  EXPECT_EQ(cache.keys(), (List<int>{7, 8}));
-}
+namespace {
+struct StatefulCacheProducer {
+  std::unique_ptr<int> calls = std::make_unique<int>(0);
+  explicit operator bool() const { return false; }
+  int operator()(int const& key) & {
+    ++*calls;
+    return key * 10;
+  }
+};
 
-TEST(LruCache, MissEvictsLeastRecentAndPreservesFailureOrdering) {
-  HashLruCache<int, int> cache(2);
-  cache.set(1, 10);
-  cache.set(2, 20);
-  auto hit = cache.get(1, [](int const&) { return -1; });
-  ASSERT_TRUE(hit);
-  EXPECT_EQ(hit->get(), 10);
-  auto miss = cache.get(3, [](int const& key) { return key * 10; });
-  ASSERT_TRUE(miss);
-  EXPECT_EQ(miss->get(), 30);
-  EXPECT_EQ(cache.keys(), (List<int>{1, 3}));
-  auto failure = cache.get(4, [](int const&) -> std::expected<int, StarException> {
-    return std::unexpected(StarException("producer"));
-  });
-  ASSERT_FALSE(failure);
-  EXPECT_TRUE(failure.error().is<StarException>());
-  EXPECT_NE(std::string_view(failure.error().what()).find("producer"), std::string_view::npos);
-  EXPECT_EQ(cache.keys(), (List<int>{3}));
-  cache.set(5, 50);
-  cache.setMaxSize(0);
-  EXPECT_EQ(cache.maxSize(), 1u);
-  EXPECT_EQ(cache.keys(), (List<int>{5}));
-}
+struct WrongCacheProducer {
+  std::expected<long, StarException> operator()(int const&) const;
+};
 
-TEST(LruCache, BorrowsMutableNoncopyableCallbacks) {
-  struct Producer {
-    std::unique_ptr<int> calls = std::make_unique<int>(0);
-    int operator()(int const& key) { ++*calls; return key * 10; }
-  } producer;
-  HashLruCache<int, int> cache(2);
-  auto first = cache.get(1, producer);
-  ASSERT_TRUE(first);
-  EXPECT_EQ(first->get(), 10);
-  auto hit = cache.get(1, producer);
-  ASSERT_TRUE(hit);
-  EXPECT_EQ(hit->get(), 10);
-  EXPECT_EQ(*producer.calls, 1);
-  cache.set(2, 20);
-  auto filter = [state = std::make_unique<int>(0)](int const& key, int& value) mutable {
-    ++*state;
-    value += 1;
-    return key == 1;
+struct WrongCacheError {
+  std::expected<int, int> operator()(int const&) const;
+};
+
+struct VoidCacheProducer {
+  void operator()(int const&) const;
+};
+
+static_assert(cache_producer<StatefulCacheProducer, int, int>);
+static_assert(cache_producer<StatefulCacheProducer&, int, int>);
+static_assert(!cache_producer<WrongCacheProducer, int, int>);
+static_assert(!cache_producer<WrongCacheError, int, int>);
+static_assert(!cache_producer<VoidCacheProducer, int, int>);
+}// namespace
+
+TEST(LruCache, HitsAndMutableLookupsTouchButConstObservationDoesNot) {
+  auto check = []<typename Cache>() {
+    Cache cache(3);
+    unsigned calls = 0;
+    auto produce = [&](int const& key) {
+      ++calls;
+      return key * 10;
+    };
+    for (int key : {1, 2, 3})
+      ASSERT_TRUE(cache.get(key, produce));
+    auto hit = cache.get(1, produce);
+    ASSERT_TRUE(hit);
+    EXPECT_EQ(hit->get(), 10);
+    EXPECT_EQ(calls, 3u);
+    EXPECT_EQ(cache.keys(), (List<int>{2, 3, 1}));
+    auto observed = std::as_const(cache).find_ref(2);
+    ASSERT_TRUE(observed);
+    EXPECT_EQ(observed->get(), 20);
+    EXPECT_EQ(cache.keys(), (List<int>{2, 3, 1}));
+    ASSERT_TRUE(cache.find_ref(3));
+    EXPECT_EQ(cache.keys(), (List<int>{2, 1, 3}));
+    ASSERT_TRUE(cache.get(4, produce));
+    EXPECT_EQ(cache.keys(), (List<int>{1, 3, 4}));
+    EXPECT_FALSE(std::as_const(cache).find_ref(2));
   };
-  cache.removeWhere(filter);
-  ASSERT_TRUE(cache.find_ref(2));
-  EXPECT_EQ(cache.find_ref(2)->get(), 21);
-  EXPECT_EQ(cache.keys(), (List<int>{2}));
+  check.template operator()<LruCache<int, int>>();
+  check.template operator()<HashLruCache<int, int>>();
+}
+
+TEST(LruCache, ProducerFailureAndEmptyProducerEvictBeforeReturningFailure) {
+  auto check = []<typename Cache>() {
+    Cache cache(2);
+    cache.insert_or_assign(1, 10);
+    cache.insert_or_assign(2, 20);
+    bool called = false;
+    auto failure = cache.get(3, [&](int const&) -> std::expected<int, StarException> {
+      called = true;
+      EXPECT_EQ(cache.keys(), (List<int>{2}));
+      return std::unexpected(StarException("producer"));
+    });
+    ASSERT_FALSE(failure);
+    EXPECT_TRUE(failure.error().template is<StarException>());
+    EXPECT_TRUE(called);
+    EXPECT_EQ(cache.keys(), (List<int>{2}));
+    cache.insert_or_assign(4, 40);
+    std::function<int(int const&)> empty;
+    EXPECT_FALSE(cache.get(5, empty));
+    EXPECT_EQ(cache.keys(), (List<int>{4}));
+    cache.set_capacity(0);
+    EXPECT_EQ(cache.capacity(), 1u);
+    EXPECT_EQ(cache.size(), 1u);
+  };
+  check.template operator()<LruCache<int, int>>();
+  check.template operator()<HashLruCache<int, int>>();
+}
+
+TEST(LruCache, ReentrantProducerKeepsExistingSameKeyAndDoesNotRetrimOtherKeys) {
+  auto check = []<typename Cache>() {
+    Cache cache(1);
+    cache.insert_or_assign(1, 10);
+    auto same = cache.get(2, [&](int const& key) {
+      EXPECT_EQ(cache.size(), 0u);
+      cache.insert_or_assign(key, 200);
+      return 20;
+    });
+    ASSERT_TRUE(same);
+    EXPECT_EQ(same->get(), 200);
+    EXPECT_EQ(cache.keys(), (List<int>{2}));
+    auto different = cache.get(3, [&](int const&) {
+      EXPECT_EQ(cache.size(), 0u);
+      cache.insert_or_assign(4, 40);
+      return 30;
+    });
+    ASSERT_TRUE(different);
+    EXPECT_EQ(different->get(), 30);
+    EXPECT_EQ(cache.size(), 2u);
+    EXPECT_EQ(cache.keys(), (List<int>{4, 3}));
+    ASSERT_TRUE(cache.get(4, [](int const&) { return -1; }));
+    EXPECT_EQ(cache.size(), 2u);
+    EXPECT_EQ(cache.keys(), (List<int>{3, 4}));
+  };
+  check.template operator()<LruCache<int, int>>();
+  check.template operator()<HashLruCache<int, int>>();
+}
+
+TEST(LruCache, InsertOrAssignPreservesBorrowsAndIsNotAHardCapacityLimit) {
+  auto check = []<typename Cache>() {
+    Cache cache(2);
+    cache.insert_or_assign(1, 10);
+    auto borrowed = cache.find_ref(1);
+    ASSERT_TRUE(borrowed);
+    auto& value = borrowed->get();
+    for (int key = 2; key <= 1100; ++key)
+      cache.insert_or_assign(key, key * 10);
+    EXPECT_EQ(value, 10);
+    EXPECT_EQ(cache.size(), 1100u);
+    cache.insert_or_assign(1, 100);
+    EXPECT_EQ(value, 100);
+    EXPECT_EQ(std::addressof(value), std::addressof(cache.find_ref(1)->get()));
+    cache.set_capacity(2);
+    EXPECT_EQ(cache.keys(), (List<int>{1100, 1}));
+    EXPECT_EQ(value, 100);
+    EXPECT_TRUE(cache.erase(1100));
+    EXPECT_FALSE(cache.erase(1100));
+    EXPECT_EQ(cache.values(), (List<int>{100}));
+  };
+  check.template operator()<LruCache<int, int>>();
+  check.template operator()<HashLruCache<int, int>>();
+}
+
+TEST(LruCache, BorrowsStatefulFalseLikeNoncopyableCallbacks) {
+  auto check = []<typename Cache>() {
+    StatefulCacheProducer producer;
+    Cache cache(2);
+    auto first = cache.get(1, producer);
+    ASSERT_TRUE(first);
+    EXPECT_EQ(first->get(), 10);
+    ASSERT_TRUE(cache.get(1, producer));
+    EXPECT_EQ(*producer.calls, 1);
+    cache.insert_or_assign(2, 20);
+    auto filter = [state = std::make_unique<int>(0)](int const& key, int& value) mutable {
+      ++*state;
+      value += 1;
+      return key == 1;
+    };
+    static_assert(cache_filter<decltype(filter), int, int>);
+    cache.erase_if(filter);
+    ASSERT_TRUE(cache.find_ref(2));
+    EXPECT_EQ(cache.find_ref(2)->get(), 21);
+    EXPECT_EQ(cache.keys(), (List<int>{2}));
+  };
+  check.template operator()<LruCache<int, int>>();
+  check.template operator()<HashLruCache<int, int>>();
+}
+
+TEST(LruCache, MoveOnlyValuesAndProducersRetainOwnershipOnHits) {
+  auto check = []<typename Cache>() {
+    Cache cache(2);
+    auto producer = [value = std::make_unique<int>(42)](int const&) mutable { return std::move(value); };
+    auto first = cache.get(1, producer);
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(first->get());
+    EXPECT_EQ(*first->get(), 42);
+    auto hit = cache.get(1, producer);
+    ASSERT_TRUE(hit);
+    ASSERT_TRUE(hit->get());
+    EXPECT_EQ(*hit->get(), 42);
+    cache.insert_or_assign(2, std::make_unique<int>(20));
+    cache.insert_or_assign(1, std::make_unique<int>(100));
+    EXPECT_EQ(*first->get(), 100);
+    auto expected_producer =
+      [value = std::make_unique<int>(30)](int const&) mutable -> std::expected<std::unique_ptr<int>, StarException> {
+      return std::move(value);
+    };
+    auto third = cache.get(3, expected_producer);
+    ASSERT_TRUE(third);
+    ASSERT_TRUE(third->get());
+    EXPECT_EQ(*third->get(), 30);
+    EXPECT_EQ(cache.keys(), (List<int>{1, 3}));
+  };
+  check.template operator()<LruCache<int, std::unique_ptr<int>>>();
+  check.template operator()<HashLruCache<int, std::unique_ptr<int>>>();
 }
 
 TEST(TtlCache, MoveOnlyProducerAndOptionalRefreshFilters) {
-  auto randomResult = RandomService::create();
-  ASSERT_TRUE(randomResult);
-  auto& random = **randomResult;
+  RandomService random(123);
   HashTtlCache<int, int> cache(random, std::chrono::milliseconds(-1), std::chrono::milliseconds(0), 4, false);
   auto produced = cache.get(1, [value = std::make_unique<int>(42)](int const&) mutable { return *value; });
   ASSERT_TRUE(produced);
@@ -432,6 +554,7 @@ TEST(TtlCache, MoveOnlyProducerAndOptionalRefreshFilters) {
     explicit operator bool() const { return false; }
     bool operator()(int const&, int const&) { return true; }
   } refresh;
+  static_assert(cache_filter<Refresh, int, int const>);
   cache.cleanup(refresh);
   auto retained = cache.find_ref(1);
   ASSERT_TRUE(retained);
@@ -440,12 +563,12 @@ TEST(TtlCache, MoveOnlyProducerAndOptionalRefreshFilters) {
   std::function<bool(int const&, int const&)> empty;
   cache.cleanup(empty);
   EXPECT_TRUE(cache.keys().empty());
-  ASSERT_TRUE(cache.set(2, 20));
+  ASSERT_TRUE(cache.insert_or_assign(2, 20));
   bool (*nullFilter)(int const&, int const&) = nullptr;
   cache.cleanup(nullFilter);
   EXPECT_TRUE(cache.keys().empty());
-  ASSERT_TRUE(cache.set(3, 30));
-  cache.cleanup({});
+  ASSERT_TRUE(cache.insert_or_assign(3, 30));
+  cache.cleanup();
   EXPECT_TRUE(cache.keys().empty());
 }
 
@@ -456,27 +579,27 @@ TEST(TtlCache, FailedSmearRetainsProducedEntryAndRetriesZeroTimestamp) {
   auto produce = [&](int const&) { ++calls; return 42; };
 
   EXPECT_FALSE(cache.get(1, produce));
-  EXPECT_EQ(cache.currentSize(), 1u);
+  EXPECT_EQ(cache.size(), 1u);
   auto retained = std::as_const(cache).find_ref(1);
   ASSERT_TRUE(retained);
   EXPECT_EQ(retained->get(), 42);
   EXPECT_FALSE(cache.get(1, produce));
   EXPECT_EQ(calls, 1u);
 
-  cache.setTimeSmear(std::chrono::milliseconds(0));
+  cache.set_time_smear(std::chrono::milliseconds(0));
   auto initialized = cache.get(1, produce);
   ASSERT_TRUE(initialized);
   EXPECT_EQ(initialized->get(), 42);
-  cache.setTimeSmear(std::chrono::milliseconds(-1));
+  cache.set_time_smear(std::chrono::milliseconds(-1));
   auto hit = cache.get(1, produce);
   ASSERT_TRUE(hit);
   EXPECT_EQ(hit->get(), 42);
   EXPECT_EQ(calls, 1u);
 
-  cache.setTtlUpdateEnabled(true);
+  cache.set_ttl_update_enabled(true);
   EXPECT_FALSE(cache.find_ref(1));
-  EXPECT_FALSE(cache.set(1, 99));
-  EXPECT_FALSE(cache.set(2, 20));
+  EXPECT_FALSE(cache.insert_or_assign(1, 99));
+  EXPECT_FALSE(cache.insert_or_assign(2, 20));
   retained = std::as_const(cache).find_ref(1);
   ASSERT_TRUE(retained);
   EXPECT_EQ(retained->get(), 42);
@@ -496,5 +619,92 @@ TEST(TtlCache, CleanupRefreshInitializesTimestampWithoutSamplingSmear) {
   EXPECT_EQ(hit->get(), 42);
   EXPECT_EQ(calls, 1u);
   cache.cleanup();
-  EXPECT_EQ(cache.currentSize(), 0u);
+  EXPECT_EQ(cache.size(), 0u);
+}
+
+TEST(TtlCache, ConstObservationAndDisabledRefreshDoNotConsumeSmearRandomness) {
+  RandomService random(123), expected(123);
+  HashTtlCache<int, int> cache(random, std::chrono::hours(1), std::chrono::milliseconds(17), 2, false);
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  ASSERT_TRUE(expected.randInt(-17, 17));
+  ASSERT_TRUE(std::as_const(cache).find_ref(1));
+  ASSERT_TRUE(cache.find_ref(1));
+  ASSERT_TRUE(cache.get(1, [](int const&) { return -1; }));
+  cache.cleanup([](int const&, int const&) { return true; });
+  EXPECT_EQ(random.randu64(), expected.randu64());
+  cache.set_ttl_update_enabled(true);
+  ASSERT_TRUE(cache.find_ref(1));
+  ASSERT_TRUE(expected.randInt(-17, 17));
+  ASSERT_TRUE(cache.get(1, [](int const&) { return -1; }));
+  ASSERT_TRUE(expected.randInt(-17, 17));
+  EXPECT_EQ(random.randu64(), expected.randu64());
+}
+
+TEST(LruCache, MutableHashAndContextualEqualityKeepLookupAndEvictionValid) {
+  struct Hash {
+    std::size_t operator()(int const& value) { return std::hash<int>{}(value); }
+  };
+  struct Decision {
+    bool value;
+    explicit operator bool() const { return value; }
+  };
+  struct Equal {
+    Decision operator()(int const& left, int const& right) { return {left == right}; }
+  };
+  HashLruCache<int, int, Hash, Equal> cache(2);
+  cache.insert_or_assign(1, 10);
+  cache.insert_or_assign(2, 20);
+  ASSERT_TRUE(std::as_const(cache).find_ref(1));
+  auto hit = cache.get(1, [](int const&) { return -1; });
+  ASSERT_TRUE(hit);
+  EXPECT_EQ(hit->get(), 10);
+  ASSERT_TRUE(cache.get(3, [](int const&) { return 30; }));
+  EXPECT_FALSE(cache.find_ref(2));
+  ASSERT_TRUE(cache.find_ref(3));
+  EXPECT_EQ(cache.find_ref(3)->get(), 30);
+}
+
+TEST(TtlCache, NullableProducerFailsWithoutCallingAndCanBeReusedAfterRebinding) {
+  struct Producer {
+    bool empty = true;
+    unsigned calls = 0;
+    bool operator==(std::nullptr_t) const { return empty; }
+    int operator()(int const& key) {
+      ++calls;
+      return key * 10;
+    }
+  } producer;
+  RandomService random(123);
+  HashTtlCache<int, int> cache(random, std::chrono::hours(1), std::chrono::milliseconds(0), 1, false);
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  EXPECT_FALSE(cache.get(2, producer));
+  EXPECT_EQ(producer.calls, 0u);
+  EXPECT_FALSE(cache.find_ref(1).value());
+  producer.empty = false;
+  auto produced = cache.get(2, producer);
+  ASSERT_TRUE(produced);
+  EXPECT_EQ(produced->get(), 20);
+  EXPECT_EQ(producer.calls, 1u);
+}
+
+TEST(LruCache, GetOnlyValuesDoNotRequireAssignment) {
+  struct Value {
+    explicit Value(int input) : number(input) {}
+    Value(Value&&) = default;
+    Value& operator=(Value&&) = delete;
+    int number;
+  };
+  HashLruCache<int, Value> lru(1);
+  auto first = lru.get(1, [](int const& key) { return Value(key * 10); });
+  ASSERT_TRUE(first);
+  EXPECT_EQ(first->get().number, 10);
+  auto next = lru.get(2, [](int const& key) { return Value(key * 10); });
+  ASSERT_TRUE(next);
+  EXPECT_FALSE(lru.find_ref(1));
+  EXPECT_EQ(next->get().number, 20);
+  RandomService random(123);
+  HashTtlCache<int, Value> ttl(random, std::chrono::hours(1), std::chrono::milliseconds(0), 1, false);
+  auto produced = ttl.get(3, [](int const& key) { return Value(key * 10); });
+  ASSERT_TRUE(produced);
+  EXPECT_EQ(produced->get().number, 30);
 }

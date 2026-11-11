@@ -420,7 +420,7 @@ struct Fixture<Pool, Workload> {
         return false;
       benchmark::DoNotOptimize(miss->get());
     }
-    return entries.currentSize() == capacity;
+    return entries.size() == capacity;
   }
   void clear() { entries.clear(); }
 };
@@ -481,7 +481,7 @@ struct Fixture<Pool, Shape::StatisticsPayload> {
       auto returnedMiss = miss->get();
       benchmark::DoNotOptimize(returnedMiss);
     }
-    return entries.currentSize() == capacity && produced - before == capacity;
+    return entries.size() == capacity && produced - before == capacity;
   }
 
   void clear() { entries.clear(); }

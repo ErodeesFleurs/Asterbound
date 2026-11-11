@@ -127,11 +127,11 @@ std::expected<std::shared_ptr<KarstCaveSelector>, StarException> KarstCaveSelect
   auto layerCacheSize = config.getUInt("layerPerlinsCacheSize", 16);
   if (!layerCacheSize)
     return std::unexpected(std::move(layerCacheSize.error()));
-  result->m_layerPerlinsCache.setMaxSize(*layerCacheSize);
+  result->m_layerPerlinsCache.set_capacity(*layerCacheSize);
   auto sectorCacheSize = config.getUInt("sectorCacheSize", 16);
   if (!sectorCacheSize)
     return std::unexpected(std::move(sectorCacheSize.error()));
-  result->m_sectorCache.setMaxSize(*sectorCacheSize);
+  result->m_sectorCache.set_capacity(*sectorCacheSize);
   return result;
 }
 

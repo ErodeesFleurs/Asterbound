@@ -12,81 +12,134 @@ import star.random;
 import star.algorithm;
 namespace Star {
 
-template <typename LruCacheType>
-class TtlCacheBase {
+using ttl_timestamp = std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>;
+
+template <typename Value>
+concept ttl_cache_value = cache_value<Value>;
+
+template <ttl_cache_value Value> using ttl_entry = std::pair<ttl_timestamp, Value>;
+
+template <typename Storage>
+concept ttl_storage =
+  requires {
+    typename Storage::key_type;
+    typename Storage::mapped_type::second_type;
+    requires ttl_cache_value<typename Storage::mapped_type::second_type>;
+    requires std::same_as<typename Storage::mapped_type, ttl_entry<typename Storage::mapped_type::second_type>>;
+  }
+  && requires(Storage& storage, Storage const& const_storage, typename Storage::key_type const& key,
+              std::size_t capacity,
+              std::function<typename Storage::mapped_type(typename Storage::key_type const&)> producer,
+              std::function<bool(typename Storage::key_type const&, typename Storage::mapped_type&)> filter) {
+       Storage{};
+       { const_storage.capacity() } -> std::same_as<std::size_t>;
+       { storage.set_capacity(capacity) } -> std::same_as<void>;
+       { const_storage.size() } -> std::same_as<std::size_t>;
+       { storage.find_ref(key) } -> std::same_as<std::optional<std::reference_wrapper<typename Storage::mapped_type>>>;
+       {
+         const_storage.find_ref(key)
+       } -> std::same_as<std::optional<std::reference_wrapper<typename Storage::mapped_type const>>>;
+       {
+         storage.get(key, producer)
+       } -> std::same_as<std::expected<std::reference_wrapper<typename Storage::mapped_type>, StarException>>;
+       { storage.erase(key) } -> std::same_as<bool>;
+       { storage.erase_if(filter) } -> std::same_as<void>;
+       { storage.clear() } -> std::same_as<void>;
+     };
+
+template <typename Storage>
+concept ttl_key_snapshot =
+  ttl_storage<Storage> && std::is_copy_constructible_v<typename Storage::key_type> && requires(Storage const& storage) {
+    { storage.keys() } -> std::same_as<List<typename Storage::key_type>>;
+  };
+
+template <typename Storage>
+concept ttl_value_snapshot = ttl_storage<Storage> && std::is_copy_constructible_v<typename Storage::mapped_type>
+  && requires(Storage const& storage) {
+       { storage.values() } -> std::same_as<List<typename Storage::mapped_type>>;
+     };
+
+template <typename Storage>
+concept ttl_assignable_storage = ttl_storage<Storage>
+  && requires(Storage& storage, typename Storage::key_type const& key, typename Storage::mapped_type entry) {
+       { storage.insert_or_assign(key, std::move(entry)) } -> std::same_as<void>;
+     };
+
+template <ttl_storage LruCacheType> class TtlCacheBase {
 public:
-  using Key = typename LruCacheType::Key;
-  using Value = typename LruCacheType::Value::second_type;
+  using key_type = typename LruCacheType::key_type;
+  using mapped_type = typename LruCacheType::mapped_type::second_type;
 
   explicit TtlCacheBase(RandomService& random);
-  TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear = std::chrono::milliseconds(1000), std::size_t maxSize = NPos, bool ttlUpdateEnabled = true);
+  TtlCacheBase(RandomService& random, std::chrono::milliseconds time_to_live,
+               std::chrono::milliseconds time_smear = std::chrono::milliseconds(1000), std::size_t capacity = NPos,
+               bool ttl_update_enabled = true);
 
-  std::chrono::milliseconds timeToLive() const;
-  void setTimeToLive(std::chrono::milliseconds timeToLive);
+  std::chrono::milliseconds time_to_live() const;
+  void set_time_to_live(std::chrono::milliseconds time_to_live);
 
-  std::chrono::milliseconds timeSmear() const;
-  void setTimeSmear(std::chrono::milliseconds timeSmear);
+  std::chrono::milliseconds time_smear() const;
+  void set_time_smear(std::chrono::milliseconds time_smear);
 
-  // If a max size is set, this cache also acts as an LRU cache with the given
-  // maximum size.
-  std::size_t maxSize() const;
-  void setMaxSize(std::size_t maxSize = NPos);
+  // A finite capacity also enables least-recently-used eviction on get misses.
+  std::size_t capacity() const;
+  void set_capacity(std::size_t capacity = NPos);
 
-  std::size_t currentSize() const;
+  std::size_t size() const;
 
-  List<Key> keys() const;
-  List<Value> values() const;
+  List<key_type> keys() const
+    requires ttl_key_snapshot<LruCacheType>;
+  List<mapped_type> values() const
+    requires ttl_value_snapshot<LruCacheType>;
 
-  // If ttlUpdateEnabled is false, then the time to live for entries will not
-  // be updated on access.
-  bool ttlUpdateEnabled() const;
-  void setTtlUpdateEnabled(bool enabled);
+  // If disabled, accessing an entry does not refresh its time to live.
+  bool ttl_update_enabled() const;
+  void set_ttl_update_enabled(bool enabled);
 
-  // If the value is in the cache, returns it and updates the access time,
-  // otherwise returns an empty optional.
-  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Value>>, StarException> find_ref(Key const& key);
-  std::optional<std::reference_wrapper<Value const>> find_ref(Key const& key) const;
+  // A mutable lookup marks the entry as accessed and optionally refreshes TTL.
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<mapped_type>>, StarException>
+  find_ref(key_type const& key);
+  std::optional<std::reference_wrapper<mapped_type const>> find_ref(key_type const& key) const;
 
-  // Put the given value into the cache.
-  [[nodiscard]] std::expected<void, StarException> set(Key const& key, Value value);
-  // Removes the given value from the cache.  If found and removed, returns
-  // true.
-  bool remove(Key const& key);
+  // Insertion does not trim capacity; get misses and set_capacity do.
+  [[nodiscard]] std::expected<void, StarException> insert_or_assign(key_type const& key, mapped_type value)
+    requires ttl_assignable_storage<LruCacheType>;
+  bool erase(key_type const& key);
 
-  // Remove all key / value pairs matching a filter.
   template <typename Filter>
-    requires std::is_invocable_r_v<bool, Filter&, Key const&, Value&>
-  void removeWhere(Filter&& filter);
+    requires cache_filter<Filter, key_type, mapped_type>
+  void erase_if(Filter&& filter);
 
-  // If the value for the key is not found in the cache, produce it with the
-  // given producer.  Producer should take the key as an argument and return
-  // the Value.
   template <typename Producer>
-    requires std::invocable<Producer&, Key const&>
-  [[nodiscard]] std::expected<std::reference_wrapper<Value>, StarException> get(Key const& key, Producer&& producer);
+    requires cache_producer<Producer, key_type, mapped_type>
+  [[nodiscard]] std::expected<std::reference_wrapper<mapped_type>, StarException> get(key_type const& key,
+                                                                                      Producer&& producer);
 
   void clear();
 
-  // Cleanup any cached entries that are older than their time to live, if the
-  // refreshFilter is given, things that match the refreshFilter instead have
-  // their ttl refreshed rather than being removed.
-  void cleanup(std::nullptr_t = nullptr);
+  // Expiration is enforced only here. Matching refresh filters refresh TTL
+  // instead of removing entries, without sampling random smear.
+  void cleanup();
   template <typename Filter>
-    requires std::is_invocable_r_v<bool, Filter&, Key const&, Value const&>
-  void cleanup(Filter&& refreshFilter);
+    requires cache_filter<Filter, key_type, mapped_type const>
+  void cleanup(Filter&& refresh_filter);
 
 private:
-  template <typename Filter>
-  static bool refreshFilterPresent(Filter const& filter) {
-    if constexpr (std::is_pointer_v<Filter> || std::is_member_pointer_v<Filter>)
-      return filter != nullptr;
+  using entry_type = typename LruCacheType::mapped_type;
+
+  template <typename Callback>
+    requires cache_filter<Callback, key_type, mapped_type const>
+  static bool callback_present(Callback const& callback) {
+    if constexpr (std::is_pointer_v<Callback> || std::is_member_pointer_v<Callback>)
+      return callback != nullptr;
     else
       return true;
   }
 
   template <typename Result, typename... Args>
-  static bool refreshFilterPresent(std::function<Result(Args...)> const& filter) {
-    return static_cast<bool>(filter);
+    requires cache_filter<std::function<Result(Args...)>, key_type, mapped_type const>
+  static bool callback_present(std::function<Result(Args...)> const& callback) {
+    return static_cast<bool>(callback);
   }
 
   // The owning service must outlive this cache.
@@ -98,188 +151,201 @@ private:
   bool m_ttlUpdateEnabled;
 };
 
-template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>>, 1024>>
-using TtlCache = TtlCacheBase<LruCache<Key, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, Compare, Allocator>>;
+template <typename Key, ttl_cache_value Value, typename Compare = std::less<Key>,
+          typename Allocator = BlockAllocator<std::pair<Key const, ttl_entry<Value>>, 1024>>
+  requires requires { typename LruCache<Key, ttl_entry<Value>, Compare, Allocator>; }
+using TtlCache = TtlCacheBase<LruCache<Key, ttl_entry<Value>, Compare, Allocator>>;
 
-template <typename Key, typename Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = BlockAllocator<std::pair<Key const, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>>, 1024>>
-using HashTtlCache = TtlCacheBase<HashLruCache<Key, std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, Hash, Equals, Allocator>>;
+template <typename Key, ttl_cache_value Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>,
+          typename Allocator = BlockAllocator<std::pair<Key const, ttl_entry<Value>>, 1024>>
+  requires requires { typename HashLruCache<Key, ttl_entry<Value>, Hash, Equals, Allocator>; }
+using HashTtlCache = TtlCacheBase<HashLruCache<Key, ttl_entry<Value>, Hash, Equals, Allocator>>;
 
-template <typename LruCacheType>
+template <ttl_storage LruCacheType>
 TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random)
-  : TtlCacheBase(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(1000), NPos, true) {}
+    : TtlCacheBase(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(1000), NPos, true) {}
 
-template <typename LruCacheType>
-TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::chrono::milliseconds timeToLive, std::chrono::milliseconds timeSmear, std::size_t maxSize, bool ttlUpdateEnabled)
-  : m_random(random) {
-  m_cache.setMaxSize(maxSize);
-  m_timeToLive = timeToLive;
-  m_timeSmear = timeSmear;
-  m_ttlUpdateEnabled = ttlUpdateEnabled;
+template <ttl_storage LruCacheType>
+TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::chrono::milliseconds time_to_live,
+                                         std::chrono::milliseconds time_smear, std::size_t capacity,
+                                         bool ttl_update_enabled)
+    : m_random(random) {
+  m_cache.set_capacity(capacity);
+  m_timeToLive = time_to_live;
+  m_timeSmear = time_smear;
+  m_ttlUpdateEnabled = ttl_update_enabled;
 }
 
-template <typename LruCacheType>
-std::chrono::milliseconds TtlCacheBase<LruCacheType>::timeToLive() const {
+template <ttl_storage LruCacheType> std::chrono::milliseconds TtlCacheBase<LruCacheType>::time_to_live() const {
   return m_timeToLive;
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setTimeToLive(std::chrono::milliseconds timeToLive) {
-  m_timeToLive = timeToLive;
+template <ttl_storage LruCacheType>
+void TtlCacheBase<LruCacheType>::set_time_to_live(std::chrono::milliseconds time_to_live) {
+  m_timeToLive = time_to_live;
 }
 
-template <typename LruCacheType>
-std::chrono::milliseconds TtlCacheBase<LruCacheType>::timeSmear() const {
+template <ttl_storage LruCacheType> std::chrono::milliseconds TtlCacheBase<LruCacheType>::time_smear() const {
   return m_timeSmear;
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setTimeSmear(std::chrono::milliseconds timeSmear) {
-  m_timeSmear = timeSmear;
+template <ttl_storage LruCacheType>
+void TtlCacheBase<LruCacheType>::set_time_smear(std::chrono::milliseconds time_smear) {
+  m_timeSmear = time_smear;
 }
 
-template <typename LruCacheType>
-bool TtlCacheBase<LruCacheType>::ttlUpdateEnabled() const {
+template <ttl_storage LruCacheType> bool TtlCacheBase<LruCacheType>::ttl_update_enabled() const {
   return m_ttlUpdateEnabled;
 }
 
-template <typename LruCacheType>
-std::size_t TtlCacheBase<LruCacheType>::maxSize() const {
-  return m_cache.maxSize();
+template <ttl_storage LruCacheType> std::size_t TtlCacheBase<LruCacheType>::capacity() const {
+  return m_cache.capacity();
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setMaxSize(std::size_t maxSize) {
-  m_cache.setMaxSize(maxSize);
+template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::set_capacity(std::size_t capacity) {
+  m_cache.set_capacity(capacity);
 }
 
-template <typename LruCacheType>
-std::size_t TtlCacheBase<LruCacheType>::currentSize() const {
-  return m_cache.currentSize();
-}
+template <ttl_storage LruCacheType> std::size_t TtlCacheBase<LruCacheType>::size() const { return m_cache.size(); }
 
-template <typename LruCacheType>
-auto TtlCacheBase<LruCacheType>::keys() const -> List<Key> {
+template <ttl_storage LruCacheType>
+auto TtlCacheBase<LruCacheType>::keys() const -> List<key_type>
+  requires ttl_key_snapshot<LruCacheType>
+{
   return m_cache.keys();
 }
 
-template <typename LruCacheType>
-auto TtlCacheBase<LruCacheType>::values() const -> List<Value> {
-  List<Value> values;
-  for (auto& p : m_cache.values())
-    values.push_back(std::move(p.second));
+template <ttl_storage LruCacheType>
+auto TtlCacheBase<LruCacheType>::values() const -> List<mapped_type>
+  requires ttl_value_snapshot<LruCacheType>
+{
+  List<mapped_type> values;
+  for (auto& entry : m_cache.values())
+    values.push_back(std::move(entry.second));
   return values;
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::setTtlUpdateEnabled(bool enabled) {
+template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::set_ttl_update_enabled(bool enabled) {
   m_ttlUpdateEnabled = enabled;
 }
 
-template <typename LruCacheType>
-[[nodiscard]] auto TtlCacheBase<LruCacheType>::find_ref(Key const& key)
-  -> std::expected<std::optional<std::reference_wrapper<Value>>, StarException> {
-  if (auto p = m_cache.find_ref(key)) {
+template <ttl_storage LruCacheType>
+[[nodiscard]] auto TtlCacheBase<LruCacheType>::find_ref(key_type const& key)
+  -> std::expected<std::optional<std::reference_wrapper<mapped_type>>, StarException> {
+  if (auto entry = m_cache.find_ref(key)) {
     if (m_ttlUpdateEnabled) {
       auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
       if (!smear)
         return std::unexpected(std::move(smear.error()));
-      p->get().first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear);
+      entry->get().first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
+                                                                                   + std::chrono::microseconds(500))
+        + std::chrono::milliseconds(*smear);
     }
-    return std::optional{std::reference_wrapper<Value>(p->get().second)};
+    return std::optional{std::reference_wrapper<mapped_type>(entry->get().second)};
   }
   return std::nullopt;
 }
 
-template <typename LruCacheType>
-auto TtlCacheBase<LruCacheType>::find_ref(Key const& key) const -> std::optional<std::reference_wrapper<Value const>> {
-  if (auto value = m_cache.find_ref(key))
-    return std::reference_wrapper<Value const>(value->get().second);
+template <ttl_storage LruCacheType>
+auto TtlCacheBase<LruCacheType>::find_ref(key_type const& key) const
+  -> std::optional<std::reference_wrapper<mapped_type const>> {
+  if (auto entry = m_cache.find_ref(key))
+    return std::reference_wrapper<mapped_type const>(entry->get().second);
   return std::nullopt;
 }
 
-template <typename LruCacheType>
-[[nodiscard]] std::expected<void, StarException> TtlCacheBase<LruCacheType>::set(Key const& key, Value value) {
+template <ttl_storage LruCacheType>
+[[nodiscard]] std::expected<void, StarException> TtlCacheBase<LruCacheType>::insert_or_assign(key_type const& key,
+                                                                                              mapped_type value)
+  requires ttl_assignable_storage<LruCacheType>
+{
   auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
   if (!smear)
     return std::unexpected(std::move(smear.error()));
-  m_cache.set(key, std::make_pair(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear), std::move(value)));
+  m_cache.insert_or_assign(key,
+                           entry_type(std::chrono::time_point_cast<std::chrono::milliseconds>(
+                                        std::chrono::steady_clock::now() + std::chrono::microseconds(500))
+                                        + std::chrono::milliseconds(*smear),
+                                      std::move(value)));
   return {};
 }
 
-template <typename LruCacheType>
-bool TtlCacheBase<LruCacheType>::remove(Key const& key) {
-  return m_cache.remove(key);
+template <ttl_storage LruCacheType> bool TtlCacheBase<LruCacheType>::erase(key_type const& key) {
+  return m_cache.erase(key);
 }
 
-template <typename LruCacheType>
+template <ttl_storage LruCacheType>
 template <typename Filter>
-  requires std::is_invocable_r_v<bool, Filter&, typename LruCacheType::Key const&, typename LruCacheType::Value::second_type&>
-void TtlCacheBase<LruCacheType>::removeWhere(Filter&& filter) {
-  m_cache.removeWhere([&filter](auto const& key, auto& value) { return std::invoke(filter, key, value.second); });
+  requires cache_filter<Filter, typename LruCacheType::key_type, typename LruCacheType::mapped_type::second_type>
+void TtlCacheBase<LruCacheType>::erase_if(Filter&& filter) {
+  m_cache.erase_if(
+    [&filter](key_type const& key, entry_type& entry) { return std::invoke(filter, key, entry.second); });
 }
 
-template <typename LruCacheType>
+template <ttl_storage LruCacheType>
 template <typename Producer>
-  requires std::invocable<Producer&, typename LruCacheType::Key const&>
-[[nodiscard]] auto TtlCacheBase<LruCacheType>::get(Key const& key, Producer&& producer) -> std::expected<std::reference_wrapper<Value>, StarException> {
-  auto result = m_cache.get(key, [&producer](Key const& key) -> std::expected<std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>, StarException> {
-      if constexpr (!std::is_function_v<std::remove_reference_t<Producer>> && requires { producer == nullptr; }) {
-        if (producer == nullptr)
-          return std::unexpected(StarException("Cannot invoke an empty cache producer"));
-      }
-      if constexpr (std::same_as<std::invoke_result_t<Producer&, Key const&>, std::expected<Value, StarException>>) {
-        auto produced = std::invoke(producer, key);
-        if (!produced)
-          return std::unexpected(std::move(produced.error()));
-        return std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>(std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{}, std::move(*produced));
-      } else {
-        return std::pair<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, Value>(std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{}, std::invoke(producer, key));
-      }
-    });
+  requires cache_producer<Producer, typename LruCacheType::key_type, typename LruCacheType::mapped_type::second_type>
+[[nodiscard]] auto TtlCacheBase<LruCacheType>::get(key_type const& key, Producer&& producer)
+  -> std::expected<std::reference_wrapper<mapped_type>, StarException> {
+  auto result = m_cache.get(key, [&producer](key_type const& key) -> std::expected<entry_type, StarException> {
+    if constexpr (!std::is_function_v<std::remove_reference_t<Producer>> && requires { producer == nullptr; }) {
+      if (producer == nullptr)
+        return std::unexpected(StarException("Cannot invoke an empty cache producer"));
+    }
+    if constexpr (std::same_as<std::invoke_result_t<Producer&, key_type const&>,
+                               std::expected<mapped_type, StarException>>) {
+      auto produced = std::invoke(producer, key);
+      if (!produced)
+        return std::unexpected(std::move(produced.error()));
+      return entry_type(ttl_timestamp{}, std::move(*produced));
+    } else {
+      return entry_type(ttl_timestamp{}, std::invoke(producer, key));
+    }
+  });
   if (!result)
     return std::unexpected(std::move(result.error()));
-  auto& value = result->get();
-  if (value.first == std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>{} || m_ttlUpdateEnabled) {
+  auto& entry = result->get();
+  if (entry.first == ttl_timestamp{} || m_ttlUpdateEnabled) {
     auto smear = m_random.get().randInt(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
     if (!smear)
       return std::unexpected(std::move(smear.error()));
-    value.first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*smear);
+    entry.first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
+                                                                          + std::chrono::microseconds(500))
+      + std::chrono::milliseconds(*smear);
   }
-  return std::reference_wrapper<Value>(value.second);
+  return std::reference_wrapper<mapped_type>(entry.second);
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::clear() {
-  m_cache.clear();
+template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::clear() { m_cache.clear(); }
+
+template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::cleanup() {
+  cleanup([](key_type const&, mapped_type const&) { return false; });
 }
 
-template <typename LruCacheType>
-void TtlCacheBase<LruCacheType>::cleanup(std::nullptr_t) {
-  cleanup([](Key const&, Value const&) { return false; });
-}
-
-template <typename LruCacheType>
+template <ttl_storage LruCacheType>
 template <typename Filter>
-  requires std::is_invocable_r_v<bool, Filter&, typename LruCacheType::Key const&, typename LruCacheType::Value::second_type const&>
-void TtlCacheBase<LruCacheType>::cleanup(Filter&& refreshFilter) {
-  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  m_cache.removeWhere([&](auto const& key, auto& value) {
-      if (refreshFilterPresent(refreshFilter) && std::invoke(refreshFilter, key, std::as_const(value.second))) {
-        value.first = currentTime;
-      } else {
-        if (currentTime - value.first > m_timeToLive)
-          return true;
-      }
-      return false;
-    });
+  requires cache_filter<Filter, typename LruCacheType::key_type, typename LruCacheType::mapped_type::second_type const>
+void TtlCacheBase<LruCacheType>::cleanup(Filter&& refresh_filter) {
+  auto current_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
+                                                                              + std::chrono::microseconds(500));
+  m_cache.erase_if([&](key_type const& key, entry_type& entry) {
+    if (callback_present(refresh_filter) && std::invoke(refresh_filter, key, std::as_const(entry.second))) {
+      entry.first = current_time;
+    } else {
+      if (current_time - entry.first > m_timeToLive)
+        return true;
+    }
+    return false;
+  });
 }
-
 }
 
 export module star.ttl_cache;
 
 export namespace Star {
-  using ::Star::TtlCacheBase;
-  using ::Star::TtlCache;
-  using ::Star::HashTtlCache;
+using ::Star::HashTtlCache;
+using ::Star::ttl_cache_value;
+using ::Star::ttl_storage;
+using ::Star::TtlCache;
+using ::Star::TtlCacheBase;
 }
