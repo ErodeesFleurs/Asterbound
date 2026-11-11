@@ -407,7 +407,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       auto assetImage = image(path);
       if (!assetImage)
         return std::unexpected(std::move(assetImage.error()));
-      if ((*assetImage)->bytesPerPixel() == 3)
+      if ((*assetImage)->bytes_per_pixel() == 3)
         return (*assetImage)->convert(PixelFormat::RGBA32);
       return **assetImage;
     });
@@ -1848,7 +1848,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
     auto device = file->get().source->open(file->get().sourceName);
     if (!device)
       return std::unexpected(std::move(device.error()));
-    auto decoded = Image::readPng(m_logger, std::move(*device));
+    auto decoded = Image::read_png(m_logger, std::move(*device));
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     image = std::make_shared<Image>(std::move(*decoded));
@@ -2247,9 +2247,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     StringList referencePaths;
     for (auto const& directives : path.directives.list())
       directives.loadOperations();
-    path.directives.forEach([&](auto const& entry, Directives const&) {
-      addImageOperationReferences(entry.operation, referencePaths);
-    });
+    path.directives.forEach(
+      [&](auto const& entry, Directives const&) { add_image_operation_references(entry.operation, referencePaths); });
     for (auto const& ref : referencePaths) {
       auto components = AssetPath::split(ref);
       if (auto valid = validatePath(components, true, false); !valid)
@@ -2265,7 +2264,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       references[ref] = image.image;
     }
     return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto image = path.directives.applyNewImage(
+      auto image = path.directives.apply_new_image(
         *source.image,
         [&](String const& ref) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
           if (auto reference = references.find_ref(ref))
@@ -2303,7 +2302,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     if (!frame)
       return std::unexpected(AssetException(Star::format("No such frame {} in frames spec {}", *path.subPath, source.frames->framesFile)));
     return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto image = source.image->subImage(Vec2U(frame->get().xMin(), source.image->height() - frame->get().yMax()), frame->get().size());
+      auto image = source.image->sub_image(Vec2U(frame->get().xMin(), source.image->height() - frame->get().yMax()),
+                                           frame->get().size());
       if (!image)
         return std::unexpected(std::move(image.error()));
       auto data = std::make_shared<ImageData>();

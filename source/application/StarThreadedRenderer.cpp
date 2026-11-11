@@ -202,7 +202,7 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
     return std::ref(writing().append(operation));
   }
   static void copyImage(Image& destination, ImageView source) {
-    if (destination.size() != source.size || destination.pixelFormat() != source.format)
+    if (destination.size() != source.size || destination.pixel_format() != source.format)
       destination.reset(source.size, source.format);
     std::copy_n(source.data.begin(), destination.data().size(), destination.data().begin());
   }

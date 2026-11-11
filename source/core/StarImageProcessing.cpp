@@ -20,10 +20,10 @@ import star.vector;
 import star.math_common;
 namespace Star {
 
-std::expected<StringList, StarException> colorDirectivesFromConfig(JsonArray const& directives) {
+std::expected<StringList, StarException> color_directives_from_config(JsonArray const& directives) {
   StringList result;
   for (auto const& entry : directives) {
-    auto text = entry.type() == Json::Type::Object ? paletteSwapDirectivesFromConfig(entry) : entry.toString();
+    auto text = entry.type() == Json::Type::Object ? palette_swap_directives_from_config(entry) : entry.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
     result.push_back(std::move(*text));
@@ -31,7 +31,7 @@ std::expected<StringList, StarException> colorDirectivesFromConfig(JsonArray con
   return result;
 }
 
-std::expected<String, StarException> paletteSwapDirectivesFromConfig(Json const& swaps) {
+std::expected<String, StarException> palette_swap_directives_from_config(Json const& swaps) {
   ColorReplaceImageOperation paletteSwaps;
   auto object = swaps.iterateObject();
   if (!object)
@@ -48,18 +48,18 @@ std::expected<String, StarException> paletteSwapDirectivesFromConfig(Json const&
       return std::unexpected(std::move(to.error()));
     paletteSwaps.colorReplaceMap[from->toRgba()] = to->toRgba();
   }
-  return "?" + imageOperationToString(paletteSwaps);
+  return "?" + image_operation_to_string(paletteSwaps);
 }
 
-HueShiftImageOperation HueShiftImageOperation::hueShiftDegrees(float degrees) {
+HueShiftImageOperation HueShiftImageOperation::hue_shift_degrees(float degrees) {
   return HueShiftImageOperation{degrees / 360.0f};
 }
 
-SaturationShiftImageOperation SaturationShiftImageOperation::saturationShift100(float amount) {
+SaturationShiftImageOperation SaturationShiftImageOperation::saturation_shift_100(float amount) {
   return SaturationShiftImageOperation{amount / 100.0f};
 }
 
-BrightnessMultiplyImageOperation BrightnessMultiplyImageOperation::brightnessMultiply100(float amount) {
+BrightnessMultiplyImageOperation BrightnessMultiplyImageOperation::brightness_multiply_100(float amount) {
   return BrightnessMultiplyImageOperation{amount / 100.0f + 1.0f};
 }
 
@@ -76,7 +76,7 @@ FadeToColorImageOperation::FadeToColorImageOperation(Vec3B color, float amount) 
   }
 }
 
-ImageOperation imageOperationFromString(StringView string) {
+ImageOperation image_operation_from_string(StringView string) {
   // Directives have an ASCII grammar; preserve non-ASCII reference bytes.
   std::string_view text = string.utf8();
   auto firstDelimiter = text.find_first_of("=;");
@@ -227,11 +227,11 @@ ImageOperation imageOperationFromString(StringView string) {
     if (!value)
       return error(std::move(value.error()));
     if (type == "hueshift")
-      return HueShiftImageOperation::hueShiftDegrees(*value);
+      return HueShiftImageOperation::hue_shift_degrees(*value);
     if (type == "saturation")
-      return SaturationShiftImageOperation::saturationShift100(*value);
+      return SaturationShiftImageOperation::saturation_shift_100(*value);
     if (type == "brightness")
-      return BrightnessMultiplyImageOperation::brightnessMultiply100(*value);
+      return BrightnessMultiplyImageOperation::brightness_multiply_100(*value);
     auto second = bits.size() > 2 ? lexical_cast<float>(bits[2]) : value;
     if (!second)
       return error(std::move(second.error()));
@@ -242,7 +242,7 @@ ImageOperation imageOperationFromString(StringView string) {
   return NullImageOperation{};
 }
 
-String imageOperationToString(ImageOperation const& operation) {
+String image_operation_to_string(ImageOperation const& operation) {
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
     return Star::format("hueshift={}", op->get().hueShiftAmount * 360.0f);
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
@@ -302,7 +302,9 @@ String imageOperationToString(ImageOperation const& operation) {
   return "";
 }
 
-std::expected<void, StarException> parseImageOperations(StringView params, std::function<std::expected<void, StarException>(ImageOperation&&)> outputter) {
+std::expected<void, StarException>
+parse_image_operations(StringView params,
+                       std::function<std::expected<void, StarException>(ImageOperation&&)> outputter) {
   if (!outputter)
     return std::unexpected(ImageOperationException("Missing image operation output callback"));
   auto text = params.utf8();
@@ -311,7 +313,7 @@ std::expected<void, StarException> parseImageOperations(StringView params, std::
     if (end == std::string_view::npos)
       end = text.size();
     if (end != begin) {
-      auto result = outputter(imageOperationFromString(text.substr(begin, end - begin)));
+      auto result = outputter(image_operation_from_string(text.substr(begin, end - begin)));
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
@@ -320,7 +322,7 @@ std::expected<void, StarException> parseImageOperations(StringView params, std::
   return {};
 }
 
-List<ImageOperation> parseImageOperations(StringView params) {
+List<ImageOperation> parse_image_operations(StringView params) {
   List<ImageOperation> operations;
   auto text = params.utf8();
   for (std::size_t begin = 0; begin < text.size();) {
@@ -328,31 +330,34 @@ List<ImageOperation> parseImageOperations(StringView params) {
     if (end == std::string_view::npos)
       end = text.size();
     if (end != begin)
-      operations.push_back(imageOperationFromString(text.substr(begin, end - begin)));
+      operations.push_back(image_operation_from_string(text.substr(begin, end - begin)));
     begin = end + 1;
   }
   return operations;
 }
 
-String printImageOperations(List<ImageOperation> const& list) {
-  return StringList(list.transformed(imageOperationToString)).join("?");
+String print_image_operations(List<ImageOperation> const& list) {
+  return StringList(list.transformed(image_operation_to_string)).join("?");
 }
 
-void addImageOperationReferences(ImageOperation const& operation, StringList& out) {
+void add_image_operation_references(ImageOperation const& operation, StringList& out) {
   if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt))
     out.append_range(op->get().maskImages);
   else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt))
     out.append_range(op->get().blendImages);
 }
 
-StringList imageOperationReferences(List<ImageOperation> const& operations) {
+StringList image_operation_references(List<ImageOperation> const& operations) {
   StringList references;
   for (auto const& operation : operations)
-    addImageOperationReferences(operation, references);
+    add_image_operation_references(operation, references);
   return references;
 }
 
 namespace {
+template <typename Function>
+concept pixel_color_transform = requires(Function& function, Vec4B const& pixel) { Vec4B(function(pixel)); };
+
 // Keys are internal-format bytes, including alpha. Transparent HSV pixels never
 // enter the cache, so zero is an unused key.
 struct RecentColors {
@@ -366,7 +371,7 @@ struct RecentColors {
       | std::uint32_t(pixel[3]) << 24;
   }
 
-  template <typename Function> void apply(Vec4B& pixel, Function&& compute) {
+  template <pixel_color_transform Function> void apply(Vec4B& pixel, Function&& compute) {
     auto key = pack(pixel);
     auto& entry = entries[(key * 2654435761u) >> 24];
     if (entry.in != key) {
@@ -381,9 +386,9 @@ struct RecentColors {
 };
 }// namespace
 
-static void processSaturationShift(Image& image, SaturationShiftImageOperation const& op) {
+static void process_saturation_shift(Image& image, SaturationShiftImageOperation const& op) {
   RecentColors recent;
-  image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+  image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
     if (pixel[3] != 0) {
       recent.apply(pixel, [&op](Vec4B const& input) {
         Color color = Color::rgba(input);
@@ -414,7 +419,7 @@ struct PixelRect {
 };
 
 // Four-byte images only: keep the map's internal channel order and one-step replacements.
-static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, PixelRect rect) {
+static void replace_colors(ColorReplaceMap const& replaceMap, Image& image, PixelRect rect) {
   if (replaceMap.empty() || rect.empty())
     return;
   if (std::uint64_t(rect.x1 - rect.x0) * (rect.y1 - rect.y0) < 1024) {
@@ -450,23 +455,25 @@ static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, Pixel
   std::uint32_t lastIn = 0, lastOut = 0;
   bool haveLast = false;
   for (auto y = rect.y0; y < rect.y1; ++y) {
-    auto row = data.data() + (std::size_t(y) * image.width() + rect.x0) * 4;
-    for (auto x = rect.x0; x < rect.x1; ++x) {
-      auto destination = row + std::size_t(x - rect.x0) * 4;
-      std::uint32_t input;
-      std::memcpy(&input, destination, 4);
+    auto row = data.subspan((std::size_t(y) * image.width() + rect.x0) * 4, std::size_t(rect.x1 - rect.x0) * 4);
+    auto destination = row.begin();
+    for (auto x = rect.x0; x < rect.x1; ++x, std::advance(destination, 4)) {
+      std::array<std::uint8_t, 4> inputBytes;
+      std::ranges::copy_n(destination, 4, inputBytes.begin());
+      auto input = std::bit_cast<std::uint32_t>(inputBytes);
       if (haveLast && input == lastIn) {
-        std::memcpy(destination, &lastOut, 4);
+        std::ranges::copy(std::bit_cast<std::array<std::uint8_t, 4>>(lastOut), destination);
         continue;
       }
       Vec4B pixel;
-      std::memcpy(pixel.data(), &input, 4);
+      std::ranges::copy(inputBytes, pixel.begin());
       auto output = input;
       auto bit = bitFor(pixel);
       if ((bits[bit >> 6] >> (bit & 63)) & 1) {
         if (auto replacement = replaceMap.maybe(pixel)) {
-          std::memcpy(&output, replacement->data(), 4);
-          std::memcpy(destination, &output, 4);
+          std::ranges::copy(*replacement, inputBytes.begin());
+          output = std::bit_cast<std::uint32_t>(inputBytes);
+          std::ranges::copy(inputBytes, destination);
         }
       }
       lastIn = input;
@@ -476,68 +483,133 @@ static void replaceColors(ColorReplaceMap const& replaceMap, Image& image, Pixel
   }
 }
 
+// Built after all reference callbacks: callbacks may change a previously returned
+// image. Iterators still observe target aliases and each pixel's final commit.
+struct PreparedImageReference {
+  std::reference_wrapper<Image const> image;
+  std::span<std::uint8_t const>::iterator data;
+  unsigned width = 0, height = 0, channels = 0;
+  std::size_t stride = 0;
+
+  explicit PreparedImageReference(Image const& source) : image(source) {}
+
+  void prepare() {
+    data = image.get().data().begin();
+    width = image.get().width();
+    height = image.get().height();
+    channels = image.get().bytes_per_pixel();
+    stride = std::size_t(width) * channels;
+  }
+
+  Vec4B read(unsigned x, unsigned y) const {
+    if (channels == 4) {
+      Vec4B pixel;
+      std::ranges::copy_n(std::next(data, std::size_t(y) * stride + std::size_t(x) * 4), 4, pixel.begin());
+      return pixel;
+    }
+    if (channels == 3) {
+      auto pixel = std::next(data, std::size_t(y) * stride + std::size_t(x) * 3);
+      return Vec4B(pixel[0], pixel[1], pixel[2], 255);
+    }
+    return *image.get().get(Vec2U(x, y));
+  }
+
+  std::uint8_t alpha(Vec2U position) const {
+    // Match clamp's signed-coordinate behavior, even for unsigned positions.
+    auto x = std::max(0, int(position[0])), y = std::max(0, int(position[1]));
+    if (channels == 4)
+      return *std::next(data, std::size_t(y) * stride + std::size_t(x) * 4 + 3);
+    if (channels == 3)
+      return 255;
+    return image.get().clamp(Vec2I(position))[3];
+  }
+};
+
+template <int Mode>
+concept blend_kernel_mode = Mode == BlendImageOperation::Multiply || Mode == BlendImageOperation::Screen || Mode == -1;
+
 // Resolve only this operation's references, before changing any of its pixels.
-static std::expected<PixelRect, StarException> applyBlend(BlendImageOperation const& op, Image& image,
-                                                          ImageReferenceCallback const& refCallback) {
+static std::expected<PixelRect, StarException> apply_blend(BlendImageOperation const& op, Image& image,
+                                                           ImageReferenceCallback const& refCallback) {
   if (op.blendImages.empty())
     return PixelRect{};
   if (!refCallback)
     return std::unexpected(ImageOperationException("Missing image ref callback during BlendImageOperation"));
 
-  List<std::reference_wrapper<Image const>> blendImages;
+  List<PreparedImageReference> sources;
+  sources.reserve(op.blendImages.size());
   for (auto const& reference : op.blendImages) {
     auto blend = refCallback(reference);
     if (!blend)
       return std::unexpected(std::move(blend.error()));
     if (!*blend)
       return std::unexpected(ImageOperationException::format("Missing blend image '{}'", reference));
-    blendImages.push_back(**blend);
+    sources.emplace_back((**blend).get());
   }
+
+  for (auto& source : sources)
+    source.prepare();
 
   std::int64_t offsetX = op.offset[0], offsetY = op.offset[1];
   PixelRect changed{.x0 = image.width(), .y0 = image.height(), .x1 = 0, .y1 = 0};
-  for (auto blend : blendImages) {
+  for (auto const& blend : sources) {
     changed.x0 = std::min(changed.x0, std::max<std::int64_t>(0, -offsetX));
     changed.y0 = std::min(changed.y0, std::max<std::int64_t>(0, -offsetY));
-    changed.x1 =
-      std::max(changed.x1, std::min<std::int64_t>(image.width(), std::int64_t(blend.get().width()) - offsetX));
-    changed.y1 =
-      std::max(changed.y1, std::min<std::int64_t>(image.height(), std::int64_t(blend.get().height()) - offsetY));
+    changed.x1 = std::max(changed.x1, std::min<std::int64_t>(image.width(), std::int64_t(blend.width) - offsetX));
+    changed.y1 = std::max(changed.y1, std::min<std::int64_t>(image.height(), std::int64_t(blend.height) - offsetY));
   }
-  auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
-    std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
-    Vec4F fpixel = Color::v4bToFloat(pixel);
-    for (auto blend : blendImages) {
-      if (px >= 0 && py >= 0 && px < blend.get().width() && py < blend.get().height()) {
-        Vec4F other = Color::v4bToFloat(*blend.get().get(Vec2U(px, py)));
-        if (op.mode == BlendImageOperation::Multiply)
-          fpixel = fpixel.piecewise_multiply(other);
-        else if (op.mode == BlendImageOperation::Screen)
-          fpixel = Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewise_multiply(Vec4F::filled(1.0f) - other);
+  auto apply = [&]<int Mode>()
+    requires blend_kernel_mode<Mode>
+  {
+    auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
+      std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
+      Vec4F fpixel = Color::v4bToFloat(pixel);
+      for (auto const& blend : sources) {
+        if (px >= 0 && py >= 0 && px < blend.width && py < blend.height) {
+          Vec4F other = Color::v4bToFloat(blend.read(px, py));
+          if constexpr (Mode == BlendImageOperation::Multiply)
+            fpixel = fpixel.piecewise_multiply(other);
+          else if constexpr (Mode == BlendImageOperation::Screen)
+            fpixel =
+              Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewise_multiply(Vec4F::filled(1.0f) - other);
+        }
       }
+      pixel = Color::v4fToByte(fpixel);
+    };
+    if (image.bytes_per_pixel() == 4) {
+      auto data = image.data();
+      auto stride = std::size_t(image.width()) * 4;
+      for (auto y = changed.y0; y < changed.y1; ++y) {
+        auto row = data.subspan(std::size_t(y) * stride + std::size_t(changed.x0) * 4,
+                                std::size_t(changed.x1 - changed.x0) * 4);
+        auto destination = row.begin();
+        for (auto x = changed.x0; x < changed.x1; ++x, std::advance(destination, 4)) {
+          Vec4B pixel;
+          std::ranges::copy_n(destination, 4, pixel.begin());
+          blendPixel(x, y, pixel);
+          std::ranges::copy(pixel, destination);
+        }
+      }
+    } else {
+      image.for_each_pixel(blendPixel);
     }
-    pixel = Color::v4fToByte(fpixel);
   };
-  if (image.bytesPerPixel() == 4) {
-    for (auto y = changed.y0; y < changed.y1; ++y) {
-      for (auto x = changed.x0; x < changed.x1; ++x) {
-        auto pixel = image.get32(x, y);
-        blendPixel(x, y, pixel);
-        image.set32(x, y, pixel);
-      }
-    }
-  } else {
-    image.forEachPixel(blendPixel);
-  }
+  if (op.mode == BlendImageOperation::Multiply)
+    apply.template operator()<BlendImageOperation::Multiply>();
+  else if (op.mode == BlendImageOperation::Screen)
+    apply.template operator()<BlendImageOperation::Screen>();
+  else
+    apply.template operator()<-1>();
   return changed;
 }
 
-std::expected<void, StarException> processImageOperation(ImageOperation const& operation, Image& image, ImageReferenceCallback refCallback) {
+std::expected<void, StarException> process_image_operation(ImageOperation const& operation, Image& image,
+                                                           ImageReferenceCallback refCallback) {
   if (auto error = (std::holds_alternative<ErrorImageOperation>(operation) ? std::optional{std::cref(std::get<ErrorImageOperation>(operation))} : std::nullopt))
     return std::unexpected(error->get().cause);
-  if (image.bytesPerPixel() == 3) {
+  if (image.bytes_per_pixel() == 3) {
     // Convert to an image format that has alpha so certain operations function properly
-    image = image.convert(image.pixelFormat() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
+    image = image.convert(image.pixel_format() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
   }
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
     // Exact identities preserve the input bytes, rather than round-tripping HSV.
@@ -545,18 +617,18 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     if (op->get().hueShiftAmount == 0.0f)
       return {};
     RecentColors recent;
-    image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0)
         recent.apply(pixel, [&](Vec4B const& input) { return Color::hueShiftVec4B(input, op->get().hueShiftAmount); });
     });
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
     if (op->get().saturationShiftAmount != 0.0f)
-      processSaturationShift(image, op->get());
+      process_saturation_shift(image, op->get());
   } else if (auto op = (std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<BrightnessMultiplyImageOperation>(operation))} : std::nullopt)) {
     if (op->get().brightnessMultiply == 1.0f)
       return {};
     RecentColors recent;
-    image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0) {
         recent.apply(pixel, [&](Vec4B const& input) {
           Color color = Color::rgba(input);
@@ -566,13 +638,13 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       }
     });
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([&op](unsigned, unsigned, Vec4B& pixel) {
       pixel[0] = op->get().rTable[pixel[0]];
       pixel[1] = op->get().gTable[pixel[1]];
       pixel[2] = op->get().bTable[pixel[2]];
     });
   } else if (auto op = (std::holds_alternative<ScanLinesImageOperation>(operation) ? std::optional{std::cref(std::get<ScanLinesImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned y, Vec4B& pixel) {
+    image.for_each_pixel([&op](unsigned, unsigned y, Vec4B& pixel) {
       if (y % 2 == 0) {
         pixel[0] = op->get().fade1.rTable[pixel[0]];
         pixel[1] = op->get().fade1.gTable[pixel[1]];
@@ -584,7 +656,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       }
     });
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([&op](unsigned, unsigned, Vec4B& pixel) {
       pixel[0] = op->get().color[0];
       pixel[1] = op->get().color[1];
       pixel[2] = op->get().color[2];
@@ -593,10 +665,10 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     auto const& replaceMap = op->get().colorReplaceMap;
     if (replaceMap.empty())
       return {};
-    if (image.bytesPerPixel() == 4)
-      replaceColors(replaceMap, image, {.x0 = 0, .y0 = 0, .x1 = image.width(), .y1 = image.height()});
+    if (image.bytes_per_pixel() == 4)
+      replace_colors(replaceMap, image, {.x0 = 0, .y0 = 0, .x1 = image.width(), .y1 = image.height()});
     else
-      image.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+      image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
         if (auto replacement = replaceMap.maybe(pixel))
           pixel = *replacement;
       });
@@ -608,75 +680,95 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
     if (!refCallback)
       return std::unexpected(ImageOperationException("Missing image ref callback during AlphaMaskImageOperation"));
 
-    List<std::reference_wrapper<Image const>> maskImages;
+    bool additive = op->get().mode == AlphaMaskImageOperation::Additive;
+    List<PreparedImageReference> sources;
+    if (additive)
+      sources.reserve(op->get().maskImages.size());
     for (auto const& reference : op->get().maskImages) {
       auto mask = refCallback(reference);
       if (!mask)
         return std::unexpected(std::move(mask.error()));
       if (!*mask)
         return std::unexpected(ImageOperationException::format("Missing mask image '{}'", reference));
-      maskImages.push_back(**mask);
+      if (additive)
+        sources.emplace_back((**mask).get());
     }
 
-    image.forEachPixel([&op, &maskImages](unsigned x, unsigned y, Vec4B& pixel) {
-      std::uint8_t maskAlpha = 0;
-      Vec2U pos = Vec2U(Vec2I(x, y) + op->get().offset);
-      for (auto mask : maskImages) {
-        if (pos[0] < mask.get().width() && pos[1] < mask.get().height()) {
-          if (op->get().mode == AlphaMaskImageOperation::Additive) {
-            // We produce our mask alpha from the maximum alpha of any of
-            // the
-            // mask images.
-            maskAlpha = std::max(maskAlpha, mask.get().clamp(Vec2I(pos))[3]);
-          } else if (op->get().mode == AlphaMaskImageOperation::Subtractive) {
-            // We produce our mask alpha from the minimum alpha of any of
-            // the
-            // mask images.
-            maskAlpha = std::min(maskAlpha, mask.get().clamp(Vec2I(pos))[3]);
-          }
+    // The legacy subtractive reduction starts at zero and therefore stays zero.
+    // Resolve every source above even when no alpha reads are necessary.
+    for (auto& source : sources)
+      source.prepare();
+    auto offset = Vec2U(op->get().offset);
+    auto maskAlpha = [&](unsigned x, unsigned y, std::uint8_t alpha) {
+      std::uint8_t maximum = 0;
+      auto pos = Vec2U(x, y) + offset;
+      for (auto const& mask : sources) {
+        if (pos[0] < mask.width && pos[1] < mask.height)
+          maximum = std::max(maximum, mask.alpha(pos));
+      }
+      return std::min(alpha, maximum);
+    };
+    if (image.bytes_per_pixel() == 4) {
+      auto data = image.data();
+      auto stride = std::size_t(image.width()) * 4;
+      for (unsigned y = 0; y < image.height(); ++y) {
+        auto row = data.subspan(std::size_t(y) * stride, stride);
+        auto destination = row.begin();
+        for (unsigned x = 0; x < image.width(); ++x, std::advance(destination, 4)) {
+          destination[3] = maskAlpha(x, y, destination[3]);
         }
       }
-      pixel[3] = std::min(pixel[3], maskAlpha);
-    });
+    } else {
+      image.for_each_pixel([&](unsigned x, unsigned y, Vec4B& pixel) { pixel[3] = maskAlpha(x, y, pixel[3]); });
+    }
 
   } else if (auto op = (std::holds_alternative<BlendImageOperation>(operation) ? std::optional{std::cref(std::get<BlendImageOperation>(operation))} : std::nullopt)) {
-    auto blended = applyBlend(op->get(), image, refCallback);
+    auto blended = apply_blend(op->get(), image, refCallback);
     if (!blended)
       return std::unexpected(std::move(blended.error()));
 
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
-    image.forEachPixel([&op](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([&op](unsigned, unsigned, Vec4B& pixel) {
       pixel = pixel.combine(op->get().color, [](std::uint8_t a, std::uint8_t b) -> std::uint8_t {
         return static_cast<std::uint8_t>((static_cast<int>(a) * static_cast<int>(b)) / 255);
       });
     });
 
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
-    Image borderImage(image.size() + Vec2U::filled(op->get().pixels * 2), PixelFormat::RGBA32);
-    auto copied = borderImage.copyInto(Vec2U::filled(op->get().pixels), image);
+    auto extent =
+      Vector<std::uint64_t, 2>(image.size()) + Vector<std::uint64_t, 2>::filled(std::uint64_t(op->get().pixels) * 2);
+    if (extent[0] > std::numeric_limits<int>::max() || extent[1] > std::numeric_limits<int>::max())
+      return std::unexpected(ImageOperationException("Border image extent is not representable"));
+    auto borderSize = Vec2U(extent);
+    if (!Image::size_bytes(borderSize, PixelFormat::RGBA32))
+      return std::unexpected(ImageOperationException("Border image byte size is not representable"));
+    Image borderImage(borderSize, PixelFormat::RGBA32);
+    auto copied = borderImage.copy_into(Vec2U::filled(op->get().pixels), image);
     if (!copied)
       return std::unexpected(std::move(copied.error()));
     Vec2I borderImageSize = Vec2I(borderImage.size());
 
-    borderImage.forEachPixel([&op, &image, &borderImageSize](int x, int y, Vec4B& pixel) {
+    borderImage.for_each_pixel([&op, &image, &borderImageSize](int x, int y, Vec4B& pixel) {
       int pixels = op->get().pixels;
       bool includeTransparent = op->get().includeTransparent;
       if (pixel[3] == 0 || (includeTransparent && pixel[3] != 255)) {
-        int dist = std::numeric_limits<int>::max();
-        for (int j = -pixels; j < pixels + 1; j++) {
-          for (int i = -pixels; i < pixels + 1; i++) {
+        auto dist = std::numeric_limits<std::int64_t>::max();
+        for (std::int64_t j = -std::int64_t(pixels); j <= pixels; ++j) {
+          for (std::int64_t i = -std::int64_t(pixels); i <= pixels; ++i) {
             if (i + x >= pixels && j + y >= pixels && i + x < borderImageSize[0] - pixels && j + y < borderImageSize[1] - pixels) {
               Vec4B remotePixel = image.get32(i + x - pixels, j + y - pixels);
               if (remotePixel[3] != 0) {
                 dist = std::min(dist, std::abs(i) + std::abs(j));
-                if (dist == 1) // Early out, if dist is 1 it ain't getting shorter
+                if (dist == 1)// Preserve the legacy inner break, including partial-alpha targets.
                   break;
               }
             }
           }
+          if (dist == 0 || (dist == 1 && pixel[3] == 0 && image.bytes_per_pixel() == 4))
+            break;
         }
 
-        if (dist < std::numeric_limits<int>::max()) {
+        if (dist < std::numeric_limits<std::int64_t>::max()) {
           float percent = (dist - 1) / (2.0f * pixels - 1);
           if (pixel[3] != 0) {
             Color color = Color::rgba(op->get().startColor).mix(Color::rgba(op->get().endColor), percent);
@@ -704,7 +796,7 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       }
     });
 
-    image = borderImage;
+    image = std::move(borderImage);
 
   } else if (auto op = (std::holds_alternative<ScaleImageOperation>(operation) ? std::optional{std::cref(std::get<ScaleImageOperation>(operation))} : std::nullopt)) {
     auto scale = op->get().scale;
@@ -712,14 +804,15 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
       EmergencyLog::warn("Negative scale in ScaleImageOperation ({})", scale);
       scale = scale.piecewise_max(Vec2F::filled(0.f));
     }
-    auto scaled = op->get().mode == ScaleImageOperation::Nearest ? scaleNearest(image, scale)
-      : op->get().mode == ScaleImageOperation::Bicubic ? scaleBicubic(image, scale) : scaleBilinear(image, scale);
+    auto scaled = op->get().mode == ScaleImageOperation::Nearest ? scale_nearest(image, scale)
+      : op->get().mode == ScaleImageOperation::Bicubic           ? scale_bicubic(image, scale)
+                                                                 : scale_bilinear(image, scale);
     if (!scaled)
       return std::unexpected(std::move(scaled.error()));
     image = std::move(*scaled);
 
   } else if (auto op = (std::holds_alternative<CropImageOperation>(operation) ? std::optional{std::cref(std::get<CropImageOperation>(operation))} : std::nullopt)) {
-    auto cropped = image.subImage(Vec2U(op->get().subset.min()), Vec2U(op->get().subset.size()));
+    auto cropped = image.sub_image(Vec2U(op->get().subset.min()), Vec2U(op->get().subset.size()));
     if (!cropped)
       return std::unexpected(std::move(cropped.error()));
     image = std::move(*cropped);
@@ -756,24 +849,23 @@ std::expected<void, StarException> processImageOperation(ImageOperation const& o
   return {};
 }
 
-static bool isPerPixelColorOperation(ImageOperation const* operation) {
-  return operation
-    && (std::holds_alternative<HueShiftImageOperation>(*operation)
-        || std::holds_alternative<SaturationShiftImageOperation>(*operation)
-        || std::holds_alternative<BrightnessMultiplyImageOperation>(*operation)
-        || std::holds_alternative<FadeToColorImageOperation>(*operation)
-        || std::holds_alternative<SetColorImageOperation>(*operation)
-        || std::holds_alternative<ColorReplaceImageOperation>(*operation)
-        || std::holds_alternative<MultiplyImageOperation>(*operation));
+static bool is_per_pixel_color_operation(ImageOperation const& operation) {
+  return std::holds_alternative<HueShiftImageOperation>(operation)
+    || std::holds_alternative<SaturationShiftImageOperation>(operation)
+    || std::holds_alternative<BrightnessMultiplyImageOperation>(operation)
+    || std::holds_alternative<FadeToColorImageOperation>(operation)
+    || std::holds_alternative<SetColorImageOperation>(operation)
+    || std::holds_alternative<ColorReplaceImageOperation>(operation)
+    || std::holds_alternative<MultiplyImageOperation>(operation);
 }
 
-static bool hasBytePixels(Image const& image) { return image.bytesPerPixel() == 3 || image.bytesPerPixel() == 4; }
+static bool has_byte_pixels(Image const& image) { return image.bytes_per_pixel() == 3 || image.bytes_per_pixel() == 4; }
 
-static bool scaleEnlargesByCopying(ScaleImageOperation const& scale, Image const& image) {
+static bool scale_enlarges_by_copying(ScaleImageOperation const& scale, Image const& image) {
   // Empty scales synthesize black pixels, rather than copying source pixels.
   // Float images also have different scalar byte-setter semantics.
-  if (image.empty() || !hasBytePixels(image) || scale.mode != ScaleImageOperation::Nearest
-      || !scaledCropFits(image, scale.scale, RectI(0, 0, 0, 0)))
+  if (image.empty() || !has_byte_pixels(image) || scale.mode != ScaleImageOperation::Nearest
+      || !scaled_crop_fits(image, scale.scale, RectI(0, 0, 0, 0)))
     return false;
   auto size = Vec2U::round(vmult(Vec2F(image.size()), scale.scale));
   size[0] = std::max(size[0], 1u);
@@ -781,31 +873,31 @@ static bool scaleEnlargesByCopying(ScaleImageOperation const& scale, Image const
   return std::uint64_t(size[0]) * size[1] > std::uint64_t(image.width()) * image.height();
 }
 
-static bool cropShrinks(CropImageOperation const& crop, Image const& image) {
+static bool crop_shrinks(CropImageOperation const& crop, Image const& image) {
   auto min = crop.subset.min(), max = crop.subset.max();
-  if (!hasBytePixels(image) || min[0] < 0 || min[1] < 0 || max[0] < min[0] || max[1] < min[1]
+  if (!has_byte_pixels(image) || min[0] < 0 || min[1] < 0 || max[0] < min[0] || max[1] < min[1]
       || std::uint64_t(max[0]) > image.width() || std::uint64_t(max[1]) > image.height())
     return false;
   return std::uint64_t(max[0] - min[0]) * (max[1] - min[1]) < std::uint64_t(image.width()) * image.height();
 }
 
-static std::expected<bool, StarException> processScaleCrop(ScaleImageOperation const& scale,
-                                                           CropImageOperation const& crop, Image& image) {
+static std::expected<bool, StarException> process_scale_crop(ScaleImageOperation const& scale,
+                                                             CropImageOperation const& crop, Image& image) {
   // Leave invalid crops/scales and float formats to the sequential error path.
-  if (!hasBytePixels(image) || scale.mode == ScaleImageOperation::Bicubic
-      || !scaledCropFits(image, scale.scale, crop.subset))
+  if (!has_byte_pixels(image) || scale.mode == ScaleImageOperation::Bicubic
+      || !scaled_crop_fits(image, scale.scale, crop.subset))
     return false;
-  if (image.bytesPerPixel() == 3)
-    image = image.convert(image.pixelFormat() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
-  auto scaled = scale.mode == ScaleImageOperation::Nearest ? scaleNearestCropped(image, scale.scale, crop.subset)
-                                                           : scaleBilinearCropped(image, scale.scale, crop.subset);
+  if (image.bytes_per_pixel() == 3)
+    image = image.convert(image.pixel_format() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
+  auto scaled = scale.mode == ScaleImageOperation::Nearest ? scale_nearest_cropped(image, scale.scale, crop.subset)
+                                                           : scale_bilinear_cropped(image, scale.scale, crop.subset);
   if (!scaled)
     return std::unexpected(std::move(scaled.error()));
   image = std::move(*scaled);
   return true;
 }
 
-static bool replaceSettles(ColorReplaceMap const& map) {
+static bool replace_settles(ColorReplaceMap const& map) {
   for (auto const& entry : map) {
     if (map.contains(entry.second))
       return false;
@@ -813,7 +905,7 @@ static bool replaceSettles(ColorReplaceMap const& map) {
   return true;
 }
 
-static bool replaceKeysAreKeysOf(ColorReplaceMap const& map, ColorReplaceMap const& other) {
+static bool replace_keys_are_keys_of(ColorReplaceMap const& map, ColorReplaceMap const& other) {
   for (auto const& entry : map) {
     if (!other.contains(entry.first))
       return false;
@@ -821,24 +913,109 @@ static bool replaceKeysAreKeysOf(ColorReplaceMap const& map, ColorReplaceMap con
   return true;
 }
 
+template <typename OperationAt>
+concept image_operation_accessor = requires(OperationAt& operation_at, std::size_t index) {
+  { operation_at(index) } -> std::same_as<ImageOperation const&>;
+};
+
+static bool is_separable_color_operation(ImageOperation const& operation) {
+  return std::holds_alternative<FadeToColorImageOperation>(operation)
+    || std::holds_alternative<SetColorImageOperation>(operation)
+    || std::holds_alternative<MultiplyImageOperation>(operation)
+    || std::holds_alternative<ScanLinesImageOperation>(operation);
+}
+
+static bool is_color_operation(ImageOperation const& operation) {
+  return is_per_pixel_color_operation(operation) || std::holds_alternative<ScanLinesImageOperation>(operation);
+}
+
+template <image_operation_accessor OperationAt>
+static std::expected<void, StarException> process_color_segment(std::size_t begin, std::size_t end,
+                                                                OperationAt& operation_at, Image& image,
+                                                                ImageReferenceCallback const& ref_callback) {
+  for (auto i = begin; i < end;) {
+    auto limit = i;
+    while (limit < end && is_separable_color_operation(operation_at(limit)))
+      ++limit;
+    if (limit - i < 2 || !has_byte_pixels(image)) {
+      auto processed = process_image_operation(operation_at(i), image, ref_callback);
+      if (!processed)
+        return std::unexpected(std::move(processed.error()));
+      ++i;
+      continue;
+    }
+    if (image.bytes_per_pixel() == 3)
+      image = image.convert(image.pixel_format() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
+
+    // Compose byte-to-byte tables, not floating operations: every intermediate
+    // truncation remains observable. Both row parities use absolute image y.
+    std::uint8_t tables[2][4][256];
+    for (auto& parity : tables)
+      for (auto& channel : parity)
+        for (unsigned value = 0; value < 256; ++value)
+          channel[value] = value;
+    for (auto k = i; k < limit; ++k) {
+      [[maybe_unused]] auto operation_callback = ref_callback;
+      auto const& operation = operation_at(k);
+      for (unsigned parity = 0; parity < 2; ++parity) {
+        std::optional<std::reference_wrapper<FadeToColorImageOperation const>> fade;
+        if (std::holds_alternative<FadeToColorImageOperation>(operation))
+          fade = std::cref(std::get<FadeToColorImageOperation>(operation));
+        if (std::holds_alternative<ScanLinesImageOperation>(operation)) {
+          auto const& scanlines = std::get<ScanLinesImageOperation>(operation);
+          fade = std::cref(parity == 0 ? scanlines.fade1 : scanlines.fade2);
+        }
+        if (fade) {
+          for (unsigned value = 0; value < 256; ++value) {
+            tables[parity][0][value] = fade->get().rTable[tables[parity][0][value]];
+            tables[parity][1][value] = fade->get().gTable[tables[parity][1][value]];
+            tables[parity][2][value] = fade->get().bTable[tables[parity][2][value]];
+          }
+        } else if (std::holds_alternative<SetColorImageOperation>(operation)) {
+          auto const& set = std::get<SetColorImageOperation>(operation);
+          for (unsigned channel = 0; channel < 3; ++channel)
+            std::ranges::fill(tables[parity][channel], set.color[channel]);
+        } else if (std::holds_alternative<MultiplyImageOperation>(operation)) {
+          auto const& multiply = std::get<MultiplyImageOperation>(operation);
+          for (unsigned channel = 0; channel < 4; ++channel)
+            for (auto& value : tables[parity][channel])
+              value = unsigned(value) * multiply.color[channel] / 255;
+        }
+      }
+    }
+    auto data = image.data();
+    auto stride = std::size_t(image.width()) * 4;
+    for (unsigned y = 0; y < image.height(); ++y) {
+      auto const& table = tables[y % 2];
+      auto row = data.subspan(std::size_t(y) * stride, stride);
+      auto pixel = row.begin();
+      for (unsigned x = 0; x < image.width(); ++x, std::advance(pixel, 4)) {
+        for (unsigned channel = 0; channel < 4; ++channel)
+          pixel[channel] = table[channel][pixel[channel]];
+      }
+    }
+    i = limit;
+  }
+  return {};
+}
+
 // An accessor keeps the contiguous List entrypoint allocation-free, while directives
 // can refer to stable, already loaded operations without copying their maps/tables.
-template <typename OperationAt>
-static std::expected<void, StarException> processImageOperationSequence(std::size_t count, OperationAt operationAt,
-                                                                        Image& image,
-                                                                        ImageReferenceCallback const& refCallback) {
-  ColorReplaceImageOperation const* settled = nullptr;
+template <image_operation_accessor OperationAt>
+static std::expected<void, StarException> process_image_operation_sequence(std::size_t count, OperationAt operationAt,
+                                                                           Image& image,
+                                                                           ImageReferenceCallback const& refCallback) {
+  std::optional<std::reference_wrapper<ColorReplaceImageOperation const>> settled;
   PixelRect changed;
   bool sawBlend = false;
   for (std::size_t i = 0; i < count;) {
-    auto operation = operationAt(i);
-    if (!operation)
-      return std::unexpected(ImageOperationException("Null image operation pointer"));
+    auto const& operation = operationAt(i);
 
-    if (auto blend = std::get_if<BlendImageOperation>(operation); blend && settled) {
-      // Match processImageOperation's per-operation callback value semantics.
+    if (std::holds_alternative<BlendImageOperation>(operation) && settled) {
+      auto const& blend = std::get<BlendImageOperation>(operation);
+      // Match process_image_operation's per-operation callback value semantics.
       auto operationCallback = refCallback;
-      auto blended = applyBlend(*blend, image, operationCallback);
+      auto blended = apply_blend(blend, image, operationCallback);
       if (!blended)
         return std::unexpected(std::move(blended.error()));
       changed.include(*blended);
@@ -846,68 +1023,73 @@ static std::expected<void, StarException> processImageOperationSequence(std::siz
       ++i;
       continue;
     }
-    if (auto replace = std::get_if<ColorReplaceImageOperation>(operation); replace && settled && sawBlend
-        && replaceKeysAreKeysOf(replace->colorReplaceMap, settled->colorReplaceMap)
-        && replaceSettles(replace->colorReplaceMap)) {
+    if (auto replace = (std::holds_alternative<ColorReplaceImageOperation>(operation)
+                          ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))}
+                          : std::nullopt);
+        replace && settled && sawBlend
+        && replace_keys_are_keys_of(replace->get().colorReplaceMap, settled->get().colorReplaceMap)
+        && replace_settles(replace->get().colorReplaceMap)) {
       // Outside the consecutive blends' union there are no keys left to replace.
-      replaceColors(replace->colorReplaceMap, image, changed);
+      replace_colors(replace->get().colorReplaceMap, image, changed);
       settled = replace;
       changed = {};
       sawBlend = false;
       ++i;
       continue;
     }
-    settled = nullptr;
+    settled.reset();
     changed = {};
     sawBlend = false;
 
-    if (isPerPixelColorOperation(operation)) {
+    if (is_color_operation(operation)) {
       auto end = i + 1;
-      while (end < count && isPerPixelColorOperation(operationAt(end)))
+      bool canReorderCrop = is_per_pixel_color_operation(operation);
+      while (end < count && is_color_operation(operationAt(end))) {
+        canReorderCrop = canReorderCrop && is_per_pixel_color_operation(operationAt(end));
         ++end;
-      if (end < count && operationAt(end)) {
-        if (auto crop = std::get_if<CropImageOperation>(operationAt(end)); crop && cropShrinks(*crop, image)) {
-          auto cropped = processImageOperation(*operationAt(end), image, refCallback);
+      }
+      if (canReorderCrop && end < count) {
+        if (auto crop = (std::holds_alternative<CropImageOperation>(operationAt(end))
+                           ? std::optional{std::cref(std::get<CropImageOperation>(operationAt(end)))}
+                           : std::nullopt);
+            crop && crop_shrinks(crop->get(), image)) {
+          auto cropped = process_image_operation(operationAt(end), image, refCallback);
           if (!cropped)
             return std::unexpected(std::move(cropped.error()));
-          for (auto k = i; k < end; ++k) {
-            auto processed = processImageOperation(*operationAt(k), image, refCallback);
-            if (!processed)
-              return std::unexpected(std::move(processed.error()));
-          }
+          auto processed = process_color_segment(i, end, operationAt, image, refCallback);
+          if (!processed)
+            return std::unexpected(std::move(processed.error()));
           i = end + 1;
           continue;
         }
       }
-      for (auto k = i; k < end; ++k) {
-        auto processed = processImageOperation(*operationAt(k), image, refCallback);
-        if (!processed)
-          return std::unexpected(std::move(processed.error()));
-      }
+      auto processed = process_color_segment(i, end, operationAt, image, refCallback);
+      if (!processed)
+        return std::unexpected(std::move(processed.error()));
       // Only a successfully applied final replace establishes the settled invariant.
-      if (image.bytesPerPixel() == 4 && end < count && operationAt(end)
-          && std::holds_alternative<BlendImageOperation>(*operationAt(end))) {
-        auto replace = std::get_if<ColorReplaceImageOperation>(operationAt(end - 1));
-        if (replace && replaceSettles(replace->colorReplaceMap))
-          settled = replace;
+      if (image.bytes_per_pixel() == 4 && end < count && std::holds_alternative<BlendImageOperation>(operationAt(end))
+          && std::holds_alternative<ColorReplaceImageOperation>(operationAt(end - 1))) {
+        auto const& replace = std::get<ColorReplaceImageOperation>(operationAt(end - 1));
+        if (replace_settles(replace.colorReplaceMap))
+          settled = std::cref(replace);
       }
       i = end;
       continue;
     }
 
-    if (auto scale = std::get_if<ScaleImageOperation>(operation)) {
+    if (std::holds_alternative<ScaleImageOperation>(operation)) {
+      auto const& scale = std::get<ScaleImageOperation>(operation);
       auto end = i + 1;
-      while (end < count && isPerPixelColorOperation(operationAt(end)))
+      while (end < count && is_per_pixel_color_operation(operationAt(end)))
         ++end;
-      if (end > i + 1 && scaleEnlargesByCopying(*scale, image)) {
-        for (auto k = i + 1; k < end; ++k) {
-          auto processed = processImageOperation(*operationAt(k), image, refCallback);
-          if (!processed)
-            return std::unexpected(std::move(processed.error()));
-        }
-        if (end < count && operationAt(end)) {
-          if (auto crop = std::get_if<CropImageOperation>(operationAt(end))) {
-            auto fused = processScaleCrop(*scale, *crop, image);
+      if (end > i + 1 && scale_enlarges_by_copying(scale, image)) {
+        auto processed = process_color_segment(i + 1, end, operationAt, image, refCallback);
+        if (!processed)
+          return std::unexpected(std::move(processed.error()));
+        if (end < count) {
+          if (std::holds_alternative<CropImageOperation>(operationAt(end))) {
+            auto const& crop = std::get<CropImageOperation>(operationAt(end));
+            auto fused = process_scale_crop(scale, crop, image);
             if (!fused)
               return std::unexpected(std::move(fused.error()));
             if (*fused) {
@@ -916,15 +1098,16 @@ static std::expected<void, StarException> processImageOperationSequence(std::siz
             }
           }
         }
-        auto scaled = processImageOperation(*operation, image, refCallback);
+        auto scaled = process_image_operation(operation, image, refCallback);
         if (!scaled)
           return std::unexpected(std::move(scaled.error()));
         i = end;
         continue;
       }
-      if (i + 1 < count && operationAt(i + 1)) {
-        if (auto crop = std::get_if<CropImageOperation>(operationAt(i + 1))) {
-          auto fused = processScaleCrop(*scale, *crop, image);
+      if (i + 1 < count) {
+        if (std::holds_alternative<CropImageOperation>(operationAt(i + 1))) {
+          auto const& crop = std::get<CropImageOperation>(operationAt(i + 1));
+          auto fused = process_scale_crop(scale, crop, image);
           if (!fused)
             return std::unexpected(std::move(fused.error()));
           if (*fused) {
@@ -934,7 +1117,7 @@ static std::expected<void, StarException> processImageOperationSequence(std::siz
         }
       }
     }
-    auto processed = processImageOperation(*operation, image, refCallback);
+    auto processed = process_image_operation(operation, image, refCallback);
     if (!processed)
       return std::unexpected(std::move(processed.error()));
     ++i;
@@ -942,16 +1125,17 @@ static std::expected<void, StarException> processImageOperationSequence(std::siz
   return {};
 }
 
-std::expected<void, StarException> processImageOperations(std::span<ImageOperation const* const> operations,
-                                                          Image& image, ImageReferenceCallback refCallback) {
-  return processImageOperationSequence(
-    operations.size(), [&](std::size_t i) { return operations[i]; }, image, refCallback);
+std::expected<void, StarException>
+process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const> operations, Image& image,
+                         ImageReferenceCallback refCallback) {
+  return process_image_operation_sequence(
+    operations.size(), [&](std::size_t i) -> ImageOperation const& { return operations[i].get(); }, image, refCallback);
 }
 
-std::expected<Image, StarException> processImageOperations(List<ImageOperation> const& operations, Image image,
-                                                           ImageReferenceCallback refCallback) {
-  auto processed =
-    processImageOperationSequence(operations.size(), [&](std::size_t i) { return &operations[i]; }, image, refCallback);
+std::expected<Image, StarException> process_image_operations(List<ImageOperation> const& operations, Image image,
+                                                             ImageReferenceCallback refCallback) {
+  auto processed = process_image_operation_sequence(
+    operations.size(), [&](std::size_t i) -> ImageOperation const& { return operations[i]; }, image, refCallback);
   if (!processed)
     return std::unexpected(std::move(processed.error()));
   return image;

@@ -259,7 +259,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto outputFile = File::open("mapgen.png", IOMode::Write);
     if (!outputFile)
       return std::unexpected(std::move(outputFile.error()));
-    auto written = outputImage->writePng(root->logger(), *outputFile);
+    auto written = outputImage->write_png(root->logger(), *outputFile);
     if (!written)
       return std::unexpected(std::move(written.error()));
     return (*outputFile)->close();

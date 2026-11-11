@@ -172,7 +172,7 @@ auto result8 = std::move(*result6)->colorSwap(std::move(*result7), m_monsterVari
 if (!result8) return std::unexpected(std::move(result8.error()));
 auto colorSwap = m_monsterVariant.colorSwap.value_or(std::move(*result8));
   if (!colorSwap.empty())
-    m_networkedAnimator->setProcessingDirectives(imageOperationToString(ColorReplaceImageOperation{colorSwap}));
+    m_networkedAnimator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{colorSwap}));
 
   auto result9 = StatusController::create(this->root(), m_monsterVariant.statusSettings);
 if (!result9) return std::unexpected(std::move(result9.error()));

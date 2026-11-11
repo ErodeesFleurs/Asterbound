@@ -518,7 +518,7 @@ auto result71 = this->colorSwap(std::move(*result70), variant.seed);
 if (!result71) return std::unexpected(std::move(result71.error()));
 auto colorSwap = variant.colorSwap.value_or(std::move(*result71));
   if (!colorSwap.empty())
-    animator->setProcessingDirectives(imageOperationToString(ColorReplaceImageOperation{colorSwap}));
+    animator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{colorSwap}));
   auto result72 = animator->drawables();
 if (!result72) return std::unexpected(std::move(result72.error()));
 auto drawables = std::move(*result72);

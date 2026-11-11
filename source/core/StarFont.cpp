@@ -179,14 +179,14 @@ std::expected<std::tuple<Image, Vec2I, bool>, StarException> Font::render(String
       }
     }
   } else if ((colored = (slot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA))) {
-    unsigned bpp = image.bytesPerPixel();
+    unsigned bpp = image.bytes_per_pixel();
     auto data = image.data();
     for (std::size_t y = 0; y != height; ++y) {
       auto row = data.subspan(bpp + (image.width() * (image.height() - 2 - y)) * bpp, slot->bitmap.pitch);
       std::memcpy(row.data(), slot->bitmap.buffer + y * slot->bitmap.pitch, row.size());
     }
     // unfortunately FreeType pre-multiplied the color channels :(
-    image.forEachPixel([](unsigned, unsigned, Vec4B& pixel) {
+    image.for_each_pixel([](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0 && pixel[3] != 255) {
         float a = byteToFloat(pixel[3]);
         pixel[0] /= a;

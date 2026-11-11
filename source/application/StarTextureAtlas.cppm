@@ -185,7 +185,7 @@ template <typename AtlasTextureHandle>
       for (unsigned x = 0; x < finalImageSize[0]; ++x) {
         unsigned xind = std::clamp<unsigned>(x, 1, imageSize[0]) - 1;
         unsigned yind = std::clamp<unsigned>(y, 1, imageSize[1]) - 1;
-        auto pixel = image.getrgb(xind, yind);
+        auto pixel = image.get_rgb(xind, yind);
         if (!pixel)
           return std::unexpected(std::move(pixel.error()));
         finalImage.set32(x, y, *pixel);

@@ -57,7 +57,7 @@ std::expected<void, StarException> writeImagePatchFixture(GameTest& fixture, Str
   if (!blue)
     return std::unexpected(std::move(blue.error()));
   auto buffer = std::make_shared<Buffer>();
-  auto encoded = image.writePng(fixture.root().logger(), buffer);
+  auto encoded = image.write_png(fixture.root().logger(), buffer);
   if (!encoded)
     return std::unexpected(std::move(encoded.error()));
   written = File::write_file(buffer->take_data(), File::relative_to(directory, "target.png"));

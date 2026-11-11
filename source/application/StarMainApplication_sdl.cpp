@@ -637,16 +637,16 @@ public:
       auto device = File::open(".icon/asterbound.png", IOMode::Read);
       if (!device)
         return std::unexpected(std::move(device.error()));
-      auto isPng = Image::isPng(*device);
+      auto isPng = Image::is_png(*device);
       if (!isPng)
         return std::unexpected(std::move(isPng.error()));
       if (*isPng) {
-        auto img = Image::readPng((*m_logger), *device);
+        auto img = Image::read_png((*m_logger), *device);
         if (!img)
           return std::unexpected(std::move(img.error()));
         auto conv = img->convert(PixelFormat::RGBA32);
-        auto flippedResult = processImageOperations(
-          List<ImageOperation>{ FlipImageOperation{ FlipImageOperation::Mode::FlipY } }, conv);
+        auto flippedResult = process_image_operations(
+          List<ImageOperation>{FlipImageOperation{FlipImageOperation::Mode::FlipY}}, std::move(conv));
         if (!flippedResult)
           return std::unexpected(std::move(flippedResult.error()));
         auto& flipped = *flippedResult;
@@ -655,7 +655,7 @@ public:
 
         int w = static_cast<int>(flipped.width());
         int h = static_cast<int>(flipped.height());
-        int pitch = static_cast<int>(flipped.bytesPerPixel() * flipped.width());
+        int pitch = static_cast<int>(flipped.bytes_per_pixel() * flipped.width());
 
         std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> iconSurface(SDL_CreateSurfaceFrom(
           w,
@@ -1985,40 +1985,33 @@ private:
       else
         operations = { FlipImageOperation{ FlipImageOperation::Mode::FlipY } };
 
-      auto processed = processImageOperations(operations, *image);
+      auto processed = process_image_operations(operations, *image);
       if (!processed)
         return std::unexpected(std::move(processed.error()));
       auto newImage = std::make_shared<Image>(std::move(*processed));
       // Fix fully transparent pixels inverting the underlying display pixel on Windows (allowing this could be made configurable per cursor later!)
-      newImage->forEachPixel([](unsigned /*x*/, unsigned /*y*/, Vec4B& pixel) { if (!pixel[3]) pixel[0] = pixel[1] = pixel[2] = 0; });
+      newImage->for_each_pixel([](unsigned /*x*/, unsigned /*y*/, Vec4B& pixel) {
+        if (!pixel[3])
+          pixel[0] = pixel[1] = pixel[2] = 0;
+      });
       entry->image = std::move(newImage);
 
 
       auto size = entry->image->size();
       SDL_PixelFormat pixelFormat;
-      switch (entry->image->pixelFormat()) {
-        case PixelFormat::RGB24: // I know this conversion looks wrong, but it's correct. I'm confused too.
-          pixelFormat = SDL_PIXELFORMAT_XBGR8888;
-          break;
-        case PixelFormat::RGBA32:
-          pixelFormat = SDL_PIXELFORMAT_ABGR8888;
-          break;
-        case PixelFormat::BGR24:
-          pixelFormat = SDL_PIXELFORMAT_XRGB8888;
-          break;
-        case PixelFormat::BGRA32:
-          pixelFormat = SDL_PIXELFORMAT_ARGB8888;
-          break;
-        default:
-          pixelFormat = SDL_PIXELFORMAT_UNKNOWN;
+      switch (entry->image->pixel_format()) {
+      case PixelFormat::RGB24:// I know this conversion looks wrong, but it's correct. I'm confused too.
+        pixelFormat = SDL_PIXELFORMAT_XBGR8888;
+        break;
+      case PixelFormat::RGBA32: pixelFormat = SDL_PIXELFORMAT_ABGR8888; break;
+      case PixelFormat::BGR24: pixelFormat = SDL_PIXELFORMAT_XRGB8888; break;
+      case PixelFormat::BGRA32: pixelFormat = SDL_PIXELFORMAT_ARGB8888; break;
+      default: pixelFormat = SDL_PIXELFORMAT_UNKNOWN;
       }
 
-      entry->sdlSurface.reset(SDL_CreateSurfaceFrom(
-        size[0], size[1],
-        pixelFormat,
-        const_cast<std::uint8_t*>(entry->image->data().data()),
-        entry->image->bytesPerPixel() * size[0])
-      );
+      entry->sdlSurface.reset(SDL_CreateSurfaceFrom(size[0], size[1], pixelFormat,
+                                                    const_cast<std::uint8_t*>(entry->image->data().data()),
+                                                    entry->image->bytes_per_pixel() * size[0]));
       if (!entry->sdlSurface)
         return std::unexpected(ApplicationException::format("Could not create cursor surface: {}", SDL_GetError()));
       entry->sdlCursor.reset(SDL_CreateColorCursor(entry->sdlSurface.get(), offset[0] * scale, offset[1] * scale));

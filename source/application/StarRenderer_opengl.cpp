@@ -1156,7 +1156,7 @@ std::expected<void, StarException> OpenGlRenderer::GlTextureAtlasSet::copyAtlasP
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   GLenum format;
-  auto pixelFormat = image.pixelFormat();
+  auto pixelFormat = image.pixel_format();
   if (pixelFormat == PixelFormat::RGB24)
     format = GL_RGB;
   else if (pixelFormat == PixelFormat::RGBA32)

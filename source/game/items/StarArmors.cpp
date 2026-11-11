@@ -144,7 +144,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
   if (!fullbright)
     return std::unexpected(std::move(fullbright.error()));
   m_fullbright = *fullbright;
-  auto options = config.getArray("colorOptions", JsonArray{""}).and_then(colorDirectivesFromConfig);
+  auto options = config.getArray("colorOptions", JsonArray{""}).and_then(color_directives_from_config);
   if (!options)
     return std::unexpected(std::move(options.error()));
   m_colorOptions = std::move(*options);

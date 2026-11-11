@@ -236,7 +236,7 @@ void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::Ble
   auto validate = [&] {
     return std::ranges::equal(output.data(), expected);
   };
-  auto initial = Star::processImageOperation(operation, output, references);
+  auto initial = Star::process_image_operation(operation, output, references);
   if (!initial) {
     state.SkipWithError(initial.error().what());
     return;
@@ -250,7 +250,7 @@ void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::Ble
     state.PauseTiming();
     std::ranges::copy(original.data(), output.data().begin());
     state.ResumeTiming();
-    auto result = Star::processImageOperation(operation, output, references);
+    auto result = Star::process_image_operation(operation, output, references);
     benchmark::DoNotOptimize(output.data().data());
     if (!result) {
       state.SkipWithError(result.error().what());

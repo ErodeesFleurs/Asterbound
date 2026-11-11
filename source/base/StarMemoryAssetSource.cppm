@@ -81,7 +81,7 @@ std::expected<StreamOffset, StarException> MemoryAssetSource::file_size(String c
   }
   auto const& image = *std::get<std::shared_ptr<Image>>(entry->get());
   std::uint64_t pixels = static_cast<std::uint64_t>(image.width()) * image.height();
-  auto bpp = image.bytesPerPixel();
+  auto bpp = image.bytes_per_pixel();
   if (bpp && pixels > static_cast<std::uint64_t>(std::numeric_limits<StreamOffset>::max()) / bpp)
     return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to open", path));
   return static_cast<StreamOffset>(pixels * bpp);
@@ -161,7 +161,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> MemoryAssetSource::open(
   } else {
     auto const& image = *std::get<std::shared_ptr<Image>>(p->get());
     std::uint64_t pixels = static_cast<std::uint64_t>(image.width()) * image.height();
-    auto bpp = image.bytesPerPixel();
+    auto bpp = image.bytes_per_pixel();
     if (bpp && pixels > static_cast<std::uint64_t>(std::numeric_limits<StreamOffset>::max()) / bpp)
       return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to open", path));
     return std::make_shared<AssetReader>(std::span(reinterpret_cast<char const*>(image.data().data()), pixels * bpp), path);
@@ -201,7 +201,7 @@ std::expected<ByteArray, StarException> MemoryAssetSource::read(String const& pa
   else {
     auto const& image = *std::get<std::shared_ptr<Image>>(p->get());
     std::uint64_t pixels = static_cast<std::uint64_t>(image.width()) * image.height();
-    auto bpp = image.bytesPerPixel();
+    auto bpp = image.bytes_per_pixel();
     if (bpp && pixels > std::numeric_limits<std::size_t>::max() / bpp)
       return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to read", path));
     return ByteArray(std::span(reinterpret_cast<char const*>(image.data().data()), pixels * bpp));

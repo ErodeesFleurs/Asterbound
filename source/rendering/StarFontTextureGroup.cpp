@@ -127,7 +127,7 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
         }
         broken = true;
       } else {
-        auto processed = processImageOperation(entry.operation, image);
+        auto processed = process_image_operation(entry.operation, image);
         if (!processed) {
           broken = true;
           auto character = String::create(c);
@@ -141,7 +141,7 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
     }
     if (broken) {
       glyphTexture.colored = true;
-      image.forEachPixel([](unsigned x, unsigned y, Vec4B& pixel) {
+      image.for_each_pixel([](unsigned x, unsigned y, Vec4B& pixel) {
         pixel = ((x + y) % 2 == 0) ? Vec4B(255, 0, 255, pixel[3]) : Vec4B(0, 0, 0, pixel[3]);
       });
     }

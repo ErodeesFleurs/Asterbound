@@ -22,6 +22,7 @@ set (star_core_tests_SOURCES
       image_directive_pipeline_test.cpp
       image_processing_test.cpp
       image_scaling_test.cpp
+      image_storage_test.cpp
       ref_ptr_test.cpp
       json_test.cpp
       json_contract_test.cpp

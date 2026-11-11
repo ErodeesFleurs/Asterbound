@@ -90,7 +90,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
       ownedImage = std::move(*loaded);
       image = std::cref(*ownedImage);
     }
-    if (auto written = image->get().writePng(logger, buffer); !written)
+    if (auto written = image->get().write_png(logger, buffer); !written)
       return std::unexpected(std::move(written.error()));
     return appController->setClipboardImage(image->get(), std::ref(buffer->data()));
   }); !r) return std::unexpected(std::move(r.error()));

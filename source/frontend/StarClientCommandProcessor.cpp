@@ -948,7 +948,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     }
 
     for (auto&& entry : frames) {
-      auto copied = sheet->copyInto(entry.second.first.min(), *entry.second.second);
+      auto copied = sheet->copy_into(entry.second.first.min(), *entry.second.second);
       if (!copied) return std::unexpected(std::move(copied.error()));
     }
 
@@ -969,7 +969,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       return std::unexpected(std::move(created.error()));
   }
   auto buffer = std::make_shared<Buffer>();
-  if (auto written = image->writePng(m_context.root().logger(), buffer); !written)
+  if (auto written = image->write_png(m_context.root().logger(), buffer); !written)
     return std::unexpected(std::move(written.error()));
   auto file = File::open(outputPath, IOMode::Write | IOMode::Truncate);
   if (!file) return std::unexpected(std::move(file.error()));

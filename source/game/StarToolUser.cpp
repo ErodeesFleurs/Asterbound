@@ -366,7 +366,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
 
     auto imageMetadata = m_root.get().imageMetadataDatabase();
     if (!imageMetadata) return std::unexpected(std::move(imageMetadata.error()));
-    auto operation = imageOperationToString(op);
+    auto operation = image_operation_to_string(op);
     for (Drawable& drawable : drawables) {
       if (drawable.isImage()) {
         auto applied = drawable.imagePart().addDirectives(**imageMetadata, operation, true);

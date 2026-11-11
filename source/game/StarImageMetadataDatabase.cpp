@@ -104,6 +104,8 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
     return std::unexpected(std::move(image.error()));
   int imageWidth = (*image)->width();
   int imageHeight = (*image)->height();
+  auto const bytes_per_pixel = (*image)->bytes_per_pixel();
+  auto const image_data = (*image)->data();
 
   Vec2I min((position / TilePixels).floor());
   Vec2I max(((Vec2F(imageWidth, imageHeight) + position) / TilePixels).ceil());
@@ -113,24 +115,36 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   for (int yspace = min[1]; yspace < max[1]; ++yspace) {
     for (int xspace = min[0]; xspace < max[0]; ++xspace) {
       float fillRatio = 0.0f;
+      std::array<int, TilePixels> x_pixels;
+      for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
+        int xpixel = std::round(xspace * static_cast<int>(TilePixels) + x - position[0]);
+        x_pixels[x] = flip ? imageWidth - 1 - xpixel : xpixel;
+      }
 
       for (int y = 0; y < static_cast<int>(TilePixels); ++y) {
         int ypixel = std::round(yspace * static_cast<int>(TilePixels) + y - position[1]);
         if (ypixel < 0 || ypixel >= imageHeight)
           continue;
+        auto const row_offset = bytes_per_pixel == 4 ? static_cast<std::size_t>(ypixel) * imageWidth * 4 : 0;
 
         for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
-          int xpixel = std::round(xspace * static_cast<int>(TilePixels) + x - position[0]);
-          if (flip)
-            xpixel = imageWidth - 1 - xpixel;
+          int xpixel = x_pixels[x];
 
           if (xpixel < 0 || xpixel >= imageWidth)
             continue;
 
-          auto pixel = (*image)->get(xpixel, ypixel);
-          if (!pixel)
-            return std::unexpected(std::move(pixel.error()));
-          if ((*pixel)[3] > 0)
+          bool opaque;
+          if (bytes_per_pixel == 3) {
+            opaque = true;
+          } else if (bytes_per_pixel == 4) {
+            opaque = image_data[row_offset + static_cast<std::size_t>(xpixel) * 4 + 3] > 0;
+          } else {
+            auto pixel = (*image)->get(xpixel, ypixel);
+            if (!pixel)
+              return std::unexpected(std::move(pixel.error()));
+            opaque = (*pixel)[3] > 0;
+          }
+          if (opaque)
             fillRatio += 1.0f / square(TilePixels);
         }
       }
@@ -179,10 +193,35 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
   if (!image)
     return std::unexpected(std::move(image.error()));
   RectU region = RectU::null();
-  (*image)->forEachPixel([&region](unsigned x, unsigned y, Vec4B const& pixel) {
-    if (pixel[3] > 0)
-      region.combine(RectU::withSize({x, y}, {1, 1}));
-  });
+  auto const& pixels = **image;
+  auto const bytes_per_pixel = pixels.bytes_per_pixel();
+  if (bytes_per_pixel == 3) {
+    if (pixels.width() != 0 && pixels.height() != 0)
+      region = RectU::withSize(Vec2U(), pixels.size());
+  } else if (bytes_per_pixel == 4) {
+    auto const image_data = pixels.data();
+    unsigned min_x = pixels.width(), min_y = pixels.height();
+    unsigned max_x = 0, max_y = 0;
+    std::size_t offset = 0;
+    for (unsigned y = 0; y < pixels.height(); ++y) {
+      for (unsigned x = 0; x < pixels.width(); ++x, offset += 4) {
+        if (image_data[offset + 3] != 0) {
+          min_x = std::min(min_x, x);
+          min_y = std::min(min_y, y);
+          max_x = std::max(max_x, x + 1);
+          max_y = y + 1;
+        }
+      }
+    }
+    if (min_x < pixels.width())
+      region = RectU(Vec2U(min_x, min_y), Vec2U(max_x, max_y));
+  } else {
+    // Float-format traversal deliberately retains its legacy implicit alpha.
+    pixels.for_each_pixel([&region](unsigned x, unsigned y, Vec4B const& pixel) {
+      if (pixel[3] > 0)
+        region.combine(RectU::withSize({x, y}, {1, 1}));
+    });
+  }
 
   locker.lock();
   auto stored = m_regionCache.set(path, region);
@@ -267,11 +306,11 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       auto file = (*assets)->openFile(path.basePath);
       if (!file)
         return std::unexpected(std::move(file.error()));
-      auto png = Image::isPng(*file);
+      auto png = Image::is_png(*file);
       if (!png)
         return std::unexpected(std::move(png.error()));
       if (*png) {
-        auto metadata = Image::readPngMetadata(m_root.logger(), *file);
+        auto metadata = Image::read_png_metadata(m_root.logger(), *file);
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         imageSize = std::get<0>(*metadata);

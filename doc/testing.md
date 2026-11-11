@@ -150,6 +150,10 @@ errors. See [native process output rules](development.md#logging-and-native-proc
   retain the full format/scaler matrix and byte-exact sequential oracles;
   pipeline entry points use representative combinations, separate ownership
   checks and ordered failure-prefix assertions rather than repeating that matrix.
+- `ImageStorageTest.*` covers checked layouts and wrapped rectangle endpoints,
+  clipped raw-channel copies/conversions, aliased forward feedback, float bit
+  preservation, callback failure commits, small windows of oversized conceptual
+  scales, border overflow and three-channel BGR PNG output.
 - Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and
   `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState`
   cover catalog errors, sleeve lighting and blueprint state/error boundaries.
@@ -210,6 +214,7 @@ The target list above also includes benchmarks outside this focused catalog.
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | 24 cases: borrowed string deserialization, 1/5/10-byte VLQ reads through `DataStream&`, fixed-storage UUID decoding, one-shot file writes and complete directory/packed asset payload reads. Owning/function-backed VLQ adapters are generic-path controls. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Eleven cases: rejected/accepted raw/formatted messages, one/four sinks, four persistent native callers, real file lines and unobserved/observed/capacity-bound spatial logs. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | 28 cases: new `try_emplace`/const-pair insertion, expensive duplicate map/set insertion, full-hash-collision rehash, hit/miss lookup, inline-value churn, retained-capacity clear/reuse and sparse iteration. |
+| Images | `./result/bin/image_benchmarks --benchmark_filter='Image/'` | 52 sprite/large cases: ownership, fill, clipped paste/source-over, crops, channel widths, full/windowed scalers, partial-alpha borders, aligned/offset/aliased masks and blends, color sequences, small directive outputs, traversal and libpng encode/decode. |
 
 ### Batch accounting and correctness oracles
 
@@ -224,9 +229,10 @@ batch count for amortized per-item cost:
 | `io_benchmarks` | 64 decode/VLQ/UUID operations; one operation per file iteration. |
 | `logging_benchmarks` | Labels specify 64 messages, 256 concurrent messages or 192 mixed spatial objects. Concurrent timing uses process CPU time and includes wakeup/completion. |
 | `flat_hash_benchmarks` | Labels give N entries/queries; churn counts 2N erase/insert operations and rehash counts N relocated residents. Divide batch CPU time accordingly. |
+| `image_benchmarks` | One operation/sequence per iteration; labels state timed ownership and retained reset work. Workload throughput counts processed pixels; the constant-foldable RGB alpha control counts reductions, not memory traffic or frames. |
 
 Fixture setup and complete-result validation are untimed for byte, line, I/O,
-logging and flat hash benchmarks. Preserve their independent checks and labels:
+logging, flat hash and image benchmarks. Preserve their independent checks and labels:
 
 - **Bytes:** deterministic input and complete-result fingerprints; independent
   byte oracles check signed zeros, NaN payloads, raw guards and post-loop results.
@@ -242,6 +248,11 @@ logging and flat hash benchmarks. Preserve their independent checks and labels:
 - **Logging:** complete output checks; file lines are warm writes, without
   durability sync.
 - **Flat hash storage:** an independent ordered oracle checks complete key/value membership and duplicate iteration before/after timing, including embedded-NUL/UTF-8 keys. New-insertion cases include owner creation/destruction; duplicate, lookup, churn, clear/reuse and sparse iteration keep owners outside timing. Collision rehash pauses copy/setup and includes only reserve/rebuild. Full-hash collisions are a stress case, not representative default-hash throughput.
+- **Images:** complete shape/format/raw-byte fingerprints before and after timing, with independent raw crop/copy/conversion/compositing oracles and robust hand-solved sampling/reference cases. Owning outputs include allocation/release; retained targets include the labeled reset work. PNG cases include real libpng and Buffer ownership/cursors, not a copied codec.
+  The RGB alpha-only reader is an explicitly constant-foldable control: its
+  implicit alpha is always 255, so report reductions, not memory throughput or
+  per-pixel traversal gains. The frozen comparison consumer retains its original
+  labels/counters; normalize that control as one reduction per iteration.
 
 ### Comparable measurements
 
@@ -263,6 +274,14 @@ original/current runs, retain raw JSON and compare per-item CPU medians. Include
 identical-binary A/A controls before attributing small changes; copy/move,
 allocation and hash/equality counters explain work but do not establish timing
 gains or frame-rate improvements.
+For images, freeze the original production sources, BMIs and linked executable
+before rebuilding. Build the same benchmark consumer against original/current
+modules, adapting only baseline C++ API spellings. Match every fixture/result
+label before timing; also compare full serialized image outputs across formats,
+scales and aliasing cases and exercise actual Assets, metadata and Lua bindings
+with private runtime storage. Pin one CPU, alternate seven original/current runs
+and retain identical-binary A/A controls. Report regressions and allocation-byte
+counts separately; pixel throughput does not establish frame-rate gains.
 
 ## Runtime performance evidence
 

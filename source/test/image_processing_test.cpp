@@ -28,11 +28,12 @@ using InjectedReferenceFailure = StarError<InjectedReferenceFailureTag, StarExce
 Vec4B scalarHsv(Vec4B pixel, ImageOperation const& operation) {
   if (pixel[3] == 0)
     return pixel;
-  if (auto hue = std::get_if<HueShiftImageOperation>(&operation))
-    return Color::hueShiftVec4B(pixel, hue->hueShiftAmount);
+  if (std::holds_alternative<HueShiftImageOperation>(operation))
+    return Color::hueShiftVec4B(pixel, std::get<HueShiftImageOperation>(operation).hueShiftAmount);
   Color color = Color::rgba(pixel);
-  if (auto saturation = std::get_if<SaturationShiftImageOperation>(&operation))
-    color.setSaturation(std::clamp(color.saturation() + saturation->saturationShiftAmount, 0.0f, 1.0f));
+  if (std::holds_alternative<SaturationShiftImageOperation>(operation))
+    color.setSaturation(std::clamp(
+      color.saturation() + std::get<SaturationShiftImageOperation>(operation).saturationShiftAmount, 0.0f, 1.0f));
   else
     color.setValue(
       std::clamp(color.value() * std::get<BrightnessMultiplyImageOperation>(operation).brightnessMultiply, 0.0f, 1.0f));
@@ -41,13 +42,13 @@ Vec4B scalarHsv(Vec4B pixel, ImageOperation const& operation) {
 
 void expectPixels(Image const& actual, Image const& expected) {
   EXPECT_EQ(actual.size(), expected.size());
-  EXPECT_EQ(actual.pixelFormat(), expected.pixelFormat());
-  if (actual.size() != expected.size() || actual.pixelFormat() != expected.pixelFormat())
+  EXPECT_EQ(actual.pixel_format(), expected.pixel_format());
+  if (actual.size() != expected.size() || actual.pixel_format() != expected.pixel_format())
     return;
   if (std::ranges::equal(actual.data(), expected.data()))
     return;
   ADD_FAILURE() << "image bytes differ";
-  auto bytesPerPixel = actual.bytesPerPixel();
+  auto bytesPerPixel = actual.bytes_per_pixel();
   auto rowBytes = actual.width() * bytesPerPixel;
   for (size_t offset = 0; offset < actual.data().size(); ++offset) {
     EXPECT_EQ(actual.data()[offset], expected.data()[offset])
@@ -59,7 +60,7 @@ void expectPixels(Image const& actual, Image const& expected) {
 std::expected<void, StarException> sequentialOperations(List<ImageOperation> const& operations, Image& image,
                                                         ImageReferenceCallback callback = {}) {
   for (auto const& operation : operations) {
-    auto processed = processImageOperation(operation, image, callback);
+    auto processed = process_image_operation(operation, image, callback);
     if (!processed)
       return std::unexpected(std::move(processed.error()));
   }
@@ -70,11 +71,12 @@ void expectOptimizedOperations(List<ImageOperation> const& operations, Image con
                                ImageReferenceCallback callback = {}) {
   Image expected = original;
   auto sequential = sequentialOperations(operations, expected, callback);
-  std::vector<ImageOperation const*> pointers;
+  std::vector<std::reference_wrapper<ImageOperation const>> references;
   for (auto const& operation : operations)
-    pointers.push_back(&operation);
+    references.push_back(std::cref(operation));
   Image actual = original;
-  auto optimized = processImageOperations(std::span<ImageOperation const* const>(pointers), actual, callback);
+  auto optimized = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(references),
+                                            actual, callback);
   EXPECT_EQ(bool(optimized), bool(sequential));
   if (bool(optimized) != bool(sequential))
     return;
@@ -108,9 +110,9 @@ TEST(ImageProcessingTest, HsvRepeatedColorsCollisionsAndHiddenRgb) {
           ImageOperation(SaturationShiftImageOperation{-0.31f}),
           ImageOperation(BrightnessMultiplyImageOperation{1.37f})}) {
       Image expected = original;
-      expected.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) { pixel = scalarHsv(pixel, operation); });
+      expected.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) { pixel = scalarHsv(pixel, operation); });
       Image actual = original;
-      ASSERT_TRUE(processImageOperation(operation, actual));
+      ASSERT_TRUE(process_image_operation(operation, actual));
       expectPixels(actual, expected);
       EXPECT_EQ(actual.get32(0, 0), Vec4B(91, 47, 213, 0));
     }
@@ -126,9 +128,9 @@ TEST(ImageProcessingTest, ExactHsvIdentitiesKeepBytesAfterFormatConversion) {
       ASSERT_TRUE(image.set(0, 0, Vec4B(17, 91, 203, 127)));
       ASSERT_TRUE(image.set(1, 0, Vec4B(91, 47, 213, 0)));
       ASSERT_TRUE(image.set(2, 0, Vec4B(255, 1, 127, 255)));
-      ASSERT_TRUE(processImageOperation(imageOperationFromString(StringView(std::string_view(directive))), image));
+      ASSERT_TRUE(process_image_operation(image_operation_from_string(StringView(std::string_view(directive))), image));
       bool was24 = format == PixelFormat::RGB24 || format == PixelFormat::BGR24;
-      EXPECT_EQ(image.pixelFormat(),
+      EXPECT_EQ(image.pixel_format(),
                 format == PixelFormat::BGR24     ? PixelFormat::BGRA32
                   : format == PixelFormat::RGB24 ? PixelFormat::RGBA32
                                                  : format);
@@ -159,18 +161,18 @@ TEST(ImageProcessingTest, ReplaceThresholdRunsTransparentKeysAndSingleStepChains
         Image expected = image.convert(format == PixelFormat::BGR24     ? PixelFormat::BGRA32
                                          : format == PixelFormat::RGB24 ? PixelFormat::RGBA32
                                                                         : format);
-        expected.forEachPixel([&](unsigned, unsigned, Vec4B& pixel) {
+        expected.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
           if (auto replacement = operation.colorReplaceMap.maybe(pixel))
             pixel = *replacement;
         });
-        ASSERT_TRUE(processImageOperation(operation, image));
+        ASSERT_TRUE(process_image_operation(operation, image));
         expectPixels(image, expected);
       }
     }
   }
   Image image = Image::filled(Vec2U(1024, 1), transparent);
   Image expected = image;
-  ASSERT_TRUE(processImageOperation(ColorReplaceImageOperation{}, image));
+  ASSERT_TRUE(process_image_operation(ColorReplaceImageOperation{}, image));
   expectPixels(image, expected);
 }
 
@@ -178,7 +180,7 @@ TEST(ImageProcessingTest, BlendMatchesOrderedFourChannelScalarSemantics) {
   Image first = Image::filled(Vec2U(2, 3), Vec4B(61, 137, 203, 79), PixelFormat::BGRA32);
   Image second = Image::filled(Vec2U(4, 1), Vec4B(173, 29, 89, 151), PixelFormat::RGB24);
   Image empty;
-  std::array<Image const*, 3> references{&first, &second, &empty};
+  std::array<std::reference_wrapper<Image const>, 3> references{std::cref(first), std::cref(second), std::cref(empty)};
   for (auto mode : {BlendImageOperation::Multiply, BlendImageOperation::Screen}) {
     for (auto offset : {Vec2I(0, 0), Vec2I(-1, -2), Vec2I(1, 1), Vec2I(9, -9),
                         Vec2I(std::numeric_limits<int>::min(), 0), Vec2I(0, std::numeric_limits<int>::min()),
@@ -193,11 +195,12 @@ TEST(ImageProcessingTest, BlendMatchesOrderedFourChannelScalarSemantics) {
         for (unsigned y = 0; y < expected.height(); ++y) {
           for (unsigned x = 0; x < expected.width(); ++x) {
             Vec4F result = Color::v4bToFloat(expected.get32(x, y));
-            for (auto reference : references) {
+            for (auto referenceWrapper : references) {
+              auto const& reference = referenceWrapper.get();
               std::int64_t px = std::int64_t(x) + offset[0], py = std::int64_t(y) + offset[1];
-              if (px < 0 || py < 0 || px >= reference->width() || py >= reference->height())
+              if (px < 0 || py < 0 || px >= reference.width() || py >= reference.height())
                 continue;
-              auto pixel = reference->get(Vec2U(px, py));
+              auto pixel = reference.get(Vec2U(px, py));
               ASSERT_TRUE(pixel);
               Vec4F other = Color::v4bToFloat(*pixel);
               for (unsigned channel = 0; channel < 4; ++channel)
@@ -210,11 +213,11 @@ TEST(ImageProcessingTest, BlendMatchesOrderedFourChannelScalarSemantics) {
         }
         unsigned calls = 0;
         BlendImageOperation operation{mode, {"first", "second", "empty"}, offset};
-        ASSERT_TRUE(processImageOperation(
+        ASSERT_TRUE(process_image_operation(
           operation, actual,
           [&](String const& name) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
             EXPECT_EQ(name.utf8(), std::string_view(calls == 0 ? "first" : calls == 1 ? "second" : "empty"));
-            return std::cref(*references[calls++]);
+            return references[calls++];
           }));
         EXPECT_EQ(calls, 3u);
         expectPixels(actual, expected);
@@ -228,12 +231,12 @@ TEST(ImageProcessingTest, BlendErrorsPrecedeOverlapAndRetainReferenceOrder) {
   BlendImageOperation operation{BlendImageOperation::Multiply,
                                 {"missing", "later"},
                                 Vec2I(std::numeric_limits<int>::min(), std::numeric_limits<int>::max())};
-  auto absentCallback = processImageOperation(operation, image);
+  auto absentCallback = process_image_operation(operation, image);
   ASSERT_FALSE(absentCallback);
   EXPECT_NE(std::string_view(absentCallback.error().what()).find("Missing image ref callback"), std::string_view::npos);
-  EXPECT_EQ(image.pixelFormat(), PixelFormat::BGRA32);
+  EXPECT_EQ(image.pixel_format(), PixelFormat::BGRA32);
   unsigned calls = 0;
-  auto missing = processImageOperation(
+  auto missing = process_image_operation(
     operation, image,
     [&](String const& name) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
       ++calls;
@@ -244,7 +247,7 @@ TEST(ImageProcessingTest, BlendErrorsPrecedeOverlapAndRetainReferenceOrder) {
   EXPECT_EQ(calls, 1u);
   EXPECT_NE(std::string_view(missing.error().what()).find("Missing blend image 'missing'"), std::string_view::npos);
   calls = 0;
-  auto failed = processImageOperation(
+  auto failed = process_image_operation(
     operation, image,
     [&](String const&) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
       ++calls;
@@ -255,7 +258,7 @@ TEST(ImageProcessingTest, BlendErrorsPrecedeOverlapAndRetainReferenceOrder) {
   EXPECT_NE(std::string_view(failed.error().what()).find("reference failure"), std::string_view::npos);
   calls = 0;
   Image unchanged = image;
-  auto laterFailure = processImageOperation(
+  auto laterFailure = process_image_operation(
     operation, image,
     [&](String const& name) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
       ++calls;
@@ -270,12 +273,12 @@ TEST(ImageProcessingTest, BlendErrorsPrecedeOverlapAndRetainReferenceOrder) {
   expectPixels(image, unchanged);
   operation.blendImages.clear();
   Image before = image;
-  ASSERT_TRUE(processImageOperation(operation, image));
+  ASSERT_TRUE(process_image_operation(operation, image));
   expectPixels(image, before);
   Image invalid(1, 1, PixelFormat::RGB24);
-  auto malformed = processImageOperation(ErrorImageOperation{ImageOperationException("invalid directive")}, invalid);
+  auto malformed = process_image_operation(ErrorImageOperation{ImageOperationException("invalid directive")}, invalid);
   ASSERT_FALSE(malformed);
-  EXPECT_EQ(invalid.pixelFormat(), PixelFormat::RGB24);
+  EXPECT_EQ(invalid.pixel_format(), PixelFormat::RGB24);
 }
 
 TEST(ImageProcessingTest, OptimizedDeterministicColorScaleCropChainsMatchSequential) {
@@ -462,11 +465,11 @@ TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
     Image original = Image::filled(Vec2U(4, 3), Vec4B(0, 0, 0, 0), PixelFormat::BGR24);
     Image expected = original, actual = original;
     auto sequential = sequentialOperations(operations, expected, callback(expectedCalls));
-    std::vector<ImageOperation const*> pointers;
+    std::vector<std::reference_wrapper<ImageOperation const>> references;
     for (auto const& operation : operations)
-      pointers.push_back(&operation);
-    auto optimized =
-      processImageOperations(std::span<ImageOperation const* const>(pointers), actual, callback(actualCalls));
+      references.push_back(std::cref(operation));
+    auto optimized = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(references),
+                                              actual, callback(actualCalls));
     ASSERT_FALSE(sequential);
     ASSERT_FALSE(optimized);
     EXPECT_EQ(optimized.error().is<InjectedOperationFailure>(), index == 0 || index == 4);
@@ -525,7 +528,7 @@ TEST(ImageProcessingTest, DirtyBlendRetainsPerOperationCallbackValueSemantics) {
   ASSERT_NO_FATAL_FAILURE(expectOptimizedOperations(operations, original, callback));
   Image expected = original;
   ASSERT_TRUE(sequentialOperations(operations, expected, callback));
-  auto listed = processImageOperations(operations, original, callback);
+  auto listed = process_image_operations(operations, original, callback);
   ASSERT_TRUE(listed);
   ASSERT_NO_FATAL_FAILURE(expectPixels(*listed, expected));
   ASSERT_NO_FATAL_FAILURE(expectPixels(original, Image::filled(Vec2U(8, 5), Vec4B(0, 0, 0, 0))));
@@ -539,7 +542,7 @@ TEST(ImageProcessingTest, ListOperationsPreserveInputOnSuccessAndReferenceFailur
                                   CropImageOperation{RectI(1, 1, 4, 3)}};
   Image expected = original;
   ASSERT_TRUE(sequentialOperations(operations, expected));
-  auto listed = processImageOperations(operations, original);
+  auto listed = process_image_operations(operations, original);
   ASSERT_TRUE(listed);
   ASSERT_NO_FATAL_FAILURE(expectPixels(*listed, expected));
   ASSERT_NO_FATAL_FAILURE(expectPixels(original, before));
@@ -556,7 +559,7 @@ TEST(ImageProcessingTest, ListOperationsPreserveInputOnSuccessAndReferenceFailur
   ASSERT_FALSE(sequential);
   EXPECT_TRUE(sequential.error().is<InjectedReferenceFailure>());
   calls.clear();
-  auto failed = processImageOperations(operations, original, callback);
+  auto failed = process_image_operations(operations, original, callback);
   ASSERT_FALSE(failed);
   EXPECT_TRUE(failed.error().is<InjectedReferenceFailure>());
   EXPECT_EQ(calls, (std::vector<String>{"failure"}));

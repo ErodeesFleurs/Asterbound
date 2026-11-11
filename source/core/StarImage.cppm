@@ -5,356 +5,217 @@ import star.string;
 import star.vector;
 import star.io_device;
 
-import star.math_common;
 namespace Star {
 
 class Logger;
 
-enum class PixelFormat : std::uint8_t {
-  RGB24,
-  RGBA32,
-  BGR24,
-  BGRA32,
-  RGB_F,
-  RGBA_F
-};
+enum class PixelFormat : std::uint8_t { RGB24, RGBA32, BGR24, BGRA32, RGB_F, RGBA_F };
 
-std::uint8_t bitsPerPixel(PixelFormat pf);
-std::uint8_t bytesPerPixel(PixelFormat pf);
+constexpr std::uint8_t bytes_per_pixel(PixelFormat format) noexcept {
+  switch (format) {
+  case PixelFormat::RGB24:
+  case PixelFormat::BGR24: return 3;
+  case PixelFormat::RGBA32:
+  case PixelFormat::BGRA32: return 4;
+  case PixelFormat::RGB_F: return 12;
+  default: return 16;
+  }
+}
+constexpr std::uint8_t bits_per_pixel(PixelFormat format) noexcept { return bytes_per_pixel(format) * 8; }
 
 struct ImageExceptionTag {
   static constexpr std::string_view name() { return "ImageException"; }
 };
 using ImageException = StarError<ImageExceptionTag, StarException>;
 
-// Holds an image of PixelFormat in row major order, with no padding, with (0,
-// 0) defined to be the *lower left* corner.
+// Traversal accepts void or the existing default-success/error result protocol.
+// Check the actual lvalue call and contextual failure conversion, not predicate.
+template <typename Result>
+concept pixel_result = std::is_void_v<Result> || (std::is_object_v<Result> && requires(Result& result) {
+                         Result{};
+                         !result ? 0 : 0;
+                         result.error();
+                         Result(std::unexpected(std::move(result.error())));
+                       });
+
+template <typename Callback, typename Pixel>
+concept pixel_callback = std::invocable<Callback&, unsigned, unsigned, Pixel>
+  && pixel_result<std::invoke_result_t<Callback&, unsigned, unsigned, Pixel>>;
+
+template <typename Callback>
+concept pixel_reader = pixel_callback<Callback, Vec4B const&>;
+
+template <typename Callback>
+concept pixel_writer = pixel_callback<Callback, Vec4B&>;
+
+// Tightly packed row-major storage, with (0, 0) at the lower-left corner.
 class Image {
 public:
-  [[nodiscard]] static std::expected<Image, StarException> readPng(Logger& logger, std::shared_ptr<IODevice> device);
-  [[nodiscard]] static std::expected<bool, StarException> isPng(std::shared_ptr<IODevice> device);
-  // Returns the size and pixel format that would be constructed from the given
-  // png file, without actually loading it.
-  [[nodiscard]] static std::expected<std::tuple<Vec2U, PixelFormat>, StarException> readPngMetadata(Logger& logger, std::shared_ptr<IODevice> device);
+  [[nodiscard]] static std::expected<Image, StarException> read_png(Logger& logger, std::shared_ptr<IODevice> device);
+  [[nodiscard]] static std::expected<bool, StarException> is_png(std::shared_ptr<IODevice> device);
+  [[nodiscard]] static std::expected<std::tuple<Vec2U, PixelFormat>, StarException>
+  read_png_metadata(Logger& logger, std::shared_ptr<IODevice> device);
 
-  static Image filled(Vec2U size, Vec4B color, PixelFormat pf = PixelFormat::RGBA32);
+  // Validate a layout without allocating; the result is a byte count.
+  [[nodiscard]] static std::expected<std::size_t, StarException> size_bytes(Vec2U size, PixelFormat format);
+  static Image filled(Vec2U size, Vec4B color, PixelFormat format = PixelFormat::RGBA32);
+  // Like make_unique_for_overwrite: every byte must be written before reading.
+  static Image for_overwrite(Vec2U size, PixelFormat format = PixelFormat::RGBA32);
 
-  // Creates a zero size image
-  Image() : Image(PixelFormat::RGBA32) {}
-  Image(PixelFormat pf);
-  Image(Vec2U size, PixelFormat pf = PixelFormat::RGBA32);
-  Image(unsigned width, unsigned height, PixelFormat pf = PixelFormat::RGBA32);
+  Image() noexcept : Image(PixelFormat::RGBA32) {}
+  Image(PixelFormat format) noexcept;
+  Image(Vec2U size, PixelFormat format = PixelFormat::RGBA32);
+  Image(unsigned width, unsigned height, PixelFormat format = PixelFormat::RGBA32);
   ~Image();
-
   Image(Image const& image);
-  Image(Image&& image);
-
+  Image(Image&& image) noexcept;
   Image& operator=(Image const& image);
-  Image& operator=(Image&& image);
+  Image& operator=(Image&& image) noexcept;
 
-  std::uint8_t bitsPerPixel() const;
-  std::uint8_t bytesPerPixel() const;
+  std::uint8_t bits_per_pixel() const noexcept { return Star::bits_per_pixel(m_pixelFormat); }
+  std::uint8_t bytes_per_pixel() const noexcept { return Star::bytes_per_pixel(m_pixelFormat); }
+  unsigned width() const noexcept { return m_width; }
+  unsigned height() const noexcept { return m_height; }
+  Vec2U size() const noexcept { return {m_width, m_height}; }
+  bool empty() const noexcept { return m_width == 0 || m_height == 0; }
+  PixelFormat pixel_format() const noexcept { return m_pixelFormat; }
+  std::size_t size_bytes() const noexcept { return std::size_t(m_width) * m_height * bytes_per_pixel(); }
+  std::span<std::uint8_t const> data() const noexcept { return {m_data.get(), size_bytes()}; }
+  std::span<std::uint8_t> data() noexcept { return {m_data.get(), size_bytes()}; }
 
-  unsigned width() const;
-  unsigned height() const;
-  Vec2U size() const;
-  // width or height is 0
-  bool empty() const;
+  // Changed layouts are zeroed. An unchanged extent/format preserves pixels.
+  void reset(Vec2U size, std::optional<PixelFormat> format = {});
+  void reset(unsigned width, unsigned height, std::optional<PixelFormat> format = {});
+  void fill(Vec3B const& color);
+  void fill(Vec4B const& color);
+  [[nodiscard]] std::expected<void, StarException> fill_rect(Vec2U const& pos, Vec2U const& size, Vec3B const& color);
+  [[nodiscard]] std::expected<void, StarException> fill_rect(Vec2U const& pos, Vec2U const& size, Vec4B const& color);
 
-  PixelFormat pixelFormat() const;
-
-  // Borrows the tightly packed image storage.
-  std::span<std::uint8_t const> data() const;
-  std::span<std::uint8_t> data();
-
-  // Reallocate the image with the given width, height, and pixel format.  The
-  // contents of the image are always zeroed after a call to reset.
-  void reset(Vec2U size, std::optional<PixelFormat> pf = {});
-  void reset(unsigned width, unsigned height, std::optional<PixelFormat> pf = {});
-
-  // Fill the image with a given color
-  void fill(Vec3B const& c);
-  void fill(Vec4B const& c);
-
-  // Fill a rectangle with a given color
-  [[nodiscard]] std::expected<void, StarException> fillRect(Vec2U const& pos, Vec2U const& size, Vec3B const& c);
-  [[nodiscard]] std::expected<void, StarException> fillRect(Vec2U const& pos, Vec2U const& size, Vec4B const& c);
-
-  // Color values use the internal format. Missing alpha is 255.
-  // Invalid coordinates are recoverable errors.
-  [[nodiscard]] std::expected<void, StarException> set(Vec2U const& pos, Vec4B const& c);
-  [[nodiscard]] std::expected<void, StarException> set(Vec2U const& pos, Vec3B const& c);
+  // Raw internal channels; missing alpha is 255. Invalid coordinates are errors.
+  [[nodiscard]] std::expected<void, StarException> set(Vec2U const& pos, Vec4B const& color);
+  [[nodiscard]] std::expected<void, StarException> set(Vec2U const& pos, Vec3B const& color);
   [[nodiscard]] std::expected<Vec4B, StarException> get(Vec2U const& pos) const;
-
-  // Same operations with RGB[A] color conversion.
-  [[nodiscard]] std::expected<void, StarException> setrgb(Vec2U const& pos, Vec4B const& c);
-  [[nodiscard]] std::expected<void, StarException> setrgb(Vec2U const& pos, Vec3B const& c);
-  [[nodiscard]] std::expected<Vec4B, StarException> getrgb(Vec2U const& pos) const;
-
-  // Get pixel value, but if pos is out of the normal pixel range, it is
-  // clamped back into the valid pixel range.  Returns (0, 0, 0, 0) if image is
-  // empty.
+  [[nodiscard]] std::expected<void, StarException> set_rgb(Vec2U const& pos, Vec4B const& color);
+  [[nodiscard]] std::expected<void, StarException> set_rgb(Vec2U const& pos, Vec3B const& color);
+  [[nodiscard]] std::expected<Vec4B, StarException> get_rgb(Vec2U const& pos) const;
+  // Empty images clamp to transparent black.
   Vec4B clamp(Vec2I const& pos) const;
-  Vec4B clamprgb(Vec2I const& pos) const;
+  Vec4B clamp_rgb(Vec2I const& pos) const;
 
-  // x / y versions of set / get, for compatibility
-  [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, Vec4B const& c);
-  [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, Vec3B const& c);
-  [[nodiscard]] std::expected<Vec4B, StarException> get(unsigned x, unsigned y) const;
-  [[nodiscard]] std::expected<void, StarException> setrgb(unsigned x, unsigned y, Vec4B const& c);
-  [[nodiscard]] std::expected<void, StarException> setrgb(unsigned x, unsigned y, Vec3B const& c);
-  [[nodiscard]] std::expected<Vec4B, StarException> getrgb(unsigned x, unsigned y) const;
-  Vec4B clamp(int x, int y) const;
-  Vec4B clamprgb(int x, int y) const;
+  [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, Vec4B const& color) {
+    return set({x, y}, color);
+  }
+  [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, Vec3B const& color) {
+    return set({x, y}, color);
+  }
+  [[nodiscard]] std::expected<Vec4B, StarException> get(unsigned x, unsigned y) const { return get({x, y}); }
+  [[nodiscard]] std::expected<void, StarException> set_rgb(unsigned x, unsigned y, Vec4B const& color) {
+    return set_rgb({x, y}, color);
+  }
+  [[nodiscard]] std::expected<void, StarException> set_rgb(unsigned x, unsigned y, Vec3B const& color) {
+    return set_rgb({x, y}, color);
+  }
+  [[nodiscard]] std::expected<Vec4B, StarException> get_rgb(unsigned x, unsigned y) const { return get_rgb({x, y}); }
+  Vec4B clamp(int x, int y) const { return clamp({x, y}); }
+  Vec4B clamp_rgb(int x, int y) const { return clamp_rgb({x, y}); }
 
-  // Must be 32 bitsPerPixel, no format conversion or bounds checking takes
-  // place.  Very fast inline versions.
-  void set32(Vec2U const& pos, Vec4B const& c);
-  void set32(unsigned x, unsigned y, Vec4B const& c);
-  Vec4B get32(unsigned x, unsigned y) const;
+  // Unchecked raw access for exactly four- or three-byte pixels.
+  void set32(Vec2U const& pos, Vec4B const& color) noexcept { set32(pos[0], pos[1], color); }
+  void set32(unsigned x, unsigned y, Vec4B const& color) noexcept;
+  Vec4B get32(unsigned x, unsigned y) const noexcept;
+  void set24(Vec2U const& pos, Vec3B const& color) noexcept { set24(pos[0], pos[1], color); }
+  void set24(unsigned x, unsigned y, Vec3B const& color) noexcept;
+  Vec3B get24(unsigned x, unsigned y) const noexcept;
 
-  // Must be 24 bitsPerPixel, no format conversion or bounds checking takes
-  // place.  Very fast inline versions.
-  void set24(Vec2U const& pos, Vec3B const& c);
-  void set24(unsigned x, unsigned y, Vec3B const& c);
-  Vec3B get24(unsigned x, unsigned y) const;
+  // Callbacks are borrowed lvalues. A failed mutable pixel is not committed.
+  template <pixel_reader Callback> [[nodiscard]] auto for_each_pixel(Callback&& callback) const {
+    return for_each_pixel_impl<false>(*this, callback);
+  }
+  template <pixel_writer Callback> [[nodiscard]] auto for_each_pixel(Callback&& callback) {
+    return for_each_pixel_impl<true>(*this, callback);
+  }
 
-  // Called as callback(unsigned x, unsigned y, Vec4B const& pixel)
-  template <typename CallbackType>
-  [[nodiscard]] auto forEachPixel(CallbackType&& callback) const;
-
-  // Called as callback(unsigned x, unsigned y, Vec4B& pixel)
-  template <typename CallbackType>
-  [[nodiscard]] auto forEachPixel(CallbackType&& callback);
-
-  // Pixel rectangle, lower left position and size of rectangle.
-  [[nodiscard]] std::expected<Image, StarException> subImage(Vec2U const& pos, Vec2U const& size) const;
-
-  // Copy given image into this one at pos
-  [[nodiscard]] std::expected<void, StarException> copyInto(Vec2U const& pos, Image const& image);
-  // Draw given image over this one at pos (with alpha composition)
-  [[nodiscard]] std::expected<void, StarException> drawInto(Vec2U const& pos, Image const& image);
-
-  // Convert this image into the given pixel format
-  Image convert(PixelFormat pixelFormat) const;
-
-  [[nodiscard]] std::expected<void, StarException> writePng(Logger& logger, std::shared_ptr<IODevice> device) const;
+  [[nodiscard]] std::expected<Image, StarException> sub_image(Vec2U const& pos, Vec2U const& size) const;
+  [[nodiscard]] std::expected<void, StarException> copy_into(Vec2U const& pos, Image const& image);
+  [[nodiscard]] std::expected<void, StarException> draw_into(Vec2U const& pos, Image const& image);
+  // Retains the existing raw-channel conversion, including BGR ordering.
+  Image convert(PixelFormat format) const;
+  [[nodiscard]] std::expected<void, StarException> write_png(Logger& logger, std::shared_ptr<IODevice> device) const;
 
 private:
-  std::uint8_t* m_data;
+  void reallocate(Vec2U size, PixelFormat format, bool initialize);
+
+  template <bool Writable, typename Callback>
+    requires(Writable ? pixel_writer<Callback> : pixel_reader<Callback>)
+  static auto for_each_pixel_impl(std::conditional_t<Writable, Image, Image const>& image, Callback& callback);
+
+  std::unique_ptr<std::uint8_t[]> m_data;
   unsigned m_width;
   unsigned m_height;
   PixelFormat m_pixelFormat;
 };
 
-inline std::uint8_t bitsPerPixel(PixelFormat pf) {
-  switch (pf) {
-    case PixelFormat::RGB24:
-      return 24;
-    case PixelFormat::RGBA32:
-      return 32;
-    case PixelFormat::BGR24:
-      return 24;
-    case PixelFormat::BGRA32:
-      return 32;
-    case PixelFormat::RGB_F:
-      return 96;
-    default:
-      return 128;
-  }
-}
-
-inline std::uint8_t bytesPerPixel(PixelFormat pf) {
-  switch (pf) {
-    case PixelFormat::RGB24:
-      return 3;
-    case PixelFormat::RGBA32:
-      return 4;
-    case PixelFormat::BGR24:
-      return 3;
-    case PixelFormat::BGRA32:
-      return 4;
-    case PixelFormat::RGB_F:
-      return 12;
-    default:
-      return 16;
-  }
-}
-
-inline std::uint8_t Image::bitsPerPixel() const {
-  return Star::bitsPerPixel(m_pixelFormat);
-}
-
-inline std::uint8_t Image::bytesPerPixel() const {
-  return Star::bytesPerPixel(m_pixelFormat);
-}
-
-inline unsigned Image::width() const {
-  return m_width;
-}
-
-inline unsigned Image::height() const {
-  return m_height;
-}
-
-inline bool Image::empty() const {
-  return m_width == 0 || m_height == 0;
-}
-
-inline Vec2U Image::size() const {
-  return {m_width, m_height};
-}
-
-inline PixelFormat Image::pixelFormat() const {
-  return m_pixelFormat;
-}
-
-inline std::span<std::uint8_t const> Image::data() const {
-  return {m_data, std::size_t(m_width) * m_height * bytesPerPixel()};
-}
-
-inline std::span<std::uint8_t> Image::data() {
-  return {m_data, std::size_t(m_width) * m_height * bytesPerPixel()};
-}
-
-inline std::expected<void, StarException> Image::set(unsigned x, unsigned y, Vec4B const& c) {
-  return set({x, y}, c);
-}
-
-inline std::expected<void, StarException> Image::set(unsigned x, unsigned y, Vec3B const& c) {
-  return set({x, y}, c);
-}
-
-inline std::expected<Vec4B, StarException> Image::get(unsigned x, unsigned y) const {
-  return get({x, y});
-}
-
-inline std::expected<void, StarException> Image::setrgb(unsigned x, unsigned y, Vec4B const& c) {
-  return setrgb({x, y}, c);
-}
-
-inline std::expected<void, StarException> Image::setrgb(unsigned x, unsigned y, Vec3B const& c) {
-  return setrgb({x, y}, c);
-}
-
-inline std::expected<Vec4B, StarException> Image::getrgb(unsigned x, unsigned y) const {
-  return getrgb({x, y});
-}
-
-inline Vec4B Image::clamp(int x, int y) const {
-  return clamp({x, y});
-}
-
-inline Vec4B Image::clamprgb(int x, int y) const {
-  return clamprgb({x, y});
-}
-
-inline void Image::set32(Vec2U const& pos, Vec4B const& c) {
-  set32(pos[0], pos[1], c);
-}
-
-inline void Image::set32(unsigned x, unsigned y, Vec4B const& c) {
+inline void Image::set32(unsigned x, unsigned y, Vec4B const& color) noexcept {
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed(m_data && x < m_width && y < m_height);
+    Star::star_assert_failed(bytes_per_pixel() == 4);
   }
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bytesPerPixel() == 4));
-  }
-
-  std::size_t offset = y * m_width * 4 + x * 4;
-  m_data[offset] = c[0];
-  m_data[offset + 1] = c[1];
-  m_data[offset + 2] = c[2];
-  m_data[offset + 3] = c[3];
+  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 4);
+  for (unsigned channel = 0; channel != 4; ++channel)
+    pixel[channel] = color[channel];
 }
 
-inline Vec4B Image::get32(unsigned x, unsigned y) const {
+inline Vec4B Image::get32(unsigned x, unsigned y) const noexcept {
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed(m_data && x < m_width && y < m_height);
+    Star::star_assert_failed(bytes_per_pixel() == 4);
   }
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bytesPerPixel() == 4));
-  }
-
-  Vec4B c;
-  std::size_t offset = y * m_width * 4 + x * 4;
-  c[0] = m_data[offset];
-  c[1] = m_data[offset + 1];
-  c[2] = m_data[offset + 2];
-  c[3] = m_data[offset + 3];
-  return c;
+  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 4);
+  return {pixel[0], pixel[1], pixel[2], pixel[3]};
 }
 
-inline void Image::set24(Vec2U const& pos, Vec3B const& c) {
-  set24(pos[0], pos[1], c);
+inline void Image::set24(unsigned x, unsigned y, Vec3B const& color) noexcept {
+  if constexpr (Star::DebugEnabled) {
+    Star::star_assert_failed(m_data && x < m_width && y < m_height);
+    Star::star_assert_failed(bytes_per_pixel() == 3);
+  }
+  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 3);
+  for (unsigned channel = 0; channel != 3; ++channel)
+    pixel[channel] = color[channel];
 }
 
-inline void Image::set24(unsigned x, unsigned y, Vec3B const& c) {
+inline Vec3B Image::get24(unsigned x, unsigned y) const noexcept {
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_data && x < m_width && y < m_height));
+    Star::star_assert_failed(m_data && x < m_width && y < m_height);
+    Star::star_assert_failed(bytes_per_pixel() == 3);
   }
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bytesPerPixel() == 3));
-  }
-
-  std::size_t offset = y * m_width * 3 + x * 3;
-  m_data[offset] = c[0];
-  m_data[offset + 1] = c[1];
-  m_data[offset + 2] = c[2];
+  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 3);
+  return {pixel[0], pixel[1], pixel[2]};
 }
 
-inline Vec3B Image::get24(unsigned x, unsigned y) const {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_data && x < m_width && y < m_height));
-  }
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bytesPerPixel() == 3));
-  }
-
-  Vec3B c;
-  std::size_t offset = y * m_width * 3 + x * 3;
-  c[0] = m_data[offset];
-  c[1] = m_data[offset + 1];
-  c[2] = m_data[offset + 2];
-  return c;
-}
-
-template <typename CallbackType>
-[[nodiscard]] auto Image::forEachPixel(CallbackType&& callback) const {
-  using Result = std::invoke_result_t<CallbackType&, unsigned, unsigned, Vec4B const&>;
-  for (unsigned y = 0; y < m_height; ++y) {
-    for (unsigned x = 0; x < m_width; ++x) {
-      Vec4B pixel = bytesPerPixel() == 4 ? get32(x, y) : Vec4B(get24(x, y), 255);
-      if constexpr (std::is_void_v<Result>)
-        callback(x, y, pixel);
-      else {
-        auto result = callback(x, y, pixel);
+template <bool Writable, typename Callback>
+  requires(Writable ? pixel_writer<Callback> : pixel_reader<Callback>)
+auto Image::for_each_pixel_impl(std::conditional_t<Writable, Image, Image const>& image, Callback& callback) {
+  using Pixel = std::conditional_t<Writable, Vec4B&, Vec4B const&>;
+  using Result = std::invoke_result_t<Callback&, unsigned, unsigned, Pixel>;
+  for (unsigned y = 0; y < image.m_height; ++y) {
+    for (unsigned x = 0; x < image.m_width; ++x) {
+      Vec4B pixel = image.bytes_per_pixel() == 4 ? image.get32(x, y) : Vec4B(image.get24(x, y), 255);
+      Pixel argument = pixel;
+      if constexpr (std::is_void_v<Result>) {
+        std::invoke(callback, x, y, argument);
+      } else {
+        auto result = std::invoke(callback, x, y, argument);
         if (!result)
           return Result(std::unexpected(std::move(result.error())));
       }
-    }
-  }
-  if constexpr (!std::is_void_v<Result>)
-    return Result{};
-}
-
-template <typename CallbackType>
-[[nodiscard]] auto Image::forEachPixel(CallbackType&& callback) {
-  using Result = std::invoke_result_t<CallbackType&, unsigned, unsigned, Vec4B&>;
-  for (unsigned y = 0; y < m_height; ++y) {
-    for (unsigned x = 0; x < m_width; ++x) {
-      Vec4B pixel = bytesPerPixel() == 4 ? get32(x, y) : Vec4B(get24(x, y), 255);
-      if constexpr (std::is_void_v<Result>)
-        callback(x, y, pixel);
-      else {
-        auto result = callback(x, y, pixel);
-        if (!result)
-          return Result(std::unexpected(std::move(result.error())));
+      if constexpr (Writable) {
+        // Re-read storage after invoking user code, as the old traversal did.
+        if (image.bytes_per_pixel() == 4)
+          image.set32(x, y, pixel);
+        else
+          image.set24(x, y, pixel.vec3());
       }
-      if (bytesPerPixel() == 4)
-        set32(x, y, pixel);
-      else
-        set24(x, y, pixel.vec3());
     }
   }
   if constexpr (!std::is_void_v<Result>)
@@ -362,10 +223,9 @@ template <typename CallbackType>
 }
 
 struct ImageView {
-  inline bool empty() const { return size.x() == 0 || size.y() == 0; }
+  bool empty() const noexcept { return size.x() == 0 || size.y() == 0; }
   ImageView() = default;
   ImageView(Image const& image);
-
   Vec2U size{0, 0};
   std::span<std::uint8_t const> data;
   PixelFormat format = PixelFormat::RGB24;
@@ -376,11 +236,15 @@ struct ImageView {
 export module star.image;
 
 export namespace Star {
-  using ::Star::PixelFormat;
-  using ::Star::bitsPerPixel;
-  using ::Star::bytesPerPixel;
-  using ::Star::ImageExceptionTag;
-  using ::Star::ImageException;
-  using ::Star::ImageView;
-  using ::Star::Image;
+using ::Star::bits_per_pixel;
+using ::Star::bytes_per_pixel;
+using ::Star::Image;
+using ::Star::ImageException;
+using ::Star::ImageExceptionTag;
+using ::Star::ImageView;
+using ::Star::pixel_callback;
+using ::Star::pixel_reader;
+using ::Star::pixel_result;
+using ::Star::pixel_writer;
+using ::Star::PixelFormat;
 }

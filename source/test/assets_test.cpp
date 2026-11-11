@@ -219,7 +219,7 @@ namespace {
     auto image = pngTestImage(PixelFormat::RGBA32);
     if (!image)
       return std::unexpected(std::move(image.error()));
-    auto written = image->writePng(logger, buffer);
+    auto written = image->write_png(logger, buffer);
     if (!written)
       return std::unexpected(std::move(written.error()));
     return buffer->take_data();
@@ -1522,17 +1522,17 @@ const GameTestRegistration pngRoundTripPreservesPixelsAndMetadata("ImageTest", "
     auto image = pngTestImage(format);
     ASSERT_TRUE(image);
     auto buffer = std::make_shared<Buffer>();
-    ASSERT_TRUE(image->writePng(fixture.root().logger(), buffer));
+    ASSERT_TRUE(image->write_png(fixture.root().logger(), buffer));
     ASSERT_TRUE(buffer->seek(0));
-    auto metadata = Image::readPngMetadata(fixture.root().logger(), buffer);
+    auto metadata = Image::read_png_metadata(fixture.root().logger(), buffer);
     ASSERT_TRUE(metadata);
     auto [size, decodedFormat] = *metadata;
     EXPECT_EQ(size, image->size());
     EXPECT_EQ(decodedFormat, format);
     ASSERT_TRUE(buffer->seek(0));
-    auto decoded = Image::readPng(fixture.root().logger(), buffer);
+    auto decoded = Image::read_png(fixture.root().logger(), buffer);
     ASSERT_TRUE(decoded);
-    EXPECT_EQ(decoded->pixelFormat(), format);
+    EXPECT_EQ(decoded->pixel_format(), format);
     for (unsigned y = 0; y < 2; ++y)
       for (unsigned x = 0; x < 2; ++x) {
         auto actual = decoded->get(x, y);
@@ -1554,15 +1554,15 @@ const GameTestRegistration damagedPngHeaderAndImageDataThrow("ImageTest", "Damag
   badHeader[29] ^= 1; // IHDR CRC: signature intact, metadata parsing fails.
   auto badPixels = bytes;
   badPixels[41] = 0; // Invalid zlib header, reached after Image/rows allocation.
-  auto headerMetadata = Image::readPngMetadata(fixture.root().logger(), std::make_shared<Buffer>(badHeader));
+  auto headerMetadata = Image::read_png_metadata(fixture.root().logger(), std::make_shared<Buffer>(badHeader));
   ASSERT_FALSE(headerMetadata);
   EXPECT_TRUE(headerMetadata.error().is<ImageException>());
-  auto headerImage = Image::readPng(fixture.root().logger(), std::make_shared<Buffer>(badHeader));
+  auto headerImage = Image::read_png(fixture.root().logger(), std::make_shared<Buffer>(badHeader));
   ASSERT_FALSE(headerImage);
   EXPECT_TRUE(headerImage.error().is<ImageException>());
-  auto pixelMetadata = Image::readPngMetadata(fixture.root().logger(), std::make_shared<Buffer>(badPixels));
+  auto pixelMetadata = Image::read_png_metadata(fixture.root().logger(), std::make_shared<Buffer>(badPixels));
   ASSERT_TRUE(pixelMetadata);
-  auto pixelImage = Image::readPng(fixture.root().logger(), std::make_shared<Buffer>(badPixels));
+  auto pixelImage = Image::read_png(fixture.root().logger(), std::make_shared<Buffer>(badPixels));
   ASSERT_FALSE(pixelImage);
   EXPECT_TRUE(pixelImage.error().is<ImageException>());
 });
@@ -1571,17 +1571,17 @@ const GameTestRegistration pngCallbacksRethrowOriginalIoException("ImageTest", "
   auto bytes = pngTestBytes(fixture.root().logger());
   ASSERT_TRUE(bytes);
   auto metadata = std::make_shared<FailingPngBuffer>(*bytes, 8);
-  auto metadataResult = Image::readPngMetadata(fixture.root().logger(), metadata);
+  auto metadataResult = Image::read_png_metadata(fixture.root().logger(), metadata);
   ASSERT_FALSE(metadataResult);
   EXPECT_TRUE(metadataResult.error().is<PngIoFailure>());
   EXPECT_EQ(metadata->unwound, 1u);
   auto header = std::make_shared<FailingPngBuffer>(*bytes, 8);
-  auto headerResult = Image::readPng(fixture.root().logger(), header);
+  auto headerResult = Image::read_png(fixture.root().logger(), header);
   ASSERT_FALSE(headerResult);
   EXPECT_TRUE(headerResult.error().is<PngIoFailure>());
   EXPECT_EQ(header->unwound, 1u);
   auto pixels = std::make_shared<FailingPngBuffer>(*bytes, 41);
-  auto pixelResult = Image::readPng(fixture.root().logger(), pixels);
+  auto pixelResult = Image::read_png(fixture.root().logger(), pixels);
   ASSERT_FALSE(pixelResult);
   EXPECT_TRUE(pixelResult.error().is<PngIoFailure>());
   EXPECT_EQ(pixels->unwound, 1u);
@@ -1589,7 +1589,7 @@ const GameTestRegistration pngCallbacksRethrowOriginalIoException("ImageTest", "
     auto output = std::make_shared<FailingPngBuffer>(ByteArray{}, failAt);
     auto image = pngTestImage(PixelFormat::RGBA32);
     ASSERT_TRUE(image);
-    auto written = image->writePng(fixture.root().logger(), output);
+    auto written = image->write_png(fixture.root().logger(), output);
     ASSERT_FALSE(written);
     EXPECT_TRUE(written.error().is<PngIoFailure>());
     EXPECT_EQ(output->unwound, 1u);
@@ -1600,17 +1600,17 @@ const GameTestRegistration pngErrorCallbackContainsDiagnosticExceptions("ImageTe
   auto damaged = pngTestBytes(fixture.root().logger());
   ASSERT_TRUE(damaged);
   (*damaged)[29] ^= 1;
-  auto metadata = Image::readPngMetadata(fixture.root().logger(), std::make_shared<FailingPngNameBuffer>(*damaged));
+  auto metadata = Image::read_png_metadata(fixture.root().logger(), std::make_shared<FailingPngNameBuffer>(*damaged));
   ASSERT_FALSE(metadata);
   EXPECT_TRUE(metadata.error().is<PngIoFailure>());
-  auto image = Image::readPng(fixture.root().logger(), std::make_shared<FailingPngNameBuffer>(*damaged));
+  auto image = Image::read_png(fixture.root().logger(), std::make_shared<FailingPngNameBuffer>(*damaged));
   ASSERT_FALSE(image);
   EXPECT_TRUE(image.error().is<PngIoFailure>());
 });
 
 const GameTestRegistration invalidPngWriteThrows("ImageTest", "InvalidPngWriteThrows", [](GameTest& fixture) {
   auto output = std::make_shared<Buffer>();
-  auto written = Image().writePng(fixture.root().logger(), output);
+  auto written = Image().write_png(fixture.root().logger(), output);
   ASSERT_FALSE(written);
   EXPECT_TRUE(written.error().is<ImageException>());
 });

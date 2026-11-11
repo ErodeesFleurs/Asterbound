@@ -222,7 +222,7 @@ std::expected<void, StarException> Tileset::exportTilesetImages(String const& ex
     auto outputFile = File::open(imageName, IOMode::Write);
     if (!outputFile)
       return std::unexpected(std::move(outputFile.error()));
-    auto written = tile->image->writePng(m_logger, *outputFile);
+    auto written = tile->image->write_png(m_logger, *outputFile);
     if (!written)
       return std::unexpected(std::move(written.error()));
     auto closed = (*outputFile)->close();

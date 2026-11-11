@@ -21,13 +21,13 @@ Image directiveSource(PixelFormat format = PixelFormat::RGBA32) {
   Image image(7, 5, format);
   for (unsigned y = 0; y < image.height(); ++y)
     for (unsigned x = 0; x < image.width(); ++x)
-      EXPECT_TRUE(image.setrgb(x, y, Vec4B(17 + x * 23, 31 + y * 29, 83, (x + y) % 3 ? 191 : 0)));
+      EXPECT_TRUE(image.set_rgb(x, y, Vec4B(17 + x * 23, 31 + y * 29, 83, (x + y) % 3 ? 191 : 0)));
   return image;
 }
 
 void expectDirectiveImage(Image const& actual, Image const& expected) {
   ASSERT_EQ(actual.size(), expected.size());
-  ASSERT_EQ(actual.pixelFormat(), expected.pixelFormat());
+  ASSERT_EQ(actual.pixel_format(), expected.pixel_format());
   ASSERT_EQ(actual.data().size(), expected.data().size());
   EXPECT_TRUE(std::equal(actual.data().begin(), actual.data().end(), expected.data().begin()));
 }
@@ -38,7 +38,7 @@ std::expected<void, StarException> sequentialValidGroup(DirectivesGroup const& g
       auto shared = directives.get();
       if (!shared)
         return std::unexpected(std::move(shared.error()));
-      return processImageOperation(entry.loadOperation(shared->get()), image);
+      return process_image_operation(entry.loadOperation(shared->get()), image);
     });
 }
 }// namespace
@@ -55,7 +55,7 @@ TEST(ImageDirectivePipelineTest, OptimizationCrossesGroupsWithoutChangingPixelsO
     group.append(Directives("?saturation=-12?flipy?setcolor=123456"));
     Image expected = source;
     ASSERT_TRUE(sequentialValidGroup(group, expected));
-    auto actual = group.applyNewImage(source);
+    auto actual = group.apply_new_image(source);
     ASSERT_TRUE(actual) << actual.error().what();
     expectDirectiveImage(*actual, expected);
     expectDirectiveImage(source, untouched);
@@ -73,7 +73,7 @@ TEST(ImageDirectivePipelineTest, LaterParseErrorRetainsSuccessfullyExecutedPrefi
     else
       group = DirectivesGroup(String("?setcolor=123456?scalenearest=2;3?crop=not-a-number"));
     Image actual = directiveSource();
-    auto result = group.applyExistingImage(actual);
+    auto result = group.apply_existing_image(actual);
     ASSERT_FALSE(result);
     expectDirectiveImage(actual, expected);
   }
@@ -81,15 +81,15 @@ TEST(ImageDirectivePipelineTest, LaterParseErrorRetainsSuccessfullyExecutedPrefi
 
 TEST(ImageDirectivePipelineTest, EarlierExecutionErrorWinsOverLaterInvalidOperation) {
   Image expected = directiveSource();
-  ASSERT_TRUE(processImageOperation(SetColorImageOperation{Vec3B(18, 52, 86)}, expected));
-  auto firstError = processImageOperation(CropImageOperation{RectI(0, 0, 99, 99)}, expected);
+  ASSERT_TRUE(process_image_operation(SetColorImageOperation{Vec3B(18, 52, 86)}, expected));
+  auto firstError = process_image_operation(CropImageOperation{RectI(0, 0, 99, 99)}, expected);
   ASSERT_FALSE(firstError);
   EXPECT_TRUE(firstError.error().is<ImageException>());
   for (auto suffix : {std::string_view("?notAnOperation"), std::string_view("?crop=not-a-number")}) {
     DirectivesGroup group(String("?setcolor=123456?crop=0;0;99;99"));
     group.append(Directives(suffix));
     Image actual = directiveSource();
-    auto result = group.applyExistingImage(actual);
+    auto result = group.apply_existing_image(actual);
     ASSERT_FALSE(result);
     EXPECT_TRUE(result.error().is<ImageException>());
     expectDirectiveImage(actual, expected);
@@ -109,12 +109,12 @@ TEST(ImageDirectivePipelineTest, FailedReferenceKeepsEarlierBlendAndPrecedesPars
   };
   DirectivesGroup prefix(String("?blendmult=/tile.png;1;1"));
   Image expected = directiveSource();
-  ASSERT_TRUE(prefix.applyExistingImage(expected, reference));
+  ASSERT_TRUE(prefix.apply_existing_image(expected, reference));
   EXPECT_EQ(calls, (std::vector<String>{"/tile.png"}));
   calls.clear();
   DirectivesGroup group(String("?blendmult=/tile.png;1;1?blendscreen=/missing.png?crop=not-a-number"));
   Image actual = directiveSource();
-  auto result = group.applyExistingImage(actual, reference);
+  auto result = group.apply_existing_image(actual, reference);
   ASSERT_FALSE(result);
   EXPECT_TRUE(result.error().is<DirectiveReferenceFailure>());
   EXPECT_EQ(calls, (std::vector<String>{"/tile.png", "/missing.png"}));

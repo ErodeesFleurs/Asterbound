@@ -217,7 +217,7 @@ std::expected<void, StarException> drawNodes(Assets const& assets, std::shared_p
       return std::unexpected(std::move(position.error()));
     Vec2I nodePos = *position * TilePixels + Vec2I(0, TilePixels - (*nodeImage)->height());
     Vec2U nodeImagePos = Vec2U(nodePos - imagePosition);
-    auto drawn = image->drawInto(nodeImagePos, **nodeImage);
+    auto drawn = image->draw_into(nodeImagePos, **nodeImage);
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));
   }
@@ -266,7 +266,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   std::shared_ptr<::Star::Image> combinedImage = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
   combinedImage->fill(Vec4B(0, 0, 0, 0));
   for (std::shared_ptr<::Star::Image const> const& layer : layers) {
-    auto drawn = combinedImage->drawInto(imagePadding, *layer);
+    auto drawn = combinedImage->draw_into(imagePadding, *layer);
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));
   }
@@ -379,13 +379,13 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
     JsonObject properties{{"liquid", liquid->name}, {"//name", liquid->name}};
     updater.defineTile(std::make_shared<Tile>(Tile{*assetSource, "liquids", "liquids", liquid->name, image, properties}));
     auto sourceImage = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
-    auto copied = sourceImage->copyInto(Vec2U(), *image);
+    auto copied = sourceImage->copy_into(Vec2U(), *image);
     if (!copied)
       return std::unexpected(std::move(copied.error()));
-    auto horizontal = sourceImage->fillRect(Vec2U(), Vec2U(image->width(), 1), SourceLiquidBorderColor);
+    auto horizontal = sourceImage->fill_rect(Vec2U(), Vec2U(image->width(), 1), SourceLiquidBorderColor);
     if (!horizontal)
       return std::unexpected(std::move(horizontal.error()));
-    auto vertical = sourceImage->fillRect(Vec2U(), Vec2U(1, image->height()), SourceLiquidBorderColor);
+    auto vertical = sourceImage->fill_rect(Vec2U(), Vec2U(1, image->height()), SourceLiquidBorderColor);
     if (!vertical)
       return std::unexpected(std::move(vertical.error()));
     String sourceName = liquid->name + "_source";

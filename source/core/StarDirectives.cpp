@@ -11,6 +11,8 @@ import star.string_view;
 import star.directives;
 import star.image;
 import star.logging;
+import star.vector;
+import star.rect;
 
 namespace Star {
 
@@ -34,7 +36,7 @@ Directives::Entry::Entry(Entry const& other) {
 
 ImageOperation const& Directives::Entry::loadOperation(Shared const& parent) const {
   if (std::holds_alternative<NullImageOperation>(operation)) {
-    operation = imageOperationFromString(string(parent));
+    operation = image_operation_from_string(string(parent));
   }
   return operation;
 }
@@ -139,7 +141,8 @@ void Directives::parse(String&& directives) {
     if (end == std::string_view::npos)
       end = bytes.size();
     if (end != begin) {
-      ImageOperation operation = begin == 0 ? imageOperationFromString(bytes.substr(begin, end - begin)) : ImageOperation(NullImageOperation{});
+      ImageOperation operation = begin == 0 ? image_operation_from_string(bytes.substr(begin, end - begin))
+                                            : ImageOperation(NullImageOperation{});
       entries.emplace_back(std::move(operation), begin, end - begin);
     }
     begin = end + 1;
@@ -348,20 +351,11 @@ void DirectivesGroup::addToString(String& string) const {
   }
 }
 
-
-std::expected<Image, StarException> DirectivesGroup::applyNewImage(Image const& image, ImageReferenceCallback refCallback) const {
-  Image result = image;
-  auto applied = applyExistingImage(result, std::move(refCallback));
-  if (!applied)
-    return std::unexpected(std::move(applied.error()));
-  return result;
-}
-
-std::expected<void, StarException> DirectivesGroup::applyExistingImage(Image& image, ImageReferenceCallback refCallback) const {
-  List<ImageOperation const*> operations;
+static std::expected<void, StarException>
+collect_image_operations(DirectivesGroup const& group, List<std::reference_wrapper<ImageOperation const>>& operations) {
   bool first = true;
-  auto collected = forEach([&](Directives::Entry const& entry,
-                               Directives const& directives) -> std::expected<void, StarException> {
+  return group.forEach([&](Directives::Entry const& entry,
+                           Directives const& directives) -> std::expected<void, StarException> {
     ImageOperation const& operation = entry.loadOperation(*directives.m_shared);
     if (std::holds_alternative<ErrorImageOperation>(operation))
       return std::unexpected(std::get<ErrorImageOperation>(operation).cause);
@@ -370,14 +364,71 @@ std::expected<void, StarException> DirectivesGroup::applyExistingImage(Image& im
     // Accepted group prefixes only promote 24-bit input, already done by any
     // preceding executable operation. Omit redundant prefixes across groups.
     if (!std::holds_alternative<NullImageOperation>(operation) || operations.empty())
-      operations.push_back(&operation);
+      operations.push_back(std::cref(operation));
     first = false;
     return {};
   });
+}
+
+std::expected<Image, StarException> DirectivesGroup::apply_new_image(Image const& image,
+                                                                     ImageReferenceCallback refCallback) const {
+  List<std::reference_wrapper<ImageOperation const>> operations;
+  auto collected = collect_image_operations(*this, operations);
+  std::optional<Image> result;
+  if (image.bytes_per_pixel() == 3 || image.bytes_per_pixel() == 4) {
+    for (std::size_t i = 0; i < operations.size(); ++i) {
+      auto const& operation = operations[i].get();
+      if (std::holds_alternative<CropImageOperation>(operation)) {
+        auto const& crop = std::get<CropImageOperation>(operation);
+        auto min = crop.subset.min(), max = crop.subset.max();
+        if (min[0] >= 0 && min[1] >= 0 && max[0] >= min[0] && max[1] >= min[1] && std::uint64_t(max[0]) <= image.width()
+            && std::uint64_t(max[1]) <= image.height()
+            && std::uint64_t(max[0] - min[0]) * (max[1] - min[1]) < std::uint64_t(image.width()) * image.height()) {
+          // Exactly the in-place optimizer's safe reorder, seeded from the
+          // original source instead of first copying all of its pixels.
+          [[maybe_unused]] auto operationCallback = refCallback;
+          auto cropped = image.sub_image(Vec2U(min), Vec2U(crop.subset.size()));
+          if (!cropped)
+            return std::unexpected(std::move(cropped.error()));
+          result.emplace(std::move(*cropped));
+          if (result->bytes_per_pixel() == 3)
+            *result =
+              result->convert(result->pixel_format() == PixelFormat::BGR24 ? PixelFormat::BGRA32 : PixelFormat::RGBA32);
+          operations.erase(operations.begin() + i);
+        }
+        break;
+      }
+      // Scanlines depend on absolute y, and references can alias the original.
+      if (!std::holds_alternative<NullImageOperation>(operation)
+          && !std::holds_alternative<HueShiftImageOperation>(operation)
+          && !std::holds_alternative<SaturationShiftImageOperation>(operation)
+          && !std::holds_alternative<BrightnessMultiplyImageOperation>(operation)
+          && !std::holds_alternative<FadeToColorImageOperation>(operation)
+          && !std::holds_alternative<SetColorImageOperation>(operation)
+          && !std::holds_alternative<ColorReplaceImageOperation>(operation)
+          && !std::holds_alternative<MultiplyImageOperation>(operation))
+        break;
+    }
+  }
+  if (!result)
+    result.emplace(image);
+  auto applied = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(operations),
+                                          *result, std::move(refCallback));
+  if (!applied)
+    return std::unexpected(std::move(applied.error()));
+  if (!collected)
+    return std::unexpected(std::move(collected.error()));
+  return std::move(*result);
+}
+
+std::expected<void, StarException> DirectivesGroup::apply_existing_image(Image& image,
+                                                                         ImageReferenceCallback refCallback) const {
+  List<std::reference_wrapper<ImageOperation const>> operations;
+  auto collected = collect_image_operations(*this, operations);
   // A later parse error must not hide an earlier execution error or discard
   // the successfully applied prefix of an existing-image operation.
-  auto applied = processImageOperations(std::span<ImageOperation const* const>(operations.data(), operations.size()),
-                                        image, std::move(refCallback));
+  auto applied = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(operations),
+                                          image, std::move(refCallback));
   if (!applied)
     return std::unexpected(std::move(applied.error()));
   return collected;

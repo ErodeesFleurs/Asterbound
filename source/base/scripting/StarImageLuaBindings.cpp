@@ -31,13 +31,15 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
 
   if (auto result = methods.registerMethodWithSignature<Vec2U, Image&>("size", std::mem_fn(&Image::size)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = methods.registerMethod("drawInto", [](Image& image, Vec2U position, Image const& source) {
-    return image.drawInto(position, source);
-  }); !result)
+  if (auto result = methods.registerMethod(
+        "drawInto",
+        [](Image& image, Vec2U position, Image const& source) { return image.draw_into(position, source); });
+      !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = methods.registerMethod("copyInto", [](Image& image, Vec2U position, Image const& source) {
-    return image.copyInto(position, source);
-  }); !result)
+  if (auto result = methods.registerMethod(
+        "copyInto",
+        [](Image& image, Vec2U position, Image const& source) { return image.copy_into(position, source); });
+      !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = methods.registerMethod("set", [](Image& image, unsigned x, unsigned y, Color const& color) {
     return image.set(x, y, color.toRgba());
@@ -52,23 +54,25 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
   }); !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = methods.registerMethod("subImage", [](Image& image, Vec2U const& min, Vec2U const& size) {
-    return image.subImage(min, size);
-  }); !result)
+  if (auto result = methods.registerMethod(
+        "subImage", [](Image& image, Vec2U const& min, Vec2U const& size) { return image.sub_image(min, size); });
+      !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto result = methods.registerMethod("process", [](Image& image, LuaEngine& engine, String const& directives) -> std::expected<Image, StarException> {
     List<std::shared_ptr<Image const>> resolvedImages;
-    return processImageOperations(parseImageOperations(directives), image, [&](String const& path) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
-      if (!engine.imageResolver())
-        return std::nullopt;
-      auto resolved = engine.imageResolver()(path);
-      if (!resolved)
-        return std::unexpected(std::move(resolved.error()));
-      auto result = optionalRef(*resolved);
-      resolvedImages.push_back(std::move(*resolved));
-      return result;
-    });
+    return process_image_operations(
+      parse_image_operations(directives), image,
+      [&](String const& path) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
+        if (!engine.imageResolver())
+          return std::nullopt;
+        auto resolved = engine.imageResolver()(path);
+        if (!resolved)
+          return std::unexpected(std::move(resolved.error()));
+        auto result = optionalRef(*resolved);
+        resolvedImages.push_back(std::move(*resolved));
+        return result;
+      });
   }); !result)
     return std::unexpected(std::move(result.error()));
 

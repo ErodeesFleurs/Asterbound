@@ -94,6 +94,33 @@ public:
   std::shared_ptr<Shared const> m_shared;
 };
 
+template <typename Result>
+concept directive_visit_result = std::is_void_v<Result> || requires(Result& result) {
+  Result{};
+  bool(!result);
+  Result(std::unexpected(std::move(result.error())));
+};
+
+template <typename Callback>
+concept directive_visitor = requires(Callback& callback, Directives::Entry const& entry, Directives const& directives) {
+  callback(entry, directives);
+} && directive_visit_result<std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>>;
+
+template <typename Result>
+concept abortable_directive_result = std::same_as<Result, bool> || requires(Result& result) {
+  bool(!result);
+  bool(!*result);
+  Result(false);
+  Result(true);
+  Result(std::unexpected(std::move(result.error())));
+};
+
+template <typename Callback>
+concept abortable_directive_visitor =
+  requires(Callback& callback, Directives::Entry const& entry, Directives const& directives) {
+    callback(entry, directives);
+  } && abortable_directive_result<std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>>;
+
 class DirectivesGroup {
 public:
   friend struct hash<DirectivesGroup>;
@@ -118,15 +145,15 @@ public:
   String toString() const;
   void addToString(String& string) const;
 
-  template <typename Callback>
-  [[nodiscard]] auto forEach(Callback&& callback) const;
+  template <directive_visitor Callback> [[nodiscard]] auto forEach(Callback&& callback) const;
 
-  template <typename Callback>
-  [[nodiscard]] auto forEachAbortable(Callback&& callback) const;
+  template <abortable_directive_visitor Callback> [[nodiscard]] auto forEachAbortable(Callback&& callback) const;
 
-  [[nodiscard]] std::expected<Image, StarException> applyNewImage(const Image& image, ImageReferenceCallback refCallback = {}) const;
-  [[nodiscard]] std::expected<void, StarException> applyExistingImage(Image& image, ImageReferenceCallback refCallback = {}) const;
-  
+  [[nodiscard]] std::expected<Image, StarException> apply_new_image(const Image& image,
+                                                                    ImageReferenceCallback refCallback = {}) const;
+  [[nodiscard]] std::expected<void, StarException> apply_existing_image(Image& image,
+                                                                        ImageReferenceCallback refCallback = {}) const;
+
   std::size_t hash() const;
   const List<Directives>& list() const;
 
@@ -160,8 +187,7 @@ inline std::expected<std::reference_wrapper<Directives::Shared const>, StarExcep
   return std::cref(*m_shared);
 }
 
-template <typename Callback>
-[[nodiscard]] auto DirectivesGroup::forEach(Callback&& callback) const {
+template <directive_visitor Callback> [[nodiscard]] auto DirectivesGroup::forEach(Callback&& callback) const {
   using Result = std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>;
   for (auto const& directives : m_directives) {
     if (!directives)
@@ -180,7 +206,7 @@ template <typename Callback>
     return Result{};
 }
 
-template <typename Callback>
+template <abortable_directive_visitor Callback>
 [[nodiscard]] auto DirectivesGroup::forEachAbortable(Callback&& callback) const {
   using Result = std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>;
   for (auto const& directives : m_directives) {
@@ -201,7 +227,6 @@ template <typename Callback>
   }
   return Result(true);
 }
-
 }
 
 export module star.directives;
@@ -213,9 +238,13 @@ export namespace Star {
 
 
 export namespace Star {
-  using ::Star::Directives;
-  using ::Star::DirectivesGroup;
-  using ::Star::DirectivesExceptionTag;
-  using ::Star::DirectivesException;
-  using ::Star::ImageDirectives;
+using ::Star::abortable_directive_result;
+using ::Star::abortable_directive_visitor;
+using ::Star::directive_visit_result;
+using ::Star::directive_visitor;
+using ::Star::Directives;
+using ::Star::DirectivesException;
+using ::Star::DirectivesExceptionTag;
+using ::Star::DirectivesGroup;
+using ::Star::ImageDirectives;
 }

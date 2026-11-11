@@ -43,7 +43,7 @@ std::expected<void, StarException> writeReferenceCacheAssets(GameTest& fixture, 
          PngFixture{"red.png", {2, 2}, {255, 0, 0, 255}}, PngFixture{"green.png", {2, 2}, {0, 255, 0, 255}},
          PngFixture{"mask.png", {2, 2}, {0, 0, 0, 128}}, PngFixture{"large.png", {3, 2}, {0, 0, 255, 255}}}) {
     auto buffer = std::make_shared<Buffer>();
-    auto written = Image::filled(png.size, png.color).writePng(fixture.root().logger(), buffer);
+    auto written = Image::filled(png.size, png.color).write_png(fixture.root().logger(), buffer);
     if (!written)
       return std::unexpected(std::move(written.error()));
     auto stored = File::write_file(buffer->take_data(), File::relative_to(directory, png.name));

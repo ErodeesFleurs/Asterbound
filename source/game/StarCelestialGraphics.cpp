@@ -335,7 +335,8 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
     auto maskPerPlanetRange = gfxConfig.get("maskPerPlanetRange").and_then([](Json const& value) { return jsonToVec2I(value); });
     if (!maskPerPlanetRange)
       return std::unexpected(std::move(maskPerPlanetRange.error()));
-    auto biomeHueShift = "?" + imageOperationToString(HueShiftImageOperation::hueShiftDegrees(terrestrialParameters->hueShift));
+    auto biomeHueShift =
+      "?" + image_operation_to_string(HueShiftImageOperation::hue_shift_degrees(terrestrialParameters->hueShift));
     if (terrestrialParameters->primarySurfaceLiquid != EmptyLiquidId) {
       RandomSource random(celestialParameters.seed());
       auto count = random.randInt((*maskPerPlanetRange)[0], (*maskPerPlanetRange)[1]);
@@ -365,9 +366,11 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       }
       String leftMask, rightMask;
       if (!masksLeft.empty())
-        leftMask = "?" + imageOperationToString(AlphaMaskImageOperation{AlphaMaskImageOperation::Additive, masksLeft, {0, 0}});
+        leftMask = "?"
+          + image_operation_to_string(AlphaMaskImageOperation{AlphaMaskImageOperation::Additive, masksLeft, {0, 0}});
       if (!masksRight.empty())
-        rightMask = "?" + imageOperationToString(AlphaMaskImageOperation{AlphaMaskImageOperation::Additive, masksRight, {0, 0}});
+        rightMask = "?"
+          + image_operation_to_string(AlphaMaskImageOperation{AlphaMaskImageOperation::Additive, masksRight, {0, 0}});
       auto base = getLR(*baseImages + biomeHueShift);
       if (!base)
         return std::unexpected(std::move(base.error()));

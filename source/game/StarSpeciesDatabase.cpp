@@ -446,7 +446,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   auto readColors = [&](String const& key, List<String>& destination) -> std::expected<void, StarException> {
     auto values = config.getArray(key, JsonArray{""});
     if (!values) return std::unexpected(std::move(values.error()));
-    auto converted = colorDirectivesFromConfig(*values);
+    auto converted = color_directives_from_config(*values);
     if (!converted) return std::unexpected(std::move(converted.error()));
     destination = std::move(*converted);
     return {};

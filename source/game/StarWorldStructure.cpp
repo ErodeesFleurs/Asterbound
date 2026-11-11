@@ -280,7 +280,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
 
     for (std::size_t y = 0; y < blocksImage->height(); ++y) {
       for (std::size_t x = 0; x < blocksImage->width(); ++x) {
-        auto pixel = blocksImage->getrgb(x, y);
+        auto pixel = blocksImage->get_rgb(x, y);
         if (!pixel) return std::unexpected(std::move(pixel.error()));
         auto blockKey = blockKeys.value(*pixel, defaultBlockKey);
         auto pos = blockPosition + Vec2I(x, y);
