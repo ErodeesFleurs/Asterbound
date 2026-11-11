@@ -53,14 +53,17 @@ private:
 };
 
 class FileLogSink : public LogSink {
+private:
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
+  FileLogSink(ConstructionKey, String filename) : m_output(std::move(filename)) {}
+
   [[nodiscard]] static std::expected<std::shared_ptr<FileLogSink>, StarException> create(
       String const& filename, LogLevel level, bool truncate);
 
   [[nodiscard]] std::expected<void, StarException> log(std::string_view msg, LogLevel level) override;
 
 private:
-  explicit FileLogSink(String filename) : m_output(std::move(filename)) {}
   File m_output;
   std::mutex m_logMutex;
 };

@@ -563,7 +563,7 @@ public:
     if (auto result = m_application->startup(cmdLineArgs); !result)
       return std::unexpected(ApplicationException("Application failed during startup", ExceptionDiagnostic(result.error())));
     m_applicationStarted = true;
-    m_logger = &m_application->logger();
+    m_logger = std::ref(m_application->logger());
 
     return m_dispatcher.invoke([&] { return initializeNative(applicationPath, platformArguments); });
   }
@@ -578,30 +578,30 @@ public:
     SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_SCALE_TO_DISPLAY, "1");
 #endif
     
-    if (auto result = (*m_logger).info("Application: Initializing SDL Video"); !result)
+    if (auto result = m_logger->get().info("Application: Initializing SDL Video"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
       return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Video: {}", SDL_GetError())));
 
-    if (auto result = (*m_logger).info("Application: using Video Driver '{}'", SDL_GetCurrentVideoDriver()); !result)
+    if (auto result = m_logger->get().info("Application: using Video Driver '{}'", SDL_GetCurrentVideoDriver()); !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = (*m_logger).info("Application: Initializing SDL Controller"); !result)
+    if (auto result = m_logger->get().info("Application: Initializing SDL Controller"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
       return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Controller: {}", SDL_GetError())));
 
-    if (auto result = (*m_logger).info("Application: Initializing SDL Audio"); !result)
+    if (auto result = m_logger->get().info("Application: Initializing SDL Audio"); !result)
       return std::unexpected(std::move(result.error()));
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
       return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Audio: {}", SDL_GetError())));
 
-    if (auto result = (*m_logger).info("Application: using Audio Driver '{}'", SDL_GetCurrentAudioDriver()); !result)
+    if (auto result = m_logger->get().info("Application: using Audio Driver '{}'", SDL_GetCurrentAudioDriver()); !result)
       return std::unexpected(std::move(result.error()));
 
     SDL_SetJoystickEventsEnabled(true);
 
-    auto platformServices = PcPlatformServices::create((*m_logger), applicationPath, platformArguments);
+    auto platformServices = PcPlatformServices::create(m_logger->get(), applicationPath, platformArguments);
     if (!platformServices)
       return std::unexpected(std::move(platformServices.error()));
     m_platformServices = std::move(*platformServices);
@@ -612,10 +612,10 @@ public:
       m_steamIsFlatpak = m_platformServices->steamIsFlatpak();
     }
     if (!m_platformServices)
-      if (auto result = (*m_logger).info("Application: No platform services available"); !result)
+      if (auto result = m_logger->get().info("Application: No platform services available"); !result)
         return std::unexpected(std::move(result.error()));
 
-    if (auto result = (*m_logger).info("Application: Creating SDL window"); !result)
+    if (auto result = m_logger->get().info("Application: Creating SDL window"); !result)
       return std::unexpected(std::move(result.error()));
 #ifdef STAR_SYSTEM_MACOS
     m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE));
@@ -641,7 +641,7 @@ public:
       if (!isPng)
         return std::unexpected(std::move(isPng.error()));
       if (*isPng) {
-        auto img = Image::read_png((*m_logger), *device);
+        auto img = Image::read_png(m_logger->get(), *device);
         if (!img)
           return std::unexpected(std::move(img.error()));
         auto conv = img->convert(PixelFormat::RGBA32);
@@ -668,7 +668,7 @@ public:
         if (iconSurface) {
           SDL_SetWindowIcon(m_sdlWindow.get(), iconSurface.get());
         } else {
-          if (auto result = (*m_logger).warn("Could not create SDL surface for icon '{}': {}", ".icon/asterbound.png", SDL_GetError()); !result)
+          if (auto result = m_logger->get().warn("Could not create SDL surface for icon '{}': {}", ".icon/asterbound.png", SDL_GetError()); !result)
             return std::unexpected(std::move(result.error()));
         }
       }
@@ -707,7 +707,7 @@ public:
         if (!*installed) {
           if (auto result = File::copy(".icon/asterbound.png", XdgIcon); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto result = (*m_logger).info("Application: Installed Icon to XDG Icons Directory"); !result)
+          if (auto result = m_logger->get().info("Application: Installed Icon to XDG Icons Directory"); !result)
             return std::unexpected(std::move(result.error()));
         }
       }
@@ -716,7 +716,7 @@ public:
     SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_ICON_NAME, "asterbound");
 #endif
 
-    if (auto result = (*m_logger).info("Application: Creating SDL OpenGL context"); !result)
+    if (auto result = m_logger->get().info("Application: Creating SDL OpenGL context"); !result)
       return std::unexpected(std::move(result.error()));
     static const std::pair<int,int> versions[] = {{4,6},{4,5},{4,4},{4,3},{4,2},{4,1},{4,0},{3,3},{3,2},{3,1}};
     for (auto& [majorVersion, minorVersion] : versions) {
@@ -744,7 +744,7 @@ public:
 
     SDL_StopTextInput(m_sdlWindow.get());
 
-    if (auto result = (*m_logger).info("Application: Opening audio device"); !result)
+    if (auto result = m_logger->get().info("Application: Opening audio device"); !result)
       return std::unexpected(std::move(result.error()));
     m_audioOutputData.clear();
     SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = 2, .freq = 44100};
@@ -762,15 +762,15 @@ public:
       }
     }, this));
     if (!m_sdlAudioOutputStream) {
-      if (auto result = (*m_logger).error("Application: Could not open audio device, no sound available!"); !result)
+      if (auto result = m_logger->get().error("Application: Could not open audio device, no sound available!"); !result)
         return std::unexpected(std::move(result.error()));
     } else {
-      if (auto result = (*m_logger).info("Application: Opened default audio device with 44.1khz / 16 bit stereo audio"); !result)
+      if (auto result = m_logger->get().info("Application: Opened default audio device with 44.1khz / 16 bit stereo audio"); !result)
         return std::unexpected(std::move(result.error()));
       SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(m_sdlAudioOutputStream.get()));
     }
 
-    auto renderer = OpenGlRenderer::create((*m_logger));
+    auto renderer = OpenGlRenderer::create(m_logger->get());
     if (!renderer)
       return std::unexpected(std::move(renderer.error()));
     m_glRenderer = std::move(*renderer);
@@ -816,7 +816,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> openAudioInputDevice(SDL_AudioDeviceID deviceId, int freq, int channels, AudioCallback callback) {
     closeAudioInputDevice();
     if (!callback) {
-      if (auto result = (*m_logger).error("Cannot open audio input with an empty callback"); !result)
+      if (auto result = m_logger->get().error("Cannot open audio input with an empty callback"); !result)
         return std::unexpected(std::move(result.error()));
       return false;
     }
@@ -831,13 +831,13 @@ public:
         if (received > 0)
           sdlPlatform.m_audioInputCallback(std::span(sdlPlatform.m_audioInputData).first(received));
         else if (received < 0)
-          if (auto result = sdlPlatform.m_logger->error("Could not read audio input stream: {}", SDL_GetError()); !result)
+          if (auto result = sdlPlatform.m_logger->get().error("Could not read audio input stream: {}", SDL_GetError()); !result)
             sdlPlatform.recordAudioError(std::move(result.error()));
       }
     }, this));
 
     if (m_sdlAudioInputStream) {
-      if (auto result = (*m_logger).info("Opened audio input device '{}'", SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(m_sdlAudioInputStream.get()))); !result) {
+      if (auto result = m_logger->get().info("Opened audio input device '{}'", SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(m_sdlAudioInputStream.get()))); !result) {
         closeAudioInputDevice();
         return std::unexpected(std::move(result.error()));
       }
@@ -845,7 +845,7 @@ public:
     }
     else {
       m_audioInputCallback = {};
-      if (auto result = (*m_logger).info("Failed to open audio input device: {}", SDL_GetError()); !result)
+      if (auto result = m_logger->get().info("Failed to open audio input device: {}", SDL_GetError()); !result)
         return std::unexpected(std::move(result.error()));
     }
 
@@ -854,7 +854,7 @@ public:
 
   bool closeAudioInputDevice() {
     if (m_sdlAudioInputStream) {
-      if (auto result = (*m_logger).info("Closing audio input device"); !result)
+      if (auto result = m_logger->get().info("Closing audio input device"); !result)
         EmergencyLog::error("Application: cleanup logging failed: {}", Star::output_exception(ExceptionDiagnostic(result.error()), true));
       // Detaching takes the stream lock and waits for an in-flight callback.
       SDL_SetAudioStreamPutCallback(m_sdlAudioInputStream.get(), nullptr, nullptr);
@@ -912,7 +912,7 @@ public:
       if (!nativeReleased && result)
         result = std::unexpected(std::move(nativeReleased.error()));
       if (!result && m_logger) {
-        if (auto logged = m_logger->error_exception("Application: failed", ExceptionDiagnostic(result.error()));
+        if (auto logged = m_logger->get().error_exception("Application: failed", ExceptionDiagnostic(result.error()));
             !logged) {
           EmergencyLog::error("{}", Star::exception_report(result.error()));
           EmergencyLog::error("Application: failure logging failed: {}", Star::exception_report(logged.error()));
@@ -920,7 +920,7 @@ public:
         m_failureReported = true;
       }
       m_application.reset();
-      m_logger = nullptr;
+      m_logger.reset();
       if (m_renderer) {
         if (auto drained = m_renderer->drain(); !drained && result)
           result = std::unexpected(std::move(drained.error()));
@@ -1244,7 +1244,7 @@ private:
     if (!m_audioError)
       m_audioError.emplace(std::move(error));
     else if (auto logged =
-               (*m_logger).error_exception("Application: audio callback failed", ExceptionDiagnostic(error));
+               m_logger->get().error_exception("Application: audio callback failed", ExceptionDiagnostic(error));
              !logged) {
       EmergencyLog::error("Application: audio callback failed: {}",
                           Star::output_exception(ExceptionDiagnostic(error), true));
@@ -1415,7 +1415,7 @@ private:
               parent.m_windowMode = WindowMode::Fullscreen;
               SDL_SetWindowFullscreen(parent.m_sdlWindow.get(), SDL_WINDOW_FULLSCREEN);
             } else {
-              if (auto result = (*parent.m_logger)
+              if (auto result = parent.m_logger->get()
                                   .warn("Failed to set resolution {}, {}", static_cast<unsigned>(closestDisplayMode.w),
                                         static_cast<unsigned>(closestDisplayMode.h));
                   !result)
@@ -1423,7 +1423,7 @@ private:
             }
           } else {
             if (auto result =
-                  (*parent.m_logger)
+                  parent.m_logger->get()
                     .warn("Unable to set requested display resolution {}, {}",
                           static_cast<int>(fullScreenResolution[0]), static_cast<int>(fullScreenResolution[1]));
                 !result)
@@ -1436,7 +1436,7 @@ private:
             // call these manually since no SDL_WindowEvent is triggered when changing between fullscreen resolutions for some reason
             changed = std::pair{parent.m_windowMode, parent.m_windowSize};
           } else {
-            if (auto result = (*parent.m_logger).error("Couldn't get window display mode!"); !result)
+            if (auto result = parent.m_logger->get().error("Couldn't get window display mode!"); !result)
               return std::unexpected(std::move(result.error()));
           }
         }
@@ -1514,7 +1514,7 @@ private:
             SDL_SetWindowSize(parent.m_sdlWindow.get(), parent.m_windowSize[0], parent.m_windowSize[1]);
             changed = std::pair{parent.m_windowMode, parent.m_windowSize};
           } else {
-            if (auto result = (*parent.m_logger).error("Couldn't get desktop display mode!"); !result)
+            if (auto result = parent.m_logger->get().error("Couldn't get desktop display mode!"); !result)
               return std::unexpected(std::move(result.error()));
           }
         }
@@ -1772,13 +1772,13 @@ private:
       } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
         auto insertion = m_SdlControllers.insert_or_assign(event.gdevice.which, std::unique_ptr<SDL_Gamepad, decltype(&SDL_CloseGamepad)>(SDL_OpenGamepad(event.gdevice.which), SDL_CloseGamepad));
         if (SDL_Gamepad* controller = insertion.first->second.get())
-          if (auto result = (*m_logger).info("Controller device '{}' added", SDL_GetGamepadName(controller)); !result)
+          if (auto result = m_logger->get().info("Controller device '{}' added", SDL_GetGamepadName(controller)); !result)
             recordNativeError(std::move(result.error()));
       } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
         auto find = m_SdlControllers.find(event.gdevice.which);
         if (find != m_SdlControllers.end()) {
           if (SDL_Gamepad* controller = find->second.get())
-            if (auto result = (*m_logger).info("Controller device '{}' removed", SDL_GetGamepadName(controller)); !result)
+            if (auto result = m_logger->get().info("Controller device '{}' removed", SDL_GetGamepadName(controller)); !result)
               recordNativeError(std::move(result.error()));
           m_SdlControllers.erase(event.gdevice.which);
         }
@@ -1944,15 +1944,15 @@ private:
     if (vsyncEnabled) {
       // If VSync is requested, try for late swap tearing first, then fall back
       // to regular VSync
-      if (auto result = (*m_logger).info("Application: Enabling adaptive VSync"); !result)
+      if (auto result = m_logger->get().info("Application: Enabling adaptive VSync"); !result)
         return std::unexpected(std::move(result.error()));
       if (!SDL_GL_SetSwapInterval(-1)) {
-        if (auto result = (*m_logger).info("Application: Enabling adaptive VSync, falling back to full VSync"); !result)
+        if (auto result = m_logger->get().info("Application: Enabling adaptive VSync, falling back to full VSync"); !result)
           return std::unexpected(std::move(result.error()));
         SDL_GL_SetSwapInterval(1);
       }
     } else {
-      if (auto result = (*m_logger).info("Application: Disabling VSync"); !result)
+      if (auto result = m_logger->get().info("Application: Disabling VSync"); !result)
         return std::unexpected(std::move(result.error()));
       SDL_GL_SetSwapInterval(0);
     }
@@ -2148,7 +2148,7 @@ private:
   std::shared_ptr<ThreadedRenderer> m_renderer;
   std::shared_ptr<OpenGlRenderer> m_glRenderer;
   std::optional<NativeUiContextScope> m_nativeContextScope;
-  Logger* m_logger = nullptr;
+  std::optional<std::reference_wrapper<Logger>> m_logger;
   MainThreadDispatcher m_dispatcher;
   std::atomic<bool> m_ownerDone = false;
   bool m_pollingEnabled = false;

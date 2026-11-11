@@ -44,7 +44,7 @@ std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogL
 
 std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(String const& filename, LogLevel level,
                                                                                bool truncate) {
-  auto sink = std::shared_ptr<FileLogSink>(new FileLogSink(filename));
+  auto sink = std::make_shared<FileLogSink>(ConstructionKey{}, filename);
   auto opened =
     sink->m_output.open(truncate ? IOMode::Write | IOMode::Append | IOMode::Truncate : IOMode::Write | IOMode::Append);
   if (!opened)
