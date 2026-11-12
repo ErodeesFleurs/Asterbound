@@ -70,7 +70,7 @@
 +/// through child completion; hashing still sees the original expanded arguments.
 +#[cfg(windows)]
 +pub(super) fn windows_response_file<'a>(
-+    executable: &Path,
++    executable: &'a Path,
 +    arguments: impl Iterator<Item = &'a std::ffi::OsStr> + Clone,
 +) -> Result<Option<tempfile::NamedTempFile>> {
 +    use std::os::windows::ffi::OsStrExt;
