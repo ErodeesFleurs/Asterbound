@@ -1,0 +1,370 @@
+--- a/src/compiler/clang.rs
++++ b/src/compiler/clang.rs
+@@ -174,11 +174,113 @@
+             language_to_clang_arg,
+         )
+         .map(|(command, dist_command, cacheable)| {
++            #[cfg(windows)]
++            let command = WindowsClangCompileCommand(command);
+             (CCompileCommand::new(command), dist_command, cacheable)
+         })
+     }
+ }
+ 
++/// Preserve the expanded SingleCompileCommand for hashing and distribution.
++/// Only local GNU-driver Clang compilation opts into response-file transport.
++#[cfg(windows)]
++#[derive(Debug)]
++struct WindowsClangCompileCommand(crate::compiler::SingleCompileCommand);
++
++#[cfg(windows)]
++#[async_trait]
++impl crate::compiler::CompileCommandImpl for WindowsClangCompileCommand {
++    fn get_executable(&self) -> PathBuf {
++        self.0.executable.clone()
++    }
++    fn get_arguments(&self) -> Vec<OsString> {
++        self.0.arguments.clone()
++    }
++    fn get_env_vars(&self) -> Vec<(OsString, OsString)> {
++        self.0.env_vars.clone()
++    }
++    fn get_cwd(&self) -> PathBuf {
++        self.0.cwd.clone()
++    }
++    async fn execute<T>(
++        &self,
++        _: &crate::server::SccacheService<T>,
++        creator: &T,
++    ) -> Result<process::Output>
++    where
++        T: CommandCreatorSync,
++    {
++        let command = &self.0;
++        let executable = crate::util::resolve_compiler_avoiding_wrapper(
++            &command.executable,
++            &command.env_vars,
++        );
++        let mut cmd = creator.clone().new_command_sync(&executable);
++        let response_file = windows_response_file(
++            &executable,
++            command.arguments.iter().map(OsString::as_os_str),
++        )?;
++        if let Some(file) = &response_file {
++            let mut argument = OsString::from("@");
++            argument.push(file.path());
++            cmd.arg("--rsp-quoting=posix").arg(argument);
++        } else {
++            cmd.args(&command.arguments);
++        }
++        cmd.env_clear()
++            .envs(command.env_vars.clone())
++            .current_dir(&command.cwd);
++        let result = run_input_output(cmd, None).await;
++        drop(response_file);
++        result
++    }
++}
++
++/// Spill only oversized Windows Clang commands. The caller retains the file
++/// through child completion; hashing still sees the original expanded arguments.
++#[cfg(windows)]
++pub(super) fn windows_response_file<'a>(
++    executable: &Path,
++    arguments: impl Iterator<Item = &'a std::ffi::OsStr> + Clone,
++) -> Result<Option<tempfile::NamedTempFile>> {
++    use std::os::windows::ffi::OsStrExt;
++
++    // Upper bound for Rust's Windows argv quoting. Reserve 1 KiB for the fixed
++    // preprocessor prefix, separators and NUL; CreateProcessW permits 32767 units.
++    let length = std::iter::once(executable.as_os_str())
++        .chain(arguments.clone())
++        .map(|arg| arg.encode_wide().count().saturating_mul(2).saturating_add(3))
++        .fold(1024usize, usize::saturating_add);
++    if length <= 30_000 {
++        return Ok(None);
++    }
++
++    let mut file = tempfile::Builder::new()
++        .prefix("sccache-clang-")
++        .suffix(".rsp")
++        .tempfile()?;
++    let mut writer = io::BufWriter::new(file.as_file_mut());
++    // GNU response quoting, not Windows argv quoting. Inside double quotes,
++    // escape every backslash and double quote; UTF-8 preserves non-ASCII text.
++    for argument in arguments {
++        let argument = argument
++            .to_str()
++            .context("Windows Clang response argument is not valid Unicode")?;
++        writer.write_all(b"\"")?;
++        for ch in argument.chars() {
++            if ch == '\\' || ch == '"' {
++                writer.write_all(b"\\")?;
++            }
++            let mut bytes = [0; 4];
++            writer.write_all(ch.encode_utf8(&mut bytes).as_bytes())?;
++        }
++        writer.write_all(b"\"\n")?;
++    }
++    writer.flush()?;
++    drop(writer);
++    Ok(Some(file))
++}
++
+ pub fn language_to_clang_arg(lang: Language) -> Option<&'static str> {
+     lang.to_clang_arg()
+ }
+--- a/src/compiler/gcc.rs
++++ b/src/compiler/gcc.rs
+@@ -811,6 +811,7 @@
+ #[allow(clippy::too_many_arguments)]
+ fn preprocess_cmd<F, T>(
+     cmd: &mut T,
++    executable: &Path,
+     parsed_args: &ParsedArguments,
+     cwd: &Path,
+     env_vars: &[(OsString, OsString)],
+@@ -819,7 +820,8 @@
+     rewrite_includes_only: bool,
+     ignorable_whitespace_flags: Vec<String>,
+     language_to_arg: F,
+-) where
++) -> Result<Option<tempfile::NamedTempFile>>
++where
+     F: Fn(Language) -> Option<&'static str>,
+     T: RunCommand,
+ {
+@@ -878,17 +880,45 @@
+         debug!("-arch args after rewrite:  {:?}", arch_args_to_use);
+     }
+ 
+-    cmd.args(&parsed_args.preprocessor_args)
+-        .args(&parsed_args.dependency_args)
+-        .args(&parsed_args.common_args)
+-        .args(arch_args_to_use);
+-    if parsed_args.double_dash_input {
+-        cmd.arg("--");
++    // Only the unbounded tail needs spilling; the language/-E/rewrite prefix
++    // above is fixed-size. No argument copies or response work on other hosts.
++    #[cfg(windows)]
++    let response_file = if kind == CCompilerKind::Clang {
++        let double_dash = parsed_args.double_dash_input.then_some(OsStr::new("--"));
++        let arguments = parsed_args.preprocessor_args.iter()
++            .chain(&parsed_args.dependency_args)
++            .chain(&parsed_args.common_args)
++            .chain(arch_args_to_use)
++            .map(OsString::as_os_str)
++            .chain(double_dash)
++            .chain(std::iter::once(parsed_args.input.as_os_str()));
++        super::clang::windows_response_file(executable, arguments)?
++    } else {
++        None
++    };
++    #[cfg(not(windows))]
++    let response_file = {
++        let _ = executable;
++        None
++    };
++    if let Some(file) = &response_file {
++        let mut argument = OsString::from("@");
++        argument.push(file.path());
++        cmd.arg("--rsp-quoting=posix").arg(argument);
++    } else {
++        cmd.args(&parsed_args.preprocessor_args)
++            .args(&parsed_args.dependency_args)
++            .args(&parsed_args.common_args)
++            .args(arch_args_to_use);
++        if parsed_args.double_dash_input {
++            cmd.arg("--");
++        }
++        cmd.arg(&parsed_args.input);
+     }
+-    cmd.arg(&parsed_args.input)
+-        .env_clear()
++    cmd.env_clear()
+         .envs(env_vars.to_vec())
+         .current_dir(cwd);
++    Ok(response_file)
+ }
+ 
+ #[allow(clippy::too_many_arguments)]
+@@ -910,8 +940,9 @@
+ {
+     trace!("preprocess");
+     let mut cmd = creator.clone().new_command_sync(executable);
+-    preprocess_cmd(
++    let response_file = preprocess_cmd(
+         &mut cmd,
++        executable,
+         parsed_args,
+         cwd,
+         env_vars,
+@@ -920,11 +951,13 @@
+         rewrite_includes_only,
+         ignorable_whitespace_flags,
+         language_to_arg,
+-    );
++    )?;
+     if log_enabled!(Trace) {
+         trace!("preprocess: {:?}", cmd);
+     }
+-    run_input_output(cmd, None).await
++    let result = run_input_output(cmd, None).await;
++    drop(response_file);
++    result
+ }
+ 
+ #[allow(clippy::too_many_arguments)]
+@@ -2009,6 +2042,7 @@
+             };
+             preprocess_cmd(
+                 &mut cmd,
++                Path::new(""),
+                 &parsed_args,
+                 Path::new(""),
+                 &[],
+@@ -2017,7 +2051,7 @@
+                 true,
+                 vec![],
+                 language_to_gcc_arg,
+-            );
++            ).unwrap();
+             // make sure the architectures were rewritten to prepocessor defines
+             let expected_args = ovec![
+                 "-x",
+@@ -2045,6 +2079,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2053,7 +2088,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         // make sure the architectures were rewritten to prepocessor defines
+         let expected_args = ovec![
+             "-x",
+@@ -2080,6 +2115,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2088,7 +2124,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         let expected_args = ovec!["-x", "c", "-E", "-frewrite-includes", "--", "foo.c"];
+         assert_eq!(cmd.args, expected_args);
+     }
+@@ -2106,6 +2142,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2114,7 +2151,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         // disable with extensions enabled
+         assert!(!cmd.args.contains(&"-fdirectives-only".into()));
+     }
+@@ -2132,6 +2169,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2140,7 +2178,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         // no reason to disable it with no extensions enabled
+         assert!(cmd.args.contains(&"-fdirectives-only".into()));
+     }
+@@ -2158,6 +2196,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2166,7 +2205,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         // disable with extensions enabled
+         assert!(!cmd.args.contains(&"-fdirectives-only".into()));
+     }
+@@ -2832,6 +2871,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2840,7 +2880,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         assert!(cmd.args.contains(&"-x".into()) && cmd.args.contains(&"c++-header".into()));
+     }
+ 
+@@ -2857,6 +2897,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2865,7 +2906,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         assert!(cmd.args.contains(&"-x".into()) && cmd.args.contains(&"c++-header".into()));
+     }
+ 
+@@ -2882,6 +2923,7 @@
+         };
+         preprocess_cmd(
+             &mut cmd,
++            Path::new(""),
+             &parsed_args,
+             Path::new(""),
+             &[],
+@@ -2890,7 +2932,7 @@
+             true,
+             vec![],
+             language_to_gcc_arg,
+-        );
++        ).unwrap();
+         assert!(!cmd.args.contains(&"-x".into()));
+     }
+ 
