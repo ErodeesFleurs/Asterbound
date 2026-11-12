@@ -60,11 +60,15 @@ jobs:
       - name: Inspect completed Nix store paths
         id: state
         if: ${{ !cancelled() && steps.baseline.outcome == 'success' }}
-        run: python3 scripts/ci/cache-state.py nix-snapshot --compare build/ci/nix-before.json
+        run: python3 scripts/ci/cache-state.py nix-snapshot --compare build/ci/nix-before.json --exclude-file "$RUNNER_TEMP/nix-cache-excludes"
 
       - name: Save completed Nix paths even after build failure
-        if: ${{ !cancelled() && steps.state.outputs.changed == 'true' }}
+        if: ${{ !cancelled() && steps.state.outcome == 'success' && steps.state.outputs.changed == 'true' }}
         uses: nix-community/cache-nix-action/save@7df957e333c1e5da7721f60227dbba6d06080569
+        env:
+          # Preserve real store outputs; exclude only the unregistered locks
+          # enumerated above. TAR_OPTIONS does not change the cache version.
+          TAR_OPTIONS: --exclude-from=${{ runner.temp }}/nix-cache-excludes
         with:
           primary-key: ${{ steps.keys.outputs.prefix }}-${{ steps.state.outputs.inventory }}
           # A GC target, not a hard quota: rooted build closures are retained.

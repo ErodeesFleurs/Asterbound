@@ -1,4 +1,8 @@
-#include <lua.hpp>
+extern "C" {
+#include "lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
+}
 import std;
 import star.format;
 import star.string;

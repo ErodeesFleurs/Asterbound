@@ -2,6 +2,7 @@
 """Fingerprint the native SDK or snapshot content-addressed CI cache entries."""
 import argparse
 import hashlib
+import glob
 import json
 import os
 from pathlib import Path
@@ -68,10 +69,27 @@ def snapshot(directory, output, compare):
     record(entries, output, compare)
 
 
-def nix_snapshot(output, compare):
+def nix_lock_excludes(store, registered, output):
+    # Only unregistered transient locks are excluded. A valid store output may
+    # itself be named Cargo.lock and must remain consistent with the saved DB.
+    locks = sorted(path for path in store.glob("*.lock") if str(path) not in registered)
+    patterns = []
+    for path in locks:
+        patterns.extend(glob.escape(name) for name in (
+            str(path), os.path.relpath(path), str(path).lstrip("/")))
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("".join(pattern + "\n" for pattern in patterns), encoding="utf-8")
+    emit({"excluded_locks": len(locks)})
+
+
+def nix_snapshot(output, compare, exclude_file):
     # Store paths already carry their immutable identity; no store files are read.
     paths = subprocess.check_output(["nix", "path-info", "--all"], text=True)
-    record(sorted(paths.splitlines()), output, compare)
+    registered = set(paths.splitlines())
+    if exclude_file:
+        nix_lock_excludes(Path("/nix/store"), registered, exclude_file)
+    record(sorted(registered), output, compare)
 
 
 def main():
@@ -86,13 +104,14 @@ def main():
     nix_cache = commands.add_parser("nix-snapshot")
     nix_cache.add_argument("--output")
     nix_cache.add_argument("--compare")
+    nix_cache.add_argument("--exclude-file")
     args = parser.parse_args()
     if args.command == "sdk":
         sdk_identity(args.compiler_root)
     elif args.command == "snapshot":
         snapshot(args.directory, args.output, args.compare)
     else:
-        nix_snapshot(args.output, args.compare)
+        nix_snapshot(args.output, args.compare, args.exclude_file)
 
 
 if __name__ == "__main__":

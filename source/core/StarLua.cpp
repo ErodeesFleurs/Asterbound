@@ -1,5 +1,9 @@
 #include <cstdio>
-#include <lua.hpp>
+extern "C" {
+#include "lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
+}
 import std;
 import star.lua;
 import star.json;

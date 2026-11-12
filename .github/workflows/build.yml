@@ -74,6 +74,8 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/source-quality"
           "$RUNNER_TEMP/source-quality/bin/pip" install 'clang-format==21.1.8'
           CLANG_FORMAT="$RUNNER_TEMP/source-quality/bin/clang-format" scripts/format-source.sh --check --base "$BASE_SHA"
+      - name: Smoke test Nix cache exclusions
+        run: python3 scripts/ci/smoke-nix-cache.py
       - name: Install CMake and Ninja
         uses: lukka/get-cmake@30aea713799f46b5b60e60f5fa83f849abd52c22
         with:

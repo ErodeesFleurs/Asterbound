@@ -252,6 +252,8 @@ The native [Build workflow](../.github/workflows/build.yml) retains Windows x64,
 
 The shared [native build action](../.github/actions/native-build/action.yml) pins CMake 3.29.2, Ninja 1.13.2, xclang 23.1.3.6 and immutable third-party Action revisions. Lua download/hash/patch preflight runs before expensive dependency configuration and exports the same prepatched source tree to the engine.
 
+The GitHub Lua source tree does not ship the release-only `lua.hpp` wrapper. C++ implementation, module-global-fragment and test consumers include the official `lua.h`, `lualib.h` and `lauxlib.h` under `extern "C"` directly. Download/patch preflight is not a substitute for compiling the actual `star.lua` consumers and running `core_tests`.
+
 Caches are restored and saved separately. Completed vcpkg packages survive later configuration/build/test failures; changed cache inventories produce new immutable keys instead of trying to overwrite an existing key. Keys include the compiler, architecture, preset and actual SDK/runner image identity. The compiler cache also receives the SDK identity through `SCCACHE_C_CUSTOM_CACHE_BUSTER`.
 
 CI uses sccache 0.17.0 for C/C++ objects and named-module BMI sidecars, with direct mode disabled. Native `clang-scan-deps` and linking remain outside the compiler cache. The local disk compiler cache is limited to 512 MiB; ThinLTO's cache pruning policy targets 512 MiB. Neither cache restores across SDK identities. Do not replace this with ccache or cache an entire build directory: standard-module support and SDK/BMI identity must be preserved.
@@ -259,6 +261,8 @@ CI uses sccache 0.17.0 for C/C++ objects and named-module BMI sidecars, with dir
 Configuration, build timings, Ninja logs, resource samples and sccache statistics are uploaded as `Build-Diagnostics-<preset>`; failed CTest runs also upload their logs and JUnit results. The profiler's `--sccache` mode starts a private foreground server so compiler children remain inside the measured process tree/Windows Job, collects statistics before flushing and stopping it, and cleans up owned processes on cancellation without stopping unrelated cache servers. Timing summaries report successful link/archive edges from that invocation, not failed links or additive wall time. Resource semantics are recorded alongside the measurements.
 
 The nightly [Sanitizers workflow](../.github/workflows/sanitized.yml) uses Nix 2.35.0 and a GitHub Actions-backed Nix store cache; no external Cachix account or new secret is required. Valid completed store paths can be saved after a failed build. Its 4 GiB GC setting is a target, not a hard quota for rooted closures. Nix, vcpkg, compiler and link caches share the repository's Actions cache quota; monitor eviction and restore/save costs after rollout.
+
+Before saving the Nix store, `cache-state.py nix-snapshot --exclude-file ...` writes an explicit GNU tar exclusion list for unregistered top-level store locks. Registered outputs named `Cargo.lock` are preserved; other unreadable files remain errors. The save-only `TAR_OPTIONS` leaves cache path/version matching unchanged and neither deletes locks nor changes their ownership/permissions. Fast source checks run `scripts/ci/smoke-nix-cache.py` against real unreadable files and archive byte/mode checks as an unprivileged Linux user.
 
 Linux/macOS `.tar.lz` distributions use tarlz level 3 without changing their contents or format. Measurements used identical existing Linux client/server inputs and four workers:
 

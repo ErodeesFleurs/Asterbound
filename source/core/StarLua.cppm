@@ -1,5 +1,9 @@
 module;
-#include <lua.hpp>
+extern "C" {
+#include "lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
+}
 import star.json;
 
 import std;
