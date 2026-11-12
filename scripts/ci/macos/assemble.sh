@@ -56,4 +56,4 @@ cp \
   scripts/steam_appid.txt \
   client_distribution/osx/
 
-tarlz -c9vf client.tar.lz client_distribution
+tarlz -c3vf client.tar.lz client_distribution

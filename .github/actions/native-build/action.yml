@@ -1,0 +1,183 @@
+name: Native configure and build
+description: Prepare pinned sources, reuse ABI-keyed dependencies, and profile the native build.
+inputs:
+  preset:
+    description: Native CMake configure/build preset
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install CMake and Ninja
+      uses: lukka/get-cmake@30aea713799f46b5b60e60f5fa83f849abd52c22
+      with:
+        cmakeVersion: 3.29.2
+        ninjaVersion: 1.13.2
+
+    - name: Preflight Lua download and patch
+      shell: bash
+      run: cmake -S scripts/ci/lua-preflight -B build/lua-preflight -G Ninja
+
+    - name: Install xclang 23.1.3.6
+      shell: bash
+      run: cmake "-DXCLANG_INSTALL_DIR=$RUNNER_TEMP/xclang-23.1.3.6" -P scripts/ci/install-xclang.cmake
+
+    - name: Bootstrap vcpkg
+      uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+      with:
+        vcpkgJsonGlob: '**/source/vcpkg.json'
+        vcpkgConfigurationJsonGlob: '**/source/vcpkg-configuration.json'
+
+    - name: Fingerprint native SDK
+      id: sdk
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py sdk --compiler-root "$XCLANG_ROOT"
+
+    - name: Scope dependency and link caches
+      id: keys
+      shell: bash
+      env:
+        CACHE_SCOPE: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-xclang23.1.3.6-${{ steps.sdk.outputs.sdk }}
+        DEPENDENCIES: ${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'source/CMakePresets.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
+      run: |
+        echo "vcpkg=vcpkg-v2-$CACHE_SCOPE-$DEPENDENCIES" >> "$GITHUB_OUTPUT"
+        echo "lto=thinlto-v1-$CACHE_SCOPE" >> "$GITHUB_OUTPUT"
+        echo "compiler=sccache0.17-v1-$CACHE_SCOPE" >> "$GITHUB_OUTPUT"
+
+    - name: Restore vcpkg binary cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/vcpkg
+        key: ${{ steps.keys.outputs.vcpkg }}-lookup
+        restore-keys: |
+          ${{ steps.keys.outputs.vcpkg }}-
+          vcpkg-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-xclang23.1.3.6-${{ steps.sdk.outputs.sdk }}-
+
+    - name: Snapshot restored dependencies
+      id: dependency-baseline
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/vcpkg --output build/ci/vcpkg-before.json
+
+    - name: Install sccache 0.17.0
+      id: compiler-cache
+      uses: Mozilla-Actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      with:
+        version: v0.17.0
+        disable_annotations: 'true'
+
+    - name: Restore module-aware compiler cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/sccache
+        key: ${{ steps.keys.outputs.compiler }}-lookup
+        restore-keys: ${{ steps.keys.outputs.compiler }}-
+
+    - name: Snapshot restored compiler cache
+      id: compiler-baseline
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/sccache --output build/ci/sccache-before.json
+
+    - name: Configure
+      id: configure
+      shell: bash
+      working-directory: source
+      env:
+        PRESET: ${{ inputs.preset }}
+        VCPKG_FEATURE_FLAGS: binarycaching
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite
+        SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+        SCCACHE_CACHE_SIZE: 512M
+        SCCACHE_DIRECT: 'false'
+        SCCACHE_C_CUSTOM_CACHE_BUSTER: ${{ steps.sdk.outputs.sdk }}
+      run: cmake --preset "$PRESET" -DSTAR_LINK_JOBS=1 "-DSTAR_THINLTO_CACHE_DIR=$GITHUB_WORKSPACE/.cache/thinlto" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+    - name: Inspect completed dependency cache
+      id: dependency-state
+      if: ${{ !cancelled() && steps.dependency-baseline.outcome == 'success' }}
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/vcpkg --compare build/ci/vcpkg-before.json
+
+    - name: Save completed dependencies even after configure failure
+      if: ${{ !cancelled() && steps.dependency-state.outputs.changed == 'true' && steps.dependency-state.outputs.entries != '0' }}
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/vcpkg
+        key: ${{ steps.keys.outputs.vcpkg }}-${{ steps.dependency-state.outputs.inventory }}
+
+    - name: Restore ThinLTO cache
+      if: ${{ success() }}
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/thinlto
+        key: ${{ steps.keys.outputs.lto }}-lookup
+        restore-keys: ${{ steps.keys.outputs.lto }}-
+
+    - name: Snapshot restored link cache
+      id: link-baseline
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/thinlto --output build/ci/thinlto-before.json
+
+    - name: Build with timing and resource report
+      id: build
+      shell: bash
+      env:
+        PRESET: ${{ inputs.preset }}
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+        SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+        SCCACHE_CACHE_SIZE: 512M
+        SCCACHE_DIRECT: 'false'
+        SCCACHE_C_CUSTOM_CACHE_BUSTER: ${{ steps.sdk.outputs.sdk }}
+      run: $PYTHON scripts/ci/build-profile.py --preset "$PRESET" --build-dir "$GITHUB_WORKSPACE/build/$PRESET" --output-dir "$GITHUB_WORKSPACE/build/ci" --sccache
+
+    - name: Inspect completed compiler cache
+      id: compiler-state
+      if: ${{ !cancelled() && steps.compiler-baseline.outcome == 'success' }}
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/sccache --compare build/ci/sccache-before.json
+
+    - name: Save completed compiler cache even after build failure
+      if: ${{ !cancelled() && steps.compiler-state.outputs.changed == 'true' && steps.compiler-state.outputs.entries != '0' }}
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/sccache
+        key: ${{ steps.keys.outputs.compiler }}-${{ steps.compiler-state.outputs.inventory }}
+
+    - name: Inspect completed link cache
+      id: link-state
+      if: ${{ !cancelled() && steps.link-baseline.outcome == 'success' }}
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      run: $PYTHON scripts/ci/cache-state.py snapshot --directory .cache/thinlto --compare build/ci/thinlto-before.json
+
+    - name: Save completed link cache even after build failure
+      if: ${{ !cancelled() && steps.link-state.outputs.changed == 'true' && steps.link-state.outputs.entries != '0' }}
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
+      with:
+        path: ${{ github.workspace }}/.cache/thinlto
+        key: ${{ steps.keys.outputs.lto }}-${{ steps.link-state.outputs.inventory }}
+
+    - name: Upload build timings and configuration diagnostics
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: Build-Diagnostics-${{ inputs.preset }}
+        path: |
+          build/ci/
+          build/${{ inputs.preset }}/CMakeFiles/CMakeConfigureLog.yaml
+          build/${{ inputs.preset }}/vcpkg-manifest-install.log
+          vcpkg/buildtrees/*/*.log
+          build/lua-preflight/_deps/*-subbuild/*-populate-prefix/src/*-stamp/*.log
+        if-no-files-found: ignore
+        retention-days: 7

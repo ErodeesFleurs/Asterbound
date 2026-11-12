@@ -1,16 +1,14 @@
 name: Sanitizers
 
-# AddressSanitizer + UndefinedBehaviorSanitizer build of the default package.
-# Its check phase runs core_tests with UBSAN_OPTIONS=halt_on_error=1, so the
-# first report fails the build; `nix run .#sanitized-tests` runs game_tests the
-# same way against a local Starbound asset copy (not possible here, those assets
-# are not redistributable).
-#
-# A sanitized build is ~30 minutes warm and rebuilds every dependency cold, so
-# this is a nightly gate rather than something that runs on every push.  Run it
-# on demand from the Actions tab, or locally with
-#   nix build .#sanitized && nix run .#sanitized-tests
+permissions:
+  contents: read
+  actions: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+# Asset-free ASan/UBSan checks stay nightly; owned game assets are not uploaded.
 on:
   schedule:
     - cron: "17 4 * * *"
@@ -19,23 +17,64 @@ on:
 jobs:
   sanitized:
     name: ASan + UBSan (core_tests gate)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          submodules: "recursive"
+          submodules: recursive
 
-      - uses: cachix/install-nix-action@v27
+      - name: Install Nix
+        id: nix
+        uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          install_url: https://releases.nixos.org/nix/nix-2.35.0/install
+          extra_nix_config: |
+            keep-outputs = true
+            keep-derivations = true
 
-      # Optional: a binary cache turns the ~35 minute cold build into a few
-      # minutes for the dependencies.
-      # - uses: cachix/cachix-action@v15
-      #   with:
-      #     name: your-cache
-      #     authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Scope sanitizer cache
+        id: keys
+        env:
+          INPUTS: ${{ hashFiles('flake.lock', 'flake.nix', 'nix/**', 'cmake/**', 'version.json') }}
+        run: echo "prefix=nix-sanitized-v1-${RUNNER_OS}-${RUNNER_ARCH}-$INPUTS" >> "$GITHUB_OUTPUT"
 
-      - name: nix build .#sanitized
-        run: nix build .#sanitized --print-build-logs
+      - name: Restore Nix store
+        uses: nix-community/cache-nix-action/restore@7df957e333c1e5da7721f60227dbba6d06080569
+        with:
+          primary-key: ${{ steps.keys.outputs.prefix }}-lookup
+          restore-prefixes-first-match: |
+            ${{ steps.keys.outputs.prefix }}-
+            nix-sanitized-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Snapshot restored Nix paths
+        id: baseline
+        run: python3 scripts/ci/cache-state.py nix-snapshot --output build/ci/nix-before.json
+
+      - name: Build and run ASan + UBSan checks
+        run: |
+          set -o pipefail
+          nix build .#sanitized --print-build-logs --out-link result-sanitized 2>&1 | tee build/ci/sanitized.log
+
+      - name: Inspect completed Nix store paths
+        id: state
+        if: ${{ !cancelled() && steps.baseline.outcome == 'success' }}
+        run: python3 scripts/ci/cache-state.py nix-snapshot --compare build/ci/nix-before.json
+
+      - name: Save completed Nix paths even after build failure
+        if: ${{ !cancelled() && steps.state.outputs.changed == 'true' }}
+        uses: nix-community/cache-nix-action/save@7df957e333c1e5da7721f60227dbba6d06080569
+        with:
+          primary-key: ${{ steps.keys.outputs.prefix }}-${{ steps.state.outputs.inventory }}
+          # A GC target, not a hard quota: rooted build closures are retained.
+          gc-max-store-size-linux: 4G
+
+      - name: Upload sanitizer failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Sanitizer-Diagnostics
+          path: build/ci/
+          if-no-files-found: ignore
+          retention-days: 7

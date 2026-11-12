@@ -26,6 +26,20 @@ function(star_default_compile_options config kind)
   endforeach()
 endfunction()
 
+# CI opts in after measuring its runner; local scheduling remains unchanged.
+set(STAR_LINK_JOBS "" CACHE STRING "Maximum concurrent Ninja link/archive jobs (empty keeps Ninja defaults)")
+if(NOT STAR_LINK_JOBS STREQUAL "")
+  if(NOT STAR_LINK_JOBS MATCHES "^[1-9][0-9]*$")
+    message(FATAL_ERROR "STAR_LINK_JOBS must be a positive integer or empty.")
+  endif()
+  if(NOT CMAKE_GENERATOR MATCHES "^Ninja")
+    message(FATAL_ERROR "STAR_LINK_JOBS requires a Ninja generator.")
+  endif()
+  set_property(GLOBAL APPEND PROPERTY JOB_POOLS "star_link=${STAR_LINK_JOBS}")
+  set(CMAKE_JOB_POOL_LINK star_link)
+endif()
+
+set(STAR_THINLTO_CACHE_DIR "" CACHE PATH "Persistent ThinLTO object cache (empty disables caching)")
 if(STAR_ENABLE_THINLTO)
   include(CheckIPOSupported)
   check_ipo_supported(LANGUAGES C CXX)
@@ -37,6 +51,31 @@ if(STAR_ENABLE_THINLTO)
   endforeach()
 endif()
 message(STATUS "ThinLTO for optimized configurations: ${STAR_ENABLE_THINLTO}")
+
+if(STAR_ENABLE_THINLTO AND NOT STAR_THINLTO_CACHE_DIR STREQUAL "")
+  cmake_path(ABSOLUTE_PATH STAR_THINLTO_CACHE_DIR
+    BASE_DIRECTORY "${CMAKE_BINARY_DIR}" NORMALIZE OUTPUT_VARIABLE star_thinlto_cache)
+  # LLVM's ThinLTO documentation and the pinned lld/MinGW/Options.td use
+  # --thinlto-cache-dir in GNU mode, NOT lld-link's /lldltocache spelling.
+  # Mach-O ld64.lld instead implements ld64's -cache_path_lto.
+  if(STAR_SYSTEM_MACOS)
+    set(star_thinlto_cache_option "LINKER:-cache_path_lto,${star_thinlto_cache}")
+  elseif(STAR_SYSTEM_WINDOWS OR STAR_SYSTEM_LINUX)
+    set(star_thinlto_cache_option "LINKER:--thinlto-cache-dir=${star_thinlto_cache}")
+  else()
+    message(FATAL_ERROR "STAR_THINLTO_CACHE_DIR is supported only for xclang's Linux, MinGW and macOS linkers.")
+  endif()
+  # Evaluate on the final consumer, respecting a target's explicit IPO opt-out.
+  # Debug and STAR_ENABLE_THINLTO=OFF never acquire cache linker flags.
+  set(star_config_ipo "$<BOOL:$<TARGET_PROPERTY:INTERPROCEDURAL_OPTIMIZATION_$<UPPER_CASE:$<CONFIG>>>>")
+  # All three lld drivers accept this policy. Explicit units are required by
+  # LLVM's parser; prune each link so CI does not upload an unbounded cache.
+  foreach(cache_option IN ITEMS "${star_thinlto_cache_option}"
+      "LINKER:--thinlto-cache-policy=cache_size=0%:cache_size_bytes=512m:prune_interval=0s")
+    target_link_options(star_build_config INTERFACE
+      "$<$<AND:$<CONFIG:Release,RelWithDebInfo,RelWithAsserts,MinSizeRel>,${star_config_ipo}>:${cache_option}>")
+  endforeach()
+endif()
 
 target_compile_definitions(star_build_config INTERFACE
   "$<$<CONFIG:Release,RelWithDebInfo>:NDEBUG>")

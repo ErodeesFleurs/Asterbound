@@ -38,7 +38,7 @@ set(archive "xclang-${XCLANG_VERSION}-${host}.tar.xz")
 set(release "https://github.com/clice-io/xclang/releases/download/${XCLANG_VERSION}")
 file(MAKE_DIRECTORY "${XCLANG_INSTALL_DIR}")
 file(DOWNLOAD "${release}/SHA256SUMS" "${XCLANG_INSTALL_DIR}/SHA256SUMS"
-    TLS_VERIFY ON STATUS download_status)
+    TLS_VERIFY ON TIMEOUT 60 INACTIVITY_TIMEOUT 20 STATUS download_status)
 list(GET download_status 0 status_code)
 if(NOT status_code EQUAL 0)
     message(FATAL_ERROR "Cannot download xclang SHA256SUMS: ${download_status}")
@@ -48,7 +48,8 @@ if(NOT "${expected_sha}  ${archive}" IN_LIST checksum_lines)
     message(FATAL_ERROR "Pinned xclang checksum does not match release SHA256SUMS: ${archive}")
 endif()
 file(DOWNLOAD "${release}/${archive}" "${XCLANG_INSTALL_DIR}/${archive}"
-    EXPECTED_HASH "SHA256=${expected_sha}" TLS_VERIFY ON SHOW_PROGRESS)
+    EXPECTED_HASH "SHA256=${expected_sha}" TLS_VERIFY ON SHOW_PROGRESS
+    TIMEOUT 600 INACTIVITY_TIMEOUT 60)
 file(ARCHIVE_EXTRACT INPUT "${XCLANG_INSTALL_DIR}/${archive}" DESTINATION "${XCLANG_INSTALL_DIR}")
 file(REMOVE "${XCLANG_INSTALL_DIR}/${archive}")
 set(XCLANG_ROOT "${XCLANG_INSTALL_DIR}/xclang")

@@ -10,6 +10,7 @@ Run commands from the repository root unless a step changes directories.
 - [Runtime paths and data import](#runtime-paths-and-data-import)
 - [Native CMake presets](#native-cmake-presets)
 - [Packaging and version metadata](#packaging-and-version-metadata)
+- [Continuous integration](#continuous-integration)
 - [ThinLTO](#thinlto)
 - [Steam and Discord SDKs](#steam-and-discord-sdks)
 - [Windows cross-builds](#windows-cross-builds)
@@ -223,7 +224,7 @@ ctest --preset windows-release
 
 Both examples run asset-free tests through the preset. Run [asset-backed tests](testing.md#native-ctest-suites) separately. Adjust concurrency for available memory.
 
-Native Linux uses the host C SDK and xclang's static C++ runtime. CI targets Ubuntu 24.04/glibc 2.39, **not** glibc 2.17. Offline builds can set `FETCHCONTENT_SOURCE_DIR_STAR_LUA` to prepatched sources containing `src/`, with `FETCHCONTENT_FULLY_DISCONNECTED=ON`.
+Native Linux uses the host C SDK and xclang's static C++ runtime. CI targets Ubuntu 24.04/glibc 2.39, **not** glibc 2.17. Offline builds can set `FETCHCONTENT_SOURCE_DIR_STAR_LUA` to prepatched sources containing `lua.h` and C sources at their root, with `FETCHCONTENT_FULLY_DISCONNECTED=ON`.
 
 ## Packaging and version metadata
 
@@ -245,11 +246,43 @@ macOS maps `a.b.c.d` to short version `a.b.c`, build version `(a*100+b).c.d`, an
 
 Linux validation is not proof of Windows/macOS native packaging or SDK interoperability; use each platform's runner for those checks.
 
+## Continuous integration
+
+The native [Build workflow](../.github/workflows/build.yml) retains Windows x64, Linux x86_64/ARM64 and macOS ARM64 coverage and all development/client/server/installer artifacts. Asset-free tests run before distribution compression. Fast source checks have a 10-minute deadline; native and sanitizer jobs have 120-minute deadlines. New push/PR runs cancel superseded runs for the same event and branch; manual dispatches remain independent. Branch names containing `/` are supported.
+
+The shared [native build action](../.github/actions/native-build/action.yml) pins CMake 3.29.2, Ninja 1.13.2, xclang 23.1.3.6 and immutable third-party Action revisions. Lua download/hash/patch preflight runs before expensive dependency configuration and exports the same prepatched source tree to the engine.
+
+Caches are restored and saved separately. Completed vcpkg packages survive later configuration/build/test failures; changed cache inventories produce new immutable keys instead of trying to overwrite an existing key. Keys include the compiler, architecture, preset and actual SDK/runner image identity. The compiler cache also receives the SDK identity through `SCCACHE_C_CUSTOM_CACHE_BUSTER`.
+
+CI uses sccache 0.17.0 for C/C++ objects and named-module BMI sidecars, with direct mode disabled. Native `clang-scan-deps` and linking remain outside the compiler cache. The local disk compiler cache is limited to 512 MiB; ThinLTO's cache pruning policy targets 512 MiB. Neither cache restores across SDK identities. Do not replace this with ccache or cache an entire build directory: standard-module support and SDK/BMI identity must be preserved.
+
+Configuration, build timings, Ninja logs, resource samples and sccache statistics are uploaded as `Build-Diagnostics-<preset>`; failed CTest runs also upload their logs and JUnit results. The profiler's `--sccache` mode starts a private foreground server so compiler children remain inside the measured process tree/Windows Job, collects statistics before flushing and stopping it, and cleans up owned processes on cancellation without stopping unrelated cache servers. Timing summaries report successful link/archive edges from that invocation, not failed links or additive wall time. Resource semantics are recorded alongside the measurements.
+
+The nightly [Sanitizers workflow](../.github/workflows/sanitized.yml) uses Nix 2.35.0 and a GitHub Actions-backed Nix store cache; no external Cachix account or new secret is required. Valid completed store paths can be saved after a failed build. Its 4 GiB GC setting is a target, not a hard quota for rooted closures. Nix, vcpkg, compiler and link caches share the repository's Actions cache quota; monitor eviction and restore/save costs after rollout.
+
+Linux/macOS `.tar.lz` distributions use tarlz level 3 without changing their contents or format. Measurements used identical existing Linux client/server inputs and four workers:
+
+| tarlz level | Combined time, pass 1 | Combined time, pass 2 | Combined archive bytes |
+|---|---:|---:|---:|
+| 9 | 148.16 s | 163.38 s | 179,619,993 |
+| 3 | 60.58 s | 84.29 s | 203,094,204 |
+
+Level 3 trades 13.07% more archive bytes for shorter compression. Byte/mode/type/symlink round trips passed. These are local packaging measurements, not macOS or whole-CI speedup claims.
+
 ## ThinLTO
 
 ThinLTO defaults to ON for `Release`, `RelWithDebInfo`, `RelWithAsserts` and `MinSizeRel`; Debug is unchanged. CMake checks C/C++ IPO support and uses xclang's `-flto=thin` with matching LLVM archive tools for project targets, including `std` modules and Lua. Prebuilt dependencies are not rebuilt with LTO.
 
 Pass `-DSTAR_ENABLE_THINLTO=OFF` at configure time to disable it. Changing the option rebuilds affected objects and libraries. Linking needs more time and memory; performance gains depend on workload.
+
+For CI-style link control, configure `-DSTAR_LINK_JOBS=1 -DSTAR_THINLTO_CACHE_DIR=/absolute/cache/path`. Both options are opt-in; ordinary local builds keep their previous scheduler and no persistent link cache. `STAR_LINK_JOBS` requires Ninja and a positive integer. CI conservatively starts with one simultaneous link/archive job because each ThinLTO link can use multiple backend threads; use the uploaded timings and memory reports before increasing it. Debug, ThinLTO-OFF builds and individual targets opting out of IPO do not receive ThinLTO cache flags.
+
+A local two-executable ThinLTO fixture also compared link concurrency. These wall times include the profiling wrapper; RSS is a sampled process-tree sum, not an exact peak. The fixture supports starting conservatively, not a universal engine concurrency recommendation:
+
+| Concurrent links | Cold-cache wall time | Warm-cache wall time | Cold-cache sampled RSS |
+|---|---:|---:|---:|
+| 1 | 4.98 s | 0.60 s | 297 MiB |
+| 2 | 7.86 s | 0.61 s | 537 MiB |
 
 ## Steam and Discord SDKs
 

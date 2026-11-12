@@ -1,6 +1,11 @@
 name: Build
 permissions:
   actions: read
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 on:
   workflow_dispatch:
@@ -27,9 +32,13 @@ on:
       - 'triplets/**'
       - 'ports/**'
       - 'scripts/ci/**'
+      - '.github/actions/**'
+      - '.clang-format'
+      - '.gitattributes'
+      - 'scripts/format-source.sh'
       - '.github/workflows/build.yml'
     branches:
-      - '*'
+      - '**'
   pull_request:
     paths:
       - 'assets/**'
@@ -40,31 +49,62 @@ on:
       - 'triplets/**'
       - 'ports/**'
       - 'scripts/ci/**'
+      - '.github/actions/**'
+      - '.gitattributes'
       - '.clang-format'
       - 'scripts/format-source.sh'
       - '.github/workflows/build.yml'
     branches:
-      - '*'
+      - '**'
 
 jobs:
+  checks:
+    name: Fast source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Check changed C++ lines
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          python3 -m venv "$RUNNER_TEMP/source-quality"
+          "$RUNNER_TEMP/source-quality/bin/pip" install 'clang-format==21.1.8'
+          CLANG_FORMAT="$RUNNER_TEMP/source-quality/bin/clang-format" scripts/format-source.sh --check --base "$BASE_SHA"
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@30aea713799f46b5b60e60f5fa83f849abd52c22
+        with:
+          cmakeVersion: 3.29.2
+          ninjaVersion: 1.13.2
+      - name: Check Lua download and project patch
+        run: cmake -S scripts/ci/lua-preflight -B build/lua-preflight -G Ninja
+      - name: Upload failed source preflight diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Source-Preflight-Diagnostics
+          path: build/lua-preflight/
+          if-no-files-found: ignore
+          retention-days: 7
+
   build_windows:
     name: Build Asterbound Windows x64
+    needs: checks
+    timeout-minutes: 120
     runs-on: windows-latest
     if: ${{ (github.event_name != 'pull_request') && ((github.event_name != 'workflow_dispatch') || (inputs.windows == true)) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           submodules: 'recursive'
 
-      - name: Install CMake & Ninja
-        uses: lukka/get-cmake@latest
-        with:
-          cmakeVersion: 3.29.2
-
       # Qt5's native MinGW build uses make; no MSYS2 compiler or C++ runtime is installed.
       - name: Install Qt5 make tool
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
         id: msys2
         with:
           msystem: UCRT64
@@ -76,38 +116,10 @@ jobs:
           "MSYS2_ROOT=${{ steps.msys2.outputs.msys2-location }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install xclang 23.1.3.6
-        shell: pwsh
-        run: cmake "-DXCLANG_INSTALL_DIR=$env:RUNNER_TEMP/xclang-23.1.3.6" -P scripts/ci/install-xclang.cmake
-
-      - name: vcpkg
-        uses: lukka/run-vcpkg@v11
-        id: runvcpkg
+      - name: Configure and build
+        uses: ./.github/actions/native-build
         with:
-          vcpkgJsonGlob: '**/source/vcpkg.json'
-          vcpkgConfigurationJsonGlob: '**/source/vcpkg-configuration.json'
-
-      - name: Restore vcpkg binary cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.cache/vcpkg
-          key: vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
-          restore-keys: |
-            vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
-
-      - name: Prepare vcpkg binary cache
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force "${{ github.workspace }}/.cache/vcpkg"
-
-      - name: Run CMake
-        uses: lukka/run-cmake@v10
-        env:
-          VCPKG_FEATURE_FLAGS: "binarycaching"
-          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite"
-        with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          configurePreset: 'windows-release'
-          buildPreset: 'windows-release'
+          preset: windows-release
 
       - name: Run Post-Build Task
         shell: cmd
@@ -121,17 +133,17 @@ jobs:
 
       - name: Run Tests
         working-directory: source
-        run: ctest --preset windows-release --verbose --output-junit test-results.xml
+        run: ctest --preset windows-release --verbose --output-junit ../build/windows-release/test-results.xml
 
       - name: Upload Windows test failure logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-Windows-Test-Failure-Logs
           path: |
             build/windows-release/Testing/Temporary/
             build/windows-release/test-results.xml
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Assemble Files
         shell: cmd
@@ -147,21 +159,21 @@ jobs:
           ren dist.zip Asterbound-Windows-All-DevOnly.zip
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-Windows-All-DevOnly
           path: Asterbound-Windows-All-DevOnly.zip
           archive: false
 
       - name: Upload Client
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-Windows-Client
           path: Asterbound-Windows-Client.zip
           archive: false
 
       - name: Upload Server
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-Windows-Server
           path: Asterbound-Windows-Server.zip
@@ -172,7 +184,7 @@ jobs:
         run: |
           set "ISCC_PATH=%programfiles%\Inno Setup 7\ISCC.exe"
           if exist "%ISCC_PATH%" exit /b 0
-          curl -fL -o "%tmp%\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe
+          curl -fL --connect-timeout 20 --max-time 180 -o "%tmp%\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe
           if errorlevel 1 exit /b 1
           "%tmp%\innosetup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
           if not exist "%ISCC_PATH%" exit /b 1
@@ -182,7 +194,7 @@ jobs:
         run: scripts/ci/windows/create-installer.ps1
 
       - name: Upload Installer
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-Windows-Installer
           path: installer/Asterbound-Windows-Installer.exe
@@ -191,6 +203,8 @@ jobs:
 
   build_linux:
     name: Build Asterbound Linux ${{ matrix.arch }}
+    needs: checks
+    timeout-minutes: 120
     runs-on: ${{ matrix.runner }}
     if: ${{ (github.event_name != 'workflow_dispatch') || (inputs.linux == true) }}
     strategy:
@@ -207,19 +221,9 @@ jobs:
             artifact: Asterbound-Linux-ARM-xclang
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           submodules: 'recursive'
-
-      - name: Check changed C++ lines
-        if: github.event_name == 'pull_request' && matrix.arch == 'x86_64'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          python3 -m venv "$RUNNER_TEMP/source-quality"
-          "$RUNNER_TEMP/source-quality/bin/pip" install 'clang-format==21.1.8'
-          CLANG_FORMAT="$RUNNER_TEMP/source-quality/bin/clang-format" scripts/format-source.sh --check --base "$BASE_SHA"
 
       - name: Install Packages
         run: |
@@ -232,40 +236,10 @@ jobs:
           '^libxcb.*-dev' libx11-xcb-dev libxrender-dev libxkbcommon-x11-dev \
           autoconf autoconf-archive automake libtool libltdl-dev patchelf tarlz
 
-      - name: Install CMake & Ninja
-        uses: lukka/get-cmake@latest
+      - name: Configure and build
+        uses: ./.github/actions/native-build
         with:
-          cmakeVersion: 3.29.2
-
-      - name: Install xclang 23.1.3.6
-        run: cmake "-DXCLANG_INSTALL_DIR=$RUNNER_TEMP/xclang-23.1.3.6" -P scripts/ci/install-xclang.cmake
-      - name: vcpkg
-        uses: lukka/run-vcpkg@v11
-        id: runvcpkg
-        with:
-          vcpkgJsonGlob: '**/source/vcpkg.json'
-          vcpkgConfigurationJsonGlob: '**/source/vcpkg-configuration.json'
-
-      - name: Restore vcpkg binary cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.cache/vcpkg
-          key: vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
-          restore-keys: |
-            vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
-
-      - name: Prepare vcpkg binary cache
-        run: mkdir -p "$GITHUB_WORKSPACE/.cache/vcpkg"
-
-      - name: Run CMake
-        uses: lukka/run-cmake@v10
-        env:
-          VCPKG_FEATURE_FLAGS: "binarycaching"
-          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite"
-        with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          configurePreset: '${{ matrix.preset }}'
-          buildPreset: '${{ matrix.preset }}'
+          preset: ${{ matrix.preset }}
 
       - name: Smoke test Linux executables
         run: |
@@ -273,21 +247,22 @@ jobs:
           ./dist/asterbound_server -version
           python3 scripts/ci/smoke-client-startup.py dist/asterbound
 
+      - name: Run Tests
+        working-directory: source
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: ctest --preset "$PRESET" --output-junit "$GITHUB_WORKSPACE/build/$PRESET/test-results.xml"
+
       - name: Prepare Artifacts
-        run: tarlz -c9vf ${{ matrix.artifact }}.tar.lz dist
+        run: tarlz -c3vf ${{ matrix.artifact }}.tar.lz dist
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.lz
           archive: false
 
-      - name: Run Tests
-        uses: lukka/run-cmake@v10
-        with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          testPreset: '${{ matrix.preset }}'
 
       - name: Assemble Files
         run: |
@@ -296,69 +271,51 @@ jobs:
           mv -v server.tar.lz ${{ matrix.artifact }}-Server.tar.lz
 
       - name: Upload Client Files
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.artifact }}-Client
           path: ${{ matrix.artifact }}-Client.tar.lz
           archive: false
 
       - name: Upload Server Files
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.artifact }}-Server
           path: ${{ matrix.artifact }}-Server.tar.lz
           archive: false
 
+      - name: Upload Linux test failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Test-Diagnostics-${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/Testing/Temporary/
+            build/${{ matrix.preset }}/test-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   build_macos:
     name: Build Asterbound macOS arm64
+    needs: checks
+    timeout-minutes: 120
     runs-on: macos-15
     if: ${{ (github.event_name != 'pull_request') && ((github.event_name != 'workflow_dispatch') || (inputs.macOS == true)) }}
     env:
       MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           submodules: 'recursive'
 
       - name: Install Packages
         run: brew install autoconf autoconf-archive automake libtool tarlz
 
-      - name: Install CMake & Ninja
-        uses: lukka/get-cmake@latest
+      - name: Configure and build
+        uses: ./.github/actions/native-build
         with:
-          cmakeVersion: 3.29.2
-
-      - name: Install xclang 23.1.3.6
-        run: cmake "-DXCLANG_INSTALL_DIR=$RUNNER_TEMP/xclang-23.1.3.6" -P scripts/ci/install-xclang.cmake
-
-      - name: vcpkg
-        uses: lukka/run-vcpkg@v11
-        id: runvcpkg
-        with:
-          vcpkgJsonGlob: '**/source/vcpkg.json'
-          vcpkgConfigurationJsonGlob: '**/source/vcpkg-configuration.json'
-
-      - name: Restore vcpkg binary cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.cache/vcpkg
-          key: vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
-          restore-keys: |
-            vcpkg-xclang23.1.3.6-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
-
-      - name: Prepare vcpkg binary cache
-        run: mkdir -p "$GITHUB_WORKSPACE/.cache/vcpkg"
-
-      - name: Run CMake
-        uses: lukka/run-cmake@v10
-        env:
-          VCPKG_FEATURE_FLAGS: "binarycaching"
-          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite"
-        with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          configurePreset: 'macos-arm-release'
-          buildPreset: 'macos-arm-release'
+          preset: macos-arm-release
 
       - name: Copy Libraries
         run: cp lib/osx/arm64/*.dylib lib/osx/libsteam_api.dylib dist/
@@ -367,16 +324,14 @@ jobs:
         run: python3 scripts/ci/smoke-client-startup.py dist/asterbound
 
       - name: Run Tests
-        uses: lukka/run-cmake@v10
-        with:
-          cmakeListsTxtPath: '${{ github.workspace }}/source/CMakeLists.txt'
-          testPreset: 'macos-arm-release'
+        working-directory: source
+        run: ctest --preset macos-arm-release --output-junit ../build/macos-arm-release/test-results.xml
 
       - name: Prepare Artifacts
-        run: tarlz -c9vf Asterbound-macOS-Silicon.tar.lz dist
+        run: tarlz -c3vf Asterbound-macOS-Silicon.tar.lz dist
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-macOS-Silicon
           path: Asterbound-macOS-Silicon.tar.lz
@@ -388,8 +343,19 @@ jobs:
           mv -v client.tar.lz Asterbound-macOS-Silicon-Client.tar.lz
 
       - name: Upload Client Files
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: Asterbound-macOS-Silicon-Client
           path: Asterbound-macOS-Silicon-Client.tar.lz
           archive: false
+
+      - name: Upload macOS test failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Test-Diagnostics-macos-arm-release
+          path: |
+            build/macos-arm-release/Testing/Temporary/
+            build/macos-arm-release/test-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
