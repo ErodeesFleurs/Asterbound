@@ -184,6 +184,7 @@ let
     "performance_benchmarks"
     "worker_benchmarks"
     "allocator_benchmarks"
+    "block_allocator_benchmarks"
   ]
   ++ lib.optionals (withBenchmarks && guiSupport) [
     "frontend_benchmarks"

@@ -1564,10 +1564,7 @@ public:
   explicit SmallList(std::from_range_t, Range&& range) {
     append_range(std::forward<Range>(range));
   }
-  SmallList(std::initializer_list<value_type> values) {
-    for (auto const& value : values)
-      m_storage.push_back(value);
-  }
+  SmallList(std::initializer_list<value_type> values) : m_storage(values) {}
 
   iterator begin() { return m_storage.begin(); }
   const_iterator begin() const { return m_storage.begin(); }
@@ -1654,8 +1651,8 @@ public:
     return std::numeric_limits<difference_type>::max() / sizeof(value_type);
   }
   auto get_allocator() const requires requires(Storage const& storage) { storage.get_allocator(); } { return m_storage.get_allocator(); }
-  value_type* data() noexcept(noexcept(m_storage.ptr())) { return m_storage.ptr(); }
-  value_type const* data() const noexcept(noexcept(m_storage.ptr())) { return m_storage.ptr(); }
+  value_type* data() noexcept(noexcept(m_storage.data())) { return m_storage.data(); }
+  value_type const* data() const noexcept(noexcept(m_storage.data())) { return m_storage.data(); }
   void swap(SmallList& other) noexcept(std::is_nothrow_swappable_v<Storage>) { std::swap(m_storage, other.m_storage); }
   bool operator==(SmallList const& other) const { return m_storage == other.m_storage; }
   bool operator<(SmallList const& other) const { return m_storage < other.m_storage; }

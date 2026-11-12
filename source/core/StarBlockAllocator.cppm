@@ -6,287 +6,219 @@ import star.type_identity;
 
 namespace Star {
 
-// Constant size only allocator using fixed size blocks of memory.  much faster
-// than general purpose allocators, but not thread safe.  Useful as the
-// allocator for containers that mostly allocate one element at a time, such as
-// std::list, std::map, std::set etc.
-template <typename T, std::size_t BlockSize>
+// Keep incomplete node types valid during allocator rebinding.
+template <typename T>
+concept allocator_value = std::is_object_v<T> && !std::is_array_v<T> && !std::is_const_v<T> && !std::is_volatile_v<T>;
+
+template <std::size_t Size>
+concept allocator_block_size = Size > 0;
+
+// Copies and rebinds share a non-thread-safe family, with one pool per type.
+// Only single-element requests use the pool; arrays use std::allocator.
+template <allocator_value T, std::size_t BlockSize>
+  requires allocator_block_size<BlockSize>
 class BlockAllocator {
-  static_assert(BlockSize > 0);
 public:
   using value_type = T;
-
-  using pointer = T*;
-  using const_pointer = T const*;
-
-  using reference = T&;
-  using const_reference = T const&;
-
-  // Allocator can be shared, but since it is NOT thread safe this should not
-  // be done by default.
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
   using propagate_on_container_copy_assignment = std::false_type;
   using propagate_on_container_move_assignment = std::true_type;
   using propagate_on_container_swap = std::true_type;
 
-  template <class U>
-  struct rebind {
+  template <allocator_value U> struct rebind {
     using other = BlockAllocator<U, BlockSize>;
   };
 
-  BlockAllocator();
-  // Copy constructed BlockAllocators of the same type share underlying
-  // resources.
-  BlockAllocator(BlockAllocator const& other) = default;
-  BlockAllocator(BlockAllocator&& other) = default;
-  // Copy constructed BlockAllocators of different type share no resources
-  template <class U>
-  BlockAllocator(BlockAllocator<U, BlockSize> const& other);
+  BlockAllocator() : m_family(std::make_shared<family_type>()) {}
+  BlockAllocator(BlockAllocator const& other) noexcept : m_family(other.get_family()), m_data(other.m_data) {
+    if (!m_data)
+      inherit_data(other);
+  }
+  BlockAllocator& operator=(BlockAllocator const& other) noexcept {
+    if (this != &other)
+      *this = BlockAllocator(other);
+    return *this;
+  }
 
-  BlockAllocator& operator=(BlockAllocator const& rhs) = default;
-  BlockAllocator& operator=(BlockAllocator&& rhs) = default;
+  // Reset the borrowed cache too; a moved source lazily obtains a fresh family.
+  BlockAllocator(BlockAllocator&& other) noexcept
+      : m_family(std::move(other.m_family)), m_data(std::exchange(other.m_data, std::nullopt)) {}
+  BlockAllocator& operator=(BlockAllocator&& other) noexcept {
+    if (this != &other) {
+      m_family = std::move(other.m_family);
+      m_data = std::exchange(other.m_data, std::nullopt);
+    }
+    return *this;
+  }
 
-  // If n is != 1, will fall back on std::allocator<T>
-  T* allocate(std::size_t n);
-  void deallocate(T* p, std::size_t n);
+  template <allocator_value U>
+  BlockAllocator(BlockAllocator<U, BlockSize> const& other) noexcept : m_family(other.get_family()) {}
 
-  template <typename... Args>
-  void construct(pointer p, Args&&... args) const;
-  void destroy(pointer p) const;
+  [[nodiscard]] value_type* allocate(size_type count) {
+    if (count != 1)
+      return std::allocator<value_type>{}.allocate(count);
 
-  // BlockAllocator will always be != to any other BlockAllocator instance
-  template <class U>
-  bool operator==(BlockAllocator<U, BlockSize> const& rhs) const;
-  template <class U>
-  bool operator!=(BlockAllocator<U, BlockSize> const& rhs) const;
+    auto& data = get_data();
+    if (!data.available)
+      find_available(data);
+
+    auto& selected = data.available->get();
+    auto index = selected.allocate();
+    if (selected.full())
+      data.available.reset();
+    return reinterpret_cast<value_type*>(std::addressof(selected.at(index)));
+  }
+
+  void deallocate(value_type* address, size_type count) {
+    if (count != 1) {
+      std::allocator<value_type>{}.deallocate(address, count);
+      return;
+    }
+
+    auto& data = get_data();
+    if constexpr (DebugEnabled)
+      star_assert_failed(address);
+    auto position = std::upper_bound(data.blocks.begin(), data.blocks.end(), address,
+                                     [](value_type* allocated, std::unique_ptr<block> const& owner) {
+                                       return std::less<void const*>{}(allocated, std::addressof(owner->at(0)));
+                                     });
+    if constexpr (DebugEnabled)
+      star_assert_failed(position != data.blocks.begin());
+    --position;
+    auto& owner = **position;
+    // Slots contain storage, not an array of T; use their byte stride.
+    auto offset =
+      reinterpret_cast<std::uintptr_t>(address) - reinterpret_cast<std::uintptr_t>(std::addressof(owner.at(0)));
+    if constexpr (DebugEnabled)
+      star_assert_failed(offset < sizeof(owner.slots) && offset % sizeof(slot) == 0);
+    owner.deallocate(static_cast<index_type>(offset / sizeof(slot)));
+
+    if (!data.available)
+      data.available = std::ref(owner);
+    else if (owner.empty() && std::addressof(data.available->get()) != std::addressof(owner))
+      data.blocks.erase(position);
+  }
+
+  template <allocator_value U> bool operator==(BlockAllocator<U, BlockSize> const& other) const noexcept {
+    return get_family() == other.get_family();
+  }
 
 private:
-  template <typename OtherT, std::size_t OtherBlockSize>
+  template <allocator_value U, std::size_t Size>
+    requires allocator_block_size<Size>
   friend class BlockAllocator;
 
-  using ChunkIndex =
+  using index_type =
     std::conditional_t<BlockSize <= std::numeric_limits<std::uint8_t>::max(), std::uint8_t,
-      std::conditional_t<BlockSize <= std::numeric_limits<std::uint16_t>::max(), std::uint16_t,
-        std::conditional_t<BlockSize <= std::numeric_limits<std::uint32_t>::max(), std::uint32_t,
-          std::conditional_t<BlockSize <= std::numeric_limits<std::uint64_t>::max(), std::uint64_t, std::uintmax_t>>>>;
+                       std::conditional_t<BlockSize <= std::numeric_limits<std::uint16_t>::max(), std::uint16_t,
+                                          std::conditional_t<BlockSize <= std::numeric_limits<std::uint32_t>::max(),
+                                                             std::uint32_t, std::uintmax_t>>>;
+  static constexpr index_type null_index = std::numeric_limits<index_type>::max();
 
-  static ChunkIndex const NullChunkIndex = std::numeric_limits<ChunkIndex>::max();
-
-  struct Unallocated {
-    ChunkIndex prev;
-    ChunkIndex next;
+  struct free_node {
+    index_type next;
   };
 
-  struct alignas(T) alignas(Unallocated) Chunk {
-    std::byte bytes[std::max(sizeof(T), sizeof(Unallocated))];
+  struct alignas(value_type) alignas(free_node) slot {
+    std::array<std::byte, std::max(sizeof(value_type), sizeof(free_node))> bytes;
 
-    Unallocated* unallocated() {
-      return std::launder(reinterpret_cast<Unallocated*>(bytes));
+    free_node& free_entry() { return *std::launder(reinterpret_cast<free_node*>(bytes.data())); }
+  };
+
+  struct block {
+    index_type allocate() {
+      if constexpr (DebugEnabled)
+        star_assert_failed(!full());
+      auto index = first_free == null_index ? allocated : first_free;
+      if (first_free != null_index) {
+        auto& entry = at(index).free_entry();
+        first_free = entry.next;
+        std::destroy_at(std::addressof(entry));
+      }
+      ++allocated;
+      return index;
     }
+
+    void deallocate(index_type index) {
+      if constexpr (DebugEnabled)
+        star_assert_failed(!empty());
+      std::construct_at(reinterpret_cast<free_node*>(std::addressof(at(index))), free_node{first_free});
+      first_free = index;
+      --allocated;
+    }
+
+    bool full() const { return allocated == BlockSize; }
+    bool empty() const { return allocated == 0; }
+    slot& at(index_type index) {
+      if constexpr (DebugEnabled)
+        star_assert_failed(index < BlockSize);
+      return slots.data()[index];
+    }
+
+    std::array<slot, BlockSize> slots;
+    index_type first_free = null_index;
+    index_type allocated = 0;
   };
 
-  struct Block {
-    T* allocate();
-    void deallocate(T* ptr);
-
-    bool full() const;
-    bool empty() const;
-
-    Chunk* chunkPointer(ChunkIndex chunkIndex);
-
-    std::array<Chunk, BlockSize> chunks;
-    ChunkIndex firstUnallocated = NullChunkIndex;
-    ChunkIndex allocationCount = 0;
+  struct pool_data {
+    std::vector<std::unique_ptr<block>> blocks;
+    std::optional<std::reference_wrapper<block>> available;
   };
+  using family_type = std::unordered_map<TypeKey, std::shared_ptr<void>>;
 
-  struct Data {
-    std::vector<std::unique_ptr<Block>> blocks;
-    Block* unfilledBlock;
-    std::allocator<T> multiAllocator;
-  };
+  [[gnu::noinline]] void find_available(pool_data& data) {
+    auto found = std::ranges::find_if(data.blocks, [](std::unique_ptr<block> const& owner) { return !owner->full(); });
+    if (found != data.blocks.end()) {
+      data.available = std::ref(**found);
+      return;
+    }
+    auto owner = std::make_unique_for_overwrite<block>();
+    auto& added = *owner;
+    auto position = std::lower_bound(
+      data.blocks.begin(), data.blocks.end(), std::ref(added),
+      [](std::unique_ptr<block> const& existing, std::reference_wrapper<block> incoming) {
+        return std::less<void const*>{}(std::addressof(existing->at(0)), std::addressof(incoming.get().at(0)));
+      });
+    data.blocks.insert(position, std::move(owner));
+    data.available = std::ref(added);
+  }
 
-  using BlockAllocatorFamily = std::unordered_map<TypeKey, std::shared_ptr<void>>;
+  pool_data& get_data() {
+    if (!m_data)
+      initialize_data();
+    return m_data->get();
+  }
+  [[gnu::noinline]] void initialize_data() {
+    auto& owner = (*get_family())[typeKey<pool_data>()];
+    if (!owner)
+      owner = std::make_shared<pool_data>();
+    // The family owns this type-erased state; the cached handle only borrows.
+    m_data = std::ref(*static_cast<pool_data*>(owner.get()));
+  }
 
-  static Data* getAllocatorData(BlockAllocatorFamily& family);
+  std::shared_ptr<family_type> const& get_family() const noexcept {
+    if (!m_family)
+      initialize_family();
+    return m_family;
+  }
+  [[gnu::noinline]] void initialize_family() const noexcept { m_family = std::make_shared<family_type>(); }
+  [[gnu::noinline]] void inherit_data(BlockAllocator const& other) noexcept {
+    auto found = m_family->find(typeKey<pool_data>());
+    if (found != m_family->end())
+      m_data = other.m_data = std::ref(*static_cast<pool_data*>(found->second.get()));
+  }
 
-  std::shared_ptr<BlockAllocatorFamily> m_family;
-  Data* m_data;
+  mutable std::shared_ptr<family_type> m_family;
+  mutable std::optional<std::reference_wrapper<pool_data>> m_data;
 };
 
-template <typename T, std::size_t BlockSize>
-BlockAllocator<T, BlockSize>::BlockAllocator() {
-  m_family = std::make_shared<BlockAllocatorFamily>();
-  m_data = getAllocatorData(*m_family);
-  m_data->blocks.reserve(32);
-  m_data->unfilledBlock = nullptr;
-}
-
-template <typename T, std::size_t BlockSize>
-template <class U>
-BlockAllocator<T, BlockSize>::BlockAllocator(BlockAllocator<U, BlockSize> const& other)
-  : m_family(other.m_family) {
-  m_data = getAllocatorData(*m_family);
-}
-
-template <typename T, std::size_t BlockSize>
-T* BlockAllocator<T, BlockSize>::allocate(std::size_t n) {
-  if (n == 1) {
-    if (m_data->unfilledBlock == nullptr) {
-      for (auto const& p : m_data->blocks) {
-        if (!p->full()) {
-          m_data->unfilledBlock = p.get();
-          break;
-        }
-      }
-
-      if (!m_data->unfilledBlock) {
-        auto block = std::make_unique<Block>();
-        auto sortedPosition = std::lower_bound(m_data->blocks.begin(), m_data->blocks.end(), block.get(), [](std::unique_ptr<Block> const& a, Block* b) {
-            return std::less<void const*>{}(a->chunkPointer(0), b->chunkPointer(0));
-          });
-        auto inserted = m_data->blocks.insert(sortedPosition, std::move(block));
-        m_data->unfilledBlock = inserted->get();
-      }
-    }
-
-    auto allocated = m_data->unfilledBlock->allocate();
-    if (m_data->unfilledBlock->full())
-      m_data->unfilledBlock = nullptr;
-    return allocated;
-  } else {
-    return m_data->multiAllocator.allocate(n);
-  }
-}
-
-template <typename T, std::size_t BlockSize>
-void BlockAllocator<T, BlockSize>::deallocate(T* p, std::size_t n) {
-  if (n == 1) {
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((p));
-    }
-
-    auto i = std::upper_bound(m_data->blocks.begin(), m_data->blocks.end(), p, [](T* a, std::unique_ptr<Block> const& b) {
-        return std::less<void const*>{}(a, b->chunkPointer(0));
-      });
-
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((i != m_data->blocks.begin()));
-    }
-    --i;
-
-    (*i)->deallocate(p);
-
-    if (!m_data->unfilledBlock) {
-      m_data->unfilledBlock = i->get();
-    } else if ((*i)->empty()) {
-      if (m_data->unfilledBlock != i->get())
-        m_data->blocks.erase(i);
-    }
-  } else {
-    m_data->multiAllocator.deallocate(p, n);
-  }
-}
-
-template <typename T, std::size_t BlockSize>
-template <typename... Args>
-void BlockAllocator<T, BlockSize>::construct(pointer p, Args&&... args) const {
-  std::construct_at(p, std::forward<Args>(args)...);
-}
-
-template <typename T, std::size_t BlockSize>
-void BlockAllocator<T, BlockSize>::destroy(pointer p) const {
-  std::destroy_at(p);
-}
-
-template <typename T, std::size_t BlockSize>
-template <class U>
-bool BlockAllocator<T, BlockSize>::operator==(BlockAllocator<U, BlockSize> const& rhs) const {
-  return m_family == rhs.m_family;
-}
-
-template <typename T, std::size_t BlockSize>
-template <class U>
-bool BlockAllocator<T, BlockSize>::operator!=(BlockAllocator<U, BlockSize> const& rhs) const {
-  return m_family != rhs.m_family;
-}
-
-template <typename T, std::size_t BlockSize>
-T* BlockAllocator<T, BlockSize>::Block::allocate() {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((allocationCount < BlockSize));
-  }
-
-  T* allocated;
-  if (firstUnallocated == NullChunkIndex) {
-    allocated = reinterpret_cast<T*>(chunkPointer(allocationCount));
-  } else {
-    auto chunk = chunkPointer(firstUnallocated);
-    auto unallocated = chunk->unallocated();
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((unallocated->prev == NullChunkIndex));
-    }
-    firstUnallocated = unallocated->next;
-    std::destroy_at(unallocated);
-    if (firstUnallocated != NullChunkIndex)
-      chunkPointer(firstUnallocated)->unallocated()->prev = NullChunkIndex;
-    allocated = reinterpret_cast<T*>(chunk);
-  }
-
-  ++allocationCount;
-  return allocated;
-}
-
-template <typename T, std::size_t BlockSize>
-void BlockAllocator<T, BlockSize>::Block::deallocate(T* ptr) {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((allocationCount > 0));
-  }
-
-  // The stride is sizeof(Chunk), not sizeof(T), and the T objects are not an
-  // array.  Use byte addresses rather than subtracting unrelated T pointers.
-  auto offset = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(chunks.data());
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((offset < sizeof(chunks) && offset % sizeof(Chunk) == 0));
-  }
-  auto chunkIndex = static_cast<ChunkIndex>(offset / sizeof(Chunk));
-  std::construct_at(reinterpret_cast<Unallocated*>(chunkPointer(chunkIndex)),
-    Unallocated{NullChunkIndex, firstUnallocated});
-  if (firstUnallocated != NullChunkIndex)
-    chunkPointer(firstUnallocated)->unallocated()->prev = chunkIndex;
-  firstUnallocated = chunkIndex;
-  --allocationCount;
-}
-
-template <typename T, std::size_t BlockSize>
-bool BlockAllocator<T, BlockSize>::Block::full() const {
-  return allocationCount == BlockSize;
-}
-
-template <typename T, std::size_t BlockSize>
-bool BlockAllocator<T, BlockSize>::Block::empty() const {
-  return allocationCount == 0;
-}
-
-template <typename T, std::size_t BlockSize>
-auto BlockAllocator<T, BlockSize>::Block::chunkPointer(ChunkIndex chunkIndex) -> Chunk* {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((chunkIndex < BlockSize));
-  }
-  return &chunks[chunkIndex];
-}
-
-template <typename T, std::size_t BlockSize>
-typename BlockAllocator<T, BlockSize>::Data* BlockAllocator<T, BlockSize>::getAllocatorData(BlockAllocatorFamily& family) {
-  // Keep each complete Data specialization distinct within the shared family.
-  auto& dataptr = family[typeKey<Data>()];
-  if (!dataptr)
-    dataptr = std::make_shared<Data>();
-  return static_cast<Data*>(dataptr.get());
-}
-
-}
+}// namespace Star
 
 export module star.block_allocator;
 
 export namespace Star {
-  using ::Star::BlockAllocator;
-}
+using ::Star::allocator_block_size;
+using ::Star::allocator_value;
+using ::Star::BlockAllocator;
+}// namespace Star

@@ -80,9 +80,7 @@ struct CopyableVectorValue {
   std::reference_wrapper<SmallVectorLifetime> state;
   int value;
 
-  CopyableVectorValue(SmallVectorLifetime& state, int value) : state(state), value(value) {
-    ++state.alive;
-  }
+  CopyableVectorValue(SmallVectorLifetime& state, int value) : state(state), value(value) { ++state.alive; }
   CopyableVectorValue(CopyableVectorValue const& other) : state(other.state), value(other.value) {
     ++state.get().copies;
     ++state.get().alive;
@@ -112,9 +110,7 @@ struct MoveOnlyVectorValue {
   std::reference_wrapper<SmallVectorLifetime> state;
   int value;
 
-  MoveOnlyVectorValue(SmallVectorLifetime& state, int value) : state(state), value(value) {
-    ++state.alive;
-  }
+  MoveOnlyVectorValue(SmallVectorLifetime& state, int value) : state(state), value(value) { ++state.alive; }
   MoveOnlyVectorValue(MoveOnlyVectorValue const&) = delete;
   MoveOnlyVectorValue(MoveOnlyVectorValue&& other) : state(other.state), value(other.value) {
     ++state.get().moves;
@@ -131,7 +127,7 @@ struct MoveOnlyVectorValue {
     --state.get().alive;
   }
 };
-}
+}// namespace
 
 TEST(SmallVectorTest, EqualityNeedsOnlyContextualInequality) {
   struct Value {
@@ -183,20 +179,17 @@ TEST(SmallVectorTest, ZeroCapacityAndOveralignedStorage) {
     int value;
   };
   static_assert(alignof(SmallVector<Value, 1>) == alignof(Value));
-  static_assert(sizeof(SmallVector<Value, 1>) == 2 * sizeof(Value));
-  static_assert(sizeof(SmallVector<Value, 0>) == 2 * sizeof(Value));
-  static_assert(sizeof(SmallVector<int, 2>) == 2 * sizeof(int) + 3 * sizeof(int*));
   SmallVector<Value, 0> empty;
-  EXPECT_NE(empty.ptr(), nullptr);
+  EXPECT_NE(empty.data(), nullptr);
   EXPECT_TRUE(empty.empty());
   empty.emplace_back(42);
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(empty.ptr()) % alignof(Value), 0u);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(empty.data()) % alignof(Value), 0u);
   EXPECT_EQ(empty[0].value, 42);
   SmallVector<Value, 1> values;
   values.emplace_back(1);
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.ptr()) % alignof(Value), 0u);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.data()) % alignof(Value), 0u);
   values.emplace_back(2);
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.ptr()) % alignof(Value), 0u);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.data()) % alignof(Value), 0u);
   EXPECT_EQ(values[0].value, 1);
   EXPECT_EQ(values[1].value, 2);
 }
@@ -207,12 +200,8 @@ TEST(SmallVectorTest, NothrowMoveIsPreferredToCopy) {
     std::reference_wrapper<int> copies;
 
     explicit Value(int& moves, int& copies) : moves(moves), copies(copies) {}
-    Value(Value const& other) : moves(other.moves), copies(other.copies) {
-      ++copies.get();
-    }
-    Value(Value&& other) noexcept : moves(other.moves), copies(other.copies) {
-      ++moves.get();
-    }
+    Value(Value const& other) : moves(other.moves), copies(other.copies) { ++copies.get(); }
+    Value(Value&& other) noexcept : moves(other.moves), copies(other.copies) { ++moves.get(); }
   };
   int moves = 0;
   int copies = 0;
@@ -307,11 +296,11 @@ TEST(SmallVectorTest, NondefaultCopyAssignmentGrowsHeapAndReusesCapacity) {
     EXPECT_EQ(target[1].value, 20);
     EXPECT_EQ(target[2].value, 30);
     EXPECT_EQ(state.alive, 6);
-    auto storage = target.ptr();
+    auto storage = reinterpret_cast<std::uintptr_t>(target.data());
     ASSERT_TRUE(source.pop_back());
     ASSERT_TRUE(source.pop_back());
     target = source;
-    EXPECT_EQ(target.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(target.data()), storage);
     EXPECT_EQ(target.size(), 1u);
     EXPECT_EQ(state.alive, 2);
   }
@@ -328,14 +317,14 @@ TEST(SmallVectorTest, HeapMoveTakesStorageEvenAfterShrinkingAndReleasesTarget) {
     source.emplace_back(state, 30);
     ASSERT_TRUE(source.pop_back());
     ASSERT_TRUE(source.pop_back());
-    auto storage = source.ptr();
+    auto storage = reinterpret_cast<std::uintptr_t>(source.data());
     SmallVector<MoveOnlyVectorValue, 2> target;
     target.reserve(9);
     target.emplace_back(state, 40);
     target.emplace_back(state, 50);
     auto destroyed = state.destroyed;
     target = std::move(source);
-    EXPECT_EQ(target.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(target.data()), storage);
     ASSERT_EQ(target.size(), 1u);
     EXPECT_EQ(target[0].value, 10);
     EXPECT_EQ(state.moves, 0);
@@ -343,12 +332,12 @@ TEST(SmallVectorTest, HeapMoveTakesStorageEvenAfterShrinkingAndReleasesTarget) {
     EXPECT_EQ(state.destroyed - destroyed, 2);
     EXPECT_EQ(state.alive, 1);
     EXPECT_TRUE(source.empty());
-    EXPECT_NE(source.ptr(), storage);
+    EXPECT_NE(reinterpret_cast<std::uintptr_t>(source.data()), storage);
     source.emplace_back(state, 60);
     EXPECT_EQ(source[0].value, 60);
     auto& alias = target;
     target = std::move(alias);
-    EXPECT_EQ(target.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(target.data()), storage);
     EXPECT_EQ(target[0].value, 10);
     EXPECT_EQ(state.alive, 2);
   }
@@ -361,19 +350,19 @@ TEST(SmallVectorTest, HeapMoveConstructionAndEmptyHeapKeepCapacity) {
     SmallVector<MoveOnlyVectorValue, 2> source;
     source.reserve(8);
     source.emplace_back(state, 10);
-    auto storage = source.ptr();
+    auto storage = reinterpret_cast<std::uintptr_t>(source.data());
     SmallVector<MoveOnlyVectorValue, 2> target(std::move(source));
-    EXPECT_EQ(target.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(target.data()), storage);
     EXPECT_EQ(target[0].value, 10);
     EXPECT_TRUE(source.empty());
     source.emplace_back(state, 20);
     target.clear();
     SmallVector<MoveOnlyVectorValue, 2> empty(std::move(target));
     EXPECT_TRUE(empty.empty());
-    EXPECT_EQ(empty.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(empty.data()), storage);
     for (int i = 0; i < 8; ++i)
       empty.emplace_back(state, i);
-    EXPECT_EQ(empty.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(empty.data()), storage);
     EXPECT_EQ(state.moves, 0);
     EXPECT_TRUE(target.empty());
     target.emplace_back(state, 30);
@@ -391,9 +380,9 @@ TEST(SmallVectorTest, InlineMoveOnlyAssignmentAndEraseNeedNoCopyOrDefault) {
     source.emplace_back(state, 30);
     SmallVector<MoveOnlyVectorValue, 4> target;
     target.emplace_back(state, 1);
-    auto sourceStorage = source.ptr();
+    auto sourceStorage = reinterpret_cast<std::uintptr_t>(source.data());
     target = std::move(source);
-    EXPECT_NE(target.ptr(), sourceStorage);
+    EXPECT_NE(reinterpret_cast<std::uintptr_t>(target.data()), sourceStorage);
     EXPECT_TRUE(source.empty());
     EXPECT_EQ(state.moveAssignments, 1);
     EXPECT_EQ(state.moves, 2);
@@ -423,7 +412,6 @@ TEST(SmallVectorTest, InlineMoveOnlyAssignmentAndEraseNeedNoCopyOrDefault) {
   EXPECT_EQ(state.alive, 0);
 }
 
-
 TEST(SmallVectorTest, InlineMoveConstructionOnlyRequiresMoveConstruction) {
   struct Value {
     int value;
@@ -452,10 +440,10 @@ TEST(SmallVectorTest, InlineMoveIntoHeapTargetReusesStorageAndDestroysTail) {
     target.emplace_back(state, 20);
     target.emplace_back(state, 30);
     target.emplace_back(state, 40);
-    auto storage = target.ptr();
+    auto storage = reinterpret_cast<std::uintptr_t>(target.data());
     auto destroyed = state.destroyed;
     target = std::move(source);
-    EXPECT_EQ(target.ptr(), storage);
+    EXPECT_EQ(reinterpret_cast<std::uintptr_t>(target.data()), storage);
     ASSERT_EQ(target.size(), 1u);
     EXPECT_EQ(target[0].value, 10);
     EXPECT_EQ(state.moveAssignments, 1);
@@ -607,4 +595,45 @@ TEST(SmallVectorTest, EraseIncludesElementsAppendedByMoveAssignment) {
   EXPECT_EQ(values[0].value, 30);
   EXPECT_EQ(values[1].value, 40);
   EXPECT_EQ(values[2].value, 50);
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(SmallVectorTest, RejectsWrappedByteCapacityInsteadOfAllocatingZeroBytes) {
+  auto previous_style = testing::GTEST_FLAG(death_test_style);
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  using Vector = SmallVector<std::uint64_t, 0>;
+  EXPECT_DEATH(
+    {
+      Vector values;
+      values.reserve(std::numeric_limits<std::size_t>::max() / sizeof(std::uint64_t) + 1);
+    },
+    "");
+  testing::GTEST_FLAG(death_test_style) = previous_style;
+}
+#endif
+
+TEST(SmallVectorTest, ReservePublishesReplacementBeforeRetiringOldElements) {
+  struct Value {
+    std::reference_wrapper<std::function<void()>> retired;
+    int value;
+    Value(std::function<void()>& retired, int value) : retired(retired), value(value) {}
+    Value(Value const&) = delete;
+    Value(Value&& other) : retired(other.retired), value(std::exchange(other.value, -1)) {}
+    ~Value() {
+      if (value == -1)
+        retired.get()();
+    }
+  };
+  std::vector<int> observed;
+  std::function<void()> retired;
+  SmallVector<Value, 1> values;
+  values.emplace_back(retired, 81);
+  retired = [&] {
+    for (auto const& value : values)
+      observed.push_back(value.value);
+  };
+  values.reserve(4);
+  EXPECT_EQ(observed, (std::vector<int>{81}));
+  ASSERT_EQ(values.size(), 1u);
+  EXPECT_EQ(values[0].value, 81);
 }

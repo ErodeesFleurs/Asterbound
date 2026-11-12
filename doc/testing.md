@@ -216,6 +216,7 @@ The target list above also includes benchmarks outside this focused catalog.
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | 28 cases: new `try_emplace`/const-pair insertion, expensive duplicate map/set insertion, full-hash-collision rehash, hit/miss lookup, inline-value churn, retained-capacity clear/reuse and sparse iteration. |
 | Images | `./result/bin/image_benchmarks --benchmark_filter='Image/'` | 52 sprite/large cases: ownership, fill, clipped paste/source-over, crops, channel widths, full/windowed scalers, partial-alpha borders, aligned/offset/aliased masks and blends, color sequences, small directive outputs, traversal and libpng encode/decode. |
 | LRU/TTL caches | `./result/bin/lru_benchmarks --benchmark_filter='^(Lru|Ttl)/'` | 52 cases: ordered/hash LRU hit, const peek, full miss, duplicate update, insert-then-trim and capacity shrink at 64/256/1000/20000 entries; hash TTL refresh on/off and keep/drop cleanup at 256 entries. |
+| Pools and small vectors | `./result/bin/block_allocator_benchmarks --benchmark_filter='^(BlockAllocator|StdList|StdMap|SmallVector)/'` | 50 cases: empty/rebound families, first allocation, warm reuse, multi-block random release, actual standard list/map nodes, and normal/over-aligned inline/spill, sized, range and copy construction. |
 
 ### Batch accounting and correctness oracles
 
@@ -232,9 +233,10 @@ batch count for amortized per-item cost:
 | `flat_hash_benchmarks` | Labels give N entries/queries; churn counts 2N erase/insert operations and rehash counts N relocated residents. Divide batch CPU time accordingly. |
 | `image_benchmarks` | One operation/sequence per iteration; labels state timed ownership and retained reset work. Workload throughput counts processed pixels; the constant-foldable RGB alpha control counts reductions, not memory traffic or frames. |
 | `lru_benchmarks` | N operations/entries per sweep; `ShrinkHalf` counts N/2 evicted entries. Shrink/drop reset is untimed. String keys and shared immutable payloads are prebuilt; payload construction, FPS and single-call latency are not measured. |
+| `block_allocator_benchmarks` | Labels give the batch count: 64 families/first allocations/reuse operations or vectors; 257 random-release items for four-slot blocks; 1024/1025/20000 items for large blocks; 64/1025 list/map nodes. Vector results are amortized ns/vector, not ns/element. Respect each label's timed construction/reset/destruction boundaries. |
 
 Fixture setup and complete-result validation are untimed for byte, line, I/O,
-logging, flat hash, image and LRU/TTL benchmarks. Preserve their independent checks and labels:
+logging, flat hash, image, LRU/TTL and pool/small-vector benchmarks. Preserve their independent checks and labels:
 
 - **Bytes:** deterministic input and complete-result fingerprints; independent
   byte oracles check signed zeros, NaN payloads, raw guards and post-loop results.
@@ -256,6 +258,7 @@ logging, flat hash, image and LRU/TTL benchmarks. Preserve their independent che
   per-pixel traversal gains. The frozen comparison consumer retains its original
   labels/counters; normalize that control as one reduction per iteration.
 - **LRU/TTL caches:** validate complete ordered key snapshots and every payload field before/after timing, with content fingerprints and exact producer counts. Full-miss and insert/trim cases alternate disjoint windows, then normalize the untimed final state so labels do not depend on calibration parity. Preserve soft capacity and the production allocator. TTL uses seeded randomness, future-deadline hits and already-expired keep/drop cleanup; refresh/cleanup mutation is escaped through a compiler barrier. Run the same frozen consumer against isolated old/new modules, require matching labels on every row, and retain A/A drift and regressions.
+- **Pools and small vectors:** deterministic values/permutations and full fixture/content fingerprints; check every value, order, alignment, guard and family relationship. Pool cold allocation excludes prior family construction; lazy metadata therefore moves work from construction into that row. Reuse keeps storage warm; random release spans block boundaries. List/map churn canonicalizes its final state before fingerprinting. Vector outputs include complete values and adjacent guards. Output validation and cleanup are untimed: do not interpret construction-only rows as whole-lifetime cost. Compare the same frozen consumer against isolated old/new modules, match all labels, and retain first-allocation regressions and A/A drift.
 
 ### Comparable measurements
 
