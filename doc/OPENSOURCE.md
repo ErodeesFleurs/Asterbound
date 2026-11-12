@@ -3,9 +3,11 @@ Open Source Software used in Starbound and Accompanying Utilities
 
 [The Lua Scripting Language 5.5.1](https://www.lua.org/)
 -----------------------------------------
-Lua is fetched as a version/hash-locked dependency rather than stored in the
-repository. The source lock is `cmake/dependencies/lua.json`; project changes
-are recorded in `cmake/patches/lua-openstarbound.patch`.
+Lua is fetched from the official [lua/lua GitHub repository](https://github.com/lua/lua)
+at the Lua 5.5.1 commit `7579fc9d7ed90240487251dfb69168f8e64e9294`, rather than
+stored in this repository. The source URL and archive SHA-256 are locked in
+`cmake/dependencies/lua.json` for both CMake and Nix; project changes are recorded
+in `cmake/patches/lua-openstarbound.patch` against GitHub's root-level sources.
 Project changes retain compound assignment, safe navigation, `math.round`,
 `math.copysign`, 256-byte source descriptions and `max_align_t` userdata alignment.
 Loop variables and the `global` keyword use Lua 5.5 semantics.

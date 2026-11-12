@@ -1,5 +1,5 @@
---- a/src/lparser.c
-+++ b/src/lparser.c
+--- a/lparser.c
++++ b/lparser.c
 @@ -1195,6 +1195,39 @@
  */
  
@@ -102,8 +102,8 @@
    else {  /* stat -> func */
      Instruction *inst;
      check_condition(ls, v.v.k == VCALL, "syntax error");
---- a/src/llex.c
-+++ b/src/llex.c
+--- a/llex.c
++++ b/llex.c
 @@ -49,6 +49,7 @@
      "return", "then", "true", "until", "while",
      "//", "..", "...", "==", ">=", "<=", "~=",
@@ -200,8 +200,8 @@
        case '0': case '1': case '2': case '3': case '4':
        case '5': case '6': case '7': case '8': case '9': {
          return read_numeral(ls, seminfo);
---- a/src/llex.h
-+++ b/src/llex.h
+--- a/llex.h
++++ b/llex.h
 @@ -39,6 +39,9 @@
    TK_IDIV, TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE,
    TK_SHL, TK_SHR,
@@ -212,8 +212,8 @@
    TK_FLT, TK_INT, TK_NAME, TK_STRING
  };
  
---- a/src/luaconf.h
-+++ b/src/luaconf.h
+--- a/luaconf.h
++++ b/luaconf.h
 @@ -342,7 +342,7 @@
  @@ LUA_COMPAT_GLOBAL avoids 'global' being a reserved word
  */
@@ -243,8 +243,8 @@
  
  
  #endif
---- a/src/lmathlib.c
-+++ b/src/lmathlib.c
+--- a/lmathlib.c
++++ b/lmathlib.c
 @@ -99,6 +99,24 @@
  }
  

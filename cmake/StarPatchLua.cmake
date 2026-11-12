@@ -5,7 +5,7 @@ foreach(required STAR_LUA_SOURCE_DIR STAR_LUA_PATCH STAR_LUA_PATCH_STATE GIT_EXE
     message(FATAL_ERROR "Lua patch helper requires ${required}")
   endif()
 endforeach()
-if(NOT EXISTS "${STAR_LUA_SOURCE_DIR}/src/lua.h")
+if(NOT EXISTS "${STAR_LUA_SOURCE_DIR}/lua.h")
   message(FATAL_ERROR "Not a complete Lua source root: ${STAR_LUA_SOURCE_DIR}")
 endif()
 file(MAKE_DIRECTORY "${STAR_LUA_PATCH_STATE}")

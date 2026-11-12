@@ -60,11 +60,11 @@ set(lua_sources
   lmathlib.c lmem.c loadlib.c lobject.c lopcodes.c loslib.c lparser.c
   lstate.c lstring.c lstrlib.c ltable.c ltablib.c ltm.c lundump.c
   lutf8lib.c lvm.c lzio.c)
-list(TRANSFORM lua_sources PREPEND "${star_lua_SOURCE_DIR}/src/")
+list(TRANSFORM lua_sources PREPEND "${star_lua_SOURCE_DIR}/")
 add_library(star_lua STATIC ${lua_sources})
 set_target_properties(star_lua PROPERTIES
   C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
-target_include_directories(star_lua PUBLIC "${star_lua_SOURCE_DIR}/src")
+target_include_directories(star_lua PUBLIC "${star_lua_SOURCE_DIR}")
 # This retains the project's platform, profile and sanitizer policy for Lua C
 # code without pulling its implementation into star_extern's object closure.
 target_link_libraries(star_lua PRIVATE star_build_config)

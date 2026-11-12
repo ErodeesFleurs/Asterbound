@@ -26,7 +26,7 @@ Run commands from the repository root unless a step changes directories.
 
 GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependencies must use the same C++ runtime; all configurations use static mimalloc with `MI_OVERRIDE=OFF` and must not mix allocator heaps.
 
-Lua is fetched with a [version/hash lock](../cmake/dependencies/lua.json) and a [project patch](../cmake/patches/lua-openstarbound.patch). Git is required unless using Nix or supplying prepatched Lua sources.
+Lua is fetched from the official [`lua/lua`](https://github.com/lua/lua) GitHub repository at the Lua 5.5.1 commit pinned by the [source URL and archive hash](../cmake/dependencies/lua.json), then receives the [project patch](../cmake/patches/lua-openstarbound.patch). Git is required unless using Nix or supplying prepatched Lua sources. Both CMake and Nix use the same lock and patch; prepatched source overrides must expose `lua.h` and the C sources directly at their root.
 
 ## Linux without Nix
 
