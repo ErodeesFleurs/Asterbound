@@ -12,18 +12,23 @@ import star.format;
 using namespace Star;
 
 namespace {
-// The original per-pixel implementation, including its byte-oriented get/set
-// behavior. Volatile divisors keep this oracle scalar under fast-math too.
+// Keep the reference's binary32 division exact even when surrounding tests use
+// fast-math: packed reciprocal refinement can cross a nearest-pixel boundary.
+#pragma float_control(precise, on, push)
+[[gnu::noinline]] int scalarNearestIndex(unsigned position, float scale) {
+  return static_cast<int>(std::round(static_cast<float>(position) / scale));
+}
+#pragma float_control(pop)
+
+// Preserve the original byte-oriented get/set behavior without vector division.
 std::expected<Image, StarException> scalarNearest(Image const& source, Vec2F const& scale) {
   Vec2U size = Vec2U::round(vmult(Vec2F(source.size()), scale));
   size[0] = std::max(size[0], 1u);
   size[1] = std::max(size[1], 1u);
   Image result(size, source.pixel_format());
-  volatile float scaleX = scale[0], scaleY = scale[1];
   for (unsigned y = 0; y < size[1]; ++y) {
     for (unsigned x = 0; x < size[0]; ++x) {
-      auto pixel =
-        source.clamp(Vec2I::round(vdiv(Vec2F(x, y), Vec2F(static_cast<float>(scaleX), static_cast<float>(scaleY)))));
+      auto pixel = source.clamp(Vec2I(scalarNearestIndex(x, scale[0]), scalarNearestIndex(y, scale[1])));
       auto assigned = result.set(x, y, pixel);
       if (!assigned)
         return std::unexpected(std::move(assigned.error()));
@@ -118,8 +123,8 @@ TEST(ImageScalingTest, NearestRoundsHalfUpAndClampsLastPixel) {
 }
 
 TEST(ImageScalingTest, NearestDivisionBoundarySurvivesDirectivesConsumer) {
-  // 3 / 0.15384616f rounds to exactly 19.5f, hence source index 20.
-  // Multiplication by its rounded reciprocal instead selects index 19.
+  // Strict binary32 division selects 6 at position 1 (just below 6.5), and 20
+  // at position 3 (exactly 19.5). Reciprocal refinement can change either.
   for (auto format : {PixelFormat::RGB24, PixelFormat::BGR24, PixelFormat::RGBA32, PixelFormat::BGRA32}) {
     Image source = patternedImage(Vec2U(27, 27), format);
     auto expected = scalarNearest(source, Vec2F(0.15384616f, 0.15384616f));
@@ -128,11 +133,16 @@ TEST(ImageScalingTest, NearestDivisionBoundarySurvivesDirectivesConsumer) {
     ASSERT_TRUE(direct);
     expectSameImage(*direct, *expected);
     ASSERT_EQ(direct->size(), Vec2U(4, 4));
-    auto selected = source.get_rgb(20, 20);
-    auto actual = direct->get_rgb(3, 3);
-    ASSERT_TRUE(selected);
-    ASSERT_TRUE(actual);
-    EXPECT_EQ(*actual, *selected);
+    constexpr std::array<unsigned, 4> indices{0, 6, 13, 20};
+    for (unsigned y = 0; y < indices.size(); ++y) {
+      for (unsigned x = 0; x < indices.size(); ++x) {
+        auto selected = source.get_rgb(indices[x], indices[y]);
+        auto actual = direct->get_rgb(x, y);
+        ASSERT_TRUE(selected);
+        ASSERT_TRUE(actual);
+        EXPECT_EQ(*actual, *selected) << "pixel " << x << "," << y;
+      }
+    }
 
     DirectivesGroup directives(String("?scalenearest=0.15384616;0.15384616"));
     auto processed = directives.apply_new_image(source);

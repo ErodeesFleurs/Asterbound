@@ -154,6 +154,12 @@ errors. See [native process output rules](development.md#logging-and-native-proc
   clipped raw-channel copies/conversions, aliased forward feedback, float bit
   preservation, callback failure commits, small windows of oversized conceptual
   scales, border overflow and three-channel BGR PNG output.
+- `ImageScalingTest.*` compares raw pixels against a scalar reference whose
+  binary32 division uses a narrowly scoped precise-FP function. Volatile loads
+  alone do not prevent fast-math reciprocal refinement from changing sample
+  indices on different CPUs. Independent nearest/directive boundary checks retain
+  both sides of the half-integer boundary: scale `0.15384616f` selects source
+  indices `0, 6, 13, 20` for destination coordinates `0, 1, 2, 3`.
 - Asset-backed `DamageDatabaseTest.*`, `HumanoidRenderTest.*` and
   `ItemTest.BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState`
   cover catalog errors, sleeve lighting and blueprint state/error boundaries.
