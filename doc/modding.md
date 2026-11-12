@@ -83,8 +83,18 @@ Additional guarded repairs cover:
 | Titancorp 2.4.4 / 2.4.5 | Repair the byte-identical duplicate projectile and powered food-maker integration. Verified object, recipe and implementation fingerprints guard the repair; authored recipes and power behavior are retained. |
 | The Forge: Blade Dance 0.7.1 | Make the five custom-weapon recipes' global carrier-image paths absolute without replacing or changing their encoded artwork. Already-saved custom item descriptors are not migrated. |
 | Advanced Teleporter Interface 1.1.1 | Retain concise inspection warnings and keep complete caught diagnostics in Debug logs instead of embedding native stacks in every warning. |
+| Galaxy in Conflict v4.3.2a | Preserve fractional NPC range sampling and zero-based bomb-tile drawing with writable loop locals; fix the live Sika helicopter's malformed numeric token. The skeleton species references GIC's own silent sound for both genders, without weakening species validation or inventing audio. |
+| FrackinUniverse 6.5.8 | Repair read-only loop assignments in player deployment, SAIL, the Item Transference Device and Item Network Terminal. FRHelper tracks its own successfully loaded scripts instead of the removed engine-internal `_SBLOADED` global; callback caching and failed-load retries remain intact. |
 
 Rebuild the engine and compatibility source together when building from source: source-owned patch/load-script replacement uses the [current Assets APIs](lua/openstarbound/assets.md).
+
+The GIC/FU repairs in compatibility assets **1.1.2** require the exact effective provider, metadata version and full source fingerprint (accepting LF/CRLF differences only). They do not rewrite Workshop packages or saves. Existing builds with the current Assets APIs can update this compatibility pack without rebuilding the engine.
+
+For an immutable installation still bundling an older compatibility source, a newly packed `asterbound-compat.pak` in its later-scanned `mods` directory replaces that source by the existing `opensb_compat` identity; it is not a second set of patches. Restart the client to use it. Remove that temporary override once the installed distribution ships compatibility assets 1.1.2 or newer, so an old local pack cannot mask future bundled updates.
+
+Linux isolation checks used the official GIC v4.3.2a and FU 6.5.8 Workshop packages separately: GIC character/world entry and live helicopter initialization; FU player initialization, real-source SAIL navigation and racial-bonus toggling; real wired storage bridges, an ITD and a terminal transferring 37 items, then withdrawing 5 with 32 remaining. All eight repaired Lua scripts compile in the target engine. Guard checks cover absent/foreign providers, unknown versions/content, LF/CRLF and repeat application; FRHelper's callback cache, multiple helpers/contexts, callback-free loads and failed-load retry were also exercised.
+
+This is not a complete campaign, multiplayer or native Windows/macOS acceptance test. GIC's optional Otherworlds recipes and missing upstream artwork/music remain original-content defects; absent resources are not fabricated and dormant broken scripts are not blanket-migrated. The bomb-tile script is repaired, but its complete minigame was not played: this package lacks the referenced `gic_cain_teleporterbomb` object definition. These fixes do **not** make the two overhauls compatible with each other: [GIC's author](https://steamcommunity.com/sharedfiles/filedetails/?id=2754886445) recommends separate play, and [FU's incompatibility list](https://frackinuniverse.miraheze.org/wiki/Incompatible) explicitly lists GIC. Keep separate characters and universes.
 
 ## Required third-party dependencies
 
