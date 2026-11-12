@@ -963,7 +963,8 @@ std::expected<void, StarException> ClientApplication::render() {
       return std::unexpected(std::move(cinematic.error()));
 
   } else if (m_state == MainAppState::Title) {
-    auto title = m_titleScreen->render();
+    auto title = m_titleScreen->render(
+        m_root->timing().timescale == 0.0f ? 1.0f : appController()->renderInterpolation());
     if (!title)
       return std::unexpected(std::move(title.error()));
     auto cinematic = m_cinematicOverlay->render();

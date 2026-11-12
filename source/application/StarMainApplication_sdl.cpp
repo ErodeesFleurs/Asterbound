@@ -1177,7 +1177,6 @@ private:
         auto renderStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         bool prepared = false;
         if (!m_ownerFrame && !m_quitRequested && m_scheduler.beginRender(renderStart)) {
-          m_renderInterpolation = m_scheduler.interpolation(renderStart);
           // Only backend setup touches SDL/GL. Main owns IO until this call
           // returns; afterward it does not touch ImGui until consuming us.
           m_dispatcher.invoke([&] {
@@ -1189,6 +1188,11 @@ private:
           imguiFrameActive = true;
           if (auto started = m_renderer->startFrame(); !started)
             return std::unexpected(std::move(started.error()));
+          // Backend setup can wait on main. Sample presentation only once that
+          // handshake and renderer setup have completed, without moving either
+          // the fixed-update deadline or the frame-start render reservation.
+          m_renderInterpolation = m_scheduler.interpolation(
+              std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)));
           setImguiPresentationActive(true);
           auto rendered = m_application->render();
           setImguiPresentationActive(false);

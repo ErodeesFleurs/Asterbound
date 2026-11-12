@@ -1007,8 +1007,11 @@ PresentationContext WorldClient::presentationFor(Entity const& entity, Presentat
 
 void WorldClient::resetPresentation() {
   m_entityPresentation.clear();
+  m_parallaxWindTime.resetPresentation();
   if (m_particles)
     m_particles->resetPresentation();
+  if (m_sky)
+    m_sky->resetPresentation();
 }
 
 std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, PresentationContext presentation) {
@@ -1345,7 +1348,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   
   this->root().logMap().set("client_render_particle_count", renderData.particles.size());
   
-  auto result75 = m_sky->renderData();
+  auto result75 = m_sky->renderData(interpolation);
   if (!result75)
     return std::unexpected(std::move(result75.error()));
   renderData.skyRenderData = (std::move(*result75));
@@ -1436,6 +1439,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (!result85)
     return std::unexpected(std::move(result85.error()));
   auto functionDatabase = (std::move(*result85));
+  float windInterpolation = renderData.skyRenderData.epochTime == m_sky->epochTime() ? 1.0f : interpolation;
+  auto windTimeSample = m_parallaxWindTime.sample(windInterpolation);
   for (auto& layer : renderData.parallaxLayers) {
     if (layer.followsWind || layer.windSpeedMultiplier) {
       double windTime;
@@ -1445,10 +1450,10 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         // so negate the magnitude to make positive wind move imagery right.
         horizontalSpeed = -std::abs(horizontalSpeed);
         windTime = layer.windSpeedMultiplier
-            ? m_parallaxSignedWindTime * *layer.windSpeedMultiplier
-            : m_parallaxWindDirectionTime;
+            ? windTimeSample[2] * *layer.windSpeedMultiplier
+            : windTimeSample[0];
       } else {
-        windTime = m_parallaxWindMagnitudeTime * *layer.windSpeedMultiplier;
+        windTime = windTimeSample[1] * *layer.windSpeedMultiplier;
       }
       
       layer.parallaxOffset[0] += horizontalSpeed * windTime / m_sky->dayLength();
@@ -2277,6 +2282,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   if (!result165)
     return std::unexpected(std::move(result165.error()));
   
+  if (!m_headless) {
+    m_parallaxWindTime.beginUpdate(m_sky->epochTime());
+    m_sky->beginUpdate();
+  }
   auto result166 = m_sky->update(dt);
   if (!result166)
     return std::unexpected(std::move(result166.error()));
@@ -2301,13 +2310,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     if (!weatherDomain)
       return std::unexpected(std::move(weatherDomain.error()));
     float parallaxWind = *weatherDomain == m_weatherDomain ? m_weather->wind() : 0.0f;
-    if (m_lastParallaxWindEpoch && parallaxEpoch >= *m_lastParallaxWindEpoch) {
-      double elapsed = parallaxEpoch - *m_lastParallaxWindEpoch;
-      m_parallaxWindDirectionTime += elapsed * (parallaxWind > 0.0f ? 1.0 : -1.0);
-      m_parallaxWindMagnitudeTime += elapsed * std::abs(parallaxWind);
-      m_parallaxSignedWindTime += elapsed * parallaxWind;
-    }
-    m_lastParallaxWindEpoch = parallaxEpoch;
+    m_parallaxWindTime.update(parallaxEpoch, parallaxWind);
     if (!m_mainPlayer->isDead()) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
       // desyncs etc
@@ -3644,10 +3647,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   m_weatherParallaxBiome.reset();
   m_weatherParallax.reset();
   m_weatherDomain.reset();
-  m_lastParallaxWindEpoch.reset();
-  m_parallaxWindDirectionTime = 0.0;
-  m_parallaxWindMagnitudeTime = 0.0;
-  m_parallaxSignedWindTime = 0.0;
+  m_parallaxWindTime = {};
   if (m_weather)
     remember(m_weather->clear());
   m_parallaxFadeTimer.setDone();

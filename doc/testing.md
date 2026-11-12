@@ -299,6 +299,33 @@ Compare fixed-rate instruction counts at the same simulation/render cadence;
 uncapped instructions per display frame also vary with the fixed ticks amortized
 into each frame.
 
+For frame-pacing comparisons, measure uncapped rendering with VSync, capped
+rendering with VSync and the same cap without VSync separately. Record the actual
+swap-interval result, not only the requested setting. A delayed-backend sampling
+check must inject its wait into the main-thread frame-setup handshake, separately
+from a slow-swap check, and compare the actual presentation alpha with the
+post-handshake scheduler sample. Keep these synthetic waits out of normal
+performance comparisons.
+
+For display-motion checks, observe multiple render samples with the same logical
+tick: the sampled sky time and transform may change, but the simulation clock must
+not. Cover day/rotation wrap, interleaved alpha queries, pause/current-state
+sampling, flight transitions and network clock corrections. Distinguish these
+sampled coordinates from the camera's intentional screen-pixel alignment; finer
+samples alone do not prove a higher FPS or smoother physical scanout.
+
+Wind and overlay checks also cover the direction/magnitude/signed-time integrals
+and the separation offset independently of the entity anchor. Repeated display
+visits must neither integrate wind nor re-run separation. Exercise birth, removal,
+identity reuse and reset boundaries with overlapping native labels/bubbles; use a
+native weather/parallax layer rather than a HUD imitation of cloud motion.
+
+Cold-entry checks distinguish application-cache misses from kernel page-cache
+coldness. Correlate resource spans with the same native frame interval, including
+preceding fixed updates; do not add nested load spans to their parents. Font
+regressions exercise cache retention until the last cloned face is released and
+independent glyph sizes after the original font/library owners are destroyed.
+
 Private instrumentation and offscreen swap timings are diagnostic, not evidence
 of physical-display pacing or native Windows behavior. A startup smoke, same-build
 unit tests and Linux measurements do not establish native GUI behavior on other

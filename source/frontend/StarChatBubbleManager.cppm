@@ -39,6 +39,7 @@ namespace Star {
 class GuiContext;
 class AssetTextureGroup;
 class WorldClient;
+class Entity;
 class StoredFunction;
 
 class ChatBubbleManager {
@@ -66,6 +67,8 @@ private:
     List<BubbleImage> backgroundImages;
     List<BubbleText> bubbleText;
     bool onscreen;
+    std::optional<std::weak_ptr<Entity>> instance;
+    std::uint64_t presentationEpoch = 0;
   };
 
   struct PortraitBubble {
@@ -78,6 +81,7 @@ private:
     List<BubbleImage> backgroundImages;
     List<BubbleText> bubbleText;
     bool onscreen;
+    std::optional<std::weak_ptr<Entity>> instance;
   };
 
   // Calculate the alpha for a speech bubble based on distance from player to
@@ -94,6 +98,8 @@ private:
   std::reference_wrapper<GuiContext> m_guiContext;
 
   WorldCamera m_camera;
+  std::weak_ptr<WorldClient> m_world;
+  std::optional<std::uint64_t> m_presentationEpoch;
 
   TextPositioning m_textTemplate;
   TextPositioning m_portraitTextTemplate;

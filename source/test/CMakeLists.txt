@@ -195,11 +195,13 @@ set (star_game_tests_SOURCES
       material_types_test.cpp
       movement_controller_test.cpp
       particle_presentation_test.cpp
+      parallax_wind_presentation_test.cpp
       physics_object_test.cpp
       player_storage_test.cpp
       root_test.cpp
       server_test.cpp
       spawn_test.cpp
+      sky_presentation_test.cpp
       species_test.cpp
       stat_test.cpp
       tile_array_test.cpp
@@ -239,7 +241,7 @@ set_tests_properties(core_tests PROPERTIES
 if(STAR_BUILD_GUI)
   add_executable(frontend_tests
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core> $<TARGET_OBJECTS:star_game>
-    gtest/gtest-all.cc game_tests_main.cpp StarTestUniverse.cpp StarGameTest.cpp frontend_test.cpp)
+    gtest/gtest-all.cc game_tests_main.cpp StarTestUniverse.cpp StarGameTest.cpp frontend_test.cpp bubble_presentation_test.cpp)
   target_sources(frontend_tests PRIVATE FILE_SET CXX_MODULES FILES StarTestUniverse.cppm StarGameTest.cppm)
   target_include_directories(frontend_tests PRIVATE
     ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}

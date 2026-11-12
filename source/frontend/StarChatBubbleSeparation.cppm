@@ -30,9 +30,19 @@ struct BubbleState {
   // Where the bubble offset is now, which could be anywhere en route to the
   // seperatedOffset.
   Vec2F currentOffset;
+  Vec2F previousOffset;
+  bool presentationContinuous = false;
 
-  // The final position.
-  Vec2F currentPosition;
+  Vec2F sampleOffset(float alpha) const {
+    if (!presentationContinuous)
+      return currentOffset;
+    return previousOffset + std::clamp(alpha, 0.0f, 1.0f) * (currentOffset - previousOffset);
+  }
+
+  void resetPresentation() {
+    previousOffset = currentOffset;
+    presentationContinuous = false;
+  }
 };
 
 template <typename T>
@@ -53,9 +63,12 @@ public:
 
   void filter(std::function<bool(Bubble const&, T&)> func);
   List<Bubble> filtered(std::function<bool(Bubble const&, T const&)> func);
-  [[nodiscard]] std::expected<void, StarException> forEach(std::function<std::expected<void, StarException>(Bubble&, T&)> func);
+  // Tick-only: update anchors and solve separation, before filtering/tweening.
+  [[nodiscard]] std::expected<void, StarException> updateDestinations(std::function<std::expected<void, StarException>(Bubble&, T&)> func);
+  [[nodiscard]] std::expected<void, StarException> forEach(std::function<std::expected<void, StarException>(Bubble const&, T const&)> func) const;
 
   void update(float dt);
+  void resetPresentation();
   void clear();
   bool empty() const;
 
@@ -116,8 +129,14 @@ void BubbleSeparator<T>::addBubble(Vec2F position, RectF boundBox, T contents, u
   boundBox.setYMax(boundBox.yMax() + margin);
   RectF separated = separateBubble(m_sortedLeftEdges, m_sortedRightEdges, m_sortedLeftEdges, m_sortedRightEdges, boundBox);
   Vec2F separatedOffset = separated.min() - boundBox.min();
-  Vec2F separatedPosition = position + separatedOffset;
-  Bubble bubble = Bubble{ contents, position, position, boundBox, separatedOffset, separated, separatedOffset, separatedPosition };
+  Bubble bubble = {.contents = std::move(contents),
+                   .idealDestination = position,
+                   .currentDestination = position,
+                   .boundBox = boundBox,
+                   .seperatedOffset = separatedOffset,
+                   .separatedBox = separated,
+                   .currentOffset = separatedOffset,
+                   .previousOffset = separatedOffset};
   m_bubbles.insert_sorted(std::move(bubble), &BubbleSeparator<T>::compareBubbleY);
 }
 
@@ -139,7 +158,7 @@ List<BubbleState<T>> BubbleSeparator<T>::filtered(std::function<bool(Bubble cons
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> BubbleSeparator<T>::forEach(std::function<std::expected<void, StarException>(Bubble&, T&)> func) {
+[[nodiscard]] std::expected<void, StarException> BubbleSeparator<T>::updateDestinations(std::function<std::expected<void, StarException>(Bubble&, T&)> func) {
   for (auto& bubble : m_bubbles) {
     auto result = func(bubble, bubble.contents);
     if (!result)
@@ -168,12 +187,30 @@ template <typename T>
 }
 
 template <typename T>
+[[nodiscard]] std::expected<void, StarException> BubbleSeparator<T>::forEach(std::function<std::expected<void, StarException>(Bubble const&, T const&)> func) const {
+  for (auto const& bubble : m_bubbles) {
+    auto result = func(bubble, bubble.contents);
+    if (!result)
+      return std::unexpected(std::move(result.error()));
+  }
+  return {};
+}
+
+template <typename T>
 void BubbleSeparator<T>::update(float) {
   m_bubbles.exec([this](Bubble& bubble) {
+    bubble.previousOffset = bubble.currentOffset;
     Vec2F delta = bubble.seperatedOffset - bubble.currentOffset;
     bubble.currentOffset += m_tweenFactor * delta;
-    bubble.currentPosition = bubble.currentDestination + bubble.currentOffset;
+    if (!bubble.presentationContinuous)
+      bubble.previousOffset = bubble.currentOffset;
+    bubble.presentationContinuous = true;
   });
+}
+
+template <typename T>
+void BubbleSeparator<T>::resetPresentation() {
+  m_bubbles.exec([](Bubble& bubble) { bubble.resetPresentation(); });
 }
 
 template <typename T>

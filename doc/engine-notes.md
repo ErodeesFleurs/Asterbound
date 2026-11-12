@@ -38,6 +38,7 @@ commits identify upstream sources; they are not cross-platform validation report
 - [Referenced-image caching](https://github.com/OpenStarbound/OpenStarbound/commit/3f33581f) keeps recently used blend/mask images longer. Boot `assetsSettings.referenceImageTimeToLive` defaults to 300 seconds and `referenceImagePixelBudget` to 16777216 logical pixels (64 MiB for RGBA32, not a total-cache memory cap). Actual reference cache hits refresh recency; newest references fitting the budget receive the extended lifetime. A zero budget or reference TTL no greater than `assetTimeToLive` disables the extension. Ordinary assets keep their normal TTL; `clearCache` and Root reload still evict unheld references immediately, while externally held images retain normal persistence.
 - [Vanished loose patches](https://github.com/OpenStarbound/OpenStarbound/commit/8852bada) are skipped with a warning only after a failed read confirms that their directory entry is absent. This applies to JSON and Lua image patches; unreadable or replaced files, dangling symlinks, packed-source read failures and JSON/Lua errors still fail the asset load.
 - Unix file opens inspect the acquired descriptor and reject directories with a recoverable I/O error. A patch replaced by a directory fails asset loading instead of treating a directory seek position as a buffer size; only confirmed vanished patches are skipped.
+- WOFF2 font sources decode to shared, immutable SFNT bytes once. Text painters retain independent FreeType faces and pixel sizes without repeating WOFF2 decompression. The asset cache retains a source while clones share its backing bytes; after the last clone is released, normal cache expiry applies.
 
 ### Gameplay catalogs and physics
 
@@ -79,6 +80,29 @@ Each scheduler pass performs at most `maxFrameSkip + 1` due simulation ticks. Ba
 ### Presentation and tick-owned effects
 
 World presentation samples the previous and current fixed-tick states, normally adding one simulation tick of visual latency without extrapolating gameplay. Entity positions, supported native animation transforms, particles and the camera share the display sample. Pausing displays the current state. World/player replacement, reloads, native teleports and large corrections invalidate presentation history; authored small teleports can call [`mcontroller.resetPresentation()`](lua/movementcontroller.md). Continuous movement must not reset it each tick.
+
+Presentation alpha is sampled after the synchronous main-thread ImGui backend
+handshake and renderer frame setup, immediately before application draw
+preparation. Waiting for that setup does not freeze the sample at the earlier
+render deadline. Fixed-update deadlines, the render cap and single-frame
+backpressure are unchanged; subsequent preparation, backend work and presentation
+can still add latency.
+
+World and title-screen sky motion use the display alpha for epoch-based drift,
+orbital motion, star/world offsets and wrapped rotations. Only displaying clients
+retain the compact motion endpoints; headless simulation does not capture them.
+Clock corrections, sky replacement, flight-phase changes and explicit world
+presentation resets discard that history instead of sweeping across a jump.
+Lighting, sky colors, audio and flight events remain tick-owned. Wind-driven
+parallax integrals also advance only on ticks, but their direction, magnitude and
+signed-time endpoints are sampled at the display alpha. Clock corrections and
+presentation resets do not blend unrelated wind histories.
+
+Nameplates and speech bubbles sample both their entity anchors and separation
+offsets. Separation solving and offset tweening run only on ticks; render visits
+are read-only. Newly created or replaced entities/bubbles start without stale
+offset history. Camera presentation still aligns the tile grid to screen pixels;
+higher sampling does not remove that spatial quantization.
 
 Timers, one-shot audio/particle collection and beam transitions belong to ticks, including offscreen entities. Resource-cache jitter and native cosmetic noise use a separate presentation random service rather than consuming gameplay randomness. Display sampling does not write interpolated coordinates back to movement controllers. Camera conversions and overlay anchors use the displayed transform; input between frames retains the last displayed camera.
 

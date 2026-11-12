@@ -323,7 +323,7 @@ std::expected<void, StarException> ChatBubbleManager::setCamera(WorldCamera cons
   if (m_camera.pixelRatio() != oldPixelRatio || m_cachedInterfaceScale != oldInterfaceScale) {
     List<ChatAction> actions;
     auto collected = m_bubbles.forEach(
-      [&actions](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
+      [&actions](BubbleState<Bubble> const& state, Bubble const& bubble) -> std::expected<void, StarException> {
         actions.push_back(SayChatAction{bubble.entity, bubble.text, state.idealDestination, bubble.config});
         return {};
       });
@@ -339,9 +339,23 @@ std::expected<void, StarException> ChatBubbleManager::setCamera(WorldCamera cons
 }
 
 std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shared_ptr<WorldClient> world) {
-  auto updated = m_bubbles.forEach([this, dt, &world](BubbleState<Bubble>& bubbleState, Bubble& bubble) -> std::expected<void, StarException> {
+  if (m_world.lock() != world) {
+    // Actions queued for the new world have not bound an entity yet.
+    m_bubbles.filter([](BubbleState<Bubble> const&, Bubble const& bubble) { return !bubble.instance; });
+    filter(m_portraitBubbles, [](PortraitBubble const& bubble) { return !bubble.instance; });
+    m_world = world;
+  }
+  auto updated = m_bubbles.updateDestinations([this, dt, &world](BubbleState<Bubble>& bubbleState, Bubble& bubble) -> std::expected<void, StarException> {
     bubble.age += dt;
     if (auto entity = world->get<ChattyEntity>(bubble.entity)) {
+      if (bubble.instance && bubble.instance->lock() != entity)
+        return {};
+      if (!bubble.instance)
+        bubble.instance = entity;
+      if (bubble.presentationEpoch != entity->presentationEpoch()) {
+        bubbleState.resetPresentation();
+        bubble.presentationEpoch = entity->presentationEpoch();
+      }
       auto onscreen = m_camera.worldGeometry().rectIntersectsRect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       bubble.onscreen = *onscreen;
@@ -356,6 +370,10 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
   for (auto& portraitBubble : m_portraitBubbles) {
     portraitBubble.age += dt;
     if (auto entity = world->entity(portraitBubble.entity)) {
+      if (portraitBubble.instance && portraitBubble.instance->lock() != entity)
+        continue;
+      if (!portraitBubble.instance)
+        portraitBubble.instance = entity;
       auto onscreen = m_camera.worldGeometry().rectIntersectsRect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       portraitBubble.onscreen = *onscreen;
@@ -374,16 +392,17 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
       count[portraitBubble.entity] += m_maxMessagePerEntity;
       if (count[portraitBubble.entity] > m_maxMessagePerEntity)
         return false;
-      if (world->get<ChattyEntity>(portraitBubble.entity))
-        return portraitBubble.age < m_portraitMaxAge;
+      if (auto entity = world->get<ChattyEntity>(portraitBubble.entity))
+        return portraitBubble.instance && portraitBubble.instance->lock() == entity
+            && portraitBubble.age < m_portraitMaxAge;
       return false;
     });
 
   m_bubbles.filter([&](BubbleState<Bubble> const&, Bubble const& bubble) -> bool {
       if (++count[bubble.entity] > m_maxMessagePerEntity)
         return false;
-      if (world->get<ChattyEntity>(bubble.entity))
-        return bubble.age < m_maxAge;
+      if (auto entity = world->get<ChattyEntity>(bubble.entity))
+        return bubble.instance && bubble.instance->lock() == entity && bubble.age < m_maxAge;
       return false;
     });
 
@@ -406,6 +425,12 @@ std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAl
   return std::clamp(static_cast<int>(*evaluated), 0, 255);
 }
 std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
+  if (m_world.lock().get() != &world)
+    return {};
+  if (m_presentationEpoch != presentation.epoch()) {
+    m_bubbles.resetPresentation();
+    m_presentationEpoch = presentation.epoch();
+  }
   if (m_bubbles.empty() && m_portraitBubbles.empty())
     return {};
   auto configuration = m_guiContext.get().root().configuration();
@@ -418,14 +443,15 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
 
   float pixelRatio = m_guiContext.get().interfaceScale();
 
-  auto rendered = m_bubbles.forEach([this, &world, &camera, presentation, pixelRatio](BubbleState<Bubble> const& state, Bubble& bubble) -> std::expected<void, StarException> {
+  auto rendered = m_bubbles.forEach([this, &world, &camera, presentation, pixelRatio](BubbleState<Bubble> const& state, Bubble const& bubble) -> std::expected<void, StarException> {
       if (bubble.onscreen) {
         auto entity = world.entity(bubble.entity);
+        if (!entity || !bubble.instance || bubble.instance->lock() != entity)
+          return {};
         auto origin = m_camera.screenToWorld(state.idealDestination);
-        if (entity)
-          origin += world.geometry().diff(world.renderPosition(bubble.entity, presentation), entity->position());
+        origin += world.geometry().diff(world.renderPosition(bubble.entity, presentation), entity->position());
         auto screenPosition = camera.worldToScreen(origin)
-            + (state.currentPosition - state.idealDestination);
+            + state.sampleOffset(bubble.presentationEpoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
         auto fade = calcDistanceFadeAlpha(screenPosition, m_bubbleFadeFunction, camera);
         if (!fade) return std::unexpected(std::move(fade.error()));
         int alpha = *fade;
@@ -441,10 +467,12 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
   if (!rendered) return std::unexpected(std::move(rendered.error()));
 
   for (auto const& portraitBubble : m_portraitBubbles) {
+    auto entity = world.entity(portraitBubble.entity);
+    if (!entity || !portraitBubble.instance || portraitBubble.instance->lock() != entity)
+      continue;
     if (portraitBubble.onscreen) {
       auto position = portraitBubble.position;
-      if (auto entity = world.entity(portraitBubble.entity))
-        position += world.geometry().diff(world.renderPosition(portraitBubble.entity, presentation), entity->position());
+      position += world.geometry().diff(world.renderPosition(portraitBubble.entity, presentation), entity->position());
       Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
       int frame = 0;
       if (portraitBubble.age <= m_portraitChatterDuration)

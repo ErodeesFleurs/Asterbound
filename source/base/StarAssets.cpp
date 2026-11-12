@@ -1479,7 +1479,7 @@ bool Assets::AudioData::shouldPersist() const {
 }
 
 bool Assets::FontData::shouldPersist() const {
-  return forcePersist || font.use_count() != 1;
+  return forcePersist || font.use_count() != 1 || font->sharesBackingBuffer();
 }
 
 bool Assets::BytesData::shouldPersist() const {

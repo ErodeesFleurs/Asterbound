@@ -56,7 +56,7 @@ bool bubblePreflight() {
     int id = 0;
     for (auto const& obstacle : obstacles)
       separator.addBubble(obstacle.center(), obstacle, id++);
-    auto prepared = separator.forEach([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+    auto prepared = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
       return {};
     });
     if (!prepared)
@@ -138,7 +138,7 @@ void separateBubbles(benchmark::State& state, BubbleFixture const& fixture) {
     separator.addBubble(box.center(), box, id++);
   for (auto _ : state) {
     (void)_;
-    auto separated = separator.forEach([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+    auto separated = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
       return {};
     });
     if (!separated) {

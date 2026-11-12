@@ -48,6 +48,8 @@ public:
 
   // Create a new font from the same data
   [[nodiscard]] std::expected<std::shared_ptr<Font>, StarException> clone() const;
+  // Asset caches must retain decoded data while independent faces still use it.
+  bool sharesBackingBuffer() const { return m_fontBuffer.use_count() > 1; }
 
   [[nodiscard]] std::expected<void, StarException> setPixelSize(unsigned pixelSize);
   void setAlphaThreshold(std::uint8_t alphaThreshold = 0);

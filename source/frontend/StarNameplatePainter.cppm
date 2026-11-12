@@ -36,6 +36,7 @@ import star.world_camera;
 namespace Star {
 
 class WorldClient;
+class Entity;
 class GuiContext;
 
 class NameplatePainter {
@@ -55,6 +56,8 @@ private:
     float opacity;
     EntityId entityId;
     Vec2F origin;
+    std::weak_ptr<Entity> instance;
+    std::uint64_t presentationEpoch = 0;
   };
 
   TextPositioning namePosition(Vec2F bubblePosition) const;
@@ -76,6 +79,9 @@ private:
   Set<EntityId> m_entitiesWithNametags;
   Set<EntityId> m_foundEntities;
   BubbleSeparator<Nametag> m_nametags;
+  std::weak_ptr<WorldClient> m_world;
+  std::optional<std::uint64_t> m_presentationEpoch;
+  float m_pixelRatio = 0.0f;
 };
 
 }

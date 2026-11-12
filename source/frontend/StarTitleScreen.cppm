@@ -94,7 +94,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> renderInit(std::shared_ptr<Renderer> renderer);
 
-  [[nodiscard]] std::expected<void, StarException> render();
+  [[nodiscard]] std::expected<void, StarException> render(float interpolation);
 
   [[nodiscard]] std::expected<bool, StarException> handleInputEvent(InputEvent const& event);
   [[nodiscard]] std::expected<void, StarException> update(float dt);

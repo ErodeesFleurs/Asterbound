@@ -64,6 +64,8 @@ public:
   
   // handles flying and warp state transitions
   [[nodiscard]] std::expected<void, StarException> stateUpdate();
+  // Retain motion endpoints only for a displaying client, not a headless server.
+  void beginUpdate();
   [[nodiscard]] std::expected<void, StarException> update(double dt);
 
   void setType(SkyType type);
@@ -127,7 +129,10 @@ public:
   WarpPhase warpPhase() const;
   bool inHyperspace() const;
 
-  [[nodiscard]] std::expected<SkyRenderData, StarException> renderData() const;
+  // Samples continuous motion only; simulation clocks, lighting and flight events
+  // remain tick-owned.
+  [[nodiscard]] std::expected<SkyRenderData, StarException> renderData(float interpolation) const;
+  void resetPresentation();
 
 private:
   explicit Sky(Root& root);
@@ -173,6 +178,15 @@ private:
   SkyType m_skyType = SkyType::Orbital;
 
   double m_time = 0.0;
+
+  struct PresentationMotion {
+    double time;
+    Vec2F starOffset;
+    float starRotation;
+    Vec2F worldOffset;
+    float worldRotation;
+  };
+  std::optional<PresentationMotion> m_previousMotion;
 
   std::shared_ptr<Clock const> m_referenceClock;
   std::optional<double> m_clockTrackingTime;

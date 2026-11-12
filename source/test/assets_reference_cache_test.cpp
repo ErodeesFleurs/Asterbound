@@ -7,6 +7,7 @@ import star.byte_array;
 import star.file;
 import star.format;
 import star.game_test;
+import star.font;
 import star.image;
 import star.io_device;
 import star.list;
@@ -243,4 +244,85 @@ const GameTestRegistration assetsReferenceCacheExternalHandlesPersist(
       EXPECT_TRUE(ordinaryLifetime.expired());
       EXPECT_TRUE(referenceLifetime.expired());
     }
+  });
+
+const GameTestRegistration assetsFontClonesRetainCache(
+  "AssetsTest", "FontClonesRetainCacheUntilLastFaceIsReleased", [](GameTest& fixture) {
+    auto sourceAssets = fixture.root().assets();
+    ASSERT_TRUE(sourceAssets);
+    auto bytes = (*sourceAssets)->bytes("/font/unifont.woff2");
+    ASSERT_TRUE(bytes) << bytes.error().what();
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(**bytes, File::relative_to(*directory, "sample.woff2")));
+    auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(0));
+    ASSERT_TRUE(assets) << assets.error().what();
+    std::weak_ptr<Font const> lifetime;
+    std::shared_ptr<Font> clone;
+    {
+      auto source = (*assets)->font("/sample.woff2");
+      ASSERT_TRUE(source) << source.error().what();
+      lifetime = *source;
+      auto copied = (*source)->clone();
+      ASSERT_TRUE(copied) << copied.error().what();
+      clone = std::move(*copied);
+    }
+    (*assets)->cleanup();
+    EXPECT_FALSE(lifetime.expired());
+    {
+      auto retained = (*assets)->font("/sample.woff2");
+      ASSERT_TRUE(retained) << retained.error().what();
+      EXPECT_EQ(retained->get(), lifetime.lock().get());
+    }
+    clone.reset();
+    (*assets)->cleanup();
+    EXPECT_TRUE(lifetime.expired());
+  });
+
+const GameTestRegistration fontClonesRetainIndependentFaces(
+  "FontTest", "ClonesKeepGlyphsAndIndependentSizesAfterOwnersAreReleased", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto bytes = (*assets)->bytes("/font/twemoji.woff2");
+    ASSERT_TRUE(bytes) << bytes.error().what();
+    std::shared_ptr<Font> first, second;
+    {
+      auto library = FontLibrary::create();
+      ASSERT_TRUE(library) << library.error().what();
+      auto source = Font::loadFont(*library, *bytes);
+      ASSERT_TRUE(source) << source.error().what();
+      auto a = (*source)->clone();
+      auto b = (*source)->clone();
+      ASSERT_TRUE(a) << a.error().what();
+      ASSERT_TRUE(b) << b.error().what();
+      first = std::move(*a);
+      second = std::move(*b);
+    }
+    ASSERT_TRUE(first->setPixelSize(24));
+    auto before = first->render(U'\U0001F600');
+    ASSERT_TRUE(before) << before.error().what();
+    ASSERT_TRUE(second->setPixelSize(48));
+    auto large = second->render(U'\U0001F600');
+    ASSERT_TRUE(large) << large.error().what();
+    EXPECT_NE(std::get<0>(*before).size(), std::get<0>(*large).size());
+    second.reset();
+    auto after = first->render(U'\U0001F600');
+    ASSERT_TRUE(after) << after.error().what();
+    auto const& expected = std::get<0>(*before);
+    auto const& actual = std::get<0>(*after);
+    ASSERT_EQ(expected.size(), actual.size());
+    for (unsigned y = 0; y < expected.height(); ++y) {
+      for (unsigned x = 0; x < expected.width(); ++x) {
+        auto a = expected.get(x, y);
+        auto b = actual.get(x, y);
+        ASSERT_TRUE(a) << a.error().what();
+        ASSERT_TRUE(b) << b.error().what();
+        EXPECT_EQ(*a, *b);
+      }
+    }
+    EXPECT_EQ(std::get<1>(*before), std::get<1>(*after));
+    EXPECT_EQ(std::get<2>(*before), std::get<2>(*after));
+    EXPECT_EQ(first->height(), 24u);
   });

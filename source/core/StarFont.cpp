@@ -1,5 +1,6 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_TRUETYPE_TABLES_H
 import std;
 import star.file;
 import star.format;
@@ -64,6 +65,27 @@ std::expected<std::shared_ptr<Font>, StarException> Font::loadFont(FontLibrary c
   auto loaded = font->loadFontImpl();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
+  if (bytes->size() >= 4 && std::string_view(bytes->data(), 4) == "wOF2") {
+    // Keep the decoded SFNT data shared by clones, rather than asking FreeType
+    // to decompress the same WOFF2 font for every text painter.
+    FT_ULong size = 0;
+    if (FT_Load_Sfnt_Table(font->m_fontImpl->face, 0, 0, nullptr, &size)
+        || size == 0 || size > ByteArray::max_size()
+        || size > static_cast<FT_ULong>(std::numeric_limits<FT_Long>::max()))
+      return std::unexpected(FontException("Could not read decoded font size"));
+    auto decoded = std::make_shared<ByteArray>();
+    decoded->resize(size);
+    if (FT_Load_Sfnt_Table(font->m_fontImpl->face, 0, 0,
+            reinterpret_cast<FT_Byte*>(decoded->data()), &size)
+        || size != decoded->size())
+      return std::unexpected(FontException("Could not read decoded font data"));
+    // The old face must release its borrowed input before replacing that input.
+    font->m_fontImpl.reset();
+    font->m_fontBuffer = std::move(decoded);
+    loaded = font->loadFontImpl();
+    if (!loaded)
+      return std::unexpected(std::move(loaded.error()));
+  }
   return font;
 }
 

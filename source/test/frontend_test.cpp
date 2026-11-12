@@ -268,7 +268,7 @@ std::optional<RectF> separateAgainst(List<RectF> const& obstacles, RectF box) {
   int id = 0;
   for (auto const& obstacle : obstacles)
     separator.addBubble(obstacle.center(), obstacle, id++);
-  auto prepared = separator.forEach([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+  auto prepared = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
     return {};
   });
   EXPECT_TRUE(prepared);

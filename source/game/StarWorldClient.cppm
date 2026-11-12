@@ -144,6 +144,35 @@ struct WorldClientExceptionTag {
 };
 using WorldClientException = StarError<WorldClientExceptionTag, StarException>;
 
+// Tick-owned integrals, ordered as direction, magnitude and signed wind time.
+// Display sampling only reads the two fixed-size endpoints.
+struct ParallaxWindTime {
+  void beginUpdate(double epoch) {
+    previous = current;
+    lastEpoch = epoch;
+  }
+
+  void update(double epoch, float wind) {
+    if (lastEpoch && epoch >= *lastEpoch) {
+      double elapsed = epoch - *lastEpoch;
+      current += Vec3D(wind > 0.0f ? 1.0 : -1.0, std::abs(wind), wind) * elapsed;
+    } else {
+      previous = current;
+    }
+    lastEpoch = epoch;
+  }
+
+  Vec3D sample(float alpha) const {
+    return previous + std::clamp(static_cast<double>(alpha), 0.0, 1.0) * (current - previous);
+  }
+
+  void resetPresentation() { previous = current; }
+
+  Vec3D previous;
+  Vec3D current;
+  std::optional<double> lastEpoch;
+};
+
 class WorldClient : public World {
 public:
   void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<WorldClient, World>(this, key); }
@@ -496,10 +525,7 @@ private:
   std::shared_ptr<Biome const> m_weatherParallaxBiome;
   std::shared_ptr<Parallax> m_weatherParallax;
   std::optional<String> m_weatherDomain;
-  std::optional<double> m_lastParallaxWindEpoch;
-  double m_parallaxWindDirectionTime = 0.0;
-  double m_parallaxWindMagnitudeTime = 0.0;
-  double m_parallaxSignedWindTime = 0.0;
+  ParallaxWindTime m_parallaxWindTime;
 
   std::optional<float> m_overrideGravity;
 
@@ -589,6 +615,7 @@ export namespace Star {
   using ::Star::LuaRoot;
   using ::Star::OverheadBar;
   using ::Star::Parallax;
+  using ::Star::ParallaxWindTime;
   using ::Star::ParticleManager;
   using ::Star::Player;
   using ::Star::PlayerStorage;

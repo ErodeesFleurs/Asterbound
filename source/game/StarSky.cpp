@@ -111,6 +111,7 @@ std::expected<std::shared_ptr<Sky>, StarException> Sky::create(Root& root, SkyPa
 }
 
 std::expected<void, StarException> Sky::startFlying(bool enterHyperspace, bool startInWarp, Json settings) {
+  resetPresentation();
   if (startInWarp)
     m_flyingType = FlyingType::Warp;
   else
@@ -146,6 +147,8 @@ std::expected<void, StarException> Sky::readUpdate(ByteArray data, NetCompatibil
 }
 
 std::expected<void, StarException> Sky::stateUpdate() {
+  if (m_lastFlyingType != m_flyingType || m_lastWarpPhase != m_warpPhase)
+    resetPresentation();
   if (m_lastFlyingType != m_flyingType) {
     m_flyingTimer = 0.0f;
 
@@ -292,6 +295,8 @@ std::expected<void, StarException> Sky::update(double dt) {
 }
 
 void Sky::setType(SkyType skyType) {
+  if (m_skyType != skyType)
+    resetPresentation();
   m_skyType = skyType;
 }
 
@@ -328,6 +333,7 @@ double Sky::epochTime() const {
 }
 
 void Sky::setEpochTime(double epochTime) {
+  resetPresentation();
   m_time = epochTime;
 }
 
@@ -340,6 +346,7 @@ void Sky::setAltitude(float altitude) {
 }
 
 void Sky::setReferenceClock(std::shared_ptr<Clock const> const& referenceClock) {
+  resetPresentation();
   m_referenceClock = referenceClock;
   m_time = m_referenceClock->time();
   m_clockTrackingTime = {};
@@ -587,7 +594,7 @@ bool Sky::inHyperspace() const {
   return m_flyingType == FlyingType::Warp && m_enterHyperspace;
 }
 
-std::expected<SkyRenderData, StarException> Sky::renderData() const {
+std::expected<SkyRenderData, StarException> Sky::renderData(float interpolation) const {
   SkyRenderData renderData;
   renderData.settings = m_settings;
   renderData.skyParameters = m_skyParameters;
@@ -605,6 +612,19 @@ std::expected<SkyRenderData, StarException> Sky::renderData() const {
   renderData.worldRotation = getWorldRotation();
   renderData.orbitAngle = orbitAngle();
 
+  if (m_previousMotion && interpolation < 1.0f) {
+    float alpha = std::clamp(interpolation, 0.0f, 1.0f);
+    auto const& previous = *m_previousMotion;
+    renderData.epochTime = std::lerp(previous.time, renderData.epochTime, static_cast<double>(alpha));
+    renderData.timeOfDay = m_skyParameters.dayLength
+        ? std::fmod(renderData.epochTime, static_cast<double>(renderData.dayLength)) : 0.0f;
+    renderData.orbitAngle = 2 * std::numbers::pi * renderData.timeOfDay / renderData.dayLength;
+    renderData.starOffset = lerp(alpha, previous.starOffset, renderData.starOffset);
+    renderData.starRotation = angleLerp(alpha, previous.starRotation, renderData.starRotation);
+    renderData.worldOffset = lerp(alpha, previous.worldOffset, renderData.worldOffset);
+    renderData.worldRotation = angleLerp(alpha, previous.worldRotation, renderData.worldRotation);
+  }
+
   renderData.starFrames = m_starFrames;
   renderData.starList = m_starList;
   renderData.hyperStarList = m_hyperStarList;
@@ -615,6 +635,14 @@ std::expected<SkyRenderData, StarException> Sky::renderData() const {
   renderData.flashColor = skyFlashColor();
 
   return renderData;
+}
+
+void Sky::resetPresentation() {
+  m_previousMotion.reset();
+}
+
+void Sky::beginUpdate() {
+  m_previousMotion = PresentationMotion{m_time, getStarOffset(), getStarRotation(), getWorldOffset(), getWorldRotation()};
 }
 
 std::expected<void, StarException> Sky::writeNetStates() {
@@ -642,6 +670,7 @@ std::expected<void, StarException> Sky::writeNetStates() {
 }
 
 std::expected<void, StarException> Sky::readNetStates() {
+  resetPresentation();
   if (m_skyParametersNetState.pullUpdated()) {
     auto json = DataStreamBuffer::deserialize<Json>(m_skyParametersNetState.get().span());
     if (!json) return std::unexpected(std::move(json.error()));
@@ -848,6 +877,7 @@ std::expected<void, StarException> Sky::skyParametersUpdated() {
   m_starList = std::move(*starList);
   m_hyperStarList = std::move(*hyperStarList);
   m_skyParametersUpdated = true;
+  resetPresentation();
   return {};
 }
 

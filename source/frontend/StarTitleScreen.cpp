@@ -343,7 +343,7 @@ std::expected<void, StarException> TitleScreen::renderInit(std::shared_ptr<Rende
   return {};
 }
 
-std::expected<void, StarException> TitleScreen::render() {
+std::expected<void, StarException> TitleScreen::render(float interpolation) {
   auto assets = m_guiContext.root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
@@ -352,7 +352,7 @@ std::expected<void, StarException> TitleScreen::render() {
   if (!windowSize)
     return std::unexpected(std::move(windowSize.error()));
   Vec2F screenSize(*windowSize);
-  auto skyRenderData = m_skyBackdrop->renderData();
+  auto skyRenderData = m_skyBackdrop->renderData(interpolation);
   if (!skyRenderData)
     return std::unexpected(std::move(skyRenderData.error()));
   float pixelRatioBasis = screenSize[1] / 1080.0f;
@@ -410,6 +410,7 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
     p.first->setPosition(Vec2I(*width / m_guiContext.interfaceScale(), 0) + p.second);
   m_mainMenu->determineSizeFromChildren();
   m_backgroundMenu->determineSizeFromChildren();
+  m_skyBackdrop->beginUpdate();
   if (auto r = m_skyBackdrop->update(dt); !r) return std::unexpected(std::move(r.error()));
   m_environmentPainter->update(dt);
   if (auto r = m_backgroundMenu->update(dt); !r) return std::unexpected(std::move(r.error()));
