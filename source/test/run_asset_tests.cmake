@@ -31,10 +31,11 @@ endfunction()
 json_path("${TEST_ASSETS}" vanilla)
 json_path("${TEST_BUNDLED_ASSETS}" bundled)
 json_path("${TEST_COMPAT_ASSETS}" compatibility)
+json_path("${TEST_LEGACY_ASSETS}" legacy)
 json_path("${runtime}/storage" storage)
 json_path("${runtime}/logs" logs)
 file(WRITE "${runtime}/sbinit.config"
-  "{\n  \"assetSources\": [${vanilla}, ${bundled}, ${compatibility}],\n  \"storageDirectory\": ${storage},\n  \"logDirectory\": ${logs}\n}\n")
+  "{\n  \"assetSources\": [${vanilla}, ${bundled}, ${compatibility}, ${legacy}],\n  \"storageDirectory\": ${storage},\n  \"logDirectory\": ${logs}\n}\n")
 message(STATUS "Asset test runtime and reports: ${runtime}")
 execute_process(
   COMMAND ${TEST_EMULATOR} "${TEST_EXECUTABLE}" -bootconfig sbinit.config

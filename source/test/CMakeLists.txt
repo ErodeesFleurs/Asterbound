@@ -167,6 +167,7 @@ function(star_add_asset_test target)
       "-DTEST_ASSETS=${STAR_TEST_ASSETS}"
       "-DTEST_BUNDLED_ASSETS=${PROJECT_SOURCE_DIR}/../assets/asterbound"
       "-DTEST_COMPAT_ASSETS=${PROJECT_SOURCE_DIR}/../assets/asterbound-compat"
+      "-DTEST_LEGACY_ASSETS=${PROJECT_SOURCE_DIR}/../assets/asterbound-legacy"
       "-DTEST_RUNTIME_ROOT=${CMAKE_CURRENT_BINARY_DIR}/runtime/${target}"
       -P "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/run_asset_tests.cmake")
   set_tests_properties(${target} PROPERTIES

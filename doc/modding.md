@@ -58,14 +58,15 @@ Physical names and metadata dependency names serve different purposes:
 | --- | --- | --- |
 | `assets/asterbound` | `asterbound.pak` | `asterbound_base` |
 | `assets/asterbound-compat` | `asterbound-compat.pak` | `asterbound_compat` |
+| `assets/asterbound-legacy` | `asterbound-legacy.pak` | `opensb_base` |
 
 The compatibility source contains optional fixes and does not require any third-party mod to be installed. Distributions ship it beside the main pack; Nix packages install it as a sibling directory. Normal asset-directory scanning loads it automatically. Custom boot configurations using explicit `assetSources` must include it and use the current physical names. Do not keep duplicate old/new bundles in the same scanned directory.
 
 Owned virtual paths move from `/scripts/opensb/`, `/interface/opensb/`, `/humanoid/opensb/`, `/objects/opensb/`, `/projectiles/opensb/` and `/opensb/` to the corresponding `asterbound` segments. Root artwork is now `/asterbound/modicon.png`, and `/binds/opensb.binds` becomes `/binds/asterbound.binds`; the public input group remains `opensb`. External Mods must migrate imports, resource references and patches targeting these owned paths. No old-path aliases are shipped. Projectile/entity IDs, protocol fields, save identifiers and OpenStarbound Lua context names are unchanged.
 
-Both bundled sources share `version.json`'s `assetVersion`, reset to `0.1.0.0` for Asterbound; see [version synchronization](building.md#packaging-and-version-metadata). Their former upstream version series are not continued.
+The main and compatibility bundles share `version.json`'s `assetVersion`, reset to `0.1.0.0` for Asterbound; see [version synchronization](building.md#packaging-and-version-metadata). Their former upstream version series are not continued. The metadata-only legacy marker has its own `1.0.0` version and is not an engine asset-version check target.
 
-This is a clean metadata and owned resource-path cutover: update external Mods' `requires` / `includes` and source-name lookups from `opensb_base` / `opensb_compat` to `asterbound_base` / `asterbound_compat`, as well as affected imports and patches. There are no old-name aliases. Remove old upstream bundles from scanned asset/mod directories; distinct old and new identities will not override one another and may apply patches twice. Rebuild the engine and install both matching Asterbound bundles together.
+A metadata-only legacy dependency marker is bundled alongside the real Asterbound sources. Its `name` is `opensb_base` and it requires `asterbound_base`, so external Mods' existing `requires` / `includes` retain their dependency ordering without engine changes. It contains no scripts, patches or artwork and does not restore old resource paths, source-name lookup behavior, APIs or `opensb_compat`. Remove any separately installed fake `opensb_base` marker when using this bundled source. Do not install actual old upstream bundles alongside Asterbound: they can override the marker and apply old assets or patches again. Migrate remaining old imports, patches and `opensb_compat` dependencies to the current names. Rebuild the engine and install its matching Asterbound bundles together.
 
 ### Guarded repairs
 

@@ -397,6 +397,7 @@ stdenv.mkDerivation {
     ''}
     cp -r ../assets/asterbound "$out/share/asterbound/assets/asterbound"
     cp -r ../assets/asterbound-compat "$out/share/asterbound/assets/asterbound-compat"
+    cp -r ../assets/asterbound-legacy "$out/share/asterbound/assets/asterbound-legacy"
     install -m644 ../scripts/packing.config "$out/share/asterbound/packing.config"
     install -m644 ../scripts/ci/linux/sbinit.config \
       "$out/share/asterbound/sbinit.config.example"

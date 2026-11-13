@@ -1,0 +1,7 @@
+{
+  "name" : "opensb_base",
+  "friendlyName" : "Asterbound Legacy Dependency Marker",
+  "version" : "1.0.0",
+  "description" : "Metadata-only bridge for legacy opensb_base dependencies. Does not provide old OpenStarbound asset paths or APIs.",
+  "requires" : ["asterbound_base"]
+}
