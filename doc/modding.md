@@ -19,12 +19,12 @@ Asterbound is the current product; OpenStarbound is the upstream and compatibili
 | --- | --- |
 | Network versions | Starbound protocol `747`, OpenStarbound extension protocol `18`, stream version `18` |
 | Handshake | `brand = "Asterbound"`; existing `openProtocolVersion`, compression negotiation, packet IDs and field layouts |
-| Mod/resource identity | `asterbound_base`, `asterbound_compat`; existing virtual asset paths and entity IDs remain unchanged |
+| Mod/resource identity | `asterbound_base`, `asterbound_compat`; owned virtual paths use `asterbound`, while entity IDs remain unchanged |
 | Script/input identity | Existing `OpenStarbound` script-context names and the `opensb` input group |
 | Public protocol APIs | `clientOpenProtocolVersion` / `serverOpenProtocolVersion` |
 | Save identifiers | `SBVJ01` save header and `World4` world identifier |
 
-The existing handshake does not negotiate a common minimum version. Accepting a version number is not proof of compatibility with a future implementation. New Asterbound-only assets should use their own namespace rather than rename resources referenced by existing mods, saves or remote clients. The `doc/lua/openstarbound/` and `doc/json/openstarbound/` reference paths also remain stable.
+The existing handshake does not negotiate a common minimum version. Accepting a version number is not proof of compatibility with a future implementation. The owned asset namespace has moved to `asterbound`; this does not rename entity IDs, script contexts or public APIs. The `doc/lua/openstarbound/` and `doc/json/openstarbound/` reference paths also remain stable.
 
 Brand artwork and scripts change the asset digest. A server requiring identical assets can reject an otherwise wire-compatible client. Do not disable this policy globally or advertise digest equality; deploy matching assets, or explicitly allow the difference on both endpoints when appropriate.
 
@@ -44,7 +44,7 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 | Finalizers and random numbers | Finalizer errors become warnings; `math.random` sequences may change. |
 | Text templates | Use `<name>` and `<<` for a literal `<`, not brace-format placeholders. |
 
-Asterbound repairs vanilla `/scripts/actions/flying.lua` and `/stagehands/coordinator/npccombat.lua` in memory, preserving their fractional sample bounds. Mod scripts still need migration; the vanilla repairs do not migrate arbitrary scripts.
+Asterbound repairs vanilla `/scripts/actions/flying.lua`, `/stagehands/coordinator/npccombat.lua` and the fossil game's tile helpers in memory, using writable local loop variables. The flying/combat repairs preserve fractional sample bounds. Mod scripts still need migration; the vanilla repairs do not migrate arbitrary scripts.
 
 Use the [Lua API index](lua/README.md) to find the script host and related tables, and the [stub setup guide](lua/stubs/README.md) for LuaLS. Editor completion is not proof that an API exists in a particular runtime context.
 
@@ -61,11 +61,11 @@ Physical names and metadata dependency names serve different purposes:
 
 The compatibility source contains optional fixes and does not require any third-party mod to be installed. Distributions ship it beside the main pack; Nix packages install it as a sibling directory. Normal asset-directory scanning loads it automatically. Custom boot configurations using explicit `assetSources` must include it and use the current physical names. Do not keep duplicate old/new bundles in the same scanned directory.
 
-The virtual paths `/scripts/opensb/`, `/interface/opensb/` and other existing resource paths remain unchanged. A physical directory or pack rename is not a reason to rename mod references.
+Owned virtual paths move from `/scripts/opensb/`, `/interface/opensb/`, `/humanoid/opensb/`, `/objects/opensb/`, `/projectiles/opensb/` and `/opensb/` to the corresponding `asterbound` segments. Root artwork is now `/asterbound/modicon.png`, and `/binds/opensb.binds` becomes `/binds/asterbound.binds`; the public input group remains `opensb`. External Mods must migrate imports, resource references and patches targeting these owned paths. No old-path aliases are shipped. Projectile/entity IDs, protocol fields, save identifiers and OpenStarbound Lua context names are unchanged.
 
 Both bundled sources share `version.json`'s `assetVersion`, reset to `0.1.0.0` for Asterbound; see [version synchronization](building.md#packaging-and-version-metadata). Their former upstream version series are not continued.
 
-This is a clean metadata identity cutover: update external Mods' `requires` / `includes` and source-name lookups from `opensb_base` / `opensb_compat` to `asterbound_base` / `asterbound_compat`. There are no old-name aliases. Remove old upstream bundles from scanned asset/mod directories; distinct old and new identities will not override one another and may apply patches twice. Rebuild the engine and install both matching Asterbound bundles together.
+This is a clean metadata and owned resource-path cutover: update external Mods' `requires` / `includes` and source-name lookups from `opensb_base` / `opensb_compat` to `asterbound_base` / `asterbound_compat`, as well as affected imports and patches. There are no old-name aliases. Remove old upstream bundles from scanned asset/mod directories; distinct old and new identities will not override one another and may apply patches twice. Rebuild the engine and install both matching Asterbound bundles together.
 
 ### Guarded repairs
 
@@ -100,6 +100,24 @@ Linux isolation checks used the official GIC v4.3.2a and FU 6.5.8 Workshop packa
 
 This is not a complete campaign, multiplayer or native Windows/macOS acceptance test. GIC's optional Otherworlds recipes and missing upstream artwork/music remain original-content defects; absent resources are not fabricated and dormant broken scripts are not blanket-migrated. The bomb-tile script is repaired, but its complete minigame was not played: this package lacks the referenced `gic_cain_teleporterbomb` object definition. These fixes do **not** make the two overhauls compatible with each other: [GIC's author](https://steamcommunity.com/sharedfiles/filedetails/?id=2754886445) recommends separate play, and [FU's incompatibility list](https://frackinuniverse.miraheze.org/wiki/Incompatible) explicitly lists GIC. Keep separate characters and universes.
 
+### Large collection repairs
+
+The bundled `collection.lua` rules cover the inspected 840-PAK collection, including its **CN United Front GIC 3.1.1**, not just the separate official GIC release above. Each replacement requires its exact provider, metadata version, complete source fingerprint and any declared dependency fingerprints. Text fingerprints accept CRLF/LF differences only; binary artwork guards use the original bytes. Patch and metadata-script replacements retain their owning source and registered order. A rule with an unmatched edit is not partially applied.
+
+| Area | Repair and boundary |
+| --- | --- |
+| Lua migration | Repair 66 known mod scripts, including Arcana automation and live GIC/expansion scripts; unreferenced drafts and ambiguous broken gameplay code are not blanket-rewritten. |
+| HLib, Classic Quickbar, Stardust and Terra | Preserve shared/cyclic table keys in deepcopy. Repeatable UI/loader entries execute through private cached chunks in their original environment; ordinary `require` caching and cycle rejection remain strict. No fake `_SBLOADED` global is installed. |
+| GIC 3.1.1 expansion crafting | Convert 70 authored inline recipes to native recipe registration and preserve their former ungated availability. Add an `EXP` category to the three real crafting panes. Register 67 new assets and reuse three guarded canonical recipes: native recipe identity ignores groups, so duplicating those recipes would lose the expansion category. Ingredients, yields and other groups are retained. |
+| Returning-player initialization | BLShield seeds its RNG with integral world-clock seconds. RPG Growth renews its continuously-owned effects using their authored three-/five-second defaults on the existing update intervals, instead of sending infinite fixed-point timers. Existing removal paths and native numeric range checks remain intact. |
+| Resource and patch schemas | Repair the Raptorkin recipe comma, Tsaiqir hatch frame reference, known translation/schema conflicts and a monitor's actual icon path. Vanta's codex script addition preserves the base codex defaults. MoreMM's full upgrade/reset patch stays on QuickbarMini's real original pane; only its redundant wrapper registration is removed. |
+| Duplicate identifiers | Remove only fingerprinted, semantically equivalent duplicates, with referenced artwork/code guarded. Divergent definitions are not resolved by arbitrarily choosing a winner. |
+| Custom collections | Use the real Custom Collections UI dependency below. Preserve selection by collection ID instead of a hard-coded radio index, and separate its entry from Elithian's unique-weapons tab in the known nine-slot layout. Paper Mario 1.0.5.7's two orphan custom-collection declarations have neither definitions nor collectable grants; remove those declarations, retaining its real cooking collection additions and badge gameplay. Missing collections are not fabricated. |
+
+Failed assets are not requeued after cache clearing while their cached error remains. Other queued work can finish; hot reload clears the failure and permits a repaired asset to load. This requires the updated engine as well as matching current asset bundles.
+
+The collection still contains genuinely missing items, divergent identifier collisions and unfinished scripts. These repairs do not supply absent FU content, invent missing artwork/physics or make GIC and FU safe to combine. Test with isolated characters/universes; successful startup is not complete campaign or multiplayer acceptance.
+
 ## Required third-party dependencies
 
 The compatibility pack does **not** download, install or fabricate dependencies.
@@ -108,6 +126,7 @@ The compatibility pack does **not** download, install or fabricate dependencies.
 | --- | --- | --- |
 | Voyage addons | [Voyage](https://steamcommunity.com/sharedfiles/filedetails/?id=2957477338) | `MWHArcanaAddon` |
 | Neia harpoons | [Elithian Races Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=850109963) | `Elithian_Races_Mod` |
+| Metal and Figurines custom collections | [Custom Collections UI](https://steamcommunity.com/sharedfiles/filedetails/?id=760881689) ([upstream source](https://github.com/NotMrFlibble/CustomCollectionsUI)) | `CustomCollectionsUI` |
 
 Voyage's missing items, builders and NPC scripts are not fabricated. Neia's harpoon physics preset and return sound are absent from Neia itself; the compatibility source does not redistribute the missing audio or substitute unrelated sounds. Installing Elithian also installs its gameplay content.
 

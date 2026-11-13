@@ -148,7 +148,7 @@ client = {}
 ---@return ClientMetadata
 function client.storage(namespace) end
 
---- Loaded by require "/interface/opensb/ui/api.lua"; requests are asynchronous.
+--- Loaded by require "/interface/asterbound/ui/api.lua"; requests are asynchronous.
 ---@class ui
 ui = {}
 

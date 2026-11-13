@@ -887,3 +887,80 @@ const GameTestRegistration assetsPackedSourceBytes(
     ASSERT_TRUE(observed) << observed.error().what();
     EXPECT_EQ(*observed, Json(JsonObject{{"length", 7}, {"exact", true}}));
   });
+
+const GameTestRegistration guardedCollectionRepairs(
+  "AssetsPatchReadTest", "CollectionRepairsKeepUnknownContentAndRejectPartialEdits", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto known = File::relative_to(*directory, "known");
+    auto future = File::relative_to(*directory, "future");
+    auto foreign = File::relative_to(*directory, "foreign");
+    auto repair = File::relative_to(*directory, "repair");
+    ASSERT_TRUE(writePatchProvider(known, {
+      {"_metadata", R"({"name":"fixture_known","version":"1"})"}, {"preload.config", "[]"},
+      {"accepted.json", "{\r\n\"value\":1\r\n}"}, {"changed.json", "{\n\"value\":3\n}"},
+      {"partial.json", "{\n\"value\":1\n}"}
+    }));
+    ASSERT_TRUE(writePatchProvider(future, {
+      {"_metadata", R"({"name":"fixture_future","version":"2"})"}, {"future.json", "{\n\"value\":1\n}"}
+    }));
+    ASSERT_TRUE(writePatchProvider(foreign, {
+      {"_metadata", R"({"name":"fixture_foreign","version":"1"})"}, {"foreign.json", "{\n\"value\":1\n}"}
+    }));
+    auto bundled = fixture.root().assets();
+    ASSERT_TRUE(bundled);
+    auto loader = (*bundled)->bytes("/scripts/asterbound/compat/collection.lua");
+    ASSERT_TRUE(loader);
+    ASSERT_TRUE(writePatchProvider(repair, {
+      {"_metadata", R"({"scripts":{"onLoad":["/repair.lua"]}})"},
+      {"repair.lua", String(std::string_view((*loader)->begin(), (*loader)->end()))}
+    }));
+    for (std::string_view component : {"scripts", "scripts/asterbound", "scripts/asterbound/compat"})
+      ASSERT_TRUE(File::create_directory(File::relative_to(repair, component)));
+    std::string original = "{\n\"value\":1\n}";
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    for (unsigned char byte : original)
+      hash = (hash ^ byte) * 0x100000001b3ULL;
+    auto makeRule = [&](String path, String name) {
+      return JsonObject{
+        {"path", std::move(path)}, {"name", std::move(name)}, {"version", "1"},
+        {"size", original.size()}, {"hash", Star::format("{:016x}", hash)},
+        {"edits", JsonArray{JsonObject{{"before", "\"value\":1"}, {"after", "\"value\":2"}, {"count", 1}}}}
+      };
+    };
+    JsonArray rules{
+      makeRule("/accepted.json", "fixture_known"), makeRule("/changed.json", "fixture_known"),
+      makeRule("/future.json", "fixture_future"), makeRule("/foreign.json", "fixture_known")
+    };
+    auto partial = makeRule("/partial.json", "fixture_known");
+    partial["edits"] = JsonArray{
+      JsonObject{{"before", "\"value\":1"}, {"after", "\"value\":2"}, {"count", 1}},
+      JsonObject{{"before", "absent second edit"}, {"after", "never published"}, {"count", 1}}
+    };
+    rules.push_back(std::move(partial));
+    auto ruleText = Json(std::move(rules)).repr();
+    ASSERT_TRUE(ruleText);
+    ASSERT_TRUE(File::write_file(*ruleText,
+        File::relative_to(repair, "scripts/asterbound/compat/collection_runtime.config")));
+    for (std::string_view group : {"arcana", "lua", "content", "recipes", "duplicates"})
+      ASSERT_TRUE(File::write_file(String("[]"),
+          File::relative_to(repair, Star::format("scripts/asterbound/compat/collection_{}.config", group))));
+    Logger logger;
+    Assets::Settings settings{};
+    settings.workerPoolSize = 1;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
+        {known, future, foreign, repair});
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto accepted = (*assets)->json("/accepted.json");
+    ASSERT_TRUE(accepted);
+    EXPECT_EQ(*accepted, Json(JsonObject{{"value", 2}}));
+    for (std::string_view path : {"/changed.json", "/future.json", "/foreign.json", "/partial.json"}) {
+      auto loaded = (*assets)->json(path);
+      ASSERT_TRUE(loaded);
+      EXPECT_EQ(*loaded, Json(JsonObject{{"value", path == "/changed.json" ? 3 : 1}}));
+    }
+    auto bytes = (*assets)->bytes("/accepted.json");
+    ASSERT_TRUE(bytes);
+    EXPECT_EQ(String(std::string_view((*bytes)->begin(), (*bytes)->end())), "{\r\n\"value\":2\r\n}");
+  });

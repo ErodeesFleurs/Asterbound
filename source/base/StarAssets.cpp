@@ -1618,7 +1618,7 @@ bool Assets::queueAsset(AssetId const& assetId) const {
   if (i != m_assetsCache.end()) {
     if (i->second)
       freshen(i->second);
-  } else {
+  } else if (!m_assetErrors.contains(assetId)) {
     auto j = m_queue.find(assetId);
     if (j == m_queue.end()) {
       m_queue[assetId] = QueuePriority::Load;

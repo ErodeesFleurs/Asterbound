@@ -8,7 +8,7 @@ This page documents extensions to the [base species format](../species.md).
 ## `buildScripts`
 An optional array of paths to Lua scripts used to dynamically change the player/NPC's humanoidConfig based on their identity and humanoidParameters, much like item build scripts modify an item's resulting config.
 
-See [`assets/asterbound/humanoid/opensb/build.lua`](../../../assets/asterbound/humanoid/opensb/build.lua) for an example.
+See [`assets/asterbound/humanoid/asterbound/build.lua`](../../../assets/asterbound/humanoid/asterbound/build.lua) for an example.
 
 `build(JsonObject identity, JsonObject humanoidParameters, JsonObject humanoidConfig, Variant<JsonObject, nil> npcHumanoidConfig)` is invoked and must return a valid `JsonObject humanoidConfig` or the humanoid will fail to initialize correctly.
 
@@ -22,4 +22,4 @@ It is run whenever the player/npc initializes, changes species or imagePath in t
 ## `createScripts`
 An optional array of paths to Lua scripts used to create humanoidIdentity, humanoidParameters and equipment during character creation.
 
-See [`assets/asterbound/humanoid/opensb/create.lua`](../../../assets/asterbound/humanoid/opensb/create.lua) for an example.
+See [`assets/asterbound/humanoid/asterbound/create.lua`](../../../assets/asterbound/humanoid/asterbound/create.lua) for an example.

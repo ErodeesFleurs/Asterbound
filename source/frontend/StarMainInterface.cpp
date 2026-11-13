@@ -689,7 +689,7 @@ std::expected<void, StarException> MainInterface::initUiController() {
   m_uiController = std::make_unique<LuaUpdateScript>(context().root());
   // Session capability replacement is an integration boundary, not a policy
   // installed independently on every pane. LuaBaseComponent owns script reload.
-  if (auto scripts = m_uiController->setScript("/interface/opensb/ui/controller.lua"); !scripts)
+  if (auto scripts = m_uiController->setScript("/interface/asterbound/ui/controller.lua"); !scripts)
     return std::unexpected(std::move(scripts.error()));
   return synchronizeUiSession();
 }

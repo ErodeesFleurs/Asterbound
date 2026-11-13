@@ -60,7 +60,7 @@ GCC, Apple Clang and MSVC builds are unsupported.
 
 ## Compatibility and provenance
 
-The wire baseline is Starbound protocol **747**, OpenStarbound extension protocol **18**, and stream version **18**. Physical asset directories and packages use Asterbound names; existing `opensb` resource identities, public Lua names and save-format identifiers remain compatibility contracts. See [compatibility scope and verified boundaries](doc/modding.md#asterbound-compatibility-identity); this is not a guarantee for every older or future OpenStarbound release.
+The wire baseline is Starbound protocol **747**, OpenStarbound extension protocol **18**, and stream version **18**. Physical asset directories, packages and owned resource paths use Asterbound names; existing entity IDs, the `opensb` input group, public Lua names and save-format identifiers remain compatibility contracts. External Mod imports and patches targeting old owned resource paths must migrate; no old-path aliases are shipped. See [compatibility scope and verified boundaries](doc/modding.md#asterbound-compatibility-identity); this is not a guarantee for every older or future OpenStarbound release.
 
 [`version.json`](version.json) records product, bundled-asset and base-game versions separately. Bundled assets must match the engine's asset version.
 

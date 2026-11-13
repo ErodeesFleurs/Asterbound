@@ -11,10 +11,10 @@
 		"emote"
 	],
 	"cosmeticAnimations" : [
-		"/humanoid/opensb/head.cosmetic.animation",
-		"/humanoid/opensb/chest.cosmetic.animation",
-		"/humanoid/opensb/legs.cosmetic.animation",
-		"/humanoid/opensb/back.cosmetic.animation"
+		"/humanoid/asterbound/head.cosmetic.animation",
+		"/humanoid/asterbound/chest.cosmetic.animation",
+		"/humanoid/asterbound/legs.cosmetic.animation",
+		"/humanoid/asterbound/back.cosmetic.animation"
 	],
 	"identityFramesetTags" : {
 		"bodyFrameset" : "<gender>body.png",

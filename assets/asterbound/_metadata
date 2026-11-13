@@ -5,18 +5,18 @@
   "friendlyName" : "Asterbound Assets",
   "requires" : ["base"],
   "version" : "0.1.0.0",
-  "icon" : "/opensb/modicon.png",
+  "icon" : "/asterbound/modicon.png",
   "link" : "https://github.com/ErodeesFleurs/Asterbound",
   "scripts" : {
-    //"onLoad" : ["/scripts/opensb/assets/onload.lua"],
-    "postLoad" : ["/scripts/opensb/assets/postload.lua"]
+    //"onLoad" : ["/scripts/asterbound/assets/onload.lua"],
+    "postLoad" : ["/scripts/asterbound/assets/postload.lua"]
   },
   "errorHandlers" : { // only here as an example
-    //"item"    : ["/scripts/opensb/errorHandling/item.lua"],
-    //"object"  : ["/scripts/opensb/errorHandling/object.lua"],
-    //"npc"     : ["/scripts/opensb/errorHandling/npc.lua"],
-    //"player"  : ["/scripts/opensb/errorHandling/player.lua"],
-    //"monster" : ["/scripts/opensb/errorHandling/monster.lua"],
-    //"vehicle" : ["/scripts/opensb/errorHandling/vehicle.lua"]
+    //"item"    : ["/scripts/asterbound/errorHandling/item.lua"],
+    //"object"  : ["/scripts/asterbound/errorHandling/object.lua"],
+    //"npc"     : ["/scripts/asterbound/errorHandling/npc.lua"],
+    //"player"  : ["/scripts/asterbound/errorHandling/player.lua"],
+    //"monster" : ["/scripts/asterbound/errorHandling/monster.lua"],
+    //"vehicle" : ["/scripts/asterbound/errorHandling/vehicle.lua"]
   }
 }

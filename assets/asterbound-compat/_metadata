@@ -6,7 +6,7 @@
   "requires" : ["base", "asterbound_base"],
   "includes" : [
     "SChinese", "Arcana", "advanced_teleporter_interface",
-    "Neia Race", "Elithian_Races_Mod", "Halloween", "Draconis Race(Humanoid Dragon Race)",
+    "Neia Race", "Elithian_Races_Mod", "ElithianRacesGoodGamesFixes", "Halloween", "Draconis Race(Humanoid Dragon Race)",
     "[Arcana]Automation Extension", "mwh_brewology", "landableships", "PropPack",
     "The_Black_Armory_SChinese", "EP's Shadow Expansion_SChinese_Patch",
     "GalacticAlmanach", "IWUniWardrobe", "MWHArcanaAddonCN",
@@ -19,17 +19,44 @@
     "UI CharaCreate RacEx 88 arcana", "MWHArcanaAddon", "bk3k_inventory",
     "Enhanced Matter Manipulator", "QuickbarMini", "Project Redemption",
     "Turret_Guns", "The Black Armory", "OptimizedWeather", "BDR",
-    "Galaxy_in_Conflict", "FrackinUniverse"
+    "Galaxy_in_Conflict", "FrackinUniverse",
+    "HLib", "Wardrobe", "[oSB] Forgemaster's Inventory", "zzQuickbarPlus", "terraliblite",
+    "ArcanaSchinese", "AutomationAides", "Shellguard Expansion ", "Voided", "Ripto",
+    "[GiC] Blue Archive Expansion v0.1.4", "SlimeRaceMod", "Warframe Parkour", "[ex] Nodachi",
+    "[GIC]The Escalate Expansion", "Inkbound", "GiC_Otherworlds", "shattered_alchemy",
+    "Project Ancient Cosmos", "FFS_contributions", "HaranakRace", "shoggothracemod",
+    "Titillating Tentacle Porn Pack", "Whobound",
+    "Dreamers race - Updated 2026", "Tessu Fire Arms", "FFS",
+    "FFS_dungeons", "puns_shared_frameworks", "KFMECHXIUFU",
+    "Project Knightfall", "Post Apocalyptic Gear Pack [WIP]", "uircai",
+    "UIR Cities & Industry 个人AI汉化", "kirby plush", "herotaegypt",
+    "Ori  Spirit Tree Race", "raptorkin", "Tsaiqir Race",
+    "Neonblocks and Equipment", "Renamon Race 中文汉化", "Renamon Race",
+    "gic311CN_complete", "The Aether mod 中文汉化", "The Aether Mod",
+    "RPG_Growth", "[WIP]RPG_Growth_Re-Skin", "Starbound Paper Mario Mod", "Deremas Bound", "RemnantsoftheProtectorateCN",
+    "bookstore", "IWPrtcRemnants", "RPG_Growth_Chinese_Reborn",
+    "projectAncientCosmosCnTranslate", "nnmm_tweaks", "Ningen Apparel",
+    "ManyMoreTabsInventorsTable1", "Ningen [Fixed for 1.3]", "ikn_furnishing",
+    "GreckanRaceMod", "mantizi", "Deep Kingdom Mod",
+    "Blood Mod Reduced", "M32CN", "Maple32",
+    "plushboundzhCN", "plushbound", "PlushboundPlus",
+    "plushboundpluszhCN", "mwh_brewology_ZHCN", "FFSSchinese",
+    "hrg_oreplants_re", "Faster Farming", "ucdfwd",
+    "DenelaunCN", "DenelaunRace", "shattered_alchemy_Chinese-Patch",
+    "projectknightfalleSchinese", "FFSDungeonsAndEncountersCN", "oSBztarboundsailsupportpatch",
+    "randgenblshields", "spacePolice", "[GIC]恶化扩展——汉化", "sylveonoid",
+    "Custom Crafter Template", "vanta-race", "moremmupgrades", "CustomCollectionsUI", "gicexp_311patch"
   ],
   "scripts" : {
     "onLoad" : [
-      "/scripts/opensb/compat/content.lua",
-      "/scripts/opensb/compat/bladedance.lua",
-      "/scripts/opensb/compat/translation.lua",
-      "/scripts/opensb/compat/ati.lua",
-      "/scripts/opensb/compat/gic.lua",
-      "/scripts/opensb/compat/frackinuniverse.lua"
+      "/scripts/asterbound/compat/content.lua",
+      "/scripts/asterbound/compat/bladedance.lua",
+      "/scripts/asterbound/compat/translation.lua",
+      "/scripts/asterbound/compat/ati.lua",
+      "/scripts/asterbound/compat/gic.lua",
+      "/scripts/asterbound/compat/frackinuniverse.lua",
+      "/scripts/asterbound/compat/collection.lua"
     ],
-    "postLoad" : ["/scripts/opensb/compat/starcore.lua", "/scripts/opensb/compat/arcana.lua"]
+    "postLoad" : ["/scripts/asterbound/compat/starcore.lua", "/scripts/asterbound/compat/arcana.lua"]
   }
 }

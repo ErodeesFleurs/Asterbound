@@ -6,7 +6,7 @@ Start with the API for the script's host, then follow its related tables. A tabl
 
 Asterbound uses Lua 5.5.1 with additional operators and helpers; see the [Lua migration notes](../modding.md#lua-551-migration) before porting older scripts. The reference is organized into base API pages and OpenStarbound-compatible extensions. This organization is not a guarantee that every documented call works in retail Starbound: some base pages also describe extended behavior.
 
-The `openstarbound/` documentation paths and existing `opensb` API/resource identifiers are compatibility contracts, not the current product name. They remain unchanged.
+The `openstarbound/` documentation paths and existing public API identifiers remain compatibility contracts, not the current product name. Owned resource paths have moved from `opensb` to `asterbound`; external Mod imports and patches must migrate without old-path aliases. Script-context names and the `opensb` input group remain unchanged; see [the migration boundary](../modding.md#bundled-mod-compatibility).
 
 ## Base API
 

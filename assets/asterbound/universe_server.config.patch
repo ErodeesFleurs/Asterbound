@@ -2,7 +2,7 @@
   {
     "op" : "add",
     "path" : "/commandProcessorScripts/-",
-    "value" : "/scripts/opensb/servercommands/servercommands.lua"
+    "value" : "/scripts/asterbound/servercommands/servercommands.lua"
   },
   {
     "op" : "add",

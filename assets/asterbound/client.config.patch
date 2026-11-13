@@ -1,6 +1,6 @@
 {
   "windowTitle" : "Asterbound",
-  "universeScriptContexts" : { "OpenStarbound" : ["/scripts/opensb/universeclient/universeclient.lua"] },
+  "universeScriptContexts" : { "OpenStarbound" : ["/scripts/asterbound/universeclient/universeclient.lua"] },
 
   // Disables scissoring and letterboxing on vanilla and modded warp cinematics
   "warpCinematicBase" : {

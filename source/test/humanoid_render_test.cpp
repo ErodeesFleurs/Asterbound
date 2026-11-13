@@ -970,7 +970,7 @@ const GameTestRegistration humanoidTickOwnedPose(
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "species")));
     ASSERT_TRUE(File::write_file(String(R"([
-      {"op":"add","path":"/buildScripts","value":["/humanoid/opensb/build.lua"]}
+      {"op":"add","path":"/buildScripts","value":["/humanoid/asterbound/build.lua"]}
     ])"),
                                  File::relative_to(overlay, "species/human.species.patch")));
     auto settings = fixture.rootSettings();

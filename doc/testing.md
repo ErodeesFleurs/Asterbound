@@ -38,9 +38,10 @@ asset-backed suites are explicitly skipped; an invalid configured directory fail
 Each native asset-backed invocation runs one process per executable with a fresh
 boot configuration, storage and logs under
 `<build>/test/runtime/<executable>/<run-id>/`. `results.json` and the runtime are
-retained for diagnosis. These tests do not read your normal boot configuration or
-saves. See the [native asset runner](../source/test/run_asset_tests.cmake) for the
-setup and [test registrations](../source/test/CMakeLists.txt) for suite labels.
+retained for diagnosis. Both current bundled sources (`asterbound_base` and
+`asterbound_compat`) are included. These tests do not read your normal boot
+configuration or saves. See the [native asset runner](../source/test/run_asset_tests.cmake)
+for the setup and [test registrations](../source/test/CMakeLists.txt) for suite labels.
 
 Each asset-free CTest preset limits an entire test executable to 900 seconds, not
 each GoogleTest case. Windows CI runs CTest verbosely so individual cases remain
@@ -142,6 +143,12 @@ errors. See [native process output rules](development.md#logging-and-native-proc
   buffered-packet delivery after close retain separate coverage.
 - `fixed_scheduler_tests` covers deadline pacing, bounded catch-up, clock
   discontinuities, invalid rates and repeated slow presents without game assets.
+- Asset queue regressions retain a failed asset across cache clearing, drain
+  unrelated queued work and recover the repaired asset after hot reload.
+- Collection repair regressions preserve unknown providers, versions and bytes,
+  reject partially matched edits, and accept guarded CRLF sources through the
+  real asset loader. Source-owned replacement cases retain patch order and
+  failure recovery.
 
 ### Images, gameplay and frontend lifecycles
 

@@ -158,7 +158,7 @@ configuration or state. See [script pane runtime](scriptpane.md).
 Load the public Lua helper with:
 
 ```lua
-require "/interface/opensb/ui/api.lua"
+require "/interface/asterbound/ui/api.lua"
 
 ui.register("example", {
   config = "/interface/example/example.config",
@@ -185,7 +185,7 @@ player changes or becomes unavailable; session instances retain standard
 The canonical session registrations `"Notifications"`, `"TargetHealth"`,
 `"SpecialHealth"` and `"MainBar"` open on `"Background"` in that drawing order,
 after the breath HUD and before later debug/named-canvas/Hud/window drawing.
-Their assets live under `/interface/opensb/notifications/`, `targethealth/`,
+Their assets live under `/interface/asterbound/notifications/`, `targethealth/`,
 `specialhealth/` and `mainbar/`. Lua owns their presentation state; native
 world entities, damage, inventory, travel and the renderer remain native.
 
@@ -215,7 +215,7 @@ buttons or a native cursor-tooltip presentation updater.
 
 `"ActionBar"`, `"TeamBar"` and `"RadioMessagePopup"` are canonical, automatically
 opened session `"Hud"` Lua registrations, not native pane identifiers or aliases.
-Assets live in `/interface/opensb/actionbar/`, `team/` and `radio/`. The retained
+Assets live in `/interface/asterbound/actionbar/`, `team/` and `radio/`. The retained
 instances and original named children support cached pane/widget handles across
 reload and player/world service rebinding; interface teardown ends them.
 
@@ -282,7 +282,7 @@ does not prove remote completion.
 ### Bundled status-effect HUD
 
 The `"status"` session-scoped `"Hud"` registration loads
-`/interface/opensb/status/status.config` and its `status.lua` script. Lua owns
+`/interface/asterbound/status/status.config` and its `status.lua` script. Lua owns
 icon filtering, ordering, layout, duration masks and tooltip hit testing, using
 the shared `BaseScriptPane` and Canvas widgets. Status application and lifetime
 calculation remain in the native `status` service.
@@ -297,7 +297,7 @@ Patch the registered pane configuration or script to customize this HUD.
 
 ### Bundled breath HUD
 
-The `"breath"` session instance loads `/interface/opensb/breath/breath.config`.
+The `"breath"` session instance loads `/interface/asterbound/breath/breath.config`.
 Lua owns the ten-block display, rounded visibility threshold and zero-breath
 warning flash; resource regeneration, depletion and damage remain native.
 The existing `breathPos` and `breathBarPos` settings remain supported.
@@ -312,7 +312,7 @@ icon-step behavior at fractional interface scales.
 ### Bundled bookmark editor
 
 The `"bookmarkEditor"` world-scoped `"ModalWindow"` registration loads
-`/interface/opensb/bookmarks/bookmarkeditor.config`. Its `edit` event accepts
+`/interface/asterbound/bookmarks/bookmarkeditor.config`. Its `edit` event accepts
 `{bookmark, sourceEntityId, sourceUniqueId?}`; bookmark data uses the canonical
 JSON returned by `player.teleportBookmarks()`. Native flag/teleporter
 interactions and teleport-list edit buttons deliver this event through the
@@ -349,7 +349,7 @@ This registration does not handle confirmation, join requests or HTTP trust.
 ### Bundled songbook
 
 The `"songbook"` registration loads
-`/interface/opensb/songbook/songbook.config` on the `"Window"` layer with
+`/interface/asterbound/songbook/songbook.config` on the `"Window"` layer with
 `"player"` scope and `"retain": true`. Native instrument interactions open it
 through the generic interface bridge. It reuses the original songbook widget
 layout; no native songbook window class is involved.
@@ -374,7 +374,7 @@ discarding player-scoped UI does not add an implicit `songbook.stop()`.
 
 ### Bundled codex
 
-The `"codex"` registration loads `/interface/opensb/codex/codex.config` as a
+The `"codex"` registration loads `/interface/asterbound/codex/codex.config` as a
 player-scoped, retained `"Window"`, reusing the original species tabs, list,
 labels and paging buttons. Lua owns filtering, selection and paging; rows carry
 stable book IDs, including when identical titles or read-driven sorting change
@@ -386,7 +386,7 @@ before an instance exists, without overriding native keyboard capture or modal
 barriers. Ordinary dismissal preserves species, book and page; world changes
 retain the window, while player changes and interface teardown destroy it.
 
-`/interface/opensb/codex/unread.lua` owns automatic unread opening. It waits while
+`/interface/asterbound/codex/unread.lua` owns automatic unread opening. It waits while
 a modal window is present, selects the native first unread ID, and acknowledges
 it through `player.markCodexRead`. Reload does not replay already acknowledged
 books. Content parsing, unlocks, read flags and ordering remain native player
@@ -395,7 +395,7 @@ domain services; known content follows the player's held Codex objects.
 ### Bundled quest log
 
 The canonical `"QuestLog"` registration loads
-`/interface/opensb/questlog/questlog.config` as a player-scoped, retained
+`/interface/asterbound/questlog/questlog.config` as a player-scoped, retained
 `"Window"`, reusing the original layout and named widgets. The main-bar button
 and `globalActions.InterfaceQuest` toggle it through the generic Lua manager;
 there is no native QuestLog window class or registration.
@@ -415,7 +415,7 @@ player-domain operations.
 
 ### Bundled quest dialogs
 
-`/interface/opensb/questdialogs/pending.lua` schedules the canonical
+`/interface/asterbound/questdialogs/pending.lua` schedules the canonical
 `"QuestDialog"` dynamic registration on `"ModalWindow"`, independently of the
 quest log. It waits for an in-world player and an unoccupied modal layer, then
 selects queued administrator previews, failed quests, completed quests and
@@ -446,7 +446,7 @@ classes or separate presentation poller.
 ### Bundled pause menu
 
 The canonical `"EscapeDialog"` registration loads
-`/interface/opensb/escapemenu/escapemenu.config` as a session-scoped
+`/interface/asterbound/escapemenu/escapemenu.config` as a session-scoped
 `"ModalWindow"`. It is created on first open and retained across ordinary
 dismissal/reopening; interface teardown destroys it. There is no native pause
 menu constructor, enum registration or Escape-toggle branch.
@@ -473,7 +473,7 @@ existing local-server pause path; UI updates continue while the world is paused.
 ### Bundled world-name HUD
 
 The canonical `"PlanetText"` registration loads
-`/interface/opensb/planettext/planettext.config` as an automatically opened,
+`/interface/asterbound/planettext/planettext.config` as an automatically opened,
 session-scoped `"Hud"`. Lua owns its countdown, name formatting, visibility
 and final fade. The native initializer, timer and presentation updater are
 removed. The named `planetText` label and cached pane/widget handles survive
@@ -497,7 +497,7 @@ The HUD is noninteractive; hiding or reloading does not replay its countdown.
 ### Bundled quest tracker
 
 The canonical `"QuestTracker"` dynamic registration loads
-`/interface/opensb/questtracker/questtracker.config` as an automatically opened,
+`/interface/asterbound/questtracker/questtracker.config` as an automatically opened,
 session-scoped `"Hud"`. The public identifier keeps its original spelling, but
 there is no native tracker window class or native registration.
 

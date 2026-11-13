@@ -940,12 +940,12 @@ const GameTestRegistration
     auto creationScripts = humanConfig.getArray("createScripts", {});
     ASSERT_TRUE(creationScripts);
     if (creationScripts->empty())
-      creationScripts->push_back("/humanoid/opensb/create.lua");
+      creationScripts->push_back("/humanoid/asterbound/create.lua");
     creationScripts->push_back("/readycatalog/create.lua");
     auto buildScripts = humanConfig.getArray("buildScripts", {});
     ASSERT_TRUE(buildScripts);
     if (buildScripts->empty())
-      buildScripts->push_back("/humanoid/opensb/build.lua");
+      buildScripts->push_back("/humanoid/asterbound/build.lua");
     buildScripts->push_back("/readycatalog/humanoid.lua");
     auto humanWithCreation = humanConfig.set("createScripts", *creationScripts);
     ASSERT_TRUE(humanWithCreation);

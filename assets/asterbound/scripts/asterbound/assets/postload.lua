@@ -1,0 +1,126 @@
+-- Lua 5.5 makes for control variables read-only. Keep vanilla's fractional
+-- scan bounds and floor each sample into a body-local instead.
+local flyingPath = "/scripts/actions/flying.lua"
+local flyingScript, flyingFixes = assets.bytes(flyingPath):gsub(
+  "(for y=groundLine%[1%]%[2%], groundPoint%[2%], %-1 do%s+)y = math%.floor%(y%)",
+  "%1local y = math.floor(y)",
+  1
+)
+if flyingFixes > 0 then
+  assets.add(flyingPath, flyingScript)
+end
+
+-- Clamp the visible sample without assigning Lua 5.5's numeric loop control.
+local npcCombatPath = "/stagehands/coordinator/npccombat.lua"
+local npcCombatScript, npcCombatFixes = assets.bytes(npcCombatPath):gsub(
+  "(for range = math%.floor%(minRange%), math%.ceil%(maxRange%) do%s+)range = math%.max%(minRange, math%.min%(maxRange, range%)%)",
+  "%1local range = math.max(minRange, math.min(maxRange, range))",
+  1
+)
+if npcCombatFixes > 0 then
+  assets.add(npcCombatPath, npcCombatScript)
+end
+
+-- Vanilla's fossil minigame uses a zero-based working index while its iterator
+-- remains one-based. Only rewrite the verified base asset, not a mod override.
+local fossilPath = "/interface/games/fossilgame/tileset.lua"
+local fossilSource = assets.origin(fossilPath)
+local fossilMetadata = fossilSource and assets.sourceMetadata(fossilSource)
+if fossilMetadata and fossilMetadata.name == "base" then
+  local bytes = assets.sourceBytes(fossilSource, fossilPath)
+  local normalized = bytes:gsub("\r\n", "\n")
+  local hash = 0xcbf29ce484222325
+  for i = 1, #normalized do
+    hash = (hash ~ normalized:byte(i)) * 0x100000001b3
+  end
+  if #normalized == 7167 and hash == 0x843c2874f21549c2 then
+    local repaired, count = bytes:gsub(
+      "for i,value in ipairs%(self%.tiles%) do(%s+)i = i %- 1",
+      "for originalIndex,value in ipairs(self.tiles) do%1local i = originalIndex - 1", 1)
+    if count == 1 then assets.add(fossilPath, repaired) end
+  end
+end
+
+-- Revert cursor frames if a mod replaced cursors.png with a SD version again
+-- Otherwise, scale down our HD cursors
+if assets.image("/cursors/cursors.png"):size()[1] == 64 then
+  local path = "/cursors/asterbound/revert.cursor.patch"
+  assets.add(path, '{"scale":null}')
+  assets.patch("/cursors/inspect.cursor", path)
+  assets.patch("/cursors/link.cursor", path)
+  assets.patch("/cursors/pointer.cursor", path)
+  path = "/cursors/asterbound/revert.frames.patch"
+  assets.add(path, '{"frameGrid":{"size":[16,16]}}')
+  assets.patch("/cursors/cursors.frames", path)
+else
+  local cursors = assets.json("/cursors/cursors.frames:frameGrid.names")
+  ---@cast cursors string[][]
+  local path = "/cursors/%s.cursor.patch"
+  for i = 1, #cursors do
+    for j = 1, #cursors[i] do
+      assets.add(string.format(path, cursors[i][j]), '{"scale":1}')
+    end
+  end
+end
+
+-- Add object patches
+local objects = assets.byExtension("object")
+local objectPatchPath = "/objects/asterbound/object.patch.lua"
+for i = 1, #objects do
+  assets.patch(objects[i], objectPatchPath)
+end
+
+assets.patch(
+  "/interface/windowconfig/songbook.config",
+  "/interface/windowconfig/songbook_search_patch.lua"
+)
+
+assets.patch(
+  "/interface/windowconfig/playerinventory.config",
+  "/interface/windowconfig/inventory_cosmetics_patch.lua"
+)
+
+-- Relocate songs to the /songs/ folder
+
+local songs = assets.byExtension("abc")
+local count = 0
+
+for i = 1, #songs do
+  local song = songs[i]
+  if song:sub(1, 7) ~= "/songs/" then
+    local data = assets.bytes(song)
+    assets.erase(song)
+    assets.add("/songs" .. song, data)
+    count = count + 1
+  end
+end
+
+if count > 0 then
+  sb.logInfo("Moved %s misplaced songs to /songs/", count)
+end
+
+-- pre generating the 20 occupant slot animations so we're not wasting time generating the same thing multiple times later
+local chestLegsSortOrder = { 14, 8, 2, 0, 15, 9, 3, 1, 4, 5, 6, 7, 10, 11, 12, 13, 16, 17, 18, 19 }
+for _, path in ipairs(assets.scan("/humanoid/", "cosmetic.animation")) do
+  for i = 1, 20 do
+    assets.add(path .. "." .. i, assets.bytes(path):gsub(
+      '<slot>', tostring(i)
+    ):gsub(
+      '"zLevel"%s*:%s*(%d+%.%d+)', '"zLevel":%1'..string.format('%04d', i)
+    ):gsub(
+      '"flippedZLevel"%s*:%s*(%d+%.%d+)', '"flippedZLevel":%1'..string.format('%04d', i)
+    ):gsub(
+      '"zLevelChestLegs"%s*:%s*(%d+%.%d+)', '"zLevel":%1'..string.format('%04d', chestLegsSortOrder[i])
+    ):gsub(
+      '"flippedZLevelChestLegs"%s*:%s*(%d+%.%d+)', '"flippedZLevel":%1'..string.format('%04d', chestLegsSortOrder[i])
+    ):gsub(
+      '"zLevel"%s*:%s*(%-%d+%.%d+)', '"zLevel":%1'..string.format('%04d', 20-i)
+    ):gsub(
+      '"flippedZLevel"%s*:%s*(%-%d+%.%d+)', '"flippedZLevel":%1'..string.format('%04d', 20-i)
+    ):gsub(
+      '"zLevelChestLegs"%s*:%s*(%-%d+%.%d+)', '"zLevel":%1'..string.format('%04d', 20-chestLegsSortOrder[i])
+    ):gsub(
+      '"flippedZLevelChestLegs"%s*:%s*(%-%d+%.%d+)', '"flippedZLevel":%1'..string.format('%04d', 20-chestLegsSortOrder[i])
+    ))
+  end
+end

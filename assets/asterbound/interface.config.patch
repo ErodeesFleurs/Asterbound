@@ -1,7 +1,7 @@
 {
   "panes" : {
     "chat" : {
-      "config" : "/interface/opensb/chat/chat.config",
+      "config" : "/interface/asterbound/chat/chat.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
@@ -19,21 +19,21 @@
       "events" : {"messages" : "receiveMessages"}
     },
     "status" : {
-      "config" : "/interface/opensb/status/status.config",
+      "config" : "/interface/asterbound/status/status.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
       "order" : 20
     },
     "breath" : {
-      "config" : "/interface/opensb/breath/breath.config",
+      "config" : "/interface/asterbound/breath/breath.config",
       "layer" : "Background",
       "scope" : "session",
       "open" : true,
       "order" : 30
     },
     "bookmarkEditor" : {
-      "config" : "/interface/opensb/bookmarks/bookmarkeditor.config",
+      "config" : "/interface/asterbound/bookmarks/bookmarkeditor.config",
       "layer" : "ModalWindow",
       "scope" : "world",
       "open" : false,
@@ -41,7 +41,7 @@
       "events" : {"edit" : "editBookmark"}
     },
     "popup" : {
-      "config" : "/interface/opensb/popup/popup.config",
+      "config" : "/interface/asterbound/popup/popup.config",
       "layer" : "Window",
       "scope" : "player",
       "open" : false,
@@ -49,7 +49,7 @@
       "events" : {"show" : "showPopup"}
     },
     "songbook" : {
-      "config" : "/interface/opensb/songbook/songbook.config",
+      "config" : "/interface/asterbound/songbook/songbook.config",
       "layer" : "Window",
       "scope" : "player",
       "retain" : true,
@@ -57,7 +57,7 @@
       "order" : 60
     },
     "codex" : {
-      "config" : "/interface/opensb/codex/codex.config",
+      "config" : "/interface/asterbound/codex/codex.config",
       "layer" : "Window",
       "scope" : "player",
       "retain" : true,
@@ -66,7 +66,7 @@
       "globalActions" : {"InterfaceCodex" : "toggle"}
     },
     "QuestLog" : {
-      "config" : "/interface/opensb/questlog/questlog.config",
+      "config" : "/interface/asterbound/questlog/questlog.config",
       "layer" : "Window",
       "scope" : "player",
       "retain" : true,
@@ -75,21 +75,21 @@
       "globalActions" : {"InterfaceQuest" : "toggle"}
     },
     "QuestTracker" : {
-      "config" : "/interface/opensb/questtracker/questtracker.config",
+      "config" : "/interface/asterbound/questtracker/questtracker.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
       "order" : 80
     },
     "PlanetText" : {
-      "config" : "/interface/opensb/planettext/planettext.config",
+      "config" : "/interface/asterbound/planettext/planettext.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
       "order" : 90
     },
     "Notifications" : {
-      "config" : "/interface/opensb/notifications/notifications.config",
+      "config" : "/interface/asterbound/notifications/notifications.config",
       "layer" : "Background",
       "scope" : "session",
       "open" : true,
@@ -97,65 +97,65 @@
       "events" : {"message" : "push", "pickup" : "pickup"}
     },
     "TargetHealth" : {
-      "config" : "/interface/opensb/targethealth/targethealth.config",
+      "config" : "/interface/asterbound/targethealth/targethealth.config",
       "layer" : "Background",
       "scope" : "session",
       "open" : true,
       "order" : 120
     },
     "SpecialHealth" : {
-      "config" : "/interface/opensb/specialhealth/specialhealth.config",
+      "config" : "/interface/asterbound/specialhealth/specialhealth.config",
       "layer" : "Background",
       "scope" : "session",
       "open" : true,
       "order" : 130
     },
     "MainBar" : {
-      "config" : "/interface/opensb/mainbar/mainbar.config",
+      "config" : "/interface/asterbound/mainbar/mainbar.config",
       "layer" : "Background",
       "scope" : "session",
       "open" : true,
       "order" : 140
     },
     "MainBarTooltip" : {
-      "config" : "/interface/opensb/mainbar/tooltip.config",
+      "config" : "/interface/asterbound/mainbar/tooltip.config",
       "layer" : "Tooltip",
       "scope" : "session",
       "open" : true,
       "order" : 141
     },
     "ActionBar" : {
-      "config" : "/interface/opensb/actionbar/actionbar.config",
+      "config" : "/interface/asterbound/actionbar/actionbar.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
       "order" : 150
     },
     "TeamBar" : {
-      "config" : "/interface/opensb/team/teambar.config",
+      "config" : "/interface/asterbound/team/teambar.config",
       "layer" : "Hud", "scope" : "session", "open" : true, "order" : 160
     },
     "TeamInvite" : {
-      "config" : "/interface/opensb/team/teaminvite.config",
+      "config" : "/interface/asterbound/team/teaminvite.config",
       "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 161
     },
     "TeamInvitation" : {
-      "config" : "/interface/opensb/team/teaminvitation.config",
+      "config" : "/interface/asterbound/team/teaminvitation.config",
       "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 162
     },
     "TeamMemberMenu" : {
-      "config" : "/interface/opensb/team/teammembermenu.config",
+      "config" : "/interface/asterbound/team/teammembermenu.config",
       "layer" : "Window", "scope" : "session", "open" : false, "retain" : true, "order" : 163
     },
     "RadioMessagePopup" : {
-      "config" : "/interface/opensb/radio/radio.config",
+      "config" : "/interface/asterbound/radio/radio.config",
       "layer" : "Hud",
       "scope" : "session",
       "open" : true,
       "order" : 170
     },
     "EscapeDialog" : {
-      "config" : "/interface/opensb/escapemenu/escapemenu.config",
+      "config" : "/interface/asterbound/escapemenu/escapemenu.config",
       "layer" : "ModalWindow",
       "scope" : "session",
       "open" : false,
