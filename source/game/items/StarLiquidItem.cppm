@@ -92,12 +92,10 @@ export namespace Star {
 
 class LiquidItem : public Item, public FireableItem, public PreviewTileTool, public BeamItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LiquidItem, Item, FireableItem, PreviewTileTool, BeamItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LiquidItem, Item, FireableItem, PreviewTileTool, BeamItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LiquidItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LiquidItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<LiquidItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& settings);

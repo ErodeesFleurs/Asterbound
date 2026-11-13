@@ -109,12 +109,10 @@ export namespace Star {
 
 class UnlockItem : public Item, public SwingableItem, public PreviewableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<UnlockItem, Item, SwingableItem, PreviewableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<UnlockItem, Item, SwingableItem, PreviewableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<UnlockItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UnlockItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<UnlockItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& itemParameters = JsonObject());
@@ -197,7 +195,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
   // Only players can use unlock items.
-  if (auto player = asRef<Player>(itemOwner->get())) {
+  if (auto player = as_ref<Player>(itemOwner->get())) {
     auto shouldConsume = instanceValue("consume", true).and_then([](Json const& value) { return value.toBool(); });
     if (!shouldConsume)
       return std::unexpected(std::move(shouldConsume.error()));

@@ -24,12 +24,10 @@ namespace Star {
 
 class InspectableEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<InspectableEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<InspectableEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<InspectableEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<InspectableEntity>(); }
 
   // Default implementation returns true
   virtual bool inspectable() const;

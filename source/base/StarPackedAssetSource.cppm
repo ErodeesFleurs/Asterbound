@@ -21,12 +21,10 @@ export module star.packed_asset_source;
 export namespace Star {
 class PackedAssetSource : public AssetSource {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<PackedAssetSource, AssetSource>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<PackedAssetSource, AssetSource>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<PackedAssetSource>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PackedAssetSource>(); }
   using BuildProgressCallback = std::function<std::expected<void, StarException>(std::size_t, std::size_t, String, String)>;
 
   // Build a packed file, sorting specified extensions before all others and

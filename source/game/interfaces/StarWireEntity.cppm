@@ -41,12 +41,10 @@ namespace Star {
 
 class WireEntity : public virtual TileEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<WireEntity, TileEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<WireEntity, TileEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<WireEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WireEntity>(); }
 
   ~WireEntity() override = default;
 

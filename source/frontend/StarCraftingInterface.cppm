@@ -58,12 +58,8 @@ class AudioInstance;
 
 class CraftingPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<CraftingPane, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<CraftingPane>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<CraftingPane, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CraftingPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<CraftingPane>, StarException> create(GuiContext& guiContext,
       std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId = NullEntityId);

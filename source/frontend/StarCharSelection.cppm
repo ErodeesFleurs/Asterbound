@@ -46,12 +46,10 @@ class Player;
 
 class CharSelectionPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<CharSelectionPane, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<CharSelectionPane, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<CharSelectionPane>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CharSelectionPane>(); }
 
   using CreateCharCallback = std::function<std::expected<void, StarException>()>;
   using SelectCharacterCallback = std::function<std::expected<void, StarException>(std::shared_ptr<Player> const&)>;

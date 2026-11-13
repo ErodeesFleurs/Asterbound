@@ -60,12 +60,10 @@ using CharCreationException = StarError<CharCreationExceptionTag, StarException>
 
 class CharCreationPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<CharCreationPane, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<CharCreationPane, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<CharCreationPane>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CharCreationPane>(); }
 
   // The callback here is either called with null (when the user hits the
   // cancel button) or the newly created player (when the user hits the save

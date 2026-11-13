@@ -10,133 +10,139 @@ struct PointerConvertExceptionTag {
 };
 using PointerConvertException = StarError<PointerConvertExceptionTag, StarException>;
 
+template <typename T>
+concept cast_target = std::is_void_v<T> || std::is_object_v<T>;
+
+template <typename T>
+concept cast_source = std::is_object_v<T> || std::is_void_v<T>;
+
+template <cast_target Target, cast_source Source>
+using cast_result_t = std::conditional_t<std::is_const_v<Source>, std::add_const_t<Target>, Target>;
+
 template <typename Target, typename Source>
-Target* queryCast(Source* p) noexcept {
-  if (!p)
+concept capability_castable =
+  cast_target<Target> && cast_source<Source> && (!std::is_const_v<Source> || std::is_const_v<Target>)
+  && (std::is_convertible_v<Source*, Target*> || (std::is_class_v<Target> && capability_queryable<Source>));
+
+template <typename Target, typename Source>
+concept reference_castable = cast_target<Target> && cast_source<Source> && !std::is_void_v<Target>
+  && capability_castable<cast_result_t<Target, Source>, Source>;
+
+// Raw addresses are confined to the erased protocol and standard pointer boundary.
+template <cast_target Target, cast_source Source>
+  requires capability_castable<Target, Source>
+Target* query_cast(Source* value) noexcept {
+  if (!value)
     return nullptr;
   if constexpr (std::is_convertible_v<Source*, Target*>) {
-    return p;
+    return value;
   } else {
-    auto result = static_cast<std::remove_const_t<Target> const*>(p->queryType(typeKey<Target>()));
+    auto result = static_cast<std::remove_const_t<Target> const*>(value->query_type(type_key<Target>()));
     if constexpr (std::is_const_v<Target>)
       return result;
-    else {
-      static_assert(!std::is_const_v<Source>);
+    else
       return const_cast<Target*>(result);
-    }
   }
 }
 
-template <typename Type1, typename Type2>
-Type1* as(Type2* p) {
-  return queryCast<Type1>(p);
+template <cast_target Target, cast_source Source>
+  requires capability_castable<cast_result_t<Target, Source>, Source>
+cast_result_t<Target, Source>* as(Source* value) noexcept {
+  return query_cast<cast_result_t<Target, Source>>(value);
 }
 
-template <typename Type1, typename Type2>
-Type1 const* as(Type2 const* p) {
-  return queryCast<Type1 const>(p);
-}
-
-template <typename Type1, typename Type2>
-std::shared_ptr<Type1> as(std::shared_ptr<Type2> const& p) {
-  if (auto adjusted = as<Type1>(p.get()))
-    return std::shared_ptr<Type1>(p, adjusted);
+template <cast_target Target, cast_source Source>
+  requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
+std::shared_ptr<cast_result_t<Target, Source>> as(std::shared_ptr<Source> const& owner) noexcept {
+  if (auto adjusted = as<Target>(owner.get()))
+    return std::shared_ptr<cast_result_t<Target, Source>>(owner, adjusted);
   return {};
 }
 
-template <typename Type1, typename Type2>
-std::shared_ptr<Type1 const> as(std::shared_ptr<Type2 const> const& p) {
-  if (auto adjusted = as<Type1>(p.get()))
-    return std::shared_ptr<Type1 const>(p, adjusted);
+template <cast_target Target, cast_source Source>
+  requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
+std::shared_ptr<cast_result_t<Target, Source>> as(std::shared_ptr<Source>&& owner) noexcept {
+  if (auto adjusted = as<Target>(owner.get()))
+    return std::shared_ptr<cast_result_t<Target, Source>>(std::move(owner), adjusted);
   return {};
 }
 
-// Capability lookup borrows the supplied object and preserves its constness.
-template <typename Target, typename Source>
-auto asRef(Source& value)
-    -> std::optional<std::reference_wrapper<std::conditional_t<std::is_const_v<Source>, std::add_const_t<Target>, Target>>> {
-  using Result = std::conditional_t<std::is_const_v<Source>, std::add_const_t<Target>, Target>;
-  if (auto adjusted = queryCast<Result>(std::addressof(value)))
-    return std::reference_wrapper<Result>(*adjusted);
+template <cast_target Target, cast_source Source>
+  requires reference_castable<Target, Source>
+auto as_ref(Source& value) noexcept -> std::optional<std::reference_wrapper<cast_result_t<Target, Source>>> {
+  if (auto adjusted = as<Target>(std::addressof(value)))
+    return std::ref(*adjusted);
   return std::nullopt;
 }
 
-template <typename Type1, typename Type2>
-bool is(Type2* p) {
-  return as<Type1>(p) != nullptr;
+template <cast_target Target, cast_source Source>
+  requires capability_castable<cast_result_t<Target, Source>, Source>
+bool is(Source* value) noexcept {
+  return as<Target>(value) != nullptr;
 }
 
-template <typename Type1, typename Type2>
-bool is(Type2 const* p) {
-  return as<Type1>(p) != nullptr;
+template <cast_target Target, cast_source Source>
+  requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
+bool is(std::shared_ptr<Source> const& owner) noexcept {
+  return is<Target>(owner.get());
 }
 
-template <typename Type1, typename Type2>
-bool is(std::shared_ptr<Type2> const& p) {
-  return is<Type1>(p.get());
+template <typename Target, typename Ptr>
+concept cast_input = cast_target<Target> && requires(Ptr&& value) {
+  as<Target>(std::forward<Ptr>(value));
+  { static_cast<bool>(value) } -> std::same_as<bool>;
+  typename std::pointer_traits<std::remove_cvref_t<Ptr>>::element_type;
+};
+
+template <cast_target Target, typename Ptr>
+  requires cast_input<Target, Ptr>
+[[nodiscard]] auto convert(Ptr&& value)
+  -> std::expected<decltype(as<Target>(std::forward<Ptr>(value))), StarException> {
+  if (!value)
+    return std::unexpected(
+      PointerConvertException::format("Could not convert from nullptr to {}", type_name<Target>()));
+  if (auto result = as<Target>(std::forward<Ptr>(value)))
+    return result;
+  if constexpr (requires { value->dynamic_type_name(); }) {
+    return std::unexpected(PointerConvertException::format("Could not convert from {} to {}",
+                                                           value->dynamic_type_name(), type_name<Target>()));
+  } else {
+    using Source = typename std::pointer_traits<std::remove_cvref_t<Ptr>>::element_type;
+    return std::unexpected(
+      PointerConvertException::format("Could not convert from {} to {}", type_name<Source>(), type_name<Target>()));
+  }
 }
 
-template <typename Type1, typename Type2>
-bool is(std::shared_ptr<Type2 const> const& p) {
-  return is<Type1>(p.get());
-}
-
-template <typename Type1, typename Type2>
-bool ris(Type2& r) {
-  return is<Type1>(&r);
-}
-
-template <typename Type1, typename Type2>
-bool ris(Type2 const& r) {
-  return is<Type1>(&r);
-}
-
-template <typename Type, typename Ptr>
-[[nodiscard]] auto convert(Ptr const& p) -> std::expected<decltype(as<Type>(p)), StarException> {
-  if (!p)
-    return std::unexpected(PointerConvertException::format("Could not convert from nullptr to {}", typeName<Type>()));
-  else if (auto a = as<Type>(p))
-    return a;
+template <cast_target Target, cast_source Source>
+  requires reference_castable<Target, Source>
+[[nodiscard]] auto convert_ref(Source& value)
+  -> std::expected<std::reference_wrapper<cast_result_t<Target, Source>>, StarException> {
+  if (auto result = as_ref<Target>(value))
+    return *result;
+  using Result = cast_result_t<Target, Source>;
+  if constexpr (requires { value.dynamic_type_name(); })
+    return std::unexpected(PointerConvertException::format("Could not convert from {} to {}", value.dynamic_type_name(),
+                                                           type_name<Result>()));
   else
-    return std::unexpected(PointerConvertException::format("Could not convert from {} to {}", p->dynamicTypeName(), typeName<Type>()));
+    return std::unexpected(
+      PointerConvertException::format("Could not convert from {} to {}", type_name<Source>(), type_name<Result>()));
 }
-
-template <typename Type1, typename Type2>
-[[nodiscard]] std::expected<std::reference_wrapper<Type1>, StarException> rconvert(Type2& r) {
-  if (auto result = asRef<Type1>(r))
-    return *result;
-  return std::unexpected(PointerConvertException::format("Could not convert from {} to {}", r.dynamicTypeName(), typeName<Type1>()));
-}
-
-template <typename Type1, typename Type2>
-[[nodiscard]] std::expected<std::reference_wrapper<Type1 const>, StarException> rconvert(Type2 const& r) {
-  if (auto result = asRef<Type1 const>(r))
-    return *result;
-  return std::unexpected(PointerConvertException::format("Could not convert from {} to {}", r.dynamicTypeName(), typeName<Type1 const>()));
-}
-
-template <typename Type>
-std::weak_ptr<Type> asWeak(std::shared_ptr<Type> const& p) {
-  return std::weak_ptr<Type>(p);
-}
-
-template <typename Type>
-std::weak_ptr<Type const> asWeak(std::shared_ptr<Type const> const& p) {
-  return std::weak_ptr<Type>(p);
-}
-
 }
 
 export module star.casting;
 
 export namespace Star {
-  using ::Star::PointerConvertExceptionTag;
-  using ::Star::PointerConvertException;
-  using ::Star::is;
-  using ::Star::ris;
-  using ::Star::as;
-  using ::Star::asRef;
-  using ::Star::convert;
-  using ::Star::rconvert;
-  using ::Star::asWeak;
+using ::Star::as;
+using ::Star::as_ref;
+using ::Star::capability_castable;
+using ::Star::cast_input;
+using ::Star::cast_result_t;
+using ::Star::cast_source;
+using ::Star::cast_target;
+using ::Star::convert;
+using ::Star::convert_ref;
+using ::Star::is;
+using ::Star::PointerConvertException;
+using ::Star::PointerConvertExceptionTag;
+using ::Star::reference_castable;
 }

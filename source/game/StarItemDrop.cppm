@@ -61,12 +61,10 @@ class Item;
 
 class ItemDrop : public virtual MobileEntity, public virtual ScriptedEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ItemDrop, MobileEntity, ScriptedEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ItemDrop, MobileEntity, ScriptedEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ItemDrop>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ItemDrop>(); }
 
   // Creates a drop at the given position and adds a hard-coded amount of
   // randomness to the drop position / velocity.

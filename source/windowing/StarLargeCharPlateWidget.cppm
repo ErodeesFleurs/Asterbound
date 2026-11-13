@@ -56,12 +56,10 @@ class Player;
 
 class LargeCharPlateWidget : public ButtonWidget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LargeCharPlateWidget, ButtonWidget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LargeCharPlateWidget, ButtonWidget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LargeCharPlateWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LargeCharPlateWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<LargeCharPlateWidget>, StarException> create(GuiContext& context, WidgetCallbackFunc mainCallback, std::shared_ptr<Player> player = {});
 

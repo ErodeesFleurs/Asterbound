@@ -55,6 +55,13 @@ Worker cancellation uses `std::stop_source`/`std::stop_token`, with stable token
 - Keep non-template module definitions in implementation units with their own direct imports. Register those units as private CMake sources with `CXX_SCAN_FOR_MODULES` enabled; importing an interface does not expose its implementation dependencies.
 - Qt connections use typed signals and an explicit receiver context. Keep `Q_OBJECT` and moc where custom signals or reflection require them, not merely for ordinary receiver methods.
 
+### Type identity and capability casts
+
+- Use `type_key`, `type_name`, `query_type`, `query_type_of` and `dynamic_type_name`. Identity keys are process-local address tokens, normalize top-level cv/reference qualifiers, and are not persistent IDs or a cross-version plugin ABI. Identity/name functions accept all C++ types; do not add artificial class-only concepts to them.
+- Capability graphs use the snake_case `capability_queryable`, `capability_base` and `capability_graph` concepts. Base queries must be explicitly qualified, never virtual dispatch back into the most-derived override. Shared virtual-base addresses merge; distinct matching subobjects remain ambiguous. Remove only redundant registration arguments, not inherited capabilities or base classes.
+- `as_ref` / `convert_ref` borrow through optional/checked reference wrappers and preserve source constness. `as` / `convert` retain standard pointer and aliasing-owner boundaries. Successful shared/intrusive rvalue casts transfer ownership; failure, including a null stored-pointer alias, leaves the source intact. Lvalue aliases retain the original control block. Construct a weak alias explicitly from a successfully locked/cast shared owner.
+- `RefPtr` uses a unique storage owner with an intrusive deleter and snake_case operation concepts; its count remains non-atomic and externally synchronized. Preserve incomplete-type declarations, protected destruction through `RefCounter`, and acquire-before-release reset. Borrow only across proven lifetime boundaries: entity callbacks may retain an alias, while `NetItem` virtual calls and stream callbacks can reenter and replace the current item, so subsequent queries must not reuse an earlier borrow.
+
 ### Collections, names and value semantics
 
 - Reuse the checked `Star::transform` for owning transforms. `transformInto` appends and preserves the committed prefix on insertion failure; do not introduce eager capacity errors. Computed-key sorting constructs keys only after successful evaluation.

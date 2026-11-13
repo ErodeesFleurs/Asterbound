@@ -32,12 +32,10 @@ namespace Star {
 
 class InteractiveEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<InteractiveEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<InteractiveEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<InteractiveEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<InteractiveEntity>(); }
 
   // Interaction always takes place on the *server*, whether the interactive
   // entity is master or slave there.

@@ -50,12 +50,8 @@ namespace Star {
 
 class LabelWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LabelWidget, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LabelWidget>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<LabelWidget, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LabelWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<LabelWidget>, StarException> create(GuiContext& context, String text = {},
       Color const& color = Color::White,

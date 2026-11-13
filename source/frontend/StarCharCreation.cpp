@@ -281,7 +281,7 @@ std::expected<void, StarException> CharCreationPane::init(
   guiReader.registerCallback("randomize", [this](Widget&) { return randomize(); });
   guiReader.registerCallback("name", [this](Widget& object) { return nameBoxCallback(object); });
   guiReader.registerCallback("species", [this](Widget& widget) -> std::expected<void, StarException> {
-    auto button = rconvert<ButtonWidget>(widget);
+    auto button = convert_ref<ButtonWidget>(widget);
     if (!button)
       return std::unexpected(std::move(button.error()));
     std::size_t choice = button->get().buttonGroupId();
@@ -294,14 +294,14 @@ std::expected<void, StarException> CharCreationPane::init(
     return {};
   });
   guiReader.registerCallback("gender", [this](Widget& widget) -> std::expected<void, StarException> {
-    auto button = rconvert<ButtonWidget>(widget);
+    auto button = convert_ref<ButtonWidget>(widget);
     if (!button)
       return std::unexpected(std::move(button.error()));
     m_genderChoice = button->get().buttonGroupId();
     return changed();
   });
   guiReader.registerCallback("mode", [this](Widget& widget) -> std::expected<void, StarException> {
-    auto button = rconvert<ButtonWidget>(widget);
+    auto button = convert_ref<ButtonWidget>(widget);
     if (!button)
       return std::unexpected(std::move(button.error()));
     m_modeChoice = button->get().buttonGroupId();
@@ -565,7 +565,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
 }
 
 std::expected<void, StarException> CharCreationPane::nameBoxCallback(Widget& object) {
-  if (!asRef<TextBoxWidget>(object))
+  if (!as_ref<TextBoxWidget>(object))
     return std::unexpected(GuiException("Invalid object type, expected TextBoxWidget."));
   return changed();
 }

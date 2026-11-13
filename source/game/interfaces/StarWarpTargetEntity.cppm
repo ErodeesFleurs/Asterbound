@@ -40,12 +40,10 @@ namespace Star {
 
 class WarpTargetEntity : public virtual TileEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<WarpTargetEntity, TileEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<WarpTargetEntity, TileEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<WarpTargetEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WarpTargetEntity>(); }
 
   // Foot position for things teleporting onto this entity, relative to root
   // position.

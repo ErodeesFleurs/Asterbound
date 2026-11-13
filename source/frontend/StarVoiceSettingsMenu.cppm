@@ -48,12 +48,10 @@ namespace Star {
 
 class VoiceSettingsMenu : public BaseScriptPane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<VoiceSettingsMenu, BaseScriptPane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<VoiceSettingsMenu, BaseScriptPane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<VoiceSettingsMenu>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<VoiceSettingsMenu>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<VoiceSettingsMenu>, StarException> create(GuiContext& guiContext, Json const& config);
 

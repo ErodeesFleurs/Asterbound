@@ -38,7 +38,7 @@ namespace Star {
 
 std::expected<std::reference_wrapper<Root>, StarException> luaExecutionRoot(LuaEngine& engine) {
   if (auto host = engine.executionHost()) {
-    if (auto scope = asRef<LuaExecutionScope>(host->get()))
+    if (auto scope = as_ref<LuaExecutionScope>(host->get()))
       return std::ref(scope->get().root());
   }
   return std::unexpected(LuaException("Game Lua conversion requires an explicit game execution scope"));

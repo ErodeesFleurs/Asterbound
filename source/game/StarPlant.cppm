@@ -58,12 +58,8 @@ using PlantException = StarError<PlantExceptionTag, StarException>;
 
 class Plant : public virtual TileEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Plant, TileEntity>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Plant>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Plant, TileEntity>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Plant>(); }
 
   // TODO: For right now the space scan threshold is hard-coded, but should be
   // configurable in the future

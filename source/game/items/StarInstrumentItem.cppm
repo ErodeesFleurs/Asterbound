@@ -86,12 +86,11 @@ class InstrumentItem : public Item,
                        public ActivatableItem,
                        public PointableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<InstrumentItem, Item, StatusEffectItem, EffectSourceItem, ToolUserItem, ActivatableItem, PointableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<InstrumentItem, Item, StatusEffectItem, EffectSourceItem, ToolUserItem, ActivatableItem,
+                         PointableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<InstrumentItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<InstrumentItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<InstrumentItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);

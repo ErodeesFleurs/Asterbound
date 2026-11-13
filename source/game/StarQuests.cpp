@@ -1080,7 +1080,7 @@ std::expected<void, StarException> Quest::setEntityParameter(String const& param
   std::optional<String> name;
   std::optional<String> species;
   std::optional<Gender> gender;
-  if (auto portraitEntity = asRef<PortraitEntity>(entity)) {
+  if (auto portraitEntity = as_ref<PortraitEntity>(entity)) {
     auto drawables = portraitEntity->get().portrait(PortraitMode::Full);
     if (!drawables) return std::unexpected(std::move(drawables.error()));
     auto json = jsonFromList(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
@@ -1090,10 +1090,10 @@ std::expected<void, StarException> Quest::setEntityParameter(String const& param
     if (!entityName) return std::unexpected(std::move(entityName.error()));
     name = std::move(*entityName);
   }
-  if (auto npc = asRef<Npc>(entity)) {
+  if (auto npc = as_ref<Npc>(entity)) {
     species = npc->get().species();
     gender = npc->get().gender();
-  } else if (auto player = asRef<Player>(entity)) {
+  } else if (auto player = as_ref<Player>(entity)) {
     species = player->get().species();
     gender = player->get().gender();
   }

@@ -143,8 +143,8 @@ extern std::expected<EnumMap<WorldServerFidelity>, StarException> const WorldSer
 
 class WorldServer : public World {
 public:
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<WorldServer, World>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<WorldServer>(); }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<WorldServer, World>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldServer>(); }
 
   using ScriptComponent = LuaEntityScript;
   using WorldPropertyListener = std::function<std::expected<void, StarException>(Json const&)>;

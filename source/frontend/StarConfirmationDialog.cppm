@@ -43,12 +43,10 @@ namespace Star {
 
 class ConfirmationDialog : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ConfirmationDialog, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ConfirmationDialog, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ConfirmationDialog>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConfirmationDialog>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ConfirmationDialog>, StarException> create(GuiContext& guiContext);
 

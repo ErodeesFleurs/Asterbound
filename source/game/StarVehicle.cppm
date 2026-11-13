@@ -86,13 +86,11 @@ class Vehicle :
   public virtual PhysicsEntity, 
   public virtual ScriptedEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Vehicle, MobileEntity, LoungeableEntity, InteractiveEntity,
-        PhysicsEntity, ScriptedEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<Vehicle, MobileEntity, LoungeableEntity, InteractiveEntity, PhysicsEntity, ScriptedEntity>(
+      this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Vehicle>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Vehicle>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<Vehicle>, StarException> create(Root& rootContext, Json baseConfig, String path, Json dynamicConfig);
 

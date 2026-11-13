@@ -50,8 +50,8 @@ struct VersionedJson;
 
 class CelestialDatabase {
 public:
-  virtual void const* queryType(TypeKey key) const noexcept { return queryTypeOf<CelestialDatabase>(this, key); }
-  virtual std::string_view dynamicTypeName() const noexcept { return Star::typeName<CelestialDatabase>(); }
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<CelestialDatabase>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<CelestialDatabase>(); }
 
   virtual ~CelestialDatabase();
 
@@ -108,8 +108,10 @@ protected:
 
 class CelestialMasterDatabase : public CelestialDatabase {
 public:
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<CelestialMasterDatabase, CelestialDatabase>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<CelestialMasterDatabase>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<CelestialMasterDatabase, CelestialDatabase>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialMasterDatabase>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<CelestialMasterDatabase>, StarException> create(Root& root, std::optional<String> databaseFile = {});
 
@@ -237,8 +239,10 @@ private:
 
 class CelestialSlaveDatabase : public CelestialDatabase {
 public:
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<CelestialSlaveDatabase, CelestialDatabase>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<CelestialSlaveDatabase>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<CelestialSlaveDatabase, CelestialDatabase>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialSlaveDatabase>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<CelestialSlaveDatabase>, StarException> create(
       std::shared_ptr<Assets const> const& assets, RandomService& random, CelestialBaseInformation baseInformation);

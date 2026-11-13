@@ -976,7 +976,7 @@ if (!result185) return std::unexpected(std::move(result185.error()));
 }
 
     auto anchor = m_movementController->entityAnchor();
-    if (auto loungeAnchor = anchor ? asRef<LoungeAnchor>(*anchor) : std::nullopt) {
+    if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt) {
       if (loungeAnchor->get().emote)
         {
   auto result188 = requestEmote(*loungeAnchor->get().emote);
@@ -1034,7 +1034,6 @@ if (!result190) return std::unexpected(std::move(result190.error()));
     } else {
       auto result199 = m_statusController->setPersistentEffects("lounging", {});
 if (!result199) return std::unexpected(std::move(result199.error()));
-
     }
 
     auto result200 = m_armor->effects(*m_effectEmitter);
@@ -1239,7 +1238,7 @@ std::expected<void, StarException> Npc::updateHumanoidDirectives() {
 std::expected<void, StarException> Npc::render(RenderCallback& renderCallback) {
   EntityRenderLayer renderLayer = RenderLayerNpc;
   auto anchor = m_movementController->entityAnchor();
-  if (auto loungeAnchor = anchor ? asRef<LoungeAnchor>(*anchor) : std::nullopt)
+  if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt)
     renderLayer = loungeAnchor->get().loungeRenderLayer;
 
   auto result237 = humanoid();
@@ -1426,7 +1425,7 @@ std::move(*result280)->setRotation(m_movementController->rotation());
 
   ActorMovementModifiers firingModifiers;
   auto mainItem = handItem(ToolHand::Primary);
-  if (auto fireableMain = mainItem ? asRef<FireableItem>(*mainItem) : std::nullopt) {
+  if (auto fireableMain = mainItem ? as_ref<FireableItem>(*mainItem) : std::nullopt) {
     if (fireableMain->get().firing()) {
       if (fireableMain->get().stopWhileFiring())
         firingModifiers.movementSuppressed = true;
@@ -1436,7 +1435,7 @@ std::move(*result280)->setRotation(m_movementController->rotation());
   }
 
   auto altItem = handItem(ToolHand::Alt);
-  if (auto fireableAlt = altItem ? asRef<FireableItem>(*altItem) : std::nullopt) {
+  if (auto fireableAlt = altItem ? as_ref<FireableItem>(*altItem) : std::nullopt) {
     if (fireableAlt->get().firing()) {
       if (fireableAlt->get().stopWhileFiring())
         firingModifiers.movementSuppressed = true;
@@ -2380,7 +2379,7 @@ if (!result497) return std::unexpected(std::move(result497.error()));
 bool canUse = !std::move(*result497) && !m_statusController->toolUsageSuppressed();
   if (canUse) {
     auto anchor = m_movementController->entityAnchor();
-    if (auto loungeAnchor = anchor ? asRef<LoungeAnchor>(*anchor) : std::nullopt)
+    if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt)
       if (loungeAnchor->get().suppressTools.value_or(loungeAnchor->get().controllable))
         return false;
   }

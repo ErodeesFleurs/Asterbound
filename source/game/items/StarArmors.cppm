@@ -82,12 +82,10 @@ extern std::expected<EnumMap<ArmorType>, StarException> const ArmorTypeNames;
 
 class ArmorItem : public Item, public EffectSourceItem, public SwingableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ArmorItem, Item, EffectSourceItem, SwingableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ArmorItem, Item, EffectSourceItem, SwingableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ArmorItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ArmorItem>(); }
 
   ~ArmorItem() override = default;
 
@@ -152,12 +150,10 @@ private:
 
 class HeadArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<HeadArmor, ArmorItem, PreviewableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<HeadArmor, ArmorItem, PreviewableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<HeadArmor>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HeadArmor>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<HeadArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
@@ -183,12 +179,10 @@ private:
 
 class ChestArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ChestArmor, ArmorItem, PreviewableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ChestArmor, ArmorItem, PreviewableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ChestArmor>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChestArmor>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<ChestArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
@@ -223,12 +217,10 @@ private:
 
 class LegsArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LegsArmor, ArmorItem, PreviewableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LegsArmor, ArmorItem, PreviewableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LegsArmor>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LegsArmor>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<LegsArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
@@ -253,12 +245,10 @@ private:
 
 class BackArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<BackArmor, ArmorItem, PreviewableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<BackArmor, ArmorItem, PreviewableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<BackArmor>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BackArmor>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<BackArmor>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);

@@ -249,10 +249,10 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!m_parent)
       return std::unexpected(StarException("Inventory pane is detached from its interface"));
     auto& parent = m_parent->get();
-    auto convertResult3 = rconvert<ItemGridWidget>(widget);
-    if (!convertResult3)
-      return std::unexpected(std::move(convertResult3.error()));
-    auto& itemGrid = convertResult3->get();
+    auto grid = convert_ref<ItemGridWidget>(widget);
+    if (!grid)
+      return std::unexpected(std::move(grid.error()));
+    auto& itemGrid = grid->get();
     InventorySlot inventorySlot = BagSlot(bagType, itemGrid.selectedIndex());
 
     auto inventory = m_player->inventory();
@@ -402,26 +402,27 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   return {};
 };
 
-  auto bagGridCallback = [rightClickCallback](String const& bagType, Widget& widget)  -> std::expected<void, StarException> {
-    auto convertResult26 = rconvert<ItemGridWidget>(widget);
-    if (!convertResult26)
-      return std::unexpected(std::move(convertResult26.error()));
-    auto slot = BagSlot(bagType, convertResult26->get().selectedIndex());
+  auto bagGridCallback = [rightClickCallback](String const& bagType,
+                                              Widget& widget) -> std::expected<void, StarException> {
+    auto grid = convert_ref<ItemGridWidget>(widget);
+    if (!grid)
+      return std::unexpected(std::move(grid.error()));
+    auto slot = BagSlot(bagType, grid->get().selectedIndex());
     auto rightClickCallbackResult27 = rightClickCallback(slot);
     if (!rightClickCallbackResult27)
       return std::unexpected(std::move(rightClickCallbackResult27.error()));
-  
-  return {};
-};
+
+    return {};
+  };
 
   auto middleClickCallback = [this](String const& bagType, Widget& widget)  -> std::expected<void, StarException> {
     if (!m_player->inWorld()) 
       return {};
 
-    auto convertResult28 = rconvert<ItemGridWidget>(widget);
-    if (!convertResult28)
-      return std::unexpected(std::move(convertResult28.error()));
-    auto& itemGrid = convertResult28->get();
+    auto grid = convert_ref<ItemGridWidget>(widget);
+    if (!grid)
+      return std::unexpected(std::move(grid.error()));
+    auto& itemGrid = grid->get();
     InventorySlot inventorySlot = BagSlot(bagType, itemGrid.selectedIndex());
     auto inventory = m_player->inventory();
     {
@@ -532,54 +533,51 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   return {};
 });
 
-  invWindowReader.registerCallback("gridModeSelector", [this](Widget& widget)  -> std::expected<void, StarException> {
-      auto convertResult47 = rconvert<ButtonWidget>(widget);
-      if (!convertResult47)
-        return std::unexpected(std::move(convertResult47.error()));
-      auto toStringResult48 = convertResult47->get().data().toString();
-      if (!toStringResult48)
-        return std::unexpected(std::move(toStringResult48.error()));
-      auto selected = std::move(*toStringResult48);
-      auto tab_lookup = m_tabButtonData.key_of(selected);
-      if (!tab_lookup)
-        return std::unexpected(std::move(tab_lookup.error()));
-      auto tab_selected = selectTab(std::move(*tab_lookup));
-      if (!tab_selected)
-        return std::unexpected(std::move(tab_selected.error()));
+  invWindowReader.registerCallback("gridModeSelector", [this](Widget& widget) -> std::expected<void, StarException> {
+    auto button = convert_ref<ButtonWidget>(widget);
+    if (!button)
+      return std::unexpected(std::move(button.error()));
+    auto selected_value = button->get().data().toString();
+    if (!selected_value)
+      return std::unexpected(std::move(selected_value.error()));
+    auto selected = std::move(*selected_value);
+    auto tab_lookup = m_tabButtonData.key_of(selected);
+    if (!tab_lookup)
+      return std::unexpected(std::move(tab_lookup.error()));
+    auto tab_selected = selectTab(std::move(*tab_lookup));
+    if (!tab_selected)
+      return std::unexpected(std::move(tab_selected.error()));
+
+    return {};
+  });
+
+  auto registerSlotCallbacks = [&](String name, InventorySlot slot) -> std::expected<void, StarException> {
+    invWindowReader.registerCallback(name, [this, slot](Widget& paneObj) -> std::expected<void, StarException> {
+      if (as_ref<ItemSlotWidget>(paneObj)) {
+        auto shiftSwapResult51 = m_player->inventory()->shiftSwap(slot);
+        if (!shiftSwapResult51)
+          return std::unexpected(std::move(shiftSwapResult51.error()));
+
+      } else
+        return std::unexpected(GuiException("Invalid object type, expected ItemSlotWidget"));
 
       return {};
-});
+    });
+    invWindowReader.registerCallback(
+      name + ".right", [slot, rightClickCallback](Widget& paneObj) -> std::expected<void, StarException> {
+        if (as_ref<ItemSlotWidget>(paneObj)) {
+          auto rightClickCallbackResult52 = rightClickCallback(slot);
+          if (!rightClickCallbackResult52)
+            return std::unexpected(std::move(rightClickCallbackResult52.error()));
 
-  auto registerSlotCallbacks = [&](String name, InventorySlot slot)  -> std::expected<void, StarException> {
-    invWindowReader.registerCallback(name, [this, slot](Widget& paneObj)  -> std::expected<void, StarException> {
-        if (asRef<ItemSlotWidget>(paneObj))
-          {
-            auto shiftSwapResult51 = m_player->inventory()->shiftSwap(slot);
-            if (!shiftSwapResult51)
-              return std::unexpected(std::move(shiftSwapResult51.error()));
-            
-          }
-        else
+        } else
           return std::unexpected(GuiException("Invalid object type, expected ItemSlotWidget"));
-      
-  return {};
-});
-    invWindowReader.registerCallback(name + ".right", [slot, rightClickCallback](Widget& paneObj)  -> std::expected<void, StarException> {
-        if (asRef<ItemSlotWidget>(paneObj))
-          {
-            auto rightClickCallbackResult52 = rightClickCallback(slot);
-            if (!rightClickCallbackResult52)
-              return std::unexpected(std::move(rightClickCallbackResult52.error()));
-            
-          }
-        else
-          return std::unexpected(GuiException("Invalid object type, expected ItemSlotWidget"));
-      
-  return {};
-});
-  
-  return {};
-};
+
+        return {};
+      });
+
+    return {};
+  };
 
   {
     auto const& enumResult53 = EquipmentSlotNames;

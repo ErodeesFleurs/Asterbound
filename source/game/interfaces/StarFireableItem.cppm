@@ -77,12 +77,10 @@ namespace Star {
 
 class FireableItem : public virtual ToolUserItem, public virtual StatusEffectItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<FireableItem, ToolUserItem, StatusEffectItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<FireableItem, ToolUserItem, StatusEffectItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<FireableItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FireableItem>(); }
 
   FireableItem();
   ~FireableItem() override = default;

@@ -757,8 +757,8 @@ namespace WorldImpl {
         });
     };
 
-    if (auto tileEntity = as<TileEntity>(entity)) {
-      for (auto space : preferInteractive ? tileEntity->interactiveSpaces() : tileEntity->spaces()) {
+    if (auto tileEntity = as_ref<TileEntity>(*entity)) {
+      for (auto space : preferInteractive ? tileEntity->get().interactiveSpaces() : tileEntity->get().spaces()) {
         auto spacePosition = entity->position() + centerOfTile(space);
         if (geometry.diff(spacePosition, sourcePosition).magnitude() <= maxRange) {
           auto reachable = canReachTile(spacePosition);
@@ -768,9 +768,8 @@ namespace WorldImpl {
             return true;
         }
       }
-    } else if (preferInteractive && is<InteractiveEntity>(entity)) {
-      auto interactiveEntity = as<InteractiveEntity>(entity);
-      auto entityBounds = interactiveEntity->interactiveBoundBox().translated(entity->position());
+    } else if (auto interactiveEntity = preferInteractive ? as_ref<InteractiveEntity>(*entity) : std::nullopt) {
+      auto entityBounds = interactiveEntity->get().interactiveBoundBox().translated(entity->position());
       auto contains = geometry.rectContains(entityBounds, sourcePosition);
       if (!contains)
         return std::unexpected(std::move(contains.error()));

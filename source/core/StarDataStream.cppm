@@ -71,10 +71,8 @@ class DataStream {
 public:
   DataStream();
   virtual ~DataStream() = default;
-  virtual void const* queryType(TypeKey key) const noexcept {
-    return queryTypeOf<DataStream>(this, key);
-  }
-  virtual std::string_view dynamicTypeName() const noexcept { return typeName<DataStream>(); }
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<DataStream>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return type_name<DataStream>(); }
 
   ByteOrder byte_order() const;
   void set_byte_order(ByteOrder byte_order);

@@ -349,86 +349,77 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
   m_reader.registerCallback("close", [this](Widget&)  -> std::expected<void, StarException> { dismiss();
   return {};
 });
-  m_reader.registerCallback("itemGrid", [this](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto swapSlotResult249 = swapSlot(itemGrid->get());
-          if (!swapSlotResult249)
-            return std::unexpected(std::move(swapSlotResult249.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
-  m_reader.registerCallback("itemGrid.right", [rightClickCallback](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto rightClickCallbackResult250 = rightClickCallback(itemGrid->get().selectedIndex());
-          if (!rightClickCallbackResult250)
-            return std::unexpected(std::move(rightClickCallbackResult250.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
+  m_reader.registerCallback("itemGrid", [this](Widget& paneObj) -> std::expected<void, StarException> {
+    if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+      auto swapSlotResult249 = swapSlot(itemGrid->get());
+      if (!swapSlotResult249)
+        return std::unexpected(std::move(swapSlotResult249.error()));
 
-  m_reader.registerCallback("itemGrid2", [this](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto swapSlotResult251 = swapSlot(itemGrid->get());
-          if (!swapSlotResult251)
-            return std::unexpected(std::move(swapSlotResult251.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
-  m_reader.registerCallback("itemGrid2.right", [rightClickCallback](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto rightClickCallbackResult252 = rightClickCallback(itemGrid->get().selectedIndex());
-          if (!rightClickCallbackResult252)
-            return std::unexpected(std::move(rightClickCallbackResult252.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
+    } else
+      return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
 
-  m_reader.registerCallback("outputItemGrid", [this](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto swapSlotResult253 = swapSlot(itemGrid->get());
-          if (!swapSlotResult253)
-            return std::unexpected(std::move(swapSlotResult253.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
-  m_reader.registerCallback("outputItemGrid.right", [rightClickCallback](Widget& paneObj)  -> std::expected<void, StarException> {
-      if (auto itemGrid = asRef<ItemGridWidget>(paneObj))
-        {
-          auto rightClickCallbackResult254 = rightClickCallback(itemGrid->get().selectedIndex());
-          if (!rightClickCallbackResult254)
-            return std::unexpected(std::move(rightClickCallbackResult254.error()));
-          
-        }
-      else
-        return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
-    
-  return {};
-});
+    return {};
+  });
+  m_reader.registerCallback("itemGrid.right",
+                            [rightClickCallback](Widget& paneObj) -> std::expected<void, StarException> {
+                              if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+                                auto rightClickCallbackResult250 = rightClickCallback(itemGrid->get().selectedIndex());
+                                if (!rightClickCallbackResult250)
+                                  return std::unexpected(std::move(rightClickCallbackResult250.error()));
+
+                              } else
+                                return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
+
+                              return {};
+                            });
+
+  m_reader.registerCallback("itemGrid2", [this](Widget& paneObj) -> std::expected<void, StarException> {
+    if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+      auto swapSlotResult251 = swapSlot(itemGrid->get());
+      if (!swapSlotResult251)
+        return std::unexpected(std::move(swapSlotResult251.error()));
+
+    } else
+      return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
+
+    return {};
+  });
+  m_reader.registerCallback("itemGrid2.right",
+                            [rightClickCallback](Widget& paneObj) -> std::expected<void, StarException> {
+                              if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+                                auto rightClickCallbackResult252 = rightClickCallback(itemGrid->get().selectedIndex());
+                                if (!rightClickCallbackResult252)
+                                  return std::unexpected(std::move(rightClickCallbackResult252.error()));
+
+                              } else
+                                return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
+
+                              return {};
+                            });
+
+  m_reader.registerCallback("outputItemGrid", [this](Widget& paneObj) -> std::expected<void, StarException> {
+    if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+      auto swapSlotResult253 = swapSlot(itemGrid->get());
+      if (!swapSlotResult253)
+        return std::unexpected(std::move(swapSlotResult253.error()));
+
+    } else
+      return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
+
+    return {};
+  });
+  m_reader.registerCallback("outputItemGrid.right",
+                            [rightClickCallback](Widget& paneObj) -> std::expected<void, StarException> {
+                              if (auto itemGrid = as_ref<ItemGridWidget>(paneObj)) {
+                                auto rightClickCallbackResult254 = rightClickCallback(itemGrid->get().selectedIndex());
+                                if (!rightClickCallbackResult254)
+                                  return std::unexpected(std::move(rightClickCallbackResult254.error()));
+
+                              } else
+                                return std::unexpected(GuiException("Invalid object type, expected ItemGridWidget."));
+
+                              return {};
+                            });
 
   m_reader.registerCallback("toggleCrafting", [this](Widget&)  -> std::expected<void, StarException> { auto toggleCraftingResult255 = toggleCrafting();
                                                                 if (!toggleCraftingResult255)

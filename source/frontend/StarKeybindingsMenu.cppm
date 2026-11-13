@@ -45,12 +45,10 @@ class ListWidget;
 
 class KeybindingsMenu : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<KeybindingsMenu, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<KeybindingsMenu, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<KeybindingsMenu>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<KeybindingsMenu>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<KeybindingsMenu>, StarException> create(GuiContext& guiContext);
 

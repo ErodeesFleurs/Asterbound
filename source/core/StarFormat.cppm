@@ -159,14 +159,9 @@ public:
 
   char const* what() const noexcept { return m_payload->rendered(false).c_str(); }
 
-  template <error_category Error>
-  bool is() const noexcept {
-    return m_payload->matcher(typeKey<Error>());
-  }
+  template <error_category Error> bool is() const noexcept { return m_payload->matcher(type_key<Error>()); }
 
-  static bool matches_error_type(TypeKey key) noexcept {
-    return key == typeKey<StarException>();
-  }
+  static bool matches_error_type(TypeKey key) noexcept { return key == type_key<StarException>(); }
 
   std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const noexcept { return m_payload->summary; }
 
@@ -422,7 +417,7 @@ public:
 
 
   static bool matches_error_type(TypeKey key) noexcept {
-    return key == typeKey<StarError>() || Base::matches_error_type(key);
+    return key == type_key<StarError>() || Base::matches_error_type(key);
   }
 
   StarError() : StarError(Tag::name(), std::string(), true) {}

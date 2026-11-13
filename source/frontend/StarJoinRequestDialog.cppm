@@ -45,12 +45,10 @@ enum class P2PJoinRequestReply;
 
 class JoinRequestDialog : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<JoinRequestDialog, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<JoinRequestDialog, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<JoinRequestDialog>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<JoinRequestDialog>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<JoinRequestDialog>, StarException> create(GuiContext& guiContext);
 

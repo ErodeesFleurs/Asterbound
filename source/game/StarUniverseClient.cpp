@@ -321,7 +321,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       return std::unexpected(std::move(socketResult.error()));
     auto& socket = socketResult->get();
     if (!legacyServer) {
-      auto compressed = asRef<CompressedPacketSocket>(socket);
+      auto compressed = as_ref<CompressedPacketSocket>(socket);
       if (protocolResponse->info) {
         auto versionResult = protocolResponse->info.getUInt("openProtocolVersion", 1);
         if (!versionResult)
@@ -1258,7 +1258,7 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
     if (!playerWorldResult)
       return std::unexpected(std::move(playerWorldResult.error()));
     auto& playerWorld = playerWorldResult->get();
-    world = asRef<WorldClient>(playerWorld);
+    world = as_ref<WorldClient>(playerWorld);
   }
   if (!world)
     return std::unexpected(StarException("Cannot reload player without a client world"));

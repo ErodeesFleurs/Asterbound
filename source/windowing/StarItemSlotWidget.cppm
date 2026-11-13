@@ -57,12 +57,10 @@ inline constexpr float ItemIndicateNewTime = 1.5f;
 
 class ItemSlotWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ItemSlotWidget, Widget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ItemSlotWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ItemSlotWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ItemSlotWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ItemSlotWidget>, StarException> create(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage);
 

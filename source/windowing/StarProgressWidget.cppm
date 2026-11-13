@@ -50,12 +50,10 @@ namespace Star {
 
 class ProgressWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ProgressWidget, Widget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ProgressWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ProgressWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProgressWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ProgressWidget>, StarException> create(GuiContext& context, String const& background,
       String const& overlay,

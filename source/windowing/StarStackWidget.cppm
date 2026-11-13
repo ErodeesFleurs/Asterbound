@@ -50,12 +50,8 @@ namespace Star {
 
 class StackWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<StackWidget, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<StackWidget>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<StackWidget, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StackWidget>(); }
 
   explicit StackWidget(GuiContext& context) : Widget(context) {}
 

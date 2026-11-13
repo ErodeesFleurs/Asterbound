@@ -1366,7 +1366,7 @@ std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doSwapItems
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doApplyAugment(std::size_t slot, std::shared_ptr<Item> const& item) {
   itemsUpdated();
-  if (auto augment = item ? asRef<AugmentItem>(*item) : std::nullopt) {
+  if (auto augment = item ? as_ref<AugmentItem>(*item) : std::nullopt) {
     auto slotItemResult = m_items->at(slot);
     if (!slotItemResult)
       return std::unexpected(std::move(slotItemResult.error()));

@@ -30,12 +30,12 @@ struct AssetWorkerBenchmarkAccess {
       return std::unexpected(StarException("Asset worker stopped before benchmark completion"));
     lock.unlock();
     std::lock_guard luaLock(assets.m_luaMutex);
-    return asRef<LuaEngine>(*assets.m_luaEngine)->get().memoryUsage();
+    return as_ref<LuaEngine>(*assets.m_luaEngine)->get().memoryUsage();
   }
 
   static std::expected<std::size_t, StarException> collect(Assets& assets) {
     std::lock_guard lock(assets.m_luaMutex);
-    auto& engine = asRef<LuaEngine>(*assets.m_luaEngine)->get();
+    auto& engine = as_ref<LuaEngine>(*assets.m_luaEngine)->get();
     auto collected = engine.collectGarbage();
     if (!collected)
       return std::unexpected(std::move(collected.error()));

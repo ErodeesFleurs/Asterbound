@@ -46,12 +46,10 @@ enum class LoungeControl { Left, Right, Down, Up, Jump, PrimaryFire, AltFire, Sp
 extern std::expected<EnumMap<LoungeControl>, StarException> const LoungeControlNames;
 
 struct LoungeAnchor : EntityAnchor {
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LoungeAnchor, EntityAnchor>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LoungeAnchor, EntityAnchor>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LoungeAnchor>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungeAnchor>(); }
 
   LoungeOrientation orientation;
   EntityRenderLayer loungeRenderLayer;
@@ -72,12 +70,10 @@ struct LoungeAnchor : EntityAnchor {
 // may be called on both the master and slave.
 class LoungeableEntity : public AnchorableEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LoungeableEntity, AnchorableEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LoungeableEntity, AnchorableEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LoungeableEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungeableEntity>(); }
 
   std::size_t anchorCount() const override = 0;
   [[nodiscard]] std::expected<std::shared_ptr<EntityAnchor const>, StarException> anchor(std::size_t anchorPositionIndex) const override;
@@ -100,12 +96,10 @@ public:
 // in the same spot.
 class LoungingEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LoungingEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LoungingEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<LoungingEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungingEntity>(); }
 
   virtual std::optional<EntityAnchorState> loungingIn() const = 0;
   // Returns true if the entity is in a lounge achor, but other entities are

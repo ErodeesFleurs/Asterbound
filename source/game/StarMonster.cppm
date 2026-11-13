@@ -108,14 +108,11 @@ class Monster
     public virtual InteractiveEntity,
     public virtual ActorEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Monster, DamageBarEntity, AggressiveEntity, ScriptedEntity,
-        PhysicsEntity, NametagEntity, ChattyEntity, InteractiveEntity,
-        ActorEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<Monster, DamageBarEntity, AggressiveEntity, ScriptedEntity, PhysicsEntity, NametagEntity,
+                         ChattyEntity, InteractiveEntity, ActorEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Monster>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Monster>(); }
 
   struct SkillInfo {
     String label;

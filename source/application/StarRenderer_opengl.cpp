@@ -969,7 +969,7 @@ std::expected<void, StarException> OpenGlRenderer::appendImmediate(DetachedRende
 std::expected<void, StarException> OpenGlRenderer::setRenderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, DetachedRenderGeometry const& geometry) {
   if (!renderBuffer)
     return std::unexpected(RendererException("Cannot set a null render buffer"));
-  auto buffer = rconvert<GlRenderBuffer>(*renderBuffer);
+  auto buffer = convert_ref<GlRenderBuffer>(*renderBuffer);
   if (!buffer) return std::unexpected(std::move(buffer.error()));
   return buffer->get().set(geometry);
 }
@@ -977,7 +977,7 @@ std::expected<void, StarException> OpenGlRenderer::setRenderBuffer(std::shared_p
 std::expected<void, StarException> OpenGlRenderer::renderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, Mat3F const& transformation) {
   if (!renderBuffer)
     return std::unexpected(RendererException("Cannot render a null render buffer"));
-  auto buffer = rconvert<GlRenderBuffer>(*renderBuffer);
+  auto buffer = convert_ref<GlRenderBuffer>(*renderBuffer);
   if (!buffer) return std::unexpected(std::move(buffer.error()));
   auto flushed = flushImmediatePrimitives();
   if (!flushed) return std::unexpected(std::move(flushed.error()));
@@ -1281,7 +1281,7 @@ Vec2U OpenGlRenderer::GlLoneTexture::glTextureCoordinateOffset() const {
 
 OpenGlRenderer::GlRenderBuffer::~GlRenderBuffer() {
   for (auto const& texture : usedTextures) {
-    if (auto gt = asRef<GlGroupedTexture>(*texture))
+    if (auto gt = as_ref<GlGroupedTexture>(*texture))
       gt->get().decrementBufferUseCount();
   }
   for (auto const& vb : vertexBuffers)
@@ -1291,7 +1291,7 @@ OpenGlRenderer::GlRenderBuffer::~GlRenderBuffer() {
 
 void OpenGlRenderer::GlRenderBuffer::reset() {
   for (auto const& texture : usedTextures)
-    if (auto grouped = asRef<GlGroupedTexture>(*texture))
+    if (auto grouped = as_ref<GlGroupedTexture>(*texture))
       grouped->get().decrementBufferUseCount();
   usedTextures.clear();
   accumulationBuffer.clear();
@@ -1306,7 +1306,7 @@ std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::appendPrimiti
     return {};
 
   TexturePtr const& selectedTexture = texture ? texture : whiteTexture;
-  auto glTexture = asRef<GlTexture>(*selectedTexture);
+  auto glTexture = as_ref<GlTexture>(*selectedTexture);
   if (!glTexture)
     return std::unexpected(RendererException("Render primitive uses a texture from another renderer"));
 
@@ -1332,7 +1332,7 @@ std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::appendPrimiti
     ++batch.textureCount;
   }
   if (usedTextures.add(selectedTexture))
-    if (auto grouped = asRef<GlGroupedTexture>(*selectedTexture))
+    if (auto grouped = as_ref<GlGroupedTexture>(*selectedTexture))
       grouped->get().incrementBufferUseCount();
 
   auto textureOffset = Vec2F(glTexture->get().glTextureCoordinateOffset());

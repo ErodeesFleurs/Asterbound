@@ -120,12 +120,8 @@ class Texture : public RefCounter {
 public:
   ~Texture() override = default;
 
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Texture, RefCounter>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Texture>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Texture, RefCounter>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Texture>(); }
 
   virtual Vec2U size() const = 0;
   virtual TextureFiltering filtering() const = 0;
@@ -149,12 +145,8 @@ class RenderBuffer {
 public:
   virtual ~RenderBuffer() = default;
 
-  virtual void const* queryType(TypeKey key) const noexcept {
-    return queryTypeOf<RenderBuffer>(this, key);
-  }
-  virtual std::string_view dynamicTypeName() const noexcept {
-    return Star::typeName<RenderBuffer>();
-  }
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<RenderBuffer>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<RenderBuffer>(); }
 
   // Transforms the given primitives into a form suitable for the underlying
   // graphics system and stores it for fast replaying.

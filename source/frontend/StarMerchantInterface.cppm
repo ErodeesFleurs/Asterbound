@@ -57,12 +57,8 @@ class TabSetWidget;
 
 class MerchantPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<MerchantPane, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<MerchantPane>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<MerchantPane, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MerchantPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<MerchantPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId = NullEntityId);
 

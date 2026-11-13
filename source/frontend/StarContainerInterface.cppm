@@ -75,12 +75,8 @@ class ItemBag;
 
 class ContainerPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ContainerPane, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ContainerPane>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ContainerPane, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ContainerPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ContainerPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, std::shared_ptr<ContainerInteractor> containerInteractor);
 

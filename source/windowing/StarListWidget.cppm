@@ -53,12 +53,8 @@ namespace Star {
 
 class ListWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ListWidget, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ListWidget>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ListWidget, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ListWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ListWidget>, StarException> create(GuiContext& context, Json const& schema);
   [[nodiscard]] static std::expected<std::shared_ptr<ListWidget>, StarException> create(GuiContext& context);

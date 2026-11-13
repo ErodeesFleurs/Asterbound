@@ -65,12 +65,8 @@ class UniverseClient;
 
 class TeleportDialog : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<TeleportDialog, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<TeleportDialog>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<TeleportDialog, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TeleportDialog>(); }
 
   using SendPaneEvent = std::function<std::expected<void, StarException>(String const&, String const&, Json)>;
   [[nodiscard]] static std::expected<std::shared_ptr<TeleportDialog>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client,

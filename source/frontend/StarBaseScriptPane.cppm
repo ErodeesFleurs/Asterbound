@@ -54,12 +54,8 @@ class CanvasWidget;
 
 class BaseScriptPane : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<BaseScriptPane, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<BaseScriptPane>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<BaseScriptPane, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BaseScriptPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<BaseScriptPane>, StarException> create(GuiContext& guiContext, Json config, bool construct = true);
 

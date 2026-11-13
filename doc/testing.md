@@ -230,6 +230,7 @@ The target list above also includes benchmarks outside this focused catalog.
 | Images | `./result/bin/image_benchmarks --benchmark_filter='Image/'` | 52 sprite/large cases: ownership, fill, clipped paste/source-over, crops, channel widths, full/windowed scalers, partial-alpha borders, aligned/offset/aliased masks and blends, color sequences, small directive outputs, traversal and libpng encode/decode. |
 | LRU/TTL caches | `./result/bin/lru_benchmarks --benchmark_filter='^(Lru|Ttl)/'` | 52 cases: ordered/hash LRU hit, const peek, full miss, duplicate update, insert-then-trim and capacity shrink at 64/256/1000/20000 entries; hash TTL refresh on/off and keep/drop cleanup at 256 entries. |
 | Pools and small vectors | `./result/bin/block_allocator_benchmarks --benchmark_filter='^(BlockAllocator|StdList|StdMap|SmallVector)/'` | 50 cases: empty/rebound families, first allocation, warm reuse, multi-block random release, actual standard list/map nodes, and normal/over-aligned inline/spill, sized, range and copy construction. |
+| Type identity and casts | `./result/bin/casting_benchmarks --benchmark_filter='Casting/'` | 43 cases: identity/static controls, single/deep/multiple/virtual/ambiguous graphs, const and reference borrows, checked diagnostics, shared/intrusive lvalue/rvalue owners, null stored-pointer aliases, and actual DataStreamReader/NetElement graphs. |
 
 ### Batch accounting and correctness oracles
 
@@ -247,9 +248,10 @@ batch count for amortized per-item cost:
 | `image_benchmarks` | One operation/sequence per iteration; labels state timed ownership and retained reset work. Workload throughput counts processed pixels; the constant-foldable RGB alpha control counts reductions, not memory traffic or frames. |
 | `lru_benchmarks` | N operations/entries per sweep; `ShrinkHalf` counts N/2 evicted entries. Shrink/drop reset is untimed. String keys and shared immutable payloads are prebuilt; payload construction, FPS and single-call latency are not measured. |
 | `block_allocator_benchmarks` | Labels give the batch count: 64 families/first allocations/reuse operations or vectors; 257 random-release items for four-slot blocks; 1024/1025/20000 items for large blocks; 64/1025 list/map nodes. Vector results are amortized ns/vector, not ns/element. Respect each label's timed construction/reset/destruction boundaries. |
+| `casting_benchmarks` | 64 queries/casts. Checked-failure rows include typed diagnostic construction and replacement of the previous result. Owner rows exclude output release/input restoration; production rows exclude construction and content/cursor checks. Report amortized ns/cast, not whole consumer latency. |
 
 Fixture setup and complete-result validation are untimed for byte, line, I/O,
-logging, flat hash, image, LRU/TTL and pool/small-vector benchmarks. Preserve their independent checks and labels:
+logging, flat hash, image, LRU/TTL, pool/small-vector and casting benchmarks. Preserve their independent checks and labels:
 
 - **Bytes:** deterministic input and complete-result fingerprints; independent
   byte oracles check signed zeros, NaN payloads, raw guards and post-loop results.
@@ -272,6 +274,7 @@ logging, flat hash, image, LRU/TTL and pool/small-vector benchmarks. Preserve th
   labels/counters; normalize that control as one reduction per iteration.
 - **LRU/TTL caches:** validate complete ordered key snapshots and every payload field before/after timing, with content fingerprints and exact producer counts. Full-miss and insert/trim cases alternate disjoint windows, then normalize the untimed final state so labels do not depend on calibration parity. Preserve soft capacity and the production allocator. TTL uses seeded randomness, future-deadline hits and already-expired keep/drop cleanup; refresh/cleanup mutation is escaped through a compiler barrier. Run the same frozen consumer against isolated old/new modules, require matching labels on every row, and retain A/A drift and regressions.
 - **Pools and small vectors:** deterministic values/permutations and full fixture/content fingerprints; check every value, order, alignment, guard and family relationship. Pool cold allocation excludes prior family construction; lazy metadata therefore moves work from construction into that row. Reuse keeps storage warm; random release spans block boundaries. List/map churn canonicalizes its final state before fingerprinting. Vector outputs include complete values and adjacent guards. Output validation and cleanup are untimed: do not interpret construction-only rows as whole-lifetime cost. Compare the same frozen consumer against isolated old/new modules, match all labels, and retain first-allocation regressions and A/A drift.
+- **Type identity and casts:** independent construction tags and known subobject adjustments check every address, payload field, guard, error category and diagnostic fingerprint, without RTTI. Owner cases verify the original control block/count, restore moved inputs before fingerprinting and check final destruction; null stored-pointer aliases retain their original owner. Actual Reader/NetElement fixtures validate contents and cursors outside timing. Freeze and execute the original production-linked binary before replacing modules; compile the identical consumer for the new modules with only a baseline API-spelling adapter. Require all 43 labels to match, alternate A/B runs, retain A/A drift and every regression, and never overlap timing with builds or runtime tests.
 
 ### Comparable measurements
 

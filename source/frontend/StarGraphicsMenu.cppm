@@ -57,12 +57,8 @@ class ShadersMenu;
 
 class GraphicsMenu : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<GraphicsMenu, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<GraphicsMenu>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<GraphicsMenu, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GraphicsMenu>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<GraphicsMenu>, StarException> create(GuiContext& guiContext, PaneManager& manager, std::shared_ptr<UniverseClient> client);
   void detachInterface() noexcept;

@@ -251,8 +251,10 @@ struct ProxyTexture final : Texture {
   ProxyTexture(std::shared_ptr<ThreadedRendererState> state, ResourceId id, Vec2U size, TextureAddressing addressing, TextureFiltering filtering)
     : state(std::move(state)), resource(id), dimensions(size), address(addressing), filter(filtering) {}
   ~ProxyTexture() override { state->destroy(Operation::DeleteTexture, resource); }
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<ProxyTexture, Texture>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<ProxyTexture>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ProxyTexture, Texture>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProxyTexture>(); }
   Vec2U size() const override { return dimensions; }
   TextureFiltering filtering() const override { return filter; }
   TextureAddressing addressing() const override { return address; }
@@ -277,8 +279,10 @@ struct ProxyGroup final : TextureGroup {
 struct ProxyBuffer final : RenderBuffer {
   ProxyBuffer(std::shared_ptr<ThreadedRendererState> state, ResourceId id) : state(std::move(state)), resource(id) {}
   ~ProxyBuffer() override { state->destroy(Operation::DeleteBuffer, resource); }
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<ProxyBuffer, RenderBuffer>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<ProxyBuffer>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ProxyBuffer, RenderBuffer>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProxyBuffer>(); }
   std::expected<void, StarException> set(List<RenderPrimitive>& primitives) override {
     // OpenGlRenderer::GlRenderBuffer::set borrows, but does not consume, this
     // list. A detached version is recorded on every mutation, in call order.
@@ -305,7 +309,7 @@ std::expected<void, StarException> ThreadedRendererState::capture(List<RenderPri
       }
       ResourceId textureId = 0;
       if (shape.texture) {
-        auto proxy = asRef<ProxyTexture>(*shape.texture);
+        auto proxy = as_ref<ProxyTexture>(*shape.texture);
         if (!proxy || proxy->get().state.get() != this)
           return std::unexpected(RendererException("Render primitive uses a texture from another renderer"));
         textureId = proxy->get().resource;
@@ -674,7 +678,7 @@ std::expected<std::shared_ptr<RenderBuffer>, StarException> ThreadedRenderer::cr
 }
 std::expected<void, StarException> ThreadedRenderer::renderBuffer(std::shared_ptr<RenderBuffer> const& buffer, Mat3F const& transform) {
   if (!buffer) return std::unexpected(RendererException("Cannot render a null render buffer"));
-  auto proxy = asRef<ProxyBuffer>(*buffer);
+  auto proxy = as_ref<ProxyBuffer>(*buffer);
   if (!proxy || proxy->get().state != m_state)
     return std::unexpected(RendererException("Render buffer belongs to another renderer"));
   auto command = m_state->append(Operation::DrawBuffer);

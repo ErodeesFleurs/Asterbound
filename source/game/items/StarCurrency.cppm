@@ -35,12 +35,8 @@ export namespace Star {
 
 class CurrencyItem : public Item {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<CurrencyItem, Item>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<CurrencyItem>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<CurrencyItem, Item>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CurrencyItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<CurrencyItem>, StarException> create(Root& root, Json const& config, String const& directory);

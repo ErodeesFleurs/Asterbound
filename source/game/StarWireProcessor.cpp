@@ -83,10 +83,12 @@ WireProcessor::WireProcessor(std::shared_ptr<WorldStorage> worldStorage) { m_wor
 
 std::expected<void, StarException> WireProcessor::process() {
   // First, populate all the working entities that are already live
-  auto populated = m_worldStorage->entityMap()->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-    if (auto wireEntity = asRef<WireEntity>(*entity)) return populateWorking(wireEntity->get());
-    return {};
-  });
+  auto populated = m_worldStorage->entityMap()->forAllEntities(
+    [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      if (auto wireEntity = as_ref<WireEntity>(*entity))
+        return populateWorking(wireEntity->get());
+      return {};
+    });
   if (!populated) return std::unexpected(std::move(populated.error()));
 
   // Then, scan the network of each entity in the working set.  This may, as a
@@ -168,10 +170,12 @@ std::expected<void, StarException> WireProcessor::loadNetwork(Vec2I tilePosition
       if (auto r = m_worldStorage->loadSector(*sector); !r) return std::unexpected(std::move(r.error()));
       auto region = m_worldStorage->regionForSector(*sector);
       if (!region) return std::unexpected(StarException("Wire sector has no region"));
-      auto populated = m_worldStorage->entityMap()->forEachEntity(RectF(*region), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-        if (auto wireEntity = asRef<WireEntity>(*entity)) return populateWorking(wireEntity->get());
-        return {};
-      });
+      auto populated = m_worldStorage->entityMap()->forEachEntity(
+        RectF(*region), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+          if (auto wireEntity = as_ref<WireEntity>(*entity))
+            return populateWorking(wireEntity->get());
+          return {};
+        });
       if (!populated) return std::unexpected(std::move(populated.error()));
     }
 

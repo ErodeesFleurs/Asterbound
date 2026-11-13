@@ -108,7 +108,7 @@ static std::expected<std::optional<ByteArray>, StarException> readPatch(AssetSou
   if (bytes)
     return std::optional<ByteArray>(std::move(*bytes));
   if (bytes.error().is<IOException>()) {
-    if (auto directory = asRef<DirectoryAssetSource>(source)) {
+    if (auto directory = as_ref<DirectoryAssetSource>(source)) {
       auto filesystem = directory->get().toFilesystem(path);
       if (filesystem) {
         std::error_code error;
@@ -1243,7 +1243,7 @@ std::expected<Json, StarException> Assets::json(String const& path) const {
   auto data = getAsset(AssetId{.type = AssetType::Json, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return asRef<JsonData>(**data)->get().json;
+  return as_ref<JsonData>(**data)->get().json;
 }
 
 std::expected<Json, StarException> Assets::fetchJson(Json const& v, String const& dir) const {
@@ -1283,7 +1283,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::image(AssetPa
   auto data = getAsset({.type = AssetType::Image, .path = path});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return asRef<ImageData>(**data)->get().image;
+  return as_ref<ImageData>(**data)->get().image;
 }
 
 std::expected<void, StarException> Assets::queueImages(StringList const& paths) const {
@@ -1315,7 +1315,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::tryImage(Asse
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
-    return asRef<ImageData>(**data)->get().image;
+    return as_ref<ImageData>(**data)->get().image;
   return std::shared_ptr<Image const>{};
 }
 
@@ -1334,7 +1334,7 @@ std::expected<std::shared_ptr<Audio const>, StarException> Assets::audio(String 
   auto data = getAsset({.type = AssetType::Audio, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return asRef<AudioData>(**data)->get().audio;
+  return as_ref<AudioData>(**data)->get().audio;
 }
 
 std::expected<void, StarException> Assets::queueAudios(StringList const& paths) const {
@@ -1369,7 +1369,7 @@ std::expected<std::shared_ptr<Audio const>, StarException> Assets::tryAudio(Stri
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
-    return asRef<AudioData>(**data)->get().audio;
+    return as_ref<AudioData>(**data)->get().audio;
   return std::shared_ptr<Audio const>{};
 }
 
@@ -1380,7 +1380,7 @@ std::expected<std::shared_ptr<Font const>, StarException> Assets::font(String co
   auto data = getAsset({.type = AssetType::Font, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return asRef<FontData>(**data)->get().font;
+  return as_ref<FontData>(**data)->get().font;
 }
 
 std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path) const {
@@ -1390,7 +1390,7 @@ std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(Str
   auto data = getAsset({.type = AssetType::Bytes, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return asRef<BytesData>(**data)->get().bytes;
+  return as_ref<BytesData>(**data)->get().bytes;
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> Assets::openFile(String const& path) const {
@@ -1420,7 +1420,7 @@ void Assets::cleanup() {
     std::vector<ImageData const*> references;
     for (auto const& entry : m_assetsCache) {
       if (entry.first.type == AssetType::Image && entry.second) {
-        auto const& image = asRef<ImageData>(*entry.second)->get();
+        auto const& image = as_ref<ImageData>(*entry.second)->get();
         if (image.isReference && image.image)
           references.push_back(&image);
       }
@@ -1701,7 +1701,7 @@ std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken)
         {
           std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
           lockWithDiagnostics(luaLocker);
-          collected = asRef<LuaEngine>(*m_luaEngine)->get().collectGarbage();
+          collected = as_ref<LuaEngine>(*m_luaEngine)->get().collectGarbage();
         }
         assetsLocker.lock();
         if (!collected) {
@@ -1838,7 +1838,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
   if (!file)
     return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
   std::shared_ptr<Image const> image;
-  if (auto memorySource = asRef<MemoryAssetSource>(*file->get().source)) {
+  if (auto memorySource = as_ref<MemoryAssetSource>(*file->get().source)) {
     auto stored = memorySource->get().image(file->get().sourceName);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
@@ -1861,7 +1861,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
 std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePatches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
   std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
   lockWithDiagnostics(luaLocker);
-  auto& luaEngine = asRef<LuaEngine>(*m_luaEngine)->get();
+  auto& luaEngine = as_ref<LuaEngine>(*m_luaEngine)->get();
   auto imageUserData = luaEngine.createUserData(*image);
   if (!imageUserData)
     return std::unexpected(std::move(imageUserData.error()));
@@ -2027,7 +2027,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       lockWithDiagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
-        auto createdContext = asRef<LuaEngine>(*m_luaEngine)->get().createContext();
+        auto createdContext = as_ref<LuaEngine>(*m_luaEngine)->get().createContext();
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
@@ -2215,7 +2215,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadJso
       return std::unexpected(std::move(top.error()));
     if (!*top)
       return std::shared_ptr<AssetData>{};
-    auto value = asRef<JsonData>(**top)->get().json.query(*path.subPath);
+    auto value = as_ref<JsonData>(**top)->get().json.query(*path.subPath);
     if (!value)
       return std::unexpected(AssetException(Star::format("Could not read JSON value {}", path), value.error()));
     auto data = std::make_shared<JsonData>();
@@ -2242,7 +2242,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     if (!*loaded)
       return std::shared_ptr<AssetData>{};
     // Keep loaded owning the wrapper throughout the unlocked image operation.
-    auto& source = asRef<ImageData>(**loaded)->get();
+    auto& source = as_ref<ImageData>(**loaded)->get();
     StringMap<std::shared_ptr<Image const>> references;
     StringList referencePaths;
     for (auto const& directives : path.directives.list())
@@ -2258,7 +2258,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
         return std::unexpected(std::move(reference.error()));
       if (!*reference)
         return std::shared_ptr<AssetData>{};
-      auto& image = asRef<ImageData>(**reference)->get();
+      auto& image = as_ref<ImageData>(**reference)->get();
       image.isReference = true;
       freshen(*reference);
       references[ref] = image.image;
@@ -2284,7 +2284,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
       return std::shared_ptr<AssetData>{};
-    auto& source = asRef<ImageData>(**loaded)->get();
+    auto& source = as_ref<ImageData>(**loaded)->get();
     if (!source.frames)
       return std::unexpected(AssetException::format("No associated frames file found for image '{}' while resolving image frame '{}'", path.basePath, path));
     if (auto alias = source.frames->aliases.find_ref(*path.subPath)) {
@@ -2294,7 +2294,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       if (!*target)
         return std::shared_ptr<AssetData>{};
       auto data = std::make_shared<ImageData>();
-      data->image = asRef<ImageData>(**target)->get().image;
+      data->image = as_ref<ImageData>(**target)->get().image;
       data->alias = true;
       return data;
     }
@@ -2365,7 +2365,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadByt
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::postProcessAudio(std::shared_ptr<AssetData> const& original) const {
   return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto audioData = asRef<AudioData>(*original);
+    auto audioData = as_ref<AudioData>(*original);
     if (!audioData)
       return std::shared_ptr<AssetData>{};
     auto duration = audioData->get().audio->totalTime();

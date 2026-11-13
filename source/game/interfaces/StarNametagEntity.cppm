@@ -25,12 +25,10 @@ namespace Star {
 
 class NametagEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<NametagEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<NametagEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<NametagEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NametagEntity>(); }
 
   [[nodiscard]] virtual std::expected<String, StarException> nametag() const = 0;
   virtual std::optional<String> statusText() const = 0;

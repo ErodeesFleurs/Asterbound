@@ -38,6 +38,7 @@ star_add_core_benchmark(line_benchmarks)
 star_add_core_benchmark(image_benchmarks)
 star_add_core_benchmark(lru_benchmarks)
 star_add_core_benchmark(block_allocator_benchmarks)
+star_add_core_benchmark(casting_benchmarks)
 target_link_libraries(byte_array_benchmarks PRIVATE
   zlib-ng::zlib
   $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)

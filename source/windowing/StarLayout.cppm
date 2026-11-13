@@ -50,12 +50,8 @@ namespace Star {
 // VERY simple base class for a layout container object.
 class Layout : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Layout, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Layout>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Layout, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Layout>(); }
 
   Layout(GuiContext& context);
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;

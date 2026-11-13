@@ -111,12 +111,10 @@ export namespace Star {
 
 class CodexItem : public Item, public SwingableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<CodexItem, Item, SwingableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<CodexItem, Item, SwingableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<CodexItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CodexItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<CodexItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
@@ -189,7 +187,7 @@ std::expected<void, StarException> CodexItem::fireTriggered() {
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  if (auto player = asRef<Player>(itemOwner->get())) {
+  if (auto player = as_ref<Player>(itemOwner->get())) {
     auto codexLearned = player->get().codexes()->learnCodex(m_codexId);
     if (!codexLearned)
       return std::unexpected(std::move(codexLearned.error()));

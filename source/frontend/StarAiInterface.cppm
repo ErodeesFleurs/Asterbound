@@ -81,12 +81,8 @@ using AiInterfaceException = StarError<AiInterfaceExceptionTag, StarException>;
 
 class AiInterface : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<AiInterface, Pane>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<AiInterface>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<AiInterface, Pane>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AiInterface>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<AiInterface>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, std::shared_ptr<Cinematic> cinematic);
 

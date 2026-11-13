@@ -74,7 +74,7 @@ const GameTestRegistration
       ASSERT_TRUE(descriptor);
       auto item = (*database)->item(*descriptor);
       ASSERT_TRUE(item);
-      auto chest = asRef<ChestArmor>(**item);
+      auto chest = as_ref<ChestArmor>(**item);
       ASSERT_TRUE(chest);
       if (!chest->get().backSleeveFrameset(identity.gender).empty()) {
         chestName = name;
@@ -87,7 +87,7 @@ const GameTestRegistration
       ASSERT_TRUE(descriptor);
       auto item = (*database)->item(*descriptor);
       ASSERT_TRUE(item);
-      auto chest = asRef<ChestArmor>(**item);
+      auto chest = as_ref<ChestArmor>(**item);
       ASSERT_TRUE(chest);
       ASSERT_EQ(chest->get().fullbright(), fullbright);
       ASSERT_TRUE((*humanoid)->setWearableFromChest(0, chest->get(), identity.gender));

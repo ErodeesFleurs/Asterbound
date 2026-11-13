@@ -901,7 +901,7 @@ ToolUser::NetItem::NetItem(Root& root) : m_root(root) {}
 void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
   m_netVersion = version;
   m_itemDescriptor.initNetVersion(m_netVersion);
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt)
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
     netItem->get().initNetVersion(m_netVersion);
 }
 
@@ -910,7 +910,8 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
   const_cast<NetItem&>(*this).updateItemDescriptor();
   auto descriptor = m_itemDescriptor.netStore(ds, rules);
   if (!descriptor) return std::unexpected(std::move(descriptor.error()));
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().netStore(ds, rules);
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+    return netItem->get().netStore(ds, rules);
   return {};
 }
 
@@ -924,7 +925,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   if (*loaded) {
     m_newItem = true;
-    if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
+    if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt) {
       netItem->get().initNetVersion(m_netVersion);
       if (m_netInterpolationEnabled) {
         auto enabled = netItem->get().enableNetInterpolation(m_netExtrapolationHint);
@@ -932,27 +933,32 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
       }
     }
   }
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().netLoad(ds, rules);
+  // Initialization/interpolation are virtual calls and may replace the item.
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+    return netItem->get().netLoad(ds, rules);
   return {};
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::NetItem::enableNetInterpolation(float hint) {
   m_netInterpolationEnabled = true;
   m_netExtrapolationHint = hint;
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().enableNetInterpolation(hint);
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+    return netItem->get().enableNetInterpolation(hint);
   return {};
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::NetItem::disableNetInterpolation() {
   m_netInterpolationEnabled = false;
   m_netExtrapolationHint = 0;
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().disableNetInterpolation();
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+    return netItem->get().disableNetInterpolation();
   return {};
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::NetItem::tickNetInterpolation(float dt) {
   if (m_netInterpolationEnabled)
-    if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().tickNetInterpolation(dt);
+    if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+      return netItem->get().tickNetInterpolation(dt);
   return {};
 }
 
@@ -969,14 +975,15 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
     if (!code) return std::unexpected(std::move(code.error()));
     auto bytes = ds.write_bytes(m_buffer.data());
     if (!bytes) return std::unexpected(std::move(bytes.error()));
-    if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
+    if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt) {
       auto code = ds.write<std::uint8_t>(2);
       if (!code) return std::unexpected(std::move(code.error()));
       auto stored = netItem->get().netStore(ds, rules);
       if (!stored) return std::unexpected(std::move(stored.error()));
     }
   }
-  if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
+  // Stream callbacks and virtual netStore may replace the item before its delta.
+  if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt) {
     m_buffer.clear();
     auto delta = netItem->get().writeNetDelta(m_buffer, fromVersion, rules);
     if (!delta) return std::unexpected(std::move(delta.error()));
@@ -1011,7 +1018,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
         if (!loaded) return std::unexpected(std::move(loaded.error()));
         if (*loaded) {
           m_newItem = true;
-          if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
+          if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt) {
             netItem->get().initNetVersion(m_netVersion);
             if (m_netInterpolationEnabled) {
               auto enabled = netItem->get().enableNetInterpolation(m_netExtrapolationHint);
@@ -1021,7 +1028,7 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
         }
       }
     } else if (*code == 2 || *code == 3) {
-      auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt;
+      auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt;
       if (!netItem) return std::unexpected(IOException("Server/Client disagreement about whether an Item is a NetElement in NetItem::readNetDelta"));
       auto loaded = *code == 2 ? netItem->get().netLoad(ds, rules) : netItem->get().readNetDelta(ds, interpolationTime, rules);
       if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -1032,7 +1039,8 @@ void ToolUser::NetItem::initNetVersion(std::optional<std::reference_wrapper<NetE
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::NetItem::blankNetDelta(float time) {
   if (m_netInterpolationEnabled)
-    if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) return netItem->get().blankNetDelta(time);
+    if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt)
+      return netItem->get().blankNetDelta(time);
   return {};
 }
 
@@ -1044,7 +1052,7 @@ std::shared_ptr<Item> const& ToolUser::NetItem::get() const {
   if (m_item != item) {
     m_item = std::move(item);
     m_newItem = true;
-    if (auto netItem = m_item ? asRef<NetElement>(*m_item) : std::nullopt) {
+    if (auto netItem = m_item ? as_ref<NetElement>(*m_item) : std::nullopt) {
       netItem->get().initNetVersion(m_netVersion);
       auto interpolation = m_netInterpolationEnabled ? netItem->get().enableNetInterpolation(m_netExtrapolationHint) : netItem->get().disableNetInterpolation();
       if (!interpolation) return std::unexpected(std::move(interpolation.error()));

@@ -3439,7 +3439,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       return std::unexpected(std::move(pushed.error()));
     if (auto sent = connection.sendAll(clientWaitLimit); !sent)
       return std::unexpected(std::move(sent.error()));
-    if (auto compressed = asRef<CompressedPacketSocket>(socket->get()))
+    if (auto compressed = as_ref<CompressedPacketSocket>(socket->get()))
       compressed->get().setCompressionStreamEnabled(compressionStream);
     String remote = remoteAddress ? Star::to_string(*remoteAddress) : "local";
     if (auto logged = m_root.logger().info("UniverseServer: Awaiting connection info from {} ({} client)", remote, legacyClient ? "vanilla" : "custom"); !logged)

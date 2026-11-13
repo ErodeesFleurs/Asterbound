@@ -67,14 +67,14 @@ std::optional<std::reference_wrapper<ButtonWidget>> ButtonGroup::button(int id) 
   auto owner = link->get().lock();
   if (!owner)
     return {};
-  return asRef<ButtonWidget>(*owner);
+  return as_ref<ButtonWidget>(*owner);
 }
 
 List<std::reference_wrapper<ButtonWidget>> ButtonGroup::buttons() const {
   List<std::reference_wrapper<ButtonWidget>> result;
   for (auto const& entry : m_buttons) {
     if (auto owner = entry.second.lock()) {
-      if (auto button = asRef<ButtonWidget>(*owner))
+      if (auto button = as_ref<ButtonWidget>(*owner))
         result.push_back(*button);
     }
   }

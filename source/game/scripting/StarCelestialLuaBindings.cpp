@@ -328,8 +328,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
   if (!createdCallbacks)
     return std::unexpected(std::move(createdCallbacks.error()));
   LuaCallbacks callbacks = std::move(*createdCallbacks);
-  
-  if (auto client = asRef<UniverseClient>(universe)) {
+
+  if (auto client = as_ref<UniverseClient>(universe)) {
     auto systemWorld = client->get().systemWorldClient();
 
     if (auto registration = callbacks.registerCallback("skyFlying", [client]() {

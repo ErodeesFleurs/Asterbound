@@ -54,12 +54,10 @@ struct MaterialSpace {
 // tile grid, and occupy tile spaces, possibly affecting collision.
 class TileEntity : public virtual InteractiveEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<TileEntity, InteractiveEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<TileEntity, InteractiveEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<TileEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileEntity>(); }
 
   TileEntity();
 
