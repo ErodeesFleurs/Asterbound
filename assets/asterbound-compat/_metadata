@@ -2,7 +2,7 @@
   "author" : "OpenStarbound contributors",
   "name" : "asterbound_compat",
   "friendlyName" : "Asterbound Mod Compatibility",
-  "version" : "0.1.0.0",
+  "version" : "0.1.0.1",
   "requires" : ["base", "asterbound_base"],
   "includes" : [
     "SChinese", "Arcana", "advanced_teleporter_interface",
