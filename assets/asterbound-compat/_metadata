@@ -1,9 +1,9 @@
 {
   "author" : "OpenStarbound contributors",
-  "name" : "opensb_compat",
+  "name" : "asterbound_compat",
   "friendlyName" : "Asterbound Mod Compatibility",
-  "version" : "1.1.2",
-  "requires" : ["base", "opensb_base"],
+  "version" : "0.1.0.0",
+  "requires" : ["base", "asterbound_base"],
   "includes" : [
     "SChinese", "Arcana", "advanced_teleporter_interface",
     "Neia Race", "Elithian_Races_Mod", "Halloween", "Draconis Race(Humanoid Dragon Race)",

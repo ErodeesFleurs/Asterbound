@@ -176,7 +176,7 @@ The target argument is optional and defaults to the Asterbound runtime root. The
 - Refuses populated targets, same/nested source and target paths, and directory-link cycles.
 - Leaves a partial target after a failed copy rather than automatically deleting data.
 
-Move old bundled `opensb.pak` / `opensb-compat.pak` files or corresponding resource directories out of scanned asset directories before launch, so they do not shadow packaged Asterbound resources. Keep the owned `packed.pak` and your local content. See [resource names and Mod compatibility](modding.md#bundled-mod-compatibility).
+Move old bundled `opensb.pak` / `opensb-compat.pak` files or corresponding resource directories out of scanned asset directories before launch. Their old metadata identities do not replace the new Asterbound sources and can cause duplicate patches. Keep the owned `packed.pak` and your local content; migrate Mod dependencies as described in [resource names and Mod compatibility](modding.md#bundled-mod-compatibility).
 
 ### Portable distributions and manual builds
 
@@ -237,10 +237,20 @@ Root [`version.json`](../version.json) is the shared version source:
 | Field | Contract |
 |---|---|
 | `version` | Four-part Asterbound product version; consumed by C++, Nix, Windows resources and the installer |
-| `assetVersion` | Required `assets/asterbound/_metadata` version; keep the engine/resource match check |
+| `assetVersion` | Shared version of both bundled asset sources and packs; also the engine's required `asterbound_base` version |
 | `starboundVersion` | Base-game compatibility identifier, not the product version |
 
 A product-version change alone does not require a wire or asset-version change. See [protocol and resource compatibility](modding.md#asterbound-compatibility-identity).
+
+Edit `assetVersion` only in `version.json`, then synchronize both checked-in `_metadata` files:
+
+```sh
+cmake -DASTERBOUND_SYNC_ASSET_VERSIONS=ON -P cmake/AsterboundVersion.cmake
+```
+
+The command preserves metadata comments and formatting. Both `assets/asterbound` (`asterbound_base`) and `assets/asterbound-compat` (`asterbound_compat`) use this asset release number. Asterbound's asset series starts at `0.1.0.0`, independent of the former upstream main and compatibility versions. Product and asset versions remain independently controlled.
+
+`cmake -P cmake/AsterboundVersion.cmake` checks without writing. CMake configuration, CI source checks and all platform assembly scripts reject stale metadata. Changing either metadata file also triggers a CMake reconfiguration. The runtime's strict main-asset version check remains enabled for `asterbound_base`; network versions are unchanged.
 
 macOS maps `a.b.c.d` to short version `a.b.c`, build version `(a*100+b).c.d`, and the full version in `CFBundleGetInfoString`. Each original component must be in `0..99` and the folded first component positive; unsupported values fail packaging. See Apple's [short-version](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring) and [build-version](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleversion) requirements.
 

@@ -1,10 +1,10 @@
 {
   "author" : "Not Chucklefish",
-  "name" : "opensb_base",
+  "name" : "asterbound_base",
   "priority" : -9999,
   "friendlyName" : "Asterbound Assets",
   "requires" : ["base"],
-  "version" : "0.1.15.1",
+  "version" : "0.1.0.0",
   "icon" : "/opensb/modicon.png",
   "link" : "https://github.com/ErodeesFleurs/Asterbound",
   "scripts" : {

@@ -1,4 +1,7 @@
 @echo off
+cmake -P cmake\AsterboundVersion.cmake
+if errorlevel 1 exit /b %errorlevel%
+
 set client=client_distribution
 if exist %client% rmdir %client% /S /Q
 

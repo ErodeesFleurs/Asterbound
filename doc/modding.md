@@ -15,11 +15,11 @@ Many StarExtensions mods remain compatible; StarExtensions itself is deprecated.
 
 Asterbound is the current product; OpenStarbound is the upstream and compatibility API/protocol source. Branding, network compatibility, matching assets and save compatibility are separate concerns.
 
-| Boundary | Retained contract |
+| Boundary | Current contract |
 | --- | --- |
 | Network versions | Starbound protocol `747`, OpenStarbound extension protocol `18`, stream version `18` |
 | Handshake | `brand = "Asterbound"`; existing `openProtocolVersion`, compression negotiation, packet IDs and field layouts |
-| Mod/resource identity | `opensb_base`, `opensb_compat`, existing virtual asset paths and entity IDs |
+| Mod/resource identity | `asterbound_base`, `asterbound_compat`; existing virtual asset paths and entity IDs remain unchanged |
 | Script/input identity | Existing `OpenStarbound` script-context names and the `opensb` input group |
 | Public protocol APIs | `clientOpenProtocolVersion` / `serverOpenProtocolVersion` |
 | Save identifiers | `SBVJ01` save header and `World4` world identifier |
@@ -30,7 +30,7 @@ Brand artwork and scripts change the asset digest. A server requiring identical 
 
 ### Scope of interoperability evidence
 
-The rebrand was smoke-tested on Linux with preserved local OpenStarbound binaries from source `90296aed875c749bdc465eb8b0ce1d74faa511a9`: real TCP in both directions, None and Zstd stream modes, world entry, reconnection and chat round trips. Both brands also connected concurrently to Asterbound. These checks used owned base assets and explicitly allowed differing extension assets. They are not a full extended-world/gameplay matrix, a test of every upstream release, native Windows/macOS validation, or proof of Steam/Discord interoperability.
+Before the bundled asset identity/version reset, the rebrand was smoke-tested on Linux with preserved local OpenStarbound binaries from source `90296aed875c749bdc465eb8b0ce1d74faa511a9`: real TCP in both directions, None and Zstd stream modes, world entry, reconnection and chat round trips. Both brands also connected concurrently to Asterbound. These checks used owned base assets and explicitly allowed differing extension assets. They do not prove compatibility with old metadata dependencies, a full extended-world/gameplay matrix, every upstream release, native Windows/macOS, or Steam/Discord interoperability.
 
 ## Lua 5.5.1 migration
 
@@ -52,16 +52,20 @@ Use the [Lua API index](lua/README.md) to find the script host and related table
 
 ### Loading the bundled sources
 
-The physical names and stable metadata names serve different purposes:
+Physical names and metadata dependency names serve different purposes:
 
 | Repository source | Distribution pack | Metadata `name` |
 | --- | --- | --- |
-| `assets/asterbound` | `asterbound.pak` | `opensb_base` |
-| `assets/asterbound-compat` | `asterbound-compat.pak` | `opensb_compat` |
+| `assets/asterbound` | `asterbound.pak` | `asterbound_base` |
+| `assets/asterbound-compat` | `asterbound-compat.pak` | `asterbound_compat` |
 
 The compatibility source contains optional fixes and does not require any third-party mod to be installed. Distributions ship it beside the main pack; Nix packages install it as a sibling directory. Normal asset-directory scanning loads it automatically. Custom boot configurations using explicit `assetSources` must include it and use the current physical names. Do not keep duplicate old/new bundles in the same scanned directory.
 
 The virtual paths `/scripts/opensb/`, `/interface/opensb/` and other existing resource paths remain unchanged. A physical directory or pack rename is not a reason to rename mod references.
+
+Both bundled sources share `version.json`'s `assetVersion`, reset to `0.1.0.0` for Asterbound; see [version synchronization](building.md#packaging-and-version-metadata). Their former upstream version series are not continued.
+
+This is a clean metadata identity cutover: update external Mods' `requires` / `includes` and source-name lookups from `opensb_base` / `opensb_compat` to `asterbound_base` / `asterbound_compat`. There are no old-name aliases. Remove old upstream bundles from scanned asset/mod directories; distinct old and new identities will not override one another and may apply patches twice. Rebuild the engine and install both matching Asterbound bundles together.
 
 ### Guarded repairs
 
@@ -88,9 +92,9 @@ Additional guarded repairs cover:
 
 Rebuild the engine and compatibility source together when building from source: source-owned patch/load-script replacement uses the [current Assets APIs](lua/openstarbound/assets.md).
 
-The GIC/FU repairs in compatibility assets **1.1.2** require the exact effective provider, metadata version and full source fingerprint (accepting LF/CRLF differences only). They do not rewrite Workshop packages or saves. Existing builds with the current Assets APIs can update this compatibility pack without rebuilding the engine.
+The GIC/FU repairs (originally released as upstream compatibility assets **1.1.2**) require the exact effective provider, metadata version and full source fingerprint (accepting LF/CRLF differences only). They do not rewrite Workshop packages or saves. The current compatibility pack requires the renamed `asterbound_base` source; do not install it as a drop-in update to an upstream OpenStarbound installation.
 
-For an immutable installation still bundling an older compatibility source, a newly packed `asterbound-compat.pak` in its later-scanned `mods` directory replaces that source by the existing `opensb_compat` identity; it is not a second set of patches. Restart the client to use it. Remove that temporary override once the installed distribution ships compatibility assets 1.1.2 or newer, so an old local pack cannot mask future bundled updates.
+For an immutable Asterbound installation already using the new identities but bundling an older compatibility source, a newly packed `asterbound-compat.pak` in its later-scanned `mods` directory replaces that source by its `asterbound_compat` identity; it is not a second set of patches. Restart the client to use it. Remove that temporary override once the installed distribution ships these repairs, so an old local pack cannot mask future bundled updates. Do not numerically compare the former standalone compatibility versions with Asterbound's reset asset release numbers.
 
 Linux isolation checks used the official GIC v4.3.2a and FU 6.5.8 Workshop packages separately: GIC character/world entry and live helicopter initialization; FU player initialization, real-source SAIL navigation and racial-bonus toggling; real wired storage bridges, an ITD and a terminal transferring 37 items, then withdrawing 5 with 32 remaining. All eight repaired Lua scripts compile in the target engine. Guard checks cover absent/foreign providers, unknown versions/content, LF/CRLF and repeat application; FRHelper's callback cache, multiple helpers/contexts, callback-free loads and failed-load retry were also exercised.
 

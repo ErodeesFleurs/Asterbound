@@ -33,12 +33,7 @@ if(NOT DEFINED CMAKE_BUILD_RPATH AND DEFINED ENV{ASTERBOUND_BUILD_RPATH})
 endif()
 project(starbound)
 
-set(asterbound_version_file "${PROJECT_SOURCE_DIR}/../version.json")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${asterbound_version_file}")
-file(READ "${asterbound_version_file}" asterbound_metadata)
-string(JSON ASTERBOUND_VERSION GET "${asterbound_metadata}" version)
-string(JSON ASTERBOUND_ASSET_VERSION GET "${asterbound_metadata}" assetVersion)
-string(JSON STARBOUND_VERSION GET "${asterbound_metadata}" starboundVersion)
+include("${PROJECT_SOURCE_DIR}/../cmake/AsterboundVersion.cmake")
 string(REPLACE "." "," ASTERBOUND_VERSION_COMMA "${ASTERBOUND_VERSION}")
 configure_file("${PROJECT_SOURCE_DIR}/../cmake/AsterboundVersion.h.in"
   "${PROJECT_BINARY_DIR}/AsterboundVersion.h" @ONLY)

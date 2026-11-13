@@ -1,5 +1,7 @@
 #!/bin/sh -e
 
+cmake -P cmake/AsterboundVersion.cmake
+
 mkdir client_distribution
 mkdir client_distribution/assets
 mkdir client_distribution/assets/user
