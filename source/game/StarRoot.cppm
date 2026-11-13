@@ -100,6 +100,9 @@ public:
     // Number of rotated log file backups
     unsigned logFileBackups;
 
+    // Maximum active log bytes before rotation; zero disables runtime rotation.
+    std::uint64_t logFileSizeLimit = 32 * 1024 * 1024;
+
     // The minimum log level to write to any log sink
     LogLevel logLevel;
 

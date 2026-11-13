@@ -215,11 +215,12 @@ std::expected<void, StarException> Root::initialize() {
         return std::unexpected(std::move(made.error()));
     }
 
-    auto backup = File::backup_file_in_sequence(logFile, File::relative_to(oldLogDirectory, *m_settings.logFile),
-                                                m_settings.logFileBackups);
+    auto backupFile = File::relative_to(oldLogDirectory, *m_settings.logFile);
+    auto backup = File::backup_file_in_sequence(logFile, backupFile, m_settings.logFileBackups);
     if (!backup)
       return std::unexpected(std::move(backup.error()));
-    auto sink = FileLogSink::create(logFile, m_settings.logLevel, true);
+    auto sink = FileLogSink::create(logFile, m_settings.logLevel, true, m_settings.logFileSizeLimit,
+                                    m_settings.logFileBackups, std::move(backupFile));
     if (!sink)
       return std::unexpected(std::move(sink.error()));
     m_logger.add_sink(std::move(*sink));
@@ -328,6 +329,7 @@ Root::~Root() {
 }
 
 std::expected<void, StarException> Root::reload() {
+  m_logger.reset_exception_repeats();
   auto logged = m_logger.info("Root: Reloading from disk");
   if (!logged)
     return std::unexpected(std::move(logged.error()));

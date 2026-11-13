@@ -56,15 +56,25 @@ class FileLogSink : public LogSink {
 private:
   struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
-  FileLogSink(ConstructionKey, String filename) : m_output(std::move(filename)) {}
+  FileLogSink(ConstructionKey, String filename, std::uint64_t sizeLimit, unsigned backups, String backupFilename)
+    : m_output(std::move(filename)), m_sizeLimit(sizeLimit), m_backups(backups),
+      m_backupFilename(std::move(backupFilename)) {}
 
+  // Zero disables size-based rotation. Oversized records remain whole, rotating
+  // before the next record. The sink exclusively owns writes to this file.
   [[nodiscard]] static std::expected<std::shared_ptr<FileLogSink>, StarException> create(
-      String const& filename, LogLevel level, bool truncate);
+      String const& filename, LogLevel level, bool truncate, std::uint64_t sizeLimit = 0,
+      unsigned backups = 10, std::optional<String> backupFilename = {});
 
   [[nodiscard]] std::expected<void, StarException> log(std::string_view msg, LogLevel level) override;
 
 private:
   File m_output;
+  std::uint64_t m_sizeLimit;
+  unsigned m_backups;
+  String m_backupFilename;
+  // A failed write may have partially succeeded; refresh only on that path.
+  std::optional<std::uint64_t> m_size = 0;
   std::mutex m_logMutex;
 };
 
@@ -107,6 +117,8 @@ public:
                                                                    ExceptionDiagnostic const& error);
   [[nodiscard]] std::expected<void, StarException> warn_exception(std::string_view operation,
                                                                   ExceptionDiagnostic const& error);
+  // Start a fresh diagnostic epoch after script/asset reload.
+  void reset_exception_repeats();
   bool loggable(LogLevel level);
 
 private:
@@ -115,6 +127,16 @@ private:
   static SinkRegistry::const_iterator first_loggable(SinkRegistry const& sinks, LogLevel level);
   [[nodiscard]] std::expected<void, StarException> dispatch(SinkRegistry const& sinks, LogLevel level,
                                                             std::string_view message);
+
+  struct RepeatedException {
+    LogLevel level;
+    bool debug;
+    std::string operation;
+    std::shared_ptr<ExceptionSummary const> summary;
+    std::chrono::steady_clock::time_point reported;
+    std::uint64_t repeats = 0;
+  };
+  std::vector<RepeatedException> s_repeatedExceptions;
 
   std::shared_ptr<StdoutLogSink> s_stdoutSink;
   std::shared_ptr<SinkRegistry const> s_sinks;

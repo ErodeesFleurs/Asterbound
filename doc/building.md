@@ -159,6 +159,8 @@ The launcher creates a writable runtime under `$XDG_DATA_HOME/asterbound`, falli
 
 The launcher writes `<runtime>/sbinit.config`. An explicit `-bootconfig` bypasses this generated path configuration. The engine accepts single-dash long options, such as `-version`, `-help` and `-bootconfig`; old `OPENSTARBOUND_*` environment variables are not aliases.
 
+The boot setting `logFileSizeLimit` limits each active log to 33554432 bytes (32 MiB) by default; `0` disables size-based rotation. Rotation happens before a record would exceed the limit, except that a single oversized record is kept whole and rotated before the following record. Startup and size-based rotation share the same `logFileBackups` backup set (default 10). Backups use `logDirectory` when configured, or `<storageDirectory>/logs` otherwise; setting `logFileBackups` to `0` discards old contents on rotation.
+
 ### Import OpenStarbound data
 
 Stop both games and servers, keep a backup, then copy into an absent or completely empty target:

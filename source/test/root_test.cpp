@@ -795,6 +795,35 @@ const GameTestRegistration
                               {"selfReady", true},
                               {"aReady", true},
                               {"bReady", true}}));
+
+    // Fresh contexts must still fail, without publishing the same native-origin
+    // require error and Debug stack for every attempt.
+    class CycleLogSink : public LogSink {
+    public:
+      std::expected<void, StarException> log(std::string_view, LogLevel level) override {
+        if (level == LogLevel::Error)
+          ++errors;
+        else if (level == LogLevel::Debug)
+          ++details;
+        return {};
+      }
+      unsigned errors = 0;
+      unsigned details = 0;
+    };
+    Logger logger;
+    logger.remove_stdout_sink();
+    auto sink = std::make_shared<CycleLogSink>();
+    sink->set_level(LogLevel::Debug);
+    logger.add_sink(sink);
+    for (unsigned attempt = 0; attempt < 3; ++attempt) {
+      auto failure = (*lua)->createContext("/p5-cycle-a.lua");
+      ASSERT_FALSE(failure);
+      EXPECT_TRUE(failure.error().is<LuaException>());
+      EXPECT_EQ(failure.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
+      ASSERT_TRUE(logger.error_exception("Require cycle", ExceptionDiagnostic(failure.error())));
+    }
+    EXPECT_EQ(sink->errors, 1u);
+    EXPECT_EQ(sink->details, 1u);
   });
 
 const GameTestRegistration

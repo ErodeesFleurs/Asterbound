@@ -68,6 +68,43 @@ TEST(FileTest, LogSinkRejectsShortWriteWithoutRetrying) {
   ASSERT_TRUE(continued);
   EXPECT_TRUE(continued->utf8().ends_with("next-complete-marker\n"));
 }
+
+TEST(FileTest, LogSinkCountsPartialWritesBeforeTheNextRotation) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto path = File::relative_to(*directory, "partial-size.log");
+  {
+    auto probe = FileLogSink::create(path, LogLevel::Info, true);
+    ASSERT_TRUE(probe);
+    ASSERT_TRUE((*probe)->log("probe", LogLevel::Info));
+  }
+  auto probe = File::read_file_string(path);
+  ASSERT_TRUE(probe);
+  auto limit = 2 * probe->utf8_size() - 1;
+  auto sink = FileLogSink::create(path, LogLevel::Info, true, limit, 1);
+  ASSERT_TRUE(sink);
+  shortened_writes = 0;
+  shorten_next_write = true;
+  auto result = (*sink)->log("short", LogLevel::Info);
+  shorten_next_write = false;
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<EofException>());
+  EXPECT_EQ(shortened_writes, 1u);
+  ASSERT_TRUE((*sink)->log("whole", LogLevel::Info));
+  auto boundary = File::read_file_string(path);
+  ASSERT_TRUE(boundary);
+  EXPECT_EQ(boundary->utf8_size(), limit);
+  EXPECT_EQ(File::exists(path + ".1"), false);
+  ASSERT_TRUE((*sink)->log("third", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(path + ".1"), *boundary);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("third\n"));
+  EXPECT_EQ(current->utf8_size(), probe->utf8_size());
+}
 #endif
 namespace {
   // An IODevice that reports more bytes than it was asked for, the way
@@ -133,6 +170,181 @@ namespace {
     std::error_code ignored;
     std::filesystem::remove_all(fsPath(path), ignored);
   }
+}
+
+TEST(FileTest, LogSinkRotatesAtTheBoundaryAndRetainsOnlyNewestBackups) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  auto path = File::relative_to(*directory, "active.log");
+  auto backupDirectory = File::relative_to(*directory, "logs");
+  ASSERT_TRUE(File::create_directory(backupDirectory));
+  auto backupPath = File::relative_to(backupDirectory, "active.log");
+  String startup("previous session");
+  ASSERT_TRUE(File::write_file(startup, path));
+  ASSERT_TRUE(File::backup_file_in_sequence(path, backupPath, 2));
+  {
+    auto seed = FileLogSink::create(path, LogLevel::Info, true);
+    ASSERT_TRUE(seed);
+    ASSERT_TRUE((*seed)->log("first", LogLevel::Info));
+  }
+  auto first = File::read_file_string(path);
+  ASSERT_TRUE(first);
+  auto limit = 2 * first->utf8_size();
+  auto sink = FileLogSink::create(path, LogLevel::Info, false, limit, 2, backupPath);
+  ASSERT_TRUE(sink);
+  ASSERT_TRUE((*sink)->log("secnd", LogLevel::Info));
+  auto firstPair = File::read_file_string(path);
+  ASSERT_TRUE(firstPair);
+  EXPECT_EQ(firstPair->utf8_size(), limit);
+  EXPECT_TRUE(firstPair->utf8().starts_with(first->utf8()));
+  EXPECT_EQ(File::read_file_string(backupPath + ".1"), startup);
+
+  ASSERT_TRUE((*sink)->log("third", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(backupPath + ".1"), *firstPair);
+  EXPECT_EQ(File::read_file_string(backupPath + ".2"), startup);
+  ASSERT_TRUE((*sink)->log("forth", LogLevel::Info));
+  auto secondPair = File::read_file_string(path);
+  ASSERT_TRUE(secondPair);
+  EXPECT_EQ(secondPair->utf8_size(), limit);
+  ASSERT_TRUE((*sink)->log("ééx", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(backupPath + ".2"), *firstPair);
+  EXPECT_EQ(File::read_file_string(backupPath + ".1"), *secondPair);
+  ASSERT_TRUE((*sink)->log("sixth", LogLevel::Info));
+  auto thirdPair = File::read_file_string(path);
+  ASSERT_TRUE(thirdPair);
+  ASSERT_TRUE((*sink)->log("sevth", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(backupPath + ".2"), *secondPair);
+  EXPECT_EQ(File::read_file_string(backupPath + ".1"), *thirdPair);
+  EXPECT_EQ(File::exists(backupPath + ".3"), false);
+  EXPECT_EQ(File::exists(path + ".1"), false);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("sevth\n"));
+  EXPECT_EQ(current->utf8_size(), first->utf8_size());
+  auto entries = File::directory_entries(backupDirectory);
+  ASSERT_TRUE(entries);
+  EXPECT_EQ(entries->size(), 2u);
+}
+
+TEST(FileTest, LogSinkKeepsOversizedMultilineRecordsWhole) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  auto path = File::relative_to(*directory, "oversized.log");
+  auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 2);
+  ASSERT_TRUE(sink);
+  std::string message = "first line\n" + std::string(1024, '#') + "\nlast line";
+  ASSERT_TRUE((*sink)->log(message, LogLevel::Info));
+  auto first = File::read_file_string(path);
+  ASSERT_TRUE(first);
+  EXPECT_TRUE(first->utf8().ends_with(message + "\n"));
+  EXPECT_EQ(File::exists(path + ".1"), false);
+  ASSERT_TRUE((*sink)->log("next", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(path + ".1"), *first);
+  auto second = File::read_file_string(path);
+  ASSERT_TRUE(second);
+  EXPECT_TRUE(second->utf8().ends_with("next\n"));
+  ASSERT_TRUE((*sink)->log("last", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(path + ".2"), *first);
+  EXPECT_EQ(File::read_file_string(path + ".1"), *second);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("last\n"));
+}
+
+TEST(FileTest, LogSinkAppendsExistingBytesBeforeRotating) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  auto path = File::relative_to(*directory, "existing.log");
+  String existing("existing bytes without a newline");
+  ASSERT_TRUE(File::write_file(existing, path));
+  auto sink = FileLogSink::create(path, LogLevel::Info, false, existing.utf8_size(), 1);
+  ASSERT_TRUE(sink);
+  ASSERT_TRUE((*sink)->log("fresh", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(path + ".1"), existing);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("fresh\n"));
+  EXPECT_EQ(current->utf8().find(existing.utf8()), std::string::npos);
+}
+
+TEST(FileTest, LogSinkTruncationDoesNotCountReplacedBytes) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  auto path = File::relative_to(*directory, "truncated.log");
+  ASSERT_TRUE(File::write_file(String(std::string(1024, '#')), path));
+  auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 1);
+  ASSERT_TRUE(sink);
+  EXPECT_EQ(File::read_file_string(path), String());
+  ASSERT_TRUE((*sink)->log("fresh", LogLevel::Info));
+  EXPECT_EQ(File::exists(path + ".1"), false);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("fresh\n"));
+  EXPECT_EQ(current->utf8().find('#'), std::string::npos);
+}
+
+TEST(FileTest, LogSinkZeroLimitDisablesRotationAndZeroBackupsDiscardsOldRecords) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  for (bool disabled : {false, true}) {
+    SCOPED_TRACE(disabled);
+    auto path = File::relative_to(*directory, disabled ? String("disabled.log") : String("discard.log"));
+    auto sink = FileLogSink::create(path, LogLevel::Info, true, disabled ? 0 : 1, disabled ? 2 : 0);
+    ASSERT_TRUE(sink);
+    ASSERT_TRUE((*sink)->log("first", LogLevel::Info));
+    auto first = File::read_file_string(path);
+    ASSERT_TRUE(first);
+    ASSERT_TRUE((*sink)->log("other", LogLevel::Info));
+    auto current = File::read_file_string(path);
+    ASSERT_TRUE(current);
+    EXPECT_TRUE(current->utf8().ends_with("other\n"));
+    EXPECT_EQ(current->utf8_size(), first->utf8_size() * (disabled ? 2 : 1));
+    if (disabled)
+      EXPECT_TRUE(current->utf8().starts_with(first->utf8()));
+    EXPECT_EQ(File::exists(path + ".1"), false);
+  }
+}
+
+TEST(FileTest, LogSinkRotationPropagatesBackupFailureWithoutLosingCurrentRecords) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = finally([&] { removeTree(*directory); });
+  auto path = File::relative_to(*directory, "failure.log");
+  auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 1);
+  ASSERT_TRUE(sink);
+  ASSERT_TRUE((*sink)->log("preserved", LogLevel::Info));
+  auto first = File::read_file_string(path);
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(File::create_directory(path + ".1"));
+  ASSERT_TRUE(File::write_file(String("block replacement"), File::relative_to(path + ".1", "blocker")));
+  auto failed = (*sink)->log("must not be written", LogLevel::Info);
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<IOException>());
+  EXPECT_EQ(File::read_file_string(path), *first);
+  ASSERT_TRUE(File::remove_all(path + ".1"));
+  ASSERT_TRUE((*sink)->log("recovered", LogLevel::Info));
+  EXPECT_EQ(File::read_file_string(path + ".1"), *first);
+  auto current = File::read_file_string(path);
+  ASSERT_TRUE(current);
+  EXPECT_TRUE(current->utf8().ends_with("recovered\n"));
+  EXPECT_EQ(current->utf8().find("must not be written"), std::string::npos);
 }
 
 TEST(FileTest, DirectoryOpenFailsWithoutPreventingSubsequentFileReads) {
