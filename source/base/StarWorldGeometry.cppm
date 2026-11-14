@@ -163,14 +163,14 @@ inline int WorldGeometry::xwrap(int x) const {
   if (m_size[0] == 0)
     return x;
   else
-    return pmod<int>(x, m_size[0]);
+    return positive_mod<int>(x, m_size[0]);
 }
 
 inline float WorldGeometry::xwrap(float x) const {
   if (m_size[0] == 0)
     return x;
   else
-    return pfmod<float>(x, m_size[0]);
+    return positive_mod<float>(x, m_size[0]);
 }
 
 inline Vec2F WorldGeometry::xwrap(Vec2F const& pos) const {
@@ -207,21 +207,21 @@ inline int WorldGeometry::pdiff(int x1, int x2) const {
   if (m_size[0] == 0)
     return x1 - x2;
   else
-    return pmod<int>(x1 - x2, m_size[0]);
+    return positive_mod<int>(x1 - x2, m_size[0]);
 }
 
 inline float WorldGeometry::diff(float x1, float x2) const {
   if (m_size[0] == 0)
     return x1 - x2;
   else
-    return wrapDiffF<float>(x1, x2, m_size[0]);
+    return wrap_difference<float>(x1, x2, m_size[0]);
 }
 
 inline int WorldGeometry::diff(int x1, int x2) const {
   if (m_size[0] == 0)
     return x1 - x2;
   else
-    return wrapDiff<int>(x1, x2, m_size[0]);
+    return wrap_difference<int>(x1, x2, m_size[0]);
 }
 
 inline Vec2F WorldGeometry::diff(Vec2F const& p1, Vec2F const& p2) const {

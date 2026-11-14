@@ -200,22 +200,22 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
 
       // maybe set new goal angle
       if (static_random_float(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
-        worm.goalAngle = pfmod(
+        worm.goalAngle = positive_mod(
           static_random_float_range(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
       }
 
       if (worm.angle != worm.goalAngle) {
         // turn the worm toward goal angle
-        float angleDiff = worm.goalAngle - worm.angle;
+        float angle_difference = worm.goalAngle - worm.angle;
 
         // stop if we're close enough
-        if (std::abs(angleDiff) < wormTurnRate * thisSpeed)
+        if (std::abs(angle_difference) < wormTurnRate * thisSpeed)
           worm.angle = worm.goalAngle;
         else {
           // turn the shortest angular distance
-          if (std::abs(angleDiff) > twoPi)
-            angleDiff = -angleDiff;
-          worm.angle = pfmod(worm.angle + std::copysign(wormTurnRate * thisSpeed, angleDiff), twoPi);
+          if (std::abs(angle_difference) > twoPi)
+            angle_difference = -angle_difference;
+          worm.angle = positive_mod(worm.angle + std::copysign(wormTurnRate * thisSpeed, angle_difference), twoPi);
         }
       }
     }
@@ -260,7 +260,7 @@ std::expected<std::shared_ptr<WormCaveSelector>, StarException> WormCaveSelector
 }
 
 std::expected<float, StarException> WormCaveSelector::get(int x, int y) const {
-  Vec2I sector = Vec2I(x - pmod(x, m_sectorSize), y - pmod(y, m_sectorSize));
+  Vec2I sector = Vec2I(x - positive_mod(x, m_sectorSize), y - positive_mod(y, m_sectorSize));
   auto cached = m_cache.get(sector, [this](Vec2I const& sector) {
     return WormCaveSector::create(m_sectorSize, sector, config, parameters.seed, parameters.commonality);
   });

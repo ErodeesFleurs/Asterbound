@@ -79,8 +79,8 @@ std::expected<EntityId, StarException> EntityMap::reserveEntityId() {
 
   EntityId id = m_nextId;
   while (m_spatialMap.contains(id))
-    id = cycleIncrement(id, m_beginIdSpace, m_endIdSpace);
-  m_nextId = cycleIncrement(id, m_beginIdSpace, m_endIdSpace);
+    id = cycle_increment(id, m_beginIdSpace, m_endIdSpace);
+  m_nextId = cycle_increment(id, m_beginIdSpace, m_endIdSpace);
 
   return id;
 }

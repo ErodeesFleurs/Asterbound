@@ -174,7 +174,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
     colorVariant = tile.backgroundColorVariant;
     mod = tile.backgroundMod;
     modHue = tile.backgroundModHueShift;
-    damageLevel = byteToFloat(tile.backgroundDamageLevel);
+    damageLevel = byte_to_float(tile.backgroundDamageLevel);
     damageType = tile.backgroundDamageType;
     color = Color::rgba(m_backgroundLayerColor);
   } else {
@@ -183,7 +183,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
     colorVariant = tile.foregroundColorVariant;
     mod = tile.foregroundMod;
     modHue = tile.foregroundModHueShift;
-    damageLevel = byteToFloat(tile.foregroundDamageLevel);
+    damageLevel = byte_to_float(tile.foregroundDamageLevel);
     damageType = tile.foregroundDamageType;
     color = Color::rgba(m_foregroundLayerColor);
   }

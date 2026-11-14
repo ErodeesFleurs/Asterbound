@@ -180,10 +180,10 @@ private:
     auto cd = other.diff();
     T denom = ab ^ cd;
     [[maybe_unused]] std::conditional_t<Full, IntersectResult, bool> result;
-    if (nearZero(denom)) {
+    if (near_zero(denom)) {
       T xNumer = (a ^ b) * cd[0] - (c ^ d) * ab[0];
       T yNumer = (a ^ b) * cd[1] - (c ^ d) * ab[1];
-      if (nearZero(xNumer) && nearZero(yNumer)) {
+      if (near_zero(xNumer) && near_zero(yNumer)) {
         bool hit = infinite || (a >= c && a <= d) || (c >= a && c <= b);
         if constexpr (!Full) {
           return hit;
@@ -230,7 +230,7 @@ private:
         result.point = VectorType(ta * (b[0] - a[0]) + a[0], ta * (b[1] - a[1]) + a[1]);
         result.coincides = false;
         result.glances =
-          !infinite && hit && (nearZero(ta) || nearEqual(ta, 1.0f) || nearZero(tb) || nearEqual(tb, 1.0f));
+          !infinite && hit && (near_zero(ta) || near_equal(ta, T{1}) || near_zero(tb) || near_equal(tb, T{1}));
       }
     }
     if constexpr (Full)

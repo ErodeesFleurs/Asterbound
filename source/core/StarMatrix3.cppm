@@ -187,7 +187,7 @@ public:
   [[nodiscard]] std::expected<Matrix3, StarException> inverse() const requires matrix_checked_scalar<T> {
     for (auto const& row : m_rows)
       for (T value : row)
-        if (!isFinite(value))
+        if (!is_finite(value))
           return std::unexpected(MathException("Cannot invert a nonfinite matrix"));
     Matrix3 working = *this;
     Matrix3 result = identity();
@@ -220,7 +220,7 @@ public:
       }
       for (std::size_t r = 0; r != 3; ++r)
         for (std::size_t c = 0; c != 3; ++c)
-          if (!isFinite(working[r][c]) || !isFinite(result[r][c]))
+          if (!is_finite(working[r][c]) || !is_finite(result[r][c]))
             return std::unexpected(MathException("Matrix inverse arithmetic is not finite"));
     }
     return result;
@@ -235,16 +235,16 @@ public:
   }
 
   [[nodiscard]] bool is_orthogonal(T tolerance) const requires matrix_checked_scalar<T> {
-    if (!isFinite(tolerance) || tolerance < 0)
+    if (!is_finite(tolerance) || tolerance < 0)
       return false;
     for (auto const& row : m_rows)
       for (T value : row)
-        if (!isFinite(value))
+        if (!is_finite(value))
           return false;
     for (std::size_t r = 0; r != 3; ++r)
       for (std::size_t c = r; c != 3; ++c) {
         T dot = m_rows[r][0]*m_rows[c][0] + m_rows[r][1]*m_rows[c][1] + m_rows[r][2]*m_rows[c][2];
-        if (!isFinite(dot) || std::fabs(dot - T(r == c)) > tolerance)
+        if (!is_finite(dot) || std::fabs(dot - T(r == c)) > tolerance)
           return false;
       }
     return true;
@@ -258,13 +258,13 @@ public:
       T residual_tolerance = 16 * std::numeric_limits<T>::epsilon()) const
     requires matrix_checked_scalar<T>
   {
-    if (!isFinite(residual_tolerance) || residual_tolerance < 0)
+    if (!is_finite(residual_tolerance) || residual_tolerance < 0)
       return std::unexpected(MathException("Invalid orthonormalization tolerance"));
     Matrix3 result;
     for (std::size_t r = 0; r != 3; ++r) {
       T magnitude = 0;
       for (T value : m_rows[r]) {
-        if (!isFinite(value))
+        if (!is_finite(value))
           return std::unexpected(MathException("Cannot orthonormalize a nonfinite matrix"));
         magnitude = std::max(magnitude, std::fabs(value));
       }
@@ -278,7 +278,7 @@ public:
             residual[c] -= dot * result[previous][c];
         }
       T length = std::hypot(residual[0], residual[1], residual[2]);
-      if (!isFinite(length) || length <= residual_tolerance)
+      if (!is_finite(length) || length <= residual_tolerance)
         return std::unexpected(MathException("Cannot orthonormalize a degenerate matrix"));
       result[r] = residual / length;
     }

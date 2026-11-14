@@ -210,7 +210,7 @@ std::expected<std::tuple<Image, Vec2I, bool>, StarException> Font::render(String
     // unfortunately FreeType pre-multiplied the color channels :(
     image.for_each_pixel([](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0 && pixel[3] != 255) {
-        float a = byteToFloat(pixel[3]);
+        float a = byte_to_float(pixel[3]);
         pixel[0] /= a;
         pixel[1] /= a;
         pixel[2] /= a;

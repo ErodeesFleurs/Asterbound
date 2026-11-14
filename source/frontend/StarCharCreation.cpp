@@ -449,7 +449,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
   auto genderOptions = species.genderOptions.wrap(m_genderChoice);
   if (!genderOptions)
     return std::unexpected(std::move(genderOptions.error()));
-  int genderIdx = pmod<std::int64_t>(m_genderChoice, species.genderOptions.size());
+  int genderIdx = positive_mod<std::int64_t>(m_genderChoice, species.genderOptions.size());
   auto const& labels = (*speciesDefinition)->charGenTextLabels();
   for (auto const& [name, index] : {
       std::pair{std::string_view("labelMainSkinColor"), 0}, std::pair{std::string_view("labelHairStyle"), 1},

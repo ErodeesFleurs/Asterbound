@@ -425,7 +425,7 @@ void Color::setValue(float v) {
 }
 
 void Color::hueShift(float h) {
-  setHue(pfmod(hue() + h, 1.0f));
+  setHue(positive_mod(hue() + h, 1.0f));
 }
 
 void Color::fade(float value) {

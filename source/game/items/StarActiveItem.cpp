@@ -565,9 +565,9 @@ std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpo
     light.beamAngle += m_armAngle.get();
     if (itemOwner->get().facingDirection() == Direction::Left) {
       if (light.beamAngle > 0)
-        light.beamAngle = std::numbers::pi / 2 + constrainAngle(std::numbers::pi / 2 - light.beamAngle);
+        light.beamAngle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - light.beamAngle);
       else
-        light.beamAngle = -std::numbers::pi / 2 - constrainAngle(light.beamAngle + std::numbers::pi / 2);
+        light.beamAngle = -std::numbers::pi / 2 - normalize_angle(light.beamAngle + std::numbers::pi / 2);
     }
     result.push_back(std::move(light));
   }

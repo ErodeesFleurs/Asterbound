@@ -17,7 +17,7 @@ std::function<float(float, float)> WorldGeometry::xDiffFunction() const {
     return [](float x1, float x2) -> float { return x1 - x2; };
   } else {
     unsigned xsize = m_size[0];
-    return [xsize](float x1, float x2) -> float { return wrapDiffF<float>(x1, x2, xsize); };
+    return [xsize](float x1, float x2) -> float { return wrap_difference<float>(x1, x2, xsize); };
   }
 }
 
@@ -27,7 +27,7 @@ std::function<Vec2F(Vec2F, Vec2F)> WorldGeometry::diffFunction() const {
   } else {
     unsigned xsize = m_size[0];
     return [xsize](Vec2F const& a, Vec2F const& b) -> Vec2F {
-      return Vec2F(wrapDiffF<float>(a[0], b[0], xsize), a[1] - b[1]);
+      return Vec2F(wrap_difference<float>(a[0], b[0], xsize), a[1] - b[1]);
     };
   }
 }
@@ -38,7 +38,7 @@ std::function<float(float, float, float)> WorldGeometry::xLerpFunction(std::opti
   } else {
     unsigned xsize = m_size[0];
     return [discontinuityThreshold, xsize](float offset, float min, float max) -> float {
-      float distance = wrapDiffF<float>(max, min, xsize);
+      float distance = wrap_difference<float>(max, min, xsize);
       if (discontinuityThreshold && std::abs(distance) > *discontinuityThreshold)
         return min + distance;
       return min + offset * distance;
@@ -52,7 +52,7 @@ std::function<Vec2F(float, Vec2F, Vec2F)> WorldGeometry::lerpFunction(std::optio
   } else {
     unsigned xsize = m_size[0];
     return [discontinuityThreshold, xsize](float offset, Vec2F const& min, Vec2F const& max) -> Vec2F {
-      Vec2F distance = Vec2F(wrapDiffF<float>(max[0], min[0], xsize), max[1] - min[1]);
+      Vec2F distance = Vec2F(wrap_difference<float>(max[0], min[0], xsize), max[1] - min[1]);
       if (discontinuityThreshold && distance.magnitude() > *discontinuityThreshold)
         return min + distance;
       return min + offset * distance;

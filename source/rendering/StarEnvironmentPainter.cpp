@@ -244,7 +244,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     Vec2D debrisPositionOffset = viewMin + velocityOffset;
     for (auto& debrisItem : *debrisItems) {
       Vec2F debrisPosition = rotMatrix.transform_point(Vec2F(debrisItem.first - debrisPositionOffset));
-      float debrisAngle = std::fmod(Constants::deg2rad * debrisItem.second.second * sky.epochTime, std::numbers::pi * 2) + sky.starRotation;
+      float debrisAngle = std::fmod(Constants::degrees_to_radians * debrisItem.second.second * sky.epochTime, std::numbers::pi * 2) + sky.starRotation;
       if (auto result = drawOrbiter(pixelRatio, screenSize, sky, {SkyOrbiterType::SpaceDebris, 1.0f, debrisAngle, debrisItem.second.first, debrisPosition}); !result)
         return std::unexpected(std::move(result.error()));
     }
@@ -430,9 +430,9 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
 
         RectF subImage = RectF::withSize(Vec2F(), parallaxSize);
         if (tileLimitTop != top && y + 1 > tileLimitTop)
-          subImage.setYMin(parallaxSize[1] * (1.0f - fpart(tileLimitTop)));
+          subImage.setYMin(parallaxSize[1] * (1.0f - fractional_part(tileLimitTop)));
         if (tileLimitBottom != bottom && y < tileLimitBottom)
-          anchorPoint[1] += fpart(tileLimitBottom) * parallaxPixels[1];
+          anchorPoint[1] += fractional_part(tileLimitBottom) * parallaxPixels[1];
 
         for (auto const& textureImage : layer.textures) {
           AssetPath withDirectives = textureImage;

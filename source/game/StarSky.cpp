@@ -288,7 +288,7 @@ std::expected<void, StarException> Sky::update(double dt) {
   if (!state) return std::unexpected(std::move(state.error()));
 
   if (!flying())
-    m_starRotation = constrainAngle(m_starRotation + dt / dayLength() * 2 * std::numbers::pi);
+    m_starRotation = normalize_angle(m_starRotation + dt / dayLength() * 2 * std::numbers::pi);
   else
     m_starRotation = 0;
   return {};
@@ -476,7 +476,7 @@ float Sky::dayCycle() const {
 
   // timeOfDay() is defined such that 0.0 is mid-dawn.  For convenience, shift
   // the time of day forwards such that 0.0 is the beginning of the morning.
-  float shiftedTime = pfmod(timeOfDay + transitionTime / 2, dayLength);
+  float shiftedTime = positive_mod(timeOfDay + transitionTime / 2, dayLength);
 
   // There are 5 times here, beginning of the morning, end of the morning,
   // beginning of the evening, end of the evening, and then the beginning of
@@ -486,7 +486,7 @@ float Sky::dayCycle() const {
   // The values here are mid-night, mid-day, mid-day, mid-night, mid-night.
   Array<float, 5> transitionValues = {-1.0f, 1.0f, 1.0f, 3.0f, 3.0f};
 
-  return pfmod(parametricInterpolate2(
+  return positive_mod(parametricInterpolate2(
                    transitionPositions, transitionValues, shiftedTime, SinWeightOperator<float>(), BoundMode::Clamp),
       4.0f);
 }
@@ -724,7 +724,7 @@ std::expected<void, StarException> Sky::exitHyperspace() {
   m_pathOffset = *position;
   auto rotation = originMap.getFloat("rotation");
   if (!rotation) return std::unexpected(std::move(rotation.error()));
-  m_pathRotation = *rotation * Constants::deg2rad;
+  m_pathRotation = *rotation * Constants::degrees_to_radians;
 
   float maxVelocity = m_numericSettings.flyMaxVelocity;
   float exitDistance = maxVelocity / 2.0 * slowdownTime();
@@ -749,7 +749,7 @@ std::expected<bool, StarException> Sky::controlledMovement(JsonArray const& path
   Vec2F previousOffset = *previousPosition;
   auto originRotation = origin.getFloat("rotation");
   if (!originRotation) return std::unexpected(std::move(originRotation.error()));
-  float previousRotation = *originRotation * Constants::deg2rad;
+  float previousRotation = *originRotation * Constants::degrees_to_radians;
 
   float stepTime = 0;
   Vec2F stepOffset;
@@ -762,7 +762,7 @@ std::expected<bool, StarException> Sky::controlledMovement(JsonArray const& path
     stepOffset = *position;
     auto rotation = entry.getFloat("rotation");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
-    stepRotation = *rotation * Constants::deg2rad;
+    stepRotation = *rotation * Constants::degrees_to_radians;
     auto time = entry.getFloat("time");
     if (!time) return std::unexpected(std::move(time.error()));
     stepTime += *time;

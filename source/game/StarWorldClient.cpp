@@ -1282,16 +1282,16 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       renderTile.foregroundModHueShift = clientTile.foregroundModHueShift;
       renderTile.foregroundColorVariant = clientTile.foregroundColorVariant;
       renderTile.foregroundDamageType = clientTile.foregroundDamage.damageType();
-      renderTile.foregroundDamageLevel = floatToByte(clientTile.foregroundDamage.damageEffectPercentage());
+      renderTile.foregroundDamageLevel = float_to_byte(clientTile.foregroundDamage.damageEffectPercentage());
       
       renderTile.backgroundHueShift = clientTile.backgroundHueShift;
       renderTile.backgroundModHueShift = clientTile.backgroundModHueShift;
       renderTile.backgroundColorVariant = clientTile.backgroundColorVariant;
       renderTile.backgroundDamageType = clientTile.backgroundDamage.damageType();
-      renderTile.backgroundDamageLevel = floatToByte(clientTile.backgroundDamage.damageEffectPercentage());
+      renderTile.backgroundDamageLevel = float_to_byte(clientTile.backgroundDamage.damageEffectPercentage());
       
       renderTile.liquidId = clientTile.liquid.liquid;
-      renderTile.liquidLevel = floatToByte(clientTile.liquid.level);
+      renderTile.liquidLevel = float_to_byte(clientTile.liquid.level);
       return {};
     });
   if (!result74)
@@ -1306,11 +1306,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       if (p.liquid) {
         auto& liquid = *p.liquid;
         if (liquid.liquid == renderTile.liquidId) {
-          std::uint8_t added = floatToByte(liquid.level, true);
+          std::uint8_t added = float_to_byte(liquid.level, true);
           renderTile.liquidLevel = (renderTile.liquidLevel > 255 - added) ? 255 : renderTile.liquidLevel + added;
         } else {
           renderTile.liquidId = liquid.liquid;
-          renderTile.liquidLevel = floatToByte(liquid.level, true);
+          renderTile.liquidLevel = float_to_byte(liquid.level, true);
         }
       }
       
@@ -3192,7 +3192,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
   // instead needs every image in its unwrapped calculation region, including
   // the configured border around large viewports and small worlds.
   for (int destinationX = region.xMin(); destinationX < region.xMax();) {
-    int sourceX = pmod<int>(destinationX, worldWidth);
+    int sourceX = positive_mod<int>(destinationX, worldWidth);
     int stripWidth = std::min(region.xMax() - destinationX, worldWidth - sourceX);
     RectI strip(sourceX, region.yMin(), sourceX + stripWidth, region.yMax());
     auto gatherStrip = [&](Vec2I const& pos, std::span<ClientTile const> column) -> std::expected<void, StarException> {
@@ -4341,7 +4341,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
   auto log_poly = [&self = *this](PolyF poly, Vec2F position, float r, float g, float b) {
     poly.translate(position);
     self.root().spatialLogger().log_poly("world", poly,
-                                         {floatToByte(r, true), floatToByte(g, true), floatToByte(b, true), 255});
+                                         {float_to_byte(r, true), float_to_byte(g, true), float_to_byte(b, true), 255});
   };
 
   auto result311 = forEachCollisionBlock(clientWindow, [&](auto const& block) -> std::expected<void, StarException> {

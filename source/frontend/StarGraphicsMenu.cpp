@@ -185,7 +185,7 @@ std::expected<double, StarException> validatedRenderFpsLimit(Json const& value) 
   auto rate = value.toDouble();
   if (!rate)
     return std::unexpected(std::move(rate.error()));
-  if (!isFinite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
+  if (!is_finite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
     return std::unexpected(GuiException("renderFpsLimit must be a finite nonnegative render rate"));
   return *rate;
 }

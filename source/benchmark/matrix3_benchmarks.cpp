@@ -115,7 +115,7 @@ ReferenceMatrix reference_inverse(ReferenceMatrix const& input) {
 
 template <bench_scalar T>
 bool near(T actual, long double expected) {
-  return Star::isFinite(actual) && std::fabs(static_cast<long double>(actual) - expected)
+  return Star::is_finite(actual) && std::fabs(static_cast<long double>(actual) - expected)
       <= 64 * std::numeric_limits<T>::epsilon() * std::max(1.0L, std::fabs(expected));
 }
 

@@ -657,7 +657,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
     if (!beamAngleResult)
       return std::unexpected(std::move(beamAngleResult.error()));
     auto beamAngle = std::move(*beamAngleResult);
-    orientation->beamAngle = beamAngle * Constants::deg2rad;
+    orientation->beamAngle = beamAngle * Constants::degrees_to_radians;
     if (auto containsResult = orientationSettings.contains("particleEmitter"); !containsResult)
       return std::unexpected(std::move(containsResult.error()));
     else if (*containsResult) {

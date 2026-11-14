@@ -375,7 +375,7 @@ std::expected<float, StarException> InspectionTool::pointInspectionLevel(Vec2F c
     return std::unexpected(std::move(itemWorld.error()));
   Vec2F gdiff = itemWorld->get().geometry().diff(position, m_currentPosition);
   float gdist = gdiff.magnitude();
-  float angleFactor = (std::abs(angleDiff(gdiff.angle(), m_currentAngle)) - m_inspectionAngles[0]) / (m_inspectionAngles[1] - m_inspectionAngles[0]);
+  float angleFactor = (std::abs(angle_difference(gdiff.angle(), m_currentAngle)) - m_inspectionAngles[0]) / (m_inspectionAngles[1] - m_inspectionAngles[0]);
   float distFactor = (gdist - m_inspectionRanges[0]) / (m_inspectionRanges[1] - m_inspectionRanges[0]);
   float ambientFactor = gdist / m_ambientInspectionRadius;
   return 1 - std::clamp(std::max(distFactor, std::min(ambientFactor, angleFactor)), 0.0f, 1.0f);

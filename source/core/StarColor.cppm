@@ -159,19 +159,19 @@ private:
 void write_text(TextBuffer& buffer, Color const& c);
 
 inline Vec3F Color::v3bToFloat(Vec3B const& b) {
-  return Vec3F(byteToFloat(b[0]), byteToFloat(b[1]), byteToFloat(b[2]));
+  return Vec3F(byte_to_float(b[0]), byte_to_float(b[1]), byte_to_float(b[2]));
 }
 
 inline Vec3B Color::v3fToByte(Vec3F const& f, bool doClamp) {
-  return Vec3B(floatToByte(f[0], doClamp), floatToByte(f[1], doClamp), floatToByte(f[2], doClamp));
+  return Vec3B(float_to_byte(f[0], doClamp), float_to_byte(f[1], doClamp), float_to_byte(f[2], doClamp));
 }
 
 inline Vec4F Color::v4bToFloat(Vec4B const& b) {
-  return Vec4F(byteToFloat(b[0]), byteToFloat(b[1]), byteToFloat(b[2]), byteToFloat(b[3]));
+  return Vec4F(byte_to_float(b[0]), byte_to_float(b[1]), byte_to_float(b[2]), byte_to_float(b[3]));
 }
 
 inline Vec4B Color::v4fToByte(Vec4F const& f, bool doClamp) {
-  return Vec4B(floatToByte(f[0], doClamp), floatToByte(f[1], doClamp), floatToByte(f[2], doClamp), floatToByte(f[3], doClamp));
+  return Vec4B(float_to_byte(f[0], doClamp), float_to_byte(f[1], doClamp), float_to_byte(f[2], doClamp), float_to_byte(f[3], doClamp));
 }
 
 }

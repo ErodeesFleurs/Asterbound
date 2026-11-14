@@ -30,7 +30,7 @@ public:
   }
 
   void setUpdateRate(double rate, std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> now) {
-    if (!isFinite(rate) || rate <= 0.0)
+    if (!is_finite(rate) || rate <= 0.0)
       return;
     std::chrono::duration<double> period(1.0 / rate);
     if (period != m_updatePeriod) {
@@ -40,7 +40,7 @@ public:
   }
 
   void setRenderRate(double rate, std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> now) {
-    if (!isFinite(rate) || rate < 0.0)
+    if (!is_finite(rate) || rate < 0.0)
       return;
     std::chrono::duration<double> period(rate > 0.0 ? 1.0 / rate : 0.0);
     if (period != m_renderPeriod) {

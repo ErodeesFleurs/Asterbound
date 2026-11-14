@@ -157,8 +157,8 @@ double RandomSource::nrandd(double stddev, double mean) {
 }
 
 std::int64_t RandomSource::stochasticRound(double val) {
-  double fpart = val - std::floor(val);
-  if (randd() < fpart)
+  double fractional_part = val - std::floor(val);
+  if (randd() < fractional_part)
     return std::ceil(val);
   else
     return std::floor(val);

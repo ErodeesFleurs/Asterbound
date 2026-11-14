@@ -180,6 +180,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | Byte order | `./result/bin/bytes_benchmarks --benchmark_filter='Bytes/'` | Scalar and misaligned raw reversal/conversion. |
 | Geometry | `./result/bin/line_benchmarks --benchmark_filter='Line/'` | Complete/boolean intersections and point distance. |
 | Matrices | `./result/bin/matrix3_benchmarks --benchmark_filter='Matrix3/'` | Arithmetic, aliasing, affine composition, transforms, inverse and row-major packing. |
+| Scalar math | `./result/bin/math_common_benchmarks --benchmark_filter='MathCommon/'` | Fractions, modular wrapping, angles, comparison policy and byte quantization; scalar and batched inputs. |
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | Borrowed deserialization, VLQ, UUID, file writes and full asset payload reads. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Raw/formatted messages, sinks, concurrent callers, files and spatial logs. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | Insertion/duplicates, collision rehash, lookup, churn, reuse and sparse iteration. |
@@ -211,6 +212,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
   oracles. Historical inverse results are incorrect; missing direction support and
   narrowed double-angle results also make `AfterOnly` cases incomparable. Exclude
   them from baseline speedup claims rather than relaxing validation.
+- **Scalar-math baseline:** preserve the original implementation and complete pre/post timed-output oracles. Ordinary-domain angle comparisons use the same independent numerical tolerance; their output bits can differ. Fixed endpoint/extended-precision behavior and fractions outside the old integer-conversion domain are correctness cases, not baseline speedups. Labels report fixture/output fingerprints and results per item; normalize by both batch size and result count.
 
 ### Comparable measurements
 

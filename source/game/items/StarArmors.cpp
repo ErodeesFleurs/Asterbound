@@ -248,7 +248,7 @@ std::expected<List<Drawable>, StarException> ArmorItem::drawables() const {
 }
 
 std::expected<float, StarException> ArmorItem::getAngle(float) {
-  return -25.0f * Constants::deg2rad;
+  return -25.0f * Constants::degrees_to_radians;
 }
 
 std::expected<void, StarException> ArmorItem::fire(FireMode, bool, bool) { return {}; }

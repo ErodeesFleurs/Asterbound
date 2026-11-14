@@ -3419,7 +3419,7 @@ const GameTestRegistration questTrackerPresentation(
     for (float target : {6.2f, 0.01f, 3.2f, -3.2f, 0.0f}) {
       (*quest)->setCompassDirection(target);
       for (int step = 0; step < 13; ++step) {
-        float diff = pfmod(target - direction, static_cast<float>(std::numbers::pi) * 2);
+        float diff = positive_mod(target - direction, static_cast<float>(std::numbers::pi) * 2);
         if (std::abs(diff) < *acceleration && std::abs(speed) < *acceleration) {
           speed = 0;
           direction = target;

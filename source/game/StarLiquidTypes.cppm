@@ -51,7 +51,7 @@ inline LiquidLevel::LiquidLevel(LiquidId liquid, float level)
   : liquid(liquid), level(level) {}
 
 inline LiquidLevel LiquidNetUpdate::liquidLevel() const {
-  return LiquidLevel{liquid, byteToFloat(level)};
+  return LiquidLevel{liquid, byte_to_float(level)};
 }
 
 }

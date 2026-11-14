@@ -349,7 +349,7 @@ std::expected<void, StarException> CanvasWidget::renderTiledImage(Vec2F const& r
   Vec2F texSize(*textureSize);
   Vec2F texScaledSize = texSize * textureScale;
   Vec2I textureCount = Vec2I::ceil(screenCoords.size().piecewise_divide(texScaledSize)) + Vec2I(2, 2);
-  Vec2F screenLowerLeft = screenCoords.min() - Vec2F(pfmod<double>(texScaledSize[0] - offset[0], texScaledSize[0]), pfmod<double>(texScaledSize[1] - offset[1], texScaledSize[1]));
+  Vec2F screenLowerLeft = screenCoords.min() - Vec2F(positive_mod<double>(texScaledSize[0] - offset[0], texScaledSize[0]), positive_mod<double>(texScaledSize[1] - offset[1], texScaledSize[1]));
 
   for (int x = 0; x < textureCount[0]; ++x) {
     for (int y = 0; y < textureCount[1]; ++y) {

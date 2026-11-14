@@ -773,7 +773,7 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
           if (pixel[3] != 0) {
             Color color = Color::rgba(op->get().startColor).mix(Color::rgba(op->get().endColor), percent);
             if (op->get().outlineOnly) {
-              float pixelA = byteToFloat(pixel[3]);
+              float pixelA = byte_to_float(pixel[3]);
               color.setAlphaF((1.0f - pixelA) * std::fminf(pixelA, 0.5f) * 2.0f);
             }
             else {

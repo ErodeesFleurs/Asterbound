@@ -706,7 +706,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     }
     auto angle = lightConfig.getFloat("pointAngle", 0.0f);
     if (!angle) return std::unexpected(std::move(angle.error()));
-    light.pointAngle.set(*angle * Constants::deg2rad);
+    light.pointAngle.set(*angle * Constants::degrees_to_radians);
     auto point = lightConfig.getBool("pointLight", false);
     if (!point) return std::unexpected(std::move(point.error()));
     light.pointLight = std::move(*point);
@@ -1462,7 +1462,7 @@ std::expected<void, StarException> NetworkedAnimator::setLightColor(String const
 std::expected<void, StarException> NetworkedAnimator::setLightPointAngle(String const& lightName, float angle) {
   auto entry = m_lights.get(lightName);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().pointAngle.set(angle * Constants::deg2rad);
+  entry->get().pointAngle.set(angle * Constants::degrees_to_radians);
   return {};
 }
 
@@ -1799,7 +1799,7 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
       continue;
 
     Vec2F position = {pair.second.xPosition.get(), pair.second.yPosition.get()};
-    float pointAngle = constrainAngle(pair.second.pointAngle.get());
+    float pointAngle = normalize_angle(pair.second.pointAngle.get());
     Mat3F transformation = Mat3F::identity();
     if (pair.second.anchorPart) {
       auto anchor = queryPartTransformation(*pair.second.anchorPart, sample);
@@ -1823,9 +1823,9 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
     position = globalTransformation().transform_point(position);
     if (m_flipped.get()) {
       if (pointAngle > 0)
-        pointAngle = std::numbers::pi / 2 + constrainAngle(std::numbers::pi / 2 - pointAngle);
+        pointAngle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - pointAngle);
       else
-        pointAngle = -std::numbers::pi / 2 - constrainAngle(pointAngle + std::numbers::pi / 2);
+        pointAngle = -std::numbers::pi / 2 - normalize_angle(pointAngle + std::numbers::pi / 2);
     }
 
     Color color = pair.second.color.get();
@@ -2002,7 +2002,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
     if (rotationGroup.angularVelocity == 0.0f)
       rotationGroup.currentAngle = rotationGroup.targetAngle.get();
     else
-      rotationGroup.currentAngle = approachAngle(rotationGroup.targetAngle.get(), rotationGroup.currentAngle, rotationGroup.angularVelocity * dt);
+      rotationGroup.currentAngle = approach_angle(rotationGroup.targetAngle.get(), rotationGroup.currentAngle, rotationGroup.angularVelocity * dt);
   }
 
   if (dynamicTarget) {

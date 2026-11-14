@@ -9,35 +9,248 @@ import star.format;
 
 using namespace Star;
 
+namespace {
+
+template <typename T, typename U>
+concept has_near_equal = requires(T a, U b) { near_equal(a, b); near_equal(a, b, 2); };
+
+template <typename T>
+concept has_positive_mod = requires(T a) { positive_mod(a, a); };
+
+template <typename T>
+concept has_wrap_difference = requires(T a) { wrap_difference(a, a, a); };
+
+template <typename T>
+concept has_fractional_part = requires(T a) { fractional_part(a); };
+
+template <typename T>
+concept has_angle_operations = requires(T a) {
+  normalize_angle(a); angle_difference(a, a); approach_angle(a, a, a);
+};
+
+struct NotNumeric {};
+
+struct ContextualBool {
+  bool value;
+  explicit constexpr operator bool() const noexcept { return value; }
+};
+
+struct AlgebraicScalar {
+  int value;
+  constexpr AlgebraicScalar(int value) noexcept : value(value) {}
+  AlgebraicScalar(AlgebraicScalar const&) noexcept = default;
+  AlgebraicScalar(AlgebraicScalar&&) = delete;
+  AlgebraicScalar& operator=(AlgebraicScalar const&) = delete;
+  AlgebraicScalar& operator=(AlgebraicScalar&&) = delete;
+  friend constexpr AlgebraicScalar operator*(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
+    return AlgebraicScalar(a.value * b.value);
+  }
+  friend constexpr AlgebraicScalar operator+(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
+    return AlgebraicScalar(a.value + b.value);
+  }
+  friend constexpr AlgebraicScalar operator-(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
+    return AlgebraicScalar(a.value - b.value);
+  }
+  friend constexpr AlgebraicScalar operator-(AlgebraicScalar const& a) noexcept {
+    return AlgebraicScalar(-a.value);
+  }
+  friend constexpr ContextualBool operator<(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
+    return {a.value < b.value};
+  }
+  friend constexpr ContextualBool operator>(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
+    return {a.value > b.value};
+  }
+};
+
+struct ExplicitScalar {
+  explicit constexpr ExplicitScalar(int) noexcept {}
+  friend constexpr int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept { return 4; }
+};
+
+static_assert(has_near_equal<int, unsigned> && has_near_equal<float, long double>);
+static_assert(!has_near_equal<int, double> && !has_near_equal<double, int>);
+static_assert(!has_near_equal<NotNumeric, NotNumeric>);
+static_assert(has_positive_mod<int> && has_positive_mod<unsigned> && has_positive_mod<long double>);
+static_assert(!has_positive_mod<NotNumeric>);
+static_assert(has_wrap_difference<int> && has_wrap_difference<long double>);
+static_assert(!has_wrap_difference<unsigned> && !has_wrap_difference<bool>);
+static_assert(has_fractional_part<float> && !has_fractional_part<int> && !has_fractional_part<NotNumeric>);
+static_assert(has_angle_operations<long double> && !has_angle_operations<int>);
+static_assert(finite_classifiable<float> && finite_classifiable<double> && !finite_classifiable<long double>);
+static_assert(!square_operand<NotNumeric> && !square_operand<ExplicitScalar>);
+static_assert(!clampable<NotNumeric> && !approachable<NotNumeric>);
+static_assert(square_operand<AlgebraicScalar> && clampable<AlgebraicScalar> && approachable<AlgebraicScalar>);
+static_assert(magnitude_clampable<AlgebraicScalar, int>);
+static_assert(noexcept(square(std::declval<AlgebraicScalar const&>())));
+static_assert(noexcept(clamp_magnitude(std::declval<AlgebraicScalar const&>(), 2)));
+static_assert(noexcept(clamp(std::declval<AlgebraicScalar const&>(), std::declval<AlgebraicScalar const&>(),
+  std::declval<AlgebraicScalar const&>())));
+static_assert(noexcept(approach(std::declval<AlgebraicScalar const&>(), std::declval<AlgebraicScalar const&>(),
+  std::declval<AlgebraicScalar const&>())));
+static_assert(square(4) == 16 && clamp(4, 1, 3) == 3 && approach(8, 2, 3) == 5);
+
+template <std::floating_point T>
+void expect_angle_boundaries() {
+  T pi = std::acos(T{-1});
+  T below = std::nextafter(pi, T{0});
+  T above = std::nextafter(pi, T{4});
+  EXPECT_EQ(normalize_angle(pi), -pi);
+  EXPECT_EQ(normalize_angle(-pi), -pi);
+  EXPECT_EQ(normalize_angle(below), below);
+  EXPECT_LT(normalize_angle(above), T{0});
+  EXPECT_GT(normalize_angle(std::nextafter(-pi, T{-4})), T{0});
+  EXPECT_EQ(angle_difference(T{0}, pi), -pi);
+  EXPECT_EQ(angle_difference(T{0}, -pi), -pi);
+  T tiny = std::numeric_limits<T>::epsilon() / T{8};
+  EXPECT_EQ(normalize_angle(tiny), tiny);
+  EXPECT_EQ(normalize_angle(-tiny), -tiny);
+  EXPECT_EQ(angle_difference(T{0}, tiny), tiny);
+  EXPECT_EQ(angle_difference(tiny, T{0}), -tiny);
+  T period = T{2} * pi;
+  T turn_boundary = T{3} * pi;
+  for (T value : {T{-16}, T{-8}, T{8}, T{16}, std::nextafter(turn_boundary, T{0}),
+         std::nextafter(-turn_boundary, T{-16}), std::numeric_limits<T>::max()}) {
+    T expected = std::remainder(value, period);
+    if (expected >= pi)
+      expected -= period;
+    EXPECT_EQ(normalize_angle(value), expected);
+  }
+}
+
+}
+
+TEST(Math, IntegralNearEqualPreservesValuesAcrossSignednessAndPromotions) {
+  EXPECT_FALSE(near_equal(-1, std::numeric_limits<unsigned>::max()));
+  EXPECT_FALSE(near_equal(-1LL, std::numeric_limits<std::uint64_t>::max()));
+  EXPECT_TRUE(near_equal(42, 42u));
+  EXPECT_TRUE(near_equal(static_cast<signed char>(7), static_cast<unsigned char>(7)));
+  EXPECT_FALSE(near_equal(static_cast<signed char>(-1), static_cast<unsigned char>(255)));
+  EXPECT_TRUE(near_equal(true, 1u));
+  EXPECT_TRUE(near_equal(false, '\0'));
+  EXPECT_FALSE(near_equal(true, 2));
+  EXPECT_TRUE(near_equal('A', L'A'));
+  EXPECT_TRUE(near_equal(u'A', U'A'));
+  EXPECT_TRUE(near_equal(char8_t{65}, 65));
+  EXPECT_FALSE(near_equal(char32_t{0xffffffffu}, -1));
+}
+
+TEST(Math, FloatingNearEqualUsesCommonTypeAndRelativeEpsilon) {
+  double adjacent = std::nextafter(1.0, 2.0);
+  EXPECT_TRUE(near_equal(1.0f, adjacent));
+  EXPECT_TRUE(near_equal(adjacent, 1.0f));
+  EXPECT_FALSE(near_equal(1.0f, 1.0 + 4 * std::numeric_limits<double>::epsilon()));
+  EXPECT_FALSE(near_equal(0.0, std::numeric_limits<double>::min()));
+  EXPECT_TRUE(near_equal(0.0, -0.0));
+}
+
+TEST(Math, NearZeroRetainsMinimumNormalPolicy) {
+  volatile std::uint64_t subnormal_bits = 1;
+  double subnormal = std::bit_cast<double>(static_cast<std::uint64_t>(subnormal_bits));
+  EXPECT_TRUE(near_zero(subnormal));
+  EXPECT_TRUE(near_zero(-subnormal));
+  EXPECT_TRUE(near_zero(std::numeric_limits<double>::min() * 2));
+  EXPECT_FALSE(near_zero(std::numeric_limits<double>::min() * 4));
+  EXPECT_TRUE(near_zero(0));
+  EXPECT_FALSE(near_zero(1u));
+  EXPECT_TRUE(near_zero(false));
+  EXPECT_FALSE(near_zero(std::numeric_limits<double>::epsilon()));
+}
+
+TEST(Math, FractionalPartHandlesNegativeAndHugeFiniteInputs) {
+  EXPECT_EQ(fractional_part(-1.25), 0.75);
+  EXPECT_EQ(fractional_part(-0.25f), 0.75f);
+  EXPECT_EQ(fractional_part(3.25L), 0.25L);
+  EXPECT_EQ(fractional_part(-4.0), 0.0);
+  EXPECT_EQ(fractional_part(std::numeric_limits<double>::max()), 0.0);
+  EXPECT_EQ(fractional_part(-std::numeric_limits<double>::max()), 0.0);
+  // Preserve the original signed-zero result through production fast-math.
+  // Volatile input bits and object representations avoid signbit folding.
+  for (auto bits : {0ull, 0x8000000000000000ull}) {
+    volatile std::uint64_t input = bits;
+    double result = fractional_part(std::bit_cast<double>(static_cast<std::uint64_t>(input)));
+    EXPECT_EQ(std::bit_cast<std::uint64_t>(result), bits);
+  }
+  for (auto bits : {0u, 0x80000000u}) {
+    volatile std::uint32_t input = bits;
+    float result = fractional_part(std::bit_cast<float>(static_cast<std::uint32_t>(input)));
+    EXPECT_EQ(std::bit_cast<std::uint32_t>(result), bits);
+  }
+}
+
+TEST(Math, SignedModuloAndWrappingPreserveHalfPeriodAndZeroPolicies) {
+  EXPECT_EQ(positive_mod(-1, 10), 9);
+  EXPECT_EQ(positive_mod(-20, 10), 0);
+  EXPECT_EQ(positive_mod(static_cast<signed char>(-8), static_cast<signed char>(7)), 6);
+  int max = std::numeric_limits<int>::max();
+  EXPECT_EQ(positive_mod(std::numeric_limits<int>::min(), max), max - 1);
+  EXPECT_EQ(wrap_difference(std::numeric_limits<int>::min(), max, max), -1);
+  EXPECT_EQ(wrap_difference(5, 0, 10), 5);
+  EXPECT_EQ(wrap_difference(0, 5, 10), -5);
+  EXPECT_EQ(wrap_difference(10, 109, 100), 1);
+  EXPECT_EQ(wrap_difference(10, 111, 100), -1);
+  EXPECT_EQ(wrap_difference(static_cast<signed char>(-8), static_cast<signed char>(8),
+    static_cast<signed char>(10)), 4);
+  EXPECT_EQ(positive_mod(-1.25, 1.0), 0.75);
+  EXPECT_EQ(positive_mod(-1.25, 0.0), -1.25);
+  EXPECT_EQ(wrap_difference(5.0, 0.0, 10.0), 5.0);
+  EXPECT_EQ(wrap_difference(0.0, 5.0, 10.0), -5.0);
+  EXPECT_EQ(wrap_difference(3.0, 7.0, 0.0), -4.0);
+}
+
+TEST(Math, TypedAnglesPreserveIntervalAndTinyDisplacements) {
+  expect_angle_boundaries<float>();
+  expect_angle_boundaries<double>();
+  expect_angle_boundaries<long double>();
+  long double current = 1.0L;
+  long double target = current + 8 * std::numeric_limits<long double>::epsilon();
+  EXPECT_EQ(angle_difference(current, target), target - current);
+  EXPECT_EQ(approach_angle(0.5, 0.0, 0.125), 0.125);
+  EXPECT_EQ(approach_angle(-0.5, 0.0, 0.125), -0.125);
+}
+
+TEST(Math, AlgebraicHelpersAcceptCopyOnlyAndContextualComparisons) {
+  AlgebraicScalar value{7}, negative{-7}, low{2}, high{5}, rate{2};
+  EXPECT_EQ(square(value).value, 49);
+  EXPECT_EQ(clamp_magnitude(value, 3).value, 3);
+  EXPECT_EQ(clamp_magnitude(negative, 3).value, -3);
+  EXPECT_EQ(clamp_magnitude(low, 3).value, 2);
+  EXPECT_EQ(clamp(value, low, high).value, 5);
+  EXPECT_EQ(clamp(low, high, rate).value, 2);
+  EXPECT_EQ(approach(value, low, rate).value, 4);
+  EXPECT_EQ(approach(low, value, rate).value, 5);
+  EXPECT_EQ(approach(high, value, value).value, 5);
+  EXPECT_EQ(approach(value, value, rate).value, 7);
+}
+
 TEST(Math, FiniteBoundaryClassificationSurvivesFastMath) {
   for (auto value : {0.0, -0.0, 1.0, -1.0, std::numeric_limits<double>::max(), std::numeric_limits<double>::denorm_min()})
-    EXPECT_TRUE(isFinite(value));
+    EXPECT_TRUE(is_finite(value));
   for (auto bits : {0x7ff0000000000000ull, 0xfff0000000000000ull, 0x7ff8000000000001ull, 0xfff8000000000001ull}) {
     volatile std::uint64_t input = bits;
-    EXPECT_FALSE(isFinite(std::bit_cast<double>(static_cast<std::uint64_t>(input))));
+    EXPECT_FALSE(is_finite(std::bit_cast<double>(static_cast<std::uint64_t>(input))));
   }
   for (auto value : {0.0f, -0.0f, 1.0f, -1.0f, std::numeric_limits<float>::max(), std::numeric_limits<float>::denorm_min()})
-    EXPECT_TRUE(isFinite(value));
+    EXPECT_TRUE(is_finite(value));
   for (auto bits : {0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00001u}) {
     volatile std::uint32_t input = bits;
-    EXPECT_FALSE(isFinite(std::bit_cast<float>(static_cast<std::uint32_t>(input))));
+    EXPECT_FALSE(is_finite(std::bit_cast<float>(static_cast<std::uint32_t>(input))));
   }
 }
 
 TEST(Math, CycleIncrement) {
   int a = 0;
-  a = cycleIncrement(a, 10, 13);
+  a = cycle_increment(a, 10, 13);
   ASSERT_EQ(a, 10);
-  a = cycleIncrement(a, 10, 13);
+  a = cycle_increment(a, 10, 13);
   ASSERT_EQ(a, 11);
-  a = cycleIncrement(a, 10, 13);
+  a = cycle_increment(a, 10, 13);
   ASSERT_EQ(a, 12);
-  a = cycleIncrement(a, 10, 13);
+  a = cycle_increment(a, 10, 13);
   ASSERT_EQ(a, 13);
-  a = cycleIncrement(a, 10, 13);
+  a = cycle_increment(a, 10, 13);
   ASSERT_EQ(a, 10);
   int b = 14;
-  b = cycleIncrement(b, 10, 13);
+  b = cycle_increment(b, 10, 13);
   ASSERT_EQ(b, 10);
 }
 
@@ -48,11 +261,11 @@ TEST(Math, GenericLerpPreservesArithmetic) {
 }
 
 TEST(Math, ClampedFloatToBytePreservesSaturationAndTruncation) {
-  EXPECT_EQ(floatToByte(-1.0f, true), 0);
-  EXPECT_EQ(floatToByte(0.0f, true), 0);
-  EXPECT_EQ(floatToByte(0.5f, true), 127);
-  EXPECT_EQ(floatToByte(1.0f, true), 255);
-  EXPECT_EQ(floatToByte(2.0f, true), 255);
+  EXPECT_EQ(float_to_byte(-1.0f, true), 0);
+  EXPECT_EQ(float_to_byte(0.0f, true), 0);
+  EXPECT_EQ(float_to_byte(0.5f, true), 127);
+  EXPECT_EQ(float_to_byte(1.0f, true), 255);
+  EXPECT_EQ(float_to_byte(2.0f, true), 255);
 }
 
 TEST(Math, LegacyClampPreservesReversedBounds) {

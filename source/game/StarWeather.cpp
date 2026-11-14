@@ -372,7 +372,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
       // Figure out a good target value based on the rate per x tile, making
       // sure to handle very low count values appropriately on average.
       float count = projectileConfig.ratePerX * spawnRect.width() * dt * m_currentWeatherIntensity;
-      if (m_root.get().random().randf() > fpart(count))
+      if (m_root.get().random().randf() > fractional_part(count))
         count = std::floor(count);
       else
         count = std::ceil(count);
@@ -555,7 +555,7 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
 
     for (auto const& renderZone : newClientRegion.subtract(visibleRegion)) {
       float count = particleConfig.density * renderZone.width() * renderZone.height() * m_currentWeatherIntensity;
-      if (m_root.get().random().randf() > fpart(count))
+      if (m_root.get().random().randf() > fractional_part(count))
         count = std::floor(count);
       else
         count = std::ceil(count);

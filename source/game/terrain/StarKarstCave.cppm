@@ -136,7 +136,7 @@ std::expected<std::shared_ptr<KarstCaveSelector>, StarException> KarstCaveSelect
 }
 
 std::expected<float, StarException> KarstCaveSelector::get(int x, int y) const {
-  Vec2I key = Vec2I(x - pmod(x, m_sectorSize), y - pmod(y, m_sectorSize));
+  Vec2I key = Vec2I(x - positive_mod(x, m_sectorSize), y - positive_mod(y, m_sectorSize));
   auto sector = m_sectorCache.get(key, [this](Vec2I const& key) {
     return Sector::create(*this, key);
   });

@@ -715,10 +715,10 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
     if (hasShadow) {
       //Kae: unlike vanilla we draw only one shadow glyph instead of two, so i'm tweaking the alpha here
       Vec4B shadow = m_renderSettings.shadow;
-      std::uint8_t alphaU = m_renderSettings.color[3] * byteToFloat(shadow[3]);
+      std::uint8_t alphaU = m_renderSettings.color[3] * byte_to_float(shadow[3]);
       if (alphaU != 255) {
-        float alpha = byteToFloat(alphaU);
-        shadow[3] = floatToByte(alpha * (1.5f - 0.5f * alpha));
+        float alpha = byte_to_float(alphaU);
+        shadow[3] = float_to_byte(alpha * (1.5f - 0.5f * alpha));
       }
       else
         shadow[3] = alphaU;

@@ -180,7 +180,7 @@ std::expected<void, StarException> TilePainter::adjustLighting(WorldRenderData& 
   RectI lightRange = RectI::withSize(renderData.lightMinPosition, Vec2I(renderData.lightMap.size()));
   return forEachRenderTile(renderData, lightRange, [&](Vec2I const& pos, RenderTile const& tile) -> std::expected<void, StarException> {
       // Only adjust lighting for tiles with liquid above the draw threshold
-      float drawLevel = liquidDrawLevel(byteToFloat(tile.liquidLevel));
+      float drawLevel = liquidDrawLevel(byte_to_float(tile.liquidLevel));
       if (drawLevel == 0.0f)
         return {};
 
@@ -461,7 +461,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     colorVariant = tile.backgroundColorVariant;
     mod = tile.backgroundMod;
     modHue = tile.backgroundModHueShift;
-    damageLevel = byteToFloat(tile.backgroundDamageLevel);
+    damageLevel = byte_to_float(tile.backgroundDamageLevel);
     damageType = tile.backgroundDamageType;
     color = m_backgroundLayerColor;
   } else {
@@ -470,7 +470,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     colorVariant = tile.foregroundColorVariant;
     mod = tile.foregroundMod;
     modHue = tile.foregroundModHueShift;
-    damageLevel = byteToFloat(tile.foregroundDamageLevel);
+    damageLevel = byte_to_float(tile.foregroundDamageLevel);
     damageType = tile.foregroundDamageType;
     color = m_foregroundLayerColor;
   }
@@ -621,12 +621,12 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
 std::expected<void, StarException> TilePainter::produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive>>& primitives, Vec2I const& pos, WorldRenderData const& renderData) {
   RenderTile const& tile = getRenderTile(renderData, pos);
 
-  float drawLevel = liquidDrawLevel(byteToFloat(tile.liquidLevel));
+  float drawLevel = liquidDrawLevel(byte_to_float(tile.liquidLevel));
   if (drawLevel <= 0.0f)
     return {};
 
   RenderTile const& tileBottom = getRenderTile(renderData, pos - Vec2I(0, 1));
-  float bottomDrawLevel = liquidDrawLevel(byteToFloat(tileBottom.liquidLevel));
+  float bottomDrawLevel = liquidDrawLevel(byte_to_float(tileBottom.liquidLevel));
 
   RectF worldRect;
   if (tileBottom.foreground == EmptyMaterialId && bottomDrawLevel < 1.0f)

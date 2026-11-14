@@ -181,7 +181,7 @@ Tile TileSectorArray<Tile, SectorSize>::defaultTile() const {
 
 template <typename Tile, unsigned SectorSize>
 auto TileSectorArray<Tile, SectorSize>::sectorFor(Vec2I const& pos) const -> Sector {
-  return m_tileSectors.sectorFor(static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0])),
+  return m_tileSectors.sectorFor(static_cast<unsigned>(positive_mod<int>(pos[0], m_worldSize[0])),
                                  static_cast<unsigned>(pos[1]));
 }
 
@@ -287,7 +287,7 @@ bool TileSectorArray<Tile, SectorSize>::tileLoaded(Vec2I const& pos) const {
   if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return false;
 
-  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned xind = static_cast<unsigned>(positive_mod<int>(pos[0], m_worldSize[0]));
   unsigned yind = static_cast<unsigned>(pos[1]);
 
   return m_tileSectors.get(xind, yind).has_value();
@@ -298,7 +298,7 @@ Tile const& TileSectorArray<Tile, SectorSize>::tile(Vec2I const& pos) const {
   if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return m_default;
 
-  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned xind = static_cast<unsigned>(positive_mod<int>(pos[0], m_worldSize[0]));
   unsigned yind = static_cast<unsigned>(pos[1]);
 
   auto tile = m_tileSectors.get(xind, yind);
@@ -312,7 +312,7 @@ auto TileSectorArray<Tile, SectorSize>::modifyTile(Vec2I const& pos) -> std::opt
   if (pos[1] < 0 || pos[1] >= static_cast<int>(m_worldSize[1]))
     return std::nullopt;
 
-  unsigned xind = static_cast<unsigned>(pmod<int>(pos[0], m_worldSize[0]));
+  unsigned xind = static_cast<unsigned>(positive_mod<int>(pos[0], m_worldSize[0]));
   unsigned yind = static_cast<unsigned>(pos[1]);
 
   return m_tileSectors.get(xind, yind);
@@ -537,7 +537,7 @@ template <typename Tile, unsigned SectorSize>
     return StaticList<SplitRect, 2>();
 
   int width = rect.width();
-  int xMin = pmod<int>(rect.xMin(), m_worldSize[0]);
+  int xMin = positive_mod<int>(rect.xMin(), m_worldSize[0]);
   int xOffset = rect.xMin() - xMin;
   rect.setXMin(xMin);
   rect.setXMax(xMin + width);

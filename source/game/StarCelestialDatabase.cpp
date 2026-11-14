@@ -85,8 +85,8 @@ Vec2I CelestialDatabase::chunkIndexFor(CelestialCoordinate const& coordinate) co
 }
 
 Vec2I CelestialDatabase::chunkIndexFor(Vec2I const& systemXY) const {
-  return {(systemXY[0] - pmod(systemXY[0], m_baseInformation.chunkSize)) / m_baseInformation.chunkSize,
-      (systemXY[1] - pmod(systemXY[1], m_baseInformation.chunkSize)) / m_baseInformation.chunkSize};
+  return {(systemXY[0] - positive_mod(systemXY[0], m_baseInformation.chunkSize)) / m_baseInformation.chunkSize,
+      (systemXY[1] - positive_mod(systemXY[1], m_baseInformation.chunkSize)) / m_baseInformation.chunkSize};
 }
 
 List<Vec2I> CelestialDatabase::chunkIndexesFor(RectI const& region) const {

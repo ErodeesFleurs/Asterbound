@@ -792,7 +792,7 @@ std::expected<Color, StarException> MaterialDatabase::materialParticleColor(Mate
   auto info = getMaterialInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
   auto color = info->get().particleColor;
-  color.setHue(pfmod(color.hue() + materialHueToDegrees(hueShift) / 360.0f, 1.0f));
+  color.setHue(positive_mod(color.hue() + materialHueToDegrees(hueShift) / 360.0f, 1.0f));
   return color;
 }
 

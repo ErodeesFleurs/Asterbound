@@ -22,7 +22,7 @@ enum class InterpolationMode {
 
 template <typename T1, typename T2>
 T2 angleLerp(T1 const& offset, T2 const& f0, T2 const& f1) {
-  return f0 + angleDiff(f0, f1) * offset;
+  return f0 + angle_difference(f0, f1) * offset;
 }
 
 template <typename T1, typename T2>
@@ -220,7 +220,7 @@ Bound2<LocType, IndexType> getBound2(LocType loc, IndexType extent, BoundMode bm
 
   bound.offset = 0;
   if (bmode == BoundMode::Wrap) {
-    loc = pfmod<LocType>(loc, extent);
+    loc = positive_mod<LocType>(loc, extent);
   } else {
     LocType newLoc = std::clamp<LocType>(loc, 0, extent - 1);
     if (bmode == BoundMode::Extrapolate)
@@ -270,7 +270,7 @@ Bound4<LocType, IndexType> getBound4(LocType loc, IndexType extent, BoundMode bm
 
   bound.offset = 0;
   if (bmode == BoundMode::Wrap) {
-    loc = pfmod<LocType>(loc, extent);
+    loc = positive_mod<LocType>(loc, extent);
   } else {
     LocType newLoc = std::clamp<LocType>(loc, 0, extent - 1);
     if (bmode == BoundMode::Extrapolate)

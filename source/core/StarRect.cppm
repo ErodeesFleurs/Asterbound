@@ -775,7 +775,7 @@ bool Box<T, N>::containsEpsilon(Coord const& p, unsigned epsilons) const {
   for (std::size_t i = 0; i < N; ++i) {
     if (p[i] < m_min[i] || p[i] > m_max[i])
       return false;
-    if (nearEqual(p[i], m_min[i], epsilons) || nearEqual(p[i], m_max[i], epsilons))
+    if (near_equal(p[i], m_min[i], epsilons) || near_equal(p[i], m_max[i], epsilons))
       return false;
   }
   return true;

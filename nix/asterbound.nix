@@ -174,6 +174,7 @@ let
     "list_benchmarks"
     "vector_benchmarks"
     "matrix3_benchmarks"
+    "math_common_benchmarks"
     "set_benchmarks"
     "string_benchmarks"
     "format_benchmarks"

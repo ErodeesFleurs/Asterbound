@@ -523,7 +523,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     auto rate = jUpdateRate->toFloat();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
-    if (!isFinite(*rate) || *rate <= 0.0f)
+    if (!is_finite(*rate) || *rate <= 0.0f)
       return std::unexpected(StarException("updateRate must be finite and positive"));
     updateRate = *rate;
     m_root->timing().timestep = 1.0f / updateRate;
@@ -535,7 +535,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     auto rate = jServerRate->toFloat();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
-    if (!isFinite(*rate) || *rate <= 0.0f)
+    if (!is_finite(*rate) || *rate <= 0.0f)
       return std::unexpected(StarException("serverUpdateRate must be finite and positive"));
     m_root->timing().serverTimestep = 1.0f / *rate;
   }
@@ -900,7 +900,7 @@ std::expected<void, StarException> ClientApplication::applyRenderSettings(Config
   auto limit = configuration.get("renderFpsLimit").and_then([](Json value) { return value.toDouble(); });
   if (!limit)
     return std::unexpected(std::move(limit.error()));
-  if (!isFinite(*limit) || *limit < 0.0 || *limit > std::numeric_limits<float>::max())
+  if (!is_finite(*limit) || *limit < 0.0 || *limit > std::numeric_limits<float>::max())
     return std::unexpected(StarException("renderFpsLimit must be finite, nonnegative and representable as a float"));
   auto vsync = configuration.get("vsync").and_then([](Json value) { return value.toBool(); });
   if (!vsync)

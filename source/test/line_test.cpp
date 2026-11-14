@@ -61,6 +61,17 @@ static_assert(!std::constructible_from<Line2F, Vec2F const&>);
 
 }// namespace
 
+TEST(LineTest, IntegerEndpointIntersectionRetainsSignedCoordinateSupport) {
+  Line2I horizontal({0, 0}, {4, 0});
+  Line2I vertical({4, 0}, {4, 4});
+  auto result = horizontal.intersection(vertical);
+  EXPECT_TRUE(result.intersects);
+  EXPECT_TRUE(result.glances);
+  EXPECT_FALSE(result.coincides);
+  EXPECT_EQ(result.point, Vec2I(4, 0));
+  EXPECT_EQ(result.t, 1);
+}
+
 TEST(LineTest, IntersectionEndpoint) {
   Line2F a({0, 0}, {10, 10});
   Line2F b({10, -10}, {0, 0});

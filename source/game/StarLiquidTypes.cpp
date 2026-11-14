@@ -36,7 +36,7 @@ LiquidStore::LiquidStore(LiquidId liquid, float level, float pressure, bool sour
   : LiquidLevel(liquid, level), pressure(pressure), source(source) {}
 
 LiquidNetUpdate LiquidStore::netUpdate() const {
-  return LiquidNetUpdate{liquid, floatToByte(level, true)};
+  return LiquidNetUpdate{liquid, float_to_byte(level, true)};
 }
 
 std::optional<LiquidNetUpdate> LiquidStore::update(LiquidId liquid, float level, float pressure) {
@@ -52,14 +52,14 @@ std::optional<LiquidNetUpdate> LiquidStore::update(LiquidId liquid, float level,
     pressure = 0.0f;
   }
 
-  bool netUpdate = this->liquid != liquid || floatToByte(this->level, true) != floatToByte(level, true);
+  bool netUpdate = this->liquid != liquid || float_to_byte(this->level, true) != float_to_byte(level, true);
 
   this->liquid = liquid;
   this->level = level;
   this->pressure = pressure;
 
   if (netUpdate)
-    return LiquidNetUpdate{liquid, floatToByte(level, true)};
+    return LiquidNetUpdate{liquid, float_to_byte(level, true)};
   else
     return {};
 }

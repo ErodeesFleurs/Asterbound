@@ -1770,7 +1770,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
 
   Vec2I dimensions(tileArray->size());
 
-  auto wrapCoords = [=](Vec2I const& coord) -> Vec2I { return Vec2I{pmod<int>(coord[0], dimensions[0]), coord[1]}; };
+  auto wrapCoords = [=](Vec2I const& coord) -> Vec2I { return Vec2I{positive_mod<int>(coord[0], dimensions[0]), coord[1]}; };
 
   RectI sectorTiles = tileArray->sectorRegion(sector);
   RectI bounds = sectorTiles.padded(Vec2I(WorldSectorSize - 1, WorldSectorSize - 1));
