@@ -37,7 +37,7 @@ import star.terrain_cache;
 namespace Star {
 
 TerrainSelectorParameters::TerrainSelectorParameters(RandomService& random) {
-  seed = random.randu64();
+  seed = random.next_u64();
   worldWidth = 0;
   baseHeight = 0;
   commonality = 1.0f;

@@ -358,7 +358,7 @@ String Item::category() const {
 }
 
 std::expected<String, StarException> Item::pickupSound() const {
-  auto sound = root().random().randFrom(m_pickupSounds);
+  auto sound = root().random().sample_ref(m_pickupSounds);
   if (!sound)
     return std::unexpected(std::move(sound.error()));
   return sound->get();

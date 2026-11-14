@@ -64,10 +64,10 @@ private:
 class RatePeriodic {
 public:
   explicit RatePeriodic(RandomService& random)
-    : m_random(random), m_period(1), m_noise(0), m_counter(1 + random.randf() * 0), m_elapsed(0.0) {}
+    : m_random(random), m_period(1), m_noise(0), m_counter(1 + random.uniform_float() * 0), m_elapsed(0.0) {}
 
   [[nodiscard]] static std::expected<RatePeriodic, StarException> create(RandomService& random, double period, double noise = 0) {
-    auto draw = random.randf(-noise, noise);
+    auto draw = random.uniform_float(-noise, noise);
     if (!draw)
       return std::unexpected(std::move(draw.error()));
     return RatePeriodic(random, period, noise, period + *draw);
@@ -89,7 +89,7 @@ public:
     m_elapsed += subAmount;
 
     if (m_counter <= 0.0) {
-      auto draw = m_random.get().randf(-m_noise, m_noise);
+      auto draw = m_random.get().uniform_float(-m_noise, m_noise);
       if (!draw)
         return std::unexpected(std::move(draw.error()));
       m_counter = m_period + *draw;

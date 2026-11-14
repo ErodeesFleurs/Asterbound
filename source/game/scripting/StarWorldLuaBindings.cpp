@@ -1259,7 +1259,7 @@ namespace LuaBindings {
         List<BiomeItemDistribution> distributions;
         distributions.reserve(distributionConfigs.size());
         for (auto const& config : distributionConfigs) {
-          auto distributionResult = BiomeItemDistribution::create(serverWorld->get().root(), config, serverWorld->get().root().random().randu64());
+          auto distributionResult = BiomeItemDistribution::create(serverWorld->get().root(), config, serverWorld->get().root().random().next_u64());
           if (!distributionResult)
             return std::unexpected(std::move(distributionResult.error()));
           auto distribution = std::move(*distributionResult);
@@ -2607,7 +2607,7 @@ namespace LuaBindings {
       return std::unexpected(std::move(treasureDatabaseResult.error()));
     auto treasureDatabase = std::move(*treasureDatabaseResult);
     auto spawn = [&]() -> std::expected<void, StarException> {
-      auto treasureResult = treasureDatabase->createTreasure(pool, level, seed.value_or(world.root().random().randu64()));
+      auto treasureResult = treasureDatabase->createTreasure(pool, level, seed.value_or(world.root().random().next_u64()));
       if (!treasureResult)
         return std::unexpected(std::move(treasureResult.error()));
       auto treasure = std::move(*treasureResult);
@@ -2639,7 +2639,7 @@ namespace LuaBindings {
     auto monsterDatabase = std::move(*monsterDatabaseResult);
     auto spawn = [&]() -> std::expected<std::optional<EntityId>, StarException> {
       JsonObject parameters;
-      parameters["aggressive"] = world.root().random().randb();
+      parameters["aggressive"] = world.root().random().next_bool();
       if (arg3)
         parameters.merge(*arg3, true);
       float level = 1;
@@ -2685,7 +2685,7 @@ namespace LuaBindings {
       float arg4,
       std::optional<std::uint64_t> arg5,
       Json const& arg6) {
-    auto seed = arg5 ? *arg5 : world.root().random().randu64();
+    auto seed = arg5 ? *arg5 : world.root().random().next_u64();
     auto npcDatabaseResult = world.root().npcDatabase();
     if (!npcDatabaseResult)
       return std::unexpected(std::move(npcDatabaseResult.error()));

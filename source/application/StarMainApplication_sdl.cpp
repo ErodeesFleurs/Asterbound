@@ -526,7 +526,7 @@ public:
         ++it;
       }
     }
-    if (auto result = m_cursorRandom.init(); !result)
+    if (auto result = m_cursorRandom.seed(); !result)
       return std::unexpected(std::move(result.error()));
 
     auto nativeBase = m_dispatcher.invoke([&]() -> std::expected<void, StarException> {

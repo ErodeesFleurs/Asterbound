@@ -15,7 +15,7 @@ TEST(PolyTest, ConvexHull) {
   auto& random = **randomResult;
   PolyF::VertexList inputVertexes;
   for (unsigned i = 0; i < 1000; ++i) {
-    float angle = random.randf() * 2 * std::numbers::pi;
+    float angle = random.uniform_float() * 2 * std::numbers::pi;
     inputVertexes.push_back({std::sin(angle), std::cos(angle)});
   }
 
@@ -23,7 +23,7 @@ TEST(PolyTest, ConvexHull) {
 
   PolyF::VertexList testVertexes;
   for (unsigned i = 0; i < 1000; ++i) {
-    float angle = random.randf() * 2 * std::numbers::pi;
+    float angle = random.uniform_float() * 2 * std::numbers::pi;
     testVertexes.push_back({std::sin(angle) * 0.75f, std::cos(angle) * 0.75f});
   }
 

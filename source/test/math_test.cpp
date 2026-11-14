@@ -28,6 +28,9 @@ concept has_angle_operations = requires(T a) {
   normalize_angle(a); angle_difference(a, a); approach_angle(a, a, a);
 };
 
+template <typename... T>
+concept has_finite_classification = requires(T const&... values) { classify_finite(values...); };
+
 struct NotNumeric {};
 
 struct ContextualBool {
@@ -77,6 +80,8 @@ static_assert(!has_wrap_difference<unsigned> && !has_wrap_difference<bool>);
 static_assert(has_fractional_part<float> && !has_fractional_part<int> && !has_fractional_part<NotNumeric>);
 static_assert(has_angle_operations<long double> && !has_angle_operations<int>);
 static_assert(finite_classifiable<float> && finite_classifiable<double> && !finite_classifiable<long double>);
+static_assert(has_finite_classification<float, double> && has_finite_classification<double, double, double>);
+static_assert(!has_finite_classification<> && !has_finite_classification<float, int> && !has_finite_classification<long double>);
 static_assert(!square_operand<NotNumeric> && !square_operand<ExplicitScalar>);
 static_assert(!clampable<NotNumeric> && !approachable<NotNumeric>);
 static_assert(square_operand<AlgebraicScalar> && clampable<AlgebraicScalar> && approachable<AlgebraicScalar>);
@@ -223,17 +228,27 @@ TEST(Math, AlgebraicHelpersAcceptCopyOnlyAndContextualComparisons) {
 }
 
 TEST(Math, FiniteBoundaryClassificationSurvivesFastMath) {
-  for (auto value : {0.0, -0.0, 1.0, -1.0, std::numeric_limits<double>::max(), std::numeric_limits<double>::denorm_min()})
+  for (auto value : {0.0, -0.0, 1.0, -1.0, std::numeric_limits<double>::max(), std::numeric_limits<double>::denorm_min()}) {
     EXPECT_TRUE(is_finite(value));
+    EXPECT_EQ(classify_finite(value, value, value), (std::array{true, true, true}));
+  }
   for (auto bits : {0x7ff0000000000000ull, 0xfff0000000000000ull, 0x7ff8000000000001ull, 0xfff8000000000001ull}) {
     volatile std::uint64_t input = bits;
-    EXPECT_FALSE(is_finite(std::bit_cast<double>(static_cast<std::uint64_t>(input))));
+    auto value = std::bit_cast<double>(static_cast<std::uint64_t>(input));
+    EXPECT_FALSE(is_finite(value));
+    EXPECT_EQ(classify_finite(value, 1.0, value), (std::array{false, true, false}));
+    EXPECT_EQ(classify_finite(1.0, value, 1.0), (std::array{true, false, true}));
   }
-  for (auto value : {0.0f, -0.0f, 1.0f, -1.0f, std::numeric_limits<float>::max(), std::numeric_limits<float>::denorm_min()})
+  for (auto value : {0.0f, -0.0f, 1.0f, -1.0f, std::numeric_limits<float>::max(), std::numeric_limits<float>::denorm_min()}) {
     EXPECT_TRUE(is_finite(value));
+    EXPECT_EQ(classify_finite(value, value), (std::array{true, true}));
+  }
   for (auto bits : {0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00001u}) {
     volatile std::uint32_t input = bits;
-    EXPECT_FALSE(is_finite(std::bit_cast<float>(static_cast<std::uint32_t>(input))));
+    auto value = std::bit_cast<float>(static_cast<std::uint32_t>(input));
+    EXPECT_FALSE(is_finite(value));
+    EXPECT_EQ(classify_finite(value, 1.0f, value), (std::array{false, true, false}));
+    EXPECT_EQ(classify_finite(1.0f, value, 1.0f), (std::array{true, false, true}));
   }
 }
 

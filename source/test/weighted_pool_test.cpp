@@ -99,7 +99,7 @@ TEST(WeightedPoolTest, OverflowRejectionLeavesThePoolUsable) {
   ASSERT_TRUE(pool.insert(1.0, 13));
   RandomSource random(17), reference(17);
   for (unsigned i = 0; i < 128; ++i)
-    EXPECT_EQ(pool.select(random), reference.randd() <= 0.5 ? 11 : 13);
+    EXPECT_EQ(pool.select(random), reference.uniform_double() <= 0.5 ? 11 : 13);
 }
 
 TEST(WeightedPoolTest, MoveConstructionAssignmentAndSelfMovePreserveReusableState) {
@@ -128,19 +128,19 @@ TEST(WeightedPoolTest, EmptyAndZeroCountOperationsPreserveRandomStreamContracts)
   WeightedPool<int> empty;
   RandomSource source(71), expected(71);
   EXPECT_EQ(empty.select(source), 0);
-  EXPECT_EQ(source.randu64(), expected.randu64());
+  EXPECT_EQ(source.next_u64(), expected.next_u64());
   EXPECT_EQ(empty.select_index(source), NPos);
-  (void)expected.randd();
-  EXPECT_EQ(source.randu64(), expected.randu64());
+  (void)expected.uniform_double();
+  EXPECT_EQ(source.next_u64(), expected.next_u64());
   RandomService service(81), service_expected(81);
   EXPECT_EQ(empty.select(service), 0);
-  EXPECT_EQ(service.randu64(), service_expected.randu64());
+  EXPECT_EQ(service.next_u64(), service_expected.next_u64());
   EXPECT_EQ(empty.select_index(service), NPos);
-  (void)service_expected.randd();
-  EXPECT_EQ(service.randu64(), service_expected.randu64());
+  (void)service_expected.uniform_double();
+  EXPECT_EQ(service.next_u64(), service_expected.next_u64());
   EXPECT_TRUE(empty.select_unique(0, service).empty());
-  (void)service_expected.randu64();
-  EXPECT_EQ(service.randu64(), service_expected.randu64());
+  (void)service_expected.next_u64();
+  EXPECT_EQ(service.next_u64(), service_expected.next_u64());
   EXPECT_FALSE(empty.at(0));
   EXPECT_FALSE(empty.item(0));
   EXPECT_FALSE(empty.weight(0));

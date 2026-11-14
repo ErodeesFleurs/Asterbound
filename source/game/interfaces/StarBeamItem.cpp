@@ -284,16 +284,16 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     beamParticle.position = itemOwner->get().position() + m_beamCurve.pointAt(curveLoc);
     beamParticle.size = 1.0f;
     Color randomColor = m_lastUpdateColor;
-    auto valueScale = beamRoot().random().randf(1, 4);
+    auto valueScale = beamRoot().random().uniform_float(1, 4);
     if (!valueScale)
       return std::unexpected(std::move(valueScale.error()));
     randomColor.setValue(1 - (1 - randomColor.value()) / *valueScale);
-    auto saturationScale = beamRoot().random().randf(1, 4);
+    auto saturationScale = beamRoot().random().uniform_float(1, 4);
     if (!saturationScale)
       return std::unexpected(std::move(saturationScale.error()));
     randomColor.setSaturation(randomColor.saturation() / *saturationScale);
     beamParticle.color = randomColor;
-    beamParticle.velocity = Vec2F::filled(beamRoot().random().randf());
+    beamParticle.velocity = Vec2F::filled(beamRoot().random().uniform_float());
     beamParticle.finalVelocity = Vec2F(0.0f, -20.0f);
     beamParticle.approach = Vec2F(0.0f, 5.0f);
     beamParticle.timeToLive = 0.25f;
@@ -352,15 +352,25 @@ std::expected<float, StarException> BeamItem::getAppropriateOpacity() const {
   const float rangeEffect = (m_range - curveLen) / m_range;
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
-  auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(beamRoot().presentationRandom().nrandf(dev, projectOntoRange(min, max)), min, max);
+  auto rangeRand = [&](float dev, float min, float max) -> std::expected<float, StarException> {
+    auto value = beamRoot().presentationRandom().normal_float(dev, projectOntoRange(min, max));
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    return clamp<float>(*value, min, max);
   };
 
   int numLines = projectOntoRange(m_minBeamLines, m_maxBeamLines);
-  float res = (1 - rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans));
+  auto transparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+  if (!transparency)
+    return std::unexpected(std::move(transparency.error()));
+  float res = 1 - *transparency;
   if (numLines > 0) {
-    for (auto line = 0; line < numLines - 1; line++)
-      res *= (1 - rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans));
+    for (auto line = 0; line < numLines - 1; line++) {
+      auto nextTransparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+      if (!nextTransparency)
+        return std::unexpected(std::move(nextTransparency.error()));
+      res *= 1 - *nextTransparency;
+    }
   }
   return 1 - res;
 }
@@ -376,8 +386,11 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
   const float rangeEffect = (m_range - curveLen) / m_range;
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
-  auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(beamRoot().presentationRandom().nrandf(dev, projectOntoRange(min, max)), min, max);
+  auto rangeRand = [&](float dev, float min, float max) -> std::expected<float, StarException> {
+    auto value = beamRoot().presentationRandom().normal_float(dev, projectOntoRange(min, max));
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    return clamp<float>(*value, min, max);
   };
 
   if (initialized() && m_beamInRange) {
@@ -410,8 +423,14 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
       }
 
       for (auto line = 0; line < numLines; line++) {
-        float lineThickness = rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);
-        float beamTransparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+        auto width = rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);
+        if (!width)
+          return std::unexpected(std::move(width.error()));
+        float lineThickness = *width;
+        auto transparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+        if (!transparency)
+          return std::unexpected(std::move(transparency.error()));
+        float beamTransparency = *transparency;
         mainColor.setAlphaF(mainColor.alphaF() * beamTransparency);
         Vec2F previousLoc = m_beamCurve.origin(); // lines meet at origin and dest.
         Color innerStripe = mainColor;
@@ -427,9 +446,13 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
             / static_cast<float>(
                         static_cast<int>(curveLen * m_targetSegmentRun + .5));// project the discrete steps evenly
 
-          Vec2F currentLoc =
-              m_beamCurve.pointAt(pos) + Vec2F(rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter),
-                                             rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter));
+          auto jitterX = rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter);
+          if (!jitterX)
+            return std::unexpected(std::move(jitterX.error()));
+          auto jitterY = rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter);
+          if (!jitterY)
+            return std::unexpected(std::move(jitterY.error()));
+          Vec2F currentLoc = m_beamCurve.pointAt(pos) + Vec2F(*jitterX, *jitterY);
           res.push_back(
               Drawable::makeLine(Line2F(previousLoc, currentLoc), lineThickness, mainColor, Vec2F()));
           res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),

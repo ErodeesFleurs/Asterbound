@@ -402,7 +402,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
           if (!durationResult)
             return std::unexpected(std::move(durationResult.error()));
           auto duration = std::move(*durationResult);
-          auto intervalResult = root().random().randf(duration[0], duration[1]);
+          auto intervalResult = root().random().uniform_float(duration[0], duration[1]);
           if (!intervalResult)
             return std::unexpected(std::move(intervalResult.error()));
           auto interval = std::move(*intervalResult);
@@ -458,7 +458,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     auto variantResult = foliageName.empty() ? plants->buildTreeVariant(stemName, stemHueShift) : plants->buildTreeVariant(stemName, stemHueShift, foliageName, foliageHueShift);
     if (!variantResult)
       return std::unexpected(std::move(variantResult.error()));
-    auto plantResult = plants->createPlant(*variantResult, root().random().randi64());
+    auto plantResult = plants->createPlant(*variantResult, root().random().next_i64());
     if (!plantResult)
       return std::unexpected(std::move(plantResult.error()));
     auto plant = std::move(*plantResult);
@@ -499,7 +499,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!durationResult)
       return std::unexpected(std::move(durationResult.error()));
     auto duration = std::move(*durationResult);
-    auto intervalResult = root().random().randf(duration[0], duration[1]);
+    auto intervalResult = root().random().uniform_float(duration[0], duration[1]);
     if (!intervalResult)
       return std::unexpected(std::move(intervalResult.error()));
     auto interval = std::move(*intervalResult);
@@ -529,8 +529,10 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!altsResult)
       return std::unexpected(std::move(altsResult.error()));
     auto alts = std::move(*altsResult);
-    auto alt = root().random().randInt(alts - 1);
-    m_stageAlt = alt;
+    auto alt = root().random().uniform_int(alts - 1);
+    if (!alt)
+      return std::unexpected(std::move(alt.error()));
+    m_stageAlt = *alt;
   }
   m_stage = newStage;
   setImageKey("stage", Star::to_string(m_stage));

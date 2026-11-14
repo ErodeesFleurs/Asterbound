@@ -117,7 +117,7 @@ std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServ
   if (!placed)
     return std::unexpected(std::move(placed.error()));
   server->m_lastSpawn = server->time() - server->systemConfig().objectSpawnCycle;
-  auto interval = root.random().randf(server->systemConfig().objectSpawnInterval[0], server->systemConfig().objectSpawnInterval[1]);
+  auto interval = root.random().uniform_float(server->systemConfig().objectSpawnInterval[0], server->systemConfig().objectSpawnInterval[1]);
   if (!interval)
     return std::unexpected(std::move(interval.error()));
   server->m_objectSpawnTime = *interval;
@@ -486,7 +486,7 @@ std::expected<void, StarException> SystemWorldServer::queueUpdatePackets() {
 
 std::expected<void, StarException> SystemWorldServer::handleIncomingPacket(ConnectionId, std::shared_ptr<Packet> packet) {
   if (auto spawn = as<SystemObjectSpawnPacket>(packet)) {
-    RandomSource random(root().random().randu64());
+    RandomSource random(root().random().next_u64());
     // value_or previously evaluated this draw even for an explicit position.
     auto randomPosition = randomObjectSpawnPosition(random);
     if (!randomPosition)
@@ -576,7 +576,7 @@ std::expected<void, StarException> SystemWorldServer::spawnObjects() {
   m_lastSpawn = time() - diff;
   while (diff > m_objectSpawnTime) {
     m_lastSpawn += m_objectSpawnTime;
-    auto interval = root().random().randf(systemConfig().objectSpawnInterval[0], systemConfig().objectSpawnInterval[1]);
+    auto interval = root().random().uniform_float(systemConfig().objectSpawnInterval[0], systemConfig().objectSpawnInterval[1]);
     if (!interval)
       return std::unexpected(std::move(interval.error()));
     m_objectSpawnTime = *interval;
@@ -598,7 +598,7 @@ std::expected<void, StarException> SystemWorldServer::spawnObjects() {
     auto config = systemObjectConfig(name, uuid);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    RandomSource random(root().random().randu64());
+    RandomSource random(root().random().next_u64());
     auto position = randomObjectSpawnPosition(random);
     if (!position)
       return std::unexpected(std::move(position.error()));
@@ -611,7 +611,7 @@ std::expected<void, StarException> SystemWorldServer::spawnObjects() {
         return std::ranges::none_of(objects(), [&p](std::shared_ptr<SystemObject> const& object) { return object->orbitTarget() == p; });
       });
       if (!targets.empty()) {
-        auto selected = root().random().randFrom(targets);
+        auto selected = root().random().sample_ref(targets);
         if (!selected)
           return std::unexpected(std::move(selected.error()));
         auto const& target = selected->get();
@@ -697,11 +697,11 @@ std::expected<Vec2F, StarException> SystemWorldServer::randomObjectSpawnPosition
     return std::unexpected(std::move(size.error()));
   float rim = *distance + *size / 2.0 + config.objectSpawnPadding;
   ranges.push_back(Vec2F(rim, rim + config.objectSpawnPadding));
-  auto selected = random.randFrom(ranges);
+  auto selected = random.sample_ref(ranges);
   if (!selected)
     return std::unexpected(std::move(selected.error()));
   auto const& range = selected->get();
-  return Vec2F::with_angle(random.randf() * std::numbers::pi * 2.0, range[0] + random.randf() * (range[1] - range[0]));
+  return Vec2F::with_angle(random.uniform_float() * std::numbers::pi * 2.0, range[0] + random.uniform_float() * (range[1] - range[0]));
 }
 
 std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParameters(SystemLocation const& location) const {

@@ -288,12 +288,21 @@ std::expected<void, StarException> WirePane::renderWire(Vec2F from, Vec2F to, Co
   from = m_worldPainter->camera().worldToScreen(from);
   to = m_worldPainter->camera().worldToScreen(to);
 
-  auto rangeRand = [&](float dev, float min, float max) {
-    return clamp<float>(context().root().presentationRandom().nrandf(dev, max), min, max);
+  auto rangeRand = [&](float dev, float min, float max) -> std::expected<float, StarException> {
+    auto value = context().root().presentationRandom().normal_float(dev, max);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    return clamp<float>(*value, min, max);
   };
 
-  float lineThickness = m_worldPainter->camera().pixelRatio() * rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);
-  float beamTransparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+  auto width = rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);
+  if (!width)
+    return std::unexpected(std::move(width.error()));
+  float lineThickness = m_worldPainter->camera().pixelRatio() * *width;
+  auto transparency = rangeRand(m_beamTransDev, m_minBeamTrans, m_maxBeamTrans);
+  if (!transparency)
+    return std::unexpected(std::move(transparency.error()));
+  float beamTransparency = *transparency;
   baseColor.setAlphaF(baseColor.alphaF() * beamTransparency);
   Color innerStripe = baseColor;
   innerStripe.setValue(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);

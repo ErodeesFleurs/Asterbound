@@ -469,9 +469,9 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
     auto type = (*types)->spawnType(name);
     if (!type) return std::unexpected(std::move(type.error()));
     if (!type->spawnParameters.compatible(**cellParameters)) continue;
-    if (root().random().randf() < type->spawnChance) {
+    if (root().random().uniform_float() < type->spawnChance) {
       std::uint64_t seed = static_random_u64(type->seedMix, m_facade->spawnSeed());
-      auto groupSize = root().random().randInt(type->groupSize[0], type->groupSize[1]);
+      auto groupSize = root().random().uniform_int(type->groupSize[0], type->groupSize[1]);
       if (!groupSize) return std::unexpected(std::move(groupSize.error()));
       for (int i = 0; i < *groupSize; ++i) {
         String monsterType;
@@ -490,11 +490,11 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
           if (!threat) return std::unexpected(std::move(threat.error()));
           float level = *threat;
           if (m_facade->dayLevel() >= m_minimumDayLevel) {
-            auto adjustment = root().random().randf(type->dayLevelAdjustment[0], type->dayLevelAdjustment[1]);
+            auto adjustment = root().random().uniform_float(type->dayLevelAdjustment[0], type->dayLevelAdjustment[1]);
             if (!adjustment) return std::unexpected(std::move(adjustment.error()));
             level += *adjustment;
           } else {
-            auto adjustment = root().random().randf(type->nightLevelAdjustment[0], type->nightLevelAdjustment[1]);
+            auto adjustment = root().random().uniform_float(type->nightLevelAdjustment[0], type->nightLevelAdjustment[1]);
             if (!adjustment) return std::unexpected(std::move(adjustment.error()));
             level += *adjustment;
           }

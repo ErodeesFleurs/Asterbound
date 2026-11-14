@@ -160,7 +160,7 @@ m_foliageDropConfig = std::move(*result430);
   float xOffset = 0;
   float yOffset = 0;
 
-  float roffset = this->root().random().randf() * 0.5f;
+  float roffset = this->root().random().uniform_float() * 0.5f;
 
   m_descriptions = config.descriptions;
   m_ephemeral = config.ephemeral;
@@ -179,8 +179,9 @@ if (!result432) return std::unexpected(std::move(result432.error()));
 auto result433 = std::move(*result432).toObject();
 if (!result433) return std::unexpected(std::move(result433.error()));
 JsonObject bases = std::move(*result433);
-    auto result434 = rnd.randInt(bases.size() - 1);
-String baseKey = bases.keys()[result434];
+    auto result434 = rnd.uniform_int(bases.size() - 1);
+if (!result434) return std::unexpected(std::move(result434.error()));
+String baseKey = bases.keys()[*result434];
     auto result435 = bases[baseKey].toObject();
 if (!result435) return std::unexpected(std::move(result435.error()));
 JsonObject baseSettings = std::move(*result435);
@@ -220,7 +221,7 @@ float baseImageHeight = std::move(*result443)->height();
       piece.kind = PlantPieceKind::Stem;
       piece.zLevel = 0.0f;
       piece.rotationType = DontRotate;
-      piece.rotationOffset = this->root().random().randf() + roffset;
+      piece.rotationOffset = this->root().random().uniform_float() + roffset;
       m_pieces.push_back(piece);
     }
 
@@ -272,7 +273,7 @@ piece.structuralSegment = false;
 piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().randf() + roffset;
+piece.rotationOffset = this->root().random().uniform_float() + roffset;
 m_pieces.push_back(piece);
       }
 
@@ -298,7 +299,7 @@ piece.structuralSegment = false;
 piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().randf() + roffset;
+piece.rotationOffset = this->root().random().uniform_float() + roffset;
 m_pieces.push_back(piece);
       }
     }
@@ -333,8 +334,9 @@ auto result469 = config.stemSettings.getInt("middleMaxSize", 6);
 if (!result469) return std::unexpected(std::move(result469.error()));
 auto result470 = config.stemSettings.getInt("middleMinSize", 1);
 if (!result470) return std::unexpected(std::move(result470.error()));
-auto result471 = rnd.randInt(std::move(*result469) - std::move(*result470));
-int middleHeight = std::move(*result468) + result471;
+auto result471 = rnd.uniform_int(std::move(*result469) - std::move(*result470));
+if (!result471) return std::unexpected(std::move(result471.error()));
+int middleHeight = std::move(*result468) + *result471;
 
     auto result472 = config.stemSettings.contains("branch");
 if (!result472) return std::unexpected(std::move(result472.error()));
@@ -351,8 +353,9 @@ branches = std::move(*result474);
     }
 
     for (int i = 0; i < middleHeight; i++) {
-      auto result475 = rnd.randInt(middles.size() - 1);
-String middleKey = middles.keys()[result475];
+      auto result475 = rnd.uniform_int(middles.size() - 1);
+if (!result475) return std::unexpected(std::move(result475.error()));
+String middleKey = middles.keys()[*result475];
       auto result476 = middles[middleKey].toObject();
 if (!result476) return std::unexpected(std::move(result476.error()));
 JsonObject middleSettings = std::move(*result476);
@@ -386,7 +389,7 @@ String middleFile = AssetPath::relative_to(config.stemDirectory, std::move(*resu
   piece.kind = PlantPieceKind::Stem;
   piece.zLevel = 1.0f;
   piece.rotationType = DontRotate;
-  piece.rotationOffset = this->root().random().randf() + roffset;
+  piece.rotationOffset = this->root().random().uniform_float() + roffset;
   m_pieces.push_back(piece);
 }
 
@@ -437,7 +440,7 @@ piece.structuralSegment = false;
 piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = 3.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().randf() + roffset;
+piece.rotationOffset = this->root().random().uniform_float() + roffset;
 m_pieces.push_back(piece);
         }
 
@@ -463,7 +466,7 @@ piece.structuralSegment = false;
 piece.kind = PlantPieceKind::Foliage;
 piece.zLevel = -1.0f;
 piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().randf() + roffset;
+piece.rotationOffset = this->root().random().uniform_float() + roffset;
 m_pieces.push_back(piece);
         }
       }
@@ -481,8 +484,9 @@ yOffset += std::move(*result505) / TilePixels;
 
       // branch
       while (hasBranches && (yOffset >= branchYOffset) && ((middleHeight - i) > 0)) {
-        auto result506 = rnd.randInt(branches.size() - 1);
-String branchKey = branches.keys()[result506];
+        auto result506 = rnd.uniform_int(branches.size() - 1);
+if (!result506) return std::unexpected(std::move(result506.error()));
+String branchKey = branches.keys()[*result506];
         auto result507 = branches[branchKey].toObject();
 if (!result507) return std::unexpected(std::move(result507.error()));
 JsonObject branchSettings = std::move(*result507);
@@ -513,11 +517,12 @@ float yO = branchYOffset + std::move(*result514) / TilePixels;
 if (!result515) return std::unexpected(std::move(result515.error()));
 bool condition517 = static_cast<bool>(std::move(*result515));
 if (!condition517) {
-auto result516 = rnd.randInt(2 + i);
-condition517 = static_cast<bool>(result516 != 0);
+auto result516 = rnd.uniform_int(2 + i);
+if (!result516) return std::unexpected(std::move(result516.error()));
+condition517 = static_cast<bool>(*result516 != 0);
 }
 if (condition517) {
-          float boffset = this->root().random().randf() + roffset;
+          float boffset = this->root().random().uniform_float() + roffset;
           auto result518 = branchSettings.get("image");
 if (!result518) return std::unexpected(std::move(result518.error()));
 auto result519 = result518->get().toString();
@@ -620,8 +625,9 @@ m_pieces.push_back(piece);
 if (!result538) return std::unexpected(std::move(result538.error()));
 auto result539 = result538->get().toDouble();
 if (!result539) return std::unexpected(std::move(result539.error()));
-auto result540 = rnd.randInt(4);
-branchYOffset += (std::move(*result539) / TilePixels) / static_cast<float>(1 + result540);
+auto result540 = rnd.uniform_int(4);
+if (!result540) return std::unexpected(std::move(result540.error()));
+branchYOffset += (std::move(*result539) / TilePixels) / static_cast<float>(1 + *result540);
         }
       }
       segment++;
@@ -635,8 +641,9 @@ if (!result541) return std::unexpected(std::move(result541.error()));
 JsonObject crowns = std::move(*result541);
     bool hasCrown = crowns.size() > 0;
     if (hasCrown) {
-      auto result542 = rnd.randInt(crowns.size() - 1);
-String crownKey = crowns.keys()[result542];
+      auto result542 = rnd.uniform_int(crowns.size() - 1);
+if (!result542) return std::unexpected(std::move(result542.error()));
+String crownKey = crowns.keys()[*result542];
       auto result543 = crowns[crownKey].toObject();
 if (!result543) return std::unexpected(std::move(result543.error()));
 JsonObject crownSettings = std::move(*result543);
@@ -656,7 +663,7 @@ auto result548 = result547->get().toDouble();
 if (!result548) return std::unexpected(std::move(result548.error()));
 yOffset += std::move(*result548) / TilePixels;
 
-      float coffset = roffset + this->root().random().randf();
+      float coffset = roffset + this->root().random().uniform_float();
 
       auto result549 = crownSettings.get("image");
 if (!result549) return std::unexpected(std::move(result549.error()));
@@ -845,7 +852,10 @@ std::expected<void, StarException> Plant::initialize(GrassVariant const& config,
 
   RandomSource rand(seed);
 
-  String imageName = AssetPath::relative_to(config.directory, rand.randValueFrom(config.images));
+  auto image = rand.sample_value(config.images);
+  if (!image)
+    return std::unexpected(std::move(image.error()));
+  String imageName = AssetPath::relative_to(config.directory, *image);
 
   Vec2F offset = Vec2F();
   // If this is a ceiling plant, offset the image so that the [0, 0] space is
@@ -906,7 +916,10 @@ std::expected<void, StarException> Plant::initialize(BushVariant const& config, 
 if (!result421) return std::unexpected(std::move(result421.error()));
 auto assets = std::move(*result421);
 
-  auto shape = rand.randValueFrom(config.shapes);
+  auto shapeResult = rand.sample_value(config.shapes);
+  if (!shapeResult)
+    return std::unexpected(std::move(shapeResult.error()));
+  auto shape = std::move(*shapeResult);
   String shapeImageName = AssetPath::relative_to(config.directory, shape.image);
   auto result422 = assets->image(shapeImageName);
 if (!result422) return std::unexpected(std::move(result422.error()));
@@ -927,7 +940,10 @@ float shapeImageHeight = std::move(*result422)->height();
     m_pieces.push_back(piece);
   }
 
-  auto mod = rand.randValueFrom(shape.mods);
+  auto modResult = rand.sample_value(shape.mods);
+  if (!modResult)
+    return std::unexpected(std::move(modResult.error()));
+  auto mod = std::move(*modResult);
   if (!mod.empty()) {
     PlantPiece piece;
     piece.image = Star::format("{}?hueshift={}", AssetPath::relative_to(config.directory, mod), config.modHueShift);
@@ -1275,7 +1291,7 @@ if (!result623) return std::unexpected(std::move(result623.error()));
 }
 
 std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& renderCallback) {
-  auto damageOffset = this->root().random().randf(-0.1f, 0.1f);
+  auto damageOffset = this->root().random().uniform_float(-0.1f, 0.1f);
   if (!damageOffset)
     return std::unexpected(std::move(damageOffset.error()));
   m_presentationDamageXOffset = *damageOffset * m_tileDamageStatus->damageEffectPercentage();
@@ -1297,7 +1313,10 @@ auto hueshift = std::move(*result608) / 360.0f;
 if (!result609) return std::unexpected(std::move(result609.error()));
 auto density = std::move(*result609);
       while (density-- > 0) {
-        auto config = this->root().random().randValueFrom(particleOptions, {});
+        auto configResult = this->root().random().sample_value(particleOptions, {});
+        if (!configResult)
+          return std::unexpected(std::move(configResult.error()));
+        auto config = std::move(*configResult);
         bool condition1282 = static_cast<bool>(config.isNull());
 if (!condition1282) {
 auto result1281 = config.size();
@@ -1316,7 +1335,7 @@ auto particle = std::move(*result611);
           particle.string = Star::format("{}?hueshift={}", particle.string, hueshift);
           particle.image = particle.string;
         }
-        particle.position = {m_tileDamageX + this->root().random().randf(), m_tileDamageY + this->root().random().randf()};
+        particle.position = {m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float()};
         particle.translate(position());
         auto result612 = renderCallback.addParticle(std::move(particle));
 if (!result612) return std::unexpected(std::move(result612.error()));
@@ -1327,10 +1346,10 @@ auto result614 = std::move(*result613).getArray("damageTree", JsonArray());
 if (!result614) return std::unexpected(std::move(result614.error()));
 JsonArray damageTreeSoundOptions = std::move(*result614);
       if (damageTreeSoundOptions.size()) {
-        auto result615 = this->root().random().randFrom(damageTreeSoundOptions);
+        auto result615 = this->root().random().sample_ref(damageTreeSoundOptions);
 if (!result615) return std::unexpected(std::move(result615.error()));
 auto sound = result615->get();
-        Vec2F pos = position() + Vec2F(m_tileDamageX + this->root().random().randf(), m_tileDamageY + this->root().random().randf());
+        Vec2F pos = position() + Vec2F(m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float());
         auto result616 = this->root().assets();
 if (!result616) return std::unexpected(std::move(result616.error()));
 auto assets = std::move(*result616);
@@ -1719,7 +1738,7 @@ auto geometry = result575->get().geometry();
     segments[piece.segmentIdx].push_back(piece);
   }
   std::reverse(segmentOrder.begin(), segmentOrder.end());
-  auto result578 = this->root().random().randf(-0.3f, 0.3f);
+  auto result578 = this->root().random().uniform_float(-0.3f, 0.3f);
 if (!result578) return std::unexpected(std::move(result578.error()));
 float random = std::move(*result578);
   auto fallVector = (worldSpaceBreakPoint - sourcePosition).normalized();

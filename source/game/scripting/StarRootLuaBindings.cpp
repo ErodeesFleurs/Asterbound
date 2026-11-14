@@ -759,7 +759,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       parsedGender = *parsed;
     }
-    auto result = (*database)->generateHumanoid(species, seed.value_or(root.random().randu64()), parsedGender, itemCatalog);
+    auto result = (*database)->generateHumanoid(species, seed.value_or(root.random().next_u64()), parsedGender, itemCatalog);
     if (!result) return std::unexpected(std::move(result.error()));
     auto identity = result->identity.toJson();
     if (!identity) return std::unexpected(std::move(identity.error()));
@@ -1018,7 +1018,7 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::liquidStatusEffec
 std::expected<String, StarException> LuaBindings::RootCallbacks::generateName(Root& root, String const& rulesAsset, std::optional<std::uint64_t> seed) {
   auto generator = root.nameGenerator();
   if (!generator) return std::unexpected(std::move(generator.error()));
-  return (*generator)->generateName(rulesAsset, seed.value_or(root.random().randu64()));
+  return (*generator)->generateName(rulesAsset, seed.value_or(root.random().next_u64()));
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::questConfig(Root& root, String const& templateId) {
@@ -1039,7 +1039,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
     std::optional<JsonObject> const& parameters) {
   auto database = root.npcDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().randu64()), parameters.value_or(JsonObject{}), itemCatalog);
+  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
   auto mode = enumValue<PortraitModeNames>(portraitMode);
   if (!mode) return std::unexpected(std::move(mode.error()));
@@ -1058,7 +1058,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
 std::expected<Json, StarException> LuaBindings::RootCallbacks::npcVariant(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, String const& species, String const& typeName, float level, std::optional<std::uint64_t> seed, std::optional<JsonObject> const& parameters) {
   auto database = root.npcDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().randu64()), parameters.value_or(JsonObject{}), itemCatalog);
+  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
   return (*database)->writeNpcVariantToJson(*variant);
 }
@@ -1091,7 +1091,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::createTreasu
     Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, String const& pool, float level, std::optional<std::uint64_t> seed) {
   auto database = root.treasureDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto treasure = (*database)->createTreasure(pool, level, seed.value_or(root.random().randu64()), itemCatalog);
+  auto treasure = (*database)->createTreasure(pool, level, seed.value_or(root.random().next_u64()), itemCatalog);
   if (!treasure) return std::unexpected(std::move(treasure.error()));
   return treasure->transformed([](std::shared_ptr<Item> const& item) { return item->descriptor().toJson(); });
 }

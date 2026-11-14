@@ -523,7 +523,7 @@ std::expected<String, StarException> InspectionTool::inspectionFailureText(Strin
   auto options = nothingThere->getArray(*contains ? species : String("default"));
   if (!options)
     return std::unexpected(std::move(options.error()));
-  auto option = options->wrap(root().random().randu64());
+  auto option = options->wrap(root().random().next_u64());
   if (!option)
     return std::unexpected(std::move(option.error()));
   return option->get().toString();

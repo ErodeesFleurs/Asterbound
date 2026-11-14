@@ -626,18 +626,158 @@ TEST(TtlCache, ConstObservationAndDisabledRefreshDoNotConsumeSmearRandomness) {
   RandomService random(123), expected(123);
   HashTtlCache<int, int> cache(random, std::chrono::hours(1), std::chrono::milliseconds(17), 2, false);
   ASSERT_TRUE(cache.insert_or_assign(1, 10));
-  ASSERT_TRUE(expected.randInt(-17, 17));
+  ASSERT_TRUE(expected.uniform_int(-17, 17));
   ASSERT_TRUE(std::as_const(cache).find_ref(1));
   ASSERT_TRUE(cache.find_ref(1));
   ASSERT_TRUE(cache.get(1, [](int const&) { return -1; }));
   cache.cleanup([](int const&, int const&) { return true; });
-  EXPECT_EQ(random.randu64(), expected.randu64());
+  EXPECT_EQ(random.next_u64(), expected.next_u64());
   cache.set_ttl_update_enabled(true);
   ASSERT_TRUE(cache.find_ref(1));
-  ASSERT_TRUE(expected.randInt(-17, 17));
+  ASSERT_TRUE(expected.uniform_int(-17, 17));
   ASSERT_TRUE(cache.get(1, [](int const&) { return -1; }));
-  ASSERT_TRUE(expected.randInt(-17, 17));
-  EXPECT_EQ(random.randu64(), expected.randu64());
+  ASSERT_TRUE(expected.uniform_int(-17, 17));
+  EXPECT_EQ(random.next_u64(), expected.next_u64());
+}
+
+TEST(TtlCache, CleanupTracksTtlChangesAndClearReinsert) {
+  RandomService random(123);
+  HashTtlCache<int, int> cache(random, std::chrono::hours(1), std::chrono::milliseconds(0), 4, false);
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  cache.cleanup();
+  EXPECT_EQ(cache.values(), (List<int>{10}));
+
+  cache.set_time_to_live(std::chrono::milliseconds(-1));
+  cache.cleanup();
+  EXPECT_EQ(cache.size(), 0u);
+
+  cache.set_time_to_live(std::chrono::hours(1));
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  cache.cleanup();
+  cache.clear();
+  EXPECT_EQ(cache.size(), 0u);
+  ASSERT_TRUE(cache.insert_or_assign(2, 20));
+  cache.cleanup();
+  EXPECT_EQ(cache.values(), (List<int>{20}));
+  cache.set_time_to_live(std::chrono::milliseconds(-1));
+  cache.cleanup();
+  EXPECT_EQ(cache.size(), 0u);
+}
+
+TEST(TtlCache, NegativeSmearMovesEveryWritePathBeforeWarmCleanupBound) {
+  enum class Update { Find, Get, Assign, Insert };
+  for (auto update : {Update::Find, Update::Get, Update::Assign, Update::Insert}) {
+    SCOPED_TRACE(static_cast<int>(update));
+    RandomService random(123);
+    HashTtlCache<int, int> cache(random, std::chrono::hours(1), std::chrono::milliseconds(0), 4, true);
+    ASSERT_TRUE(cache.insert_or_assign(1, 10));
+    ASSERT_TRUE(cache.insert_or_assign(2, 20));
+    cache.cleanup();
+    ASSERT_EQ(cache.size(), 2u);
+
+    // This genuine MWC seed starts below the midpoint, giving a timestamp
+    // several days earlier without a sleep or a test clock.
+    constexpr std::uint64_t seed = 52339836760827ull;
+    constexpr int smear_width = 1000000000;
+    RandomService expected(seed);
+    auto smear = expected.uniform_int(-smear_width, smear_width);
+    ASSERT_TRUE(smear);
+    ASSERT_LT(*smear, -std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)).count());
+    random.seed(seed);
+    cache.set_time_smear(std::chrono::milliseconds(smear_width));
+
+    switch (update) {
+      case Update::Find: {
+        auto found = cache.find_ref(1);
+        ASSERT_TRUE(found);
+        ASSERT_TRUE(*found);
+        EXPECT_EQ((*found)->get(), 10);
+        break;
+      }
+      case Update::Get: {
+        auto found = cache.get(1, [](int const&) { return -1; });
+        ASSERT_TRUE(found);
+        EXPECT_EQ(found->get(), 10);
+        break;
+      }
+      case Update::Assign:
+        ASSERT_TRUE(cache.insert_or_assign(1, 99));
+        break;
+      case Update::Insert:
+        ASSERT_TRUE(cache.insert_or_assign(3, 30));
+        break;
+    }
+
+    cache.cleanup();
+    EXPECT_FALSE(std::as_const(cache).find_ref(update == Update::Insert ? 3 : 1));
+    auto retained = std::as_const(cache).find_ref(2);
+    ASSERT_TRUE(retained);
+    EXPECT_EQ(retained->get(), 20);
+    EXPECT_EQ(cache.size(), update == Update::Insert ? 2u : 1u);
+    EXPECT_EQ(random.next_u64(), expected.next_u64());
+  }
+}
+
+TEST(TtlCache, FailedSmearMissExpiresBesideWarmFutureEntry) {
+  constexpr std::uint64_t seed = 31415926;
+  constexpr int smear_width = 1000000000;
+  RandomService random(seed), expected(seed);
+  auto smear = expected.uniform_int(-smear_width, smear_width);
+  ASSERT_TRUE(smear);
+  ASSERT_GT(*smear, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)).count());
+  HashTtlCache<int, int> cache(random, std::chrono::milliseconds(0),
+                             std::chrono::milliseconds(smear_width), 4, false);
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  cache.cleanup();
+  ASSERT_EQ(cache.size(), 1u);
+
+  cache.set_time_smear(std::chrono::milliseconds(-1));
+  EXPECT_FALSE(cache.get(2, [](int const&) { return 20; }));
+  ASSERT_EQ(cache.size(), 2u);
+  auto failed_entry = std::as_const(cache).find_ref(2);
+  ASSERT_TRUE(failed_entry);
+  EXPECT_EQ(failed_entry->get(), 20);
+  cache.cleanup();
+  EXPECT_FALSE(std::as_const(cache).find_ref(2));
+  auto retained = std::as_const(cache).find_ref(1);
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(retained->get(), 10);
+  EXPECT_EQ(cache.size(), 1u);
+  EXPECT_EQ(random.next_u64(), expected.next_u64());
+}
+
+TEST(TtlCache, FilteredCleanupVisitsWarmEntriesAndTracksEarlierRefresh) {
+  constexpr std::uint64_t seed = 31415926;
+  constexpr int smear_width = 1000000000;
+  RandomService random(seed), expected(seed);
+  auto smear = expected.uniform_int(-smear_width, smear_width);
+  ASSERT_TRUE(smear);
+  ASSERT_GT(*smear, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)).count());
+  HashTtlCache<int, int> cache(random, std::chrono::milliseconds(-1),
+                             std::chrono::milliseconds(smear_width), 4, false);
+  ASSERT_TRUE(cache.insert_or_assign(1, 10));
+  random.seed(seed);
+  ASSERT_TRUE(cache.insert_or_assign(2, 20));
+  cache.cleanup();
+  ASSERT_EQ(cache.size(), 2u);
+
+  unsigned calls = 0;
+  int value_sum = 0;
+  cache.cleanup([&](int const& key, int const& value) {
+    ++calls;
+    value_sum += value;
+    return key == 1;
+  });
+  EXPECT_EQ(calls, 2u);
+  EXPECT_EQ(value_sum, 30);
+  EXPECT_EQ(cache.size(), 2u);
+  cache.cleanup();
+  EXPECT_FALSE(std::as_const(cache).find_ref(1));
+  auto retained = std::as_const(cache).find_ref(2);
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(retained->get(), 20);
+  EXPECT_EQ(cache.size(), 1u);
+  EXPECT_EQ(random.next_u64(), expected.next_u64());
 }
 
 TEST(LruCache, MutableHashAndContextualEqualityKeepLookupAndEvictionValid) {

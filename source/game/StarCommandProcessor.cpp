@@ -432,7 +432,7 @@ std::expected<String, StarException> CommandProcessor::warpRandom(ConnectionId c
     return false;
   };
   while (!target) {
-    RectI region = RectI::withSize(Vec2I(m_root.random().randi32(), m_root.random().randi32()), size);
+    RectI region = RectI::withSize(Vec2I(m_root.random().next_i32(), m_root.random().next_i32()), size);
     while (true) {
       auto loaded = celestialDatabase->scanRegionFullyLoaded(region);
       if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -780,7 +780,7 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
         auto treasureDatabaseResult = m_root.treasureDatabase();
         if (!treasureDatabaseResult) return std::unexpected(std::move(treasureDatabaseResult.error()));
         auto treasureDatabase = std::move(*treasureDatabaseResult);
-        auto treasure = treasureDatabase->createTreasure(treasurePool, level, m_root.random().randu64());
+        auto treasure = treasureDatabase->createTreasure(treasurePool, level, m_root.random().next_u64());
         if (!treasure) return std::unexpected(std::move(treasure.error()));
         for (auto const& treasureItem : *treasure) {
           auto aimPosition = player->aimPosition();
@@ -909,7 +909,7 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
     if (!npcDatabaseResult) return std::unexpected(std::move(npcDatabaseResult.error()));
     auto npcDatabase = std::move(*npcDatabaseResult);
     float npcLevel = 1;
-    std::uint64_t seed = m_root.random().randu64();
+    std::uint64_t seed = m_root.random().next_u64();
     Json overrides;
 
     if (arguments.size() < 2)

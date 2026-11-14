@@ -246,7 +246,7 @@ std::expected<std::shared_ptr<Parallax>, StarException> Parallax::create(Root& r
     if (!kind) return std::unexpected(std::move(kind.error()));
     auto frequency = settings.getFloat("frequency", 1.0);
     if (!frequency) return std::unexpected(std::move(frequency.error()));
-    if (rnd.randf() > *frequency) continue;
+    if (rnd.uniform_float() > *frequency) continue;
     if (auto r = result->buildLayer(settings, *kind); !r) return std::unexpected(std::move(r.error()));
   }
   std::stable_sort(result->m_layers.begin(), result->m_layers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) { return a.zLevel > b.zLevel; });
@@ -358,13 +358,19 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
   if (!baseCount)
     return std::unexpected(std::move(baseCount.error()));
   int baseCountValue = *baseCount;
-  int base = rnd.randInt(baseCountValue - 1) + 1;
+  auto baseDraw = rnd.uniform_int(baseCountValue - 1);
+  if (!baseDraw)
+    return std::unexpected(std::move(baseDraw.error()));
+  int base = *baseDraw + 1;
   layer.textures.push_back(AssetPath::relative_to(texPath, "base/" + Star::to_string<int>(base) + ".png"));
   auto modCount = layerSettings.getInt("modCount", 0);
   if (!modCount)
     return std::unexpected(std::move(modCount.error()));
   int modCountValue = *modCount;
-  int mod = rnd.randInt(modCountValue);
+  auto modDraw = rnd.uniform_int(modCountValue);
+  if (!modDraw)
+    return std::unexpected(std::move(modDraw.error()));
+  int mod = *modDraw;
   if (mod != 0)
     layer.textures.push_back(AssetPath::relative_to(texPath, "mod/" + Star::to_string<int>(mod) + ".png"));
 
@@ -423,7 +429,10 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
     auto size = (*imgMetadata)->imageSize(layer.textures[0]);
     if (!size)
       return std::unexpected(std::move(size.error()));
-    layer.parallaxOffset[0] += rnd.randInt((*size)[0]);
+    auto offset = rnd.uniform_int((*size)[0]);
+    if (!offset)
+      return std::unexpected(std::move(offset.error()));
+    layer.parallaxOffset[0] += *offset;
   }
   auto correlation = layerSettings.getString("timeOfDayCorrelation", "");
   if (!correlation)
@@ -445,7 +454,7 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
   auto maxX = maxSpeed->getFloat(0);
   if (!maxX)
     return std::unexpected(std::move(maxX.error()));
-  auto speedX = rnd.randf(*minX, *maxX);
+  auto speedX = rnd.uniform_float(*minX, *maxX);
   if (!speedX)
     return std::unexpected(std::move(speedX.error()));
   auto minY = minSpeed->getFloat(1);
@@ -454,7 +463,7 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
   auto maxY = maxSpeed->getFloat(1);
   if (!maxY)
     return std::unexpected(std::move(maxY.error()));
-  auto speedY = rnd.randf(*minY, *maxY);
+  auto speedY = rnd.uniform_float(*minY, *maxY);
   if (!speedY)
     return std::unexpected(std::move(speedY.error()));
   layer.speed = {*speedX, *speedY};

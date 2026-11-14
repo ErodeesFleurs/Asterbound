@@ -130,7 +130,7 @@ std::expected<std::shared_ptr<DisplacementSelector>, StarException> Displacement
     auto beta = config.getFloat(key("Beta"), 2.0f);
     if (!beta)
       return std::unexpected(std::move(beta.error()));
-    return PerlinF(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.randu64());
+    return PerlinF(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.next_u64());
   };
   auto xFunction = readFunction('x');
   if (!xFunction)

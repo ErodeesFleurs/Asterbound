@@ -317,7 +317,7 @@ std::expected<void, StarException> ServerQueryThread::run() {
 }
 
 ServerQueryThread::RequestChallenge::RequestChallenge(RandomService& random)
-    : m_time(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_challenge(random.randi32()) {}
+    : m_time(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500))), m_challenge(random.next_i32()) {}
 
 bool ServerQueryThread::RequestChallenge::before(std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<std::uint64_t, std::milli>> time) { return m_time < time; }
 

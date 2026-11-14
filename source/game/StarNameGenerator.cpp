@@ -95,7 +95,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
 }
 
 std::expected<String, StarException> PatternedNameGenerator::generateName(String const& rulesAsset) const {
-  RandomSource random(m_root.random().randu64());
+  RandomSource random(m_root.random().next_u64());
   return generateName(rulesAsset, random);
 }
 
@@ -169,8 +169,10 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
   } else if (mode == "alts") {
     if (index == rule.size())
       return std::unexpected(NameGeneratorException("Name rule has no alternatives"));
-    auto selected = random.randInt(rule.size() - 1 - index);
-    auto part = evaluate(rule[index + selected]);
+    auto selected = random.uniform_int(rule.size() - 1 - index);
+    if (!selected)
+      return std::unexpected(std::move(selected.error()));
+    auto part = evaluate(rule[index + *selected]);
     if (!part)
       return std::unexpected(std::move(part.error()));
     result += *part;
@@ -192,12 +194,12 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
     auto maximum = (**range)[1].toUInt();
     if (!maximum)
       return std::unexpected(std::move(maximum.error()));
-    auto target = random.randUInt(*minimum, *maximum);
+    auto target = random.uniform_uint(*minimum, *maximum);
     if (!target)
       return std::unexpected(std::move(target.error()));
     String piece;
     for (std::size_t tries = 0; tries < 10; ++tries) {
-      auto start = random.randFrom(source->get().starts);
+      auto start = random.sample_ref(source->get().starts);
       if (!start)
         return std::unexpected(std::move(start.error()));
       piece = start->get();
@@ -218,7 +220,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
         auto chain = source->get().chains.find_ref(*link);
         if (!chain)
           break;
-        auto next = random.randFrom(chain->get());
+        auto next = random.sample_ref(chain->get());
         if (!next)
           return std::unexpected(std::move(next.error()));
         piece += next->get();

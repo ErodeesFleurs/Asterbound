@@ -165,7 +165,7 @@ String typeName = std::move(*result5);
 }
 
 std::expected<NpcVariant, StarException> NpcDatabase::generateNpcVariant(String const& species, String const& typeName, float level, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  return generateNpcVariant(species, typeName, level, m_root.random().randu64(), {}, itemCatalog);
+  return generateNpcVariant(species, typeName, level, m_root.random().next_u64(), {}, itemCatalog);
 }
 
 std::expected<NpcVariant, StarException> NpcDatabase::generateNpcVariant(
@@ -191,7 +191,7 @@ if (!result8) return std::unexpected(std::move(result8.error()));
 auto result9 = jsonToVec2F(std::move(*result8));
 if (!result9) return std::unexpected(std::move(result9.error()));
 auto levelVariance = std::move(*result9);
-  auto result10 = randSource.randf(level + levelVariance[0], level + levelVariance[1]);
+  auto result10 = randSource.uniform_float(level + levelVariance[0], level + levelVariance[1]);
 if (!result10) return std::unexpected(std::move(result10.error()));
 variant.level = std::max(std::move(*result10), 0.0f);
 
@@ -287,7 +287,7 @@ auto usedHumanoidConfig = std::move(*result35);
     // this only needs to be done if the npc has a unique humanoid config, otherwise the output from generateHumanoid should be fine
     auto result36 = usedHumanoidConfig.getArray("personalities");
 if (!result36) return std::unexpected(std::move(result36.error()));
-auto result37 = randSource.randFrom(*result36);
+auto result37 = randSource.sample_ref(*result36);
 if (!result37) return std::unexpected(std::move(result37.error()));
 auto result38 = parsePersonalityArray(result37->get());
 if (!result38) return std::unexpected(std::move(result38.error()));
@@ -414,7 +414,7 @@ bool matchColorIndices = std::move(*result65);
           auto result66 = highestLevelItemsConfig.arrayPtr();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
-          auto result67 = randSource.randFrom(**result66);
+          auto result67 = randSource.sample_ref(**result66);
           if (!result67)
             return std::unexpected(std::move(result67.error()));
           auto result68 = result67->get().toObject();
@@ -424,7 +424,7 @@ bool matchColorIndices = std::move(*result65);
             auto result69 = itemSlotConfig.second.arrayPtr();
             if (!result69)
               return std::unexpected(std::move(result69.error()));
-            auto result70 = randSource.randFrom(**result69);
+            auto result70 = randSource.sample_ref(**result69);
             if (!result70)
               return std::unexpected(std::move(result70.error()));
             auto result71 = ItemDescriptor::create(result70->get());
@@ -446,7 +446,7 @@ bool matchColorIndices = std::move(*result65);
                     auto result74 = colorIndex.arrayPtr();
                     if (!result74)
                       return std::unexpected(std::move(result74.error()));
-                    auto result75 = randSource.randFrom(**result74);
+                    auto result75 = randSource.sample_ref(**result74);
                     if (!result75)
                       return std::unexpected(std::move(result75.error()));
                     auto result76 = result75->get().toInt();

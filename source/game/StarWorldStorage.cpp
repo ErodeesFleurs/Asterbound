@@ -1070,7 +1070,7 @@ bool WorldStorage::belongsInSector(Sector const& sector, Vec2F const& position) 
 }
 
 std::expected<float, StarException> WorldStorage::randomizedSectorTTL() const {
-  return this->root().random().randf(m_sectorTimeToLive[0], m_sectorTimeToLive[1]);
+  return this->root().random().uniform_float(m_sectorTimeToLive[0], m_sectorTimeToLive[1]);
 }
 
 std::expected<std::pair<bool, std::size_t>, StarException> WorldStorage::generateSectorToLevel(Sector const& sector, SectorGenerationLevel targetGenerationLevel, std::size_t sectorGenerationLevelLimit) {

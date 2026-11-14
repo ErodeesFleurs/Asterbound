@@ -217,7 +217,7 @@ std::expected<QuestDescriptor, StarException> QuestDescriptor::fromJson(Root& ro
   if (json.isType(Json::Type::String)) {
     auto name = json.toString();
     if (!name) return std::unexpected(std::move(name.error()));
-    return QuestDescriptor{*name, *name, {}, root.random().randu64()};
+    return QuestDescriptor{*name, *name, {}, root.random().next_u64()};
   }
   auto id = json.getString("questId");
   if (!id) return std::unexpected(std::move(id.error()));
@@ -227,7 +227,7 @@ std::expected<QuestDescriptor, StarException> QuestDescriptor::fromJson(Root& ro
   if (!params) return std::unexpected(std::move(params.error()));
   auto parameters = questParamsFromJson(*params);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  auto seed = json.getUInt("seed", root.random().randu64());
+  auto seed = json.getUInt("seed", root.random().next_u64());
   if (!seed) return std::unexpected(std::move(seed.error()));
   return QuestDescriptor{*id, *templateId, std::move(*parameters), *seed};
 }
@@ -246,7 +246,7 @@ std::expected<QuestDescriptor, StarException> QuestDescriptor::diskLoad(Root& ro
   if (!params) return std::unexpected(std::move(params.error()));
   auto parameters = questParamsDiskLoad(root, *params);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  auto seed = json->getUInt("seed", root.random().randu64());
+  auto seed = json->getUInt("seed", root.random().next_u64());
   if (!seed) return std::unexpected(std::move(seed.error()));
   return QuestDescriptor{*id, *templateId, std::move(*parameters), *seed};
 }

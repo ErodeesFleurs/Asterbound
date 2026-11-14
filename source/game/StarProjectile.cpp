@@ -858,9 +858,9 @@ particle.color = std::move(*result892);
       particle.applyVariance(rootContext, blockDamageVariance);
 
       particle.approach += Vec2F(0.0f, 5.0f);
-      particle.velocity += Vec2F(rootContext.random().randf() - 0.5f, 5.0f + rootContext.random().randf());
-      particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * rootContext.random().randf(), 1.0f - 2.0f * rootContext.random().randf());
-      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(rootContext.random().randf() - 0.5f, -20.0f + rootContext.random().randf()));
+      particle.velocity += Vec2F(rootContext.random().uniform_float() - 0.5f, 5.0f + rootContext.random().uniform_float());
+      particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * rootContext.random().uniform_float(), 1.0f - 2.0f * rootContext.random().uniform_float());
+      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(rootContext.random().uniform_float() - 0.5f, -20.0f + rootContext.random().uniform_float()));
       particle.trail = true;
 
       result.push_back(std::move(particle));
@@ -1060,7 +1060,7 @@ if (result762->get().material({x, m_collisionTile[1] + radius + 1}, layer) == Em
             auto result763 = world();
 if (!result763) return std::unexpected(std::move(result763.error()));
 auto mat = result763->get().material({x, y}, layer);
-            if (this->root().random().randf() <= chance) {
+            if (this->root().random().uniform_float() <= chance) {
               if (isRealMaterial(mat)) {
                 auto result764 = world();
 if (!result764) return std::unexpected(std::move(result764.error()));
@@ -1192,9 +1192,9 @@ if (!result797) return std::unexpected(std::move(result797.error()));
 auto result798 = jsonToVec4F(std::move(*result797));
 if (!result798) return std::unexpected(std::move(result798.error()));
 auto offsetRange = std::move(*result798);
-      auto result799 = this->root().random().randf(offsetRange[0], offsetRange[2]);
+      auto result799 = this->root().random().uniform_float(offsetRange[0], offsetRange[2]);
 if (!result799) return std::unexpected(std::move(result799.error()));
-auto result800 = this->root().random().randf(offsetRange[1], offsetRange[3]);
+auto result800 = this->root().random().uniform_float(offsetRange[1], offsetRange[3]);
 if (!result800) return std::unexpected(std::move(result800.error()));
 offset = Vec2F(std::move(*result799), std::move(*result800));
     }
@@ -1225,7 +1225,7 @@ angle = std::move(*result805) * std::numbers::pi / 180.0f;
 if (!result806) return std::unexpected(std::move(result806.error()));
 if (std::move(*result806))
         {
-auto result807 = this->root().random().randf(-1, 1);
+auto result807 = this->root().random().uniform_float(-1, 1);
 if (!result807) return std::unexpected(std::move(result807.error()));
 auto result808 = parameters.getFloat("fuzzAngle");
 if (!result808) return std::unexpected(std::move(result808.error()));
@@ -1305,9 +1305,9 @@ if (!result824) return std::unexpected(std::move(result824.error()));
 for (auto& particle : std::move(*result824)) {
       // enable trails and such
       particle.approach += Vec2F(0.0f, 5.0f);
-      particle.velocity += Vec2F(this->root().random().randf() - 0.5f, 5.0f + this->root().random().randf());
-      particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * this->root().random().randf(), 1.0f - 2.0f * this->root().random().randf());
-      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(this->root().random().randf() - 0.5f, -20.0f + this->root().random().randf()));
+      particle.velocity += Vec2F(this->root().random().uniform_float() - 0.5f, 5.0f + this->root().random().uniform_float());
+      particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * this->root().random().uniform_float(), 1.0f - 2.0f * this->root().random().uniform_float());
+      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(this->root().random().uniform_float() - 0.5f, -20.0f + this->root().random().uniform_float()));
       particle.trail = true;
 
       m_pendingRenderables.push_back(std::move(particle));
@@ -1478,7 +1478,7 @@ if (!result862->get().isClient())
 if (!result863) return std::unexpected(std::move(result863.error()));
 auto result864 = parameters.getArray("options");
 if (!result864) return std::unexpected(std::move(result864.error()));
-auto result865 = this->root().random().randValueFrom(std::move(*result864)).toString();
+auto result865 = this->root().random().sample_value(std::move(*result864)).and_then([](Json const& value) { return value.toString(); });
 if (!result865) return std::unexpected(std::move(result865.error()));
 auto result866 = std::move(*result863)->audio(std::move(*result865));
 if (!result866) return std::unexpected(std::move(result866.error()));
@@ -1515,7 +1515,7 @@ if (!result873) return std::unexpected(std::move(result873.error()));
 JsonArray options = std::move(*result873);
     if (options.size())
       {
-auto result874 = this->root().random().randFrom(options);
+auto result874 = this->root().random().sample_ref(options);
 if (!result874) return std::unexpected(std::move(result874.error()));
 auto result875 = processAction(result874->get());
 if (!result875) return std::unexpected(std::move(result875.error()));

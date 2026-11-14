@@ -843,16 +843,16 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(player.addParticles({particle}));
     ASSERT_TRUE(player.addSound(sounds->front()));
     constexpr std::uint64_t gameplaySeed = 0x50524553454e54;
-    root.random().init(gameplaySeed);
+    root.random().seed(gameplaySeed);
     RandomSource untouchedGameplay(gameplaySeed);
     for (float alpha : {0.0f, 0.25f, 0.75f, 1.0f, 0.5f}) {
       events.alpha = alpha;
       auto geometry = player.render(events);
       ASSERT_TRUE(geometry) << geometry.error().what();
-      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "geometry alpha=" << alpha;
+      ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "geometry alpha=" << alpha;
       auto lighting = player.renderLightSources(events);
       ASSERT_TRUE(lighting) << lighting.error().what();
-      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "lighting alpha=" << alpha;
+      ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "lighting alpha=" << alpha;
     }
     EXPECT_EQ(events.particles, 0u);
     EXPECT_EQ(events.audios, 0u);

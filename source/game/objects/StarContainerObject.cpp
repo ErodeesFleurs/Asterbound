@@ -160,7 +160,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!levelResult)
         return std::unexpected(std::move(levelResult.error()));
       auto level = std::move(*levelResult);
-      auto seedConfigResult = configValue("treasureSeed", root().random().randu64());
+      auto seedConfigResult = configValue("treasureSeed", root().random().next_u64());
       if (!seedConfigResult)
         return std::unexpected(std::move(seedConfigResult.error()));
       auto seedConfig = std::move(*seedConfigResult);
@@ -230,7 +230,10 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
         if (!poolsResult)
           return std::unexpected(std::move(poolsResult.error()));
         auto pools = std::move(*poolsResult);
-        auto poolValue = root().random().randValueFrom(pools);
+        auto poolValueResult = root().random().sample_value(pools);
+        if (!poolValueResult)
+          return std::unexpected(std::move(poolValueResult.error()));
+        auto poolValue = std::move(*poolValueResult);
         auto poolResult = poolValue.toString();
         if (!poolResult)
           return std::unexpected(std::move(poolResult.error()));
@@ -366,7 +369,10 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!soundsResult)
             return std::unexpected(std::move(soundsResult.error()));
           auto sounds = std::move(*soundsResult);
-          auto soundValue = root().random().randValueFrom(sounds);
+          auto soundValueResult = root().random().sample_value(sounds);
+          if (!soundValueResult)
+            return std::unexpected(std::move(soundValueResult.error()));
+          auto soundValue = std::move(*soundValueResult);
           auto soundNameResult = soundValue.toString();
           if (!soundNameResult)
             return std::unexpected(std::move(soundNameResult.error()));
@@ -408,7 +414,10 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!soundsResult)
             return std::unexpected(std::move(soundsResult.error()));
           auto sounds = std::move(*soundsResult);
-          auto soundValue = root().random().randValueFrom(sounds);
+          auto soundValueResult = root().random().sample_value(sounds);
+          if (!soundValueResult)
+            return std::unexpected(std::move(soundValueResult.error()));
+          auto soundValue = std::move(*soundValueResult);
           auto soundNameResult = soundValue.toString();
           if (!soundNameResult)
             return std::unexpected(std::move(soundNameResult.error()));

@@ -120,7 +120,7 @@ std::expected<std::shared_ptr<EffectSource>, StarException> EffectSource::create
   if (!loops)
     return std::unexpected(std::move(loops.error()));
   result->m_loops = *loops;
-  result->m_timer = root.random().randf() * (*duration + 0.5 * *variance);
+  result->m_timer = root.random().uniform_float() * (*duration + 0.5 * *variance);
   result->m_stop = false;
   result->m_initialTick = true;
   result->m_loopTick = false;
@@ -148,7 +148,7 @@ void EffectSource::stop() {
 void EffectSource::tick(float dt) {
   m_timer -= dt;
   if ((m_timer <= 0) && m_loops) {
-    m_timer = m_loopDuration + m_durationVariance * (m_root.random().randf() - 0.5f);
+    m_timer = m_loopDuration + m_durationVariance * (m_root.random().uniform_float() - 0.5f);
     m_loopTick = true;
   }
   if (m_stop || (m_timer <= 0))
@@ -174,8 +174,11 @@ std::expected<List<String>, StarException> EffectSource::particles() {
     }
     if (choices->options->empty())
       return {};
-    // Match randValueFrom's single inclusive draw, including the one-option case.
-    auto index = static_cast<std::size_t>(m_root.random().randInt(choices->options->size() - 1));
+    // Match sample_value's single inclusive draw, including the one-option case.
+    auto selection = m_root.random().uniform_int(choices->options->size() - 1);
+    if (!selection)
+      return std::unexpected(std::move(selection.error()));
+    auto index = static_cast<std::size_t>(*selection);
     auto& decoded = choices->decoded[index];
     if (!decoded) {
       auto selected = jsonToStringList((*choices->options)[index]);
@@ -276,7 +279,10 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
     auto options = config.arrayPtr();
     if (!options)
       return std::unexpected(std::move(options.error()));
-    particles = root.random().randValueFrom(**options, Json());
+    auto selected = root.random().sample_value(**options, Json());
+    if (!selected)
+      return std::unexpected(std::move(selected.error()));
+    particles = std::move(*selected);
   }
   List<Particle> result;
   if (particles.isNull())
@@ -322,7 +328,10 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
     auto options = config.arrayPtr();
     if (!options)
       return std::unexpected(std::move(options.error()));
-    sound = root.random().randValueFrom(**options, Json());
+    auto selected = root.random().sample_value(**options, Json());
+    if (!selected)
+      return std::unexpected(std::move(selected.error()));
+    sound = std::move(*selected);
   }
   List<std::shared_ptr<AudioInstance>> result;
   if (sound.isNull())
@@ -362,7 +371,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
     auto pitch = entry.getFloat("pitch", 1.0f);
     if (!pitch)
       return std::unexpected(std::move(pitch.error()));
-    auto randomPitch = root.random().randf() * 2.0f - 1.0f;
+    auto randomPitch = root.random().uniform_float() * 2.0f - 1.0f;
     auto variability = entry.getFloat("pitchVariability", 0.0f);
     if (!variability)
       return std::unexpected(std::move(variability.error()));

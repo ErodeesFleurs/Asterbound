@@ -250,7 +250,7 @@ std::expected<void, StarException> CharSelectionPane::selectCharacter(unsigned b
       auto sounds = soundsConfig->toArray();
       if (!sounds)
         return std::unexpected(std::move(sounds.error()));
-      auto sound = context().root().random().randValueFrom(*sounds, "").toString();
+      auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.toString(); });
       if (!sound)
         return std::unexpected(std::move(sound.error()));
       if (!sound->empty()) {

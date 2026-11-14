@@ -11,7 +11,7 @@ import star.encode;
 namespace Star {
 
 Uuid::Uuid(RandomService& random) {
-  random.randBytes({m_data.data(), UuidSize});
+  random.fill_bytes({m_data.data(), UuidSize});
 }
 
 std::expected<Uuid, StarException> Uuid::create(ByteArray const& bytes) {

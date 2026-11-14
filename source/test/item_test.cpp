@@ -1212,14 +1212,14 @@ const GameTestRegistration
 
       // This private Root has no UniverseServer/background simulation threads.
       constexpr std::uint64_t seed = 0x4245414d5449434b;
-      root.random().init(seed);
+      root.random().seed(seed);
       RandomSource untouched(seed);
       for (unsigned i = 0; i != displayCalls; ++i) {
         auto sampled = beam->nonRotatedDrawables();
         ASSERT_TRUE(sampled);
         EXPECT_FALSE(sampled->empty());
       }
-      EXPECT_EQ(root.random().randu64(), untouched.randu64());
+      EXPECT_EQ(root.random().next_u64(), untouched.next_u64());
 
       // Changing input is not itself a beam tick. Display sampling must neither
       // observe the future transition nor enqueue its leftovers.
@@ -1232,7 +1232,7 @@ const GameTestRegistration
       Events events;
       ASSERT_TRUE(player.collectRenderEvents(events));
       EXPECT_TRUE(events.particles.empty());
-      EXPECT_EQ(root.random().randu64(), untouched.randu64());
+      EXPECT_EQ(root.random().next_u64(), untouched.next_u64());
 
       ASSERT_TRUE((*tools)->tick(dt, false, {}));
       for (unsigned i = 0; i != displayCalls; ++i) {
@@ -1252,7 +1252,7 @@ const GameTestRegistration
       ASSERT_TRUE((*tools)->tick(dt, false, {}));
       ASSERT_TRUE(player.collectRenderEvents(events));
       EXPECT_EQ(events.particles.size(), count);
-      auto nextRandom = root.random().randu64();
+      auto nextRandom = root.random().next_u64();
       if (displayCalls == 0) {
         baseline = events.particles;
         baselineRandom = nextRandom;

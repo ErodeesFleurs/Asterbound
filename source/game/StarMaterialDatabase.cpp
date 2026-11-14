@@ -764,12 +764,12 @@ std::expected<String, StarException> MaterialDatabase::miningSound(MaterialId ma
   if (isRealMod(modId)) {
     auto info = getModInfo(modId);
     if (!info) return std::unexpected(std::move(info.error()));
-    if (!info->get().miningSounds.empty()) return m_random.randValueFrom(info->get().miningSounds);
+    if (!info->get().miningSounds.empty()) return m_random.sample_value(info->get().miningSounds);
   }
   if (isRealMaterial(materialId)) {
     auto info = getMaterialInfo(materialId);
     if (!info) return std::unexpected(std::move(info.error()));
-    if (!info->get().miningSounds.empty()) return m_random.randValueFrom(info->get().miningSounds);
+    if (!info->get().miningSounds.empty()) return m_random.sample_value(info->get().miningSounds);
   }
   return String();
 }

@@ -161,7 +161,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
     if (!grasses) return std::unexpected(std::move(grasses.error()));
     auto plants = root.plantDatabase();
     if (!plants) return std::unexpected(std::move(plants.error()));
-    auto grass = rand.randFrom(*grasses);
+    auto grass = rand.sample_ref(*grasses);
     if (!grass) return std::unexpected(std::move(grass.error()));
     auto variant = (*plants)->buildGrassVariant(grass->get(), biomeHueShift);
     if (!variant) return std::unexpected(std::move(variant.error()));
@@ -170,20 +170,26 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
   else if (*match) {
     auto bushes = config.getArray("bushes", {});
     if (!bushes) return std::unexpected(std::move(bushes.error()));
-    auto settings = rand.randValueFrom(*bushes);
+    auto settingsResult = rand.sample_value(*bushes);
+    if (!settingsResult)
+      return std::unexpected(std::move(settingsResult.error()));
+    auto settings = std::move(*settingsResult);
     auto name = settings.getString("name");
     if (!name) return std::unexpected(std::move(name.error()));
     auto plants = root.plantDatabase();
     if (!plants) return std::unexpected(std::move(plants.error()));
     auto mods = (*plants)->bushMods(*name);
     if (!mods) return std::unexpected(std::move(mods.error()));
-    auto mod = rand.randValueFrom(*mods);
-    auto baseRandom = rand.randf(-1.0f, 1.0f);
+    auto modResult = rand.sample_value(*mods);
+    if (!modResult)
+      return std::unexpected(std::move(modResult.error()));
+    auto mod = std::move(*modResult);
+    auto baseRandom = rand.uniform_float(-1.0f, 1.0f);
     if (!baseRandom) return std::unexpected(std::move(baseRandom.error()));
     auto baseMax = settings.getFloat("baseHueShiftMax");
     if (!baseMax) return std::unexpected(std::move(baseMax.error()));
     float baseHue = *baseRandom * *baseMax;
-    auto modRandom = rand.randf(-1.0f, 1.0f);
+    auto modRandom = rand.uniform_float(-1.0f, 1.0f);
     if (!modRandom) return std::unexpected(std::move(modRandom.error()));
     auto modMax = settings.getFloat("modHueShiftMax");
     if (!modMax) return std::unexpected(std::move(modMax.error()));
@@ -222,18 +228,21 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       auto logged = root.logger().warn("Specified stemList and foliageList, but no matching pairs found.");
       if (!logged) return std::unexpected(std::move(logged.error()));
     }
-    auto pair = rand.randValueFrom(matchingPairs);
-    auto stemHueRandom = rand.randf(-1.0f, 1.0f);
+    auto pairResult = rand.sample_value(matchingPairs);
+    if (!pairResult)
+      return std::unexpected(std::move(pairResult.error()));
+    auto pair = std::move(*pairResult);
+    auto stemHueRandom = rand.uniform_float(-1.0f, 1.0f);
     if (!stemHueRandom) return std::unexpected(std::move(stemHueRandom.error()));
     auto stemHueMax = config.getFloat("treeStemHueShiftMax", 0);
     if (!stemHueMax) return std::unexpected(std::move(stemHueMax.error()));
     float stemHue = *stemHueRandom * *stemHueMax;
-    auto foliageHueRandom = rand.randf(-1.0f, 1.0f);
+    auto foliageHueRandom = rand.uniform_float(-1.0f, 1.0f);
     if (!foliageHueRandom) return std::unexpected(std::move(foliageHueRandom.error()));
     auto foliageHueMax = config.getFloat("treeFoliageHueShiftMax", 0);
     if (!foliageHueMax) return std::unexpected(std::move(foliageHueMax.error()));
     float foliageHue = *foliageHueRandom * *foliageHueMax;
-    auto altHueRandom = rand.randf(-1.0f, 1.0f);
+    auto altHueRandom = rand.uniform_float(-1.0f, 1.0f);
     if (!altHueRandom) return std::unexpected(std::move(altHueRandom.error()));
     auto altHueMax = config.getFloat("treeFoliageHueShiftMax", 0);
     if (!altHueMax) return std::unexpected(std::move(altHueMax.error()));
@@ -272,7 +281,10 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
   else if (*match) {
     auto sets = config.getArray("objectSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
-    auto poolConfig = rand.randValueFrom(*sets);
+    auto poolConfigResult = rand.sample_value(*sets);
+    if (!poolConfigResult)
+      return std::unexpected(std::move(poolConfigResult.error()));
+    auto poolConfig = std::move(*poolConfigResult);
     ObjectPool pool;
     auto parameters = poolConfig.get("parameters", JsonObject());
     if (!parameters) return std::unexpected(std::move(parameters.error()));
@@ -294,7 +306,7 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
   else if (*match) {
     auto sets = config.getArray("treasureBoxSets");
     if (!sets) return std::unexpected(std::move(sets.error()));
-    auto name = rand.randValueFrom(*sets).toString();
+    auto name = rand.sample_value(*sets).and_then([](Json const& value) { return value.toString(); });
     if (!name) return std::unexpected(std::move(name.error()));
     return BiomeItem{TreasureBoxSet(std::move(*name))};
   } else if (auto match = type->equals_ignore_case("microdungeon"); !match) return std::unexpected(std::move(match.error()));
@@ -359,7 +371,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
       if (!value) return std::unexpected(std::move(value.error()));
       result.m_blockProbability = std::move(*value);
     }
-    result.m_blockSeed = rand.randu64();
+    result.m_blockSeed = rand.next_u64();
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
@@ -387,19 +399,19 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
       result.m_modulus = std::move(*value);
     }
     {
-      auto value = rand.randInt(-result.m_modulus, result.m_modulus);
+      auto value = rand.uniform_int(-result.m_modulus, result.m_modulus);
       if (!value) return std::unexpected(std::move(value.error()));
       result.m_modulusOffset = std::move(*value);
     }
     result.m_densityFunction = PerlinF(static_cast<unsigned>(*octaves), 1.0f / *densityPeriod, 1.0, *densityOffset,
-                                       *alpha, *beta, rand.randu64());
+                                       *alpha, *beta, rand.next_u64());
     result.m_modulusDistortion = PerlinF(static_cast<unsigned>(*octaves), 1.0f / result.m_modulus, *modulusVariance,
-                                         *modulusVariance * 2, *alpha, *beta, rand.randu64());
+                                         *modulusVariance * 2, *alpha, *beta, rand.next_u64());
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
       if (*item) {
-        PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.randu64());
+        PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.next_u64());
         result.m_weightedItems.push_back({std::move(**item), weight});
       }
     }
@@ -531,7 +543,9 @@ std::expected<std::optional<BiomeItemPlacement>, StarException> BiomeItemDistrib
   if (m_distribution == DistributionType::Random) {
     if (static_random_float(x, y, m_blockSeed) <= m_blockProbability) {
       auto item = static_random_value_from(m_randomItems, x, y, m_blockSeed);
-      return BiomeItemPlacement{std::move(item), Vec2I(x, y), m_priority};
+      if (!item)
+        return std::unexpected(std::move(item.error()));
+      return BiomeItemPlacement{std::move(*item), Vec2I(x, y), m_priority};
     }
 
   } else if (m_distribution == DistributionType::Periodic) {

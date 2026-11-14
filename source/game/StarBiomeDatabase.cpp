@@ -387,14 +387,14 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     auto surfacePlaceablesConfig = parameters.getObject("surfacePlaceables", {});
     if (!surfacePlaceablesConfig) return std::unexpected(std::move(surfacePlaceablesConfig.error()));
     {
-      auto value = readBiomePlaceables(*surfacePlaceablesConfig, random.randu64(), *hue);
+      auto value = readBiomePlaceables(*surfacePlaceablesConfig, random.next_u64(), *hue);
       if (!value) return std::unexpected(std::move(value.error()));
       biome->surfacePlaceables = std::move(*value);
     }
     auto undergroundPlaceablesConfig = parameters.getObject("undergroundPlaceables", {});
     if (!undergroundPlaceablesConfig) return std::unexpected(std::move(undergroundPlaceablesConfig.error()));
     {
-      auto value = readBiomePlaceables(*undergroundPlaceablesConfig, random.randu64(), *hue);
+      auto value = readBiomePlaceables(*undergroundPlaceablesConfig, random.next_u64(), *hue);
       if (!value) return std::unexpected(std::move(value.error()));
       biome->undergroundPlaceables = std::move(*value);
     }
@@ -464,7 +464,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
     auto options = config.optArray("grassMod");
     if (!options) return std::unexpected(std::move(options.error()));
     if (*options && !(*options)->empty()) {
-      auto choice = rand.randFrom(**options);
+      auto choice = rand.sample_ref(**options);
       if (!choice) return std::unexpected(std::move(choice.error()));
       auto name = choice->get().toString();
       if (!name) return std::unexpected(std::move(name.error()));
@@ -486,7 +486,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
     auto options = config.optArray("ceilingGrassMod");
     if (!options) return std::unexpected(std::move(options.error()));
     if (*options && !(*options)->empty()) {
-      auto choice = rand.randFrom(**options);
+      auto choice = rand.sample_ref(**options);
       if (!choice) return std::unexpected(std::move(choice.error()));
       auto name = choice->get().toString();
       if (!name) return std::unexpected(std::move(name.error()));
@@ -507,7 +507,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
   auto items = config.getArray("items", {});
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& item : *items) {
-    auto distribution = BiomeItemDistribution::create(m_root, item, rand.randu64(), biomeHueShift);
+    auto distribution = BiomeItemDistribution::create(m_root, item, rand.next_u64(), biomeHueShift);
     if (!distribution) return std::unexpected(std::move(distribution.error()));
     result.itemDistributions.push_back(std::move(*distribution));
   }

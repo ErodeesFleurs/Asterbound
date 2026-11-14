@@ -16,7 +16,7 @@ namespace LuaBindings {
   [[nodiscard]] std::expected<String, StarException> formatLua(String const& string, List<LuaValue> const& args);
 
   namespace UtilityCallbacks {
-    double nrand(RandomService& random, std::optional<double> const& stdev, std::optional<double> const& mean);
+    [[nodiscard]] std::expected<double, StarException> nrand(RandomService& random, std::optional<double> const& stdev, std::optional<double> const& mean);
     String makeUuid(RandomService& random);
     [[nodiscard]] std::expected<void, StarException> logInfo(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args);
     [[nodiscard]] std::expected<void, StarException> logWarn(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args);

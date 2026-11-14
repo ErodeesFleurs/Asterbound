@@ -122,36 +122,36 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   for (int x = sector[0] - sectorRadius; x <= sector[0] + sectorRadius; x += sectorSize)
     for (int y = sector[1] - sectorRadius; y <= sector[1] + sectorRadius; y += sectorSize) {
       RandomSource rs(static_random_u64(x, y, seed));
-      auto drawnCount = rs.randf(numberOfWormsPerSectorRange[0], numberOfWormsPerSectorRange[1]);
+      auto drawnCount = rs.uniform_float(numberOfWormsPerSectorRange[0], numberOfWormsPerSectorRange[1]);
       if (!drawnCount)
         return std::unexpected(std::move(drawnCount.error()));
       float numberOfWorms = *drawnCount * commonality;
       int intNumberOfWorms = static_cast<int>(numberOfWorms);
-      if (rs.randf() < (numberOfWorms - intNumberOfWorms))
+      if (rs.uniform_float() < (numberOfWorms - intNumberOfWorms))
         intNumberOfWorms++;
       for (int n = 0; n < intNumberOfWorms; ++n) {
         Worm worm;
-        auto xOffset = rs.randf(0, sectorSize);
+        auto xOffset = rs.uniform_float(0, sectorSize);
         if (!xOffset)
           return std::unexpected(std::move(xOffset.error()));
-        auto yOffset = rs.randf(0, sectorSize);
+        auto yOffset = rs.uniform_float(0, sectorSize);
         if (!yOffset)
           return std::unexpected(std::move(yOffset.error()));
         worm.pos = Vec2F(x, y) + Vec2F(*xOffset, *yOffset);
-        auto angle = rs.randf(wormAngleRange[0], wormAngleRange[1]);
+        auto angle = rs.uniform_float(wormAngleRange[0], wormAngleRange[1]);
         if (!angle)
           return std::unexpected(std::move(angle.error()));
         worm.angle = *angle;
-        auto goalAngle = rs.randf(wormAngleRange[0], wormAngleRange[1]);
+        auto goalAngle = rs.uniform_float(wormAngleRange[0], wormAngleRange[1]);
         if (!goalAngle)
           return std::unexpected(std::move(goalAngle.error()));
         worm.goalAngle = *goalAngle;
-        auto size = rs.randf(wormSizeRange[0], wormSizeRange[1]);
+        auto size = rs.uniform_float(wormSizeRange[0], wormSizeRange[1]);
         if (!size)
           return std::unexpected(std::move(size.error()));
         worm.size = *size * commonality;
         worm.length = 0;
-        auto length = rs.randf(wormLengthRange[0], wormLengthRange[1]);
+        auto length = rs.uniform_float(wormLengthRange[0], wormLengthRange[1]);
         if (!length)
           return std::unexpected(std::move(length.error()));
         worm.goalLength = *length * commonality;
@@ -200,8 +200,10 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
 
       // maybe set new goal angle
       if (static_random_float(worm.pos[0], worm.pos[1], seed, 1) < wormTurnChance * thisSpeed) {
-        worm.goalAngle = positive_mod(
-          static_random_float_range(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2), twoPi);
+        auto goalAngle = static_random_float_range(wormAngleRange[0], wormAngleRange[1], worm.pos[0], worm.pos[1], seed, 2);
+        if (!goalAngle)
+          return std::unexpected(std::move(goalAngle.error()));
+        worm.goalAngle = positive_mod(*goalAngle, twoPi);
       }
 
       if (worm.angle != worm.goalAngle) {

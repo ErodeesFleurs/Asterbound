@@ -86,7 +86,7 @@ namespace Dungeon {
     float distribution = 0;
     for (std::size_t i = 0; i < options.size(); i++)
       distribution += options[i]->part().chance();
-    float pick = rnd.randf() * distribution;
+    float pick = rnd.uniform_float() * distribution;
     for (std::size_t i = 0; i < options.size(); i++) {
       pick -= options[i]->part().chance();
       if (pick <= 0)
@@ -416,7 +416,7 @@ namespace Dungeon {
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       result->m_brushes.push_back(std::move(*parsed));
     }
-    result->m_seed = root.random().randi64();
+    result->m_seed = root.random().next_i64();
     return result;
   }
 
@@ -543,7 +543,7 @@ namespace Dungeon {
   std::expected<std::shared_ptr<NpcBrush>, StarException> NpcBrush::create(Root& root, Json const& brush) {
     auto map = brush.toObject();
     if (!map) return std::unexpected(std::move(map.error()));
-    if (map->value("seed") == Json("stable")) (*map)["seed"] = root.random().randu64();
+    if (map->value("seed") == Json("stable")) (*map)["seed"] = root.random().next_u64();
     auto result = std::shared_ptr<NpcBrush>(new NpcBrush);
     result->m_npc = std::move(*map);
     return result;
@@ -561,7 +561,7 @@ namespace Dungeon {
       if (!compact) return std::unexpected(std::move(compact.error()));
       auto options = compact->split(",");
       if (!options) return std::unexpected(std::move(options.error()));
-      auto chosen = writer.root().random().randFrom(*options);
+      auto chosen = writer.root().random().sample_ref(*options);
       if (!chosen) return std::unexpected(std::move(chosen.error()));
       auto npc = m_npc.set("species", chosen->get());
       if (!npc) return std::unexpected(std::move(npc.error()));
@@ -1876,7 +1876,7 @@ std::expected<std::shared_ptr<Dungeon::Part const>, StarException> DungeonGenera
       validAnchors.push_back(name);
   }
   if (validAnchors.empty()) return std::shared_ptr<Dungeon::Part const>();
-  auto name = m_rand.randFrom(validAnchors);
+  auto name = m_rand.sample_ref(validAnchors);
   if (!name) return std::unexpected(std::move(name.error()));
   auto part = m_def->parts().get(name->get());
   if (!part) return std::unexpected(std::move(part.error()));

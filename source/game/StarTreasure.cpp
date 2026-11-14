@@ -284,7 +284,7 @@ TreasureDatabase::ItemPool::ItemPool() : allowDuplication() {}
 TreasureDatabase::TreasureChest::TreasureChest() : minimumLevel() {}
 
 std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::createTreasure(String const& treasurePool, float level) const {
-  return createTreasure(treasurePool, level, m_root.random().randu64());
+  return createTreasure(treasurePool, level, m_root.random().next_u64());
 }
 
 std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::createTreasure(String const& treasurePool, float level, std::uint64_t seed) const {
@@ -374,7 +374,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::crea
 
 std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::fillWithTreasure(
     std::shared_ptr<ItemBag> const& itemBag, String const& treasurePool, float level) const {
-  return fillWithTreasure(itemBag, treasurePool, level, m_root.random().randu64());
+  return fillWithTreasure(itemBag, treasurePool, level, m_root.random().next_u64());
 }
 
 std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::fillWithTreasure(
@@ -394,7 +394,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::fill
 }
 
 std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase::createTreasureChest(World& world, String const& treasureChestSet, Vec2I const& position, Direction direction) const {
-  return createTreasureChest(world, treasureChestSet, position, direction, m_root.random().randu64());
+  return createTreasureChest(world, treasureChestSet, position, direction, m_root.random().next_u64());
 }
 
 std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase::createTreasureChest(World& world, String const& treasureChestSet, Vec2I const& position, Direction direction, std::uint64_t seed) const {

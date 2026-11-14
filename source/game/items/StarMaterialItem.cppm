@@ -382,7 +382,10 @@ std::expected<void, StarException> MaterialItem::init(ToolUserEntity& owner, Too
   auto beam = BeamItem::init(owner, hand);
   if (!beam)
     return std::unexpected(std::move(beam.error()));
-  auto sound = owner.addSound(root().random().randValueFrom(m_placeSounds), 1.0f, 2.0f);
+  auto selectedSound = root().random().sample_value(m_placeSounds);
+  if (!selectedSound)
+    return std::unexpected(std::move(selectedSound.error()));
+  auto sound = owner.addSound(*selectedSound, 1.0f, 2.0f);
   if (!sound)
     return std::unexpected(std::move(sound.error()));
   if (auto player = as_ref<Player>(owner))
@@ -438,7 +441,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
           if (!stored)
             return std::unexpected(std::move(stored.error()));
         }
-        auto pitch = root().random().randf(0.9f, 1.1f);
+        auto pitch = root().random().uniform_float(0.9f, 1.1f);
         if (!pitch)
           return std::unexpected(std::move(pitch.error()));
         auto sound = itemOwner->get().addSound("/sfx/tools/cyclematcollision.ogg", 1.0f, *pitch);
@@ -472,7 +475,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         auto stored = player->get().setSecretProperty(BlockSwapPropertyKey, m_blockSwap);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
-        auto pitch = root().random().randf(0.9f, 1.1f);
+        auto pitch = root().random().uniform_float(0.9f, 1.1f);
         if (!pitch)
           return std::unexpected(std::move(pitch.error()));
         auto sound = itemOwner->get().addSound(m_blockSwap ? std::string_view("/sfx/interface/button/click.wav") : std::string_view("/sfx/interface/button/release.wav"), 1.0f, *pitch);
@@ -654,8 +657,11 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
 
   if (total) {
     float intensity = std::clamp(std::sqrt(static_cast<float>(total)) / 16, 0.0f, 1.0f);
-    auto sound = root().random().randValueFrom(m_placeSounds);
-    auto pitch = root().random().randf(0.9f, 1.1f);
+    auto soundResult = root().random().sample_value(m_placeSounds);
+    if (!soundResult)
+      return std::unexpected(std::move(soundResult.error()));
+    auto sound = std::move(*soundResult);
+    auto pitch = root().random().uniform_float(0.9f, 1.1f);
     if (!pitch)
       return std::unexpected(std::move(pitch.error()));
     auto played = itemOwner->get().addSound(sound, 1.0f + intensity, (1.125f - intensity * 0.75f) * *pitch);
@@ -817,7 +823,10 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     auto sounds = jsonToStringList(*strikeSounds);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
-    auto sound = root().random().randValueFrom(*sounds);
+    auto soundResult = root().random().sample_value(*sounds);
+    if (!soundResult)
+      return std::unexpected(std::move(soundResult.error()));
+    auto sound = std::move(*soundResult);
     auto toolVolume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.toFloat(); });
     if (!toolVolume)
       return std::unexpected(std::move(toolVolume.error()));

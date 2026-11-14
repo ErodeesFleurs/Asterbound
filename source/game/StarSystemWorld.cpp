@@ -405,12 +405,12 @@ std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCo
       distance += *size;
     }
     if (coordinate.isPlanetaryBody()) {
-      auto padding = random.randf(m_config.planetaryOrbitPadding[0], m_config.planetaryOrbitPadding[1]);
+      auto padding = random.uniform_float(m_config.planetaryOrbitPadding[0], m_config.planetaryOrbitPadding[1]);
       if (!padding)
         return std::unexpected(std::move(padding.error()));
       distance += *padding;
     } else if (coordinate.isSatelliteBody()) {
-      auto padding = random.randf(m_config.satelliteOrbitPadding[0], m_config.satelliteOrbitPadding[1]);
+      auto padding = random.uniform_float(m_config.satelliteOrbitPadding[0], m_config.satelliteOrbitPadding[1]);
       if (!padding)
         return std::unexpected(std::move(padding.error()));
       distance += *padding;
@@ -529,9 +529,9 @@ std::expected<Vec2F, StarException> SystemWorld::planetPosition(CelestialCoordin
   if (!distance)
     return std::unexpected(std::move(distance.error()));
   float interval = orbitInterval(*distance, coordinate.isSatelliteBody());
-  double start = random.randf();
+  double start = random.uniform_float();
   double offset = std::fmod(m_universeClock->time(), interval) / interval;
-  int direction = random.randf() > 0.5 ? 1 : -1;
+  int direction = random.uniform_float() > 0.5 ? 1 : -1;
   float angle = (start + direction * offset) * (std::numbers::pi * 2);
   return *parentPosition + Vec2F(std::cos(angle), std::sin(angle)) * *distance;
 }
@@ -562,11 +562,11 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   object.speed = *speed;
-  auto orbitDistance = root().random().randf((*orbitRange)[0], (*orbitRange)[1]);
+  auto orbitDistance = root().random().uniform_float((*orbitRange)[0], (*orbitRange)[1]);
   if (!orbitDistance)
     return std::unexpected(std::move(orbitDistance.error()));
   object.orbitDistance = *orbitDistance;
-  auto lifeTime = root().random().randf((*lifetimeRange)[0], (*lifetimeRange)[1]);
+  auto lifeTime = root().random().uniform_float((*lifetimeRange)[0], (*lifetimeRange)[1]);
   if (!lifeTime)
     return std::unexpected(std::move(lifeTime.error()));
   object.lifeTime = *lifeTime;
@@ -643,9 +643,9 @@ std::expected<std::optional<Vec2F>, StarException> SystemWorld::systemLocationPo
 }
 
 Vec2F SystemWorld::randomArrivalPosition() const {
-  RandomSource rand(this->root().random().randu64());
-  float range = m_config.arrivalRange[0] + (rand.randf() * (m_config.arrivalRange[1] - m_config.arrivalRange[0]));
-  float angle = rand.randf() * std::numbers::pi * 2;
+  RandomSource rand(this->root().random().next_u64());
+  float range = m_config.arrivalRange[0] + (rand.uniform_float() * (m_config.arrivalRange[1] - m_config.arrivalRange[0]));
+  float angle = rand.uniform_float() * std::numbers::pi * 2;
   return Vec2F::with_angle(angle, range);
 }
 
@@ -804,7 +804,7 @@ bool SystemObject::shouldDestroy() const {
 }
 
 void SystemObject::enterOrbit(CelestialCoordinate const& target, Vec2F const& targetPosition, double time) {
-  int direction = this->root().random().randf() > 0.5 ? 1 : -1; // random direction
+  int direction = this->root().random().uniform_float() > 0.5 ? 1 : -1; // random direction
   m_orbit.set(CelestialOrbit{target, direction, time, targetPosition - position()});
   m_approach.reset();
 }
@@ -859,7 +859,7 @@ std::expected<void, StarException> SystemObject::serverUpdate(SystemWorldServer&
       return std::ranges::none_of(system.objects(), [&p](std::shared_ptr<SystemObject> const& o) { return o->orbitTarget() == p; });
     });
     if (!available.empty()) {
-      auto selected = root().random().randFrom(available);
+      auto selected = root().random().sample_ref(available);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       m_approach = selected->get();

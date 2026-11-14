@@ -292,20 +292,20 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
       auto database = ObjectDatabase::create(root);
       ASSERT_TRUE(database) << database.error().what();
       constexpr std::uint64_t seed = 0x435552534f525052;
-      root.random().init(seed);
+      root.random().seed(seed);
       RandomSource untouchedGameplay(seed);
       auto cold = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
       ASSERT_TRUE(cold) << cold.error().what();
       ASSERT_FALSE(cold->empty());
-      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "cold preview";
+      ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "cold preview";
       auto cachedConfig = (*database)->getConfig(objectName);
       ASSERT_TRUE(cachedConfig) << cachedConfig.error().what();
       ASSERT_TRUE((*cachedConfig)->lightFlickering);
-      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "warm config lookup";
+      ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "warm config lookup";
       auto warm = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
       ASSERT_TRUE(warm) << warm.error().what();
       EXPECT_EQ(*warm, *cold);
-      ASSERT_EQ(root.random().randu64(), untouchedGameplay.randu64()) << "warm preview";
+      ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "warm preview";
     }
   });
 

@@ -99,7 +99,7 @@ Vec3B const EnvironmentPainter::RayColor = Vec3B(255, 255, 200);
 
 EnvironmentPainter::EnvironmentPainter(Root& root, std::shared_ptr<Renderer> renderer)
   : m_root(root), m_renderer(std::move(renderer)), m_timer(0),
-    m_rayPerlin(1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2.0f, 2.0f, root.presentationRandom().randu64()) {}
+    m_rayPerlin(1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2.0f, 2.0f, root.presentationRandom().next_u64()) {}
 
 std::expected<std::shared_ptr<EnvironmentPainter>, StarException> EnvironmentPainter::create(Root& root, std::shared_ptr<Renderer> renderer) {
   auto textureGroup = renderer->createTextureGroup(TextureGroupSize::Large);
@@ -153,9 +153,9 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
   std::size_t starTypesSize = sky.starTypes().size();
 
   auto stars = m_starGenerator->generate(field, [&](RandomSource& rand) -> std::expected<std::pair<std::size_t, float>, StarException> {
-      std::size_t starType = rand.randu32() % starTypesSize;
-      auto frame = rand.randu32() % sky.starFrames;
-      auto twinkle = rand.randf(*twinkleMin, *twinkleMax);
+      std::size_t starType = rand.next_u32() % starTypesSize;
+      auto frame = rand.next_u32() % sky.starFrames;
+      auto twinkle = rand.uniform_float(*twinkleMin, *twinkleMax);
       if (!twinkle) return std::unexpected(std::move(twinkle.error()));
       return std::pair<std::size_t, float>(starType, frame + *twinkle);
     });
@@ -211,9 +211,11 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     if (!velocityRange) return std::unexpected(std::move(velocityRange.error()));
     auto debrisXVel =
       static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldXVel");
+    if (!debrisXVel) return std::unexpected(std::move(debrisXVel.error()));
     auto debrisYVel =
       static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldYVel");
-    Vec2D velocityOffset = -Vec2D(debrisXVel, debrisYVel) * sky.epochTime;
+    if (!debrisYVel) return std::unexpected(std::move(debrisYVel.error()));
+    Vec2D velocityOffset = -Vec2D(*debrisXVel, *debrisYVel) * sky.epochTime;
     auto imageOptions = debrisField.queryArray("list");
     if (!imageOptions) return std::unexpected(std::move(imageOptions.error()));
     Vec2U biggest;
@@ -232,11 +234,11 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     if (!angularRange) return std::unexpected(std::move(angularRange.error()));
     auto debrisItems = m_debrisGenerators[i]->generate(field,
         [&](RandomSource& rand) -> std::expected<std::pair<String, float>, StarException> {
-          auto option = rand.randFrom(*imageOptions);
+          auto option = rand.sample_ref(*imageOptions);
           if (!option) return std::unexpected(std::move(option.error()));
           auto image = option->get().toString();
           if (!image) return std::unexpected(std::move(image.error()));
-          auto angularVelocity = rand.randf((*angularRange)[0], (*angularRange)[1]);
+          auto angularVelocity = rand.uniform_float((*angularRange)[0], (*angularRange)[1]);
           if (!angularVelocity) return std::unexpected(std::move(angularVelocity.error()));
           return std::pair<String, float>(std::move(*image), *angularVelocity);
         });

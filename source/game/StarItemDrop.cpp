@@ -138,7 +138,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::createRandomiz
   auto distance = config->getFloat("randomizedDistance");
   if (!distance)
     return std::unexpected(std::move(distance.error()));
-  auto offset = Vec2F(*distance, 0).rotate(std::numbers::pi * 2.0 * rootContext.random().randf());
+  auto offset = Vec2F(*distance, 0).rotate(std::numbers::pi * 2.0 * rootContext.random().uniform_float());
   offset[1] = std::fabs(offset[1]);
   (*drop)->setPosition(position + offset / TilePixels);
   auto speed = config->getFloat("randomizedSpeed");
@@ -491,7 +491,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       auto takeable = canTake();
       if (!takeable)
         return std::unexpected(std::move(takeable.error()));
-      if (*takeable && m_mode.get() == Mode::Available && root().random().randf() < m_combineChance) {
+      if (*takeable && m_mode.get() == Mode::Available && root().random().uniform_float() < m_combineChance) {
         auto found = world.findEntity(
           RectF::withCenter(position(), Vec2F::filled(m_combineRadius)),
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
@@ -824,7 +824,7 @@ std::expected<void, StarException> ItemDrop::initialize() {
   auto overheadDistance = m_config.getFloat("overheadRandomizedDistance");
   if (!overheadDistance)
     return std::unexpected(std::move(overheadDistance.error()));
-  m_overheadOffset = Vec2F(*overheadDistance, 0).rotate(std::numbers::pi * 2.0 * root().random().randf());
+  m_overheadOffset = Vec2F(*overheadDistance, 0).rotate(std::numbers::pi * 2.0 * root().random().uniform_float());
   if (auto loaded = loadFloat("combineChance", m_combineChance); !loaded)
     return std::unexpected(std::move(loaded.error()));
   if (auto loaded = loadFloat("combineRadius", m_combineRadius); !loaded)

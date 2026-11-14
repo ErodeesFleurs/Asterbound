@@ -3514,7 +3514,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         auto length = lengthJson->toUInt();
         if (!length)
           return std::unexpected(std::move(length.error()));
-        auto salt = secureRandomBytes(*length);
+        auto salt = secure_random_bytes(*length);
         if (!salt)
           return std::unexpected(std::move(salt.error()));
         if (auto logged = m_root.logger().info("UniverseServer: Sending Handshake Challenge"); !logged)
@@ -4397,7 +4397,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         return std::unexpected(std::move(configuredSeed.error()));
       seed = *configuredSeed;
     } else {
-      seed = m_root.random().randu64();
+      seed = m_root.random().next_u64();
     }
     auto type = config->getString("type");
     if (!type)

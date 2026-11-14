@@ -325,9 +325,9 @@ std::expected<std::optional<Vec2I>, StarException> WorldTemplate::findSensiblePl
   auto height = m_templateConfig.getInt("playerStartFreeBlocksHeight");
   if (!height) return std::unexpected(std::move(height.error()));
   for (int i = 0; i < *tries; ++i) {
-    auto searchRegion = this->root().random().randFrom(playerStartSearchRegions);
+    auto searchRegion = this->root().random().sample_ref(playerStartSearchRegions);
     if (!searchRegion) return std::unexpected(std::move(searchRegion.error()));
-    auto randomX = this->root().random().randInt(searchRegion->get().xMin(), searchRegion->get().xMax());
+    auto randomX = this->root().random().uniform_int(searchRegion->get().xMin(), searchRegion->get().xMax());
     if (!randomX) return std::unexpected(std::move(randomX.error()));
     int x = *randomX;
     for (int y = searchRegion->get().yMax() - 1; y >= searchRegion->get().yMin(); --y) {
@@ -426,7 +426,9 @@ std::expected<List<WorldTemplate::Dungeon>, StarException> WorldTemplate::dungeo
       if (layer.dungeons.size() > 0) {
         int dungeonSpacing = std::floor(geometry.width() / layer.dungeons.size());
         auto offset = static_random_u32_range(0, geometry.width(), seed, layer.layerBaseHeight);
-        std::uint32_t dungeonOffset = offset;
+        if (!offset)
+          return std::unexpected(std::move(offset.error()));
+        std::uint32_t dungeonOffset = *offset;
         for (auto const& dungeon : layer.dungeons) {
           dungeonList.push_back({.dungeon = dungeon,
                                  .baseHeight = layer.layerBaseHeight,
@@ -847,7 +849,7 @@ std::expected<void, StarException> WorldTemplate::initialize() {
   if (!cacheSize) return std::unexpected(std::move(cacheSize.error()));
   m_blockCache.set_capacity(*cacheSize);
   m_geometry = Vec2U(2048, 2048);
-  m_seed = this->root().random().randu64();
+  m_seed = this->root().random().next_u64();
   return {};
 }
 

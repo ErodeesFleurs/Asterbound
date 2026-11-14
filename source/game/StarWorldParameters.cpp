@@ -1262,7 +1262,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!autobiomeChoicesResult3) return std::unexpected(std::move(autobiomeChoicesResult3.error()));
     auto biomeChoices = std::move((*autobiomeChoicesResult3));
     auto selected_biome = static_random_value_from(biomeChoices, seed, layerNameSeed);
-    region.biome = std::move(selected_biome);
+    if (!selected_biome)
+      return std::unexpected(std::move(selected_biome.error()));
+    region.biome = std::move(*selected_biome);
     auto block_selector_choices = regionConfig.getArray("blockSelector");
     if (!block_selector_choices)
       return std::unexpected(std::move(block_selector_choices.error()));
@@ -1332,7 +1334,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!cave_liquid_choices)
       return std::unexpected(std::move(cave_liquid_choices.error()));
     auto selected_cave_liquid = static_random_value_from((*cave_liquid_choices), seed, "caveLiquid");
-    auto cave_liquid_name = selected_cave_liquid.optString();
+    if (!selected_cave_liquid)
+      return std::unexpected(std::move(selected_cave_liquid.error()));
+    auto cave_liquid_name = selected_cave_liquid->optString();
     if (!cave_liquid_name)
       return std::unexpected(std::move(cave_liquid_name.error()));
     auto caveLiquid = std::move((*cave_liquid_name));
@@ -1347,7 +1351,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       region.caveLiquid = std::move((*regioncaveLiquidResult1));
       auto cave_liquid_density = static_random_float_range(caveLiquidSeedDensityRange[0], caveLiquidSeedDensityRange[1],
                                                            seed, "caveLiquidSeedDensity", layerNameSeed);
-      region.caveLiquidSeedDensity = std::move(cave_liquid_density);
+      if (!cave_liquid_density)
+        return std::unexpected(std::move(cave_liquid_density.error()));
+      region.caveLiquidSeedDensity = *cave_liquid_density;
     } else {
       region.caveLiquid = EmptyLiquidId;
       region.caveLiquidSeedDensity = 0.0f;
@@ -1356,7 +1362,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!ocean_liquid_choices)
       return std::unexpected(std::move(ocean_liquid_choices.error()));
     auto selected_ocean_liquid = static_random_value_from((*ocean_liquid_choices), seed, "oceanLiquid", layerNameSeed);
-    auto ocean_liquid_name = selected_ocean_liquid.optString();
+    if (!selected_ocean_liquid)
+      return std::unexpected(std::move(selected_ocean_liquid.error()));
+    auto ocean_liquid_name = selected_ocean_liquid->optString();
     if (!ocean_liquid_name)
       return std::unexpected(std::move(ocean_liquid_name.error()));
     auto oceanLiquid = std::move((*ocean_liquid_name));
@@ -1456,12 +1464,16 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto secondary_region_count =
       static_random_i32_range(static_cast<int>(secondaryRegionCountRange[0]),
                               static_cast<int>(secondaryRegionCountRange[1]), seed, layerName, "SecondaryRegionCount");
-    int secondaryRegionCount = std::move(secondary_region_count);
+    if (!secondary_region_count)
+      return std::unexpected(std::move(secondary_region_count.error()));
+    int secondaryRegionCount = *secondary_region_count;
     auto autosecondaryRegionListResult1 = layerConfig.getArray("secondaryRegions");
     if (!autosecondaryRegionListResult1) return std::unexpected(std::move(autosecondaryRegionListResult1.error()));
     auto secondaryRegionList = std::move((*autosecondaryRegionListResult1));
     if (!secondaryRegionList.empty()) {
-      static_random_shuffle(secondaryRegionList, seed, layerName, "SecondaryRegionShuffle");
+      auto shuffled = static_random_shuffle(secondaryRegionList, seed, layerName, "SecondaryRegionShuffle");
+      if (!shuffled)
+        return std::unexpected(std::move(shuffled.error()));
       for (auto const& regionName : secondaryRegionList) {
         if (secondaryRegionCount <= 0) break;
         auto JsonsecondaryRegionConfigResult1 = regionName.toString();
@@ -1526,7 +1538,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     }
     auto dungeon_count =
       static_random_u32_range(dungeonCountRange[0], dungeonCountRange[1], seed, layerName, "DungeonCount");
-    unsigned dungeonCount = std::move(dungeon_count);
+    if (!dungeon_count)
+      return std::unexpected(std::move(dungeon_count.error()));
+    unsigned dungeonCount = *dungeon_count;
     layer.dungeons.append_range(
       dungeonPool.select_unique(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
     auto layerdungeonXVarianceResult1 = layerConfig.getInt("dungeonXVariance", 0);
@@ -1550,7 +1564,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
   auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
-  parameters->gravity = std::move(gravity_value);
+  if (!gravity_value)
+    return std::unexpected(std::move(gravity_value.error()));
+  parameters->gravity = *gravity_value;
   auto parametersairlessResult1 = biomeDatabase->biomeIsAirless(primaryBiome);
   if (!parametersairlessResult1) return std::unexpected(std::move(parametersairlessResult1.error()));
   parameters->airless = std::move((*parametersairlessResult1));
@@ -1605,7 +1621,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!parametersskyColoringResult1) return std::unexpected(std::move(parametersskyColoringResult1.error()));
   parameters->skyColoring = std::move((*parametersskyColoringResult1));
   auto day_length_value = static_random_float_range(dayLengthRange[0], dayLengthRange[1], seed, "DayLength");
-  parameters->dayLength = std::move(day_length_value);
+  if (!day_length_value)
+    return std::unexpected(std::move(day_length_value.error()));
+  parameters->dayLength = *day_length_value;
   auto parametersblockNoiseConfigResult1 = config.get("blockNoise");
   if (!parametersblockNoiseConfigResult1) return std::unexpected(std::move(parametersblockNoiseConfigResult1.error()));
   parameters->blockNoiseConfig = std::move((*parametersblockNoiseConfigResult1));
@@ -1680,7 +1698,9 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
   auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
-  parameters->gravity = std::move(gravity_value);
+  if (!gravity_value)
+    return std::unexpected(std::move(gravity_value.error()));
+  parameters->gravity = *gravity_value;
   auto parametersenvironmentStatusEffectsResult1 = asteroidsConfig.getArray("environmentStatusEffects", JsonArray());
   if (!parametersenvironmentStatusEffectsResult1) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult1.error()));
   auto parametersenvironmentStatusEffectsResult2 = jsonToStringList((*parametersenvironmentStatusEffectsResult1));

@@ -339,12 +339,12 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       "?" + image_operation_to_string(HueShiftImageOperation::hue_shift_degrees(terrestrialParameters->hueShift));
     if (terrestrialParameters->primarySurfaceLiquid != EmptyLiquidId) {
       RandomSource random(celestialParameters.seed());
-      auto count = random.randInt((*maskPerPlanetRange)[0], (*maskPerPlanetRange)[1]);
+      auto count = random.uniform_int((*maskPerPlanetRange)[0], (*maskPerPlanetRange)[1]);
       if (!count)
         return std::unexpected(std::move(count.error()));
       List<int> masks;
       for (int i = 0; i < *count; ++i) {
-        auto mask = random.randInt((*numMasks)[0], (*numMasks)[1]);
+        auto mask = random.uniform_int((*numMasks)[0], (*numMasks)[1]);
         if (!mask)
           return std::unexpected(std::move(mask.error()));
         masks.push_back(*mask);

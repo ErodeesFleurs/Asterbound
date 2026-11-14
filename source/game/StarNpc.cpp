@@ -1146,7 +1146,7 @@ auto state = std::move(*result226);
     }
 
     if (m_blinkCooldownTimer.tick(dt)) {
-      auto result227 = this->root().random().randf(m_blinkInterval[0], m_blinkInterval[1]);
+      auto result227 = this->root().random().uniform_float(m_blinkInterval[0], m_blinkInterval[1]);
 if (!result227) return std::unexpected(std::move(result227.error()));
 m_blinkCooldownTimer = GameTimer(std::move(*result227));
       if (m_emoteState == HumanoidEmote::Idle)

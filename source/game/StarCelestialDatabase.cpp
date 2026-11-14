@@ -557,15 +557,15 @@ std::expected<bool, StarException> CelestialMasterDatabase::coordinateValid(Cele
 std::expected<std::optional<CelestialCoordinate>, StarException> CelestialMasterDatabase::findRandomWorld(
     unsigned tries, unsigned trySpatialRange, std::function<std::expected<bool, StarException>(CelestialCoordinate)> filter,
     std::optional<std::uint64_t> seed) {
-  RandomSource random(m_root.random().randu64());
+  RandomSource random(m_root.random().next_u64());
   if (seed)
-    random.init(*seed);
+    random.seed(*seed);
   for (unsigned i = 0; i < tries; ++i) {
     auto range = xyRange();
-    auto x = random.randInt(range.xMin(), range.xMax());
+    auto x = random.uniform_int(range.xMin(), range.xMax());
     if (!x)
       return std::unexpected(std::move(x.error()));
-    auto y = random.randInt(range.yMin(), range.yMax());
+    auto y = random.uniform_int(range.yMin(), range.yMax());
     if (!y)
       return std::unexpected(std::move(y.error()));
     auto systems = scanSystems(RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(trySpatialRange)));
@@ -580,7 +580,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> CelestialMaster
       auto planets = children(system);
       if (!planets)
         return std::unexpected(std::move(planets.error()));
-      auto selected = random.randFrom(*planets);
+      auto selected = random.sample_ref(*planets);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       auto world = selected->get();
@@ -588,11 +588,11 @@ std::expected<std::optional<CelestialCoordinate>, StarException> CelestialMaster
       if (!worldHasChildren)
         return std::unexpected(std::move(worldHasChildren.error()));
       // Preserve the existing 50% satellite choice and random draw order.
-      if (worldHasChildren->value_or(false) && random.randb()) {
+      if (worldHasChildren->value_or(false) && random.next_bool()) {
         auto satellites = children(world);
         if (!satellites)
           return std::unexpected(std::move(satellites.error()));
-        auto selectedSatellite = random.randFrom(*satellites);
+        auto selectedSatellite = random.sample_ref(*satellites);
         if (!selectedSatellite)
           return std::unexpected(std::move(selectedSatellite.error()));
         world = selectedSatellite->get();
@@ -963,8 +963,8 @@ std::expected<CelestialChunk, StarException> CelestialMasterDatabase::produceChu
   List<Vec3I> locations;
   for (int x = region.xMin(); x < region.xMax(); ++x) {
     for (int y = region.yMin(); y < region.yMax(); ++y) {
-      if (random.randf() < m_generationInformation.systemProbability) {
-        auto z = random.randi32() % (m_baseInformation.zCoordRange[1] - m_baseInformation.zCoordRange[0])
+      if (random.uniform_float() < m_generationInformation.systemProbability) {
+        auto z = random.next_i32() % (m_baseInformation.zCoordRange[1] - m_baseInformation.zCoordRange[0])
             + m_baseInformation.zCoordRange[0];
         locations.push_back(Vec3I(x, y, z));
       }
@@ -1010,43 +1010,49 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
     return std::unexpected(std::move(typeResult.error()));
   auto const& type = typeResult->get();
   CelestialCoordinate systemCoordinate(location);
-  std::uint64_t systemSeed = random.randu64();
+  std::uint64_t systemSeed = random.next_u64();
   String prefix = m_generationInformation.systemPrefixNames.select(random);
   String mid = m_generationInformation.systemNames.select(random);
   String suffix = m_generationInformation.systemSuffixNames.select(random);
   auto systemName = String(Star::format("{} {} {}", prefix, mid, suffix)).trim();
   if (!systemName)
     return std::unexpected(std::move(systemName.error()));
-  auto oneDigit = systemName->replace("<onedigit>", Star::format("{:01d}", random.randu32() % 10));
+  auto oneDigit = systemName->replace("<onedigit>", Star::format("{:01d}", random.next_u32() % 10));
   if (!oneDigit)
     return std::unexpected(std::move(oneDigit.error()));
-  auto twoDigits = oneDigit->replace("<twodigit>", Star::format("{:02d}", random.randu32() % 100));
+  auto twoDigits = oneDigit->replace("<twodigit>", Star::format("{:02d}", random.next_u32() % 100));
   if (!twoDigits)
     return std::unexpected(std::move(twoDigits.error()));
-  auto threeDigits = twoDigits->replace("<threedigit>", Star::format("{:03d}", random.randu32() % 1000));
+  auto threeDigits = twoDigits->replace("<threedigit>", Star::format("{:03d}", random.next_u32() % 1000));
   if (!threeDigits)
     return std::unexpected(std::move(threeDigits.error()));
-  auto fourDigits = threeDigits->replace("<fourdigit>", Star::format("{:04d}", random.randu32() % 10000));
+  auto fourDigits = threeDigits->replace("<fourdigit>", Star::format("{:04d}", random.next_u32() % 10000));
   if (!fourDigits)
     return std::unexpected(std::move(fourDigits.error()));
   systemName = std::move(fourDigits);
+  auto systemVariation = random.sample_value(type.variationParameters);
+  if (!systemVariation)
+    return std::unexpected(std::move(systemVariation.error()));
   auto systemParameters = CelestialParameters::create(m_root, systemCoordinate, systemSeed, *systemName,
-      jsonMerge(type.baseParameters, random.randValueFrom(type.variationParameters)));
+      jsonMerge(type.baseParameters, *systemVariation));
   if (!systemParameters)
     return std::unexpected(std::move(systemParameters.error()));
   List<int> planetaryOrbits;
   for (int i = 1; i <= m_baseInformation.planetOrbitalLevels; ++i)
     if (auto region = orbitRegion(type.orbitRegions, i))
-      if (random.randf() <= region->bodyProbability)
+      if (random.uniform_float() <= region->bodyProbability)
         planetaryOrbits.push_back(i);
   HashMap<int, CelestialPlanet> objects;
   for (auto [planetIndex, planetOrbit] : std::views::enumerate(planetaryOrbits)) {
     auto region = orbitRegion(type.orbitRegions, planetOrbit);
     auto planetaryTypeName = region->planetaryTypes.select(random);
     if (auto planetType = m_generationInformation.planetaryTypes.find_ref(planetaryTypeName)) {
-      auto planetaryParameters = jsonMerge(planetType->get().baseParameters, random.randValueFrom(planetType->get().variationParameters));
+      auto planetaryVariation = random.sample_value(planetType->get().variationParameters);
+      if (!planetaryVariation)
+        return std::unexpected(std::move(planetaryVariation.error()));
+      auto planetaryParameters = jsonMerge(planetType->get().baseParameters, *planetaryVariation);
       CelestialCoordinate planetCoordinate(location, planetOrbit);
-      std::uint64_t planetSeed = random.randu64();
+      std::uint64_t planetSeed = random.next_u64();
       auto planetarySuffix = m_generationInformation.planetarySuffixes.at(static_cast<std::size_t>(planetIndex));
       if (!planetarySuffix)
         return std::unexpected(std::move(planetarySuffix.error()));
@@ -1058,18 +1064,24 @@ CelestialMasterDatabase::produceSystem(RandomSource& random, Vec3I const& locati
       planet.planetParameters = std::move(*parameters);
       List<int> satelliteOrbits;
       for (int i = 1; i <= m_baseInformation.satelliteOrbitalLevels; ++i)
-        if (satelliteOrbits.size() < planetType->get().maxSatelliteCount && random.randf() < planetType->get().satelliteProbability)
+        if (satelliteOrbits.size() < planetType->get().maxSatelliteCount && random.uniform_float() < planetType->get().satelliteProbability)
           satelliteOrbits.push_back(i);
       for (auto [satelliteIndex, satelliteOrbit] : std::views::enumerate(satelliteOrbits)) {
         auto satelliteTypeName = region->satelliteTypes.select(random);
         if (auto satelliteType = m_generationInformation.satelliteTypes.find_ref(satelliteTypeName)) {
-          auto variation = random.randValueFrom(satelliteType->get().variationParameters);
+          auto variationResult = random.sample_value(satelliteType->get().variationParameters);
+          if (!variationResult)
+            return std::unexpected(std::move(variationResult.error()));
+          auto variation = std::move(*variationResult);
           auto orbitParameters = satelliteType->get().orbitParameters.value(region->regionName, JsonArray()).toArray();
           if (!orbitParameters)
             return std::unexpected(std::move(orbitParameters.error()));
-          auto satelliteParameters = jsonMerge(satelliteType->get().baseParameters, variation, random.randValueFrom(*orbitParameters));
+          auto orbitVariation = random.sample_value(*orbitParameters);
+          if (!orbitVariation)
+            return std::unexpected(std::move(orbitVariation.error()));
+          auto satelliteParameters = jsonMerge(satelliteType->get().baseParameters, variation, *orbitVariation);
           CelestialCoordinate satelliteCoordinate(location, planetOrbit, satelliteOrbit);
-          std::uint64_t satelliteSeed = random.randu64();
+          std::uint64_t satelliteSeed = random.next_u64();
           auto satelliteSuffix = m_generationInformation.satelliteSuffixes.at(static_cast<std::size_t>(satelliteIndex));
           if (!satelliteSuffix)
             return std::unexpected(std::move(satelliteSuffix.error()));
@@ -1090,8 +1102,8 @@ std::expected<List<CelestialConstellation>, StarException> CelestialMasterDataba
     RandomSource& random, List<Vec2I> const& constellationCandidates) const {
   List<CelestialConstellation> constellations;
 
-  if (random.randf() < m_generationInformation.constellationProbability && constellationCandidates.size() > 2) {
-    auto targetConstellationLineCount = random.randUInt(
+  if (random.uniform_float() < m_generationInformation.constellationProbability && constellationCandidates.size() > 2) {
+    auto targetConstellationLineCount = random.uniform_uint(
         m_generationInformation.constellationLineCountRange[0], m_generationInformation.constellationLineCountRange[1]);
     if (!targetConstellationLineCount)
       return std::unexpected(std::move(targetConstellationLineCount.error()));
@@ -1104,13 +1116,15 @@ std::expected<List<CelestialConstellation>, StarException> CelestialMasterDataba
       if (++tries > m_generationInformation.constellationMaxTries)
         break;
 
-      Vec2I start;
-      if (constellationPoints.empty())
-        start = random.randValueFrom(constellationCandidates);
-      else
-        start = random.randValueFrom(constellationPoints);
+      auto startPoint = constellationPoints.empty() ? random.sample_value(constellationCandidates) : random.sample_value(constellationPoints);
+      if (!startPoint)
+        return std::unexpected(std::move(startPoint.error()));
+      Vec2I start = *startPoint;
 
-      Vec2I end = random.randValueFrom(constellationCandidates);
+      auto endPoint = random.sample_value(constellationCandidates);
+      if (!endPoint)
+        return std::unexpected(std::move(endPoint.error()));
+      Vec2I end = *endPoint;
 
       Line2I proposedLine(start, end);
       Line2D proposedLineD(proposedLine);

@@ -429,7 +429,7 @@ if (!result316) return std::unexpected(std::move(result316.error()));
 dropOptions = std::move(*result316);
 }
         if (dropOptions.size()) {
-          auto result317 = this->root().random().randFrom(dropOptions);
+          auto result317 = this->root().random().sample_ref(dropOptions);
 if (!result317) return std::unexpected(std::move(result317.error()));
 auto result318 = result317->get().toArray();
 if (!result318) return std::unexpected(std::move(result318.error()));
@@ -439,10 +439,10 @@ for (auto const& drop : option) {
   if (!result319)
     return std::unexpected(std::move(result319.error()));
   auto size = std::move(*result319);
-  auto result320 = this->root().random().randf(-0.2f, 0.2f);
+  auto result320 = this->root().random().uniform_float(-0.2f, 0.2f);
   if (!result320)
     return std::unexpected(std::move(result320.error()));
-  auto result321 = this->root().random().randf(-0.2f, 0.2f);
+  auto result321 = this->root().random().uniform_float(-0.2f, 0.2f);
   if (!result321)
     return std::unexpected(std::move(result321.error()));
   Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / TilePixels).rotate(m_movementController->rotation())
@@ -540,12 +540,21 @@ auto spaces = Set<Vec2I>::from(std::move(*result301));
     return {};
 
   while (density > 0) {
-    Vec2F particlePos = piece.offset + Vec2F(imageSize) / 2.0f + Vec2F(this->root().random().nrandf(imageSize.x() / 8.0f, 0), this->root().random().nrandf(imageSize.y() / 8.0f, 0));
+    auto offsetX = this->root().random().normal_float(imageSize.x() / 8.0f, 0);
+    if (!offsetX)
+      return std::unexpected(std::move(offsetX.error()));
+    auto offsetY = this->root().random().normal_float(imageSize.y() / 8.0f, 0);
+    if (!offsetY)
+      return std::unexpected(std::move(offsetY.error()));
+    Vec2F particlePos = piece.offset + Vec2F(imageSize) / 2.0f + Vec2F(*offsetX, *offsetY);
 
     if (!spaces.contains(Vec2I(particlePos.floor())))
       continue;
 
-    auto config = this->root().random().randValueFrom(particleOptions, {});
+    auto configResult = this->root().random().sample_value(particleOptions, {});
+    if (!configResult)
+      return std::unexpected(std::move(configResult.error()));
+    auto config = std::move(*configResult);
 
     auto result302 = this->root().particleDatabase();
 if (!result302) return std::unexpected(std::move(result302.error()));
@@ -589,7 +598,7 @@ auto result264 = std::move(*result263).getArray("breakTree", JsonArray());
 if (!result264) return std::unexpected(std::move(result264.error()));
 JsonArray breakTreeOptions = std::move(*result264);
         if (breakTreeOptions.size()) {
-          auto result265 = self.root().random().randFrom(breakTreeOptions);
+          auto result265 = self.root().random().sample_ref(breakTreeOptions);
 if (!result265) return std::unexpected(std::move(result265.error()));
 auto sound = result265->get();
           auto result266 = sound.getString("file");
@@ -639,7 +648,7 @@ auto result257 = std::move(*result256).getArray("hitGround", JsonArray());
 if (!result257) return std::unexpected(std::move(result257.error()));
 JsonArray hitGroundOptions = std::move(*result257);
       if (hitGroundOptions.size()) {
-        auto result258 = self.root().random().randFrom(hitGroundOptions);
+        auto result258 = self.root().random().sample_ref(hitGroundOptions);
 if (!result258) return std::unexpected(std::move(result258.error()));
 auto sound = result258->get();
         auto result259 = sound.getString("file");

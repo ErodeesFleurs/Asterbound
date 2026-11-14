@@ -65,7 +65,7 @@ void KeySet::generate() const {
   std::call_once(m_generated, [this] {
     SecretKey secret;
     std::visit([&secret](auto random) {
-      random.get().randBytes({reinterpret_cast<char*>(secret.data()), secret.size()});
+      random.get().fill_bytes({reinterpret_cast<char*>(secret.data()), secret.size()});
     }, m_random);
     secret[0]  &= 248;
     secret[31] &= 127;

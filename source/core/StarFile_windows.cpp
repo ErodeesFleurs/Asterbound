@@ -243,7 +243,7 @@ std::expected<String, StarException> File::temporary_file_name(RandomService& ra
   auto root = temporary_root();
   if (!root)
     return std::unexpected(std::move(root.error()));
-  return relative_to(*root, Star::format("starbound.tmpfile.{}", hexEncode(random.randBytes(16))));
+  return relative_to(*root, Star::format("starbound.tmpfile.{}", hexEncode(random.random_bytes(16))));
 }
 
 std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomService& random) {
@@ -289,7 +289,7 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
   if (!root)
     return std::unexpected(std::move(root.error()));
   for (;;) {
-    auto directory = relative_to(*root, Star::format("starbound.tmpdir.{}", hexEncode(random.randBytes(16))));
+    auto directory = relative_to(*root, Star::format("starbound.tmpdir.{}", hexEncode(random.random_bytes(16))));
     auto path = stringToUtf16(directory);
     if (!path)
       return std::unexpected(std::move(path.error()));

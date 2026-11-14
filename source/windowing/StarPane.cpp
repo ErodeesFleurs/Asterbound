@@ -671,7 +671,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
 
   auto addWidget = registerPaneCallback("addWidget",
     [](Pane& pane, Json const& config, std::optional<String> const& widgetName) -> std::expected<std::optional<LuaCallbacks>, StarException> {
-      String name = widgetName.value_or(Star::to_string(pane.context().root().random().randu64()));
+      String name = widgetName.value_or(Star::to_string(pane.context().root().random().next_u64()));
       auto guiReader = pane.reader();
       auto widget = guiReader->makeSingle(name, config);
       if (!widget)

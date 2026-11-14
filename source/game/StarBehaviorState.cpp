@@ -351,7 +351,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runRandomize(RandomizeNo
   if (!state) {
     auto root = luaExecutionRoot(m_luaContext.engine());
     if (!root) return std::unexpected(std::move(root.error()));
-    state.emplace(CompositeState(node.children.size(), root->get().random().randUInt(node.children.size() - 1)));
+    state.emplace(CompositeState(node.children.size(), root->get().random().uniform_uint(node.children.size() - 1)));
   }
   auto& composite = std::get<CompositeState>(*state);
   auto child = node.children.at(composite.index);

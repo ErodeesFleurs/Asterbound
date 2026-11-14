@@ -1059,7 +1059,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
               return std::unexpected(std::move(operation3.error()));
           }
         } else if (!m_config->smashDropOptions.empty()) {
-          auto optionsResult = root().random().randFrom(m_config->smashDropOptions);
+          auto optionsResult = root().random().sample_ref(m_config->smashDropOptions);
           if (!optionsResult)
             return std::unexpected(std::move(optionsResult.error()));
           auto const& options = optionsResult->get();
@@ -1097,7 +1097,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
               return std::unexpected(std::move(operation5.error()));
           }
         } else if (!m_config->breakDropOptions.empty()) {
-          auto optionsResult = root().random().randFrom(m_config->breakDropOptions);
+          auto optionsResult = root().random().sample_ref(m_config->breakDropOptions);
           if (!optionsResult)
             return std::unexpected(std::move(optionsResult.error()));
           auto const& options = optionsResult->get();
@@ -1152,7 +1152,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
     if (!assetsResult)
       return std::unexpected(std::move(assetsResult.error()));
     auto assets = std::move(*assetsResult);
-    auto soundResult = root().random().randFrom(m_config->smashSoundOptions);
+    auto soundResult = root().random().sample_ref(m_config->smashSoundOptions);
     if (!soundResult)
       return std::unexpected(std::move(soundResult.error()));
     auto const& sound = soundResult->get();
@@ -2463,7 +2463,7 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
         auto particle = emitter.particle;
         particle.applyVariance(root(), emitter.particleVariance);
         if (emitter.placeInSpaces) {
-          auto spaceResult = root().random().randFrom(orientation->spaces);
+          auto spaceResult = root().random().sample_ref(orientation->spaces);
           if (!spaceResult)
             return std::unexpected(std::move(spaceResult.error()));
           auto const& space = spaceResult->get();
@@ -2473,7 +2473,7 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
         auto operation1 = renderCallback.addParticle(std::move(particle));
         if (!operation1)
           return std::unexpected(std::move(operation1.error()));
-        auto varianceResult = root().random().randf(-emitter.particleEmissionRateVariance, emitter.particleEmissionRateVariance);
+        auto varianceResult = root().random().uniform_float(-emitter.particleEmissionRateVariance, emitter.particleEmissionRateVariance);
         if (!varianceResult)
           return std::unexpected(std::move(varianceResult.error()));
         auto variance = std::move(*varianceResult);
@@ -2504,7 +2504,7 @@ std::expected<void, StarException> Object::collectSounds(RenderCallback& renderC
       if (!durationResult)
         return std::unexpected(std::move(durationResult.error()));
       auto duration = std::move(*durationResult);
-      auto operation1 = sound->seekTime(root().random().randf() * duration);
+      auto operation1 = sound->seekTime(root().random().uniform_float() * duration);
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
       sound->setRangeMultiplier(m_config->soundEffectRangeMultiplier);
@@ -2532,11 +2532,11 @@ std::expected<Vec2F, StarException> Object::damageShake() const {
 
 std::expected<Vec2F, StarException> Object::computeDamageShake() const {
   if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damageProtected()) {
-    auto xResult = root().random().randf(-1, 1);
+    auto xResult = root().random().uniform_float(-1, 1);
     if (!xResult)
       return std::unexpected(std::move(xResult.error()));
     auto x = std::move(*xResult);
-    auto yResult = root().random().randf(-1, 1);
+    auto yResult = root().random().uniform_float(-1, 1);
     if (!yResult)
       return std::unexpected(std::move(yResult.error()));
     auto y = std::move(*yResult);

@@ -256,10 +256,10 @@ static std::expected<void, StarException> run(int argc, char** argv) {
           return std::unexpected(std::move(written.error()));
       }
 
-      auto x = rand.randInt(0, worldSize[0]);
+      auto x = rand.uniform_int(0, worldSize[0]);
       if (!x)
         return std::unexpected(std::move(x.error()));
-      auto y = rand.randInt(0, worldSize[1]);
+      auto y = rand.uniform_int(0, worldSize[1]);
       if (!y)
         return std::unexpected(std::move(y.error()));
       RectI region = RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(regionSize));

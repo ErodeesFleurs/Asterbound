@@ -153,7 +153,7 @@ namespace {
       auto inserted = db.insert(toByteArray(k), val);
       ASSERT_TRUE(inserted) << inserted.error().what();
 
-      int i = random.randi32();
+      int i = random.next_i32();
       if (i % 23 == 0) {
         auto committed = db.commit();
         ASSERT_TRUE(committed) << committed.error().what();
@@ -232,7 +232,7 @@ namespace {
     ASSERT_TRUE(db.setAutoCommit(false));
 
     while (keySet.size() < testCount) {
-      auto key = random.randUInt(0, MaxKey);
+      auto key = random.uniform_uint(0, MaxKey);
       ASSERT_TRUE(key);
       keySet.add(*key);
     }
@@ -349,9 +349,9 @@ TEST(BTreeDatabaseTest, Threading) {
   List<std::uint32_t> deleteKeySet;
 
   while (writeKeySet.size() < 5000) {
-    std::uint32_t key = random.randu32();
+    std::uint32_t key = random.next_u32();
     writeKeySet.push_back(key);
-    if (random.randf() > 0.3)
+    if (random.uniform_float() > 0.3)
       deleteKeySet.push_back(key);
   }
   random.shuffle(writeKeySet);
@@ -364,7 +364,7 @@ TEST(BTreeDatabaseTest, Threading) {
             auto inserted = db.insert(toByteArray(k), val);
             if (!inserted)
               return std::unexpected(std::move(inserted.error()));
-            if (random.randi32() % 23 == 0) {
+            if (random.next_i32() % 23 == 0) {
               auto committed = db.commit();
               if (!committed)
                 return std::unexpected(std::move(committed.error()));
@@ -380,7 +380,7 @@ TEST(BTreeDatabaseTest, Threading) {
             auto removed = db.remove(toByteArray(k));
             if (!removed)
               return std::unexpected(std::move(removed.error()));
-            if (random.randi32() % 23 == 0) {
+            if (random.next_i32() % 23 == 0) {
               auto committed = db.commit();
               if (!committed)
                 return std::unexpected(std::move(committed.error()));

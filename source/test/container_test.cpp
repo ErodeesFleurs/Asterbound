@@ -714,7 +714,7 @@ TEST_F(FileNativeTest, StatusDistinguishesMissingWrongTypeAndMetadata) {
 TEST_F(FileNativeTest, NamedTemporaryAcquisitionRetriesOnlyCollisions) {
   auto entropy = RandomService::create();
   ASSERT_TRUE(entropy);
-  auto seed = (*entropy)->randu64();
+  auto seed = (*entropy)->next_u64();
   RandomService first(seed);
   RandomService repeated(seed);
   auto candidate_file = File::temporary_file(first);
@@ -735,7 +735,7 @@ TEST_F(FileNativeTest, NamedTemporaryAcquisitionRetriesOnlyCollisions) {
 TEST_F(FileNativeTest, TemporaryDirectoriesDoNotAdoptExistingDirectory) {
   auto entropy = RandomService::create();
   ASSERT_TRUE(entropy);
-  auto seed = (*entropy)->randu64();
+  auto seed = (*entropy)->next_u64();
   RandomService first(seed);
   RandomService repeated(seed);
   auto original = File::temporary_directory(first);

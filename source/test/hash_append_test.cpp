@@ -296,18 +296,21 @@ TEST(HashAppendTest, AdlReturnTemporariesCompleteBeforeNextAppend) {
 TEST(HashAppendTest, ContainerSelectionPreservesBorrowAndEmptyValuePolicy) {
   std::vector<int> values{11, 22, 33};
   auto index = Star::static_random_i32_range(0, 2, "selection");
+  ASSERT_TRUE(index);
   auto selected = Star::static_random_from(values, "selection");
   ASSERT_TRUE(selected);
-  EXPECT_EQ(&selected->get(), &values[index]);
+  EXPECT_EQ(&selected->get(), &values[*index]);
   auto const& constValues = values;
   auto constSelected = Star::static_random_from(constValues, "selection");
   ASSERT_TRUE(constSelected);
-  EXPECT_EQ(&constSelected->get(), &values[index]);
-  EXPECT_EQ(Star::static_random_value_from(values, "selection"), values[index]);
+  EXPECT_EQ(&constSelected->get(), &values[*index]);
+  auto selected_value = Star::static_random_value_from(values, "selection");
+  ASSERT_TRUE(selected_value);
+  EXPECT_EQ(*selected_value, values[*index]);
   HashAppendCustom::SelectionOnlyContainer selectionOnly;
   auto minimallySelected = Star::static_random_from(selectionOnly, "selection");
   ASSERT_TRUE(minimallySelected);
-  EXPECT_EQ(&minimallySelected->get(), &selectionOnly.values[index]);
+  EXPECT_EQ(&minimallySelected->get(), &selectionOnly.values[*index]);
   std::vector<int> empty;
   EXPECT_FALSE(Star::static_random_from(empty, 7));
   EXPECT_EQ(Star::static_random_value_from(empty, 7), 0);
@@ -369,4 +372,20 @@ TEST(HashAppendTest, NonExactInputsKeepStreamingOverloadAndAdlPolicy) {
   expect_static_stream_parity(static_cast<short>(-7), static_cast<unsigned char>(0xA5), HashAppendCustom::PromotedValue,
                               HashAppendCustom::IntConvertible{});
   expect_static_stream_parity(11, HashAppendCustom::VoidValue{7}, "label", 17ull);
+}
+
+TEST(HashAppendTest, InvalidRandomBoundsRejectBeforeUserHashing) {
+  std::vector<int> events;
+  HashAppendCustom::DeferredValue value{7, &events};
+  EXPECT_FALSE(Star::static_random_i32_range(1, -1, value));
+  EXPECT_FALSE(Star::static_random_u32_range(1, 0, value));
+  auto nan = std::bit_cast<float>(0x7fc00001u);
+  auto infinity = std::bit_cast<double>(0x7ff0000000000000ull);
+  EXPECT_FALSE(Star::static_random_float_range(nan, 1, value));
+  EXPECT_FALSE(Star::static_random_float_range(1, -1, value));
+  EXPECT_FALSE(Star::static_random_double_range(0, infinity, value));
+  EXPECT_TRUE(events.empty());
+  auto selected = Star::static_random_i32_range(-7, 7, value);
+  ASSERT_TRUE(selected);
+  EXPECT_EQ(events, (std::vector<int>{7, -7}));
 }

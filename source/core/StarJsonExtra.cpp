@@ -338,7 +338,7 @@ std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random,
   }
   if (options.empty())
     return default_;
-  float choice = random.randf() * sum;
+  float choice = random.uniform_float() * sum;
   for (auto const& entry : options) {
     if (entry.first >= choice)
       return entry.second;

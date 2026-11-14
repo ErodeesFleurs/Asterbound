@@ -111,7 +111,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
     auto sounds = jsonToStringSet(*soundsValue);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
-    auto sound = root().random().randFrom(*sounds);
+    auto sound = root().random().sample_ref(*sounds);
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     return sound->get();

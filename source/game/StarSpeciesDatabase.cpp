@@ -305,14 +305,14 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::generateH
   RandomSource randSource(seed);
   auto definition = species(speciesChoice);
   if (!definition) return std::unexpected(std::move(definition.error()));
-  auto chosenGender = gender.value_or(randSource.randb() ? Gender::Male : Gender::Female);
+  auto chosenGender = gender.value_or(randSource.next_bool() ? Gender::Male : Gender::Female);
   auto generator = m_root.nameGenerator();
   if (!generator) return std::unexpected(std::move(generator.error()));
   auto name = (*generator)->generateName((*definition)->nameGen(chosenGender), randSource);
   if (!name) return std::unexpected(std::move(name.error()));
-  return createHumanoid(std::move(*name), speciesChoice, static_cast<unsigned>(chosenGender), randSource.randu32(),
-                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(),
-                        randSource.randu32(), randSource.randu32(), randSource.randu32(), randSource.randu32(), {},
+  return createHumanoid(std::move(*name), speciesChoice, static_cast<unsigned>(chosenGender), randSource.next_u32(),
+                        randSource.next_u32(), randSource.next_u32(), randSource.next_u32(), randSource.next_u32(),
+                        randSource.next_u32(), randSource.next_u32(), randSource.next_u32(), randSource.next_u32(), {},
                         itemCatalog);
 }
 

@@ -2928,7 +2928,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
     return std::unexpected(std::move(result314.error()));
   m_tileEntityBreakCheckTimer = GameTimer(std::move(*result314));
 
-  auto liquidSeed = root.random().randu64();
+  auto liquidSeed = root.random().next_u64();
   auto liquidWorld = LiquidWorld::create(*this);
   if (!liquidWorld)
     return std::unexpected(std::move(liquidWorld.error()));
@@ -2981,7 +2981,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
       while (retryCounter > 0) {
         --retryCounter;
         auto dungeonFacade = std::make_shared<DungeonGeneratorWorld>(world, true);
-        auto result323 = rnd.randInt(0, dungeon.xVariance);
+        auto result323 = rnd.uniform_int(0, dungeon.xVariance);
         if (!result323)
           return std::unexpected(std::move(result323.error()));
         Vec2I position = Vec2I((dungeon.baseX + std::move(*result323)) % world.m_geometry.width(), dungeon.baseHeight);
@@ -4549,7 +4549,7 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerSpaceStart(float targ
   CollisionSet collideWithAnything{CollisionKind::Null, CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery};
   for (int t = 0; t < maximumTries; ++t) {
     Vec2F testPos = m_geometry.limit(
-      basePos + Vec2F::with_angle(this->root().random().randf() * 2 * std::numbers::pi, t * distanceIncrement));
+      basePos + Vec2F::with_angle(this->root().random().uniform_float() * 2 * std::numbers::pi, t * distanceIncrement));
     RectF testRect = RectF::withCenter(testPos, testRectSize);
     auto result481 = generateRegion(RectI::integral(testRect));
     if (!result481)

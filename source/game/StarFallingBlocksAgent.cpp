@@ -57,7 +57,7 @@ import star.algorithm;
 namespace Star {
 
 FallingBlocksAgent::FallingBlocksAgent(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade)
-  : m_facade(std::move(worldFacade)), m_random(root.random().randu64()) {
+  : m_facade(std::move(worldFacade)), m_random(root.random().next_u64()) {
 }
 
 std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksAgent::create(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade) {
@@ -125,7 +125,7 @@ std::expected<void, StarException> FallingBlocksAgent::update() {
           FallingBlockType belowRightBlock = *belowRightBlockResult;
 
           if (belowLeftBlock == FallingBlockType::Open && belowRightBlock == FallingBlockType::Open)
-            moveTo = m_random.randb() ? belowLeftPos : belowRightPos;
+            moveTo = m_random.next_bool() ? belowLeftPos : belowRightPos;
           else if (belowLeftBlock == FallingBlockType::Open)
             moveTo = belowLeftPos;
           else if (belowRightBlock == FallingBlockType::Open)
@@ -135,7 +135,7 @@ std::expected<void, StarException> FallingBlocksAgent::update() {
 
       if (moveTo) {
         if (auto r = m_facade->moveBlock(pos, *moveTo); !r) return std::unexpected(std::move(r.error()));
-        if (m_random.randf() < m_immediateUpwardPropagateProbability) {
+        if (m_random.uniform_float() < m_immediateUpwardPropagateProbability) {
           processing.add(pos + Vec2I(0, 1));
           processing.add(pos + Vec2I(-1, 1));
           processing.add(pos + Vec2I(1, 1));

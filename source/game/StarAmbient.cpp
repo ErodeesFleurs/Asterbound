@@ -148,7 +148,10 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
           return std::unexpected(std::move(removed.error()));
       }
       while (true) {
-        m_currentTrackName = m_root.random().randValueFrom(tracks);
+        auto track = m_root.random().sample_value(tracks);
+        if (!track)
+          return std::unexpected(std::move(track.error()));
+        m_currentTrackName = std::move(*track);
         if (m_currentTrackName.empty() || !m_recentTracks.contains(m_currentTrackName))
           break;
         auto removed = m_recentTracks.pop_front_checked();
@@ -216,7 +219,10 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
   }
 
   if (!m_weatherTrack) {
-    m_weatherTrackName = m_root.random().randValueFrom(tracks);
+    auto track = m_root.random().sample_value(tracks);
+    if (!track)
+      return std::unexpected(std::move(track.error()));
+    m_weatherTrackName = std::move(*track);
     if (!m_weatherTrackName.empty()) {
       auto audio = (*assets)->tryAudio(m_weatherTrackName);
       if (!audio)

@@ -273,7 +273,7 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
   if (options->size()) {
-    auto selected = root().random().randFrom(*options);
+    auto selected = root().random().sample_ref(*options);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
     auto option = selected->get().toArray();

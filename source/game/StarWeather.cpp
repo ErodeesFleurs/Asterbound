@@ -193,10 +193,10 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
       }
       m_lastWeatherChangeTime = m_nextWeatherChangeTime;
       if (!m_currentWeatherType) return std::unexpected(StarException("No selected weather type in a nonempty weather pool"));
-      auto duration = m_root.get().random().randd(m_currentWeatherType->duration[0], m_currentWeatherType->duration[1]);
+      auto duration = m_root.get().random().uniform_double(m_currentWeatherType->duration[0], m_currentWeatherType->duration[1]);
       if (!duration) return std::unexpected(std::move(duration.error()));
       m_nextWeatherChangeTime = m_currentTime + *duration;
-      m_currentWind = m_currentWeatherType->maximumWind * (m_root.get().random().randb() ? 1 : -1);
+      m_currentWind = m_currentWeatherType->maximumWind * (m_root.get().random().next_bool() ? 1 : -1);
     }
     m_currentWeatherIntensity = std::min(std::clamp((m_currentTime - m_lastWeatherChangeTime) / *warmup, 0.0, 1.0),
                                          std::clamp((m_nextWeatherChangeTime - m_currentTime) / *cooldown, 0.0, 1.0));
@@ -264,12 +264,12 @@ std::expected<void, StarException> ServerWeather::setWeatherIndex(std::size_t we
       m_currentWeatherType = std::move(*value);
     }
     m_currentWeatherIntensity = 1.0f;
-    m_currentWind = m_currentWeatherType->maximumWind * (m_root.get().random().randb() ? 1 : -1);
+    m_currentWind = m_currentWeatherType->maximumWind * (m_root.get().random().next_bool() ? 1 : -1);
   }
   m_lastWeatherChangeTime = m_currentTime;
   if (m_forceWeather) m_nextWeatherChangeTime = std::numeric_limits<float>::infinity();
   else if (m_currentWeatherType) {
-    auto duration = m_root.get().random().randd(m_currentWeatherType->duration[0], m_currentWeatherType->duration[1]);
+    auto duration = m_root.get().random().uniform_double(m_currentWeatherType->duration[0], m_currentWeatherType->duration[1]);
     if (!duration) return std::unexpected(std::move(duration.error()));
     m_nextWeatherChangeTime = m_currentTime + *duration;
   } else m_nextWeatherChangeTime = m_currentTime;
@@ -372,13 +372,13 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
       // Figure out a good target value based on the rate per x tile, making
       // sure to handle very low count values appropriately on average.
       float count = projectileConfig.ratePerX * spawnRect.width() * dt * m_currentWeatherIntensity;
-      if (m_root.get().random().randf() > fractional_part(count))
+      if (m_root.get().random().uniform_float() > fractional_part(count))
         count = std::floor(count);
       else
         count = std::ceil(count);
 
       for (int i = 0; i < count; ++i) {
-        Vec2F position = {m_root.get().random().randf() * spawnRect.width() + spawnRect.xMin(), m_root.get().random().randf() * spawnRect.height() + spawnRect.yMin()};
+        Vec2F position = {m_root.get().random().uniform_float() * spawnRect.width() + spawnRect.xMin(), m_root.get().random().uniform_float() * spawnRect.height() + spawnRect.yMin()};
 
         if (position[1] > m_undergroundLevel) {
           if (m_weatherEffectsActiveQuery) {
@@ -557,15 +557,15 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
 
     for (auto const& renderZone : newClientRegion.subtract(visibleRegion)) {
       float count = particleConfig.density * renderZone.width() * renderZone.height() * m_currentWeatherIntensity;
-      if (m_root.get().random().randf() > fractional_part(count))
+      if (m_root.get().random().uniform_float() > fractional_part(count))
         count = std::floor(count);
       else
         count = std::ceil(count);
 
       for (int i = 0; i < count; ++i) {
         auto newParticle = particleConfig.particle;
-        float x = m_root.get().random().randf() * renderZone.width() + renderZone.xMin();
-        float y = m_root.get().random().randf() * renderZone.height() + renderZone.yMin();
+        float x = m_root.get().random().uniform_float() * renderZone.width() + renderZone.xMin();
+        float y = m_root.get().random().uniform_float() * renderZone.height() + renderZone.yMin();
         newParticle.position += m_worldGeometry.xwrap(Vec2F(x, y));
         newParticle.velocity = targetVelocity;
         if (y > m_undergroundLevel) {

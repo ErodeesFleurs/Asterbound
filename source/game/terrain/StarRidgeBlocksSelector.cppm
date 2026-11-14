@@ -67,9 +67,9 @@ std::expected<std::shared_ptr<RidgeBlocksSelector>, StarException> RidgeBlocksSe
     return std::unexpected(std::move(noiseFrequency.error()));
   result->noiseFrequency = *noiseFrequency;
   RandomSource random(parameters.seed);
-  result->ridgePerlin1 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.randu64());
-  result->ridgePerlin2 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.randu64());
-  result->noisePerlin = PerlinF(1, *noiseFrequency, *noiseAmplitude, 0, 1.0f, 2.0f, random.randu64());
+  result->ridgePerlin1 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.next_u64());
+  result->ridgePerlin2 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.next_u64());
+  result->noisePerlin = PerlinF(1, *noiseFrequency, *noiseAmplitude, 0, 1.0f, 2.0f, random.next_u64());
   return result;
 }
 

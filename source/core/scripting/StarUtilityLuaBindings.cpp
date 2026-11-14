@@ -8,6 +8,7 @@ import star.utility_lua_bindings;
 import star.data_stream;
 import star.uuid;
 import star.random;
+import star.math_common;
 import star.bi_map;
 import star.interpolation;
 import star.perlin;
@@ -30,6 +31,18 @@ import star.version;
 import star.static_random;
 namespace Star {
 
+#pragma float_control(precise, on, push)
+[[gnu::noinline]] static double interpolate_static_random_double_overflow(double min, double max, double unit) {
+  return (1.0 - unit) * min + unit * max;
+}
+#pragma float_control(pop)
+
+static double interpolate_static_random_double(double min, double max, std::uint64_t hash) {
+  auto unit = (hash & 0x7fffffffffffffff) / 9223372036854775808.0;
+  auto width = max - min;
+  return is_finite(width) ? unit * width + min : interpolate_static_random_double_overflow(min, max, unit);
+}
+
 struct LuaRandomSource : RandomSource {
   LuaRandomSource(RandomService& owner, std::uint64_t seed) : RandomSource(seed), owner(owner) {}
   RandomService& owner;
@@ -44,51 +57,51 @@ struct LuaUserDataMethods<LuaRandomSource> {
     LuaMethods<LuaRandomSource> methods;
 
     if (auto result = methods.registerMethod("init", [](LuaRandomSource& source, std::optional<std::uint64_t> seed)
-        { source.init(seed ? *seed : source.owner.randu64()); }); !result)
+        { source.seed(seed ? *seed : source.owner.next_u64()); }); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = methods.registerMethod("addEntropy", [](LuaRandomSource& source, std::optional<std::uint64_t> seed)
-        { source.addEntropy(seed ? *seed : source.owner.randu64()); }); !result)
+        { source.mix_seed(seed ? *seed : source.owner.next_u64()); }); !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = methods.registerMethodWithSignature<std::uint32_t, LuaRandomSource&>("randu32", std::mem_fn(&RandomSource::randu32)); !result)
+    if (auto result = methods.registerMethodWithSignature<std::uint32_t, LuaRandomSource&>("randu32", std::mem_fn(&RandomSource::next_u32)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = methods.registerMethodWithSignature<std::uint64_t, LuaRandomSource&>("randu64", std::mem_fn(&RandomSource::randu64)); !result)
+    if (auto result = methods.registerMethodWithSignature<std::uint64_t, LuaRandomSource&>("randu64", std::mem_fn(&RandomSource::next_u64)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = methods.registerMethodWithSignature<std::int32_t, LuaRandomSource&>("randi32", std::mem_fn(&RandomSource::randi32)); !result)
+    if (auto result = methods.registerMethodWithSignature<std::int32_t, LuaRandomSource&>("randi32", std::mem_fn(&RandomSource::next_i32)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = methods.registerMethodWithSignature<std::int64_t, LuaRandomSource&>("randi64", std::mem_fn(&RandomSource::randi64)); !result)
+    if (auto result = methods.registerMethodWithSignature<std::int64_t, LuaRandomSource&>("randi64", std::mem_fn(&RandomSource::next_i64)); !result)
       return std::unexpected(std::move(result.error()));
 
     if (auto result = methods.registerMethod("randf", [](LuaRandomSource& source, std::optional<float> arg1, std::optional<float> arg2)
         -> std::expected<float, StarException> {
           if (arg1 && arg2)
-            return source.randf(*arg1, *arg2);
-          return source.randf();
+            return source.uniform_float(*arg1, *arg2);
+          return source.uniform_float();
         }); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = methods.registerMethod("randd", [](LuaRandomSource& source, std::optional<double> arg1, std::optional<double> arg2)
         -> std::expected<double, StarException> {
           if (arg1 && arg2)
-            return source.randd(*arg1, *arg2);
-          return source.randd();
+            return source.uniform_double(*arg1, *arg2);
+          return source.uniform_double();
         }); !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = methods.registerMethodWithSignature<bool, LuaRandomSource&>("randb", std::mem_fn(&RandomSource::randb)); !result)
+    if (auto result = methods.registerMethodWithSignature<bool, LuaRandomSource&>("randb", std::mem_fn(&RandomSource::next_bool)); !result)
       return std::unexpected(std::move(result.error()));
 
     if (auto result = methods.registerMethod("randInt", [](LuaRandomSource& source, std::int64_t arg1, std::optional<std::int64_t> arg2)
         -> std::expected<std::int64_t, StarException> {
           if (arg2)
-            return source.randInt(arg1, *arg2);
-          return source.randInt(arg1);
+            return source.uniform_int(arg1, *arg2);
+          return source.uniform_int(arg1);
         }); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = methods.registerMethod("randUInt", [](LuaRandomSource& source, std::uint64_t arg1, std::optional<std::uint64_t> arg2)
         -> std::expected<std::uint64_t, StarException> {
           if (arg2)
-            return source.randUInt(arg1, *arg2);
-          return source.randUInt(arg1);
+            return source.uniform_uint(arg1, *arg2);
+          return source.uniform_uint(arg1);
         }); !result)
       return std::unexpected(std::move(result.error()));
     return methods;
@@ -221,7 +234,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("jsonQuery", [](Json const& json, String const& path, Json const& def) { return json.query(path, def); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("makeRandomSource", [&random](std::optional<std::uint64_t> seed) { return LuaRandomSource(random, seed ? *seed : random.randu64()); }); !result)
+  if (auto result = callbacks.registerCallback("makeRandomSource", [&random](std::optional<std::uint64_t> seed) { return LuaRandomSource(random, seed ? *seed : random.next_u64()); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("makePerlinSource", [](Json const& config) { return PerlinF::create(config); }); !result)
     return std::unexpected(std::move(result.error()));
@@ -266,8 +279,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
         auto hash = hash64LuaValues(hashValues);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
-        std::uint64_t denom = (std::uint64_t)(-1) / ((std::uint64_t)(max - min) + 1);
-        return static_cast<std::int32_t>(*hash / denom + min);
+        auto width = static_cast<std::uint32_t>(max) - static_cast<std::uint32_t>(min);
+        auto offset = static_random_bounded(*hash, width);
+        return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(min) + static_cast<std::uint32_t>(offset));
       }); !result)
     return std::unexpected(std::move(result.error()));
 
@@ -284,10 +298,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
       [hash64LuaValues](double min, double max, LuaVariadic<LuaValue> const& hashValues) -> std::expected<double, StarException> {
         if (max < min)
           return std::unexpected(LuaException("Maximum bound in staticRandomDoubleRange must be >= minimum bound!"));
+        if (!is_finite(min) || !is_finite(max))
+          return std::unexpected(LuaException("Bounds in staticRandomDoubleRange must be finite!"));
         auto hash = hash64LuaValues(hashValues);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
-        return (*hash & 0x7fffffffffffffff) / 9223372036854775808.0 * (max - min) + min;
+        return interpolate_static_random_double(min, max, *hash);
       }); !result)
     return std::unexpected(std::move(result.error()));
 
@@ -312,8 +328,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
   return callbacks;
 }
 
-double LuaBindings::UtilityCallbacks::nrand(RandomService& random, std::optional<double> const& stdev, std::optional<double> const& mean) {
-  return random.nrandd(stdev.value_or(1.0), mean.value_or(0));
+std::expected<double, StarException> LuaBindings::UtilityCallbacks::nrand(RandomService& random, std::optional<double> const& stdev, std::optional<double> const& mean) {
+  return random.normal_double(stdev.value_or(1.0), mean.value_or(0));
 }
 
 String LuaBindings::UtilityCallbacks::makeUuid(RandomService& random) {

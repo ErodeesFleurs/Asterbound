@@ -394,7 +394,7 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::randomMonster(Stri
   seed = std::move(*result53);
       }
     } else {
-      seed = m_root.random().randu64();
+      seed = m_root.random().next_u64();
     }
 }
 
@@ -886,7 +886,7 @@ monsterVariant.animatorConfig = std::move(*result146);
 
   // select a list of monster parts
   List<MonsterPart> monsterParts;
-  auto result147 = rand.randFrom(monsterType.categories);
+  auto result147 = rand.sample_ref(monsterType.categories);
 if (!result147) return std::unexpected(std::move(result147.error()));
 auto const& categoryName = result147->get();
 
@@ -895,7 +895,7 @@ auto const& categoryName = result147->get();
 if (!result148) return std::unexpected(std::move(result148.error()));
 auto result149 = result148->get().get(partTypeName);
 if (!result149) return std::unexpected(std::move(result149.error()));
-auto result150 = rand.randFrom(result149->get());
+auto result150 = rand.sample_ref(result149->get());
 if (!result150) return std::unexpected(std::move(result150.error()));
 auto const& randPart = result150->get().second;
     auto result151 = uniqueParameters.get("selectedParts", JsonObject());
@@ -967,7 +967,10 @@ if (!result163) return std::unexpected(std::move(result163.error()));
     auto result164 = monsterVariant.dropPoolConfig.arrayPtr();
     if (!result164)
       return std::unexpected(std::move(result164.error()));
-    monsterVariant.dropPoolConfig = rand.randValueFrom(**result164);
+    auto dropPool = rand.sample_value(**result164);
+    if (!dropPool)
+      return std::unexpected(std::move(dropPool.error()));
+    monsterVariant.dropPoolConfig = std::move(*dropPool);
 }
 
   return monsterVariant;
@@ -1006,7 +1009,10 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
       // First, pick from base skills
       while (!baseSkillNames.empty() && skillNames.size() < skillCount)
         {
-        auto result174 = baseSkillNames.take_at(rand.randInt(baseSkillNames.size() - 1));
+        auto index = rand.uniform_int(baseSkillNames.size() - 1);
+        if (!index)
+          return std::unexpected(std::move(index.error()));
+        auto result174 = baseSkillNames.take_at(*index);
         if (!result174)
           return std::unexpected(std::move(result174.error()));
         skillNames.push_back(std::move(*result174));
@@ -1015,7 +1021,10 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
       // ...then fill in from special skills as needed
       while (!specialSkillNames.empty() && skillNames.size() < skillCount)
         {
-        auto result176 = specialSkillNames.take_at(rand.randInt(specialSkillNames.size() - 1));
+        auto index = rand.uniform_int(specialSkillNames.size() - 1);
+        if (!index)
+          return std::unexpected(std::move(index.error()));
+        auto result176 = specialSkillNames.take_at(*index);
         if (!result176)
           return std::unexpected(std::move(result176.error()));
         skillNames.push_back(std::move(*result176));
@@ -1057,7 +1066,10 @@ std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkill
         List<String> skillNames;
         for (std::size_t i = 0; i < skillCount; ++i)
           {
-          auto result185 = availableSkillNames.take_at(rand.randInt(availableSkillNames.size() - 1));
+          auto index = rand.uniform_int(availableSkillNames.size() - 1);
+          if (!index)
+            return std::unexpected(std::move(index.error()));
+          auto result185 = availableSkillNames.take_at(*index);
           if (!result185)
             return std::unexpected(std::move(result185.error()));
           skillNames.push_back(std::move(*result185));

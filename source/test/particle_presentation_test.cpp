@@ -18,6 +18,7 @@ import star.vector;
 import star.world_geometry;
 import star.unicode;
 import star.world_tiles;
+import star.random;
 
 using namespace Star;
 
@@ -315,6 +316,69 @@ const GameTestRegistration animatedParticleSampling(
       EXPECT_FLOAT_EQ(display.playbackState().timer, 0.25f);
       EXPECT_FALSE(finite->isComplete());
       EXPECT_FLOAT_EQ(finite->playbackState().timer, 0);
+    }
+  });
+
+const GameTestRegistration particle_variance_draw_order(
+  "ParticleConfig", "VariancePreservesFieldMappingAliasingAndBothRandomStreams", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    for (bool self_variance : {false, true}) {
+      Particle particle;
+      particle.size = 7;
+      particle.baseSize = 9;
+      particle.position = {1, 2};
+      particle.velocity = {3, -4};
+      particle.finalVelocity = {5, 6};
+      particle.rotation = 0.25f;
+      particle.angularVelocity = -0.75f;
+      particle.length = 10;
+      particle.timeToLive = 20;
+      particle.approach = {11, 12};
+      Particle variance;
+      variance.size = 0.5f;
+      variance.position = {1, 2};
+      variance.velocity = {3, 0};
+      variance.finalVelocity = {0, 0};
+      variance.rotation = 0.125f;
+      variance.angularVelocity = 0.25f;
+      variance.length = 2;
+      variance.timeToLive = 3;
+      auto original = particle;
+      auto deviations = self_variance ? original : variance;
+      RandomSource oracle(73);
+      RandomSource presentation_oracle(29);
+      std::array<float, 11> draws;
+      for (auto& value : draws)
+        value = oracle.uniform_float();
+      auto expected = original;
+      expected.size += deviations.size * (draws[0] * 2 - 1);
+      expected.position += Vec2F(deviations.position[0] * (draws[1] * 2 - 1),
+          deviations.position[1] * (draws[2] * 2 - 1));
+      expected.velocity += Vec2F(deviations.velocity[0] * (draws[3] * 2 - 1),
+          deviations.velocity[1] * (draws[4] * 2 - 1));
+      expected.finalVelocity += Vec2F(deviations.finalVelocity[0] * (draws[5] * 2 - 1),
+          deviations.finalVelocity[1] * (draws[6] * 2 - 1));
+      expected.rotation += deviations.rotation * (draws[7] * 2 - 1);
+      expected.angularVelocity += deviations.angularVelocity * (draws[8] * 2 - 1);
+      expected.length += deviations.length * (draws[9] * 2 - 1);
+      expected.timeToLive += deviations.timeToLive * (draws[10] * 2 - 1);
+      root.random().seed(73);
+      root.presentationRandom().seed(29);
+      particle.applyVariance(root, self_variance ? particle : variance);
+      EXPECT_FLOAT_EQ(particle.size, expected.size);
+      for (unsigned axis = 0; axis != 2; ++axis) {
+        EXPECT_FLOAT_EQ(particle.position[axis], expected.position[axis]);
+        EXPECT_FLOAT_EQ(particle.velocity[axis], expected.velocity[axis]);
+        EXPECT_FLOAT_EQ(particle.finalVelocity[axis], expected.finalVelocity[axis]);
+      }
+      EXPECT_FLOAT_EQ(particle.rotation, expected.rotation);
+      EXPECT_FLOAT_EQ(particle.angularVelocity, expected.angularVelocity);
+      EXPECT_FLOAT_EQ(particle.length, expected.length);
+      EXPECT_FLOAT_EQ(particle.timeToLive, expected.timeToLive);
+      EXPECT_EQ(particle.baseSize, original.baseSize);
+      EXPECT_EQ(particle.approach, original.approach);
+      EXPECT_EQ(root.random().next_u64(), oracle.next_u64());
+      EXPECT_EQ(root.presentationRandom().next_u64(), presentation_oracle.next_u64());
     }
   });
 

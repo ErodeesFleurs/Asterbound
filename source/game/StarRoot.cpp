@@ -187,7 +187,7 @@ std::expected<std::unique_ptr<Root>, StarException> Root::create(Settings settin
 }
 
 std::expected<void, StarException> Root::initialize() {
-  auto random = m_random.init();
+  auto random = m_random.seed();
   if (!random)
     return std::unexpected(std::move(random.error()));
   if (m_settings.runtimeConfigFile)
@@ -283,7 +283,7 @@ std::expected<void, StarException> Root::initialize() {
           }
         }
 
-        auto entropy = m_random.addEntropy();
+        auto entropy = m_random.mix_seed();
         if (!entropy)
           return std::unexpected(std::move(entropy.error()));
 

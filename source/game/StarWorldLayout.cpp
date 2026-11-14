@@ -436,7 +436,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildAsteroidsLayout(Root
   auto autoasteroidTerrainsResult2 = (*autoasteroidTerrainsResult1).toArray();
   if (!autoasteroidTerrainsResult2) return std::unexpected(std::move(autoasteroidTerrainsResult2.error()));
   auto asteroidTerrains = std::move((*autoasteroidTerrainsResult2));
-  auto selectedTerrain = randSource.randFrom(asteroidTerrains);
+  auto selectedTerrain = randSource.sample_ref(asteroidTerrains);
   if (!selectedTerrain) return std::unexpected(std::move(selectedTerrain.error()));
   auto const& asteroidTerrainConfig = selectedTerrain->get();
   auto autoemptyTerrainConfigResult1 = asteroidsConfig.get("emptyTerrain");
@@ -1346,9 +1346,13 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
     layer.cells.push_back(subRegion);
     layer.cells.push_back(region);
     auto region_relative_size = static_random_float_range(regionSizeRange[0], regionSizeRange[1], seed, ++mix, yStart);
-    float regionRelativeSize = std::move(region_relative_size);
+    if (!region_relative_size)
+      return std::unexpected(std::move(region_relative_size.error()));
+    float regionRelativeSize = *region_relative_size;
     auto subregion_relative_size = static_random_float_range(subRegionSize[0], subRegionSize[1], seed, ++mix, yStart);
-    float subRegionRelativeSize = std::move(subregion_relative_size);
+    if (!subregion_relative_size)
+      return std::unexpected(std::move(subregion_relative_size.error()));
+    float subRegionRelativeSize = *subregion_relative_size;
     totalRelativeSize += regionRelativeSize;
 
     if (subRegionRelativeSize >= 1.0f)
@@ -1376,7 +1380,9 @@ std::expected<void, StarException> WorldLayout::addLayer(std::uint64_t seed, int
 
   // construct boundaries based on normalized sizes
     auto next_boundary = static_random_i32_range(0, m_worldSize[0] - 1, seed, yStart, "LayerOffset");
-    int nextBoundary = std::move(next_boundary);
+    if (!next_boundary)
+      return std::unexpected(std::move(next_boundary.error()));
+    int nextBoundary = *next_boundary;
     layer.boundaries.push_back(nextBoundary);
     for (std::size_t i = 0; i + 1 < relativeRegionSizes.size(); ++i) {
       int regionSize = static_cast<int>(m_worldSize[0]) * (relativeRegionSizes[i] / totalRelativeSize);

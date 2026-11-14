@@ -1859,7 +1859,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         } else if (persistentSound.isType(Json::Type::Array)) {
           auto pool = persistentSound.toArray();
           if (!pool) return std::unexpected(std::move(pool.error()));
-          auto file = m_root.get().random().randValueFrom(*pool, "").toString();
+          auto file = m_root.get().random().sample_value(*pool, "").and_then([](Json const& value) { return value.toString(); });
           if (!file) return std::unexpected(std::move(file.error()));
           persistentSoundFile = *file;
         }
@@ -1907,7 +1907,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         } else if (immediateSound.isType(Json::Type::Array)) {
           auto pool = immediateSound.toArray();
           if (!pool) return std::unexpected(std::move(pool.error()));
-          auto file = m_root.get().random().randValueFrom(*pool, "").toString();
+          auto file = m_root.get().random().sample_value(*pool, "").and_then([](Json const& value) { return value.toString(); });
           if (!file) return std::unexpected(std::move(file.error()));
           immediateSoundFile = *file;
         }
@@ -2012,8 +2012,8 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         particle.position += config.offset;
 
         if (!offsetRegion.isNull()) {
-          particle.position[0] += m_root.get().random().randf() * offsetRegion.width() + offsetRegion.xMin();
-          particle.position[1] += m_root.get().random().randf() * offsetRegion.height() + offsetRegion.yMin();
+          particle.position[0] += m_root.get().random().uniform_float() * offsetRegion.width() + offsetRegion.xMin();
+          particle.position[1] += m_root.get().random().uniform_float() * offsetRegion.height() + offsetRegion.yMin();
         }
 
         float speed = particle.velocity.magnitude();
@@ -2063,7 +2063,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         if (pair.second.timer <= 0.0f) {
           // timer causes us to emit one set
           ++numEmissionCycles;
-          auto variance = m_root.get().random().randf(-pair.second.emissionRateVariance, pair.second.emissionRateVariance);
+          auto variance = m_root.get().random().uniform_float(-pair.second.emissionRateVariance, pair.second.emissionRateVariance);
           if (!variance) return std::unexpected(std::move(variance.error()));
           pair.second.timer = 1.0f / (pair.second.emissionRate.get() + *variance);
         } else {
@@ -2103,7 +2103,10 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           for (auto& sound : std::exchange(dynamicTarget->get().independentSounds[soundName], {}))
             sound->stop(soundEntry.volumeRampTime.get());
         } else if (signal == SoundSignal::Play) {
-          String soundFile = m_root.get().random().randValueFrom(soundEntry.soundPool.get());
+          auto selectedFile = m_root.get().random().sample_value(soundEntry.soundPool.get());
+          if (!selectedFile)
+            return std::unexpected(std::move(selectedFile.error()));
+          String soundFile = std::move(*selectedFile);
           if (!soundFile.empty()) {
             auto assets = m_root.get().assets();
             if (!assets) return std::unexpected(std::move(assets.error()));

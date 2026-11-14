@@ -440,15 +440,17 @@ void Particle::samplePresentation(Particle const& current, PresentationState con
 }
 
 void Particle::applyVariance(Root& root, Particle const& variance) {
-  size += variance.size * (root.random().randf() * 2.0f - 1.0f);
-  position += {variance.position[0] * (root.random().randf() * 2.0f - 1.0f), variance.position[1] * (root.random().randf() * 2.0f - 1.0f)};
-  velocity += {variance.velocity[0] * (root.random().randf() * 2.0f - 1.0f), variance.velocity[1] * (root.random().randf() * 2.0f - 1.0f)};
+  std::array<float, 11> draws;
+  root.random().fill_uniform(draws);
+  size += variance.size * (draws[0] * 2.0f - 1.0f);
+  position += {variance.position[0] * (draws[1] * 2.0f - 1.0f), variance.position[1] * (draws[2] * 2.0f - 1.0f)};
+  velocity += {variance.velocity[0] * (draws[3] * 2.0f - 1.0f), variance.velocity[1] * (draws[4] * 2.0f - 1.0f)};
   finalVelocity +=
-      {variance.finalVelocity[0] * (root.random().randf() * 2.0f - 1.0f), variance.finalVelocity[1] * (root.random().randf() * 2.0f - 1.0f)};
-  rotation += variance.rotation * (root.random().randf() * 2.0f - 1.0f);
-  angularVelocity += variance.angularVelocity * (root.random().randf() * 2.0f - 1.0f);
-  length += variance.length * (root.random().randf() * 2.0f - 1.0f);
-  timeToLive += variance.timeToLive * (root.random().randf() * 2.0f - 1.0f);
+      {variance.finalVelocity[0] * (draws[5] * 2.0f - 1.0f), variance.finalVelocity[1] * (draws[6] * 2.0f - 1.0f)};
+  rotation += variance.rotation * (draws[7] * 2.0f - 1.0f);
+  angularVelocity += variance.angularVelocity * (draws[8] * 2.0f - 1.0f);
+  length += variance.length * (draws[9] * 2.0f - 1.0f);
+  timeToLive += variance.timeToLive * (draws[10] * 2.0f - 1.0f);
 }
 
 void Particle::collide(Vec2F const& collisionPosition) {

@@ -143,7 +143,7 @@ const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld
   ASSERT_TRUE(worlds);
   StringList instanceWorlds = worlds->keys();
   ASSERT_GT(instanceWorlds.size(), 0u);
-  auto selectedWorld = root.random().randFrom(instanceWorlds);
+  auto selectedWorld = root.random().sample_ref(instanceWorlds);
   ASSERT_TRUE(selectedWorld);
   WorldId instanceWorld = InstanceWorldId(selectedWorld->get());
 

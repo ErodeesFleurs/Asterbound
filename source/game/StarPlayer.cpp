@@ -1946,7 +1946,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     }
 
     if (m_blinkCooldownTimer.tick(dt)) {
-      auto blinkIntervalResult = root().random().randf(m_blinkInterval[0], m_blinkInterval[1]);
+      auto blinkIntervalResult = root().random().uniform_float(m_blinkInterval[0], m_blinkInterval[1]);
       if (!blinkIntervalResult)
         return std::unexpected(std::move(blinkIntervalResult.error()));
       auto blinkInterval = std::move(*blinkIntervalResult);
@@ -2554,7 +2554,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
       noise->setPosition(position() + offset);
-      auto varianceResult = root().random().randf(0, m_footstepVolumeVariance);
+      auto varianceResult = root().random().uniform_float(0, m_footstepVolumeVariance);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
       auto variance = std::move(*varianceResult);
@@ -2703,7 +2703,7 @@ std::expected<std::shared_ptr<Item>, StarException> Player::pickupItems(std::sha
       if (auto result = m_effectsAnimator->setSoundPool("pickup", {sound}); !result)
         return std::unexpected(std::move(result.error()));
       float pitch = 1.f - (static_cast<float>(items->count()) / static_cast<float>(items->maxStack())) * 0.5f;
-      auto varianceResult = root().random().randf(0.8f, 1.2f);
+      auto varianceResult = root().random().uniform_float(0.8f, 1.2f);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
       auto variance = std::move(*varianceResult);
@@ -4807,7 +4807,7 @@ std::expected<void, StarException> Player::dropSelectedItems(std::function<std::
       if (!selected)
         return {};
     }
-    auto angleResult = root().random().randf(-std::numbers::pi, std::numbers::pi);
+    auto angleResult = root().random().uniform_float(-std::numbers::pi, std::numbers::pi);
     if (!angleResult)
       return std::unexpected(std::move(angleResult.error()));
     auto angle = std::move(*angleResult);

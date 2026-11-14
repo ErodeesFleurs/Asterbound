@@ -535,20 +535,20 @@ void Perlin<Float>::init(std::uint64_t seed) {
 
   for (i = 0; i < PerlinSampleSize; i++) {
     p[i] = i;
-    g1[i] = (Float)(static_cast<std::int64_t>(randomSource.randUInt(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
+    g1[i] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
 
     for (j = 0; j < 2; j++)
-      g2[i][j] = (Float)(static_cast<std::int64_t>(randomSource.randUInt(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
+      g2[i][j] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
     normalize2(g2[i]);
 
     for (j = 0; j < 3; j++)
-      g3[i][j] = (Float)(static_cast<std::int64_t>(randomSource.randUInt(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
+      g3[i][j] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
     normalize3(g3[i]);
   }
 
   while (--i) {
     k = p[i];
-    p[i] = p[j = randomSource.randUInt(PerlinSampleSize - 1)];
+    p[i] = p[j = randomSource.uniform_uint(PerlinSampleSize - 1)];
     p[j] = k;
   }
 

@@ -410,7 +410,7 @@ template <typename LiquidId>
       return {};
     };
 
-    bool leftFirst = m_random.randb();
+    bool leftFirst = m_random.next_bool();
     auto first = spreadPressure(leftFirst ? Adjacency::Left : Adjacency::Right, 0.0f);
     if (!first) return std::unexpected(std::move(first.error()));
     auto second = spreadPressure(leftFirst ? Adjacency::Right : Adjacency::Left, 0.0f);
@@ -462,7 +462,7 @@ template <typename LiquidId>
       return {};
     };
 
-    bool leftFirst = m_random.randb();
+    bool leftFirst = m_random.next_bool();
     auto first = pressureMove(leftFirst ? Adjacency::Left : Adjacency::Right);
     if (!first) return std::unexpected(std::move(first.error()));
     auto second = pressureMove(leftFirst ? Adjacency::Right : Adjacency::Left);
@@ -492,7 +492,7 @@ template <typename LiquidId>
 
     auto top = spreadOverfill(Adjacency::Top, m_engineParameters.spreadOverfillUpFactor);
     if (!top) return std::unexpected(std::move(top.error()));
-    bool leftFirst = m_random.randb();
+    bool leftFirst = m_random.next_bool();
     auto first = spreadOverfill(leftFirst ? Adjacency::Left : Adjacency::Right, m_engineParameters.spreadOverfillLateralFactor);
     if (!first) return std::unexpected(std::move(first.error()));
     auto second = spreadOverfill(leftFirst ? Adjacency::Right : Adjacency::Left, m_engineParameters.spreadOverfillLateralFactor);
@@ -529,7 +529,7 @@ template <typename LiquidId>
       return {};
     };
 
-    bool leftFirst = m_random.randb();
+    bool leftFirst = m_random.next_bool();
     auto first = lateralMove(leftFirst ? Adjacency::Left : Adjacency::Right);
     if (!first) return std::unexpected(std::move(first.error()));
     auto second = lateralMove(leftFirst ? Adjacency::Right : Adjacency::Left);

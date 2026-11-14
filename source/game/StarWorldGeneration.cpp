@@ -958,7 +958,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
     auto autonpcDatabaseResult1 = generationRoot.npcDatabase();
     if (!autonpcDatabaseResult1) return std::unexpected(std::move(autonpcDatabaseResult1.error()));
     auto npcDatabase = std::move((*autonpcDatabaseResult1));
-    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().randu64());
+    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().next_u64());
     if (!stduint64_tseedResult1) return std::unexpected(std::move(stduint64_tseedResult1.error()));
     std::uint64_t seed = std::move((*stduint64_tseedResult1));
     auto StringspeciesResult1 = parameters.getString("species");
@@ -999,7 +999,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
     auto automonsterDatabaseResult1 = generationRoot.monsterDatabase();
     if (!automonsterDatabaseResult1) return std::unexpected(std::move(automonsterDatabaseResult1.error()));
     auto monsterDatabase = std::move((*automonsterDatabaseResult1));
-    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().randu64());
+    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().next_u64());
     if (!stduint64_tseedResult1) return std::unexpected(std::move(stduint64_tseedResult1.error()));
     std::uint64_t seed = std::move((*stduint64_tseedResult1));
     auto StringtypeNameResult1 = parameters.getString("typeName");

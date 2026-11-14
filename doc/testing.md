@@ -131,6 +131,40 @@ See [native output rules](development.md#logging-and-native-process-output).
   versions and bytes, reject partial matches, and cover CRLF, patch order and
   failure recovery through the real loader.
 
+### Random stream compatibility
+
+`RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's
+existing random callback and source method names remain unchanged. Fixed-seed
+MWC outputs, ordinary valid draw order, static hash encoding and closed unit
+intervals remain compatibility contracts. Reseeding uses `seed`, entropy mixing
+uses `mix_seed`, and raw draws use `next_u32`/`next_u64`.
+
+Checked signed integer ranges, two-bound unsigned ranges, ranged reals, normals,
+stochastic rounding and static selection/shuffle propagate errors to consumers.
+Invalid parameters fail before drawing. Full-width integer ranges and rejected
+quotient tails are corrected boundaries; normal sampling rejects zero radius
+without caching a spare variate. Source shuffling uses a full-width URBG; service
+shuffling retains its single seed draw, including empty inputs. Reference sampling
+borrows only from lvalues or borrowed ranges, never owning temporaries.
+Keep exact output/next-state regressions and error recovery; do not repin world
+snapshots merely to hide changed output.
+
+Keep integer fast paths interface-visible and error construction cold. Batched
+finite classification retains its reference/noinline boundary under fast-math;
+speculative width subtraction and overflow interpolation stay narrowly precise.
+
+`fill_uniform` retains the ordered scalar float draws under one service lock;
+batching changes the possible interleaving between concurrent callers.
+
+`secure_random_fill` borrows a bounded byte span and uses only the OS CSPRNG;
+errors may leave a filled prefix. Grid point generation retains whole intersecting
+cells rather than exact polygon clipping, with checked bounds and integer sector
+keys and once-validated configuration. Invalid configuration still fails before
+draws or callbacks in `generate`. No-argument TTL cleanup may skip traversal only
+with a conservative earliest-timestamp bound; negative smear, TTL changes and
+failed-insertion timestamps must remain covered. Filtered cleanup still visits
+every entry. Revisiting evicted cells re-executes their deterministic callbacks.
+
 ### Weighted selection compatibility
 
 `WeightedPool` retains original positive weights and entry order for JSON and
@@ -140,7 +174,7 @@ JSON decoding still converts an entry's item before insertion, even when its
 weight is ignored, and returns the first conversion or insertion error.
 
 Single selection retains the normalized scan and final-index fallback for
-ordinary valid inputs: `select_index` consumes one `randd` even for an empty pool;
+ordinary valid inputs: `select_index` consumes one `uniform_double` even for an empty pool;
 owning `select` returns `Item{}` without consuming randomness when empty.
 
 `select_unique` uses bounded weighted sampling without replacement by entry index,
@@ -150,7 +184,7 @@ and sorting the chosen indices take average `O(size + requested * log(requested)
 work and `O(size)` scratch space. Empty, one-entry and whole-pool requests use
 shortcuts. Results retain original-index order, with index tie-breaking for equal
 ranks. Partial multi-entry ranking consumes one seeded hash per stored entry;
-the service overload always consumes exactly one `randu64`, including a zero
+the service overload always consumes exactly one `next_u64`, including a zero
 request. Historical generated-seed results for unique selections, including
 dungeon choices, intentionally change.
 These are algorithm/compatibility guarantees, not measured runtime speedups.

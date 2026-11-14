@@ -110,7 +110,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     return std::unexpected(std::move(height.error()));
   Vec2U size(*width, *height);
 
-  auto seed = numericOption<std::uint64_t>(options, "seed", root->random().randu64());
+  auto seed = numericOption<std::uint64_t>(options, "seed", root->random().next_u64());
   if (!seed)
     return std::unexpected(std::move(seed.error()));
   auto commonality = numericOption<float>(options, "commonality", 1.0f);

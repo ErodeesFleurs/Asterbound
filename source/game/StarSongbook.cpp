@@ -852,7 +852,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
               auto mapping = noteMapping(m_instrument, m_species, note);
               if (!mapping)
                 return std::unexpected(std::move(mapping.error()));
-              auto file = m_root.random().randFrom(mapping->get().files);
+              auto file = m_root.random().sample_ref(mapping->get().files);
               if (!file)
                 return std::unexpected(std::move(file.error()));
               result.push_back(
@@ -899,7 +899,7 @@ void Songbook::play(Json const& song, String const& timeSource) {
   m_song = song;
   m_timeSource = timeSource;
   if (m_timeSource.empty())
-    m_timeSource = Star::to_string(m_root.random().randu64());
+    m_timeSource = Star::to_string(m_root.random().next_u64());
 
   {
     m_epochUpdated = false;

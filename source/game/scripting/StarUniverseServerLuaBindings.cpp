@@ -361,7 +361,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
         return std::unexpected(std::move(seed.error()));
       worldSeed = *seed;
     } else {
-      worldSeed = root.random().randu64();
+      worldSeed = root.random().next_u64();
     }
     auto worldType = worldConfig.getString("type");
     if (!worldType)

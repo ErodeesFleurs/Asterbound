@@ -265,7 +265,7 @@ bool TeamManager::removeFromTeam(Uuid const& playerUuid, Uuid const& teamUuid) {
     m_teams.remove(teamUuid);
   else if (team.leaderUuid == playerUuid) {
     auto leader = team.members.begin();
-    std::advance(leader, m_root.random().randUInt(team.members.size() - 1));
+    std::advance(leader, m_root.random().uniform_uint(team.members.size() - 1));
     team.leaderUuid = leader->first;
   }
 

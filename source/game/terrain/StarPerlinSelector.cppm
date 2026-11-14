@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<PerlinSelector>, StarException> PerlinSelector::cr
   auto beta = config.getFloat("beta", 2.0f);
   if (!beta)
     return std::unexpected(std::move(beta.error()));
-  PerlinF function(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.randu64());
+  PerlinF function(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.next_u64());
   auto xInfluence = config.getFloat("xInfluence", 1.0f);
   if (!xInfluence)
     return std::unexpected(std::move(xInfluence.error()));

@@ -23,16 +23,31 @@ namespace MathDetail {
 template <typename T>
 concept finite_classifiable = std::same_as<T, float> || std::same_as<T, double>;
 
+namespace MathDetail {
+  template <finite_classifiable T>
+  constexpr bool finite_exponent(T const& value) {
+    static_assert(std::numeric_limits<T>::is_iec559);
+    if constexpr (std::same_as<T, float>)
+      return (std::bit_cast<std::uint32_t>(value) & 0x7f800000u) != 0x7f800000u;
+    else
+      return (std::bit_cast<std::uint64_t>(value) & 0x7ff0000000000000ull) != 0x7ff0000000000000ull;
+  }
+}
+
 // Keep integer-only classification behind a reference/call boundary: inlining
 // into a fast-math float-argument caller can fold even an exponent-mask test
 // into "always finite".
 template <finite_classifiable T>
 [[gnu::noinline]] bool is_finite(T const& value) {
-  static_assert(std::numeric_limits<T>::is_iec559);
-  if constexpr (std::same_as<T, float>)
-    return (std::bit_cast<std::uint32_t>(value) & 0x7f800000u) != 0x7f800000u;
-  else
-    return (std::bit_cast<std::uint64_t>(value) & 0x7ff0000000000000ull) != 0x7ff0000000000000ull;
+  return MathDetail::finite_exponent(value);
+}
+
+// Classify related values in one protected call, retaining each result so an
+// overflowed intermediate can be distinguished from a nonfinite input.
+template <finite_classifiable... T>
+  requires (sizeof...(T) > 0)
+[[gnu::noinline]] std::array<bool, sizeof...(T)> classify_finite(T const&... values) {
+  return {MathDetail::finite_exponent(values)...};
 }
 
 // Finite inputs; epsilon_multiple scales relative machine epsilon, not ULPs.
@@ -253,6 +268,7 @@ export namespace Star {
   using ::Star::clampable;
   using ::Star::approachable;
   using ::Star::is_finite;
+  using ::Star::classify_finite;
   using ::Star::near_equal;
   using ::Star::near_zero;
   using ::Star::square;

@@ -206,7 +206,10 @@ Vec2F TillingTool::handPosition() const {
 std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shifting, bool edgeTriggered) {
   if (!ready())
     return {};
-  auto strikeSound = root().random().randValueFrom(m_strikeSounds);
+  auto strikeSoundResult = root().random().sample_value(m_strikeSounds);
+  if (!strikeSoundResult)
+    return std::unexpected(std::move(strikeSoundResult.error()));
+  auto strikeSound = std::move(*strikeSoundResult);
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));

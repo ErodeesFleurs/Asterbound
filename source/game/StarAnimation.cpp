@@ -124,7 +124,10 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto variants = config.getInt("variants", 1);
   if (!variants)
     return std::unexpected(std::move(variants.error()));
-  m_variantOffset = m_root.get().random().randInt(*variants - 1) * m_frameNumber;
+  auto variant = m_root.get().random().uniform_int(*variants - 1);
+  if (!variant)
+    return std::unexpected(std::move(variant.error()));
+  m_variantOffset = *variant * m_frameNumber;
   reset();
   return {};
 }

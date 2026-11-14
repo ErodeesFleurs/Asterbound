@@ -198,7 +198,7 @@ public:
   // Results retain original pool order, independently of item equality.
   List<Item> select_unique(size_type desired_count, RandomService& rand) const
     requires weighted_pool_unique_item<Item> {
-    return select_unique(desired_count, rand.randu64());
+    return select_unique(desired_count, rand.next_u64());
   }
 
   List<Item> select_unique(size_type desired_count, std::uint64_t seed) const
@@ -242,9 +242,9 @@ public:
     return result;
   }
 
-  // Index selection consumes one randd even when the pool is empty.
-  size_type select_index(RandomSource& rand) const { return select_target(rand.randd()); }
-  size_type select_index(RandomService& rand) const { return select_target(rand.randd()); }
+  // Index selection consumes one uniform_double even when the pool is empty.
+  size_type select_index(RandomSource& rand) const { return select_target(rand.uniform_double()); }
+  size_type select_index(RandomService& rand) const { return select_target(rand.uniform_double()); }
   size_type select_index(std::uint64_t seed) const { return select_target(static_random_double(seed)); }
 
 private:

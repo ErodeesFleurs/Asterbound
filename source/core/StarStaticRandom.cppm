@@ -3,6 +3,7 @@ import std;
 import star.xx_hash;
 import star.string;
 import star.format;
+import star.math_common;
 
 namespace Star {
 
@@ -104,18 +105,40 @@ std::int32_t static_random_i32(T const& data, TL const&... rest) {
   return static_cast<std::int32_t>(static_random_u32(data, rest...));
 }
 
-template <typename T, typename... TL>
-  requires static_random_inputs<XXHash64, T, TL...>
-std::int32_t static_random_i32_range(std::int32_t min, std::int32_t max, T const& data, TL const&... rest) {
-  std::uint64_t denom = static_cast<std::uint64_t>((-1)) / (static_cast<std::uint64_t>((max - min)) + 1);
-  return static_cast<std::int32_t>((static_random_u64(data, rest...) / denom + min));
+// Keep accepted quotient mappings. Retrying hashes the original digest and a
+// canonical counter, without re-evaluating user-defined ADL append operations.
+inline std::uint64_t static_random_bounded(std::uint64_t candidate, std::uint64_t max) {
+  if (max == std::numeric_limits<std::uint64_t>::max())
+    return candidate;
+  auto original = candidate;
+  auto denominator = std::numeric_limits<std::uint64_t>::max() / (max + 1);
+  std::uint64_t retry = 0;
+  for (;;) {
+    auto value = candidate / denominator;
+    if (value <= max)
+      return value;
+    candidate = static_random_u64(original, ++retry);
+  }
 }
 
 template <typename T, typename... TL>
   requires static_random_inputs<XXHash64, T, TL...>
-std::uint32_t static_random_u32_range(std::uint32_t min, std::uint32_t max, T const& data, TL const&... rest) {
-  std::uint64_t denom = static_cast<std::uint64_t>((-1)) / (static_cast<std::uint64_t>((max - min)) + 1);
-  return static_random_u64(data, rest...) / denom + min;
+[[nodiscard]] std::expected<std::int32_t, StarException>
+static_random_i32_range(std::int32_t min, std::int32_t max, T const& data, TL const&... rest) {
+  if (max < min)
+    return std::unexpected(StarException("Maximum static integer bound must be >= minimum bound"));
+  auto width = static_cast<std::uint32_t>(max) - static_cast<std::uint32_t>(min);
+  auto offset = static_random_bounded(static_random_u64(data, rest...), width);
+  return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(min) + static_cast<std::uint32_t>(offset));
+}
+
+template <typename T, typename... TL>
+  requires static_random_inputs<XXHash64, T, TL...>
+[[nodiscard]] std::expected<std::uint32_t, StarException>
+static_random_u32_range(std::uint32_t min, std::uint32_t max, T const& data, TL const&... rest) {
+  if (max < min)
+    return std::unexpected(StarException("Maximum static integer bound must be >= minimum bound"));
+  return static_cast<std::uint32_t>(static_random_bounded(static_random_u64(data, rest...), max - min)) + min;
 }
 
 template <typename T, typename... TL>
@@ -131,10 +154,25 @@ float static_random_float(T const& data, TL const&... rest) {
   return (static_random_u32(data, rest...) & 0x7fffffff) / 2147483648.0;
 }
 
+// Only the overflowing-width fallback changes floating-point policy. Ordinary
+// arithmetic retains the production flags and historical evaluation.
+#pragma float_control(precise, on, push)
+template <std::floating_point Real>
+[[gnu::noinline]] Real static_random_interpolate_overflow(Real min, Real max, Real unit) {
+  // Finite opposite-sign endpoints reach this overflow-only branch.
+  return (Real{1} - unit) * min + unit * max;
+}
+#pragma float_control(pop)
+
 template <typename T, typename... TL>
   requires static_random_inputs<XXHash32, T, TL...>
-float static_random_float_range(float min, float max, T const& data, TL const&... rest) {
-  return static_random_float(data, rest...) * (max - min) + min;
+[[nodiscard]] std::expected<float, StarException>
+static_random_float_range(float min, float max, T const& data, TL const&... rest) {
+  if (!is_finite(min) || !is_finite(max) || max < min)
+    return std::unexpected(StarException("Static real bounds must be finite and ordered"));
+  auto unit = static_random_float(data, rest...);
+  auto width = max - min;
+  return is_finite(width) ? unit * width + min : static_random_interpolate_overflow(min, max, unit);
 }
 
 // Generates values in the range [0.0, 1.0]
@@ -146,8 +184,13 @@ double static_random_double(T const& data, TL const&... rest) {
 
 template <typename T, typename... TL>
   requires static_random_inputs<XXHash64, T, TL...>
-double static_random_double_range(double min, double max, T const& data, TL const&... rest) {
-  return static_random_double(data, rest...) * (max - min) + min;
+[[nodiscard]] std::expected<double, StarException>
+static_random_double_range(double min, double max, T const& data, TL const&... rest) {
+  if (!is_finite(min) || !is_finite(max) || max < min)
+    return std::unexpected(StarException("Static real bounds must be finite and ordered"));
+  auto unit = static_random_double(data, rest...);
+  auto width = max - min;
+  return is_finite(width) ? unit * width + min : static_random_interpolate_overflow(min, max, unit);
 }
 
 // std::advance dispatches by iterator_category. Check the operations used by
@@ -170,99 +213,107 @@ template <typename Container>
 using static_random_container_iterator = std::remove_cvref_t<decltype(std::declval<Container&>().begin())>;
 
 template <typename Container>
+using static_random_container_reference = decltype(*std::declval<static_random_container_iterator<Container>&>());
+
+template <typename Container>
+using static_random_container_value = std::iter_value_t<static_random_container_iterator<Container>>;
+
+template <typename Container>
 concept static_random_container = requires(Container& container) {
-  typename Container::value_type;
+  typename static_random_container_value<Container>;
   container.empty() ? true : false;
-  static_cast<std::int32_t>(container.size() - 1);
+  requires std::integral<decltype(container.size())>;
   container.begin();
 } && static_random_advance_iterator<static_random_container_iterator<Container>>;
 
 template <typename Container>
-using static_random_container_value =
-  std::conditional_t<std::is_const_v<Container>, typename Container::value_type const, typename Container::value_type>;
+concept static_random_reference_container = static_random_container<Container>
+  && std::is_lvalue_reference_v<static_random_container_reference<Container>>
+  && (std::is_lvalue_reference_v<Container> || std::ranges::borrowed_range<Container>);
 
 template <typename Container>
-concept static_random_reference_container =
-  static_random_container<Container> && requires(static_random_container_iterator<Container>& iterator) {
-    std::reference_wrapper<static_random_container_value<Container>>(*iterator);
-  };
+using static_random_reference = std::reference_wrapper<std::remove_reference_t<static_random_container_reference<Container>>>;
 
 template <typename Container, typename T, typename... TL>
-  requires(!std::is_const_v<Container>)
-  && static_random_reference_container<Container> && static_random_inputs<XXHash64, T, TL...>
-[[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type>, StarException>
-static_random_from(Container& container, T const& data, TL const&... rest) {
+  requires static_random_reference_container<Container> && static_random_inputs<XXHash64, T, TL...>
+[[nodiscard]] std::expected<static_random_reference<Container>, StarException>
+static_random_from(Container&& container, T const& data, TL const&... rest) {
   if (container.empty())
-    return std::unexpected(StarException::format("static_random_from called on an empty container"));
+    return std::unexpected(StarException("static_random_from called on an empty container"));
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<std::int32_t>::max()))
+    return std::unexpected(StarException("Static selection index exceeds int32 range"));
+  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
+    return std::unexpected(StarException("Static selection index exceeds iterator difference range"));
+  auto index = static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...);
+  if (!index)
+    return std::unexpected(std::move(index.error()));
   auto iterator = container.begin();
-  std::advance(iterator, static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...));
-  return std::reference_wrapper<typename Container::value_type>(*iterator);
-}
-
-template <typename Container, typename T, typename... TL>
-  requires static_random_reference_container<Container const> && static_random_inputs<XXHash64, T, TL...>
-[[nodiscard]] std::expected<std::reference_wrapper<typename Container::value_type const>, StarException>
-static_random_from(Container const& container, T const& data, TL const&... rest) {
-  if (container.empty())
-    return std::unexpected(StarException::format("static_random_from called on an empty container"));
-  auto iterator = container.begin();
-  std::advance(iterator, static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...));
-  return std::reference_wrapper<typename Container::value_type const>(*iterator);
+  std::advance(iterator, *index);
+  return static_random_reference<Container>(*iterator);
 }
 
 template <typename Container>
-concept static_random_value_container = static_random_container<Container const> && requires(Container const& container) {
-  std::type_identity_t<typename Container::value_type>{};
-  static_random_i32_range(0, container.size() - 1, 0);
-} && std::is_convertible_v<decltype(*std::declval<static_random_container_iterator<Container const>&>()), typename Container::value_type>;
+concept static_random_value_container = static_random_container<Container const>
+  && std::is_constructible_v<static_random_container_value<Container>, static_random_container_reference<Container const>>;
 
 template <typename Container, typename T, typename... TL>
   requires static_random_value_container<Container> && static_random_inputs<XXHash64, T, TL...>
-typename Container::value_type static_random_value_from(Container const& container, T const& data, TL const&... rest) {
+[[nodiscard]] std::expected<static_random_container_value<Container>, StarException>
+static_random_value_from(Container const& container, T const& data, TL const&... rest) {
+  using Value = static_random_container_value<Container>;
   if (container.empty()) {
-    return {};
-  } else {
-    auto iterator = container.begin();
-    std::advance(iterator, static_random_i32_range(0, container.size() - 1, data, rest...));
-    return *iterator;
+    if constexpr (std::is_default_constructible_v<Value>)
+      return std::expected<Value, StarException>(std::in_place);
+    else
+      return std::unexpected(StarException("static_random_value_from called on an empty container"));
   }
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<std::int32_t>::max()))
+    return std::unexpected(StarException("Static selection index exceeds int32 range"));
+  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
+    return std::unexpected(StarException("Static selection index exceeds iterator difference range"));
+  auto index = static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...);
+  if (!index)
+    return std::unexpected(std::move(index.error()));
+  auto iterator = container.begin();
+  std::advance(iterator, *index);
+  return std::expected<Value, StarException>(std::in_place, *iterator);
 }
 
-template <typename T>
-class URBG {
-public:
-  using Function = std::function<T()>;
-
-  URBG(Function func) : m_func(func) {};
-
-  using result_type = T;
-  static constexpr T min() { return std::numeric_limits<T>::min(); };
-  static constexpr T max() { return std::numeric_limits<T>::max(); };
-  T operator()() { return m_func(); };
-private:
-  Function m_func;
-};
-
 template <typename Container>
-concept static_random_shuffle_container =
-  requires(Container& container, static_random_container_iterator<Container>& iterator,
-           std::remove_cvref_t<decltype(std::declval<Container&>().end())>& end) {
-    ++iterator != end ? true : false;
+concept static_random_shuffle_container = static_random_container<Container>
+  && requires(Container& container, static_random_container_iterator<Container>& iterator) {
+    container.end();
+    ++iterator != container.end() ? true : false;
     std::swap(*iterator, *(iterator + 0));
   }
   && std::is_constructible_v<static_random_container_iterator<Container>, static_random_container_iterator<Container>&>;
 
 template <typename Container, typename T, typename... TL>
   requires static_random_shuffle_container<Container> && static_random_inputs<XXHash64, T, TL...>
-void static_random_shuffle(Container& container, T const& data, TL const&... rest) {
+[[nodiscard]] std::expected<void, StarException>
+static_random_shuffle(Container& container, T const& data, TL const&... rest) {
+  if (container.empty())
+    return {};
+  // The historical mix input is an int, including its hash encoding.
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<int>::max()))
+    return std::unexpected(StarException("Static shuffle index exceeds int range"));
+  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
+  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
+    return std::unexpected(StarException("Static shuffle index exceeds iterator difference range"));
   auto begin = container.begin();
-  auto end = container.end();
   auto iterator = begin;
-  for (int i = 1, mix = 0; ++iterator != end; ++i) {
-    int offset = static_random_u32_range(0, i, ++mix, data, rest...);
-    if (offset != i)
-      std::swap(*iterator, *(begin + offset));
+  for (int i = 1; ++iterator != container.end(); ++i) {
+    auto offset = static_random_u32_range(0, static_cast<std::uint32_t>(i), i, data, rest...);
+    if (!offset)
+      return std::unexpected(std::move(offset.error()));
+    if (*offset != static_cast<std::uint32_t>(i))
+      std::swap(*iterator, *(begin + *offset));
+    if (i == std::numeric_limits<int>::max())
+      break;
   }
+  return {};
 }
 }
 
@@ -284,5 +335,13 @@ using ::Star::static_random_u32;
 using ::Star::static_random_u32_range;
 using ::Star::static_random_u64;
 using ::Star::static_random_value_from;
-using ::Star::URBG;
+using ::Star::static_random_bounded;
+using ::Star::static_random_container;
+using ::Star::static_random_container_iterator;
+using ::Star::static_random_container_reference;
+using ::Star::static_random_container_value;
+using ::Star::static_random_reference_container;
+using ::Star::static_random_reference;
+using ::Star::static_random_value_container;
+using ::Star::static_random_shuffle_container;
 }

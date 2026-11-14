@@ -244,10 +244,13 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
       qt.showCompleteDialog, qt.showFailDialog, qt.mainQuest, qt.hideCrossServer};
   auto parameter = quest->setEntityParameter("player", player);
   if (!parameter) return std::unexpected(std::move(parameter.error()));
-  auto money = root.random().randUInt(qt.moneyRange[0], qt.moneyRange[1]);
+  auto money = root.random().uniform_uint(qt.moneyRange[0], qt.moneyRange[1]);
   if (!money) return std::unexpected(std::move(money.error()));
   quest->m_money = *money;
-  for (auto const& descriptor : root.random().randValueFrom(qt.rewards, {})) {
+  auto rewards = root.random().sample_value(qt.rewards, {});
+  if (!rewards)
+    return std::unexpected(std::move(rewards.error()));
+  for (auto const& descriptor : *rewards) {
     auto item = (*items)->item(descriptor);
     if (!item) return std::unexpected(std::move(item.error()));
     quest->m_rewards.push_back(*item);
@@ -1136,7 +1139,7 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   }
   auto parameters = questParamsFromJson(paramJson);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  QuestDescriptor descriptor{"preview", templateId, std::move(*parameters), root.random().randu64()};
+  QuestDescriptor descriptor{"preview", templateId, std::move(*parameters), root.random().next_u64()};
   auto next = position.equals_ignore_case("next");
   if (!next) return std::unexpected(std::move(next.error()));
   bool isLast = false, isFirst = false;

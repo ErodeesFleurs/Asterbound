@@ -314,9 +314,9 @@ std::expected<void, StarException> CharCreationPane::init(
     return std::unexpected(std::move(result.error()));
   if (auto result = createPlayer(); !result)
     return std::unexpected(std::move(result.error()));
-  RandomSource random(context().root().random().randu64());
-  m_speciesChoice = random.randu32() % m_speciesList.size();
-  m_genderChoice = random.randu32();
+  RandomSource random(context().root().random().next_u64());
+  m_speciesChoice = random.next_u32() % m_speciesList.size();
+  m_genderChoice = random.next_u32();
   m_modeChoice = 1;
   if (auto result = randomize(); !result)
     return std::unexpected(std::move(result.error()));
@@ -341,16 +341,16 @@ std::expected<void, StarException> CharCreationPane::createPlayer() {
 }
 
 std::expected<void, StarException> CharCreationPane::randomize() {
-  RandomSource random(context().root().random().randu64());
-  m_bodyColor = random.randu32();
-  m_hairChoice = random.randu32();
-  m_alty = random.randu32();
-  m_heady = random.randu32();
-  m_shirtChoice = random.randu32();
-  m_shirtColor = random.randu32();
-  m_pantsChoice = random.randu32();
-  m_pantsColor = random.randu32();
-  m_personality = random.randu32();
+  RandomSource random(context().root().random().next_u64());
+  m_bodyColor = random.next_u32();
+  m_hairChoice = random.next_u32();
+  m_alty = random.next_u32();
+  m_heady = random.next_u32();
+  m_shirtChoice = random.next_u32();
+  m_shirtColor = random.next_u32();
+  m_pantsChoice = random.next_u32();
+  m_pantsColor = random.next_u32();
+  m_personality = random.next_u32();
   return changed();
 }
 

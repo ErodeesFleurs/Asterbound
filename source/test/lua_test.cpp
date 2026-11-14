@@ -13,6 +13,9 @@ import star.text_formatter;
 import star.lua_converters;
 import star.lexical_cast;
 import star.rpc_promise;
+import star.logging;
+import star.random;
+import star.utility_lua_bindings;
 
 #include "gtest/gtest.h"
 
@@ -74,6 +77,60 @@ void expectLuaNil(std::expected<LuaValue, StarException> result) {
     ADD_FAILURE() << "Expected Lua nil; actual result: " << rendered->utf8();
   }
 }
+}
+
+TEST(LuaTest, RandomCallbacksPreserveNamesAndPropagateCheckedFailures) {
+  RandomService random(31415926);
+  RandomSource untouched(31415926);
+  Logger logger;
+  LogMap logMap;
+  auto callbacks = LuaBindings::makeUtilityCallbacks(random, logger, logMap);
+  ASSERT_TRUE(callbacks) << callbacks.error().what();
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->setCallbacks("sb", *callbacks));
+
+  auto checked = context->eval<bool>(R"LUA(
+    local source = sb.makeRandomSource(31415926)
+    local control = sb.makeRandomSource(31415926)
+    assert(not pcall(function() source:randInt(-1) end))
+    assert(not pcall(function() source:randInt(4, 3) end))
+    assert(not pcall(function() source:randUInt(4, 3) end))
+    assert(not pcall(function() source:randf(2, 1) end))
+    assert(not pcall(function() source:randd(0, math.huge) end))
+    assert(source:randu32() == 2950892229)
+    assert(control:randu32() == 2950892229)
+    assert(source:randu64() == control:randu64())
+    source:init(27182818)
+    control:init(27182818)
+    source:addEntropy(1234)
+    control:addEntropy(1234)
+    assert(source:randu32() == control:randu32())
+    assert(not pcall(sb.nrand, -1, 0))
+    assert(not pcall(sb.nrand, 1, math.huge))
+    assert(not pcall(sb.staticRandomI32Range, 2, 1, "seed"))
+    assert(not pcall(sb.staticRandomDoubleRange, 2, 1, "seed"))
+    assert(not pcall(sb.staticRandomDoubleRange, 0, math.huge, "seed"))
+    local full = sb.staticRandomI32Range(-2147483648, 2147483647, "seed")
+    assert(full >= -2147483648 and full <= 2147483647)
+    local ordinary = sb.staticRandomI32Range(-4, 7, "seed")
+    assert(ordinary >= -4 and ordinary <= 7)
+    local wide = sb.staticRandomDoubleRange(-1.7976931348623157e308, 1.7976931348623157e308, "seed")
+    assert(wide > -math.huge and wide < math.huge)
+    return true
+  )LUA");
+  ASSERT_TRUE(checked) << checked.error().what();
+  EXPECT_TRUE(*checked);
+  EXPECT_EQ(random.next_u64(), untouched.next_u64());
+
+  auto normal = context->eval<double>("return sb.nrand(0, 3)");
+  ASSERT_TRUE(normal) << normal.error().what();
+  EXPECT_EQ(*normal, 3);
+  auto expected = untouched.normal_double(0, 3);
+  ASSERT_TRUE(expected);
+  EXPECT_EQ(random.next_u64(), untouched.next_u64());
 }
 
 TEST(LuaTest, MatrixCodecRetainsRowsAndRejectsIncompleteTables) {

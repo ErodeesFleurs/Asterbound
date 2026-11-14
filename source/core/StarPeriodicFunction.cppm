@@ -53,8 +53,8 @@ PeriodicFunction<Float>::PeriodicFunction(
 
   m_timerMax = m_halfPeriod;
   m_timer = 0;
-  m_source = m_max + (random.randf() * 2 - 1) * m_magnitudeVariance;
-  m_target = m_min + (random.randf() * 2 - 1) * m_magnitudeVariance;
+  m_source = m_max + (random.uniform_float() * 2 - 1) * m_magnitudeVariance;
+  m_target = m_min + (random.uniform_float() * 2 - 1) * m_magnitudeVariance;
   m_targetMode = true;
 }
 
@@ -67,9 +67,9 @@ void PeriodicFunction<Float>::update(Float delta) {
   // which are greater than the period, but it avoids infinite looping
   if (m_timer <= 0.0f) {
     m_source = m_target;
-    m_target = (m_targetMode ? m_max : m_min) + (m_random.get().randf() * 2 - 1) * m_magnitudeVariance;
+    m_target = (m_targetMode ? m_max : m_min) + (m_random.get().uniform_float() * 2 - 1) * m_magnitudeVariance;
     m_targetMode = !m_targetMode;
-    m_timerMax = m_halfPeriod + (m_random.get().randf() * 2 - 1) * m_halfPeriodVariance;
+    m_timerMax = m_halfPeriod + (m_random.get().uniform_float() * 2 - 1) * m_halfPeriodVariance;
     m_timer = std::max(0.0f, m_timer + m_timerMax);
   }
 }

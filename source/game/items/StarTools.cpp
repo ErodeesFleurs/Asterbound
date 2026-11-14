@@ -339,7 +339,10 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
     }
 
     if (used) {
-      auto strike = itemOwner->get().addSound(root().random().randValueFrom(m_strikeSounds), m_toolVolume);
+      auto selectedSound = root().random().sample_value(m_strikeSounds);
+      if (!selectedSound)
+        return std::unexpected(std::move(selectedSound.error()));
+      auto strike = itemOwner->get().addSound(*selectedSound, m_toolVolume);
       if (!strike)
         return std::unexpected(std::move(strike.error()));
       auto sound = itemOwner->get().addSound(blockSound, m_blockVolume);
@@ -526,7 +529,10 @@ std::expected<void, StarException> HarvestingTool::fire(FireMode mode, bool shif
     used = *damaged != TileDamageResult::None;
   }
   if (used) {
-    auto sound = itemOwner->get().addSound(root().random().randValueFrom(m_strikeSounds), m_toolVolume);
+    auto selectedSound = root().random().sample_value(m_strikeSounds);
+    if (!selectedSound)
+      return std::unexpected(std::move(selectedSound.error()));
+    auto sound = itemOwner->get().addSound(*selectedSound, m_toolVolume);
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     return SwingableItem::fire(mode, shifting, edgeTriggered);
@@ -659,7 +665,10 @@ std::expected<void, StarException> WireTool::fire(FireMode mode, bool shifting, 
       if (!swingResult)
         return std::unexpected(std::move(swingResult.error()));
       if (*swingResult == WireConnector::Connect) {
-        auto sound = ownerp->get().addSound(root().random().randValueFrom(m_strikeSounds), m_toolVolume);
+        auto selectedSound = root().random().sample_value(m_strikeSounds);
+        if (!selectedSound)
+          return std::unexpected(std::move(selectedSound.error()));
+        auto sound = ownerp->get().addSound(*selectedSound, m_toolVolume);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
         return FireableItem::fire(mode, shifting, edgeTriggered);
@@ -960,7 +969,10 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
     }
 
     if (used) {
-      auto strike = ownerp.addSound(root().random().randValueFrom(m_strikeSounds), m_toolVolume);
+      auto selectedSound = root().random().sample_value(m_strikeSounds);
+      if (!selectedSound)
+        return std::unexpected(std::move(selectedSound.error()));
+      auto strike = ownerp.addSound(*selectedSound, m_toolVolume);
       if (!strike)
         return std::unexpected(std::move(strike.error()));
       auto sound = ownerp.addSound(blockSound, m_blockVolume);
@@ -1196,7 +1208,10 @@ std::expected<void, StarException> PaintingBeamTool::fire(FireMode mode, bool sh
       }
 
       if (used) {
-        auto sound = ownerp.addSound(root().random().randValueFrom(m_strikeSounds), m_toolVolume);
+        auto selectedSound = root().random().sample_value(m_strikeSounds);
+        if (!selectedSound)
+          return std::unexpected(std::move(selectedSound.error()));
+        auto sound = ownerp.addSound(*selectedSound, m_toolVolume);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
         return FireableItem::fire(mode, shifting, edgeTriggered);

@@ -186,7 +186,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeon);
   if (!worldParameters)
     return std::unexpected(std::move(worldParameters.error()));
-  auto worldSeed = numericOption<std::uint64_t>(options, "seed", root->random().randu64());
+  auto worldSeed = numericOption<std::uint64_t>(options, "seed", root->random().next_u64());
   if (!worldSeed)
     return std::unexpected(std::move(worldSeed.error()));
   auto worldTemplate = WorldTemplate::create(*root, *worldParameters, SkyParameters(), *worldSeed);

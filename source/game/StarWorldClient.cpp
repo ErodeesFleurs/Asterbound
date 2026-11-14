@@ -2301,7 +2301,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto flicker = flickerAmount->toFloat();
     if (!flicker)
       return std::unexpected(std::move(flicker.error()));
-    auto flickerSample = this->root().random().randf(1 - *flicker, 1);
+    auto flickerSample = this->root().random().uniform_float(1 - *flicker, 1);
     if (!flickerSample)
       return std::unexpected(std::move(flickerSample.error()));
     m_inspectionFlickerMultiplier = *flickerSample;
@@ -3065,8 +3065,8 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         m_damagedBlocks.remove(pos);
       }
       
-      if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damageEffectPercentage() - this->root().random().randf() > 0.0f
-                && (this->root().random().randf() < m_blockDamageParticleProbability)) {
+      if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damageEffectPercentage() - this->root().random().uniform_float() > 0.0f
+                && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result230 = materialDatabase->materialParticleColor(tile->get().foreground, tile->get().foregroundHueShift);
         if (!result230)
@@ -3083,8 +3083,8 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         m_particles->add(particle);
       }
       
-      if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damageEffectPercentage() - this->root().random().randf() > 0.0f
-                && (this->root().random().randf() < m_blockDamageParticleProbability)) {
+      if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damageEffectPercentage() - this->root().random().uniform_float() > 0.0f
+                && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result232 = materialDatabase->materialParticleColor(tile->get().background, tile->get().backgroundHueShift);
         if (!result232)

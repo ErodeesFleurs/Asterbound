@@ -1465,7 +1465,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     float pitch = 1.f - (static_cast<float>(item->count()) / static_cast<float>(item->maxStack())) * .2f;
     if (!m_currentSwapSlotItem || !item->matches(*m_currentSwapSlotItem, true))
       {
-        auto randFromResult210 = RandomSource(context.root().random().randu64()).randFrom(m_pickUpSounds);
+        auto randFromResult210 = RandomSource(context.root().random().next_u64()).sample_ref(m_pickUpSounds);
         if (!randFromResult210)
           return std::unexpected(std::move(randFromResult210.error()));
         auto playAudioResult211 = context.playAudio(randFromResult210->get(), 0, 1.f, pitch);
@@ -1475,7 +1475,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       }
     else if (item->count() > m_currentSwapSlotItem->count())
       {
-        auto randFromResult212 = RandomSource(context.root().random().randu64()).randFrom(m_someUpSounds);
+        auto randFromResult212 = RandomSource(context.root().random().next_u64()).sample_ref(m_someUpSounds);
         if (!randFromResult212)
           return std::unexpected(std::move(randFromResult212.error()));
         auto playAudioResult213 = context.playAudio(randFromResult212->get(), 0, 1.f, pitch);
@@ -1485,7 +1485,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       }
     else if (item->count() < m_currentSwapSlotItem->count())
       {
-        auto randFromResult214 = RandomSource(context.root().random().randu64()).randFrom(m_someDownSounds);
+        auto randFromResult214 = RandomSource(context.root().random().next_u64()).sample_ref(m_someDownSounds);
         if (!randFromResult214)
           return std::unexpected(std::move(randFromResult214.error()));
         auto playAudioResult215 = context.playAudio(randFromResult214->get(), 0, 1.f, pitch);
@@ -1498,7 +1498,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   } else {
     if (m_currentSwapSlotItem)
       {
-        auto randFromResult216 = RandomSource(context.root().random().randu64()).randFrom(m_putDownSounds);
+        auto randFromResult216 = RandomSource(context.root().random().next_u64()).sample_ref(m_putDownSounds);
         if (!randFromResult216)
           return std::unexpected(std::move(randFromResult216.error()));
         auto playAudioResult217 = context.playAudio(randFromResult216->get());
