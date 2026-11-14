@@ -186,7 +186,9 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           auto parsed = parseEntry(poolEntry);
           if (!parsed)
             return std::unexpected(std::move(parsed.error()));
-          itemPool.pool.add(*weight, std::move(*parsed));
+          auto inserted = itemPool.pool.insert(*weight, std::move(*parsed));
+          if (!inserted)
+            return std::unexpected(std::move(inserted.error()));
         }
         auto poolRounds = config->get("poolRounds", 1);
         if (!poolRounds)
@@ -195,7 +197,9 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           auto rounds = poolRounds->toFloat();
           if (!rounds)
             return std::unexpected(std::move(rounds.error()));
-          itemPool.poolRounds.add(1.0, static_cast<int>(*rounds));
+          auto inserted = itemPool.poolRounds.insert(1.0, static_cast<int>(*rounds));
+          if (!inserted)
+            return std::unexpected(std::move(inserted.error()));
         } else {
           auto rounds = poolRounds->iterateArray();
           if (!rounds)
@@ -207,7 +211,9 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
             auto count = round.getInt(1);
             if (!count)
               return std::unexpected(std::move(count.error()));
-            itemPool.poolRounds.add(*weight, *count);
+            auto inserted = itemPool.poolRounds.insert(*weight, *count);
+            if (!inserted)
+              return std::unexpected(std::move(inserted.error()));
           }
         }
         auto variance = config->get("levelVariance", JsonArray{0, 0}).and_then([](Json const& value) { return jsonToVec2F(value); });

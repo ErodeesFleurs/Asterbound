@@ -178,7 +178,7 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
     auto warmup = warmupConfig->toDouble();
     if (!warmup) return std::unexpected(std::move(warmup.error()));
     if (m_currentTime >= m_nextWeatherChangeTime) {
-      m_currentWeatherIndex = m_weatherPool.selectIndex(m_root.get().random());
+      m_currentWeatherIndex = m_weatherPool.select_index(m_root.get().random());
       if (m_currentWeatherIndex == NPos) m_currentWeatherType = {};
       else {
         auto biomes = m_root.get().biomeDatabase();
@@ -530,9 +530,11 @@ std::optional<String> ClientWeather::weatherParallax() const {
 
 std::expected<void, StarException> ClientWeather::getNetStates() {
   if (m_weatherPoolNetState.pullUpdated()) {
-    auto items = DataStreamBuffer::deserialize_container<WeatherPool::ItemsList>(m_weatherPoolNetState.get().span());
+    auto items = DataStreamBuffer::deserialize_container<WeatherPool::container_type>(m_weatherPoolNetState.get().span());
     if (!items) return std::unexpected(std::move(items.error()));
-    m_weatherPool = WeatherPool(std::move(*items));
+    auto pool = WeatherPool::from_range(std::move(*items));
+    if (!pool) return std::unexpected(std::move(pool.error()));
+    m_weatherPool = std::move(*pool);
   }
   m_undergroundLevel = m_undergroundLevelNetState.get();
   m_currentWeatherIndex = m_currentWeatherIndexNetState.get();

@@ -307,12 +307,9 @@ const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
     EXPECT_EQ(fired, (std::vector<int>{1, 2, 3, 4}));
   });
 
-// World generation is deterministic: it is a pure function of the celestial
-// parameters (the coordinate feeds the planet seed, the system/type fields come
-// from fixed Perlin seeds in the assets), so these hashes are stable across
-// runs and machines and can be compared to a constant.  When world generation
-// changes on purpose, rerun with --gtest_filter='WorldSnapshot.*'; the new hash
-// is printed to stderr.
+// This configured asset/math-profile baseline catches unintended world changes.
+// Independently constructed worlds must also agree. Update the fixed hash only
+// for an intentional generation contract change, not to hide nondeterminism.
 const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
   "WorldSnapshot", "FixedCoordinateGenerationIsDeterministic", [](GameTest& fixture) {
     auto storagePath = File::temporary_directory(fixture.root().random());
@@ -374,7 +371,8 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     ASSERT_TRUE(reported) << reported.error().what();
 
     EXPECT_EQ(*firstHash, *secondHash);
-    EXPECT_EQ(*firstHash, 0x801745d507acfcaaull) << "update the expected hash (printed above)";
+    // Bounded WeightedPool selection intentionally changes old dungeon choices.
+    EXPECT_EQ(*firstHash, 0xc45d53a5d2740da5ull) << "update the expected hash (printed above)";
   });
 
 const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldIsDeterministic", [](GameTest& fixture) {

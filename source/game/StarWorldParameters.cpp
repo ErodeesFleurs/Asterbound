@@ -84,7 +84,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   airless = std::move(*airlessValue1);
   auto weatherPoolValue1 = store.getArray("weatherPool", JsonArray());
   if (!weatherPoolValue1) return std::unexpected(std::move(weatherPoolValue1.error()));
-  auto weatherPoolValue2 = jsonToWeightedPool<String>((*weatherPoolValue1));
+  auto weatherPoolValue2 = json_to_weighted_pool<String>((*weatherPoolValue1));
   if (!weatherPoolValue2) return std::unexpected(std::move(weatherPoolValue2.error()));
   weatherPool = std::move(*weatherPoolValue2);
   auto environmentStatusEffectsJson = store.opt("environmentStatusEffects");
@@ -136,7 +136,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
 }
 
 std::expected<Json, StarException> VisitableWorldParameters::store() const {
-  auto weather = jsonFromWeightedPool<String>(weatherPool);
+  auto weather = json_from_weighted_pool<String>(weatherPool);
   if (!weather) return std::unexpected(std::move(weather.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
   auto beam = BeamUpRuleNames->get_right(beamUpRule);
@@ -183,9 +183,11 @@ std::expected<void, StarException> VisitableWorldParameters::read(DataStream& ds
     auto result = ds >> airless;
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  auto items = ds.read<WeatherPool::ItemsList>();
+  auto items = ds.read<WeatherPool::container_type>();
   if (!items) return std::unexpected(std::move(items.error()));
-  weatherPool = WeatherPool(std::move(*items));
+  auto pool = WeatherPool::from_range(std::move(*items));
+  if (!pool) return std::unexpected(std::move(pool.error()));
+  weatherPool = std::move(*pool);
   {
     auto result = ds >> environmentStatusEffects;
     if (!result) return std::unexpected(std::move(result.error()));
@@ -242,7 +244,7 @@ std::expected<void, StarException> VisitableWorldParameters::write(DataStream& d
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.write_container<WeatherPool::ItemsList>(weatherPool.items());
+    auto result = ds.write_container<WeatherPool::container_type>(weatherPool.items());
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
@@ -1511,7 +1513,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     layer.subRegionSizeRange = std::move((*layersubRegionSizeRangeResult2));
     auto WeightedPoolStringdungeonPoolResult1 = layerConfig.get("dungeons");
     if (!WeightedPoolStringdungeonPoolResult1) return std::unexpected(std::move(WeightedPoolStringdungeonPoolResult1.error()));
-    auto WeightedPoolStringdungeonPoolResult2 = jsonToWeightedPool<String>((*WeightedPoolStringdungeonPoolResult1));
+    auto WeightedPoolStringdungeonPoolResult2 = json_to_weighted_pool<String>((*WeightedPoolStringdungeonPoolResult1));
     if (!WeightedPoolStringdungeonPoolResult2) return std::unexpected(std::move(WeightedPoolStringdungeonPoolResult2.error()));
     WeightedPool<String> dungeonPool = std::move((*WeightedPoolStringdungeonPoolResult2));
     Vec2U dungeonCountRange{};
@@ -1526,7 +1528,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       static_random_u32_range(dungeonCountRange[0], dungeonCountRange[1], seed, layerName, "DungeonCount");
     unsigned dungeonCount = std::move(dungeon_count);
     layer.dungeons.append_range(
-      dungeonPool.selectUniques(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
+      dungeonPool.select_unique(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
     auto layerdungeonXVarianceResult1 = layerConfig.getInt("dungeonXVariance", 0);
     if (!layerdungeonXVarianceResult1) return std::unexpected(std::move(layerdungeonXVarianceResult1.error()));
     layer.dungeonXVariance = std::move(static_cast<int>((*layerdungeonXVarianceResult1)));
@@ -1787,7 +1789,7 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
   auto weatherPoolConfig = worldConfig.optArray("weatherPool");
   if (!weatherPoolConfig) return std::unexpected(std::move(weatherPoolConfig.error()));
   if (*weatherPoolConfig) {
-    auto parametersweatherPoolResult1 = jsonToWeightedPool<String>(**weatherPoolConfig);
+    auto parametersweatherPoolResult1 = json_to_weighted_pool<String>(**weatherPoolConfig);
     if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
     parameters->weatherPool = std::move((*parametersweatherPoolResult1));
   }

@@ -354,7 +354,9 @@ std::expected<std::optional<T>, StarException> json_to_optional(Json const& v) {
 }
 
 template <typename T, typename Converter>
-std::expected<WeightedPool<T>, StarException> jsonToWeightedPool(Json const& source, Converter&& converter) {
+  requires(json_converter<T, Converter&, Json>
+           && requires(WeightedPool<T>& pool, T& item) { pool.insert(0.0, std::move(item)); })
+std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& source, Converter&& converter) {
   WeightedPool<T> result;
   if (source.isNull())
     return result;
@@ -371,16 +373,31 @@ std::expected<WeightedPool<T>, StarException> jsonToWeightedPool(Json const& sou
     auto converted = JsonExtraDetail::convert<T>(converter, *item);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    result.add(*weight, std::move(*converted));
+    auto inserted = result.insert(*weight, std::move(*converted));
+    if (!inserted)
+      return std::unexpected(std::move(inserted.error()));
   }
   return result;
 }
+
+namespace JsonExtraDetail {
+  template <typename T>
+  concept weighted_pool_json_item =
+    (std::same_as<T, int> || std::same_as<T, unsigned>
+     || std::same_as<T, float> || std::same_as<T, double>
+     || std::same_as<T, String> || std::same_as<T, JsonArray>
+     || std::same_as<T, JsonObject> || json_converter<T, Construct<T>&, Json>)
+    && requires(WeightedPool<T>& pool, T& item) { pool.insert(0.0, std::move(item)); };
+}
+
 template <typename T>
-std::expected<WeightedPool<T>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<T>(source, Construct<T>());
+  requires(JsonExtraDetail::weighted_pool_json_item<T>)
+std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<T>(source, Construct<T>());
 }
 template <typename T, typename Converter>
-std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& pool, Converter&& converter) {
+  requires(json_converter<Json, Converter&, T>)
+std::expected<Json, StarException> json_from_weighted_pool(WeightedPool<T> const& pool, Converter&& converter) {
   JsonArray result;
   for (auto const& pair : pool.items()) {
     auto converted = JsonExtraDetail::convert<Json>(converter, pair.second);
@@ -391,17 +408,18 @@ std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& p
   return Json(std::move(result));
 }
 template <typename T>
-std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& pool) {
-  return jsonFromWeightedPool(pool, Construct<Json>());
+  requires(json_converter<Json, Construct<Json>&, T>)
+std::expected<Json, StarException> json_from_weighted_pool(WeightedPool<T> const& pool) {
+  return json_from_weighted_pool(pool, Construct<Json>());
 }
 
-template <> std::expected<WeightedPool<int>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<unsigned>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<float>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<double>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<String>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<JsonArray>, StarException> jsonToWeightedPool(Json const& source);
-template <> std::expected<WeightedPool<JsonObject>, StarException> jsonToWeightedPool(Json const& source);
+template <> std::expected<WeightedPool<int>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<unsigned>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<float>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<double>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<String>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<JsonArray>, StarException> json_to_weighted_pool(Json const& source);
+template <> std::expected<WeightedPool<JsonObject>, StarException> json_to_weighted_pool(Json const& source);
 
 template <typename Float>
 Polygon<Float> fixInsideOutPoly(Polygon<Float> p) {
@@ -471,8 +489,8 @@ export namespace Star {
   using ::Star::jsonFromDirectivesList;
   using ::Star::weightedChoiceFromJson;
   using ::Star::binnedChoiceFromJson;
-  using ::Star::jsonToWeightedPool;
-  using ::Star::jsonFromWeightedPool;
+  using ::Star::json_to_weighted_pool;
+  using ::Star::json_from_weighted_pool;
   using ::Star::jsonToArrayU;
   using ::Star::jsonToArrayS;
   using ::Star::jsonToArrayI;
@@ -497,18 +515,18 @@ export namespace Star {
 
   extern "C++" {
   template <>
-  std::expected<WeightedPool<int>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<int>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<unsigned>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<unsigned>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<float>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<float>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<double>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<double>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<String>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<String>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<JsonArray>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<JsonArray>, StarException> json_to_weighted_pool(Json const& source);
   template <>
-  std::expected<WeightedPool<JsonObject>, StarException> jsonToWeightedPool(Json const& source);
+  std::expected<WeightedPool<JsonObject>, StarException> json_to_weighted_pool(Json const& source);
   }
 }

@@ -3,201 +3,280 @@ module;
 import std;
 import star.format;
 import star.memory;
-import star.set;
 import star.list;
+import star.math_common;
 import star.random;
-
 import star.static_random;
+
 namespace Star {
 
-template <typename Item>
-struct WeightedPool {
-public:
-  using ItemsType = std::pair<double, Item>;
-  using ItemsList = List<ItemsType>;
-
-  WeightedPool();
-
-  template <typename Container>
-  explicit WeightedPool(Container container);
-
-  void add(double weight, Item item);
-  void clear();
-
-  ItemsList const& items() const;
-
-  std::size_t size() const;
-  [[nodiscard]] std::expected<std::reference_wrapper<std::pair<double, Item> const>, StarException> at(std::size_t index) const;
-  [[nodiscard]] std::expected<double, StarException> weight(std::size_t index) const;
-  [[nodiscard]] std::expected<std::reference_wrapper<Item const>, StarException> item(std::size_t index) const;
-  bool empty() const;
-
-  // Return item using the given randomness source
-  Item select(RandomSource& rand) const;
-  // Return item using the owning service's randomness source
-  Item select(RandomService& rand) const;
-  // Return item using fast static randomness from the given seed
-  Item select(std::uint64_t seed) const;
-
-  // Return a list of n items which are selected uniquely (by index), where
-  // n is the lesser of the desiredCount and the size of the pool.
-  // This INFLUENCES PROBABILITIES so it should not be used where a
-  // correct statistical distribution is required.
-  List<Item> selectUniques(std::size_t desiredCount, RandomService& rand) const;
-  List<Item> selectUniques(std::size_t desiredCount, std::uint64_t seed) const;
-
-  std::size_t selectIndex(RandomSource& rand) const;
-  std::size_t selectIndex(RandomService& rand) const;
-  std::size_t selectIndex(std::uint64_t seed) const;
-
-private:
-  std::size_t selectIndex(double target) const;
-
-  ItemsList m_items;
-  double m_totalWeight;
+struct WeightedPoolExceptionTag {
+  static constexpr std::string_view name() { return "WeightedPoolException"; }
 };
+using WeightedPoolException = StarError<WeightedPoolExceptionTag, StarException>;
+
+template <typename Item, typename Source>
+concept weighted_pool_item_source = std::is_constructible_v<Item, Source>
+  && (std::is_constructible_v<Item, Item&&> || std::is_constructible_v<Item, Item const&>);
 
 template <typename Item>
-WeightedPool<Item>::WeightedPool()
-  : m_totalWeight(0.0) {}
+concept weighted_pool_copyable_item = std::is_constructible_v<Item, Item const&>;
 
 template <typename Item>
-template <typename Container>
-WeightedPool<Item>::WeightedPool(Container container)
-  : WeightedPool() {
-  for (auto const& pair : container)
-    add(std::get<0>(pair), std::get<1>(pair));
-}
+concept weighted_pool_selectable_item = weighted_pool_copyable_item<Item> && std::is_default_constructible_v<Item>;
 
+// The owning List<Item> result must also support vector reserve relocation.
 template <typename Item>
-void WeightedPool<Item>::add(double weight, Item item) {
-  if (weight <= 0.0)
-    return;
+concept weighted_pool_unique_item = weighted_pool_copyable_item<Item> && std::is_constructible_v<Item, Item&&>;
 
-  m_items.push_back({weight, std::move(item)});
-  m_totalWeight += weight;
-}
+namespace WeightedPoolDetail {
+  using std::get;
 
-template <typename Item>
-void WeightedPool<Item>::clear() {
-  m_items.clear();
-  m_totalWeight = 0.0;
-}
-
-template <typename Item>
-auto WeightedPool<Item>::items() const -> ItemsList const & {
-  return m_items;
-}
-
-template <typename Item> std::size_t WeightedPool<Item>::size() const { return m_items.size(); }
-
-template <typename Item>
-std::expected<std::reference_wrapper<std::pair<double, Item> const>, StarException> WeightedPool<Item>::at(std::size_t index) const {
-  return m_items.at(index);
-}
-
-template <typename Item>
-std::expected<double, StarException> WeightedPool<Item>::weight(std::size_t index) const {
-  auto entry = at(index);
-  if (!entry)
-    return std::unexpected(std::move(entry.error()));
-  return entry->get().first;
-}
-
-template <typename Item>
-std::expected<std::reference_wrapper<Item const>, StarException> WeightedPool<Item>::item(std::size_t index) const {
-  auto entry = at(index);
-  if (!entry)
-    return std::unexpected(std::move(entry.error()));
-  return std::reference_wrapper<Item const>(entry->get().second);
-}
-
-template <typename Item>
-bool WeightedPool<Item>::empty() const {
-  return m_items.empty();
-}
-
-template <typename Item>
-Item WeightedPool<Item>::select(RandomSource& rand) const {
-  if (m_items.empty())
-    return Item();
-
-  return m_items[selectIndex(rand)].second;
-}
-
-template <typename Item>
-Item WeightedPool<Item>::select(RandomService& rand) const {
-  if (m_items.empty())
-    return Item();
-
-  return m_items[selectIndex(rand)].second;
-}
-
-template <typename Item>
-Item WeightedPool<Item>::select(std::uint64_t seed) const {
-  if (m_items.empty())
-    return Item();
-
-  return m_items[selectIndex(seed)].second;
-}
-
-template <typename Item>
-List<Item> WeightedPool<Item>::selectUniques(std::size_t desiredCount, RandomService& rand) const {
-  return selectUniques(desiredCount, rand.randu64());
-}
-
-template <typename Item>
-List<Item> WeightedPool<Item>::selectUniques(std::size_t desiredCount, std::uint64_t seed) const {
-  std::size_t targetCount = std::min(desiredCount, size());
-  Set<std::size_t> indices;
-  while (indices.size() < targetCount)
-    indices.add(selectIndex(++seed));
-  List<Item> result;
-  for (std::size_t i : indices)
-    result.push_back(m_items[i].second);
-  return result;
-}
-
-template <typename Item>
-std::size_t WeightedPool<Item>::selectIndex(RandomSource& rand) const {
-  return selectIndex(rand.randd());
-}
-
-template <typename Item>
-std::size_t WeightedPool<Item>::selectIndex(RandomService& rand) const {
-  return selectIndex(rand.randd());
-}
-
-template <typename Item>
-std::size_t WeightedPool<Item>::selectIndex(std::uint64_t seed) const {
-  return selectIndex(static_random_double(seed));
-}
-
-template <typename Item>
-std::size_t WeightedPool<Item>::selectIndex(double target) const {
-  if (m_items.empty())
-    return NPos;
-
-  // Test a randomly generated target against each weighted item in turn, and
-  // see if that weighted item's weight value crosses the target.  This way, a
-  // random item is picked from the list, but (roughly) weighted to be
-  // proportional to its weight over the weight of all entries.
-  //
-  // TODO: This is currently O(n), but can easily be made O(log(n)) by using a
-  // tree.  If this shows up in performance measurements, this is an obvious
-  // improvement.
-
-  double accumulatedWeight = 0.0f;
-  for (std::size_t i = 0; i < m_items.size(); ++i) {
-    accumulatedWeight += m_items[i].first / m_totalWeight;
-    if (target <= accumulatedWeight)
-      return i;
+  template <std::size_t Index, typename Entry>
+    requires requires(Entry&& entry) { get<Index>(std::forward<Entry>(entry)); }
+  decltype(auto) entry_get(Entry&& entry) {
+    return get<Index>(std::forward<Entry>(entry));
   }
 
-  // If we haven't crossed the target, just assume floating point error has
-  // caused us to not quite make it to the last item.
-  return m_items.size() - 1;
+  // Keep the exponential race in log space: fast-math must not turn this
+  // difference into a ratio that can overflow for a tiny positive weight.
+#pragma float_control(precise, on, push)
+  inline double unique_race_key(double weight, std::uint64_t random_bits) {
+    double unit = (static_cast<double>(random_bits >> 12) + 0.5) * 0x1p-52;
+    return std::log(-std::log(unit)) - std::log(weight);
+  }
+#pragma float_control(pop)
 }
+
+template <typename Range>
+  requires std::ranges::input_range<Range>
+using weighted_pool_source_reference =
+  std::conditional_t<std::is_rvalue_reference_v<Range&&>, std::ranges::range_rvalue_reference_t<Range>,
+                     std::ranges::range_reference_t<Range>>;
+
+template <typename Entry, typename Item>
+concept weighted_pool_entry_source = requires(Entry&& entry) {
+  static_cast<double>(WeightedPoolDetail::entry_get<0>(std::forward<Entry>(entry)));
+  requires weighted_pool_item_source<Item,
+    decltype(WeightedPoolDetail::entry_get<1>(std::forward<Entry>(entry)))>;
+};
+
+template <typename Range, typename Item>
+concept weighted_pool_source = std::ranges::input_range<Range>
+  && weighted_pool_entry_source<weighted_pool_source_reference<Range>, Item>;
+
+template <typename Item>
+class WeightedPool {
+public:
+  using value_type = std::pair<double, Item>;
+  using container_type = List<value_type>;
+  using size_type = typename container_type::size_type;
+
+  WeightedPool() = default;
+  WeightedPool(WeightedPool const&) requires weighted_pool_copyable_item<Item> = default;
+  WeightedPool& operator=(WeightedPool const& other) requires weighted_pool_copyable_item<Item> {
+    if (this != std::addressof(other)) {
+      WeightedPool copy(other);
+      *this = std::move(copy);
+    }
+    return *this;
+  }
+
+  WeightedPool(WeightedPool&& other) noexcept(std::is_nothrow_move_constructible_v<container_type>)
+    : m_items(std::move(other.m_items)), m_total_weight(std::exchange(other.m_total_weight, 0.0)) {
+    other.m_items.clear();
+  }
+
+  WeightedPool& operator=(WeightedPool&& other) noexcept(std::is_nothrow_move_assignable_v<container_type>) {
+    if (this != std::addressof(other)) {
+      m_items = std::move(other.m_items);
+      m_total_weight = std::exchange(other.m_total_weight, 0.0);
+      other.m_items.clear();
+    }
+    return *this;
+  }
+
+  // Rvalue ranges transfer their entries; lvalue ranges retain their payloads.
+  // Only sized ranges are reserved, so input ranges are traversed exactly once.
+  template <typename Range>
+    requires weighted_pool_source<Range, Item>
+  [[nodiscard]] static std::expected<WeightedPool, StarException> from_range(Range&& range) {
+    WeightedPool pool;
+    if constexpr (std::ranges::sized_range<Range>)
+      pool.m_items.reserve(std::ranges::size(range));
+    auto position = std::ranges::begin(range);
+    auto end = std::ranges::end(range);
+    for (; position != end; ++position) {
+      auto&& entry = [&]() -> decltype(auto) {
+        if constexpr (std::is_rvalue_reference_v<Range&&>)
+          return std::ranges::iter_move(position);
+        else
+          return *position;
+      }();
+      double weight = static_cast<double>(
+        WeightedPoolDetail::entry_get<0>(std::forward<decltype(entry)>(entry)));
+      auto total = pool.checked_total(weight);
+      if (!total)
+        return std::unexpected(std::move(total.error()));
+      if (weight <= 0.0)
+        continue;
+      // Validate before even projecting the payload: a proxy get may itself move.
+      pool.m_items.emplace_back(weight,
+        WeightedPoolDetail::entry_get<1>(std::forward<decltype(entry)>(entry)));
+      pool.m_total_weight = *total;
+    }
+    return pool;
+  }
+
+  template <typename Value>
+    requires weighted_pool_item_source<Item, Value&&>
+  [[nodiscard]] std::expected<void, StarException> insert(double weight, Value&& value) {
+    auto total = checked_total(weight);
+    if (!total)
+      return std::unexpected(std::move(total.error()));
+    if (weight <= 0.0)
+      return {};
+    m_items.emplace_back(weight, std::forward<Value>(value));
+    m_total_weight = *total;
+    return {};
+  }
+
+  void clear() {
+    m_items.clear();
+    m_total_weight = 0.0;
+  }
+
+  container_type const& items() const & { return m_items; }
+  container_type const& items() && = delete;
+  container_type const& items() const && = delete;
+
+  size_type size() const { return m_items.size(); }
+  bool empty() const { return m_items.empty(); }
+
+  [[nodiscard]] std::expected<std::reference_wrapper<value_type const>, StarException> at(size_type index) const & {
+    return m_items.at(index);
+  }
+  std::expected<std::reference_wrapper<value_type const>, StarException> at(size_type) && = delete;
+  std::expected<std::reference_wrapper<value_type const>, StarException> at(size_type) const && = delete;
+
+  [[nodiscard]] std::expected<double, StarException> weight(size_type index) const {
+    auto entry = at(index);
+    if (!entry)
+      return std::unexpected(std::move(entry.error()));
+    return entry->get().first;
+  }
+
+  [[nodiscard]] std::expected<std::reference_wrapper<Item const>, StarException> item(size_type index) const & {
+    auto entry = at(index);
+    if (!entry)
+      return std::unexpected(std::move(entry.error()));
+    return std::reference_wrapper<Item const>(entry->get().second);
+  }
+  std::expected<std::reference_wrapper<Item const>, StarException> item(size_type) && = delete;
+  std::expected<std::reference_wrapper<Item const>, StarException> item(size_type) const && = delete;
+
+  // Owning selection copies the chosen item. An empty pool consumes no randomness.
+  Item select(RandomSource& rand) const requires weighted_pool_selectable_item<Item> {
+    if (m_items.empty())
+      return Item{};
+    return Item(m_items[select_index(rand)].second);
+  }
+
+  Item select(RandomService& rand) const requires weighted_pool_selectable_item<Item> {
+    if (m_items.empty())
+      return Item{};
+    return Item(m_items[select_index(rand)].second);
+  }
+
+  Item select(std::uint64_t seed) const requires weighted_pool_selectable_item<Item> {
+    if (m_items.empty())
+      return Item{};
+    return Item(m_items[select_index(seed)].second);
+  }
+
+  // Bounded weighted sampling without replacement, unique by original index.
+  // Results retain original pool order, independently of item equality.
+  List<Item> select_unique(size_type desired_count, RandomService& rand) const
+    requires weighted_pool_unique_item<Item> {
+    return select_unique(desired_count, rand.randu64());
+  }
+
+  List<Item> select_unique(size_type desired_count, std::uint64_t seed) const
+    requires weighted_pool_unique_item<Item> {
+    size_type target_count = std::min(desired_count, size());
+    List<Item> result;
+    result.reserve(target_count);
+    if (target_count == 0)
+      return result;
+    if (target_count == size()) {
+      for (auto const& entry : m_items)
+        result.emplace_back(entry.second);
+      return result;
+    }
+    if (target_count == 1) {
+      result.emplace_back(m_items[select_index(++seed)].second);
+      return result;
+    }
+
+    struct Candidate {
+      size_type index;
+      double key;
+    };
+    List<Candidate> candidates;
+    candidates.reserve(size());
+    // Independent exponential clocks give weighted sampling without replacement.
+    // Midpoint uniforms exclude both endpoints, keeping every log-space key finite.
+    for (size_type index = 0; index < size(); ++index)
+      candidates.emplace_back(index,
+        WeightedPoolDetail::unique_race_key(m_items[index].first, static_random_u64(++seed)));
+    auto key_less = [](Candidate const& left, Candidate const& right) {
+      if (left.key != right.key)
+        return left.key < right.key;
+      return left.index < right.index;
+    };
+    auto selected_end = candidates.begin() + target_count;
+    std::ranges::nth_element(candidates, selected_end, key_less);
+    std::ranges::sort(candidates.begin(), selected_end, std::ranges::less{}, &Candidate::index);
+    for (auto position = candidates.begin(); position != selected_end; ++position)
+      result.emplace_back(m_items[position->index].second);
+    return result;
+  }
+
+  // Index selection consumes one randd even when the pool is empty.
+  size_type select_index(RandomSource& rand) const { return select_target(rand.randd()); }
+  size_type select_index(RandomService& rand) const { return select_target(rand.randd()); }
+  size_type select_index(std::uint64_t seed) const { return select_target(static_random_double(seed)); }
+
+private:
+  [[nodiscard]] std::expected<double, StarException> checked_total(double weight) const {
+    // is_finite uses an integer-bit, non-inlined reference boundary, which is
+    // required under production fast-math flags for both inputs and overflow.
+    if (!is_finite(weight))
+      return std::unexpected(WeightedPoolException("Weighted pool weights must be finite"));
+    if (weight <= 0.0)
+      return m_total_weight;
+    double total = m_total_weight + weight;
+    if (!is_finite(total))
+      return std::unexpected(WeightedPoolException("Weighted pool total weight overflow"));
+    return total;
+  }
+
+  size_type select_target(double target) const {
+    if (m_items.empty())
+      return NPos;
+    // Preserve the original normalized scan and final-index rounding fallback.
+    double accumulated_weight = 0.0;
+    for (size_type index = 0; index < m_items.size(); ++index) {
+      accumulated_weight += m_items[index].first / m_total_weight;
+      if (target <= accumulated_weight)
+        return index;
+    }
+    return m_items.size() - 1;
+  }
+
+  container_type m_items;
+  double m_total_weight = 0.0;
+};
 
 }
 
@@ -205,4 +284,13 @@ export module star.weighted_pool;
 
 export namespace Star {
   using ::Star::WeightedPool;
+  using ::Star::WeightedPoolException;
+  using ::Star::WeightedPoolExceptionTag;
+  using ::Star::weighted_pool_copyable_item;
+  using ::Star::weighted_pool_entry_source;
+  using ::Star::weighted_pool_item_source;
+  using ::Star::weighted_pool_selectable_item;
+  using ::Star::weighted_pool_source;
+  using ::Star::weighted_pool_source_reference;
+  using ::Star::weighted_pool_unique_item;
 }

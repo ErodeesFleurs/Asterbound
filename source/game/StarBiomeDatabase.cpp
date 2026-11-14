@@ -143,7 +143,7 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
     if (!assets) return std::unexpected(std::move(assets.error()));
     auto poolConfig = (*assets)->fetchJson(path->get());
     if (!poolConfig) return std::unexpected(std::move(poolConfig.error()));
-    return jsonToWeightedPool<String>(*poolConfig);
+    return json_to_weighted_pool<String>(*poolConfig);
   }
   return WeatherPool();
 }

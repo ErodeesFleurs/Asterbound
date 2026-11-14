@@ -366,26 +366,26 @@ std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float 
   return def;
 }
 
-template <> std::expected<WeightedPool<int>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<int>(source, [](Json const& v) { return v.toInt(); });
+template <> std::expected<WeightedPool<int>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<int>(source, [](Json const& v) { return v.toInt(); });
 }
-template <> std::expected<WeightedPool<unsigned>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<unsigned>(source, [](Json const& v) { return v.toUInt(); });
+template <> std::expected<WeightedPool<unsigned>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<unsigned>(source, [](Json const& v) { return v.toUInt(); });
 }
-template <> std::expected<WeightedPool<float>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<float>(source, [](Json const& v) { return v.toFloat(); });
+template <> std::expected<WeightedPool<float>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<float>(source, [](Json const& v) { return v.toFloat(); });
 }
-template <> std::expected<WeightedPool<double>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<double>(source, [](Json const& v) { return v.toDouble(); });
+template <> std::expected<WeightedPool<double>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<double>(source, [](Json const& v) { return v.toDouble(); });
 }
-template <> std::expected<WeightedPool<String>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<String>(source, [](Json const& v) { return v.toString(); });
+template <> std::expected<WeightedPool<String>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<String>(source, [](Json const& v) { return v.toString(); });
 }
-template <> std::expected<WeightedPool<JsonArray>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<JsonArray>(source, [](Json const& v) { return v.toArray(); });
+template <> std::expected<WeightedPool<JsonArray>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<JsonArray>(source, [](Json const& v) { return v.toArray(); });
 }
-template <> std::expected<WeightedPool<JsonObject>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<JsonObject>(source, [](Json const& v) { return v.toObject(); });
+template <> std::expected<WeightedPool<JsonObject>, StarException> json_to_weighted_pool(Json const& source) {
+  return json_to_weighted_pool<JsonObject>(source, [](Json const& v) { return v.toObject(); });
 }
 
 }

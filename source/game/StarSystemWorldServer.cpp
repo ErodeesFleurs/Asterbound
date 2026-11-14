@@ -539,7 +539,7 @@ std::expected<void, StarException> SystemWorldServer::placeInitialObjects() {
   auto poolData = config->getArray("initialObjectPools");
   if (!poolData)
     return std::unexpected(std::move(poolData.error()));
-  auto pools = jsonToWeightedPool<JsonArray>(*poolData);
+  auto pools = json_to_weighted_pool<JsonArray>(*poolData);
   if (!pools)
     return std::unexpected(std::move(pools.error()));
   Json spawn(pools->select(random));
@@ -550,7 +550,7 @@ std::expected<void, StarException> SystemWorldServer::placeInitialObjects() {
     auto objectPoolData = spawn.getArray(1);
     if (!objectPoolData)
       return std::unexpected(std::move(objectPoolData.error()));
-    auto pool = jsonToWeightedPool<String>(*objectPoolData);
+    auto pool = json_to_weighted_pool<String>(*objectPoolData);
     if (!pool)
       return std::unexpected(std::move(pool.error()));
     for (int i = 0; i < static_cast<int>(*count); ++i) {
@@ -590,7 +590,7 @@ std::expected<void, StarException> SystemWorldServer::spawnObjects() {
     auto poolArray = poolJson->toArray();
     if (!poolArray)
       return std::unexpected(std::move(poolArray.error()));
-    auto pool = jsonToWeightedPool<String>(*poolArray);
+    auto pool = json_to_weighted_pool<String>(*poolArray);
     if (!pool)
       return std::unexpected(std::move(pool.error()));
     String name = pool->select(root().random());

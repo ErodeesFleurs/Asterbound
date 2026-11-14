@@ -261,13 +261,13 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
           region.bodyProbability = std::move(*value);
         }
         {
-          auto value = regionJson.get("planetaryTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+          auto value = regionJson.get("planetaryTypes").and_then([](Json const& value) { return json_to_weighted_pool<String>(value); });
           if (!value)
             return std::unexpected(std::move(value.error()));
           region.planetaryTypes = std::move(*value);
         }
         {
-          auto value = regionJson.get("satelliteTypes").and_then([](Json const& value) { return jsonToWeightedPool<String>(value); });
+          auto value = regionJson.get("satelliteTypes").and_then([](Json const& value) { return json_to_weighted_pool<String>(value); });
           if (!value)
             return std::unexpected(std::move(value.error()));
           region.satelliteTypes = std::move(*value);
@@ -388,7 +388,9 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
         auto name = entry.getString(1);
         if (!name)
           return std::unexpected(std::move(name.error()));
-        m_generationInformation.systemPrefixNames.add(*weight, std::move(*name));
+        auto inserted = m_generationInformation.systemPrefixNames.insert(*weight, std::move(*name));
+        if (!inserted)
+          return std::unexpected(std::move(inserted.error()));
       }
     }
     {
@@ -402,7 +404,9 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
         auto name = entry.getString(1);
         if (!name)
           return std::unexpected(std::move(name.error()));
-        m_generationInformation.systemNames.add(*weight, std::move(*name));
+        auto inserted = m_generationInformation.systemNames.insert(*weight, std::move(*name));
+        if (!inserted)
+          return std::unexpected(std::move(inserted.error()));
       }
     }
     {
@@ -416,7 +420,9 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
         auto name = entry.getString(1);
         if (!name)
           return std::unexpected(std::move(name.error()));
-        m_generationInformation.systemSuffixNames.add(*weight, std::move(*name));
+        auto inserted = m_generationInformation.systemSuffixNames.insert(*weight, std::move(*name));
+        if (!inserted)
+          return std::unexpected(std::move(inserted.error()));
       }
     }
     return {};

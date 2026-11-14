@@ -131,6 +131,30 @@ See [native output rules](development.md#logging-and-native-process-output).
   versions and bytes, reject partial matches, and cover CRLF, patch order and
   failure recovery through the real loader.
 
+### Weighted selection compatibility
+
+`WeightedPool` retains original positive weights and entry order for JSON and
+binary serialization. Checked insertion/range construction rejects nonfinite
+weights and finite-total overflow; finite nonpositive weights remain ignored.
+JSON decoding still converts an entry's item before insertion, even when its
+weight is ignored, and returns the first conversion or insertion error.
+
+Single selection retains the normalized scan and final-index fallback for
+ordinary valid inputs: `select_index` consumes one `randd` even for an empty pool;
+owning `select` returns `Item{}` without consuming randomness when empty.
+
+`select_unique` uses bounded weighted sampling without replacement by entry index,
+not item equality. For partial selections of at least two entries, independent
+exponential-clock ranks in log space avoid overflowing weight ratios; partitioning
+and sorting the chosen indices take average `O(size + requested * log(requested))`
+work and `O(size)` scratch space. Empty, one-entry and whole-pool requests use
+shortcuts. Results retain original-index order, with index tie-breaking for equal
+ranks. Partial multi-entry ranking consumes one seeded hash per stored entry;
+the service overload always consumes exactly one `randu64`, including a zero
+request. Historical generated-seed results for unique selections, including
+dungeon choices, intentionally change.
+These are algorithm/compatibility guarantees, not measured runtime speedups.
+
 ### Images, gameplay and frontend lifecycles
 
 - Image kernels retain full format/scaler coverage, byte-exact independent

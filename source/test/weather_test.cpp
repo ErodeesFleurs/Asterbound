@@ -9,6 +9,7 @@ import star.image_processing;
 import star.hash;
 import star.data_stream;
 import star.string_view;
+import star.string;
 import star.thread;
 import star.directives;
 import star.asset_path;
@@ -93,7 +94,8 @@ const GameTestRegistration weatherAbsoluteParallax("WeatherTest", "AbsoluteParal
 });
 
 const GameTestRegistration weatherCompleteStateRestoresAfterLocalClear("WeatherTest", "CompleteStateRestoresAfterLocalClear", [](GameTest& fixture) {
-  WeatherPool pool(WeatherPool::ItemsList{{1.0, "rain"}});
+  WeatherPool pool;
+  ASSERT_TRUE(pool.insert(1.0, String("rain")));
   WorldGeometry geometry(Vec2U(1000, 1000));
 
   auto server = ServerWeather::create(fixture.root());

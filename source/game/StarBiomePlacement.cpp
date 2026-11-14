@@ -95,7 +95,8 @@ std::expected<BiomeItem, StarException> variantToBiomeItem(Assets const& assets,
       if (!name) return std::unexpected(std::move(name.error()));
       auto parameters = object->get(1);
       if (!parameters) return std::unexpected(std::move(parameters.error()));
-      pool.add(*weight, {std::move(*name), std::move(*parameters)});
+      auto inserted = pool.insert(*weight, std::pair{std::move(*name), std::move(*parameters)});
+      if (!inserted) return std::unexpected(std::move(inserted.error()));
     }
     return BiomeItem{std::move(pool)};
   } else if (*type == "treasureBoxSet") {
@@ -285,7 +286,8 @@ std::expected<std::optional<BiomeItem>, StarException> BiomeItemDistribution::cr
       if (!weight) return std::unexpected(std::move(weight.error()));
       auto name = pair.getString(1);
       if (!name) return std::unexpected(std::move(name.error()));
-      pool.add(*weight, {std::move(*name), *parameters});
+      auto inserted = pool.insert(*weight, std::pair{std::move(*name), *parameters});
+      if (!inserted) return std::unexpected(std::move(inserted.error()));
     }
     return BiomeItem{std::move(pool)};
   } else if (auto match = type->equals_ignore_case("treasureBox"); !match) return std::unexpected(std::move(match.error()));
