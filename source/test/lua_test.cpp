@@ -21,6 +21,7 @@ import star.rect;
 import star.poly;
 import star.math_common;
 import star.algorithm;
+import star.matrix3;
 using namespace Star;
 
 struct BorrowedCrossStateProbe {
@@ -45,6 +46,19 @@ template <> struct LuaConverter<BorrowedCrossStateProbe> {
 }// namespace Star
 
 namespace {
+struct NoMatrixLuaConverter {};
+
+template <typename T>
+concept matrix_lua_writable = requires(LuaStack stack, Matrix3<T> const& matrix) {
+  LuaConverter<Matrix3<T>>::from(stack, matrix);
+};
+
+template <typename T>
+concept matrix_lua_readable = requires(LuaStackValue value) { LuaConverter<Matrix3<T>>::to(value); };
+
+static_assert(matrix_lua_writable<float> && matrix_lua_readable<float>);
+static_assert(!matrix_lua_writable<NoMatrixLuaConverter> && !matrix_lua_readable<NoMatrixLuaConverter>);
+
 template <typename T, typename U>
 void expectLuaAlternative(std::expected<LuaValue, StarException> result, U const& expected) {
   ASSERT_TRUE(result) << result.error().what();
@@ -60,6 +74,28 @@ void expectLuaNil(std::expected<LuaValue, StarException> result) {
     ADD_FAILURE() << "Expected Lua nil; actual result: " << rendered->utf8();
   }
 }
+}
+
+TEST(LuaTest, MatrixCodecRetainsRowsAndRejectsIncompleteTables) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  Mat3D const matrix(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  ASSERT_TRUE(context->set("matrix", matrix));
+  auto rows = context->eval<Json>("return matrix");
+  ASSERT_TRUE(rows) << rows.error().what();
+  EXPECT_EQ(*rows, (Json(JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}, JsonArray{7, 8, 9}})));
+  auto decoded = context->eval<Mat3D>("return matrix");
+  ASSERT_TRUE(decoded) << decoded.error().what();
+  EXPECT_EQ(*decoded, matrix);
+  auto incomplete = context->eval<std::optional<Mat3D>>("return {{1,2,3},{4,5,6},{7,8}}");
+  EXPECT_FALSE(incomplete);
+  auto invalid = context->eval<std::optional<Mat3D>>("return {{1,2,3},{4,'bad',6},{7,8,9}}");
+  EXPECT_FALSE(invalid);
+  auto absent = context->eval<std::optional<Mat3D>>("return nil");
+  ASSERT_TRUE(absent) << absent.error().what();
+  EXPECT_FALSE(*absent);
 }
 
 TEST(LuaTest, CheckedTextPreservesDiagnosticSpellings) {

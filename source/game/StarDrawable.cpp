@@ -170,7 +170,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
         if (!transformationConfig)
           return std::unexpected(std::move(transformationConfig.error()));
         if (*transformationConfig) {
-          auto matrix = jsonToMat3F(**transformationConfig);
+          auto matrix = json_to_mat3f(**transformationConfig);
           if (!matrix)
             return std::unexpected(std::move(matrix.error()));
           transformation = *matrix;
@@ -240,7 +240,7 @@ std::expected<Json, StarException> Drawable::toJson() const {
   } else if (std::holds_alternative<ImagePart>(part)) {
     auto const& image = std::get<ImagePart>(part);
     json.set("image", AssetPath::join(image.image));
-    json.set("transformation", jsonFromMat3F(image.transformation));
+    json.set("transformation", json_from_mat3f(image.transformation));
   }
   json.set("position", jsonFromVec2F(position));
   json.set("color", jsonFromColor(color));
@@ -279,7 +279,7 @@ void Drawable::scale(Vec2F const& scaling, Vec2F const& scaleCenter) {
 }
 
 void Drawable::transform(Mat3F const& transformation) {
-  Vec2F localTranslation = transformation.transformVec2(Vec2F());
+  Vec2F localTranslation = transformation.transform_point(Vec2F());
   Mat3F localTransform = Mat3F::translation(-localTranslation) * transformation;
 
   if (std::holds_alternative<LinePart>(part))
@@ -291,7 +291,7 @@ void Drawable::transform(Mat3F const& transformation) {
     image.transformation = localTransform * image.transformation;
   }
 
-  position = transformation.transformVec2(position);
+  position = transformation.transform_point(position);
 }
 
 void Drawable::rebase(Vec2F const& newBase) {
@@ -332,10 +332,10 @@ std::expected<RectF, StarException> Drawable::boundBox(ImageMetadataDatabase con
     }
 
     if (!imageRegion.isNull()) {
-      boundBox.combine(image.transformation.transformVec2(Vec2F(imageRegion.xMin(), imageRegion.yMin())));
-      boundBox.combine(image.transformation.transformVec2(Vec2F(imageRegion.xMax(), imageRegion.yMin())));
-      boundBox.combine(image.transformation.transformVec2(Vec2F(imageRegion.xMin(), imageRegion.yMax())));
-      boundBox.combine(image.transformation.transformVec2(Vec2F(imageRegion.xMax(), imageRegion.yMax())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMin(), imageRegion.yMin())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMax(), imageRegion.yMin())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMin(), imageRegion.yMax())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMax(), imageRegion.yMax())));
     }
   }
 

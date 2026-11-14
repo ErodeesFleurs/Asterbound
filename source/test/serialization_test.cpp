@@ -12,12 +12,28 @@ import star.bytes;
 import star.io_device;
 import star.data_stream;
 import star.uuid;
+import star.matrix3;
+import star.vector;
 
 #include "gtest/gtest.h"
 
 using namespace Star;
 
 namespace {
+struct NonDefaultMatrixScalar {
+  std::uint16_t value;
+  NonDefaultMatrixScalar() = delete;
+  explicit NonDefaultMatrixScalar(std::uint16_t v) : value(v) {}
+};
+
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
+operator>>(DataStream& stream, NonDefaultMatrixScalar& value) {
+  return stream >> value.value;
+}
+
+static_assert(stream_readable<Matrix3<NonDefaultMatrixScalar>>);
+static_assert(!stream_read_factory<Matrix3<NonDefaultMatrixScalar>>);
+
 struct StagedOptionalPayload {
   std::uint8_t value = 0;
   StagedOptionalPayload() = default;
@@ -56,6 +72,39 @@ static_assert(callback_optional_readable<StagedOptionalPayload, OptionalProbeRea
 static_assert(!callback_optional_readable<Uuid, OptionalProbeReader>);
 static_assert(!callback_optional_readable<ImmobileOptionalPayload, OptionalProbeReader>);
 static_assert(!callback_optional_readable<int, decltype([](DataStream&, int&) { return 1; })>);
+}
+
+TEST(DataStreamTest, MatrixRowMajorWireBytesAndDefaultReadFactory) {
+  using Matrix = Matrix3<std::uint16_t>;
+  static_assert(stream_read_factory<Matrix>);
+  Matrix const matrix(0x0102, 0x0304, 0x0506, 0x0708, 0x090a, 0x0b0c, 0x0d0e, 0x0f10, 0x1112);
+  for (auto order : {ByteOrder::BigEndian, ByteOrder::LittleEndian}) {
+    DataStreamBuffer stream;
+    stream.set_byte_order(order);
+    ASSERT_TRUE(stream << matrix);
+    ASSERT_TRUE(stream << std::uint8_t(0x7e));
+    ASSERT_EQ(stream.size(), 19u);
+    for (std::size_t i = 0; i < 18; ++i) {
+      auto expected = order == ByteOrder::BigEndian ? i + 1 : (i ^ 1u) + 1;
+      EXPECT_EQ(static_cast<unsigned char>(stream.data()[i]), expected);
+    }
+    EXPECT_EQ(static_cast<unsigned char>(stream.data()[18]), 0x7e);
+    ASSERT_TRUE(stream.seek(0));
+    auto decoded = stream.read<Matrix>();
+    ASSERT_TRUE(decoded) << decoded.error().what();
+    EXPECT_EQ(*decoded, matrix);
+    EXPECT_EQ(stream.read<std::uint8_t>(), 0x7e);
+  }
+}
+
+TEST(DataStreamTest, MatrixTruncationKeepsCompletedRowPrefixAndReportsFailure) {
+  using Matrix = Matrix3<std::uint16_t>;
+  DataStreamBuffer stream(ByteArray({"\x01\x02\x03\x04\x05\x06\x07", 7}));
+  Matrix matrix(9, 9, 9, 9, 9, 9, 9, 9, 9);
+  auto read = stream >> matrix;
+  ASSERT_FALSE(read);
+  EXPECT_EQ(matrix[0], (Vector<std::uint16_t, 3>(0x0102, 0x0304, 0x0506)));
+  EXPECT_EQ(matrix[2], (Vector<std::uint16_t, 3>(9, 9, 9)));
 }
 
 template <typename T>

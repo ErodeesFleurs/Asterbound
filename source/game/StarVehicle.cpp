@@ -1065,11 +1065,11 @@ if (!result1133) return std::unexpected(std::move(result1133.error()));
 Vec2F partAnchor = std::move(*result1133);
 
   auto loungePosition = std::make_shared<LoungeAnchor>();
-  loungePosition->position = partTransformation.transformVec2(partAnchor) + position();
+  loungePosition->position = partTransformation.transform_point(partAnchor) + position();
   if (positionConfig.exitBottomOffset)
-    loungePosition->exitBottomPosition = partTransformation.transformVec2(partAnchor + positionConfig.exitBottomOffset.value_or(Vec2F{})) + position();
+    loungePosition->exitBottomPosition = partTransformation.transform_point(partAnchor + positionConfig.exitBottomOffset.value_or(Vec2F{})) + position();
   loungePosition->direction = partTransformation.determinant() > 0 ? Direction::Right : Direction::Left;
-  loungePosition->angle = partTransformation.transformAngle(0.0f);
+  loungePosition->angle = partTransformation.transform_angle(0.0f);
   if (loungePosition->direction == Direction::Left)
     loungePosition->angle += std::numbers::pi;
   loungePosition->controllable = true;
@@ -1121,7 +1121,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Vehicle::forceRegions() c
         auto result1127 = m_networkedAnimator->finalPartTransformation(*p.second.attachToPart);
 if (!result1127) return std::unexpected(std::move(result1127.error()));
 Mat3F partTransformation = std::move(*result1127);
-        Vec2F localTranslation = partTransformation.transformVec2(Vec2F());
+        Vec2F localTranslation = partTransformation.transform_point(Vec2F());
         translatePos += localTranslation;
       }
 
@@ -1176,7 +1176,7 @@ std::expected<std::optional<PhysicsMovingCollision>, StarException> Vehicle::mov
 if (!result1125) return std::unexpected(std::move(result1125.error()));
 Mat3F partTransformation = std::move(*result1125);
 
-    Vec2F localTranslation = partTransformation.transformVec2(Vec2F());
+    Vec2F localTranslation = partTransformation.transform_point(Vec2F());
     collision.position += localTranslation;
 
     Mat3F localTransform = Mat3F::translation(-localTranslation) * partTransformation;

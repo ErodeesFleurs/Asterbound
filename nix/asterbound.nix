@@ -173,6 +173,7 @@ let
     "lru_benchmarks"
     "list_benchmarks"
     "vector_benchmarks"
+    "matrix3_benchmarks"
     "set_benchmarks"
     "string_benchmarks"
     "format_benchmarks"

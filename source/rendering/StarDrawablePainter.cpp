@@ -76,9 +76,9 @@ std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawab
     Mat3F transformation = imagePart.transformation;
     transformation.scale(Vec2F::filled(scale));
     Vec2F lowerLeft  = { transformation[0][2] += position.x(), transformation[1][2] += position.y() };
-    Vec2F lowerRight = transformation * Vec2F(textureSize.x(), 0.f);
-    Vec2F upperRight = transformation * textureSize;
-    Vec2F upperLeft  = transformation * Vec2F(0.f, textureSize.y());
+    Vec2F lowerRight = transformation.transform_point(Vec2F(textureSize.x(), 0.f));
+    Vec2F upperRight = transformation.transform_point(textureSize);
+    Vec2F upperLeft  = transformation.transform_point(Vec2F(0.f, textureSize.y()));
 
     float param1 = drawable.fullbright ? 0.0f : 1.0f;
 

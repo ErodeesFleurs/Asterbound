@@ -71,7 +71,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::backOrbiters(Vec2F
     Vec2F pos = std::get<1>(object);
     pos = pos.piecewise_multiply(satelliteArea);
     pos -= worldOffset;
-    pos = rotMatrix.transformVec2(pos);
+    pos = rotMatrix.transform_point(pos);
     for (auto const& l : layers)
       orbiters.push_back(SkyOrbiter{SkyOrbiterType::Moon, std::get<2>(object) * l.second, 0.0f, l.first, pos});
   }
@@ -178,7 +178,7 @@ std::expected<List<SkyOrbiter>, StarException> SkyRenderData::frontOrbiters(Vec2
         Vec2F position =
           Vec2F::with_angle(horizonCloud.startAngle + orbitAngle * horizonCloud.speed, horizonCloud.radius)
           + planetCenter;
-        position = rotMatrix.transformVec2(position);
+        position = rotMatrix.transform_point(position);
         orbiters.push_back({SkyOrbiterType::HorizonCloud, scale, worldRotation, horizonCloud.image, position});
       }
     }

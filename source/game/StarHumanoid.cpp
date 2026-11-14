@@ -1909,7 +1909,7 @@ if (!checked297) return std::unexpected(std::move(checked297.error()));
 auto rotationCenter = std::move(*checked297);
       auto checked298 = animator.partTransformation(m_headRotationPoint.first);
 if (!checked298) return std::unexpected(std::move(checked298.error()));
-auto bodyHeadRotationCenter = std::move(*checked298).transformVec2(rotationCenter);
+auto bodyHeadRotationCenter = std::move(*checked298).transform_point(rotationCenter);
       auto checked299 = animator.rotateLocalTransformationGroup("headRotation", headRotation * dir, rotationCenter);
 if (!checked299) return std::unexpected(std::move(checked299.error()));
       auto checked300 = animator.translateLocalTransformationGroup("headRotation", translate);
@@ -3357,7 +3357,7 @@ mat = std::move(*checked590);
     auto checked591 = m_networkedAnimator->partTransformation(anchor);
 if (!checked591) return std::unexpected(std::move(checked591.error()));
 mat = std::move(*checked591) * mat;
-    auto position = mat.transformVec2(offset + rotationCenter);
+    auto position = mat.transform_point(offset + rotationCenter);
     if (facingDirection == Direction::Left)
       position[0] *= -1;
     return position;
@@ -3470,7 +3470,7 @@ mat = std::move(*checked611);
     auto checked612 = m_networkedAnimator->partTransformation(anchor);
 if (!checked612) return std::unexpected(std::move(checked612.error()));
 mat = std::move(*checked612) * mat;
-    auto position = mat.transformVec2(offset + rotationCenter);
+    auto position = mat.transform_point(offset + rotationCenter);
     if (facingDirection == Direction::Left)
       position[0] *= -1;
     return position;

@@ -428,7 +428,7 @@ const GameTestRegistration semanticPartSampling(
     EXPECT_FLOAT_EQ(sampled->get().timer, .2f);
     auto body = parts->activePart("body", &sample);
     ASSERT_TRUE(body);
-    EXPECT_NEAR(body->get().animationAffineTransform().transformVec2(Vec2F{})[0], 3.2f, 1e-5f);
+    EXPECT_NEAR(body->get().animationAffineTransform().transform_point(Vec2F{})[0], 3.2f, 1e-5f);
     logical = parts->activeState("movement");
     ASSERT_TRUE(logical);
     EXPECT_FLOAT_EQ(logical->get().timer, .4f);
@@ -575,7 +575,7 @@ const GameTestRegistration animatorSemanticSampling(
     EXPECT_EQ(*state, "walk");
     auto local = animator.getLocalTransformationGroup("moving");
     ASSERT_TRUE(local);
-    EXPECT_FLOAT_EQ(local->transformVec2(Vec2F{})[0], 0);
+    EXPECT_FLOAT_EQ(local->transform_point(Vec2F{})[0], 0);
     EXPECT_TRUE(events.pullNewAudios().empty());
     EXPECT_TRUE(events.pullNewParticles().empty());
     ASSERT_TRUE(animator.rotateGroup("aim", -2.f, true));
@@ -637,8 +637,8 @@ const GameTestRegistration sampledPartTransformOverrides(
       ASSERT_TRUE(childTransform);
       ASSERT_TRUE(parentTransform);
       for (auto point : {Vec2F{}, Vec2F{1, 0}, Vec2F{0, 1}}) {
-        expectVec(childTransform->transformVec2(point), child.transformVec2(point));
-        expectVec(parentTransform->transformVec2(point), parent.transformVec2(point));
+        expectVec(childTransform->transform_point(point), child.transform_point(point));
+        expectVec(parentTransform->transform_point(point), parent.transform_point(point));
       }
       auto final = global * child;
       auto point = view.partPoint("child", "point");
@@ -653,12 +653,12 @@ const GameTestRegistration sampledPartTransformOverrides(
       ASSERT_EQ(lights->size(), 1u);
       ASSERT_TRUE(drawables);
       ASSERT_EQ(drawables->size(), 1u);
-      expectVec(**point, final.transformVec2(Vec2F{1, 0}));
+      expectVec(**point, final.transform_point(Vec2F{1, 0}));
       ASSERT_EQ((**poly).sides(), 3u);
-      expectVec((**poly)[0], final.transformVec2(Vec2F{0, 0}));
-      expectVec((**poly)[1], final.transformVec2(Vec2F{1, 0}));
-      expectVec((**poly)[2], final.transformVec2(Vec2F{0, 1}));
-      expectVec((*lights)[0].position, final.transformVec2(Vec2F{0, 0}));
+      expectVec((**poly)[0], final.transform_point(Vec2F{0, 0}));
+      expectVec((**poly)[1], final.transform_point(Vec2F{1, 0}));
+      expectVec((**poly)[2], final.transform_point(Vec2F{0, 1}));
+      expectVec((*lights)[0].position, final.transform_point(Vec2F{0, 0}));
       auto expectedLine = line;
       expectedLine.transform(final);
       ASSERT_TRUE((*drawables)[0].isLine());
@@ -704,7 +704,7 @@ const GameTestRegistration sampledPartTransformOverrides(
       ASSERT_TRUE(logical);
       ASSERT_TRUE(logicalState);
       ASSERT_TRUE(logicalGroup);
-      expectVec(logical->transformVec2(Vec2F{0, 0}), {3, 3});
+      expectVec(logical->transform_point(Vec2F{0, 0}), {3, 3});
       EXPECT_EQ(*logicalState, "idle");
       EXPECT_EQ(*logicalGroup, Mat3F::identity());
       animator.setZoom(2);
@@ -950,11 +950,11 @@ const GameTestRegistration authoredAnimationGroupSampling(
       EXPECT_FLOAT_EQ((**discrete)[0], alpha < .5f ? 0 : 8);
       auto smooth = sample.groupTransformation({"smooth"});
       ASSERT_TRUE(smooth);
-      EXPECT_NEAR(smooth->transformVec2(Vec2F{})[0], 7.2f, 1e-5f);
+      EXPECT_NEAR(smooth->transform_point(Vec2F{})[0], 7.2f, 1e-5f);
     }
     auto logical = animator.groupTransformation({"discrete"});
     ASSERT_TRUE(logical);
-    EXPECT_FLOAT_EQ(logical->transformVec2(Vec2F{})[0], 8);
+    EXPECT_FLOAT_EQ(logical->transform_point(Vec2F{})[0], 8);
     auto timer = animator.stateTimer("body");
     ASSERT_TRUE(timer);
     EXPECT_NEAR(*timer, .6f, 1e-5f);

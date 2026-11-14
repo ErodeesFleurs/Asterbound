@@ -133,23 +133,23 @@ public:
     requires(N == 2)
   {
     auto rotMatrix = Mat3F::rotation(angle, rotationCenter);
-    min() = rotMatrix.transformVec2(min());
-    max() = rotMatrix.transformVec2(max());
+    min() = rotMatrix.transform_point(min());
+    max() = rotMatrix.transform_point(max());
   }
 
   template <line_scalar T2>
   void transform(Matrix3<T2> const& transform)
     requires(N == 2)
   {
-    min() = transform.transformVec2(min());
-    max() = transform.transformVec2(max());
+    min() = transform.transform_point(min());
+    max() = transform.transform_point(max());
   }
 
   template <line_scalar T2>
   Line transformed(Matrix3<T2> const& transform) const
     requires(N == 2)
   {
-    return Line(transform.transformVec2(min()), transform.transformVec2(max()));
+    return Line(transform.transform_point(min()), transform.transform_point(max()));
   }
 
   void flip_horizontal(T horizontalPos)

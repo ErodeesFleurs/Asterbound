@@ -258,20 +258,20 @@ std::expected<Line2F, StarException> jsonToLine2F(Json const& v) {
   return Line2F(*min, *max);
 }
 Json jsonFromLine2F(Line2F const& line) { return JsonArray{jsonFromVec2F(line.min()), jsonFromVec2F(line.max())}; }
-std::expected<Mat3F, StarException> jsonToMat3F(Json const& v) {
-  Vec3F columns[3];
+std::expected<Mat3F, StarException> json_to_mat3f(Json const& v) {
+  std::array<Vec3F, 3> rows;
   for (std::size_t i = 0; i < 3; ++i) {
     auto item = v.get(i);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    auto column = jsonToVec3F(*item);
-    if (!column)
-      return std::unexpected(std::move(column.error()));
-    columns[i] = *column;
+    auto row = jsonToVec3F(*item);
+    if (!row)
+      return std::unexpected(std::move(row.error()));
+    rows[i] = *row;
   }
-  return Mat3F(columns[0], columns[1], columns[2]);
+  return Mat3F(rows[0], rows[1], rows[2]);
 }
-Json jsonFromMat3F(Mat3F const& v) { return JsonArray{jsonFromVec3F(v[0]), jsonFromVec3F(v[1]), jsonFromVec3F(v[2])}; }
+Json json_from_mat3f(Mat3F const& v) { return JsonArray{jsonFromVec3F(v[0]), jsonFromVec3F(v[1]), jsonFromVec3F(v[2])}; }
 
 std::expected<StringList, StarException> jsonToStringList(Json const& v) { return jsonToList<String>(v, [](Json const& j) { return j.toString(); }); }
 std::expected<List<float>, StarException> jsonToFloatList(Json const& v) { return jsonToList<float>(v, [](Json const& j) { return j.toFloat(); }); }

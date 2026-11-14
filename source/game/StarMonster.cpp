@@ -678,7 +678,7 @@ if (!result104) return std::unexpected(std::move(result104.error()));
       Vec2F knockback = std::get<Vec2F>(ds.knockback);
       auto result106 = m_networkedAnimator->partTransformation(anchorPart);
 if (!result106) return std::unexpected(std::move(result106.error()));
-knockback = std::move(*result106).transformVec2(knockback);
+knockback = std::move(*result106).transform_point(knockback);
       if (m_networkedAnimator->flipped())
         knockback = Vec2F(-knockback[0], knockback[1]);
       ds.knockback = knockback;

@@ -406,7 +406,7 @@ template <typename DataType>
 template <typename DataType2>
 void Polygon<DataType>::transform(Matrix3<DataType2> const& transMat) {
   for (auto& v : m_vertexes)
-    v = transMat.transformVec2(v);
+    v = transMat.transform_point(v);
 }
 
 template <typename DataType>

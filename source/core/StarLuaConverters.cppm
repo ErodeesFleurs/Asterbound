@@ -70,9 +70,17 @@ struct LuaConverter<Vector<T, N>> {
   }
 };
 
+// Matrix tables contain three rows, including the complete homogeneous row.
 template <typename T>
 struct LuaConverter<Matrix3<T>> {
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Matrix3<T> const& m) {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Matrix3<T> const& m)
+    requires(std::is_convertible_v<Vector<T, 3> const&, Vector<T, 3>>
+      && ((std::is_pointer_v<T> && std::is_convertible_v<T const&, std::string_view>)
+        || requires(LuaStack target, T const& value) {
+          { LuaConverter<std::decay_t<T>>::from(target, value) }
+            -> std::convertible_to<std::expected<void, StarException>>;
+        }))
+  {
     auto created = stack.createTable(3, 0);
     if (!created)
       return std::unexpected(std::move(created.error()));
@@ -85,8 +93,17 @@ struct LuaConverter<Matrix3<T>> {
     return {};
   }
 
-  [[nodiscard]] static std::expected<std::optional<Matrix3<T>>, StarException> to(LuaStackValue v) {
-    auto rows = LuaConverter<Vector<typename Matrix3<T>::Vec3, 3>>::to(v);
+  [[nodiscard]] static std::expected<std::optional<Matrix3<T>>, StarException> to(LuaStackValue v)
+    requires requires(LuaStackValue source, T&& value, Vector<Vector<T, 3>, 3>& rows) {
+      { LuaConverter<T>::to(source) } -> std::convertible_to<std::expected<std::optional<T>, StarException>>;
+      ::new Vector<Vector<T, 3>, 3>;
+      rows[0][0] = std::move(value);
+      Matrix3<T>(rows[0], rows[1], rows[2]);
+    } && std::is_convertible_v<Vector<Vector<T, 3>, 3>&&,
+      std::expected<std::optional<Vector<Vector<T, 3>, 3>>, StarException>>
+      && std::is_convertible_v<Matrix3<T>&&, std::expected<std::optional<Matrix3<T>>, StarException>>
+  {
+    auto rows = LuaConverter<Vector<Vector<T, 3>, 3>>::to(v);
     if (!rows)
       return std::unexpected(std::move(rows.error()));
     if (!*rows)

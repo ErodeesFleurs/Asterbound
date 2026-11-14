@@ -77,8 +77,8 @@ Json jsonFromPolyF(PolyF const& poly);
 std::expected<Line2F, StarException> jsonToLine2F(Json const& v);
 Json jsonFromLine2F(Line2F const& line);
 
-std::expected<Mat3F, StarException> jsonToMat3F(Json const& v);
-Json jsonFromMat3F(Mat3F const& v);
+std::expected<Mat3F, StarException> json_to_mat3f(Json const& v);
+Json json_from_mat3f(Mat3F const& v);
 
 std::expected<StringList, StarException> jsonToStringList(Json const& v);
 Json jsonFromStringList(List<String> const& v);
@@ -454,8 +454,8 @@ export namespace Star {
   using ::Star::jsonFromPolyF;
   using ::Star::jsonToLine2F;
   using ::Star::jsonFromLine2F;
-  using ::Star::jsonToMat3F;
-  using ::Star::jsonFromMat3F;
+  using ::Star::json_to_mat3f;
+  using ::Star::json_from_mat3f;
   using ::Star::jsonToStringList;
   using ::Star::jsonFromStringList;
   using ::Star::jsonToStringSet;

@@ -458,7 +458,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
           auto threshold = std::move(*thresholdResult);
-          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.imagePart().transformation.transformVec2(Vec2F())) * TilePixels, threshold, orientation->flipImages);
+          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.imagePart().transformation.transform_point(Vec2F())) * TilePixels, threshold, orientation->flipImages);
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);

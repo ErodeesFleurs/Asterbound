@@ -166,7 +166,7 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
   auto& primitives = m_renderer->immediatePrimitives();
 
   for (auto& star : *stars) {
-    Vec2F screenPos = transform.transformVec2(star.first);
+    Vec2F screenPos = transform.transform_point(star.first);
     if (viewRect.contains(screenPos)) {
       std::size_t starFrame = (std::size_t)(sky.epochTime + star.second.second) % sky.starFrames;
       if (auto const& texture = m_starTextures[star.second.first * sky.starFrames + starFrame])
@@ -243,7 +243,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     if (!debrisItems) return std::unexpected(std::move(debrisItems.error()));
     Vec2D debrisPositionOffset = viewMin + velocityOffset;
     for (auto& debrisItem : *debrisItems) {
-      Vec2F debrisPosition = rotMatrix.transformVec2(Vec2F(debrisItem.first - debrisPositionOffset));
+      Vec2F debrisPosition = rotMatrix.transform_point(Vec2F(debrisItem.first - debrisPositionOffset));
       float debrisAngle = std::fmod(Constants::deg2rad * debrisItem.second.second * sky.epochTime, std::numbers::pi * 2) + sky.starRotation;
       if (auto result = drawOrbiter(pixelRatio, screenSize, sky, {SkyOrbiterType::SpaceDebris, 1.0f, debrisAngle, debrisItem.second.first, debrisPosition}); !result)
         return std::unexpected(std::move(result.error()));
@@ -581,10 +581,10 @@ std::expected<void, StarException> EnvironmentPainter::drawOrbiter(float pixelRa
   Vec4B renderColor = Vec4B(255, 255, 255, 255 * alpha);
 
   m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(), std::move(texture),
-      renderMatrix.transformVec2(renderRect.min()), Vec2F(0, 0),
-      renderMatrix.transformVec2(Vec2F{renderRect.xMax(), renderRect.yMin()}), Vec2F(texSize[0], 0),
-      renderMatrix.transformVec2(renderRect.max()), Vec2F(texSize[0], texSize[1]),
-      renderMatrix.transformVec2(Vec2F{renderRect.xMin(), renderRect.yMax()}), Vec2F(0, texSize[1]),
+      renderMatrix.transform_point(renderRect.min()), Vec2F(0, 0),
+      renderMatrix.transform_point(Vec2F{renderRect.xMax(), renderRect.yMin()}), Vec2F(texSize[0], 0),
+      renderMatrix.transform_point(renderRect.max()), Vec2F(texSize[0], texSize[1]),
+      renderMatrix.transform_point(Vec2F{renderRect.xMin(), renderRect.yMax()}), Vec2F(0, texSize[1]),
     renderColor, 0.0f);
   return {};
 }

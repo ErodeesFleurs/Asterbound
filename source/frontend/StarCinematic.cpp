@@ -659,16 +659,16 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
     Vec2F screenTranslation = drawable.position * drawableScale + drawableTranslation;
 
     Vec2F lowerLeft =
-        imagePart.transformation.transformVec2(Vec2F(imageRect.xMin(), imageRect.yMin())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.xMin(), imageRect.yMin())) * drawableScale
         + screenTranslation;
     Vec2F lowerRight =
-        imagePart.transformation.transformVec2(Vec2F(imageRect.xMax(), imageRect.yMin())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.xMax(), imageRect.yMin())) * drawableScale
         + screenTranslation;
     Vec2F upperRight =
-        imagePart.transformation.transformVec2(Vec2F(imageRect.xMax(), imageRect.yMax())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.xMax(), imageRect.yMax())) * drawableScale
         + screenTranslation;
     Vec2F upperLeft =
-        imagePart.transformation.transformVec2(Vec2F(imageRect.xMin(), imageRect.yMax())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.xMin(), imageRect.yMax())) * drawableScale
         + screenTranslation;
 
     Vec4B drawableColor = drawable.color.toRgba();

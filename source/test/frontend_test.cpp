@@ -3515,7 +3515,7 @@ const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPres
       {"position", JsonArray{7, 11}}, {"mirrored", true}, {"scale", 2}});
   ASSERT_TRUE(native) << native.error().what();
   auto imagePoint = [](Drawable const& drawable, Vec2F point) {
-    return std::get<Drawable::ImagePart>(drawable.part).transformation.transformVec2(point) + drawable.position;
+    return std::get<Drawable::ImagePart>(drawable.part).transformation.transform_point(point) + drawable.position;
   };
   auto expectGeometry = [&](Drawable const& actual) {
     ASSERT_TRUE(std::holds_alternative<Drawable::ImagePart>(actual.part));

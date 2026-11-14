@@ -637,7 +637,7 @@ std::expected<Vec2I, StarException> PaneManager::calculateNewInterfacePosition(s
       scale = Mat3F::scaling(interfaceScaleRatio, Vec2F(*bounds) / 2);
     }
   }
-  return Vec2I::round((scale * Vec3F(position, 0)).vec2());
+  return Vec2I::round(scale.transform_direction(Vec2F(position)));
 }
 
 std::expected<bool, StarException> PaneManager::dismiss(std::shared_ptr<Pane> const& pane) {

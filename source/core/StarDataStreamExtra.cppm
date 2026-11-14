@@ -314,6 +314,7 @@ template <typename DataT, std::size_t Dimensions>
   return ds >> box.min() >> box.max();
 }
 
+// Preserve nine scalar transfers in row-major order and the stream's byte order.
 template <typename DataT>
   requires(stream_writable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds,

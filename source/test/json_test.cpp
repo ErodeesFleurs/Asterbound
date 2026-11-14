@@ -11,6 +11,8 @@ import star.json_path;
 import star.json_builder;
 import star.json_parser;
 import star.random;
+import star.matrix3;
+import star.vector;
 
 #include "gtest/gtest.h"
 import star.json_patch;
@@ -44,6 +46,18 @@ static_assert(!optional_json_decodable<int, FallibleVoidJsonConverter>);
 static_assert(!optional_json_decodable<int, decltype([](int) { return 1; })>);
 static_assert(optional_json_decodable<bool, RvalueJsonConverter>);
 static_assert(!optional_json_decodable<bool, RvalueJsonConverter&>);
+}
+
+TEST(JsonTest, MatrixRowsRetainAllNineScalars) {
+  Mat3F const matrix(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  Json const rows = JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}, JsonArray{7, 8, 9}};
+  EXPECT_EQ(json_from_mat3f(matrix), rows);
+  auto decoded = json_to_mat3f(rows);
+  ASSERT_TRUE(decoded) << decoded.error().what();
+  EXPECT_EQ(*decoded, matrix);
+  EXPECT_EQ((*decoded)[2], Vec3F(7, 8, 9));
+  EXPECT_FALSE(json_to_mat3f(JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}}));
+  EXPECT_FALSE(json_to_mat3f(JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}, JsonArray{7, "bad", 9}}));
 }
 
 TEST(JsonTest, OptionalNullSkipsConvertersAndFalseRemainsPresent) {

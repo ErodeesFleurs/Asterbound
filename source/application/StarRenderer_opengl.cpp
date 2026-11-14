@@ -1638,6 +1638,10 @@ auto OpenGlRenderer::createGlRenderBuffer() -> std::expected<std::shared_ptr<GlR
 }
 
 std::expected<void, StarException> OpenGlRenderer::renderGlBuffer(GlRenderBuffer const& renderBuffer, Mat3F const& transformation) {
+  auto firstBuffer = std::find_if(renderBuffer.vertexBuffers.begin(), renderBuffer.vertexBuffers.end(),
+      [](GlRenderBuffer::GlVertexBuffer const& vb) { return vb.vertexCount != 0; });
+  if (firstBuffer == renderBuffer.vertexBuffers.end())
+    return checkGlError("buffer draw");
   struct DrawBindingGuard {
     GLint vertexArray = 0;
     GLint arrayBuffer = 0;
@@ -1654,10 +1658,14 @@ std::expected<void, StarException> OpenGlRenderer::renderGlBuffer(GlRenderBuffer
     }
   } binding;
   glBindVertexArray(renderBuffer.vertexArray);
-  for (auto const& vb : renderBuffer.vertexBuffers) {
+  // Nested row storage is not one scalar array; pack only at this C ABI boundary.
+  std::array<float, 9> transformValues;
+  transformation.copy_to(transformValues);
+  glUniformMatrix3fv(m_vertexTransformUniform, 1, GL_TRUE, transformValues.data());
+  for (auto buffer = firstBuffer; buffer != renderBuffer.vertexBuffers.end(); ++buffer) {
+    auto const& vb = *buffer;
     if (vb.vertexCount == 0)
       continue;
-    glUniformMatrix3fv(m_vertexTransformUniform, 1, GL_TRUE, transformation.ptr());
 
     if (m_currentEffect->get().includeVBTextures) {
       for (std::size_t i = 0; i < vb.textureCount; ++i) {

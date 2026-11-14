@@ -1071,7 +1071,7 @@ std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::queryPartP
   if (!value) return std::unexpected(std::move(value.error()));
   auto transform = queryFinalPartTransformation(partName, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
-  return std::optional<Vec2F>(transform->transformVec2(*value));
+  return std::optional<Vec2F>(transform->transform_point(*value));
 }
 
 std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::queryPartPoly(String const& partName, String const& propertyName, Sample const* sample) const {
@@ -1809,8 +1809,8 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
     auto group = queryGroupTransformation(pair.second.transformationGroups, sample);
     if (!group) return std::unexpected(std::move(group.error()));
     transformation = *group * transformation;
-    position = transformation.transformVec2(position);
-    pointAngle = transformation.transformAngle(pointAngle);
+    position = transformation.transform_point(position);
+    pointAngle = transformation.transform_angle(pointAngle);
     if (pair.second.rotationGroup) {
       auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
       if (!rotation) return std::unexpected(std::move(rotation.error()));
@@ -1820,7 +1820,7 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
           + pair.second.rotationCenter.value_or(rg.rotationCenter);
       pointAngle += angle;
     }
-    position = globalTransformation().transformVec2(position);
+    position = globalTransformation().transform_point(position);
     if (m_flipped.get()) {
       if (pointAngle > 0)
         pointAngle = std::numbers::pi / 2 + constrainAngle(std::numbers::pi / 2 - pointAngle);
@@ -1887,7 +1887,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             if (!range) return std::unexpected(std::move(range.error()));
             activePersistentSound.audio->setRangeMultiplier(*range);
             activePersistentSound.audio->setLoops(-1);
-            activePersistentSound.audio->setPosition(globalTransformation().transformVec2(Vec2F()));
+            activePersistentSound.audio->setPosition(globalTransformation().transform_point(Vec2F()));
             auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).toFloat();
             if (!stopTime) return std::unexpected(std::move(stopTime.error()));
             activePersistentSound.stopRampTime = *stopTime;
@@ -1931,7 +1931,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto range = activeState.properties.value("immediateSoundRangeMultiplier", 1.0f).toFloat();
             if (!range) return std::unexpected(std::move(range.error()));
             activeImmediateSound.audio->setRangeMultiplier(*range);
-            activeImmediateSound.audio->setPosition(globalTransformation().transformVec2(Vec2F()));
+            activeImmediateSound.audio->setPosition(globalTransformation().transform_point(Vec2F()));
             dynamicTarget->get().pendingAudios.push_back(activeImmediateSound.audio);
           }
         }
@@ -2017,9 +2017,9 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
 
         float speed = particle.velocity.magnitude();
-        particle.velocity = Vec2F::with_angle(transformation.transformAngle(particle.velocity.angle())) * speed;
-        particle.position = transformation.transformVec2(particle.position);
-        particle.rotation = transformation.transformAngle(particle.rotation);
+        particle.velocity = Vec2F::with_angle(transformation.transform_angle(particle.velocity.angle())) * speed;
+        particle.position = transformation.transform_point(particle.position);
+        particle.rotation = transformation.transform_angle(particle.rotation);
 
         particle.size *= m_zoom.get();
         if (config.flip)
@@ -2114,7 +2114,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto sound = std::move(*instance);
             sound->setRangeMultiplier(soundEntry.rangeMultiplier);
             sound->setLoops(soundEntry.loops.get());
-            sound->setPosition(globalTransformation().transformVec2(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
+            sound->setPosition(globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
             sound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
             sound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());
             dynamicTarget->get().independentSounds[soundName].push_back(sound);
@@ -2126,7 +2126,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
       // Update all still active independent sounds position, volume, and speed
       for (auto const& activeIndependentSound : dynamicTarget->get().independentSounds.value(soundName)) {
         if (auto basePosition = dynamicTarget->get().currentAudioBasePositions.find_ref(activeIndependentSound))
-          basePosition->get() = globalTransformation().transformVec2(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get()));
+          basePosition->get() = globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get()));
         activeIndependentSound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
         activeIndependentSound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());
       }

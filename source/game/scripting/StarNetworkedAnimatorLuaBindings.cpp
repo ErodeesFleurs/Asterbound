@@ -147,7 +147,7 @@ std::expected<void, StarException> LuaBindings::Detail::registerAnimatorPartQuer
   if (auto result = callbacks.registerCallback("transformPoint", [&networkedAnimator] (Vec2F point, String const& part) -> std::expected<Vec2F, StarException> {
       auto transformation = networkedAnimator.partTransformation(part);
       if (!transformation) return std::unexpected(std::move(transformation.error()));
-      return transformation->transformVec2(point);
+      return transformation->transform_point(point);
     }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("transformPoly", [&networkedAnimator] (PolyF poly, String const& part) -> std::expected<PolyF, StarException> {
       auto transformation = networkedAnimator.partTransformation(part);
