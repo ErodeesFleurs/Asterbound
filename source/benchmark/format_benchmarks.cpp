@@ -2,7 +2,7 @@
 
 import std;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 import star.list;
 import star.map;
@@ -95,26 +95,11 @@ void register_workloads() {
   });
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime)
-    return 1;
-  register_workloads();
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) { benchmark::Shutdown(); return 1; }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_workloads();
+    return 0;
+  }, {.report_runtime_error = false});
 }

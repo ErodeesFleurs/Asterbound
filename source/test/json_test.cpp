@@ -155,24 +155,6 @@ TEST(JsonTest, ImplicitSharing) {
   EXPECT_EQ((*result2), 50);
 }
 
-TEST(JsonTest, Defaults) {
-  Json obj = JsonObject{{"null", Json()}};
-  Json arr = JsonArray{"array", JsonArray{Json(), Json()}};
-
-  auto result3 = obj.getInt("null", 5);
-  ASSERT_TRUE(result3);
-  EXPECT_EQ((*result3), 5);
-  auto result4 = arr.getInt(2, 5);
-  ASSERT_TRUE(result4);
-  EXPECT_EQ((*result4), 5);
-  auto result5 = arr.getInt(3, 5);
-  ASSERT_TRUE(result5);
-  EXPECT_EQ((*result5), 5);
-  auto error6 = arr.getInt(2);
-  ASSERT_FALSE(error6);
-  EXPECT_TRUE(error6.error().is<JsonException>());
-}
-
 TEST(JsonTest, Merging) {
   JsonObject a{{"I", "feel"}, {"friendly", "now"}};
   JsonObject b{{"hello", "there"}, {"leg", "friend"}};

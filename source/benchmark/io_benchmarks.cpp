@@ -14,21 +14,17 @@ import star.file;
 import star.format;
 import star.io_device;
 import star.logging;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.packed_asset_source;
 import star.random;
 import star.string;
 import star.uuid;
+#include "byte_fingerprint.hpp"
 
 namespace {
 constexpr std::size_t batch_size = 64;
 
-std::uint64_t fingerprint(std::span<char const> bytes) {
-  std::uint64_t result = 14695981039346656037ull;
-  for (unsigned char byte : bytes)
-    result = (result ^ byte) * 1099511628211ull;
-  return result;
-}
+using BenchmarkFixtures::fingerprint;
 
 Star::ByteArray fixture(std::size_t size) {
   Star::ByteArray bytes;
@@ -287,31 +283,8 @@ BENCHMARK(write_file)->Name("IO/WriteFile")->Arg(0)->Arg(64)->Arg(4096);
 BENCHMARK(directory_read)->Name("IO/DirectoryRead")->Arg(0)->Arg(64)->Arg(4096)->Arg(65536);
 BENCHMARK(packed_read)->Name("IO/PackedRead")->Arg(0)->Arg(64)->Arg(4096)->Arg(65536);
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, {.require_matches = false});
 }

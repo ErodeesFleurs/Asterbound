@@ -6,8 +6,9 @@ import star.flat_hash_map;
 import star.flat_hash_set;
 import star.format;
 import star.hash;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
+#include "flat_hash_fixture.hpp"
 
 // Private before-build adaptation changes only these two flat module imports
 // and this alias. Keep the consumer, fixtures and validators identical.
@@ -113,13 +114,7 @@ expected_entries<inline_map> inline_entries(std::size_t count, std::size_t offse
   return result;
 }
 
-template <benchmark_map Map>
-std::size_t fill_map(Map& map, expected_entries<Map> const& input) {
-  std::size_t inserted = 0;
-  for (auto const& entry : input)
-    inserted += map.try_emplace(entry.first, entry.second).second;
-  return inserted;
-}
+using BenchmarkFixtures::fill_map;
 
 void count_items(benchmark::State& state, std::size_t count) {
   state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(count));
@@ -139,18 +134,17 @@ void new_string_insert(benchmark::State& state) {
       candidates.emplace_back(entry.first, entry.second);
   }
   auto create = [&] {
-    string_map result;
-    if constexpr (Reserved)
-      result.reserve(count);
-    std::size_t inserted = 0;
-    if constexpr (Ordinary) {
-      for (string_map::value_type const& candidate : candidates)
-        inserted += result.insert(candidate).second;
-    } else {
-      inserted = fill_map(result, input);
-    }
-    benchmark::DoNotOptimize(inserted);
-    return result;
+    auto fill = [&](string_map& result) -> std::size_t {
+      std::size_t inserted = 0;
+      if constexpr (Ordinary) {
+        for (string_map::value_type const& candidate : candidates)
+          inserted += result.insert(candidate).second;
+      } else {
+        inserted = fill_map(result, input);
+      }
+      return inserted;
+    };
+    return BenchmarkFixtures::make_filled_map<string_map, Reserved>(count, fill);
   };
   {
     auto probe = create();
@@ -416,58 +410,36 @@ void sparse_iteration(benchmark::State& state) {
   count_items(state, count);
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto native_runtime = Star::NativeRuntime::create();
-  if (!native_runtime) {
-    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  // Independent of command-line filters and executable path in before/after.
-  runtime_salt = 73;
-  benchmark::DoNotOptimize(runtime_salt);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/NewInsertGrowConstructDestroy", &new_string_insert<false>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/NewInsertReservedConstructDestroy", &new_string_insert<true>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/NewConstInsertGrowConstructDestroy", &new_string_insert<false, true>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/NewConstInsertReservedConstructDestroy", &new_string_insert<true, true>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/ExpensiveDuplicateConstInsert", &expensive_duplicate<false>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/ExpensiveDuplicateConstHintInsert", &expensive_duplicate<true>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/OwningSet/DuplicateConstSingleInsert", &owning_set_duplicates<false>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/OwningSet/DuplicateConstRangeInsert", &owning_set_duplicates<true>)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/CollisionMap/ReserveRehashOnly", &collision_rehash)->Arg(64)->Arg(256);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/FindHit", &string_lookup<true>)->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/StringMap/FindMiss", &string_lookup<false>)->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/InlineMap/EraseReinsertChurn", &inline_churn)->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/InlineMap/RetainedCapacityClearReuse", &retained_clear_reuse)
-    ->Arg(128)->Arg(1024);
-  benchmark::RegisterBenchmark("FlatHash/InlineMap/SparseIteration", &sparse_iteration)->Arg(128)->Arg(1024);
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    // Independent of command-line filters and executable path in before/after.
+    runtime_salt = 73;
+    benchmark::DoNotOptimize(runtime_salt);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/NewInsertGrowConstructDestroy", &new_string_insert<false>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/NewInsertReservedConstructDestroy", &new_string_insert<true>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/NewConstInsertGrowConstructDestroy", &new_string_insert<false, true>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/NewConstInsertReservedConstructDestroy", &new_string_insert<true, true>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/ExpensiveDuplicateConstInsert", &expensive_duplicate<false>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/ExpensiveDuplicateConstHintInsert", &expensive_duplicate<true>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/OwningSet/DuplicateConstSingleInsert", &owning_set_duplicates<false>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/OwningSet/DuplicateConstRangeInsert", &owning_set_duplicates<true>)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/CollisionMap/ReserveRehashOnly", &collision_rehash)->Arg(64)->Arg(256);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/FindHit", &string_lookup<true>)->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/StringMap/FindMiss", &string_lookup<false>)->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/InlineMap/EraseReinsertChurn", &inline_churn)->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/InlineMap/RetainedCapacityClearReuse", &retained_clear_reuse)
+      ->Arg(128)->Arg(1024);
+    benchmark::RegisterBenchmark("FlatHash/InlineMap/SparseIteration", &sparse_iteration)->Arg(128)->Arg(1024);
+    return 0;
+  });
 }

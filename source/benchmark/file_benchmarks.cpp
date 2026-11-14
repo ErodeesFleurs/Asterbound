@@ -10,7 +10,7 @@ import star.format;
 import star.byte_array;
 import star.file;
 import star.io_device;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.random;
 import star.string;
 
@@ -343,32 +343,8 @@ BENCHMARK(file_read_string)->Name("File/ReadString")->Apply(whole_read_arguments
 BENCHMARK(file_positioned_read)->Name("File/PositionedRead")->UseRealTime();
 BENCHMARK(file_overwrite_rename)->Name("File/OverwriteRename")->Arg(4096)->Arg(1048576)->UseRealTime();
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto native_runtime = Star::NativeRuntime::create();
-  if (!native_runtime) {
-    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv);
 }

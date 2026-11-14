@@ -190,18 +190,6 @@ TEST(ListTest, BoundedAppendConsumesInputOnceAndRetainsSuccessfulPrefix) {
   EXPECT_EQ(next, 4);
 }
 
-TEST(ListTest, BoundedEmplacementRejectsBeforeMovingArguments) {
-  StaticList<std::unique_ptr<int>, 1> input;
-  ASSERT_TRUE(input.push_back(std::make_unique<int>(1)));
-  auto pending = std::make_unique<int>(2);
-  auto rejected = input.emplace_back(std::move(pending));
-  ASSERT_FALSE(rejected);
-  ASSERT_TRUE(pending);
-  EXPECT_EQ(*pending, 2);
-  ASSERT_EQ(input.size(), 1u);
-  EXPECT_EQ(*input[0], 1);
-}
-
 TEST(ListTest, StringCopiesRetainConcreteTypeAndSourceValues) {
   StringList const input{"b", "a", "b"};
   auto filtered = input.filtered([](String& value) {

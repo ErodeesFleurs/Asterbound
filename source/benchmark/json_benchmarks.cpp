@@ -9,7 +9,7 @@ import star.json_patch;
 import star.json_path;
 import star.list;
 import star.map;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 
 namespace {
@@ -414,30 +414,6 @@ BENCHMARK(BM_PatchSequenceSerializeDestroy)->Name("Json/Patch/SequenceSerializeD
 
 }// namespace
 
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 int main(int argc, char** argv) {
-  auto nativeRuntime = Star::NativeRuntime::create();
-  if (!nativeRuntime) {
-    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
-      return 1;
-    return 1;
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv);
 }

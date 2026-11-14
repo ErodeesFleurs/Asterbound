@@ -13,6 +13,7 @@ import star.lua;
 import star.lua_converters;
 import star.lua_root;
 import star.native_runtime;
+import star.benchmark_runner;
 import star.object_database;
 import star.projectile_database;
 import star.root;
@@ -38,13 +39,6 @@ struct BenchmarkSession {
 
   void fail(benchmark::State& state, StarException const& error) {
     fail(state, error.what());
-  }
-};
-
-struct BenchmarkLifetime {
-  ~BenchmarkLifetime() {
-    benchmark::ClearRegisteredBenchmarks();
-    benchmark::Shutdown();
   }
 };
 
@@ -530,8 +524,7 @@ int main(int argc, char** argv) {
   }
   // Recognized Google Benchmark flags are removed first. Remaining -bootconfig
   // and RootLoader flags retain their normal parser and error handling.
-  benchmark::Initialize(&argc, argv);
-  BenchmarkLifetime benchmarkLifetime;
+  Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
     if (!Star::print(stderr, "{}\n", loader.error().what()))
@@ -577,8 +570,8 @@ int main(int argc, char** argv) {
     luaNestedProfileExport(state, session);
   })->Iterations(8)->UseRealTime()->Unit(benchmark::kMicrosecond);
   register_player_storage_benchmarks(**root, session.failed);
-  auto matched = benchmark::RunSpecifiedBenchmarks();
+  auto result = Star::run_registered_benchmarks(true, false);
   // Remove callbacks borrowing session/Root before those owners leave scope.
   benchmark::ClearRegisteredBenchmarks();
-  return session.failed || matched == 0 ? 1 : 0;
+  return session.failed || result != 0 ? 1 : 0;
 }

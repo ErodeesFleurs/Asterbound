@@ -14,6 +14,7 @@ import star.memory_asset_source;
 import star.packed_asset_source;
 import star.random;
 import star.string;
+#include "asset_provider_fixture.hpp"
 
 namespace {
 
@@ -22,141 +23,75 @@ std::expected<Star::StreamOffset, Star::StarException> asset_length(Star::AssetS
   return source.file_size(path);
 }
 
-Star::ByteArray deterministic_bytes(std::size_t size, std::size_t key, unsigned generation) {
-  Star::ByteArray bytes(size, '\0');
-  for (std::size_t i = 0; i != size; ++i)
-    bytes[i] = static_cast<char>((i * 17 + key * 31 + generation * 67) % 251);
-  return bytes;
-}
+using BenchmarkFixtures::AssetKind;
+using BenchmarkFixtures::deterministic_bytes;
 
-enum class asset_kind { directory, packed, memory };
-
-void asset_lengths(benchmark::State& state, asset_kind kind) {
-  auto random = Star::RandomService::create();
-  if (!random) {
-    state.SkipWithError(random.error().what());
-    return;
-  }
-  auto temporary = Star::File::temporary_directory(**random);
-  if (!temporary) {
-    state.SkipWithError(temporary.error().what());
-    return;
-  }
-  auto cleanup = Star::make_scope_exit([&] {
-    auto removed = Star::File::remove_all(*temporary);
-    if (!removed)
-      state.SkipWithError(removed.error().what());
-  });
-  Star::Logger logger;
-  auto directory_path = Star::File::relative_to(*temporary, "assets");
-  auto created = Star::File::create_directory(directory_path);
-  if (!created) {
-    state.SkipWithError(created.error().what());
-    return;
-  }
+void asset_lengths(benchmark::State& state, AssetKind kind) {
   auto count = static_cast<std::size_t>(state.range(0));
-  std::vector<Star::String> paths;
-  std::vector<Star::ByteArray> payloads;
-  std::vector<Star::StreamOffset> lengths(count);
-  paths.reserve(count);
-  payloads.reserve(count);
-  auto memory = std::make_shared<Star::MemoryAssetSource>("file-benchmark");
-  Star::StreamOffset expected_total = 0;
-  for (std::size_t i = 0; i != count; ++i) {
-    auto name = Star::format("asset-{:05}.bin", i);
-    paths.push_back("/" + name);
-    payloads.push_back(deterministic_bytes(1 + (i * 37) % 512, i, 0));
-    expected_total += static_cast<Star::StreamOffset>(payloads.back().size());
-    auto written = Star::File::write_file(payloads.back(), Star::File::relative_to(directory_path, name));
-    if (!written) {
-      state.SkipWithError(written.error().what());
-      return;
-    }
-    memory->set(paths.back(), payloads.back());
-  }
-  auto directory = Star::DirectoryAssetSource::create(logger, directory_path);
-  if (!directory) {
-    state.SkipWithError(directory.error().what());
-    return;
-  }
-  std::shared_ptr<Star::AssetSource> source;
-  if (kind == asset_kind::directory) {
-    source = *directory;
-  } else if (kind == asset_kind::memory) {
-    source = memory;
-  } else {
-    auto packed_path = Star::File::relative_to(*temporary, "assets.pak");
-    auto built = Star::PackedAssetSource::build(**directory, packed_path);
-    if (!built) {
-      state.SkipWithError(built.error().what());
-      return;
-    }
-    auto packed = Star::PackedAssetSource::create(packed_path);
-    if (!packed) {
-      state.SkipWithError(packed.error().what());
-      return;
-    }
-    source = std::move(*packed);
-  }
-  if (source->assetPaths().size() != count) {
-    state.SkipWithError("Asset provider indexed an incorrect number of deterministic files");
-    return;
-  }
-  // Confirm consumer-visible bytes and metadata before sampling. Neither file
-  // creation, packing, scanning nor these reads are part of the length query.
-  Star::StreamOffset verified_total = 0;
-  for (std::size_t i = 0; i != count; ++i) {
-    auto bytes = source->read(paths[i]);
-    auto length = asset_length(*source, paths[i]);
-    if (!bytes || !length) {
-      state.SkipWithError(!bytes ? bytes.error().what() : length.error().what());
-      return;
-    }
-    if (*bytes != payloads[i] || *length != static_cast<Star::StreamOffset>(payloads[i].size())) {
-      state.SkipWithError("Asset provider returned incorrect bytes or metadata length");
-      return;
-    }
-    verified_total += *length;
-  }
-  if (verified_total != expected_total) {
-    state.SkipWithError("Asset provider returned an incorrect total length");
-    return;
-  }
-  for (auto _ : state) {
-    (void)_;
-    bool valid = true;
-    for (std::size_t i = 0; i != count; ++i) {
-      auto length = asset_length(*source, paths[i]);
-      if (!length) {
-        state.SkipWithError(length.error().what());
-        valid = false;
-        break;
+  BenchmarkFixtures::with_asset_provider(
+    state, kind, count, "file-benchmark",
+    "Asset provider indexed an incorrect number of deterministic files",
+    [&](auto const& source, auto const& paths, auto const& payloads) {
+      std::vector<Star::StreamOffset> lengths(count);
+      Star::StreamOffset expected_total = 0;
+      for (auto const& payload : payloads)
+        expected_total += static_cast<Star::StreamOffset>(payload.size());
+      // Confirm consumer-visible bytes and metadata before sampling. Neither file
+      // creation, packing, scanning nor these reads are part of the length query.
+      Star::StreamOffset verified_total = 0;
+      for (std::size_t i = 0; i != count; ++i) {
+        auto bytes = source->read(paths[i]);
+        auto length = asset_length(*source, paths[i]);
+        if (!bytes || !length) {
+          state.SkipWithError(!bytes ? bytes.error().what() : length.error().what());
+          return;
+        }
+        if (*bytes != payloads[i] || *length != static_cast<Star::StreamOffset>(payloads[i].size())) {
+          state.SkipWithError("Asset provider returned incorrect bytes or metadata length");
+          return;
+        }
+        verified_total += *length;
       }
-      lengths[i] = *length;
-    }
-    if (!valid)
-      break;
-    benchmark::ClobberMemory();
-    state.PauseTiming();
-    Star::StreamOffset total = 0;
-    char const* validation_error = nullptr;
-    for (std::size_t i = 0; i != count; ++i) {
-      if (lengths[i] != static_cast<Star::StreamOffset>(payloads[i].size())) {
-        validation_error = "Timed asset length query returned an incorrect length";
-        break;
+      if (verified_total != expected_total) {
+        state.SkipWithError("Asset provider returned an incorrect total length");
+        return;
       }
-      total += lengths[i];
-    }
-    if (!validation_error && total != expected_total)
-      validation_error = "Timed asset length batch returned an incorrect total";
-    state.ResumeTiming();
-    if (validation_error) {
-      state.SkipWithError(validation_error);
-      break;
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(count));
-  state.SetLabel("warm deterministic size queries; scan/pack/readback untimed; not whole Assets startup");
+      for (auto _ : state) {
+        (void)_;
+        bool valid = true;
+        for (std::size_t i = 0; i != count; ++i) {
+          auto length = asset_length(*source, paths[i]);
+          if (!length) {
+            state.SkipWithError(length.error().what());
+            valid = false;
+            break;
+          }
+          lengths[i] = *length;
+        }
+        if (!valid)
+          break;
+        benchmark::ClobberMemory();
+        state.PauseTiming();
+        Star::StreamOffset total = 0;
+        char const* validation_error = nullptr;
+        for (std::size_t i = 0; i != count; ++i) {
+          if (lengths[i] != static_cast<Star::StreamOffset>(payloads[i].size())) {
+            validation_error = "Timed asset length query returned an incorrect length";
+            break;
+          }
+          total += lengths[i];
+        }
+        if (!validation_error && total != expected_total)
+          validation_error = "Timed asset length batch returned an incorrect total";
+        state.ResumeTiming();
+        if (validation_error) {
+          state.SkipWithError(validation_error);
+          break;
+        }
+      }
+      state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(count));
+      state.SetLabel("warm deterministic size queries; scan/pack/readback untimed; not whole Assets startup");
+    });
 }
 
 constexpr std::size_t btree_key_count = 64;
@@ -400,9 +335,9 @@ void btree_transactions(benchmark::State& state, bool commit) {
                           "4096-byte blocks; snapshot reset/readback/reopen untimed");
 }
 
-void asset_lengths_directory(benchmark::State& state) { asset_lengths(state, asset_kind::directory); }
-void asset_lengths_packed(benchmark::State& state) { asset_lengths(state, asset_kind::packed); }
-void asset_lengths_memory(benchmark::State& state) { asset_lengths(state, asset_kind::memory); }
+void asset_lengths_directory(benchmark::State& state) { asset_lengths(state, AssetKind::directory); }
+void asset_lengths_packed(benchmark::State& state) { asset_lengths(state, AssetKind::packed); }
+void asset_lengths_memory(benchmark::State& state) { asset_lengths(state, AssetKind::memory); }
 void btree_stage_rollback(benchmark::State& state) { btree_transactions(state, false); }
 void btree_commit(benchmark::State& state) { btree_transactions(state, true); }
 

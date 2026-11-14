@@ -98,6 +98,11 @@ Prefer bounded representative cases and independent complete-result oracles over
 repeated matrices. Check error types and state/recovery; compare exact diagnostics
 only when wording or first-error selection is the contract.
 
+`star_test_gtest` compiles the shared GoogleTest implementation once. Test mains,
+Root providers, syscall wrappers and SDK configuration stay executable-specific.
+Reuse fixtures/assertion sequences without collapsing distinct failures,
+single-pass inputs, recovery paths or lifecycle transitions.
+
 ### Native output and fatal errors
 
 Preserve noninteractive fatal termination, oversized growth/write-offset and
@@ -164,6 +169,8 @@ Asset-backed cases require owned assets and explicit private
 `-bootconfig /absolute/path/to/sbinit.config`, with separate storage/logs:
 **never use your saves**. See [runtime paths](building.md#runtime-paths-and-data-import).
 GUI cases require a real display.
+Executable targets remain separate; `star.benchmark_runner` shares CLI/reporting
+and benchmark lifetime management, not Root/GUI ownership or workload timing.
 
 ### Catalog and filters
 
@@ -184,10 +191,16 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | Borrowed deserialization, VLQ, UUID, file writes and full asset payload reads. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Raw/formatted messages, sinks, concurrent callers, files and spatial logs. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | Insertion/duplicates, collision rehash, lookup, churn, reuse and sparse iteration. |
-| Images | `./result/bin/image_benchmarks --benchmark_filter='Image/'` | Ownership, pixel operations, scaling, masks/blends, directives and libpng. |
+| Images | `./result/bin/image_benchmarks --benchmark_filter='^(Image/\|Vector/ImageBlend/)'` | Ownership, pixel operations, scaling, masks/blends, directives and libpng; historical `Vector/ImageBlend/*` rows now live here, not in `vector_benchmarks`. |
 | LRU/TTL caches | `./result/bin/lru_benchmarks --benchmark_filter='^(Lru\|Ttl)/'` | Hits/misses, updates, trim/shrink, TTL refresh and cleanup. |
 | Pools and small vectors | `./result/bin/block_allocator_benchmarks --benchmark_filter='^(BlockAllocator\|StdList\|StdMap\|SmallVector)/'` | Family allocation/reuse/release, real list/map nodes and inline/spill vectors. |
 | Type identity and casts | `./result/bin/casting_benchmarks --benchmark_filter='Casting/'` | Identity, graph/owner/borrow casts, diagnostics and real Reader/NetElement graphs. |
+
+`tile_performance_benchmarks` owns a visible SDL/OpenGL session on its calling
+thread and uses the concrete renderer with a current context, not the threaded
+application renderer facade. Keep cached/fresh framebuffer comparisons and
+setup-failure/recovery checks before timing. This isolated renderer workload is
+not production frame pacing or FPS evidence.
 
 ### Batch accounting and correctness oracles
 

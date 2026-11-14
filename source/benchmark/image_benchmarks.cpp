@@ -11,7 +11,7 @@ import star.image_processing;
 import star.image_scaling;
 import star.list;
 import star.logging;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.rect;
 import star.string;
 import star.vector;
@@ -741,15 +741,79 @@ bool validate_boundaries() {
   return !rejected && reference_calls == 2 && matches(target, original);
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
+void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::BlendMode mode) {
+  auto side = static_cast<unsigned>(state.range(0));
+  auto source_count = static_cast<std::size_t>(state.range(1));
+  Star::Image original(side, side);
+  for (std::size_t i = 0; i < original.data().size(); ++i)
+    original.data()[i] = static_cast<std::uint8_t>((i * 29 + 17) % 256);
+  std::array<Star::Image, 3> sources;
+  std::array<Star::String, 3> names{"first", "second", "third"};
+  Star::BlendImageOperation blend{mode, {}, {}};
+  for (std::size_t i = 0; i < source_count; ++i) {
+    sources[i] = Star::Image(side, side);
+    for (std::size_t j = 0; j < sources[i].data().size(); ++j)
+      sources[i].data()[j] = static_cast<std::uint8_t>((j * 37 + (i + 1) * 53) % 256);
+    blend.blendImages.push_back(names[i]);
   }
-  bool failed = false;
-};
+  Star::ImageOperation operation = std::move(blend);
+  Star::ImageReferenceCallback references =
+    [&](Star::String const& name)
+      -> std::expected<std::optional<std::reference_wrapper<Star::Image const>>, Star::StarException> {
+    for (std::size_t i = 0; i < source_count; ++i)
+      if (name == names[i])
+        return std::optional{std::cref(sources[i])};
+    return std::nullopt;
+  };
+  std::vector<std::uint8_t> expected(original.data().size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    float value = original.data()[i] / 255.0f;
+    for (std::size_t j = 0; j < source_count; ++j) {
+      float other = sources[j].data()[i] / 255.0f;
+      value = mode == Star::BlendImageOperation::Multiply ? value * other : 1.0f - (1.0f - value) * (1.0f - other);
+    }
+    expected[i] = static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f);
+  }
+  Star::Image output = original;
+  auto validate = [&] {
+    return std::ranges::equal(output.data(), expected);
+  };
+  auto initial = Star::process_image_operation(operation, output, references);
+  if (!initial) {
+    state.SkipWithError(initial.error().what());
+    return;
+  }
+  if (!validate()) {
+    state.SkipWithError("Image blend differs from independent scalar byte fixture");
+    return;
+  }
+  for (auto _ : state) {
+    (void)_;
+    state.PauseTiming();
+    std::ranges::copy(original.data(), output.data().begin());
+    state.ResumeTiming();
+    auto result = Star::process_image_operation(operation, output, references);
+    benchmark::DoNotOptimize(output.data().data());
+    if (!result) {
+      state.SkipWithError(result.error().what());
+      return;
+    }
+  }
+  if (!validate())
+    state.SkipWithError("Image blend differs after timed execution");
+  state.SetItemsProcessed(state.iterations() * side * side);
+  state.SetLabel("one public image blend; input reset and scalar byte checks untimed");
+}
+
+void register_vector_image_rows() {
+  for (auto mode : {Star::BlendImageOperation::Multiply, Star::BlendImageOperation::Screen}) {
+    auto name = mode == Star::BlendImageOperation::Multiply ? "Vector/ImageBlend/Multiply" : "Vector/ImageBlend/Screen";
+    auto registration = benchmark::RegisterBenchmark(name, [mode](benchmark::State& state) {
+      measure_image_blend(state, mode);
+    });
+    registration->Args({64, 1})->Args({64, 3})->Args({256, 1})->Args({256, 3});
+  }
+}
 
 void register_rows() {
   // Bounded rows, not a format/size/cartesian-product sweep.
@@ -819,25 +883,14 @@ void register_rows() {
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
+  return Star::run_benchmarks(argc, argv, [](int) {
+    if (!validate_boundaries()) {
+      if (!Star::print(stderr, "Image benchmark untimed byte/golden/error-boundary validator failed\n"))
+        return 1;
       return 1;
-    return 1;
-  }
-  if (!validate_boundaries()) {
-    if (!Star::print(stderr, "Image benchmark untimed byte/golden/error-boundary validator failed\n"))
-      return 1;
-    return 1;
-  }
-  register_rows();
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+    }
+    register_rows();
+    register_vector_image_rows();
+    return 0;
+  });
 }

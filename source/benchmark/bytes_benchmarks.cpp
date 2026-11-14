@@ -4,7 +4,8 @@
 import std;
 import star.bytes;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
+#include "byte_fingerprint.hpp"
 
 namespace {
 using Star::ByteOrder;
@@ -28,12 +29,7 @@ bool needs_reverse(ByteOrder order) {
     && ((order == ByteOrder::LittleEndian) != (std::endian::native == std::endian::little));
 }
 
-std::uint64_t fingerprint(std::span<std::byte const> bytes) {
-  std::uint64_t hash = 14695981039346656037ull;
-  for (auto byte : bytes)
-    hash = (hash ^ std::to_integer<unsigned char>(byte)) * 1099511628211ull;
-  return hash;
-}
+using BenchmarkFixtures::fingerprint;
 
 bool require(benchmark::State& state, bool condition) {
   if (!condition)
@@ -211,45 +207,25 @@ template <std::size_t Size> void register_mixed() {
                                measure_raw<Size, raw_operation::to_mixed_copy>);
 }
 
-class checked_reporter final : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& report : reports)
-      failed |= report.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    (void)Star::print(stderr, "{}\n", runtime.error().what());
-    return 1;
-  }
-  register_scalar<std::uint16_t>("U16");
-  register_scalar<std::uint32_t>("U32");
-  register_scalar<std::uint64_t>("U64");
-  register_scalar<float>("F32");
-  register_scalar<double>("F64");
-  register_reverse<0>();
-  register_reverse<2>();
-  register_reverse<4>();
-  register_reverse<8>();
-  register_reverse<3>();
-  register_reverse<17>();
-  register_reverse<256>();
-  register_reverse<4096>();
-  register_mixed<17>();
-  register_mixed<256>();
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_scalar<std::uint16_t>("U16");
+    register_scalar<std::uint32_t>("U32");
+    register_scalar<std::uint64_t>("U64");
+    register_scalar<float>("F32");
+    register_scalar<double>("F64");
+    register_reverse<0>();
+    register_reverse<2>();
+    register_reverse<4>();
+    register_reverse<8>();
+    register_reverse<3>();
+    register_reverse<17>();
+    register_reverse<256>();
+    register_reverse<4096>();
+    register_mixed<17>();
+    register_mixed<256>();
+    return 0;
+  });
 }

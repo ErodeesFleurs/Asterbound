@@ -11,11 +11,12 @@ import star.flat_hash_map;
 import star.hash;
 import star.json;
 import star.list;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.static_random;
 import star.string;
 import star.string_view;
 import star.xx_hash;
+#include "flat_hash_fixture.hpp"
 
 namespace {
 
@@ -175,12 +176,11 @@ bool validate_map(benchmark::State& state, string_map const& map, std::vector<St
 template <map_operation Operation> void flat_map(benchmark::State& state) {
   auto count = static_cast<std::size_t>(state.range(0));
   auto keys = map_keys(count);
-  auto fill = [&](string_map& map) {
-    std::size_t inserted = 0;
-    for (std::size_t i = 0; i != count; ++i)
-      inserted += map.try_emplace(keys[i], i + 11).second;
-    return inserted;
-  };
+  auto entries = std::views::iota(std::size_t{0}, count)
+    | std::views::transform([&](std::size_t i) {
+        return std::pair<String const&, std::uint64_t>(keys[i], i + 11);
+      });
+  auto fill = [&](string_map& map) { return BenchmarkFixtures::fill_map(map, entries); };
   string_map fixture;
   if (!require(state, fill(fixture) == count, "new map insertion did not insert every key")
       || !validate_map(state, fixture, keys))
@@ -206,12 +206,7 @@ template <map_operation Operation> void flat_map(benchmark::State& state) {
         result.reserve(count * 4);
         return result;
       } else {
-        string_map result;
-        if constexpr (Operation == map_operation::insert_reserved)
-          result.reserve(count);
-        auto inserted = fill(result);
-        benchmark::DoNotOptimize(inserted);
-        return result;
+        return BenchmarkFixtures::make_filled_map<string_map, Operation == map_operation::insert_reserved>(count, fill);
       }
     };
     {
@@ -565,78 +560,56 @@ template <byte_algorithm Algorithm> void register_byte_family(char const* algori
   register_bytes<Algorithm, byte_owner::byte_array>(algorithm, "ByteArray");
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto native_runtime = Star::NativeRuntime::create();
-  if (!native_runtime) {
-    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  // Same deterministic runtime salt in before/after even if binary paths differ.
-  // Its value crosses a compiler barrier before any fixture construction.
-  runtime_salt = static_cast<std::uint64_t>(argc + 73);
-  benchmark::DoNotOptimize(runtime_salt);
-  register_byte_family<byte_algorithm::pl>("PL");
-  register_byte_family<byte_algorithm::xx32>("XXH32");
-  register_byte_family<byte_algorithm::xx64>("XXH64");
-  register_byte_family<byte_algorithm::xx3>("XXH3");
-  benchmark::RegisterBenchmark("Hash/FlatMap/NewInsertGrowConstructDestroy", &flat_map<map_operation::insert_grow>)
-    ->Arg(64)
-    ->Arg(1024);
-  benchmark::RegisterBenchmark("Hash/FlatMap/NewInsertReservedConstructDestroy",
-                               &flat_map<map_operation::insert_reserved>)
-    ->Arg(64)
-    ->Arg(1024);
-  benchmark::RegisterBenchmark("Hash/FlatMap/DuplicateInsertOnly", &flat_map<map_operation::duplicate>)
-    ->Arg(64)
-    ->Arg(1024);
-  benchmark::RegisterBenchmark("Hash/FlatMap/CopyReserveGrowDestroy", &flat_map<map_operation::reserve_grow>)
-    ->Arg(64)
-    ->Arg(1024);
-  benchmark::RegisterBenchmark("Hash/StringSet/BorrowedLookupHitMiss", &string_set_lookup)->Arg(64)->Arg(1024);
-  for (auto [nested, reverse, name] :
-       {std::tuple(false, false, "Object"), std::tuple(false, true, "ObjectOrderPermuted"),
-        std::tuple(true, false, "Nested"), std::tuple(true, true, "NestedOrderPermuted")}) {
-    auto name_string = std::format("Hash/Json/{}/HashOnly", name);
-    benchmark::RegisterBenchmark(name_string.c_str(),
-                                 [nested, reverse](benchmark::State& state) { json_hash(state, nested, reverse); })
-      ->Arg(0)
-      ->Arg(1)
-      ->Arg(8)
-      ->Arg(64);
-  }
-  benchmark::RegisterBenchmark("Hash/Composite/Int64/HashOnly", &composite_hash<composite_kind::primitive>);
-  benchmark::RegisterBenchmark("Hash/Composite/HashOf4/HashOnly", &composite_hash<composite_kind::hash_of>);
-  benchmark::RegisterBenchmark("Hash/Composite/Pair2/HashOnly", &composite_hash<composite_kind::pair>);
-  benchmark::RegisterBenchmark("Hash/Composite/Tuple4TerminalZero/HashOnly", &composite_hash<composite_kind::tuple>);
-  benchmark::RegisterBenchmark("Hash/Composite/OptionalInt64/HashOnly", &composite_hash<composite_kind::optional>);
-  benchmark::RegisterBenchmark("Hash/Composite/Array4LeftFoldZero/HashOnly", &composite_hash<composite_kind::array>);
-  benchmark::RegisterBenchmark("Hash/Composite/List4LeftFoldZero/HashOnly", &composite_hash<composite_kind::list>);
-  benchmark::RegisterBenchmark("Hash/StaticRandom/Hash32/CoordinateLabelStreaming", &deterministic_short<false, false>);
-  benchmark::RegisterBenchmark("Hash/StaticRandom/Hash64/CoordinateLabelStreaming", &deterministic_short<true, false>);
-  benchmark::RegisterBenchmark("Hash/StaticRandom/PrivateCandidate/Hash32/CoordinateLabelStackOneShot",
-                               &deterministic_short<false, true>);
-  benchmark::RegisterBenchmark("Hash/StaticRandom/PrivateCandidate/Hash64/CoordinateLabelStackOneShot",
-                               &deterministic_short<true, true>);
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int argc) {
+    // Same deterministic runtime salt in before/after even if binary paths differ.
+    // Its value crosses a compiler barrier before any fixture construction.
+    runtime_salt = static_cast<std::uint64_t>(argc + 73);
+    benchmark::DoNotOptimize(runtime_salt);
+    register_byte_family<byte_algorithm::pl>("PL");
+    register_byte_family<byte_algorithm::xx32>("XXH32");
+    register_byte_family<byte_algorithm::xx64>("XXH64");
+    register_byte_family<byte_algorithm::xx3>("XXH3");
+    benchmark::RegisterBenchmark("Hash/FlatMap/NewInsertGrowConstructDestroy", &flat_map<map_operation::insert_grow>)
+      ->Arg(64)
+      ->Arg(1024);
+    benchmark::RegisterBenchmark("Hash/FlatMap/NewInsertReservedConstructDestroy",
+                                 &flat_map<map_operation::insert_reserved>)
+      ->Arg(64)
+      ->Arg(1024);
+    benchmark::RegisterBenchmark("Hash/FlatMap/DuplicateInsertOnly", &flat_map<map_operation::duplicate>)
+      ->Arg(64)
+      ->Arg(1024);
+    benchmark::RegisterBenchmark("Hash/FlatMap/CopyReserveGrowDestroy", &flat_map<map_operation::reserve_grow>)
+      ->Arg(64)
+      ->Arg(1024);
+    benchmark::RegisterBenchmark("Hash/StringSet/BorrowedLookupHitMiss", &string_set_lookup)->Arg(64)->Arg(1024);
+    for (auto [nested, reverse, name] :
+         {std::tuple(false, false, "Object"), std::tuple(false, true, "ObjectOrderPermuted"),
+          std::tuple(true, false, "Nested"), std::tuple(true, true, "NestedOrderPermuted")}) {
+      auto name_string = std::format("Hash/Json/{}/HashOnly", name);
+      benchmark::RegisterBenchmark(name_string.c_str(),
+                                   [nested, reverse](benchmark::State& state) { json_hash(state, nested, reverse); })
+        ->Arg(0)
+        ->Arg(1)
+        ->Arg(8)
+        ->Arg(64);
+    }
+    benchmark::RegisterBenchmark("Hash/Composite/Int64/HashOnly", &composite_hash<composite_kind::primitive>);
+    benchmark::RegisterBenchmark("Hash/Composite/HashOf4/HashOnly", &composite_hash<composite_kind::hash_of>);
+    benchmark::RegisterBenchmark("Hash/Composite/Pair2/HashOnly", &composite_hash<composite_kind::pair>);
+    benchmark::RegisterBenchmark("Hash/Composite/Tuple4TerminalZero/HashOnly", &composite_hash<composite_kind::tuple>);
+    benchmark::RegisterBenchmark("Hash/Composite/OptionalInt64/HashOnly", &composite_hash<composite_kind::optional>);
+    benchmark::RegisterBenchmark("Hash/Composite/Array4LeftFoldZero/HashOnly", &composite_hash<composite_kind::array>);
+    benchmark::RegisterBenchmark("Hash/Composite/List4LeftFoldZero/HashOnly", &composite_hash<composite_kind::list>);
+    benchmark::RegisterBenchmark("Hash/StaticRandom/Hash32/CoordinateLabelStreaming", &deterministic_short<false, false>);
+    benchmark::RegisterBenchmark("Hash/StaticRandom/Hash64/CoordinateLabelStreaming", &deterministic_short<true, false>);
+    benchmark::RegisterBenchmark("Hash/StaticRandom/PrivateCandidate/Hash32/CoordinateLabelStackOneShot",
+                                 &deterministic_short<false, true>);
+    benchmark::RegisterBenchmark("Hash/StaticRandom/PrivateCandidate/Hash64/CoordinateLabelStackOneShot",
+                                 &deterministic_short<true, true>);
+    return 0;
+  });
 }

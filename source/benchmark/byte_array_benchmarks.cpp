@@ -8,9 +8,10 @@ import star.byte_array;
 import star.compression;
 import star.encode;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 import star.zstd_compression;
+#include "byte_fingerprint.hpp"
 
 namespace {
 using Star::ByteArray;
@@ -18,11 +19,7 @@ using Star::StarException;
 constexpr std::size_t batch_size = 32;
 constexpr std::size_t codec_batch_size = 4;
 
-std::uint64_t fingerprint(std::span<char const> bytes) {
-  std::uint64_t hash = 14695981039346656037ull;
-  for (unsigned char byte : bytes) hash = (hash ^ byte) * 1099511628211ull;
-  return hash;
-}
+using BenchmarkFixtures::fingerprint;
 std::string fixture(std::size_t size) {
   std::string bytes(size, '\0');
   for (std::size_t i = 0; i != size; ++i) bytes[i] = char((i * 37 + i / 7 + 11) & 255);
@@ -235,42 +232,29 @@ void register_bytes(char const* name) {
   if constexpr (Operation == operation::append || Operation == operation::append_reserved)
     for (auto size : {51, 52, 53, 3327, 3328, 3329}) entry->Arg(size);
 }
-class checked_reporter final : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& report : reports) failed |= report.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) { (void)Star::print(stderr, "{}\n", runtime.error().what()); return 1; }
-  register_bytes<operation::append>("ByteArray/AppendChunks13");
-  register_bytes<operation::append_reserved>("ByteArray/AppendChunks13Reserved");
-  register_bytes<operation::push_back>("ByteArray/PushBack");
-  register_bytes<operation::push_back_reserved>("ByteArray/PushBackReserved");
-  register_bytes<operation::terminated_text>("ByteArray/TerminatedText");
-  register_bytes<operation::insert>("ByteArray/InsertMiddle");
-  register_bytes<operation::combine_extend>("ByteArray/CombineExtend");
-  register_bytes<operation::compare_equal>("ByteArray/CompareEqual");
-  register_bytes<operation::compare_unequal>("ByteArray/CompareUnequalLast");
-  register_bytes<operation::owning_substr>("ByteArray/OwningSubstring");
-  register_bytes<operation::borrowed_subspan>("ByteArray/BorrowedSubspan");
-  for (bool base64 : {false, true}) for (bool permissive : {false, true}) {
-    auto name = std::format("ByteArray/Decode/{}/{}", base64 ? "Base64" : "Hex", permissive ? "Permissive" : "Valid");
-    benchmark::RegisterBenchmark(name.c_str(), [base64, permissive](benchmark::State& state) { measure_decode(state, base64, permissive); })->Arg(17)->Arg(4096);
-  }
-  for (bool zstd : {false, true}) for (bool decompress : {false, true}) {
-    auto name = std::format("ByteArray/{}/{}", zstd ? "Zstd" : "Zlib", decompress ? "Decompress" : "Compress");
-    benchmark::RegisterBenchmark(name.c_str(), [zstd, decompress](benchmark::State& state) { measure_codec(state, zstd, decompress); })->Arg(17)->Arg(4096);
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) { benchmark::Shutdown(); return 1; }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_bytes<operation::append>("ByteArray/AppendChunks13");
+    register_bytes<operation::append_reserved>("ByteArray/AppendChunks13Reserved");
+    register_bytes<operation::push_back>("ByteArray/PushBack");
+    register_bytes<operation::push_back_reserved>("ByteArray/PushBackReserved");
+    register_bytes<operation::terminated_text>("ByteArray/TerminatedText");
+    register_bytes<operation::insert>("ByteArray/InsertMiddle");
+    register_bytes<operation::combine_extend>("ByteArray/CombineExtend");
+    register_bytes<operation::compare_equal>("ByteArray/CompareEqual");
+    register_bytes<operation::compare_unequal>("ByteArray/CompareUnequalLast");
+    register_bytes<operation::owning_substr>("ByteArray/OwningSubstring");
+    register_bytes<operation::borrowed_subspan>("ByteArray/BorrowedSubspan");
+    for (bool base64 : {false, true}) for (bool permissive : {false, true}) {
+      auto name = std::format("ByteArray/Decode/{}/{}", base64 ? "Base64" : "Hex", permissive ? "Permissive" : "Valid");
+      benchmark::RegisterBenchmark(name.c_str(), [base64, permissive](benchmark::State& state) { measure_decode(state, base64, permissive); })->Arg(17)->Arg(4096);
+    }
+    for (bool zstd : {false, true}) for (bool decompress : {false, true}) {
+      auto name = std::format("ByteArray/{}/{}", zstd ? "Zstd" : "Zlib", decompress ? "Decompress" : "Compress");
+      benchmark::RegisterBenchmark(name.c_str(), [zstd, decompress](benchmark::State& state) { measure_codec(state, zstd, decompress); })->Arg(17)->Arg(4096);
+    }
+    return 0;
+  });
 }

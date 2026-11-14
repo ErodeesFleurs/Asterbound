@@ -10,7 +10,7 @@ import star.format;
 import star.list;
 import star.logging;
 import star.memory;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.random;
 import star.string;
 import star.thread;
@@ -357,31 +357,8 @@ BENCHMARK(spatial_unobserved)->Name("Logging/SpatialUnobserved");
 BENCHMARK(spatial_observed)->Name("Logging/SpatialObservedDrain");
 BENCHMARK(spatial_capacity)->Name("Logging/SpatialCapacitySteady");
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv);
 }

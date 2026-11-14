@@ -3,7 +3,7 @@
 
 import std;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 
 namespace {
@@ -148,43 +148,25 @@ void register_operation(char const* name) {
   }
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  register_operation<operation::replace_dense>("ReplaceDense");
-  register_operation<operation::replace_missing>("ReplaceMissing");
-  register_operation<operation::replace_sparse>("ReplaceInsensitiveMiss");
-  register_operation<operation::rsplit>("ReverseSplit");
-  register_operation<operation::rsplit_any>("ReverseSplitAny");
-  register_operation<operation::split_any>("SplitAny");
-  register_operation<operation::join>("Join");
-  register_operation<operation::join_with>("JoinWith");
-  register_operation<operation::lower>("Lower");
-  register_operation<operation::upper>("Upper");
-  register_operation<operation::rot13>("Rot13");
-  register_operation<operation::at>("AtMiddle");
-  register_operation<operation::substr>("SubstringMiddle");
-  register_operation<operation::erase>("EraseMiddle");
-  register_operation<operation::trim>("Trim");
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) { benchmark::Shutdown(); return 1; }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_operation<operation::replace_dense>("ReplaceDense");
+    register_operation<operation::replace_missing>("ReplaceMissing");
+    register_operation<operation::replace_sparse>("ReplaceInsensitiveMiss");
+    register_operation<operation::rsplit>("ReverseSplit");
+    register_operation<operation::rsplit_any>("ReverseSplitAny");
+    register_operation<operation::split_any>("SplitAny");
+    register_operation<operation::join>("Join");
+    register_operation<operation::join_with>("JoinWith");
+    register_operation<operation::lower>("Lower");
+    register_operation<operation::upper>("Upper");
+    register_operation<operation::rot13>("Rot13");
+    register_operation<operation::at>("AtMiddle");
+    register_operation<operation::substr>("SubstringMiddle");
+    register_operation<operation::erase>("EraseMiddle");
+    register_operation<operation::trim>("Trim");
+    return 0;
+  });
 }

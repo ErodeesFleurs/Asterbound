@@ -11,7 +11,7 @@ import star.net_element;
 import star.net_element_group;
 import star.net_element_sync_group;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
 
 namespace casting_api = Star;
 namespace identity_api = Star;
@@ -743,31 +743,11 @@ void register_cases() {
                                measure_production<production_operation::net_miss>);
 }
 
-class CheckedReporter final : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& report : reports)
-      failed |= report.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    (void)Star::print(stderr, "{}\n", runtime.error().what());
-    return 1;
-  }
-  register_cases();
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_cases();
+    return 0;
+  });
 }

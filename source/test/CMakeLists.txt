@@ -1,6 +1,12 @@
-set (star_core_tests_SOURCES
-      gtest/gtest-all.cc
+# All test executables use the same compiler/runtime/profile and GoogleTest
+# configuration. Keep executable-specific wrappers and standalone providers out
+# of this implementation target; no test main or Root provider is shared.
+add_library(star_test_gtest STATIC gtest/gtest-all.cc)
+target_include_directories(star_test_gtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(star_test_gtest PRIVATE star_build_config)
+set_target_properties(star_test_gtest PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
+set (star_core_tests_SOURCES
       core_tests_main.cpp
 
       algorithm_test.cpp
@@ -77,7 +83,7 @@ if (STAR_ENABLE_STEAM_INTEGRATION)
   target_include_directories (core_tests SYSTEM PRIVATE ${STEAM_API_INCLUDE_DIR})
   target_link_libraries (core_tests PRIVATE star_steam_dispatch_modules)
 endif ()
-# gtest-all.cc includes its implementation files relative to the test directory.
+# Test sources include the vendored GoogleTest headers from this directory.
 target_include_directories (core_tests PRIVATE
     ${STAR_EXTERN_INCLUDES}
     ${STAR_CORE_INCLUDES}
@@ -89,7 +95,7 @@ target_include_directories (core_tests PRIVATE
 # The star libraries are referenced by their objects, which carries no usage
 # requirements, so the module target has to be linked in explicitly wherever a
 # source imports it.
-target_link_libraries (core_tests PRIVATE star_base_modules star_build_config star_vorbis_dependencies star_lua zlib-ng::zlib
+target_link_libraries (core_tests PRIVATE star_test_gtest star_base_modules star_build_config star_vorbis_dependencies star_lua zlib-ng::zlib
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 set_target_properties (core_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAND core_tests)
@@ -98,7 +104,7 @@ add_test (NAME core_tests WORKING_DIRECTORY $<TARGET_FILE_DIR:core_tests> COMMAN
 # Its standalone module provider also keeps these tests available in headless builds.
 add_executable(fixed_scheduler_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
-  gtest/gtest-all.cc core_tests_main.cpp fixed_scheduler_test.cpp)
+  core_tests_main.cpp fixed_scheduler_test.cpp)
 target_sources(fixed_scheduler_tests PRIVATE FILE_SET CXX_MODULES
   BASE_DIRS ${PROJECT_SOURCE_DIR}/application FILES
   ${PROJECT_SOURCE_DIR}/application/StarFixedScheduler.cppm)
@@ -106,7 +112,7 @@ target_include_directories(fixed_scheduler_tests PRIVATE
   ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
   ${STAR_PLATFORM_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(fixed_scheduler_tests PRIVATE
-  star_base_modules star_build_config star_vorbis_dependencies star_lua
+  star_test_gtest star_base_modules star_build_config star_vorbis_dependencies star_lua
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 set_target_properties(fixed_scheduler_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
 add_test(NAME fixed_scheduler_tests
@@ -121,7 +127,7 @@ if (STAR_BUILD_GUI AND STAR_ENABLE_DISCORD_INTEGRATION)
   add_executable (discord_lobby_tests
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
     $<TARGET_OBJECTS:star_application>
-    gtest/gtest-all.cc core_tests_main.cpp discord_lobby_test.cpp
+    core_tests_main.cpp discord_lobby_test.cpp
     ${PROJECT_SOURCE_DIR}/application/StarP2PNetworkingService_pc.cpp
     ${PROJECT_SOURCE_DIR}/application/StarPlatformServices_pc.cpp)
   target_sources (discord_lobby_tests PRIVATE FILE_SET CXX_MODULES
@@ -134,7 +140,7 @@ if (STAR_BUILD_GUI AND STAR_ENABLE_DISCORD_INTEGRATION)
     ${STAR_PLATFORM_INCLUDES} ${PROJECT_SOURCE_DIR}/application
     ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries (discord_lobby_tests PRIVATE
-    star_base_modules star_platform_modules star_build_config
+    star_test_gtest star_base_modules star_platform_modules star_build_config
     star_vorbis_dependencies star_lua
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
   # Apply to the whole executable, including all three module interfaces.
@@ -176,8 +182,6 @@ function(star_add_asset_test target)
 endfunction()
 
 set (star_game_tests_SOURCES
-      gtest/gtest-all.cc
-
       game_tests_main.cpp
 
       StarTestUniverse.cpp
@@ -227,7 +231,7 @@ target_include_directories (game_tests PRIVATE
     ${STAR_GAME_INCLUDES}
     ${CMAKE_CURRENT_SOURCE_DIR}
   )
-target_link_libraries (game_tests PRIVATE star_base_modules star_game_modules star_build_config
+target_link_libraries (game_tests PRIVATE star_test_gtest star_base_modules star_game_modules star_build_config
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_definitions (game_tests PRIVATE STAR_TEST_WRAP_PTHREAD_CREATE=1)
@@ -243,7 +247,7 @@ set_tests_properties(core_tests PROPERTIES
 if(STAR_BUILD_GUI)
   add_executable(frontend_tests
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core> $<TARGET_OBJECTS:star_game>
-    gtest/gtest-all.cc game_tests_main.cpp StarTestUniverse.cpp StarGameTest.cpp frontend_test.cpp bubble_presentation_test.cpp)
+    game_tests_main.cpp StarTestUniverse.cpp StarGameTest.cpp frontend_test.cpp bubble_presentation_test.cpp)
   target_sources(frontend_tests PRIVATE FILE_SET CXX_MODULES FILES StarTestUniverse.cppm StarGameTest.cppm)
   target_include_directories(frontend_tests PRIVATE
     ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
@@ -251,7 +255,7 @@ if(STAR_BUILD_GUI)
     ${STAR_RENDERING_INCLUDES} ${STAR_WINDOWING_INCLUDES} ${STAR_FRONTEND_INCLUDES}
     ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(frontend_tests PRIVATE
-    star_base_modules star_frontend_modules star_application_modules star_build_config
+    star_test_gtest star_base_modules star_frontend_modules star_application_modules star_build_config
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
     $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
   set_target_properties(frontend_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)

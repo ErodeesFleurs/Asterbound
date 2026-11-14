@@ -4,7 +4,7 @@
 import std;
 import star.format;
 import star.math_common;
-import star.native_runtime;
+import star.benchmark_runner;
 
 namespace {
 
@@ -302,37 +302,15 @@ void register_type(std::string_view type) {
   register_numeric<Operation::Near, T>(type, "NearEqualAndZero");
 }
 
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 // The native main/Google Benchmark ABI is the only pointer boundary.
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  register_type<float>("Float");
-  register_type<double>("Double");
-  benchmark::RegisterBenchmark("MathCommon/Int64/ModuloAndWrap", integer_wrap)->Arg(1)->Arg(64);
-  benchmark::RegisterBenchmark("MathCommon/Byte/Quantization", byte_quantization)->Arg(1)->Arg(64);
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_type<float>("Float");
+    register_type<double>("Double");
+    benchmark::RegisterBenchmark("MathCommon/Int64/ModuloAndWrap", integer_wrap)->Arg(1)->Arg(64);
+    benchmark::RegisterBenchmark("MathCommon/Byte/Quantization", byte_quantization)->Arg(1)->Arg(64);
+    return 0;
+  });
 }

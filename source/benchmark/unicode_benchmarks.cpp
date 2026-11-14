@@ -5,7 +5,7 @@ import std;
 import star.format;
 import star.hash;
 import star.json;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 import star.unicode;
 
@@ -296,49 +296,33 @@ void register_consumer(char const* name) {
     benchmark::RegisterBenchmark(label.c_str(), [mixed](benchmark::State& state) { measure_consumer<Operation>(state, mixed); })->Arg(17)->Arg(4097);
   }
 }
-class checked_reporter final : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& report : reports) failed |= report.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    (void)Star::print(stderr, "{}\n", runtime.error().what());
-    return 1;
-  }
-  register_scan<scan_operation::length>("Length");
-  register_scan<scan_operation::forward>("CursorForward");
-  register_scan<scan_operation::reverse>("CursorReverse");
-  register_scan<scan_operation::linked>("LinkedValidateTraverse");
-  register_consumer<consumer_operation::at>("AtMiddle");
-  register_consumer<consumer_operation::substr>("SubstringMiddle");
-  register_consumer<consumer_operation::ci_hash>("CaseInsensitiveHashCreate");
-  benchmark::RegisterBenchmark("Unicode/Hex/Parse", [](benchmark::State& state) { measure_hex(state, false); });
-  benchmark::RegisterBenchmark("Unicode/Hex/Encode", [](benchmark::State& state) { measure_hex(state, true); });
-  for (unsigned kind = 0; kind != 3; ++kind) {
-    auto name = std::format("Unicode/Json/ParseRepr/{}", std::array{"Plain", "Escaped", "SurrogatePair"}[kind]);
-    benchmark::RegisterBenchmark(name.c_str(), [kind](benchmark::State& state) { measure_json(state, kind); })->Arg(8)->Arg(128);
-  }
-  for (auto const& [name, bytes, reason] : std::array{
-      std::tuple{"Truncated", std::string("ok\xf0\x9f", 4), "missing trailing code units"},
-      std::tuple{"Overlong", std::string("ok\xc0\x80", 4), "Invalid UTF-8 code point"},
-      std::tuple{"LongContinuationTail", std::string("ok") + std::string(256, '\x80'), "Invalid UTF-8 code unit sequence"}}) {
-    for (bool reverse : {false, true}) {
-      auto label = std::format("Unicode/Malformed/{}/{}", reverse ? "Reverse" : "Forward", name);
-      auto diagnosis = reverse && std::string_view(name) == "LongContinuationTail" ? "Invalid UTF-8 boundary" : reason;
-      benchmark::RegisterBenchmark(label.c_str(), [bytes, reverse, diagnosis](benchmark::State& state) { measure_malformed(state, bytes, reverse, diagnosis); });
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_scan<scan_operation::length>("Length");
+    register_scan<scan_operation::forward>("CursorForward");
+    register_scan<scan_operation::reverse>("CursorReverse");
+    register_scan<scan_operation::linked>("LinkedValidateTraverse");
+    register_consumer<consumer_operation::at>("AtMiddle");
+    register_consumer<consumer_operation::substr>("SubstringMiddle");
+    register_consumer<consumer_operation::ci_hash>("CaseInsensitiveHashCreate");
+    benchmark::RegisterBenchmark("Unicode/Hex/Parse", [](benchmark::State& state) { measure_hex(state, false); });
+    benchmark::RegisterBenchmark("Unicode/Hex/Encode", [](benchmark::State& state) { measure_hex(state, true); });
+    for (unsigned kind = 0; kind != 3; ++kind) {
+      auto name = std::format("Unicode/Json/ParseRepr/{}", std::array{"Plain", "Escaped", "SurrogatePair"}[kind]);
+      benchmark::RegisterBenchmark(name.c_str(), [kind](benchmark::State& state) { measure_json(state, kind); })->Arg(8)->Arg(128);
     }
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) { benchmark::Shutdown(); return 1; }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+    for (auto const& [name, bytes, reason] : std::array{
+        std::tuple{"Truncated", std::string("ok\xf0\x9f", 4), "missing trailing code units"},
+        std::tuple{"Overlong", std::string("ok\xc0\x80", 4), "Invalid UTF-8 code point"},
+        std::tuple{"LongContinuationTail", std::string("ok") + std::string(256, '\x80'), "Invalid UTF-8 code unit sequence"}}) {
+      for (bool reverse : {false, true}) {
+        auto label = std::format("Unicode/Malformed/{}/{}", reverse ? "Reverse" : "Forward", name);
+        auto diagnosis = reverse && std::string_view(name) == "LongContinuationTail" ? "Invalid UTF-8 boundary" : reason;
+        benchmark::RegisterBenchmark(label.c_str(), [bytes, reverse, diagnosis](benchmark::State& state) { measure_malformed(state, bytes, reverse, diagnosis); });
+      }
+    }
+    return 0;
+  });
 }

@@ -2,7 +2,7 @@
 #include <benchmark/benchmark.h>
 
 import std;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.worker_pool;
 import star.string;
 import star.format;
@@ -126,32 +126,8 @@ BENCHMARK_TEMPLATE(BM_WorkerSubmission, 128, false, true)->Arg(256)->UseRealTime
 BENCHMARK_TEMPLATE(BM_WorkerSubmission, 1, true, true)->Arg(256)->UseRealTime();
 BENCHMARK_TEMPLATE(BM_WorkerSubmission, 128, true, true)->Arg(256)->UseRealTime();
 
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }
 
 int main(int argc, char** argv) {
-  auto nativeRuntime = Star::NativeRuntime::create();
-  if (!nativeRuntime) {
-    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
-      return 1;
-    return 1;
-  }
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv);
 }

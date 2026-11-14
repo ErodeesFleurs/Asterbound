@@ -5,7 +5,7 @@ import std;
 import star.block_allocator;
 import star.small_vector;
 import star.format;
-import star.native_runtime;
+import star.benchmark_runner;
 
 namespace {
 namespace allocator_api = Star;
@@ -583,50 +583,30 @@ template <vector_value T> void register_vectors(std::string_view type) {
     ->Arg(64);
 }
 
-class checked_reporter final : public benchmark::ConsoleReporter {
-public:
-  bool failed = false;
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& report : reports)
-      failed |= report.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(reports);
-  }
-};
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    (void)Star::print(stderr, "{}\n", runtime.error().what());
-    return 1;
-  }
-  register_pool<tiny_value>("Tiny1");
-  register_pool<odd_value>("Odd3");
-  register_pool<std::uint64_t>("U64");
-  register_pool<aligned_value>("Align64");
-  benchmark::RegisterBenchmark("BlockAllocator/U64/RandomRelease/1024",
-                               measure_pool<std::uint64_t, 1024, pool_operation::random_release>)
-    ->Arg(1024)
-    ->Arg(1025)
-    ->Arg(20000);
-  benchmark::RegisterBenchmark("BlockAllocator/Align64/RandomRelease/1024",
-                               measure_pool<aligned_value, 1024, pool_operation::random_release>)
-    ->Arg(1024)
-    ->Arg(1025)
-    ->Arg(20000);
-  benchmark::RegisterBenchmark("StdList/Cold", measure_nodes<false, node_operation::cold>)->Arg(64)->Arg(1025);
-  benchmark::RegisterBenchmark("StdList/Churn", measure_nodes<false, node_operation::churn>)->Arg(64)->Arg(1025);
-  benchmark::RegisterBenchmark("StdMap/Cold", measure_nodes<true, node_operation::cold>)->Arg(64)->Arg(1025);
-  benchmark::RegisterBenchmark("StdMap/Churn", measure_nodes<true, node_operation::churn>)->Arg(64)->Arg(1025);
-  register_vectors<std::uint64_t>("U64");
-  register_vectors<aligned_value>("Align64");
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_pool<tiny_value>("Tiny1");
+    register_pool<odd_value>("Odd3");
+    register_pool<std::uint64_t>("U64");
+    register_pool<aligned_value>("Align64");
+    benchmark::RegisterBenchmark("BlockAllocator/U64/RandomRelease/1024",
+                                 measure_pool<std::uint64_t, 1024, pool_operation::random_release>)
+      ->Arg(1024)
+      ->Arg(1025)
+      ->Arg(20000);
+    benchmark::RegisterBenchmark("BlockAllocator/Align64/RandomRelease/1024",
+                                 measure_pool<aligned_value, 1024, pool_operation::random_release>)
+      ->Arg(1024)
+      ->Arg(1025)
+      ->Arg(20000);
+    benchmark::RegisterBenchmark("StdList/Cold", measure_nodes<false, node_operation::cold>)->Arg(64)->Arg(1025);
+    benchmark::RegisterBenchmark("StdList/Churn", measure_nodes<false, node_operation::churn>)->Arg(64)->Arg(1025);
+    benchmark::RegisterBenchmark("StdMap/Cold", measure_nodes<true, node_operation::cold>)->Arg(64)->Arg(1025);
+    benchmark::RegisterBenchmark("StdMap/Churn", measure_nodes<true, node_operation::churn>)->Arg(64)->Arg(1025);
+    register_vectors<std::uint64_t>("U64");
+    register_vectors<aligned_value>("Align64");
+    return 0;
+  });
 }

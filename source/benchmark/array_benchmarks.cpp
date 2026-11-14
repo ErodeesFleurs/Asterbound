@@ -4,7 +4,7 @@
 import std;
 import star.format;
 import star.array;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 
 namespace {
@@ -230,40 +230,18 @@ template <typename T, std::size_t N> void register_family(char const* type) {
   register_case<T, N, operation::private_direct_move>(type, "PrivateCandidate/TemporaryDirectMoveConstructDestroy");
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto native_runtime = Star::NativeRuntime::create();
-  if (!native_runtime) {
-    if (!Star::print(stderr, "{}\n", native_runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  register_family<std::int64_t, 2>("Scalar");
-  register_family<std::int64_t, 4>("Scalar");
-  register_family<std::int64_t, 16>("Scalar");
-  register_family<std::int64_t, 64>("Scalar");
-  register_family<String, 4>("OwningString");
-  register_family<String, 16>("OwningString");
-  register_family<assignment_diagnostic, 4>("AssignmentDiagnostic");
-  register_family<assignment_diagnostic, 16>("AssignmentDiagnostic");
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int) {
+    register_family<std::int64_t, 2>("Scalar");
+    register_family<std::int64_t, 4>("Scalar");
+    register_family<std::int64_t, 16>("Scalar");
+    register_family<std::int64_t, 64>("Scalar");
+    register_family<String, 4>("OwningString");
+    register_family<String, 16>("OwningString");
+    register_family<assignment_diagnostic, 4>("AssignmentDiagnostic");
+    register_family<assignment_diagnostic, 16>("AssignmentDiagnostic");
+    return 0;
+  });
 }

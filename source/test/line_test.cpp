@@ -150,130 +150,54 @@ TEST(LineTest, NoIntersection) {
   EXPECT_TRUE(intersection1inf.intersects);
 }
 
-TEST(LineTest, ParallelHorizontal) {
-  Line2F a({9, 12}, {10, 12});
-  Line2F b({10, 20}, {20, 20});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-
-  EXPECT_FALSE(intersection1.coincides);
-  EXPECT_FALSE(intersection2.coincides);
+TEST(LineTest, ParallelOrientations) {
+  struct Case {
+    std::string_view orientation;
+    Line2F a;
+    Line2F b;
+  };
+  for (auto const& entry : std::array<Case, 3>{{
+         {"horizontal", {{9, 12}, {10, 12}}, {{10, 20}, {20, 20}}},
+         {"vertical", {{12, 12}, {12, 14}}, {{20, 10}, {20, 20}}},
+         {"oblique", {{3, 3}, {4, 4}}, {{5, 6}, {7, 8}}}}}) {
+    SCOPED_TRACE(entry.orientation);
+    auto intersection1 = entry.a.intersection(entry.b);
+    auto intersection2 = entry.b.intersection(entry.a);
+    EXPECT_FALSE(intersection1.intersects);
+    EXPECT_FALSE(intersection2.intersects);
+    EXPECT_FALSE(intersection1.glances);
+    EXPECT_FALSE(intersection2.glances);
+    EXPECT_FALSE(intersection1.coincides);
+    EXPECT_FALSE(intersection2.coincides);
+  }
 }
 
-TEST(LineTest, ParallelVertical) {
-  Line2F a({12, 12}, {12, 14});
-  Line2F b({20, 10}, {20, 20});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-
-  EXPECT_FALSE(intersection1.coincides);
-  EXPECT_FALSE(intersection2.coincides);
-}
-
-TEST(LineTest, ParallelOther) {
-  Line2F a({3, 3}, {4, 4});
-  Line2F b({5, 6}, {7, 8});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-
-  EXPECT_FALSE(intersection1.coincides);
-  EXPECT_FALSE(intersection2.coincides);
-}
-
-TEST(LineTest, CoincidesVertical) {
-  Line2F a({3, 3}, {3, 4});
-  Line2F b({3, 5}, {3, 7});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  auto intersection1inf = a.intersection(b, true);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-  EXPECT_TRUE(intersection1inf.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-  EXPECT_TRUE(intersection1inf.glances);
-
-  EXPECT_TRUE(intersection1.coincides);
-  EXPECT_TRUE(intersection2.coincides);
-  EXPECT_TRUE(intersection1inf.coincides);
-
-  EXPECT_TRUE(std::fabs(intersection1.t - 2.0f) < 0.0001f);
-  EXPECT_TRUE(std::fabs(intersection2.t + 0.5f) < 0.0001f);
-}
-
-TEST(LineTest, CoincidesHorizontal) {
-  Line2F a({3, 3}, {4, 3});
-  Line2F b({5, 3}, {7, 3});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  auto intersection1inf = a.intersection(b, true);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-  EXPECT_TRUE(intersection1inf.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-  EXPECT_TRUE(intersection1inf.glances);
-
-  EXPECT_TRUE(intersection1.coincides);
-  EXPECT_TRUE(intersection2.coincides);
-  EXPECT_TRUE(intersection1inf.coincides);
-
-  EXPECT_TRUE(std::fabs(intersection1.t - 2.0f) < 0.0001f);
-  EXPECT_TRUE(std::fabs(intersection2.t + 0.5f) < 0.0001f);
-}
-
-TEST(LineTest, CoincidesOther) {
-  Line2F a({3, 3}, {4, 4});
-  Line2F b({5, 5}, {7, 7});
-
-  auto intersection1 = a.intersection(b);
-  auto intersection2 = b.intersection(a);
-
-  auto intersection1inf = a.intersection(b, true);
-
-  EXPECT_FALSE(intersection1.intersects);
-  EXPECT_FALSE(intersection2.intersects);
-  EXPECT_TRUE(intersection1inf.intersects);
-
-  EXPECT_FALSE(intersection1.glances);
-  EXPECT_FALSE(intersection2.glances);
-  EXPECT_TRUE(intersection1inf.glances);
-
-  EXPECT_TRUE(intersection1.coincides);
-  EXPECT_TRUE(intersection2.coincides);
-  EXPECT_TRUE(intersection1inf.coincides);
-
-  EXPECT_TRUE(std::fabs(intersection1.t - 2.0f) < 0.0001f);
-  EXPECT_TRUE(std::fabs(intersection2.t + 0.5f) < 0.0001f);
+TEST(LineTest, CoincidentOrientations) {
+  struct Case {
+    std::string_view orientation;
+    Line2F a;
+    Line2F b;
+  };
+  for (auto const& entry : std::array<Case, 3>{{
+         {"vertical", {{3, 3}, {3, 4}}, {{3, 5}, {3, 7}}},
+         {"horizontal", {{3, 3}, {4, 3}}, {{5, 3}, {7, 3}}},
+         {"oblique", {{3, 3}, {4, 4}}, {{5, 5}, {7, 7}}}}}) {
+    SCOPED_TRACE(entry.orientation);
+    auto intersection1 = entry.a.intersection(entry.b);
+    auto intersection2 = entry.b.intersection(entry.a);
+    auto intersection1inf = entry.a.intersection(entry.b, true);
+    EXPECT_FALSE(intersection1.intersects);
+    EXPECT_FALSE(intersection2.intersects);
+    EXPECT_TRUE(intersection1inf.intersects);
+    EXPECT_FALSE(intersection1.glances);
+    EXPECT_FALSE(intersection2.glances);
+    EXPECT_TRUE(intersection1inf.glances);
+    EXPECT_TRUE(intersection1.coincides);
+    EXPECT_TRUE(intersection2.coincides);
+    EXPECT_TRUE(intersection1inf.coincides);
+    EXPECT_TRUE(std::fabs(intersection1.t - 2.0f) < 0.0001f);
+    EXPECT_TRUE(std::fabs(intersection2.t + 0.5f) < 0.0001f);
+  }
 }
 
 TEST(LineTest, IntersectCoincides) {

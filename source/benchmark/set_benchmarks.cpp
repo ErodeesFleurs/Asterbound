@@ -4,7 +4,7 @@
 import std;
 import star.format;
 import star.list;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.ordered_set;
 import star.set;
 import star.string;
@@ -284,36 +284,14 @@ template <bench_key T> void register_key(char const* name) {
   register_set<Star::OrderedHashSet<T>, true>("OrderedHash", name);
 }
 
-class checked_reporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  runtime_salt = static_cast<std::uint64_t>(argc + 73);
-  benchmark::DoNotOptimize(runtime_salt);
-  register_key<int>("Int");
-  register_key<Star::String>("OwningLongString");
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  checked_reporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int argc) {
+    runtime_salt = static_cast<std::uint64_t>(argc + 73);
+    benchmark::DoNotOptimize(runtime_salt);
+    register_key<int>("Int");
+    register_key<Star::String>("OwningLongString");
+    return 0;
+  });
 }

@@ -6,30 +6,13 @@ import star.file;
 import star.format;
 import star.logging;
 import star.native_runtime;
+import star.benchmark_runner;
 import star.performance_benchmarks;
 import star.root;
 import star.root_loader;
 import star.string;
 
 namespace {
-
-struct BenchmarkLifetime {
-  ~BenchmarkLifetime() {
-    benchmark::ClearRegisteredBenchmarks();
-    benchmark::Shutdown();
-  }
-};
-
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& runs) override {
-    for (auto const& run : runs)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    ConsoleReporter::ReportRuns(runs);
-  }
-
-  bool failed = false;
-};
 
 std::expected<void, Star::StarException> requirePrivateStorage(Star::String const& storage) {
   for (std::string_view name : {"player", "universe"}) {
@@ -51,8 +34,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  benchmark::Initialize(&argc, argv);
-  BenchmarkLifetime lifetime;
+  Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = Star::RootLoader::create({{}, {}, {}, Star::LogLevel::Error, true, {}});
   if (!loader) {
     if (!Star::print(stderr, "{}\n", loader.error().what()))
@@ -91,8 +73,7 @@ int main(int argc, char** argv) {
     benchmark::ClearRegisteredBenchmarks();
     return 1;
   }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
+  auto result = Star::run_registered_benchmarks();
   benchmark::ClearRegisteredBenchmarks();
-  return session.failed || reporter.failed || matched == 0 ? 1 : 0;
+  return session.failed || result != 0 ? 1 : 0;
 }

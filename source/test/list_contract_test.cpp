@@ -282,8 +282,12 @@ TEST(ListContract, BoundedAppendRetainsPrefixAndDoesNotConsumeRejectedElement) {
   auto rejected = std::make_unique<int>(4);
   auto emplaced = sequence.emplace_back(std::move(rejected));
   ASSERT_FALSE(emplaced);
+  EXPECT_TRUE(emplaced.error().is<StaticVectorSizeException>());
   ASSERT_TRUE(rejected);
   EXPECT_EQ(*rejected, 4);
+  ASSERT_EQ(sequence.size(), 2u);
+  EXPECT_EQ(*sequence[0], 1);
+  EXPECT_EQ(*sequence[1], 2);
 }
 
 TEST(ListContract, SmallAndBoundedStorageSnapshotBorrowedSources) {

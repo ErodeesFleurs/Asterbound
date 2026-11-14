@@ -44,6 +44,40 @@ std::expected<std::shared_ptr<Assets>, StarException> patchTestAssets(GameTest& 
   return Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
 }
 
+struct PatchReadContext {
+  PatchReadContext() = default;
+  PatchReadContext(PatchReadContext const&) = delete;
+  PatchReadContext& operator=(PatchReadContext const&) = delete;
+
+  ~PatchReadContext() {
+    assets.reset();
+    if (!directory.empty())
+      EXPECT_TRUE(File::remove_all(directory));
+  }
+
+  std::expected<void, StarException> init(GameTest& fixture, String const& suffix) {
+    auto created = File::temporary_directory(fixture.root().random());
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    directory = std::move(*created);
+    auto written = writeJsonPatchFixture(
+      directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end"));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
+    auto indexed = patchTestAssets(fixture, directory, logger);
+    if (!indexed)
+      return std::unexpected(std::move(indexed.error()));
+    assets = std::move(*indexed);
+    patch_path = File::relative_to(directory, "target.json" + suffix);
+    return {};
+  }
+
+  String directory;
+  String patch_path;
+  Logger logger;
+  std::shared_ptr<Assets> assets;
+};
+
 std::expected<void, StarException> writeImagePatchFixture(GameTest& fixture, String const& directory,
                                                           String const& patch) {
   auto written = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
@@ -184,19 +218,14 @@ const GameTestRegistration assetsPatchReplacedWithDirectory(
   "AssetsPatchReadTest", "PatchReplacedWithDirectoryRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporary_directory(fixture.root().random());
-      ASSERT_TRUE(directory);
-      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-      ASSERT_TRUE(writeJsonPatchFixture(
-        *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
-      Logger logger;
-      auto assets = patchTestAssets(fixture, *directory, logger);
-      ASSERT_TRUE(assets) << assets.error().what();
-      auto patchPath = File::relative_to(*directory, "target.json" + suffix);
+      PatchReadContext setup;
+      auto initialized = setup.init(fixture, suffix);
+      ASSERT_TRUE(initialized) << initialized.error().what();
+      auto const& patchPath = setup.patch_path;
       ASSERT_TRUE(File::remove(patchPath));
       std::error_code ec;
       ASSERT_TRUE(std::filesystem::create_directory(patchFsPath(patchPath), ec)) << ec.message();
-      auto loaded = (*assets)->json("/target.json");
+      auto loaded = setup.assets->json("/target.json");
       ASSERT_FALSE(loaded);
       EXPECT_TRUE(loaded.error().is<AssetException>());
     }
@@ -206,25 +235,20 @@ const GameTestRegistration assetsPatchReplacedWithBrokenSymlink(
   "AssetsPatchReadTest", "PatchReplacedWithBrokenSymlinkRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporary_directory(fixture.root().random());
-      ASSERT_TRUE(directory);
-      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-      ASSERT_TRUE(writeJsonPatchFixture(
-        *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
-      Logger logger;
-      auto assets = patchTestAssets(fixture, *directory, logger);
-      ASSERT_TRUE(assets) << assets.error().what();
-      auto patchPath = File::relative_to(*directory, "target.json" + suffix);
+      PatchReadContext setup;
+      auto initialized = setup.init(fixture, suffix);
+      ASSERT_TRUE(initialized) << initialized.error().what();
+      auto const& patchPath = setup.patch_path;
       ASSERT_TRUE(File::remove(patchPath));
       std::error_code ec;
-      std::filesystem::create_symlink(patchFsPath(File::relative_to(*directory, "absent-link-target")),
+      std::filesystem::create_symlink(patchFsPath(File::relative_to(setup.directory, "absent-link-target")),
                                       patchFsPath(patchPath), ec);
       if (ec)
         GTEST_SKIP() << "cannot create symlinks here: " << ec.message();
       auto status = std::filesystem::symlink_status(patchFsPath(patchPath), ec);
       ASSERT_FALSE(ec) << ec.message();
       ASSERT_TRUE(std::filesystem::is_symlink(status));
-      auto loaded = (*assets)->json("/target.json");
+      auto loaded = setup.assets->json("/target.json");
       ASSERT_FALSE(loaded);
       EXPECT_TRUE(loaded.error().is<AssetException>());
     }
@@ -234,15 +258,10 @@ const GameTestRegistration
   assetsUnreadablePatch("AssetsPatchReadTest", "UnreadablePatchRemainsFailure", [](GameTest& fixture) {
     for (String const& suffix : {String(".patch"), String(".patch.lua")}) {
       SCOPED_TRACE(suffix.utf8());
-      auto directory = File::temporary_directory(fixture.root().random());
-      ASSERT_TRUE(directory);
-      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-      ASSERT_TRUE(writeJsonPatchFixture(
-        *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
-      Logger logger;
-      auto assets = patchTestAssets(fixture, *directory, logger);
-      ASSERT_TRUE(assets) << assets.error().what();
-      auto path = patchFsPath(File::relative_to(*directory, "target.json" + suffix));
+      PatchReadContext setup;
+      auto initialized = setup.init(fixture, suffix);
+      ASSERT_TRUE(initialized) << initialized.error().what();
+      auto path = patchFsPath(setup.patch_path);
       std::error_code ec;
       auto original = std::filesystem::status(path, ec).permissions();
       ASSERT_FALSE(ec) << ec.message();
@@ -255,9 +274,9 @@ const GameTestRegistration
       if (ec)
         GTEST_SKIP() << "cannot remove file read permissions here: " << ec.message();
       // Root/CAP_DAC_OVERRIDE and some filesystems can still read a mode-000 file.
-      if (File::read_file(File::relative_to(*directory, "target.json" + suffix)))
+      if (File::read_file(setup.patch_path))
         GTEST_SKIP() << "this process can still read a mode-000 patch";
-      auto loaded = (*assets)->json("/target.json");
+      auto loaded = setup.assets->json("/target.json");
       ASSERT_FALSE(loaded);
       EXPECT_TRUE(loaded.error().is<AssetException>());
     }

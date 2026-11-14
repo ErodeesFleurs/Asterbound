@@ -4,6 +4,13 @@ if(NOT benchmark_library_type STREQUAL "STATIC_LIBRARY")
   message(FATAL_ERROR "Benchmarks require a static Google Benchmark built with the pinned xclang/runtime")
 endif()
 
+add_library(star_benchmark_runner STATIC)
+target_sources(star_benchmark_runner PUBLIC FILE_SET CXX_MODULES
+  FILES StarBenchmarkRunner.cppm)
+target_link_libraries(star_benchmark_runner PUBLIC
+  benchmark::benchmark star_base_modules star_build_config)
+set_target_properties(star_benchmark_runner PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
 function(star_add_core_benchmark name)
   add_executable(${name} ${name}.cpp
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>)
@@ -11,7 +18,7 @@ function(star_add_core_benchmark name)
     ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
     ${STAR_PLATFORM_INCLUDES})
   target_link_libraries(${name} PRIVATE
-    benchmark::benchmark star_base_modules star_build_config star_vorbis_dependencies star_lua
+    star_benchmark_runner star_base_modules star_build_config star_vorbis_dependencies star_lua
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
   set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
 endfunction()
@@ -79,7 +86,7 @@ target_include_directories(game_benchmarks PRIVATE
   ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
   ${STAR_PLATFORM_INCLUDES} ${STAR_GAME_INCLUDES})
 target_link_libraries(game_benchmarks PRIVATE
-  benchmark::benchmark star_base_modules star_game_modules star_build_config
+  star_benchmark_runner star_base_modules star_game_modules star_build_config
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 set_target_properties(game_benchmarks PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
@@ -89,7 +96,7 @@ target_include_directories(ownership_benchmarks PRIVATE
   ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
   ${STAR_PLATFORM_INCLUDES} ${STAR_GAME_INCLUDES})
 target_link_libraries(ownership_benchmarks PRIVATE
-  benchmark::benchmark star_base_modules star_game_modules star_build_config
+  star_benchmark_runner star_base_modules star_game_modules star_build_config
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 set_target_properties(ownership_benchmarks PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
@@ -97,7 +104,7 @@ add_library(star_performance_benchmark_support STATIC)
 target_sources(star_performance_benchmark_support PUBLIC FILE_SET CXX_MODULES
   FILES StarPerformanceBenchmarks.cppm)
 target_link_libraries(star_performance_benchmark_support PUBLIC
-  benchmark::benchmark star_game_modules star_base_modules star_build_config)
+  star_benchmark_runner star_game_modules star_base_modules star_build_config)
 set_target_properties(star_performance_benchmark_support PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
 add_executable(performance_benchmarks performance_benchmarks.cpp
@@ -120,7 +127,7 @@ if(STAR_BUILD_GUI)
     ${STAR_PLATFORM_INCLUDES} ${STAR_GAME_INCLUDES} ${STAR_APPLICATION_INCLUDES}
     ${STAR_RENDERING_INCLUDES} ${STAR_WINDOWING_INCLUDES} ${STAR_FRONTEND_INCLUDES})
   target_link_libraries(frontend_benchmarks PRIVATE
-    benchmark::benchmark star_base_modules star_frontend_modules star_application_modules star_build_config
+    star_benchmark_runner star_base_modules star_frontend_modules star_application_modules star_build_config
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
     $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
   set_target_properties(frontend_benchmarks PROPERTIES CXX_SCAN_FOR_MODULES ON)
@@ -136,6 +143,8 @@ if(STAR_BUILD_GUI)
     ${STAR_RENDERING_INCLUDES} ${STAR_WINDOWING_INCLUDES} ${STAR_FRONTEND_INCLUDES})
   target_link_libraries(tile_performance_benchmarks PRIVATE
     star_performance_benchmark_support star_rendering_modules star_application_modules star_build_config
+    ${STAR_SDL_TARGET} OpenGL::GL
+    $<IF:$<TARGET_EXISTS:GLEW::glew_s>,GLEW::glew_s,GLEW::GLEW>
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
     $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
   set_target_properties(tile_performance_benchmarks PROPERTIES CXX_SCAN_FOR_MODULES ON)

@@ -1,22 +1,21 @@
 #include <cstdio>
 #include "GL/glew.h"
+#include "SDL3/SDL.h"
 #include <benchmark/benchmark.h>
 
 import std;
 import star.collision_block;
 import star.tile_damage;
-import star.application;
-import star.application_controller;
 import star.file;
 import star.format;
 import star.liquid_types;
 import star.liquids_database;
 import star.logging;
-import star.main_application;
 import star.material_database;
 import star.material_render_profile;
 import star.material_types;
 import star.native_runtime;
+import star.benchmark_runner;
 import star.native_ui_context;
 import star.performance_benchmarks;
 import star.renderer;
@@ -152,17 +151,16 @@ std::expected<TileFixture, StarException> makeFixture(Root& root) {
   return fixture;
 }
 
-std::expected<void, StarException> advanceNativeFrame(Renderer& renderer) {
-  // This executable links runMainApplication's SDL provider, which constructs
-  // and owns OpenGlRenderer exclusively (StarMainApplication_sdl.cpp).
-  auto& native = static_cast<OpenGlRenderer&>(renderer);
-  auto finished = native.finishFrame();
+std::expected<void, StarException> advance_native_frame(OpenGlRenderer& renderer) {
+  auto finished = renderer.finishFrame();
   if (!finished)
     return finished;
-  return native.startFrame();
+  if (!SDL_GL_SwapWindow(SDL_GL_GetCurrentWindow()))
+    return std::unexpected(StarException(Star::format("Could not present tile benchmark frame: {}", SDL_GetError())));
+  return renderer.startFrame();
 }
 
-std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, TileFixture& fixture, Renderer& renderer,
+std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, TileFixture& fixture, OpenGlRenderer& renderer,
                                                       bool liquidOnly = false, bool prepare = true) {
   if (prepare) {
     auto setup = painter.setup(fixture.camera, fixture.data);
@@ -192,13 +190,13 @@ std::expected<std::uint64_t, StarException> imageHash(TilePainter& painter, Tile
   if (auto error = glGetError(); error != GL_NO_ERROR)
     return std::unexpected(StarException(Star::format("Tile fixture framebuffer read failed: {}", error)));
   painter.cleanup();
-  auto advanced = advanceNativeFrame(renderer);
+  auto advanced = advance_native_frame(renderer);
   if (!advanced)
     return std::unexpected(std::move(advanced.error()));
   return xx_hash3(std::span<char const>(pixels));
 }
 
-std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<Renderer> const& renderer) {
+std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<OpenGlRenderer> const& renderer) {
   auto fixture = makeFixture(root);
   if (!fixture)
     return std::unexpected(std::move(fixture.error()));
@@ -343,20 +341,10 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<R
   return {};
 }
 
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& runs) override {
-    for (auto const& run : runs)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(runs);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 std::expected<void, StarException> registerTilePerformanceBenchmarks(PerformanceBenchmarkSession& session,
-                                                                     std::shared_ptr<Renderer> renderer) {
+                                                                     std::shared_ptr<OpenGlRenderer> renderer) {
   auto validated = validateFixture(session.root, renderer);
   if (!validated)
     return validated;
@@ -374,7 +362,7 @@ std::expected<void, StarException> registerTilePerformanceBenchmarks(Performance
     benchmark::RegisterBenchmark(
       benchmarkName.c_str(),
       [&session, renderer, change](benchmark::State& state) {
-        auto advanced = advanceNativeFrame(*renderer);
+        auto advanced = advance_native_frame(*renderer);
         if (!advanced) {
           session.fail(state, advanced.error());
           return;
@@ -401,7 +389,7 @@ std::expected<void, StarException> registerTilePerformanceBenchmarks(Performance
           if (change != Change::Stable) {
             fixture->reset();
             painter->reset();
-            advanced = advanceNativeFrame(*renderer);
+            advanced = advance_native_frame(*renderer);
             if (!advanced) {
               state.ResumeTiming();
               session.fail(state, advanced.error());
@@ -433,7 +421,7 @@ std::expected<void, StarException> registerTilePerformanceBenchmarks(Performance
           benchmark::ClobberMemory();
           state.PauseTiming();
           (*painter)->cleanup();
-          advanced = advanceNativeFrame(*renderer);
+          advanced = advance_native_frame(*renderer);
           if (!advanced) {
             state.ResumeTiming();
             session.fail(state, advanced.error());
@@ -443,7 +431,7 @@ std::expected<void, StarException> registerTilePerformanceBenchmarks(Performance
         }
         if (painter)
           painter->reset();
-        advanced = advanceNativeFrame(*renderer);
+        advanced = advance_native_frame(*renderer);
         if (!advanced)
           session.fail(state, advanced.error());
         state.SetItemsProcessed(state.iterations());
@@ -457,83 +445,81 @@ std::expected<void, StarException> registerTilePerformanceBenchmarks(Performance
 
 namespace {
 
-class TileBenchmarkApplication : public Application {
-public:
-  explicit TileBenchmarkApplication(int& result) : m_result(result) {}
-
-  std::expected<void, StarException> startup(StringList const& arguments) override {
-    auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
-    if (!loader)
-      return std::unexpected(std::move(loader.error()));
-    auto parsed = loader->parseOrDie(arguments);
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    auto& settings = parsed->first;
-    for (std::string_view directory : {"player", "universe"}) {
-      auto exists = File::exists(File::relative_to(settings.storageDirectory, directory));
-      if (!exists)
-        return std::unexpected(std::move(exists.error()));
-      if (*exists)
-        return std::unexpected(StarException("Tile benchmarks require private storage without player/universe saves"));
-    }
-    settings.runtimeConfigFile.reset();
-    settings.logFile.reset();
-    auto root = Root::create(std::move(settings));
-    if (!root)
-      return std::unexpected(std::move(root.error()));
-    m_root = std::move(*root);
-    return {};
-  }
-
-  Logger& logger() const override { return m_root->logger(); }
-
-  std::expected<void, StarException> applicationInit(std::shared_ptr<ApplicationController> controller) override {
-    auto base = Application::applicationInit(controller);
-    if (!base)
-      return base;
-    controller->setApplicationTitle("Asterbound TilePainter benchmark");
-    controller->setNormalWindow({640, 360});
-    return controller->setVSyncEnabled(false);
-  }
-
-  std::expected<void, StarException> renderInit(std::shared_ptr<Renderer> renderer) override {
-    auto base = Application::renderInit(renderer);
-    if (!base)
-      return base;
-    // runMainApplication owns the current SDL/GL/ImGui scope through teardown.
-    auto context = NativeUiContextScope::create(nullptr, nullptr, nullptr);
-    if (!context)
-      return std::unexpected(std::move(context.error()));
-    auto effect = renderer->switchEffectConfig("internal");
-    if (!effect)
-      return std::unexpected(std::move(effect.error()));
-    PerformanceBenchmarkSession session{*m_root};
-    auto registered = registerTilePerformanceBenchmarks(session, renderer);
-    if (!registered) {
-      auto reported = Star::print(stderr, "{}\n", registered.error().what());
-      benchmark::ClearRegisteredBenchmarks();
-      m_result = 1;
-      appController()->quit();
-      return reported;
-    }
-    CheckedReporter reporter;
-    auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-    benchmark::ClearRegisteredBenchmarks();
-    m_result = session.failed || reporter.failed || matched == 0 ? 1 : 0;
-    appController()->quit();
-    return {};
-  }
-
-  std::expected<void, StarException> shutdown() override {
-    // Release Application's renderer lease before the derived Root/logger dies.
-    // The platform still owns its renderer and current native context here.
-    return Application::renderInit({});
-  }
-
-private:
-  int& m_result;
-  std::unique_ptr<Root> m_root;
+struct SdlLifetime {
+  ~SdlLifetime() { SDL_Quit(); }
 };
+
+struct SdlWindowDeleter {
+  void operator()(SDL_Window* window) const { SDL_DestroyWindow(window); }
+};
+
+struct SdlGlContextDeleter {
+  void operator()(SDL_GLContext context) const { (void)SDL_GL_DestroyContext(context); }
+};
+
+struct BenchmarkRegistrations {
+  ~BenchmarkRegistrations() { benchmark::ClearRegisteredBenchmarks(); }
+};
+
+std::expected<int, StarException> run_native_benchmarks(Root& root) {
+  // This is a benchmark-owned direct-backend session on main, not an
+  // Application render callback: that callback receives a threaded facade.
+  SdlLifetime sdl_lifetime;
+  if (!SDL_Init(SDL_INIT_VIDEO))
+    return std::unexpected(StarException(Star::format("Could not initialize benchmark SDL video: {}", SDL_GetError())));
+  if (!SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3)
+      || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3)
+      || !SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)
+      || !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1))
+    return std::unexpected(StarException(Star::format("Could not configure benchmark OpenGL 3.3 context: {}", SDL_GetError())));
+
+  std::unique_ptr<SDL_Window, SdlWindowDeleter> window{
+      SDL_CreateWindow("Asterbound TilePainter benchmark", 640, 360, SDL_WINDOW_OPENGL)};
+  if (!window)
+    return std::unexpected(StarException(Star::format("Could not create benchmark SDL window: {}", SDL_GetError())));
+  std::unique_ptr<std::remove_pointer_t<SDL_GLContext>, SdlGlContextDeleter> gl_context;
+  // Capture before context creation makes it current. Declaration order keeps
+  // the scope's restoration after renderer teardown and before context deletion.
+  auto native_scope = NativeUiContextScope::create(nullptr, nullptr, nullptr);
+  if (!native_scope)
+    return std::unexpected(std::move(native_scope.error()));
+  gl_context.reset(SDL_GL_CreateContext(window.get()));
+  if (!gl_context)
+    return std::unexpected(StarException(Star::format("Could not create benchmark OpenGL context: {}", SDL_GetError())));
+
+  auto renderer = OpenGlRenderer::create(root.logger());
+  if (!renderer)
+    return std::unexpected(std::move(renderer.error()));
+  auto screen = (*renderer)->setScreenSize({640, 360});
+  if (!screen)
+    return std::unexpected(std::move(screen.error()));
+  auto effect = (*renderer)->switchEffectConfig("internal");
+  if (!effect)
+    return std::unexpected(std::move(effect.error()));
+  if (!*effect)
+    return std::unexpected(StarException("Tile benchmark internal renderer effect is unavailable"));
+  auto started = (*renderer)->startFrame();
+  if (!started)
+    return std::unexpected(std::move(started.error()));
+
+  PerformanceBenchmarkSession session{root};
+  // Registered closures borrow session/Root and retain the backend. Clear them
+  // on every exit before any of those owners or the native scope are released.
+  BenchmarkRegistrations registrations;
+  auto registered = registerTilePerformanceBenchmarks(session, *renderer);
+  if (!registered)
+    return std::unexpected(std::move(registered.error()));
+  auto result = Star::run_registered_benchmarks();
+  auto finished = (*renderer)->finishFrame();
+  if (!finished)
+    return std::unexpected(std::move(finished.error()));
+  benchmark::ClearRegisteredBenchmarks();
+  renderer->reset();
+  auto restored = native_scope->restore();
+  if (!restored)
+    return std::unexpected(std::move(restored.error()));
+  return session.failed || result != 0 ? 1 : 0;
+}
 
 }// namespace
 }// namespace Star
@@ -545,14 +531,41 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  benchmark::Initialize(&argc, argv);
-  Star::StringList arguments;
-  for (int i = 0; i < argc; ++i)
-    arguments.push_back(Star::String(std::string_view(argv[i])));
-  int result = 1;
-  auto status =
-    Star::runMainApplication(std::make_unique<Star::TileBenchmarkApplication>(result), std::move(arguments));
-  benchmark::ClearRegisteredBenchmarks();
-  benchmark::Shutdown();
-  return status != 0 ? status : result;
+  Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
+  auto loader = Star::RootLoader::create({{}, {}, {}, Star::LogLevel::Error, true, {}});
+  if (!loader) {
+    (void)Star::print(stderr, "{}\n", loader.error().what());
+    return 1;
+  }
+  auto parsed = loader->commandParseOrDie(argc, argv);
+  if (!parsed) {
+    (void)Star::print(stderr, "{}\n", parsed.error().what());
+    return 1;
+  }
+  auto& settings = parsed->first;
+  for (std::string_view directory : {"player", "universe"}) {
+    auto exists = Star::File::exists(Star::File::relative_to(settings.storageDirectory, directory));
+    if (!exists) {
+      (void)Star::print(stderr, "{}\n", exists.error().what());
+      return 1;
+    }
+    if (*exists) {
+      Star::StarException error("Tile benchmarks require private storage without player/universe saves");
+      (void)Star::print(stderr, "{}\n", error.what());
+      return 1;
+    }
+  }
+  settings.runtimeConfigFile.reset();
+  settings.logFile.reset();
+  auto root = Star::Root::create(std::move(settings));
+  if (!root) {
+    (void)Star::print(stderr, "{}\n", root.error().what());
+    return 1;
+  }
+  auto result = Star::run_native_benchmarks(**root);
+  if (!result) {
+    (void)Star::print(stderr, "{}\n", result.error().what());
+    return 1;
+  }
+  return *result;
 }

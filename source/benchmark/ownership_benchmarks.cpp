@@ -21,6 +21,7 @@ import star.json;
 import star.list;
 import star.logging;
 import star.native_runtime;
+import star.benchmark_runner;
 import star.root;
 import star.root_loader;
 import star.string;
@@ -44,23 +45,6 @@ struct BenchmarkSession {
   void fail(benchmark::State& state, StarException const& error) {
     fail(state, error.what());
   }
-};
-
-struct BenchmarkLifetime {
-  ~BenchmarkLifetime() {
-    benchmark::ClearRegisteredBenchmarks();
-    benchmark::Shutdown();
-  }
-};
-
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
 };
 
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
@@ -617,8 +601,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  benchmark::Initialize(&argc, argv);
-  BenchmarkLifetime benchmarkLifetime;
+  Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
     if (!Star::print(stderr, "{}\n", loader.error().what()))
@@ -664,8 +647,7 @@ int main(int argc, char** argv) {
   benchmark::RegisterBenchmark("Ownership/Assets/MixedExpiredCleanup", [&](benchmark::State& state) {
     assetsMixedCleanup(state, session);
   })->Arg(8)->Arg(128)->UseRealTime();
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
+  auto result = Star::run_registered_benchmarks();
   benchmark::ClearRegisteredBenchmarks();
-  return session.failed || reporter.failed || matched == 0 ? 1 : 0;
+  return session.failed || result != 0 ? 1 : 0;
 }

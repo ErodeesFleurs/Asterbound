@@ -15,6 +15,21 @@ template <typename Owner>
 concept borrows_temporary_json = requires(Owner&& owner) { std::move(owner).find(std::size_t{0}); };
 static_assert(!borrows_temporary_json<Json>);
 static_assert(!borrows_temporary_json<Json const>);
+
+void expect_equivalent_key_lookup(Json const& stored, Json const& equivalent) {
+  ASSERT_EQ(stored, equivalent);
+  EXPECT_EQ(Star::hash<Json>()(stored), Star::hash<Json>()(equivalent));
+  std::unordered_map<Json, int, Star::hash<Json>> values;
+  values.emplace(stored, 42);
+  auto found = values.find(equivalent);
+  ASSERT_NE(found, values.end());
+  EXPECT_EQ(found->second, 42);
+  values.insert_or_assign(equivalent, 43);
+  EXPECT_EQ(values.size(), 1u);
+  auto updated = values.find(stored);
+  ASSERT_NE(updated, values.end());
+  EXPECT_EQ(updated->second, 43);
+}
 }// namespace
 
 TEST(JsonContractTest, EqualNumericKeysShareHashesRecursively) {
@@ -27,16 +42,7 @@ TEST(JsonContractTest, EqualNumericKeysShareHashesRecursively) {
           {Json(JsonArray{1, JsonObject{{"level", 0}}}), Json(JsonArray{1.0, JsonObject{{"level", -0.0}}})},
           {Json(JsonObject{{"level", 1}, {"fraction", 1.25}}),
            Json(JsonObject{{"fraction", 1.25}, {"level", 1.0}})}}}) {
-    ASSERT_EQ(integer, floating);
-    EXPECT_EQ(Star::hash<Json>()(integer), Star::hash<Json>()(floating));
-    std::unordered_map<Json, int, Star::hash<Json>> values;
-    values.emplace(integer, 42);
-    auto found = values.find(floating);
-    ASSERT_NE(found, values.end());
-    EXPECT_EQ(found->second, 42);
-    values.insert_or_assign(floating, 43);
-    EXPECT_EQ(values.size(), 1u);
-    EXPECT_EQ(values.find(integer)->second, 43);
+    expect_equivalent_key_lookup(integer, floating);
   }
 }
 
@@ -112,22 +118,12 @@ TEST(JsonContractTest, ObjectHashFastPathsPreserveHistoricalStreamAndEquivalentK
           {JsonObject{{"z", 1}, {"empty", JsonObject{}}, {"a", JsonObject{{"child", JsonObject{{"value", 0}}}}}},
            JsonObject{{"a", JsonObject{{"child", JsonObject{{"value", -0.0}}}}}, {"empty", JsonObject{}}, {"z", 1.0}},
            multi_bytes}}}) {
-    ASSERT_EQ(entry.stored, entry.equivalent);
+    expect_equivalent_key_lookup(entry.stored, entry.equivalent);
     XXHash3 historical;
     historical.push(std::span<char const>(entry.historical_bytes));
     EXPECT_EQ(Star::hash<Json>()(entry.stored), historical.digest());
     EXPECT_EQ(Star::hash<Json>()(entry.equivalent), historical.digest());
 
-    std::unordered_map<Json, int, Star::hash<Json>> values;
-    values.emplace(entry.stored, 42);
-    auto found = values.find(entry.equivalent);
-    ASSERT_NE(found, values.end());
-    EXPECT_EQ(found->second, 42);
-    values.insert_or_assign(entry.equivalent, 43);
-    EXPECT_EQ(values.size(), 1u);
-    auto updated = values.find(entry.stored);
-    ASSERT_NE(updated, values.end());
-    EXPECT_EQ(updated->second, 43);
   }
 }
 
@@ -184,6 +180,9 @@ TEST(JsonContractTest, DefaultsPreserveKeyIndexAndUntypedNullPolicies) {
   auto outside = array.getInt(std::size_t{2}, 5);
   ASSERT_TRUE(outside);
   EXPECT_EQ(*outside, 5);
+  auto outside_without_default = array.getInt(std::size_t{2});
+  ASSERT_FALSE(outside_without_default);
+  EXPECT_TRUE(outside_without_default.error().is<JsonException>());
   auto wrongKey = object.getInt("wrong", 5);
   ASSERT_FALSE(wrongKey);
   auto wrongIndex = array.getInt(std::size_t{1}, 5);

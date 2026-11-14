@@ -3,6 +3,7 @@
 import std;
 import star.format;
 import star.native_runtime;
+import star.benchmark_runner;
 import star.random;
 import star.string;
 #ifdef ASTERBOUND_LRU_BEFORE
@@ -404,4 +405,8 @@ BENCHMARK_TEMPLATE(BM_Ttl, ttl_operation::cleanup_keep)->Name("Ttl/Hash/CleanupK
 BENCHMARK_TEMPLATE(BM_Ttl, ttl_operation::cleanup_drop)->Name("Ttl/Hash/CleanupDrop")->Arg(256);
 }// namespace
 
-BENCHMARK_MAIN();
+int main(int argc, char** argv) {
+  // Retain this family's default reporter and historical non-fatal skips.
+  return Star::run_benchmarks(argc, argv,
+    {.require_matches = false, .check_benchmark_errors = false});
+}

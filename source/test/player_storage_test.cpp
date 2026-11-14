@@ -40,20 +40,56 @@ std::expected<Json, StarException> read_metadata(String const& directory) {
   return Json::parseJson(*contents);
 }
 
+struct PlayerStorageContext {
+  PlayerStorageContext() = default;
+  PlayerStorageContext(PlayerStorageContext const&) = delete;
+  PlayerStorageContext& operator=(PlayerStorageContext const&) = delete;
+
+  ~PlayerStorageContext() {
+    storage.reset();
+    if (!temporary.empty())
+      EXPECT_TRUE(File::remove_all(temporary));
+    if (configuration)
+      EXPECT_TRUE(configuration->set("clearPlayerFiles", clear_files));
+  }
+
+  std::expected<void, StarException> init(Root& root) {
+    auto configured = root.configuration();
+    if (!configured)
+      return std::unexpected(std::move(configured.error()));
+    auto previous = (*configured)->get("clearPlayerFiles");
+    if (!previous)
+      return std::unexpected(std::move(previous.error()));
+    configuration = std::move(*configured);
+    clear_files = std::move(*previous);
+    if (auto disabled = configuration->set("clearPlayerFiles", false); !disabled)
+      return std::unexpected(std::move(disabled.error()));
+    auto created = File::temporary_directory(root.random());
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    temporary = std::move(*created);
+    directory = File::relative_to(temporary, "player");
+    auto opened = PlayerStorage::create(root, directory);
+    if (!opened)
+      return std::unexpected(std::move(opened.error()));
+    storage = std::move(*opened);
+    return {};
+  }
+
+  std::shared_ptr<Configuration> configuration;
+  Json clear_files;
+  String temporary;
+  String directory;
+  std::shared_ptr<PlayerStorage> storage;
+};
+
 const GameTestRegistration
   firstSaveRetry("PlayerStorageTest", "FailedFirstSaveDoesNotPublishAndIdenticalRetryPersists", [](GameTest& fixture) {
-    auto configuration = fixture.root().configuration();
-    ASSERT_TRUE(configuration);
-    auto clear_files = (*configuration)->get("clearPlayerFiles");
-    ASSERT_TRUE(clear_files);
-    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
-    ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
-    auto temporary = File::temporary_directory(fixture.root().random());
-    ASSERT_TRUE(temporary);
-    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
-    auto directory = File::relative_to(*temporary, "player");
-    auto storage = PlayerStorage::create(fixture.root(), directory);
-    ASSERT_TRUE(storage) << storage.error().what();
+    PlayerStorageContext setup;
+    auto initialized = setup.init(fixture.root());
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto const& directory = setup.directory;
+    auto& storage = setup.storage;
     auto player = create_player(fixture.root(), "First durable player");
     ASSERT_TRUE(player) << player.error().what();
     auto uuid = (*player)->uuid();
@@ -61,10 +97,10 @@ const GameTestRegistration
     auto path = File::relative_to(directory, uuid->hex() + ".player");
     auto stage = path + ".new";
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
-    EXPECT_FALSE((*storage)->savePlayer(*player));
-    EXPECT_EQ((*storage)->playerCount(), 0u);
-    EXPECT_FALSE((*storage)->maybeGetPlayerData(*uuid));
-    EXPECT_FALSE((*storage)->playerUuidAt(0));
+    EXPECT_FALSE(storage->savePlayer(*player));
+    EXPECT_EQ(storage->playerCount(), 0u);
+    EXPECT_FALSE(storage->maybeGetPlayerData(*uuid));
+    EXPECT_FALSE(storage->playerUuidAt(0));
     auto absent = File::exists(path);
     ASSERT_TRUE(absent);
     EXPECT_FALSE(*absent);
@@ -72,15 +108,15 @@ const GameTestRegistration
     ASSERT_TRUE(collision);
     EXPECT_EQ(*collision, String("owned collision"));
     ASSERT_TRUE(File::remove(stage));
-    auto saved = (*storage)->savePlayer(*player);
+    auto saved = storage->savePlayer(*player);
     ASSERT_TRUE(saved) << saved.error().what();
-    EXPECT_EQ((*storage)->playerCount(), 1u);
-    EXPECT_EQ((*storage)->getPlayerData(*uuid), *saved);
+    EXPECT_EQ(storage->playerCount(), 1u);
+    EXPECT_EQ(storage->getPlayerData(*uuid), *saved);
     auto bytes = VersionedJson::read_file(path);
     ASSERT_TRUE(bytes) << bytes.error().what();
     EXPECT_EQ(bytes->content, *saved);
-    ASSERT_TRUE((*storage)->moveToFront(*uuid));
-    storage->reset();
+    ASSERT_TRUE(storage->moveToFront(*uuid));
+    storage.reset();
     auto reloaded = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(reloaded) << reloaded.error().what();
     EXPECT_EQ((*reloaded)->getPlayerData(*uuid), *saved);
@@ -92,43 +128,36 @@ const GameTestRegistration
 
 const GameTestRegistration changedSaveRetry(
   "PlayerStorageTest", "FailedChangedSaveKeepsAcknowledgedPlayerAndRetriesIdenticalBytes", [](GameTest& fixture) {
-    auto configuration = fixture.root().configuration();
-    ASSERT_TRUE(configuration);
-    auto clear_files = (*configuration)->get("clearPlayerFiles");
-    ASSERT_TRUE(clear_files);
-    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
-    ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
-    auto temporary = File::temporary_directory(fixture.root().random());
-    ASSERT_TRUE(temporary);
-    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
-    auto directory = File::relative_to(*temporary, "player");
-    auto storage = PlayerStorage::create(fixture.root(), directory);
-    ASSERT_TRUE(storage);
+    PlayerStorageContext setup;
+    auto initialized = setup.init(fixture.root());
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto const& directory = setup.directory;
+    auto& storage = setup.storage;
     auto player = create_player(fixture.root(), "Original durable name");
     ASSERT_TRUE(player) << player.error().what();
     auto uuid = (*player)->uuid();
     ASSERT_TRUE(uuid);
-    auto original = (*storage)->savePlayer(*player);
+    auto original = storage->savePlayer(*player);
     ASSERT_TRUE(original) << original.error().what();
     auto path = File::relative_to(directory, uuid->hex() + ".player");
     auto stage = path + ".new";
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
     // An acknowledged, unchanged player does not attempt a replacement.
-    EXPECT_TRUE((*storage)->savePlayer(*player));
+    EXPECT_TRUE(storage->savePlayer(*player));
     ASSERT_TRUE((*player)->setName("Changed durable name"));
-    EXPECT_FALSE((*storage)->savePlayer(*player));
-    EXPECT_EQ((*storage)->getPlayerData(*uuid), *original);
+    EXPECT_FALSE(storage->savePlayer(*player));
+    EXPECT_EQ(storage->getPlayerData(*uuid), *original);
     auto old_bytes = VersionedJson::read_file(path);
     ASSERT_TRUE(old_bytes);
     EXPECT_EQ(old_bytes->content, *original);
     ASSERT_TRUE(File::remove(stage));
-    auto changed = (*storage)->savePlayer(*player);
+    auto changed = storage->savePlayer(*player);
     ASSERT_TRUE(changed) << changed.error().what();
     EXPECT_NE(*changed, *original);
     auto new_bytes = VersionedJson::read_file(path);
     ASSERT_TRUE(new_bytes);
     EXPECT_EQ(new_bytes->content, *changed);
-    storage->reset();
+    storage.reset();
     auto reloaded = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(reloaded) << reloaded.error().what();
     EXPECT_EQ((*reloaded)->getPlayerData(*uuid), *changed);
@@ -140,37 +169,30 @@ const GameTestRegistration changedSaveRetry(
 
 const GameTestRegistration metadataRetry(
   "PlayerStorageTest", "MetadataAcknowledgesOnlySuccessfulWritesAndPreservesExplicitNull", [](GameTest& fixture) {
-    auto configuration = fixture.root().configuration();
-    ASSERT_TRUE(configuration);
-    auto clear_files = (*configuration)->get("clearPlayerFiles");
-    ASSERT_TRUE(clear_files);
-    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
-    ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
-    auto temporary = File::temporary_directory(fixture.root().random());
-    ASSERT_TRUE(temporary);
-    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
-    auto directory = File::relative_to(*temporary, "player");
-    auto storage = PlayerStorage::create(fixture.root(), directory);
-    ASSERT_TRUE(storage);
-    ASSERT_TRUE((*storage)->setMetadata("selection", "old"));
+    PlayerStorageContext setup;
+    auto initialized = setup.init(fixture.root());
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto const& directory = setup.directory;
+    auto& storage = setup.storage;
+    ASSERT_TRUE(storage->setMetadata("selection", "old"));
     auto stage = File::relative_to(directory, "metadata.new");
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
-    EXPECT_TRUE((*storage)->setMetadata("selection", "old"));
-    EXPECT_FALSE((*storage)->setMetadata("selection", "new"));
+    EXPECT_TRUE(storage->setMetadata("selection", "old"));
+    EXPECT_FALSE(storage->setMetadata("selection", "new"));
     auto old_bytes = read_metadata(directory);
     ASSERT_TRUE(old_bytes);
     EXPECT_EQ(old_bytes->getString("selection"), String("old"));
-    EXPECT_EQ((*storage)->getMetadata("selection"), Json("new"));
+    EXPECT_EQ(storage->getMetadata("selection"), Json("new"));
     ASSERT_TRUE(File::remove(stage));
-    ASSERT_TRUE((*storage)->setMetadata("selection", "new"));
+    ASSERT_TRUE(storage->setMetadata("selection", "new"));
     auto new_bytes = read_metadata(directory);
     ASSERT_TRUE(new_bytes);
     EXPECT_EQ(new_bytes->getString("selection"), String("new"));
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
-    EXPECT_TRUE((*storage)->setMetadata("selection", "new"));
-    EXPECT_FALSE((*storage)->setMetadata("explicitNull", Json()));
+    EXPECT_TRUE(storage->setMetadata("selection", "new"));
+    EXPECT_FALSE(storage->setMetadata("explicitNull", Json()));
     ASSERT_TRUE(File::remove(stage));
-    ASSERT_TRUE((*storage)->setMetadata("explicitNull", Json()));
+    ASSERT_TRUE(storage->setMetadata("explicitNull", Json()));
     auto null_bytes = read_metadata(directory);
     ASSERT_TRUE(null_bytes);
     auto object = null_bytes->toObject();
@@ -178,7 +200,7 @@ const GameTestRegistration metadataRetry(
     EXPECT_TRUE(object->contains("explicitNull"));
     EXPECT_FALSE(object->contains("missing"));
     EXPECT_EQ(null_bytes->get("explicitNull"), Json());
-    storage->reset();
+    storage.reset();
     auto reloaded = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(reloaded);
     EXPECT_EQ((*reloaded)->getMetadata("selection"), Json("new"));
@@ -195,19 +217,11 @@ const GameTestRegistration metadataRetry(
 const GameTestRegistration
   orderRetry("PlayerStorageTest", "OrderDeduplicatesSuccessfulWritesAndRetriesFailedChangesIncludingDeletion",
              [](GameTest& fixture) {
-               auto configuration = fixture.root().configuration();
-               ASSERT_TRUE(configuration);
-               auto clear_files = (*configuration)->get("clearPlayerFiles");
-               ASSERT_TRUE(clear_files);
-               auto restore_configuration =
-                 make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
-               ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
-               auto temporary = File::temporary_directory(fixture.root().random());
-               ASSERT_TRUE(temporary);
-               auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
-               auto directory = File::relative_to(*temporary, "player");
-               auto storage = PlayerStorage::create(fixture.root(), directory);
-               ASSERT_TRUE(storage);
+               PlayerStorageContext setup;
+               auto initialized = setup.init(fixture.root());
+               ASSERT_TRUE(initialized) << initialized.error().what();
+               auto const& directory = setup.directory;
+               auto& storage = setup.storage;
                auto first = create_player(fixture.root(), "First ordered player");
                auto second = create_player(fixture.root(), "Second ordered player");
                ASSERT_TRUE(first);
@@ -217,22 +231,22 @@ const GameTestRegistration
                ASSERT_TRUE(first_uuid);
                ASSERT_TRUE(second_uuid);
                ASSERT_NE(*first_uuid, *second_uuid);
-               ASSERT_TRUE((*storage)->savePlayer(*first));
-               ASSERT_TRUE((*storage)->savePlayer(*second));
-               ASSERT_TRUE((*storage)->moveToFront(*first_uuid));
+               ASSERT_TRUE(storage->savePlayer(*first));
+               ASSERT_TRUE(storage->savePlayer(*second));
+               ASSERT_TRUE(storage->moveToFront(*first_uuid));
                auto stage = File::relative_to(directory, "metadata.new");
                ASSERT_TRUE(File::write_file(String("owned collision"), stage));
-               EXPECT_TRUE((*storage)->moveToFront(*first_uuid));
-               EXPECT_FALSE((*storage)->moveToFront(*second_uuid));
+               EXPECT_TRUE(storage->moveToFront(*first_uuid));
+               EXPECT_FALSE(storage->moveToFront(*second_uuid));
                auto old_bytes = read_metadata(directory);
                ASSERT_TRUE(old_bytes);
                EXPECT_EQ(old_bytes->get("order"), Json(JsonArray{first_uuid->hex(), second_uuid->hex()}));
                ASSERT_TRUE(File::remove(stage));
-               ASSERT_TRUE((*storage)->moveToFront(*second_uuid));
+               ASSERT_TRUE(storage->moveToFront(*second_uuid));
                auto changed_bytes = read_metadata(directory);
                ASSERT_TRUE(changed_bytes);
                EXPECT_EQ(changed_bytes->get("order"), Json(JsonArray{second_uuid->hex(), first_uuid->hex()}));
-               storage->reset();
+               storage.reset();
                auto reloaded = PlayerStorage::create(fixture.root(), directory);
                ASSERT_TRUE(reloaded) << reloaded.error().what();
                EXPECT_EQ((*reloaded)->playerUuidAt(0), *second_uuid);

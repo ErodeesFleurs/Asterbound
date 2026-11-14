@@ -6,7 +6,7 @@ import star.algorithm;
 import star.format;
 import star.input_event;
 import star.list;
-import star.native_runtime;
+import star.benchmark_runner;
 import star.string;
 
 namespace {
@@ -238,38 +238,16 @@ void register_key_release(std::string_view operation) {
   }
 }
 
-class CheckedReporter : public benchmark::ConsoleReporter {
-public:
-  void ReportRuns(std::vector<Run> const& reports) override {
-    for (auto const& run : reports)
-      failed |= run.skipped == benchmark::internal::SkippedWithError;
-    benchmark::ConsoleReporter::ReportRuns(reports);
-  }
-  bool failed = false;
-};
-
 }// namespace
 
 int main(int argc, char** argv) {
-  auto runtime = Star::NativeRuntime::create();
-  if (!runtime) {
-    if (!Star::print(stderr, "{}\n", runtime.error().what()))
-      return 1;
-    return 1;
-  }
-  runtime_salt = static_cast<std::uint64_t>(argc + 73);
-  benchmark::DoNotOptimize(runtime_salt);
-  register_element<std::int64_t>("Int64");
-  register_element<OwningRecord>("OwningStringRecord");
-  register_key_release<false>("ImmediateFreeFilter");
-  register_key_release<true>("LinearMemberFilter");
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    benchmark::Shutdown();
-    return 1;
-  }
-  CheckedReporter reporter;
-  auto matched = benchmark::RunSpecifiedBenchmarks(&reporter);
-  benchmark::Shutdown();
-  return reporter.failed || matched == 0 ? 1 : 0;
+  return Star::run_benchmarks(argc, argv, [](int argc) {
+    runtime_salt = static_cast<std::uint64_t>(argc + 73);
+    benchmark::DoNotOptimize(runtime_salt);
+    register_element<std::int64_t>("Int64");
+    register_element<OwningRecord>("OwningStringRecord");
+    register_key_release<false>("ImmediateFreeFilter");
+    register_key_release<true>("LinearMemberFilter");
+    return 0;
+  });
 }

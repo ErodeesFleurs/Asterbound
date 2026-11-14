@@ -80,8 +80,7 @@ constexpr bool constexpr_default_and_access() {
 static_assert(constexpr_default_and_access());
 static_assert(Array<int, 0>{}.empty());
 
-constexpr bool constexpr_container_mutation() {
-  Array<int, 4> values;
+constexpr void mutate_owned_arrays(Array<int, 4>& values, Array<int, 4>& replacement) {
   values.fill(2);
   values.front() = 5;
   values.back() = 8;
@@ -91,9 +90,14 @@ constexpr bool constexpr_container_mutation() {
     ++value;
   for (auto it = values.rbegin(); it != values.rend(); ++it)
     *it *= 2;
-  Array<int, 4> replacement;
   replacement.fill(3);
   values.swap(replacement);
+}
+
+constexpr bool constexpr_container_mutation() {
+  Array<int, 4> values;
+  Array<int, 4> replacement;
+  mutate_owned_arrays(values, replacement);
   auto const& immutable = replacement;
   return values.front() == 3 && values.back() == 3 && immutable.front() == 12 && immutable.back() == 18
     && *immutable.cbegin() == 12 && *immutable.crbegin() == 18 && immutable.data()[1] == 14 && immutable[2] == 16
@@ -253,20 +257,10 @@ TEST(ArrayAccess, CheckedBoundaryPreservesMutableAndConstReferences) {
 
 TEST(ArrayContainer, RangesAccessAndSwapMutateTheSameOwnedElements) {
   Array<int, 4> values;
-  values.fill(2);
-  values.front() = 5;
-  values.back() = 8;
-  values[1] = 6;
-  values.data()[2] = 7;
   int* identity = values.data();
-  for (auto& value : values)
-    ++value;
-  for (auto it = values.rbegin(); it != values.rend(); ++it)
-    *it *= 2;
-  EXPECT_EQ(values, (Array<int, 4>{12, 14, 16, 18}));
   Array<int, 4> replacement;
-  replacement.fill(3);
-  values.swap(replacement);
+  mutate_owned_arrays(values, replacement);
+  EXPECT_EQ(replacement, (Array<int, 4>{12, 14, 16, 18}));
   EXPECT_EQ(values.data(), identity);
   EXPECT_EQ(values, (Array<int, 4>{3, 3, 3, 3}));
   auto const& immutable = replacement;

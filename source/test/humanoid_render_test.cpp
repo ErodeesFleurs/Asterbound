@@ -47,6 +47,64 @@ import star.world_server;
 
 using namespace Star;
 
+namespace {
+struct PlayerWorldContext {
+  PlayerWorldContext() = default;
+  PlayerWorldContext(PlayerWorldContext const&) = delete;
+  PlayerWorldContext& operator=(PlayerWorldContext const&) = delete;
+
+  ~PlayerWorldContext() {
+    if (initialized)
+      EXPECT_TRUE(player->uninit());
+    player.reset();
+    client.reset();
+    if (world)
+      EXPECT_TRUE(world->close());
+  }
+
+  std::expected<void, StarException> init(Root& root) {
+    auto opened = File::ephemeral_file(root.random());
+    if (!opened)
+      return std::unexpected(std::move(opened.error()));
+    storage = std::move(*opened);
+    auto created = WorldServer::create(root, Vec2U(2048, 2048), storage);
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    world = std::move(*created);
+    world->setSpawningEnabled(false);
+    auto acquired = root.playerFactory();
+    if (!acquired)
+      return std::unexpected(std::move(acquired.error()));
+    factory = std::move(*acquired);
+    auto made = factory->create();
+    if (!made)
+      return std::unexpected(std::move(made.error()));
+    player = std::move(*made);
+    if (auto finalized = player->finalizeCreation(); !finalized)
+      return std::unexpected(std::move(finalized.error()));
+    auto uuid = player->uuid();
+    if (!uuid)
+      return std::unexpected(std::move(uuid.error()));
+    auto connected = ClientContext::create(root, Uuid(root.random()), *uuid);
+    if (!connected)
+      return std::unexpected(std::move(connected.error()));
+    client = std::move(*connected);
+    player->setClientContext(client);
+    if (auto entered = player->init(*world, 100, EntityMode::Master); !entered)
+      return std::unexpected(std::move(entered.error()));
+    initialized = true;
+    return player->refreshHumanoid();
+  }
+
+  std::shared_ptr<File> storage;
+  std::shared_ptr<WorldServer> world;
+  std::shared_ptr<PlayerFactory const> factory;
+  std::shared_ptr<ClientContext> client;
+  std::shared_ptr<Player> player;
+  bool initialized = false;
+};
+}// namespace
+
 const GameTestRegistration
   sleeveLighting("HumanoidRenderTest", "BackSleeveRetainsArmorLightingWhileHolding", [](GameTest& fixture) {
     auto assets = fixture.root().assets();
@@ -144,26 +202,10 @@ const GameTestRegistration transientMovementAnimation(
     settings.includeUGC = false;
     auto root = Root::create(std::move(settings));
     ASSERT_TRUE(root) << root.error().what();
-    auto storage = File::ephemeral_file((*root)->random());
-    ASSERT_TRUE(storage);
-    auto world = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
-    ASSERT_TRUE(world) << world.error().what();
-    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-    (*world)->setSpawningEnabled(false);
-    auto factory = (*root)->playerFactory();
-    ASSERT_TRUE(factory);
-    auto made = (*factory)->create();
-    ASSERT_TRUE(made) << made.error().what();
-    auto& player = **made;
-    ASSERT_TRUE(player.finalizeCreation());
-    auto playerUuid = player.uuid();
-    ASSERT_TRUE(playerUuid);
-    auto client = ClientContext::create(**root, Uuid((*root)->random()), *playerUuid);
-    ASSERT_TRUE(client) << client.error().what();
-    player.setClientContext(*client);
-    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninit = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
-    ASSERT_TRUE(player.refreshHumanoid());
+    PlayerWorldContext setup;
+    auto initialized = setup.init(**root);
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto& player = *setup.player;
     auto& movement = player.movementController();
     ActorMovementParameters parameters;
     parameters.gravityEnabled = false;
@@ -209,10 +251,10 @@ const GameTestRegistration transientMovementAnimation(
     for (std::size_t i = 0; i != remotes.size(); ++i) {
       auto store = player.netStore(rules[i]);
       ASSERT_TRUE(store);
-      auto remote = (*factory)->netLoadPlayer(*store, rules[i]);
+      auto remote = setup.factory->netLoadPlayer(*store, rules[i]);
       ASSERT_TRUE(remote) << remote.error().what();
       remotes[i] = *remote;
-      ASSERT_TRUE(remotes[i]->init(**world, 101 + i, EntityMode::Slave));
+      ASSERT_TRUE(remotes[i]->init(*setup.world, 101 + i, EntityMode::Slave));
     }
     // This tests the actual legacy compatibility filter, not a custom animation
     // parameter or a new tech state. It is not a vanilla-executable smoke test.
@@ -311,7 +353,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(player.uninit());
-    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
+    ASSERT_TRUE(player.init(*setup.world, 100, EntityMode::Master));
     ASSERT_TRUE(player.refreshHumanoid());
     ASSERT_TRUE(movement.updateBaseParameters(parameters));
     ASSERT_TRUE(tick());
@@ -767,26 +809,10 @@ const GameTestRegistration humanoidSemanticSampling(
 const GameTestRegistration playerPresentationEvents(
   "HumanoidRenderTest", "PlayerEventsAreTickOwnedAndInvisibleEventsAreDiscarded", [](GameTest& fixture) {
     auto& root = fixture.root();
-    auto storage = File::ephemeral_file(root.random());
-    ASSERT_TRUE(storage);
-    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
-    ASSERT_TRUE(world) << world.error().what();
-    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-    (*world)->setSpawningEnabled(false);
-    auto factory = root.playerFactory();
-    ASSERT_TRUE(factory);
-    auto made = (*factory)->create();
-    ASSERT_TRUE(made) << made.error().what();
-    auto& player = **made;
-    ASSERT_TRUE(player.finalizeCreation());
-    auto uuid = player.uuid();
-    ASSERT_TRUE(uuid);
-    auto client = ClientContext::create(root, Uuid(root.random()), *uuid);
-    ASSERT_TRUE(client);
-    player.setClientContext(*client);
-    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninit = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
-    ASSERT_TRUE(player.refreshHumanoid());
+    PlayerWorldContext setup;
+    auto initialized = setup.init(root);
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto& player = *setup.player;
     ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
 
     struct Events : NullRenderCallback {

@@ -731,6 +731,37 @@ std::expected<ScriptPaneContext, StarException> scriptPaneContext(GameTest& fixt
     return std::unexpected(std::move(bound.error()));
   return ScriptPaneContext{std::move(*context), std::move(*luaRoot), std::move(*pane)};
 }
+
+std::expected<std::shared_ptr<TextBoxWidget>, StarException> pane_input_editor(
+    ScriptPaneContext& setup, bool editor_rendering = true) {
+  auto editor = textEditor(*setup.context, "A中");
+  if (!editor)
+    return std::unexpected(std::move(editor.error()));
+  if (!editor_rendering)
+    (*editor)->setEditorRendering(false);
+  if (auto added = setup.pane->addChild("editor", *editor); !added)
+    return std::unexpected(std::move(added.error()));
+  if (auto focused = (*editor)->focus(); !focused)
+    return std::unexpected(std::move(focused.error()));
+  auto installed = setup.pane->evaluate(R"LUA(
+    storage.inputs = 0
+    function onInput(event)
+      storage.inputs = storage.inputs + 1
+      return true
+    end
+  )LUA");
+  if (!installed)
+    return std::unexpected(std::move(installed.error()));
+  return std::move(*editor);
+}
+
+void expect_pane_input_unchanged(ScriptTestPane& pane, TextBoxWidget const& editor) {
+  auto inputs = pane.evaluate("return storage.inputs");
+  ASSERT_TRUE(inputs) << inputs.error().what();
+  ASSERT_TRUE(*inputs);
+  EXPECT_EQ(**inputs, Json(0));
+  EXPECT_EQ(editor.getText(), String("A中"));
+}
 template <typename Function>
 void expectIsolatedPaneError(Function&& operation) {
   testing::TestPartResultArray errors;
@@ -945,15 +976,12 @@ const GameTestRegistration
 
 const GameTestRegistration
   canvasSessionLifetime("ScriptPane", "CanvasCapabilitiesRetireWithoutChangingSurfaceOwnership", [](GameTest& fixture) {
-    auto context = textEditorContext(fixture);
-    ASSERT_TRUE(context) << context.error().what();
-    auto luaRoot = LuaRoot::create(fixture.root());
-    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-    auto created = ScriptTestPane::create(**context);
-    ASSERT_TRUE(created) << created.error().what();
-    auto pane = std::move(*created);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-    auto surface = CanvasWidget::create(**context);
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& context = setup->context;
+    auto& luaRoot = setup->luaRoot;
+    auto pane = std::move(setup->pane);
+    auto surface = CanvasWidget::create(*context);
     ASSERT_TRUE(surface) << surface.error().what();
     (*surface)->setSize({31, 17});
     std::weak_ptr<CanvasWidget> ownedSurface = *surface;
@@ -991,7 +1019,7 @@ const GameTestRegistration
     ASSERT_TRUE(removed) << removed.error().what();
     EXPECT_TRUE(*removed);
     EXPECT_FALSE(retained[2].invoke<Vec2I>());
-    auto callbacks = LuaBindings::makeWidgetCallbacks(**context, *pane);
+    auto callbacks = LuaBindings::makeWidgetCallbacks(*context, *pane);
     ASSERT_TRUE(callbacks) << callbacks.error().what();
     ASSERT_TRUE(pane->addCallbacks("widget", std::move(*callbacks)));
     ASSERT_TRUE(pane->evaluate(capture));
@@ -1006,7 +1034,7 @@ const GameTestRegistration
     pane.reset();
     EXPECT_FALSE(retained[3].invoke<Vec2I>());
     retained.clear();
-    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    ASSERT_TRUE(luaRoot->collectGarbage());
     EXPECT_TRUE(ownedSurface.expired());
   });
 
@@ -1044,20 +1072,17 @@ const GameTestRegistration
 
 const GameTestRegistration widgetMemberLifetime(
   "ScriptPane", "RetiringMemberCallbacksReleasesLuaRootsAndLeavesOldRowsInert", [](GameTest& fixture) {
-    auto context = textEditorContext(fixture);
-    ASSERT_TRUE(context) << context.error().what();
-    auto luaRoot = LuaRoot::create(fixture.root());
-    ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-    auto created = ScriptTestPane::create(**context);
-    ASSERT_TRUE(created) << created.error().what();
-    auto pane = std::move(*created);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    auto setup = scriptPaneContext(fixture);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto& context = setup->context;
+    auto& luaRoot = setup->luaRoot;
+    auto pane = std::move(setup->pane);
     auto schema = Json::parseJson(R"JSON({
     "spacing":[0,0], "memberSize":[80,12],
     "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
   })JSON");
     ASSERT_TRUE(schema) << schema.error().what();
-    auto list = ListWidget::create(**context, *schema);
+    auto list = ListWidget::create(*context, *schema);
     ASSERT_TRUE(list) << list.error().what();
     ASSERT_TRUE(pane->addChild("list", *list));
     int calls = 0;
@@ -1093,7 +1118,7 @@ const GameTestRegistration widgetMemberLifetime(
     ASSERT_TRUE((*oldEditor)->setText("active"));
     EXPECT_EQ(calls, 1);
     ASSERT_TRUE(pane->dismissed());
-    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    ASSERT_TRUE(luaRoot->collectGarbage());
     EXPECT_TRUE(sentinel.expired());
     ASSERT_TRUE((*oldEditor)->setText("retired"));
     EXPECT_EQ(calls, 1);
@@ -1124,7 +1149,7 @@ const GameTestRegistration widgetMemberLifetime(
     EXPECT_EQ(calls, 3);
     ASSERT_TRUE((*retiringEditor)->setText("retired inside callback"));
     EXPECT_EQ(calls, 3);
-    ASSERT_TRUE((*luaRoot)->collectGarbage());
+    ASSERT_TRUE(luaRoot->collectGarbage());
     EXPECT_TRUE(sentinel.expired());
     ASSERT_TRUE(pane->dismissed());
   });
@@ -1394,18 +1419,8 @@ const GameTestRegistration
     ASSERT_TRUE(setup) << setup.error().what();
     auto& pane = *setup->pane;
     ASSERT_TRUE(pane.displayed());
-    auto editor = textEditor(*setup->context, "A中");
+    auto editor = pane_input_editor(*setup, false);
     ASSERT_TRUE(editor) << editor.error().what();
-    (*editor)->setEditorRendering(false);
-    ASSERT_TRUE(pane.addChild("editor", *editor));
-    ASSERT_TRUE((*editor)->focus());
-    ASSERT_TRUE(pane.evaluate(R"LUA(
-    storage.inputs = 0
-    function onInput(event)
-      storage.inputs = storage.inputs + 1
-      return true
-    end
-  )LUA"));
     ASSERT_TRUE(pane.hide());
     EXPECT_TRUE(pane.isDisplayed());
     for (InputEvent const& event :
@@ -1415,11 +1430,7 @@ const GameTestRegistration
       ASSERT_TRUE(consumed) << consumed.error().what();
       EXPECT_FALSE(*consumed);
     }
-    auto inputs = pane.evaluate("return storage.inputs");
-    ASSERT_TRUE(inputs) << inputs.error().what();
-    ASSERT_TRUE(*inputs);
-    EXPECT_EQ(**inputs, Json(0));
-    EXPECT_EQ((*editor)->getText(), String("A中"));
+    ASSERT_NO_FATAL_FAILURE(expect_pane_input_unchanged(pane, **editor));
     ASSERT_TRUE(pane.dismissed());
   });
 
@@ -1432,20 +1443,11 @@ const GameTestRegistration
     pane.setSize({100, 100});
     PaneManager manager(*setup->context);
     ASSERT_TRUE(manager.displayPane(PaneLayer::Background, setup->pane));
-    ASSERT_TRUE(pane.evaluate(R"LUA(
-    storage.inputs = 0
-    function onInput(event)
-      storage.inputs = storage.inputs + 1
-      return true
-    end
-  )LUA"));
     EXPECT_TRUE(pane.isDisplayed());
     EXPECT_FALSE(manager.getPaneAt({1, 1}));
     EXPECT_FALSE(manager.getPaneAt({PaneLayer::Background}, {1, 1}));
-    auto editor = textEditor(*setup->context, "A中");
+    auto editor = pane_input_editor(*setup);
     ASSERT_TRUE(editor) << editor.error().what();
-    ASSERT_TRUE(pane.addChild("editor", *editor));
-    ASSERT_TRUE((*editor)->focus());
     auto captured = manager.keyboardCapturedPane();
     ASSERT_TRUE(captured) << captured.error().what();
     EXPECT_FALSE(*captured);
@@ -1467,11 +1469,7 @@ const GameTestRegistration
       ASSERT_TRUE(consumed) << consumed.error().what();
       EXPECT_FALSE(*consumed);
     }
-    auto inputs = pane.evaluate("return storage.inputs");
-    ASSERT_TRUE(inputs) << inputs.error().what();
-    ASSERT_TRUE(*inputs);
-    EXPECT_EQ(**inputs, Json(0));
-    EXPECT_EQ((*editor)->getText(), String("A中"));
+    ASSERT_NO_FATAL_FAILURE(expect_pane_input_unchanged(pane, **editor));
 
     // A normal pane still participates in hit testing and real keyboard capture.
     auto back = Pane::create(*setup->context);

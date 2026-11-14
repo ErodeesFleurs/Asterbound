@@ -616,78 +616,94 @@ TEST(StringSet, BorrowedLookupPreservesFullByteExtent) {
   EXPECT_EQ(values.begin()->utf8(), bytes);
 }
 
+namespace {
+template <typename Container, typename MakeValue, typename Project>
+concept preset_container = requires(Container& values, MakeValue make_value, Project project, int key) {
+  values.insert(make_value(key));
+  values.erase(values.find(key));
+  project(*values.find(key));
+};
+
+template <typename Container, typename MakeValue, typename Project>
+  requires preset_container<Container, MakeValue, Project>
+void expect_preset_contract(Container values, MakeValue make_value, Project project) {
+  ASSERT_EQ(values.find(41), values.end());
+  ASSERT_EQ(project(*values.find(42)), 42);
+  ASSERT_EQ(project(*values.find(63)), 63);
+  ASSERT_EQ(values.find(64), values.end());
+  ASSERT_EQ(values.size(), 2u);
+  values.erase(values.find(42));
+  ASSERT_EQ(values.find(42), values.end());
+  ASSERT_EQ(project(*values.find(63)), 63);
+  ASSERT_EQ(values.size(), 1u);
+  values.erase(values.find(63));
+  ASSERT_EQ(values.find(42), values.end());
+  ASSERT_EQ(values.find(63), values.end());
+  ASSERT_EQ(values.size(), 0u);
+  values.insert(make_value(12));
+  values.insert(make_value(24));
+  ASSERT_EQ(project(*values.find(12)), 12);
+  ASSERT_EQ(values.size(), 2u);
+  values.clear();
+  ASSERT_EQ(values.find(12), values.end());
+  ASSERT_EQ(values.size(), 0u);
+  EXPECT_TRUE(values.insert(make_value(7)).second);
+  EXPECT_TRUE(values.insert(make_value(11)).second);
+  EXPECT_FALSE(values.insert(make_value(7)).second);
+  ASSERT_EQ(values.size(), 2u);
+  Container copy(values.begin(), values.end());
+  ASSERT_EQ(values, copy);
+  ASSERT_EQ(values.erase(values.begin(), values.end()), values.end());
+  ASSERT_EQ(values.size(), 0u);
+  ASSERT_NE(values, copy);
+  Container empty(values.begin(), values.end());
+  ASSERT_EQ(empty.size(), 0u);
+  copy = values;
+  ASSERT_EQ(values, copy);
+}
+
+template <typename MakeValue>
+  requires std::invocable<MakeValue&, Vec2I, unsigned>
+auto random_values(MakeValue make_value) {
+  List<std::invoke_result_t<MakeValue&, Vec2I, unsigned>> values;
+  for (unsigned i = 0; i < RandomSampleCount; ++i)
+    values.push_back(make_value(Vec2I(i * 743202097, i * 205495087), i));
+  return values;
+}
+
+template <typename Container, typename Values, typename Key>
+  requires requires(Container& container, Values& values, Key key) {
+    container.insert(values[0]);
+    container.erase(key(values[0]));
+  }
+void random_workload_prefix(Container& container, Values& values, RandomService& random, Key key) {
+  random.shuffle(values);
+  for (auto const& value : values)
+    container.insert(value);
+  random.shuffle(values);
+  for (std::size_t i = 0; i < values.size() / 2; ++i)
+    container.erase(key(values[i]));
+  random.shuffle(values);
+  for (std::size_t i = 0; i < values.size() / 3; ++i)
+    container.insert(values[i]);
+  random.shuffle(values);
+  for (std::size_t i = 0; i < values.size() / 2; ++i)
+    container.erase(key(values[i]));
+}
+}
+
 TEST(FlatHashSet, Preset) {
-  FlatHashSet<int> testSet = {42, 63};
-  ASSERT_EQ(testSet.find(41), testSet.end());
-  ASSERT_EQ(*testSet.find(42), 42);
-  ASSERT_EQ(*testSet.find(63), 63);
-  ASSERT_EQ(testSet.find(64), testSet.end());
-  ASSERT_EQ(testSet.size(), 2u);
-
-  testSet.erase(testSet.find(42));
-  ASSERT_EQ(testSet.find(42), testSet.end());
-  ASSERT_EQ(*testSet.find(63), 63);
-  ASSERT_EQ(testSet.size(), 1u);
-
-  testSet.erase(testSet.find(63));
-  ASSERT_EQ(testSet.find(42), testSet.end());
-  ASSERT_EQ(testSet.find(63), testSet.end());
-  ASSERT_EQ(testSet.size(), 0u);
-
-  testSet.insert(12);
-  testSet.insert(24);
-  ASSERT_EQ(*testSet.find(12), 12);
-  ASSERT_EQ(testSet.size(), 2u);
-  testSet.clear();
-
-  ASSERT_EQ(testSet.find(12), testSet.end());
-  ASSERT_EQ(testSet.size(), 0u);
-
-  EXPECT_TRUE(testSet.insert(7).second);
-  EXPECT_TRUE(testSet.insert(11).second);
-  EXPECT_FALSE(testSet.insert(7).second);
-
-  ASSERT_EQ(testSet.size(), 2u);
-
-  FlatHashSet<int> testSet2(testSet.begin(), testSet.end());
-  ASSERT_EQ(testSet, testSet2);
-
-  ASSERT_EQ(testSet.erase(testSet.begin(), testSet.end()), testSet.end());
-  ASSERT_EQ(testSet.size(), 0u);
-
-  ASSERT_NE(testSet, testSet2);
-
-  FlatHashSet<int> testSet3(testSet.begin(), testSet.end());
-  ASSERT_EQ(testSet3.size(), 0u);
-
-  testSet2 = testSet;
-  ASSERT_EQ(testSet, testSet2);
+  expect_preset_contract(FlatHashSet<int>{42, 63},
+    [](int key) { return key; }, [](int value) { return value; });
 }
 
 TEST(FlatHashSet, Random) {
   auto randomResult = RandomService::create();
   ASSERT_TRUE(randomResult);
   auto& random = **randomResult;
-  List<Vec2I> keys;
-  for (unsigned i = 0; i < RandomSampleCount; ++i)
-    keys.push_back(Vec2I(i * 743202097, i * 205495087));
-  random.shuffle(keys);
-
+  auto keys = random_values([](Vec2I key, unsigned) { return key; });
   FlatHashSet<Vec2I> testSet;
-  for (std::size_t i = 0; i < keys.size(); ++i)
-    testSet.insert(keys[i]);
-
-  random.shuffle(keys);
-  for (std::size_t i = 0; i < keys.size() / 2; ++i)
-    testSet.erase(keys[i]);
-
-  random.shuffle(keys);
-  for (std::size_t i = 0; i < keys.size() / 3; ++i)
-    testSet.insert(keys[i]);
-
-  random.shuffle(keys);
-  for (std::size_t i = 0; i < keys.size() / 2; ++i)
-    testSet.erase(keys[i]);
+  random_workload_prefix(testSet, keys, random, [](Vec2I key) { return key; });
 
   random.shuffle(keys);
   for (auto k : keys) {
@@ -720,77 +736,17 @@ TEST(FlatHashSet, Random) {
 }
 
 TEST(FlatHashMap, Preset) {
-  FlatHashMap<int, int> testMap = {{42, 42}, {63, 63}};
-  ASSERT_EQ(testMap.find(41), testMap.end());
-  ASSERT_EQ(testMap.find(42)->second, 42);
-  ASSERT_EQ(testMap.find(63)->second, 63);
-  ASSERT_EQ(testMap.find(64), testMap.end());
-  ASSERT_EQ(testMap.size(), 2u);
-
-  testMap.erase(testMap.find(42));
-  ASSERT_EQ(testMap.find(42), testMap.end());
-  ASSERT_EQ(testMap.find(63)->second, 63);
-  ASSERT_EQ(testMap.size(), 1u);
-
-  testMap.erase(testMap.find(63));
-  ASSERT_EQ(testMap.find(42), testMap.end());
-  ASSERT_EQ(testMap.find(63), testMap.end());
-  ASSERT_EQ(testMap.size(), 0u);
-
-  testMap.insert({12, 12});
-  testMap.insert({24, 24});
-  ASSERT_EQ(testMap.find(12)->second, 12);
-  ASSERT_EQ(testMap.size(), 2u);
-  testMap.clear();
-
-  ASSERT_EQ(testMap.find(12), testMap.end());
-  ASSERT_EQ(testMap.size(), 0u);
-
-  EXPECT_TRUE(testMap.insert({7, 7}).second);
-  EXPECT_TRUE(testMap.insert({11, 11}).second);
-  EXPECT_FALSE(testMap.insert({7, 7}).second);
-
-  ASSERT_EQ(testMap.size(), 2u);
-
-  FlatHashMap<int, int> testMap2(testMap.begin(), testMap.end());
-  ASSERT_EQ(testMap, testMap2);
-
-  ASSERT_EQ(testMap.erase(testMap.begin(), testMap.end()), testMap.end());
-  ASSERT_EQ(testMap.size(), 0u);
-
-  ASSERT_NE(testMap, testMap2);
-
-  FlatHashMap<int, int> testMap3(testMap.begin(), testMap.end());
-  ASSERT_EQ(testMap3.size(), 0u);
-
-  testMap2 = testMap;
-  ASSERT_EQ(testMap, testMap2);
+  expect_preset_contract(FlatHashMap<int, int>{{42, 42}, {63, 63}},
+    [](int key) { return std::pair{key, key}; }, [](auto const& entry) { return entry.second; });
 }
 
 TEST(FlatHashMap, Random) {
   auto randomResult = RandomService::create();
   ASSERT_TRUE(randomResult);
   auto& random = **randomResult;
-  List<std::pair<Vec2I, int>> values;
-  for (unsigned i = 0; i < RandomSampleCount; ++i)
-    values.push_back({Vec2I(i * 743202097, i * 205495087), i});
-  random.shuffle(values);
-
+  auto values = random_values([](Vec2I key, unsigned index) { return std::pair<Vec2I, int>{key, index}; });
   FlatHashMap<Vec2I, int> testMap;
-  for (auto v : values)
-    testMap.insert(v);
-
-  random.shuffle(values);
-  for (std::size_t i = 0; i < values.size() / 2; ++i)
-    testMap.erase(values[i].first);
-
-  random.shuffle(values);
-  for (std::size_t i = 0; i < values.size() / 3; ++i)
-    testMap.insert(values[i]);
-
-  random.shuffle(values);
-  for (std::size_t i = 0; i < values.size() / 2; ++i)
-    testMap.erase(values[i].first);
+  random_workload_prefix(testMap, values, random, [](auto const& entry) { return entry.first; });
 
   random.shuffle(values);
   for (auto v : values) {
