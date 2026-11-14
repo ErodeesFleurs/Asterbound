@@ -92,13 +92,11 @@ class Object
     public virtual InspectableEntity,
     public virtual WireEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Object, TileEntity, StatusEffectEntity, ScriptedEntity,
-        ChattyEntity, InspectableEntity, WireEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<Object, StatusEffectEntity, ScriptedEntity, ChattyEntity, InspectableEntity, WireEntity>(this,
+                                                                                                                  key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Object>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Object>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<Object>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters = JsonObject());
 

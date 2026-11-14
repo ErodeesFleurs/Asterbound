@@ -190,7 +190,7 @@ private:
     return m_data->get();
   }
   [[gnu::noinline]] void initialize_data() {
-    auto& owner = (*get_family())[typeKey<pool_data>()];
+    auto& owner = (*get_family())[type_key<pool_data>()];
     if (!owner)
       owner = std::make_shared<pool_data>();
     // The family owns this type-erased state; the cached handle only borrows.
@@ -204,7 +204,7 @@ private:
   }
   [[gnu::noinline]] void initialize_family() const noexcept { m_family = std::make_shared<family_type>(); }
   [[gnu::noinline]] void inherit_data(BlockAllocator const& other) noexcept {
-    auto found = m_family->find(typeKey<pool_data>());
+    auto found = m_family->find(type_key<pool_data>());
     if (found != m_family->end())
       m_data = other.m_data = std::ref(*static_cast<pool_data*>(found->second.get()));
   }

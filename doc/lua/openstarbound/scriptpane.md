@@ -350,7 +350,7 @@ it can create an unopened instance and does not invoke `onAction`. Native
 keyboard capture and modal windows take precedence. Held-key repeats do not
 reapply the operation; press/release state survives controller reload.
 
-The public helpers in `/interface/opensb/ui/api.lua` provide
+The public helpers in `/interface/asterbound/ui/api.lua` provide
 `ui.register(id, definition)`, `ui.open(id)`, `ui.toggle(id)`, `ui.close(id)`, and
 `ui.send(id, event, payload)`. Requests are queued until the calling script
 returns. Events posted by a handler wait for a later delivery boundary, rather

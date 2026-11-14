@@ -54,12 +54,8 @@ namespace Star {
 
 class ScrollThumb : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ScrollThumb, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ScrollThumb>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ScrollThumb, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScrollThumb>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScrollThumb>, StarException> create(GuiContext& context, GuiDirection direction);
   ~ScrollThumb() override = default;
@@ -99,12 +95,8 @@ private:
 
 class ScrollBar : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ScrollBar, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ScrollBar>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ScrollBar, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScrollBar>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScrollBar>, StarException> create(GuiContext& context, GuiDirection direction, WidgetCallbackFunc forwardFunc, WidgetCallbackFunc backwardFunc);
 
@@ -137,12 +129,8 @@ private:
 
 class ScrollArea : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ScrollArea, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ScrollArea>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ScrollArea, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScrollArea>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScrollArea>, StarException> create(GuiContext& context);
 

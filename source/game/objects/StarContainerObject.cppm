@@ -74,12 +74,10 @@ class Root;
 
 class ContainerObject : public Object, public virtual ContainerEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ContainerObject, Object, ContainerEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ContainerObject, Object, ContainerEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ContainerObject>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ContainerObject>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ContainerObject>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters);
 

@@ -281,6 +281,9 @@ std::expected<Root::Settings, StarException> RootLoader::rootSettingsForOptions(
     auto backups = boot->getUInt("logFileBackups", 10);
     if (!backups) return std::unexpected(std::move(backups.error()));
     rootSettings.logFileBackups = *backups;
+    auto logSizeLimit = boot->getUInt("logFileSizeLimit", rootSettings.logFileSizeLimit);
+    if (!logSizeLimit) return std::unexpected(std::move(logSizeLimit.error()));
+    rootSettings.logFileSizeLimit = *logSizeLimit;
     auto ugc = boot->getBool("includeUGC", true);
     if (!ugc) return std::unexpected(std::move(ugc.error()));
     rootSettings.includeUGC = *ugc;

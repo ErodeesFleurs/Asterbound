@@ -1,11 +1,14 @@
 #!/bin/sh -e
 
+cmake -P cmake/AsterboundVersion.cmake
+
 mkdir client_distribution
 mkdir client_distribution/assets
 mkdir client_distribution/assets/user
 
 ./dist/asset_packer -c scripts/packing.config assets/asterbound client_distribution/assets/asterbound.pak
 ./dist/asset_packer -c scripts/packing.config assets/asterbound-compat client_distribution/assets/asterbound-compat.pak
+./dist/asset_packer -c scripts/packing.config assets/asterbound-legacy client_distribution/assets/asterbound-legacy.pak
 
 mkdir client_distribution/mods
 touch client_distribution/mods/mods_go_here

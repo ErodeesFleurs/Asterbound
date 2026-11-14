@@ -245,7 +245,7 @@ Vec2I ScrollBar::size() const {
 
 std::expected<int, StarException> ScrollBar::trackSize() const {
   if (m_parent) {
-    auto scrollArea = asRef<ScrollArea>(m_parent->get());
+    auto scrollArea = as_ref<ScrollArea>(m_parent->get());
     if (!scrollArea)
       return std::unexpected(GuiException("Scroll bar has a non-scroll-area parent"));
     auto size = scrollArea->get().size();
@@ -265,7 +265,7 @@ std::expected<int, StarException> ScrollBar::trackSize() const {
 
 std::expected<float, StarException> ScrollBar::sizeRatio() const {
   if (m_parent) {
-    auto scrollArea = asRef<ScrollArea>(m_parent->get());
+    auto scrollArea = as_ref<ScrollArea>(m_parent->get());
     if (!scrollArea)
       return std::unexpected(GuiException("Scroll bar has a non-scroll-area parent"));
     if (m_direction == GuiDirection::Vertical) {
@@ -280,7 +280,7 @@ std::expected<float, StarException> ScrollBar::sizeRatio() const {
 
 std::expected<float, StarException> ScrollBar::scrollRatio() const {
   if (m_parent) {
-    auto scrollArea = asRef<ScrollArea>(m_parent->get());
+    auto scrollArea = as_ref<ScrollArea>(m_parent->get());
     if (!scrollArea)
       return std::unexpected(GuiException("Scroll bar has a non-scroll-area parent"));
     if (m_direction == GuiDirection::Vertical) {
@@ -310,7 +310,7 @@ std::shared_ptr<ScrollThumb> ScrollBar::thumb() const {
 
 std::expected<void, StarException> ScrollBar::drawChildren() {
   if (m_parent) {
-    auto scrollArea = asRef<ScrollArea>(m_parent->get());
+    auto scrollArea = as_ref<ScrollArea>(m_parent->get());
     if (!scrollArea)
       return std::unexpected(GuiException("Scroll bar has a non-scroll-area parent"));
     auto sizeRatioResult = sizeRatio();
@@ -361,7 +361,7 @@ std::expected<void, StarException> ScrollBar::drawChildren() {
 }
 
 std::expected<Vec2I, StarException> ScrollBar::offsetFromThumbPosition(Vec2I const& thumbPosition) const {
-  auto scrollArea = m_parent ? asRef<ScrollArea>(m_parent->get()) : std::nullopt;
+  auto scrollArea = m_parent ? as_ref<ScrollArea>(m_parent->get()) : std::nullopt;
   if (!scrollArea)
     return std::unexpected(GuiException("Scroll bar has no scroll-area parent"));
   auto track = trackSize();

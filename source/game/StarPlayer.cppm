@@ -134,14 +134,11 @@ class Player :
 
 public:
   ~Player() override;
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Player, ToolUserEntity, LoungingEntity, ChattyEntity,
-        InspectableEntity, DamageBarEntity, PortraitEntity, NametagEntity,
-        PhysicsEntity, EmoteEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<Player, ToolUserEntity, LoungingEntity, ChattyEntity, InspectableEntity, DamageBarEntity,
+                         NametagEntity, PhysicsEntity, EmoteEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Player>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Player>(); }
 
   enum class State {
     Idle,

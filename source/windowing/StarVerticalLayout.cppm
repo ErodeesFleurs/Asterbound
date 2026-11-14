@@ -52,12 +52,10 @@ namespace Star {
 
 class VerticalLayout : public Layout {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<VerticalLayout, Layout>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<VerticalLayout, Layout>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<VerticalLayout>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<VerticalLayout>(); }
 
   VerticalLayout(GuiContext& context);
   VerticalLayout(GuiContext& context, VerticalAnchor verticalAnchor, int verticalSpacing = 0);

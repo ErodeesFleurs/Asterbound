@@ -25,12 +25,10 @@ namespace Star {
 
 class StatusEffectEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<StatusEffectEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<StatusEffectEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<StatusEffectEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StatusEffectEntity>(); }
 
   [[nodiscard]] virtual std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const = 0;
   virtual PolyF statusEffectArea() const = 0;

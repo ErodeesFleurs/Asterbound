@@ -147,8 +147,10 @@ using UniverseServerException = StarError<UniverseServerExceptionTag, StarExcept
 // and routes packets between them.
 class UniverseServer : public Universe, public Thread {
 public:
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<UniverseServer, Universe, Thread>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<UniverseServer>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<UniverseServer, Universe, Thread>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseServer>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<UniverseServer>, StarException> create(Root& root, String const& storageDir, bool const& isLocal = false);
   [[nodiscard]] std::expected<void, StarException> close();

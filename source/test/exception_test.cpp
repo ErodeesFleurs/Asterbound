@@ -255,6 +255,105 @@ TEST(ExceptionTest, LoggerKeepsSeverityAndDefersFullDiagnosticsToDebug) {
   }
 }
 
+TEST(ExceptionTest, RepeatedScriptDiagnosticsKeepDistinctIdentitiesAndReset) {
+  class RecordingSink : public LogSink {
+  public:
+    std::expected<void, StarException> log(std::string_view message, LogLevel level) override {
+      if (fail)
+        return std::unexpected(IOException("repeat-sink-failure", false));
+      records.emplace_back(level, message);
+      return {};
+    }
+    bool fail = false;
+    std::vector<std::pair<LogLevel, std::string>> records;
+  };
+  Logger logger;
+  logger.remove_stdout_sink();
+  auto sink = std::make_shared<RecordingSink>();
+  sink->set_level(LogLevel::Debug);
+  logger.add_sink(sink);
+  ExceptionSummary summary;
+  summary.kind = ExceptionSummaryKind::ScriptRuntime;
+  summary.reason = "Cyclic Lua require: /a.lua -> /b.lua -> /a.lua";
+  summary.locations.push_back({"/b.lua", 1, "provider-a"});
+  auto error = StarException("full-cycle-details", false).with_summary(summary);
+  for (unsigned i = 0; i < 1000; ++i)
+    ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(error)));
+  ASSERT_EQ(sink->records.size(), 2u);
+  EXPECT_EQ(sink->records[0].first, LogLevel::Error);
+  EXPECT_NE(sink->records[0].second.find(summary.reason), std::string::npos);
+  EXPECT_EQ(sink->records[1].first, LogLevel::Debug);
+  EXPECT_NE(sink->records[1].second.find("full-cycle-details"), std::string::npos);
+
+  auto distinct = summary;
+  distinct.locations[0].provider = "provider-b";
+  auto other = error.with_summary(distinct);
+  ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(other)));
+  EXPECT_EQ(sink->records.size(), 4u);
+  distinct.locations[0].line = 2;
+  other = error.with_summary(distinct);
+  ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(other)));
+  EXPECT_EQ(sink->records.size(), 6u);
+  distinct.reason = "Cyclic Lua require: /a.lua -> /c.lua -> /a.lua";
+  other = error.with_summary(distinct);
+  ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(other)));
+  EXPECT_EQ(sink->records.size(), 8u);
+  ASSERT_TRUE(logger.warn_exception("Lua session failure", ExceptionDiagnostic(error)));
+  ASSERT_TRUE(logger.error_exception("Another operation", ExceptionDiagnostic(error)));
+  EXPECT_EQ(sink->records.size(), 12u);
+
+  logger.reset_exception_repeats();
+  ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(error)));
+  EXPECT_EQ(sink->records.size(), 14u);
+  Logger independent;
+  independent.remove_stdout_sink();
+  independent.add_sink(sink);
+  ASSERT_TRUE(independent.error_exception("Lua session failure", ExceptionDiagnostic(error)));
+  EXPECT_EQ(sink->records.size(), 16u);
+
+  // Logging failures propagate, and failed first reports do not poison retries.
+  logger.reset_exception_repeats();
+  sink->fail = true;
+  for (unsigned i = 0; i < 2; ++i) {
+    auto failed = logger.error_exception("Lua session failure", ExceptionDiagnostic(error));
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<IOException>());
+  }
+  sink->fail = false;
+  ASSERT_TRUE(logger.error_exception("Lua session failure", ExceptionDiagnostic(error)));
+  EXPECT_EQ(sink->records.size(), 18u);
+}
+
+TEST(ExceptionTest, ScriptRepeatFilteringDoesNotHideNativeErrorsOrNewDebugDetails) {
+  class RecordingSink : public LogSink {
+  public:
+    std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+      messages.emplace_back(message);
+      return {};
+    }
+    std::vector<std::string> messages;
+  };
+  Logger logger;
+  logger.remove_stdout_sink();
+  auto sink = std::make_shared<RecordingSink>();
+  logger.add_sink(sink);
+  auto native = IOException("disk-failure", false);
+  ASSERT_TRUE(logger.error_exception("native", ExceptionDiagnostic(native)));
+  ASSERT_TRUE(logger.error_exception("native", ExceptionDiagnostic(native)));
+  EXPECT_EQ(sink->messages.size(), 2u);
+  ExceptionSummary summary;
+  summary.kind = ExceptionSummaryKind::ScriptSyntax;
+  summary.reason = "invalid Lua";
+  auto script = StarException("syntax-details", false).with_summary(std::move(summary));
+  ASSERT_TRUE(logger.error_exception("script", ExceptionDiagnostic(script)));
+  ASSERT_TRUE(logger.error_exception("script", ExceptionDiagnostic(script)));
+  EXPECT_EQ(sink->messages.size(), 3u);
+  sink->set_level(LogLevel::Debug);
+  ASSERT_TRUE(logger.error_exception("script", ExceptionDiagnostic(script)));
+  ASSERT_EQ(sink->messages.size(), 5u);
+  EXPECT_NE(sink->messages.back().find("syntax-details"), std::string::npos);
+}
+
 namespace {
 
 class CallbackLogSink : public LogSink {

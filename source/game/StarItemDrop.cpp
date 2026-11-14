@@ -492,32 +492,34 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       if (!takeable)
         return std::unexpected(std::move(takeable.error()));
       if (*takeable && m_mode.get() == Mode::Available && root().random().randf() < m_combineChance) {
-        auto found = world.findEntity(RectF::withCenter(position(), Vec2F::filled(m_combineRadius)),
-            [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
-          auto closeDropRef = asRef<ItemDrop>(*entity);
-          if (!closeDropRef)
-            return false;
-          auto& closeDrop = closeDropRef->get();
-          if (std::addressof(closeDrop) == this)
-            return false;
-          auto closeTakeable = closeDrop.canTake();
-          if (!closeTakeable)
-            return std::unexpected(std::move(closeTakeable.error()));
-          if (!*closeTakeable || vmag(position() - closeDrop.position()) >= m_combineRadius || !closeDrop.isMaster())
-            return false;
-          auto const& closeItem = closeDrop.m_item;
-          if (m_item->couldStack(optionalRef(closeItem)) != closeItem->count())
-            return false;
-          auto taken = closeDrop.take();
-          if (!taken)
-            return std::unexpected(std::move(taken.error()));
-          m_item->stackWith(optionalRef(*taken));
-          m_dropAge.setElapsedTime(std::min(m_dropAge.elapsedTime(), closeDrop.m_dropAge.elapsedTime()));
-          m_movementController->setPosition(m_movementController->position()
+        auto found = world.findEntity(
+          RectF::withCenter(position(), Vec2F::filled(m_combineRadius)),
+          [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
+            auto closeDropRef = as_ref<ItemDrop>(*entity);
+            if (!closeDropRef)
+              return false;
+            auto& closeDrop = closeDropRef->get();
+            if (std::addressof(closeDrop) == this)
+              return false;
+            auto closeTakeable = closeDrop.canTake();
+            if (!closeTakeable)
+              return std::unexpected(std::move(closeTakeable.error()));
+            if (!*closeTakeable || vmag(position() - closeDrop.position()) >= m_combineRadius || !closeDrop.isMaster())
+              return false;
+            auto const& closeItem = closeDrop.m_item;
+            if (m_item->couldStack(optionalRef(closeItem)) != closeItem->count())
+              return false;
+            auto taken = closeDrop.take();
+            if (!taken)
+              return std::unexpected(std::move(taken.error()));
+            m_item->stackWith(optionalRef(*taken));
+            m_dropAge.setElapsedTime(std::min(m_dropAge.elapsedTime(), closeDrop.m_dropAge.elapsedTime()));
+            m_movementController->setPosition(
+              m_movementController->position()
               + world.geometry().diff(closeDrop.position(), m_movementController->position()) / 2.0f);
-          m_movementController->setVelocity((m_movementController->velocity() + closeDrop.velocity()) / 2.0f);
-          return true;
-        });
+            m_movementController->setVelocity((m_movementController->velocity() + closeDrop.velocity()) / 2.0f);
+            return true;
+          });
         if (!found)
           return std::unexpected(std::move(found.error()));
       }
@@ -629,7 +631,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
   }
 
   if (!m_drawables) {
-    auto mat = asRef<MaterialItem>(*m_item);
+    auto mat = as_ref<MaterialItem>(*m_item);
     List<Drawable> generated;
     if (mat) {
       auto preview = mat->get().generatedPreview(renderCallback.tileDrawer(), Vec2I(position().floor()));
@@ -862,7 +864,7 @@ std::expected<void, StarException> ItemDrop::updateTaken(bool master) {
     Vec2F diff = world.geometry().diff(targetPosition, position);
     float magnitude = diff.magnitude();
     Vec2F velocity = diff.normalized() * m_velocity * std::min(1.0f, magnitude);
-    if (auto playerEntity = asRef<Player>(*owningEntity))
+    if (auto playerEntity = as_ref<Player>(*owningEntity))
       velocity += playerEntity->get().velocity();
     m_movementController->approachVelocity(velocity, overhead ? m_overheadApproach : m_velocityApproach);
     if (master && !overhead && magnitude < m_pickupDistance)

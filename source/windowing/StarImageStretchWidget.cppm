@@ -49,12 +49,10 @@ namespace Star {
 
 class ImageStretchWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ImageStretchWidget, Widget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ImageStretchWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ImageStretchWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ImageStretchWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ImageStretchWidget>, StarException> create(GuiContext& context, ImageStretchSet const& imageStretchSet, GuiDirection direction);
   void setImageStretchSet(String const& beginImage, String const& innerImage, String const& endImage);

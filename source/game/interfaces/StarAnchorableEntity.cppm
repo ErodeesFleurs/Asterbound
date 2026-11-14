@@ -24,13 +24,8 @@ namespace Star {
 
 struct EntityAnchor {
   virtual ~EntityAnchor() = default;
-  virtual void const* queryType(TypeKey key) const noexcept {
-    return queryTypeOf<EntityAnchor>(this, key);
-  }
-  virtual std::string_view dynamicTypeName() const noexcept {
-    return Star::typeName<EntityAnchor>();
-  }
-
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<EntityAnchor>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<EntityAnchor>(); }
 
   Vec2F position;
   // If set, the entity should place the bottom center of its collision poly on
@@ -54,12 +49,10 @@ struct EntityAnchorState {
 
 class AnchorableEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<AnchorableEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<AnchorableEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<AnchorableEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AnchorableEntity>(); }
 
   virtual std::size_t anchorCount() const = 0;
   [[nodiscard]] virtual std::expected<std::shared_ptr<EntityAnchor const>, StarException> anchor(std::size_t anchorPositionIndex) const = 0;

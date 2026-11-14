@@ -19,13 +19,13 @@ namespace output_any_detail {
       if constexpr (text_writable<decltype(output_optional(value))>)
         return append_text(buffer, output_optional(value));
       else
-        std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", typeName<T>(),
-            static_cast<void const*>(std::addressof(value)));
+        std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", type_name<T>(),
+                       static_cast<void const*>(std::addressof(value)));
     } else if constexpr (text_writable<T>) {
       return append_text(buffer, value);
     } else {
-      std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", typeName<T>(),
-          static_cast<void const*>(std::addressof(value)));
+      std::format_to(std::back_inserter(buffer), "<type {} at address: {}>", type_name<T>(),
+                     static_cast<void const*>(std::addressof(value)));
     }
   }
 

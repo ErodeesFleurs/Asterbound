@@ -1614,7 +1614,7 @@ const GameTestRegistration uiWorldScope("LuaUiManager", "WorldAndPlayerTransitio
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   auto created = ScriptTestPane::create(**context);
@@ -1771,7 +1771,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
   PaneManager panes(**context);
   Map<String, std::shared_ptr<ScriptTestPane>> instances;
   LuaUpdateScript controller(fixture.root());
-  ASSERT_TRUE(controller.setScript("/interface/opensb/ui/manager.lua"));
+  ASSERT_TRUE(controller.setScript("/interface/asterbound/ui/manager.lua"));
   ASSERT_TRUE(controller.setLuaRoot(*luaRoot));
   LuaCallbacks callbacks;
   ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
@@ -1953,7 +1953,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
 const GameTestRegistration statusPresentation("LuaStatusPresentation", "LayoutMasksAndOverlappingTooltips", [](GameTest& fixture) {
   auto root = LuaRoot::create(fixture.root());
   ASSERT_TRUE(root) << root.error().what();
-  auto script = (*root)->createContext("/interface/opensb/status/status.lua");
+  auto script = (*root)->createContext("/interface/asterbound/status/status.lua");
   ASSERT_TRUE(script) << script.error().what();
   // Exercise the production presentation algorithm independently of a display.
   // The GUI smoke separately checks these commands against real effect pixels.
@@ -2031,7 +2031,7 @@ const GameTestRegistration statusPresentation("LuaStatusPresentation", "LayoutMa
 const GameTestRegistration breathPresentation("LuaBreathPresentation", "FloatBlockEdgesPhysicalGeometryAndWarningClock", [](GameTest& fixture) {
   auto root = LuaRoot::create(fixture.root());
   ASSERT_TRUE(root) << root.error().what();
-  auto script = (*root)->createContext("/interface/opensb/breath/breath.lua");
+  auto script = (*root)->createContext("/interface/asterbound/breath/breath.lua");
   ASSERT_TRUE(script) << script.error().what();
 
   // Compare the production numeric policy against the former float renderer at
@@ -2083,7 +2083,7 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets) << assets.error().what();
-  auto config = (*assets)->json("/interface/opensb/bookmarks/bookmarkeditor.config");
+  auto config = (*assets)->json("/interface/asterbound/bookmarks/bookmarkeditor.config");
   ASSERT_TRUE(config) << config.error().what();
   auto paneConfig = config->toObject();
   ASSERT_TRUE(paneConfig) << paneConfig.error().what();
@@ -2269,7 +2269,7 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets) << assets.error().what();
-  auto config = (*assets)->json("/interface/opensb/popup/popup.config");
+  auto config = (*assets)->json("/interface/asterbound/popup/popup.config");
   ASSERT_TRUE(config) << config.error().what();
   auto paneConfig = config->toObject();
   ASSERT_TRUE(paneConfig) << paneConfig.error().what();
@@ -2390,7 +2390,7 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot) << luaRoot.error().what();
     auto assets = root.assets();
     ASSERT_TRUE(assets) << assets.error().what();
-    auto config = (*assets)->json("/interface/opensb/songbook/songbook.config");
+    auto config = (*assets)->json("/interface/asterbound/songbook/songbook.config");
     ASSERT_TRUE(config) << config.error().what();
     auto paneConfig = config->toObject();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
@@ -2524,7 +2524,7 @@ const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalRe
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   auto rootCallbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
@@ -2775,7 +2775,7 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   std::shared_ptr<ScriptTestPane> instance;
@@ -2810,7 +2810,7 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
     if (!displayed) return std::unexpected(std::move(displayed.error()));
     if (modalMenu) {
       // Exercise the production action handler without initializing renderer-backed labels.
-      auto loaded = instance->evaluate("require '/interface/opensb/escapemenu/escapemenu.lua'");
+      auto loaded = instance->evaluate("require '/interface/asterbound/escapemenu/escapemenu.lua'");
       if (!loaded) return std::unexpected(std::move(loaded.error()));
     }
     return {};
@@ -2923,7 +2923,7 @@ const GameTestRegistration uiPausePolicy("LuaUiManager", "OnlyDisplayedPauseMenu
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/opensb/ui/controller.lua");
+  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/controller.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   std::shared_ptr<Pane> escape, options;
@@ -3035,7 +3035,7 @@ const GameTestRegistration
     ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
     auto assets = root.assets();
     ASSERT_TRUE(assets) << assets.error().what();
-    auto config = (*assets)->json("/interface/opensb/codex/codex.config");
+    auto config = (*assets)->json("/interface/asterbound/codex/codex.config");
     ASSERT_TRUE(config) << config.error().what();
     auto paneConfig = config->toObject();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
@@ -3097,7 +3097,7 @@ const GameTestRegistration
     ASSERT_TRUE(scroll->addChild("bookList", *list));
     ASSERT_TRUE(pane->addChild("scrollArea", scroll));
     PaneManager panes(**context);
-    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller) << controller.error().what();
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
@@ -3125,7 +3125,7 @@ const GameTestRegistration
     }));
     ASSERT_TRUE(controller->setCallbacks("interface", interface));
     auto initialized = controller->eval<LuaValue>(R"LUA(
-    require "/interface/opensb/codex/unread.lua"
+    require "/interface/asterbound/codex/unread.lua"
     definitions = {codex = root.assetJson("/interface.config:panes.codex")}
     session = {hasPlayer=true, playerGeneration=1, worldGeneration=1}
     checkpoint = {session = session}
@@ -3319,7 +3319,7 @@ const GameTestRegistration questTrackerPresentation(
     layoutJson->set("questProgress", *headlessProgress);
     layoutJson->erase("panefeature");
     layoutJson->erase("lblQuestObjectiveList");
-    auto config = (*assets)->json("/interface/opensb/questtracker/questtracker.config");
+    auto config = (*assets)->json("/interface/asterbound/questtracker/questtracker.config");
     ASSERT_TRUE(config) << config.error().what();
     auto paneConfig = config->toObject();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
@@ -3668,7 +3668,7 @@ const GameTestRegistration questLogPresentation(
 
     auto assets = root.assets();
     ASSERT_TRUE(assets);
-    auto config = (*assets)->json("/interface/opensb/questlog/questlog.config");
+    auto config = (*assets)->json("/interface/asterbound/questlog/questlog.config");
     ASSERT_TRUE(config) << config.error().what();
     auto paneConfig = config->toObject();
     ASSERT_TRUE(paneConfig);
@@ -3899,7 +3899,7 @@ const GameTestRegistration questLogPresentation(
 
     // Production registration and manager retention/scope policy, using the
     // actual consumer pane and native pane stack rather than an echoed service.
-    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller);
     LuaCallbacks interface;
     ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
@@ -4179,13 +4179,13 @@ const GameTestRegistration
         }
         return panes.displayPane(PaneLayer::ModalWindow, pane, {});
       }));
-    auto controller = (*luaRoot)->createContext("/interface/opensb/ui/manager.lua");
+    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller);
     ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
     ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
     ASSERT_TRUE(controller->setCallbacks("interface", interface));
     ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
-    require "/interface/opensb/questdialogs/pending.lua"
+    require "/interface/asterbound/questdialogs/pending.lua"
     session = {hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=1}
     checkpoint = {session=session}
     manager = UiManager.new(checkpoint, {}, session)
@@ -4466,7 +4466,7 @@ const GameTestRegistration
     auto available = MainInterface::paneIdAvailable("PlanetText");
     ASSERT_TRUE(available);
     EXPECT_TRUE(*available);
-    auto config = (*assets)->json("/interface/opensb/planettext/planettext.config");
+    auto config = (*assets)->json("/interface/asterbound/planettext/planettext.config");
     ASSERT_TRUE(config);
     auto paneConfig = config->toObject();
     ASSERT_TRUE(paneConfig);
@@ -4735,7 +4735,7 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
   ASSERT_TRUE(context);
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets);
-  auto config = (*assets)->json("/interface/opensb/notifications/notifications.config");
+  auto config = (*assets)->json("/interface/asterbound/notifications/notifications.config");
   ASSERT_TRUE(config);
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot);
@@ -4826,7 +4826,7 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
   ASSERT_TRUE(barSize);
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot);
-  auto script = (*luaRoot)->createContext("/interface/opensb/mainbar/geometry.lua");
+  auto script = (*luaRoot)->createContext("/interface/asterbound/mainbar/geometry.lua");
   ASSERT_TRUE(script);
   auto callbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(callbacks);

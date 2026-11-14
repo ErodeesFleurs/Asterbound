@@ -57,12 +57,10 @@ class ItemBag;
 
 class ItemGridWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ItemGridWidget, Widget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ItemGridWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ItemGridWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ItemGridWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ItemGridWidget>, StarException> create(GuiContext& context, std::shared_ptr<ItemBag const> bag, Vec2I const& dimensions, Vec2I const& spacing, String const& backingImage, unsigned bagOffset);
   [[nodiscard]] static std::expected<std::shared_ptr<ItemGridWidget>, StarException> create(GuiContext& context, std::shared_ptr<ItemBag const> bag, Vec2I const& dimensions, Vec2I const& rowSpacing, Vec2I const& columnSpacing, String const& backingImage, unsigned bagOffset);

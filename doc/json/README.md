@@ -4,7 +4,7 @@
 
 This directory documents selected resource formats and fields, not a complete schema for every Starbound asset. Base pages describe shared formats; the `openstarbound/` pages describe extensions available in Asterbound. Those existing directory names remain stable for links and compatibility.
 
-Resource paths such as `/humanoid/opensb/build.lua` are virtual asset paths. Repository paths such as `assets/asterbound/humanoid/opensb/build.lua` refer to files on disk; the physical Asterbound directory name does not replace the virtual `opensb` namespace.
+Resource paths such as `/humanoid/asterbound/build.lua` are virtual asset paths. Repository paths such as `assets/asterbound/humanoid/asterbound/build.lua` refer to files on disk. Owned virtual `opensb` path segments have moved to `asterbound`; external Mod imports and patches must migrate, and no old-path aliases are shipped. Entity IDs and public API reference paths remain unchanged; see [the migration boundary](../modding.md#bundled-mod-compatibility).
 
 ## Base formats
 

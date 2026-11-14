@@ -944,7 +944,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         if (!bucketSize)
           return std::unexpected(std::move(bucketSize.error()));
         if (totalLiquid >= *bucketSize) {
-          if (auto clientWorld = asRef<WorldClient>(worldp)) {
+          if (auto clientWorld = as_ref<WorldClient>(worldp)) {
             auto collected = clientWorld->get().collectLiquid(drainTiles, targetLiquid);
             if (!collected)
               return std::unexpected(std::move(collected.error()));

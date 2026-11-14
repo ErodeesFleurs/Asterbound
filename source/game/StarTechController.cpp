@@ -675,7 +675,7 @@ std::expected<void, StarException> TechController::initializeModules() {
         return std::unexpected(std::move(result.error()));
       if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(m_statusController->get())); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto player = asRef<Player>(m_parentEntity->get())) {
+      if (auto player = as_ref<Player>(m_parentEntity->get())) {
         if (auto result = add("player", LuaBindings::makePlayerCallbacks(m_root, player->get())); !result)
           return std::unexpected(std::move(result.error()));
       }
@@ -773,11 +773,13 @@ std::expected<LuaCallbacks, StarException> TechController::makeTechCallbacks(Tec
       m_yParentOffset.set(offset[1]);
     }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("parentLounging", [this]() {
-      if (auto entity = asRef<LoungingEntity>(m_parentEntity->get()))
-        return entity->get().loungingIn().has_value();
-      return false;
-    }); !result)
+  if (auto result = callbacks.registerCallback("parentLounging",
+                                               [this]() {
+                                                 if (auto entity = as_ref<LoungingEntity>(m_parentEntity->get()))
+                                                   return entity->get().loungingIn().has_value();
+                                                 return false;
+                                               });
+      !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("setToolUsageSuppressed", [this, &techModule](bool suppressed) {
       if (techModule.toolUsageSuppressed == suppressed)

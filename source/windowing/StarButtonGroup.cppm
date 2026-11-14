@@ -95,15 +95,13 @@ private:
 
 class ButtonGroupWidget : public ButtonGroup, public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
+  void const* query_type(TypeKey key) const noexcept override {
     // ButtonGroup is a non-polymorphic sibling, not a query-protocol base.
-    if (key == typeKey<ButtonGroup>())
+    if (key == type_key<ButtonGroup>())
       return static_cast<ButtonGroup const*>(this);
-    return queryTypeOf<ButtonGroupWidget, Widget>(this, key);
+    return query_type_of<ButtonGroupWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ButtonGroupWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ButtonGroupWidget>(); }
 
   explicit ButtonGroupWidget(GuiContext& context) : Widget(context) {}
 };

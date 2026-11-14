@@ -41,13 +41,8 @@ using ItemException = StarError<ItemExceptionTag, StarException>;
 
 class Item {
 public:
-  virtual void const* queryType(TypeKey key) const noexcept {
-    return queryTypeOf<Item>(this, key);
-  }
-  virtual std::string_view dynamicTypeName() const noexcept {
-    return Star::typeName<Item>();
-  }
-
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Item>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Item>(); }
 
   virtual ~Item();
 
@@ -213,12 +208,8 @@ private:
 
 class GenericItem : public Item {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<GenericItem, Item>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<GenericItem>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<GenericItem, Item>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GenericItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<GenericItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters);

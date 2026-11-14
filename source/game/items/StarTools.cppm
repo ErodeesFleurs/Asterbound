@@ -81,12 +81,10 @@ class ToolUserEntity;
 
 class MiningTool : public Item, public SwingableItem, public DurabilityItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<MiningTool, Item, SwingableItem, DurabilityItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<MiningTool, Item, SwingableItem, DurabilityItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<MiningTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MiningTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<MiningTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());
@@ -135,12 +133,10 @@ private:
 
 class HarvestingTool : public Item, public SwingableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<HarvestingTool, Item, SwingableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<HarvestingTool, Item, SwingableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<HarvestingTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HarvestingTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<HarvestingTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());
@@ -179,12 +175,10 @@ private:
 
 class WireTool : public Item, public FireableItem, public PointableItem, public BeamItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<WireTool, Item, FireableItem, PointableItem, BeamItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<WireTool, Item, FireableItem, PointableItem, BeamItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<WireTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WireTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<WireTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());
@@ -227,12 +221,10 @@ private:
 
 class BeamMiningTool : public Item, public FireableItem, public PreviewTileTool, public PointableItem, public BeamItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<BeamMiningTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<BeamMiningTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<BeamMiningTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BeamMiningTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<BeamMiningTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());
@@ -285,12 +277,10 @@ class PaintingBeamTool
     public PointableItem,
     public BeamItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<PaintingBeamTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<PaintingBeamTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<PaintingBeamTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PaintingBeamTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<PaintingBeamTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());

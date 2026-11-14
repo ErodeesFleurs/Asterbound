@@ -36,12 +36,8 @@ class Image;
 class LuaExecutionHost {
 public:
   virtual ~LuaExecutionHost() = default;
-  virtual void const* queryType(TypeKey key) const noexcept {
-    return queryTypeOf<LuaExecutionHost>(this, key);
-  }
-  virtual std::string_view dynamicTypeName() const noexcept {
-    return typeName<LuaExecutionHost>();
-  }
+  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<LuaExecutionHost>(this, key); }
+  virtual std::string_view dynamic_type_name() const noexcept { return type_name<LuaExecutionHost>(); }
 };
 using LuaEnginePtr = RefPtr<LuaEngine>;
 
@@ -575,12 +571,10 @@ struct LuaProfileEntry {
 // LuaContexts are not thread safe, use one LuaEngine per thread.
 class LuaEngine : public RefCounter {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<LuaEngine, RefCounter>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<LuaEngine, RefCounter>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return typeName<LuaEngine>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<LuaEngine>(); }
   // If 'safe' is true, then creates a lua engine with all builtin lua
   // functions that can affect the real world disabled.
   [[nodiscard]] static std::expected<LuaEnginePtr, StarException> create(bool safe = true);
@@ -1783,7 +1777,7 @@ namespace LuaDetail {
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
-      return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", typeName<T>()));
+      return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", type_name<T>()));
     return std::move(**converted);
   }
 
@@ -1918,7 +1912,7 @@ namespace LuaDetail {
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     new (*storage) T(std::move(value));
-    lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_engine.m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF));
+    lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_engine.m_registeredUserDataTypes.value(type_key<T>(), LUA_NOREF));
     lua_setmetatable(m_state, -2);
     return {};
   }
@@ -1926,7 +1920,7 @@ namespace LuaDetail {
     if (!is<LuaUserData>())
       return false;
     auto& engine = m_stack.engine();
-    int reference = engine.m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
+    int reference = engine.m_registeredUserDataTypes.value(type_key<T>(), LUA_NOREF);
     if (reference == LUA_NOREF)
       return false;
     auto state = m_stack.state();
@@ -1945,7 +1939,7 @@ namespace LuaDetail {
       return std::unexpected(std::move(matches.error()));
     if (!*matches)
       return std::unexpected(
-        LuaConversionException::format("Improper conversion from userdata to type {}", typeName<T>()));
+        LuaConversionException::format("Improper conversion from userdata to type {}", type_name<T>()));
     return std::ref(*static_cast<T*>(lua_touserdata(m_stack.state(), m_index)));
   }
 inline LuaReference::LuaReference(LuaDetail::LuaHandle handle) : m_handle(std::move(handle)) {}
@@ -2361,7 +2355,7 @@ template <typename T>
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (!*result)
-    return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", typeName<T>()));
+    return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", type_name<T>()));
   return std::move(**result);
 }
 
@@ -2371,7 +2365,7 @@ template <typename T>
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (!*result)
-    return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", typeName<T>()));
+    return std::unexpected(LuaConversionException::format("Error converting LuaValue to type '{}'", type_name<T>()));
   return std::move(**result);
 }
 
@@ -2471,7 +2465,7 @@ template <typename Ret, typename... Args>
 
 template <typename T>
 [[nodiscard]] std::expected<void, StarException> LuaEngine::registerUserDataType() {
-  if (m_registeredUserDataTypes.contains(typeKey<T>()))
+  if (m_registeredUserDataTypes.contains(type_key<T>()))
     return {};
   auto methods = LuaUserDataMethods<T>::make();
   if (!methods)
@@ -2510,7 +2504,7 @@ template <typename T>
   auto reference = copyHandle(table->handleIndex());
   if (!reference)
     return std::unexpected(std::move(reference.error()));
-  auto added = m_registeredUserDataTypes.add(typeKey<T>(), *reference);
+  auto added = m_registeredUserDataTypes.add(type_key<T>(), *reference);
   if (!added) {
     destroyHandle(*reference);
     return std::unexpected(std::move(added.error()));
@@ -2560,7 +2554,7 @@ template <typename T>
 
 template <typename T>
 [[nodiscard]] std::expected<bool, StarException> LuaEngine::userDataIsType(int handleIndex) {
-  int typeRef = m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
+  int typeRef = m_registeredUserDataTypes.value(type_key<T>(), LUA_NOREF);
   if (typeRef == LUA_NOREF)
     return false;
   LuaDetail::LuaStackRestore restore(m_state);
@@ -2575,9 +2569,9 @@ template <typename T>
 
 template <typename T>
 [[nodiscard]] std::expected<std::reference_wrapper<T>, StarException> LuaEngine::getUserData(int handleIndex) {
-  int typeRef = m_registeredUserDataTypes.value(typeKey<T>(), LUA_NOREF);
+  int typeRef = m_registeredUserDataTypes.value(type_key<T>(), LUA_NOREF);
   if (typeRef == LUA_NOREF)
-    return std::unexpected(LuaException::format("Cannot convert userdata type of {}, not registered", typeName<T>()));
+    return std::unexpected(LuaException::format("Cannot convert userdata type of {}, not registered", type_name<T>()));
   LuaDetail::LuaStackRestore restore(m_state);
   if (!lua_checkstack(m_state, 3))
     return std::unexpected(LuaException("Lua stack overflow while accessing userdata"));
@@ -2587,7 +2581,7 @@ template <typename T>
     return std::unexpected(LuaException("Cannot get userdata from lua type, no metatable found"));
   lua_rawgeti(m_state, LUA_REGISTRYINDEX, typeRef);
   if (!lua_rawequal(m_state, -1, -2) || !userdata)
-    return std::unexpected(LuaException::format("Improper conversion from userdata to type {}", typeName<T>()));
+    return std::unexpected(LuaException::format("Improper conversion from userdata to type {}", type_name<T>()));
   return std::reference_wrapper<T>(*static_cast<T*>(userdata));
 }
 

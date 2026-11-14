@@ -47,7 +47,8 @@ namespace Star {
 //
 // The boot config file can contain the following options:
 // 'assetDirectories' - Asset source search directories
-// 'logFileBackups' - Number of rotated backups of the target log file
+// 'logFileBackups' - Number of backups shared by startup and size-based rotation (default 10)
+// 'logFileSizeLimit' - Maximum active log bytes before rotation (default 33554432; 0 disables)
 // 'storageDirectory' - Primary Root storage directory
 // 'assetsSettings' - Merged with base assets settings
 // 'defaultConfiguration' - Merged with base default configuration

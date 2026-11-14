@@ -24,12 +24,10 @@ class ActorMovementController;
 // theres potentially more things shared that could be moved here
 class ActorEntity : public virtual MobileEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ActorEntity, MobileEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ActorEntity, MobileEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ActorEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ActorEntity>(); }
 
   // Successfully constructed actors always own both controllers.
   ActorMovementController& movementController() override = 0;

@@ -71,13 +71,10 @@ class AudioInstance;
 
 class Projectile : public virtual MobileEntity, public virtual ScriptedEntity, public virtual PhysicsEntity, public virtual StatusEffectEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Projectile, MobileEntity, ScriptedEntity, PhysicsEntity,
-        StatusEffectEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<Projectile, MobileEntity, ScriptedEntity, PhysicsEntity, StatusEffectEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Projectile>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Projectile>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<Projectile>, StarException> create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, Json const& parameters);
   [[nodiscard]] static std::expected<std::shared_ptr<Projectile>, StarException>

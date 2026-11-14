@@ -298,11 +298,16 @@ std::expected<void, StarException> EntityMap::forEachEntityAtTile(Vec2I const& p
     return std::unexpected(EntityMapException("Missing EntityMap::forEachEntityAtTile callback"));
   RectF rect(Vec2F(pos[0], pos[1]), Vec2F(pos[0] + 1, pos[1] + 1));
   return forEachEntity(rect, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-    if (auto tileEntity = as<TileEntity>(entity)) {
-      for (Vec2I space : tileEntity->spaces()) {
-        if (m_geometry.equal(pos, space + tileEntity->tilePosition())) {
-          auto result = callback(tileEntity);
-          if (!result) return std::unexpected(std::move(result.error()));
+    if (auto tile = as_ref<TileEntity>(*entity)) {
+      auto& tileEntity = tile->get();
+      std::shared_ptr<TileEntity> tileOwner;
+      for (Vec2I space : tileEntity.spaces()) {
+        if (m_geometry.equal(pos, space + tileEntity.tilePosition())) {
+          if (!tileOwner)
+            tileOwner = std::shared_ptr<TileEntity>(entity, std::addressof(tileEntity));
+          auto result = callback(tileOwner);
+          if (!result)
+            return std::unexpected(std::move(result.error()));
         }
       }
     }
@@ -375,12 +380,18 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityMap::findEntityAtTil
     return std::unexpected(EntityMapException("Missing EntityMap::findEntityAtTile filter"));
   RectF rect(Vec2F(pos[0], pos[1]), Vec2F(pos[0] + 1, pos[1] + 1));
   return findEntity(rect, [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
-    if (auto tileEntity = as<TileEntity>(entity)) {
-      for (Vec2I space : tileEntity->spaces()) {
-        if (m_geometry.equal(pos, space + tileEntity->tilePosition())) {
-          auto accepted = filter(tileEntity);
-          if (!accepted) return std::unexpected(std::move(accepted.error()));
-          if (*accepted) return true;
+    if (auto tile = as_ref<TileEntity>(*entity)) {
+      auto& tileEntity = tile->get();
+      std::shared_ptr<TileEntity> tileOwner;
+      for (Vec2I space : tileEntity.spaces()) {
+        if (m_geometry.equal(pos, space + tileEntity.tilePosition())) {
+          if (!tileOwner)
+            tileOwner = std::shared_ptr<TileEntity>(entity, std::addressof(tileEntity));
+          auto accepted = filter(tileOwner);
+          if (!accepted)
+            return std::unexpected(std::move(accepted.error()));
+          if (*accepted)
+            return true;
         }
       }
     }
@@ -430,32 +441,35 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
   double bestDistance = maxRadius + 100;
   double bestCenterDistance = maxRadius + 100;
   auto result = forEachEntity(rect, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-      if (auto ie = as<InteractiveEntity>(entity)) {
-        if (ie->isInteractive()) {
-          if (auto tileEntity = as<TileEntity>(entity)) {
-            for (Vec2I space : tileEntity->interactiveSpaces()) {
-              auto dist = m_geometry.diff(pos, centerOfTile(space + tileEntity->tilePosition())).magnitude();
-              auto centerDist = m_geometry.diff(tileEntity->metaBoundBox().center() + tileEntity->position(), pos).magnitude();
-              if ((dist < bestDistance) || ((dist == bestDistance) && (centerDist < bestCenterDistance))) {
-                interactiveEntity = ie;
-                bestDistance = dist;
-                bestCenterDistance = centerDist;
-              }
-            }
-          } else {
-            auto box = ie->interactiveBoundBox().translated(entity->position());
-            auto dist = m_geometry.diffToNearestCoordInBox(box, pos).magnitude();
-            auto centerDist = m_geometry.diff(box.center(), pos).magnitude();
+    if (auto interactive = as_ref<InteractiveEntity>(*entity)) {
+      auto& ie = interactive->get();
+      if (ie.isInteractive()) {
+        if (auto tile = as_ref<TileEntity>(*entity)) {
+          auto& tileEntity = tile->get();
+          for (Vec2I space : tileEntity.interactiveSpaces()) {
+            auto dist = m_geometry.diff(pos, centerOfTile(space + tileEntity.tilePosition())).magnitude();
+            auto centerDist =
+              m_geometry.diff(tileEntity.metaBoundBox().center() + tileEntity.position(), pos).magnitude();
             if ((dist < bestDistance) || ((dist == bestDistance) && (centerDist < bestCenterDistance))) {
-              interactiveEntity = ie;
+              interactiveEntity = std::shared_ptr<InteractiveEntity>(entity, std::addressof(ie));
               bestDistance = dist;
               bestCenterDistance = centerDist;
             }
           }
+        } else {
+          auto box = ie.interactiveBoundBox().translated(entity->position());
+          auto dist = m_geometry.diffToNearestCoordInBox(box, pos).magnitude();
+          auto centerDist = m_geometry.diff(box.center(), pos).magnitude();
+          if ((dist < bestDistance) || ((dist == bestDistance) && (centerDist < bestCenterDistance))) {
+            interactiveEntity = std::shared_ptr<InteractiveEntity>(entity, std::addressof(ie));
+            bestDistance = dist;
+            bestCenterDistance = centerDist;
+          }
         }
       }
-      return {};
-    });
+    }
+    return {};
+  });
   if (!result) return std::unexpected(std::move(result.error()));
   if (bestDistance <= maxRadius)
     return interactiveEntity;
@@ -465,17 +479,18 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
 std::expected<bool, StarException> EntityMap::tileIsOccupied(Vec2I const& pos, bool includeEphemeral) const {
   RectF rect(Vec2F(pos[0], pos[1]), Vec2F(pos[0] + 1, pos[1] + 1));
   auto result = findEntity(rect, [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
-      if (auto tileEntity = as<TileEntity>(entity)) {
-        if (includeEphemeral || !tileEntity->ephemeral()) {
-          for (Vec2I space : tileEntity->spaces()) {
-            if (m_geometry.equal(pos, space + tileEntity->tilePosition())) {
-              return true;
-            }
+    if (auto tile = as_ref<TileEntity>(*entity)) {
+      auto& tileEntity = tile->get();
+      if (includeEphemeral || !tileEntity.ephemeral()) {
+        for (Vec2I space : tileEntity.spaces()) {
+          if (m_geometry.equal(pos, space + tileEntity.tilePosition())) {
+            return true;
           }
         }
       }
-      return false;
-    });
+    }
+    return false;
+  });
   if (!result) return std::unexpected(std::move(result.error()));
   return static_cast<bool>(*result);
 }

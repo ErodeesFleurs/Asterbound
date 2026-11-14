@@ -185,7 +185,7 @@ std::expected<bool, StarException> LuaBindings::EntityCallbacks::isValidTarget(E
     return monster->aggressive();
 
   if (auto npc = as<Npc>(target)) {
-    if (auto attackerNpc = asRef<Npc>(entity))
+    if (auto attackerNpc = as_ref<Npc>(entity))
       return npc->aggressive() || attackerNpc->get().aggressive();
     return true;
   }

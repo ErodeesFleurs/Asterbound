@@ -77,12 +77,10 @@ namespace Star {
 
 class SwingableItem : public FireableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<SwingableItem, FireableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<SwingableItem, FireableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<SwingableItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SwingableItem>(); }
 
   SwingableItem();
   ~SwingableItem() override = default;

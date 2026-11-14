@@ -14,12 +14,10 @@ namespace Star {
 // Implements DataStream using function objects as implementations of read/write.
 class DataStreamFunctions : public DataStream {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DataStreamFunctions, DataStream>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DataStreamFunctions, DataStream>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return typeName<DataStreamFunctions>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamFunctions>(); }
   // Either callback can be unset; invoking that direction returns an error.
   DataStreamFunctions(std::function<std::expected<std::size_t, StarException>(std::span<char>)> reader,
       std::function<std::expected<std::size_t, StarException>(std::span<char const>)> writer);
@@ -34,12 +32,10 @@ private:
 
 class DataStreamIODevice : public DataStream {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DataStreamIODevice, DataStream>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DataStreamIODevice, DataStream>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return typeName<DataStreamIODevice>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamIODevice>(); }
   // Borrows the device for the entire adapter lifetime.
   explicit DataStreamIODevice(IODevice& device);
 
@@ -56,12 +52,10 @@ private:
 
 class DataStreamBuffer : public DataStream {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DataStreamBuffer, DataStream>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DataStreamBuffer, DataStream>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return typeName<DataStreamBuffer>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamBuffer>(); }
   // Serialization owns its output; synchronous deserialization borrows its input.
   // Deserialization callbacks read only and must keep the input storage valid.
 
@@ -187,12 +181,10 @@ private:
 
 class DataStreamExternalBuffer : public DataStream {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DataStreamExternalBuffer, DataStream>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DataStreamExternalBuffer, DataStream>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return typeName<DataStreamExternalBuffer>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamExternalBuffer>(); }
   DataStreamExternalBuffer();
   // Borrows read-only storage; it must remain valid and unmoved until reset or destruction.
   explicit DataStreamExternalBuffer(std::span<char const> externalData);
@@ -228,10 +220,10 @@ public:
   using DataStreamExternalBuffer::DataStreamExternalBuffer;
   using DataStreamExternalBuffer::read_vlq_u;
 
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DataStreamReader, DataStreamExternalBuffer, DataStream>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DataStreamReader, DataStreamExternalBuffer>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override { return typeName<DataStreamReader>(); }
+  std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamReader>(); }
 
   [[nodiscard]] std::expected<std::size_t, StarException> read_vlq_u(std::uint64_t& value) override;
 };

@@ -302,7 +302,7 @@ std::expected<void, StarException> KeybindingsMenu::activateBinding(Widget& widg
     return std::unexpected(std::move(deleteButton.error()));
   if (auto result = (*deleteButton)->show(); !result)
     return std::unexpected(std::move(result.error()));
-  auto button = rconvert<ButtonWidget>(widget);
+  auto button = convert_ref<ButtonWidget>(widget);
   if (!button)
     return std::unexpected(std::move(button.error()));
   button->get().setHighlighted(true);
@@ -365,7 +365,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
     }();
     buttonText.push_back(description ? std::move(*description) : String("unknown"));
   }
-  auto button = rconvert<ButtonWidget>(*activeKeybinding);
+  auto button = convert_ref<ButtonWidget>(*activeKeybinding);
   if (!button)
     return std::unexpected(std::move(button.error()));
   button->get().setText(buttonText.join(", "));
@@ -398,7 +398,7 @@ std::expected<void, StarException> KeybindingsMenu::clearActive() {
   (*base)[key->get()] = JsonArray{};
   if (auto result = (*config)->set("bindings", *base); !result)
     return std::unexpected(std::move(result.error()));
-  auto button = rconvert<ButtonWidget>(*activeKeybinding);
+  auto button = convert_ref<ButtonWidget>(*activeKeybinding);
   if (!button)
     return std::unexpected(std::move(button.error()));
   button->get().setText("<Unbound>");
@@ -418,7 +418,7 @@ std::expected<void, StarException> KeybindingsMenu::exitActiveMode() {
     return std::unexpected(std::move(deleteButton.error()));
   if (auto result = (*deleteButton)->hide(); !result)
     return std::unexpected(std::move(result.error()));
-  auto button = rconvert<ButtonWidget>(*activeKeybinding);
+  auto button = convert_ref<ButtonWidget>(*activeKeybinding);
   if (!button)
     return std::unexpected(std::move(button.error()));
   button->get().setHighlighted(false);

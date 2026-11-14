@@ -159,7 +159,7 @@ std::expected<void, StarException> CharSelectionPane::init() {
   guiReader.registerCallback("createCharButton", [this](Widget&) { return m_createCallback(); });
   guiReader.registerCallback("searchCharacter", [this](Widget& obj) -> std::expected<void, StarException> {
     m_downScroll = 0;
-    auto textBox = rconvert<TextBoxWidget>(obj);
+    auto textBox = convert_ref<TextBoxWidget>(obj);
     if (!textBox)
       return std::unexpected(std::move(textBox.error()));
     auto trimmed = textBox->get().getText().trim();
@@ -183,7 +183,7 @@ std::expected<void, StarException> CharSelectionPane::init() {
     auto configuration = context().root().configuration();
     if (!configuration)
       return std::unexpected(std::move(configuration.error()));
-    auto button = rconvert<ButtonWidget>(widget);
+    auto button = convert_ref<ButtonWidget>(widget);
     if (!button)
       return std::unexpected(std::move(button.error()));
     return (*configuration)->set("characterSwapDismisses", button->get().isChecked());

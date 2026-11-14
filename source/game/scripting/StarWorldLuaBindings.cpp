@@ -824,66 +824,79 @@ namespace LuaBindings {
         !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("name", [&world]() -> std::optional<String> {
-        if (auto serverWorld = asRef<WorldServer>(world)) {
-          if (auto worldTemplate = serverWorld->get().worldTemplate())
-            return worldTemplate->worldName();
-        } else if (auto clientWorld = asRef<WorldClient>(world)) {
-          if (auto worldTemplate = clientWorld->get().currentTemplate())
-            return worldTemplate->worldName();
-        }
-        return {};
-      }); !result)
+    if (auto result = callbacks.registerCallback("name",
+                                                 [&world]() -> std::optional<String> {
+                                                   if (auto serverWorld = as_ref<WorldServer>(world)) {
+                                                     if (auto worldTemplate = serverWorld->get().worldTemplate())
+                                                       return worldTemplate->worldName();
+                                                   } else if (auto clientWorld = as_ref<WorldClient>(world)) {
+                                                     if (auto worldTemplate = clientWorld->get().currentTemplate())
+                                                       return worldTemplate->worldName();
+                                                   }
+                                                   return {};
+                                                 });
+        !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("type", [&world](LuaEngine& engine) -> std::expected<LuaString, StarException> {
-        if (auto serverWorld = asRef<WorldServer>(world)) {
-          if (auto worldParameters = serverWorld->get().worldTemplate()->worldParameters())
-            return engine.createString(worldParameters->typeName);
-        } else if (auto clientWorld = asRef<WorldClient>(world)) {
-          if (auto worldParameters = clientWorld->get().currentTemplate()->worldParameters())
-            return engine.createString(worldParameters->typeName);
-        }
-        return engine.createString("unknown");
-      }); !result)
+    if (auto result = callbacks.registerCallback(
+          "type",
+          [&world](LuaEngine& engine) -> std::expected<LuaString, StarException> {
+            if (auto serverWorld = as_ref<WorldServer>(world)) {
+              if (auto worldParameters = serverWorld->get().worldTemplate()->worldParameters())
+                return engine.createString(worldParameters->typeName);
+            } else if (auto clientWorld = as_ref<WorldClient>(world)) {
+              if (auto worldParameters = clientWorld->get().currentTemplate()->worldParameters())
+                return engine.createString(worldParameters->typeName);
+            }
+            return engine.createString("unknown");
+          });
+        !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("inSurfaceLayer", [&world](Vec2I const& position) -> bool {
-        if (auto serverWorld = asRef<WorldServer>(world))
-          return serverWorld->get().worldTemplate()->inSurfaceLayer(position);
-        else if (auto clientWorld = asRef<WorldClient>(world))
-          return clientWorld->get().currentTemplate()->inSurfaceLayer(position);
-        return false;
-      }); !result)
+    if (auto result =
+          callbacks.registerCallback("inSurfaceLayer",
+                                     [&world](Vec2I const& position) -> bool {
+                                       if (auto serverWorld = as_ref<WorldServer>(world))
+                                         return serverWorld->get().worldTemplate()->inSurfaceLayer(position);
+                                       else if (auto clientWorld = as_ref<WorldClient>(world))
+                                         return clientWorld->get().currentTemplate()->inSurfaceLayer(position);
+                                       return false;
+                                     });
+        !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("surfaceLevel", [&world]() -> float {
-        if (auto serverWorld = asRef<WorldServer>(world))
-          return serverWorld->get().worldTemplate()->surfaceLevel();
-        else if (auto clientWorld = asRef<WorldClient>(world))
-          return clientWorld->get().currentTemplate()->surfaceLevel();
-        else
-          return world.geometry().size()[1] / 2.0f;
-      }); !result)
+    if (auto result = callbacks.registerCallback("surfaceLevel",
+                                                 [&world]() -> float {
+                                                   if (auto serverWorld = as_ref<WorldServer>(world))
+                                                     return serverWorld->get().worldTemplate()->surfaceLevel();
+                                                   else if (auto clientWorld = as_ref<WorldClient>(world))
+                                                     return clientWorld->get().currentTemplate()->surfaceLevel();
+                                                   else
+                                                     return world.geometry().size()[1] / 2.0f;
+                                                 });
+        !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto result = callbacks.registerCallback("terrestrial", [&world]() -> bool {
-        if (auto serverWorld = asRef<WorldServer>(world)) {
-          if (auto worldParameters = serverWorld->get().worldTemplate()->worldParameters())
-            return worldParameters->type() == WorldParametersType::TerrestrialWorldParameters;
-        } else if (auto clientWorld = asRef<WorldClient>(world)) {
-          if (auto worldParameters = clientWorld->get().currentTemplate()->worldParameters())
-            return worldParameters->type() == WorldParametersType::TerrestrialWorldParameters;
-        }
-        return false;
-      }); !result)
+    if (auto result = callbacks.registerCallback(
+          "terrestrial",
+          [&world]() -> bool {
+            if (auto serverWorld = as_ref<WorldServer>(world)) {
+              if (auto worldParameters = serverWorld->get().worldTemplate()->worldParameters())
+                return worldParameters->type() == WorldParametersType::TerrestrialWorldParameters;
+            } else if (auto clientWorld = as_ref<WorldClient>(world)) {
+              if (auto worldParameters = clientWorld->get().currentTemplate()->worldParameters())
+                return worldParameters->type() == WorldParametersType::TerrestrialWorldParameters;
+            }
+            return false;
+          });
+        !result)
       return std::unexpected(std::move(result.error()));
 
     if (auto result = callbacks.registerCallback("biomeBlocksAt", [&world](Vec2I position) -> std::expected<std::optional<List<MaterialId>>, StarException> {
         std::shared_ptr<WorldTemplate const> worldTemplate;
-        if (auto client = asRef<WorldClient>(world))
+        if (auto client = as_ref<WorldClient>(world))
           worldTemplate = client->get().currentTemplate();
-        else if (auto server = asRef<WorldServer>(world))
+        else if (auto server = as_ref<WorldServer>(world))
           worldTemplate = server->get().worldTemplate();
         if (worldTemplate) {
           auto blockResult = worldTemplate->blockInfo(position[0], position[1]);
@@ -904,24 +917,25 @@ namespace LuaBindings {
       }); !result)
       return std::unexpected(std::move(result.error()));
 
-
-    if (auto result = callbacks.registerCallback("dungeonId", [&world](Vec2I position) -> std::expected<DungeonId, StarException> {
-        if (auto serverWorld = asRef<WorldServer>(world)) {
-          return serverWorld->get().dungeonId(position);
-        } else {
-          auto clientWorld = rconvert<WorldClient>(world);
-          if (!clientWorld)
-            return std::unexpected(std::move(clientWorld.error()));
-          return clientWorld->get().dungeonId(position);
-        }
-      }); !result)
+    if (auto result = callbacks.registerCallback("dungeonId",
+                                                 [&world](Vec2I position) -> std::expected<DungeonId, StarException> {
+                                                   if (auto serverWorld = as_ref<WorldServer>(world)) {
+                                                     return serverWorld->get().dungeonId(position);
+                                                   } else {
+                                                     auto clientWorld = convert_ref<WorldClient>(world);
+                                                     if (!clientWorld)
+                                                       return std::unexpected(std::move(clientWorld.error()));
+                                                     return clientWorld->get().dungeonId(position);
+                                                   }
+                                                 });
+        !result)
       return std::unexpected(std::move(result.error()));
 
     if (auto result = callbacks.registerCallback("biomeAt", [&world](Vec2I position) -> std::expected<Json, StarException> {
         std::shared_ptr<WorldTemplate const> worldTemplate;
-        if (auto client = asRef<WorldClient>(world))
+        if (auto client = as_ref<WorldClient>(world))
           worldTemplate = client->get().currentTemplate();
-        else if (auto server = asRef<WorldServer>(world))
+        else if (auto server = as_ref<WorldServer>(world))
           worldTemplate = server->get().worldTemplate();
         if (worldTemplate) {
           auto blockResult = worldTemplate->blockInfo(position[0], position[1]);
@@ -941,9 +955,9 @@ namespace LuaBindings {
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.registerCallback("blockInfoAt", [&world](Vec2I position) -> std::expected<Json, StarException> {
         std::shared_ptr<WorldTemplate const> worldTemplate;
-        if (auto client = asRef<WorldClient>(world))
+        if (auto client = as_ref<WorldClient>(world))
           worldTemplate = client->get().currentTemplate();
-        else if (auto server = asRef<WorldServer>(world))
+        else if (auto server = as_ref<WorldServer>(world))
           worldTemplate = server->get().worldTemplate();
         if (!worldTemplate)
           return {};
@@ -955,7 +969,7 @@ namespace LuaBindings {
       }); !result)
       return std::unexpected(std::move(result.error()));
 
-    if (auto clientWorld = asRef<WorldClient>(world)) {
+    if (auto clientWorld = as_ref<WorldClient>(world)) {
       if (auto result = callbacks.registerCallback("inWorld", [clientWorld]() { return clientWorld->get().inWorld(); }); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = callbacks.registerCallback("mainPlayer", [clientWorld]() -> std::optional<int> {
@@ -1030,7 +1044,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(result.error()));
     }
 
-    if (auto serverWorld = asRef<WorldServer>(world)) {
+    if (auto serverWorld = as_ref<WorldServer>(world)) {
       if (auto result = callbacks.registerCallback("isClient", []() { return false; }); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = callbacks.registerCallback("isServer", []() { return true;  }); !result)
@@ -1960,10 +1974,10 @@ namespace LuaBindings {
 
     if (auto result = callbacks.registerCallback("oceanLevel", [&world](Vec2I position) -> std::expected<int, StarException> {
         std::shared_ptr<WorldTemplate const> worldTemplate;
-        if (auto server = asRef<WorldServer>(world))
+        if (auto server = as_ref<WorldServer>(world))
           worldTemplate = server->get().worldTemplate();
         else {
-          auto client = rconvert<WorldClient>(world);
+          auto client = convert_ref<WorldClient>(world);
           if (!client)
             return std::unexpected(std::move(client.error()));
           worldTemplate = client->get().currentTemplate();
@@ -2927,13 +2941,13 @@ namespace LuaBindings {
     auto entity = world.entity(entityId);
     if (!entity)
       return std::unexpected(StarException::format("No such entity with id {}", entityId));
-    if (auto npc = asRef<Npc>(*entity))
+    if (auto npc = as_ref<Npc>(*entity))
       npc->get().setUniqueId(uniqueId);
-    else if (auto monster = asRef<Monster>(*entity))
+    else if (auto monster = as_ref<Monster>(*entity))
       monster->get().setUniqueId(uniqueId);
-    else if (auto object = asRef<Object>(*entity))
+    else if (auto object = as_ref<Object>(*entity))
       object->get().setUniqueId(uniqueId);
-    else if (auto stagehand = asRef<Stagehand>(*entity))
+    else if (auto stagehand = as_ref<Stagehand>(*entity))
       stagehand->get().setUniqueId(uniqueId);
     else {
       if (!EntityTypeNames)

@@ -34,12 +34,10 @@ namespace Star {
 
 class PortraitEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<PortraitEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<PortraitEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<PortraitEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PortraitEntity>(); }
 
   [[nodiscard]] virtual std::expected<List<Drawable>, StarException> portrait(PortraitMode mode) const = 0;
 };

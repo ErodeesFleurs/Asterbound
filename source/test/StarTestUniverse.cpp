@@ -210,7 +210,7 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   // The real client supplies input callbacks bound to its explicit Input owner.
   // This headless fixture has no input device or client Input, so provide
   // callbacks where nothing is ever bound. OpenStarbound's player
-  // scripts (e.g. /scripts/opensb/player/copy_paste.lua) call input.bindDown
+  // scripts (e.g. /scripts/asterbound/player/copy_paste.lua) call input.bindDown
   // from update() and would otherwise log a Lua error every frame.
   LuaCallbacks inputCallbacks;
   auto bindState = [](String const&, String const&) -> std::optional<unsigned> { return {}; };

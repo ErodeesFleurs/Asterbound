@@ -1623,6 +1623,7 @@ const GameTestRegistration assetsFailureCacheReload(
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     auto path = File::relative_to(*directory, "failure.json");
     ASSERT_TRUE(File::write_file(String("{ invalid json"), path));
+    ASSERT_TRUE(File::write_file(String(R"({"following":17})"), File::relative_to(*directory, "following.json")));
     Assets::Settings settings{};
     settings.workerPoolSize = 2;
     settings.assetTimeToLive = 600;
@@ -1638,6 +1639,11 @@ const GameTestRegistration assetsFailureCacheReload(
     auto reason = first.error().diagnostic_summary()->reason;
     ASSERT_TRUE(File::write_file(String(R"({"recovered":42})"), path));
     (*assets)->clearCache();
+    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json", "/following.json"}));
+    ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
+    auto following = (*assets)->json("/following.json");
+    ASSERT_TRUE(following);
+    EXPECT_EQ(following->getInt("following"), 17);
     auto cached = (*assets)->json("/failure.json");
     ASSERT_FALSE(cached);
     EXPECT_EQ(cached.error().diagnostic_summary()->reason, reason);

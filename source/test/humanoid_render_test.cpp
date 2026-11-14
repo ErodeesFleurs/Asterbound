@@ -74,7 +74,7 @@ const GameTestRegistration
       ASSERT_TRUE(descriptor);
       auto item = (*database)->item(*descriptor);
       ASSERT_TRUE(item);
-      auto chest = asRef<ChestArmor>(**item);
+      auto chest = as_ref<ChestArmor>(**item);
       ASSERT_TRUE(chest);
       if (!chest->get().backSleeveFrameset(identity.gender).empty()) {
         chestName = name;
@@ -87,7 +87,7 @@ const GameTestRegistration
       ASSERT_TRUE(descriptor);
       auto item = (*database)->item(*descriptor);
       ASSERT_TRUE(item);
-      auto chest = asRef<ChestArmor>(**item);
+      auto chest = as_ref<ChestArmor>(**item);
       ASSERT_TRUE(chest);
       ASSERT_EQ(chest->get().fullbright(), fullbright);
       ASSERT_TRUE((*humanoid)->setWearableFromChest(0, chest->get(), identity.gender));
@@ -970,7 +970,7 @@ const GameTestRegistration humanoidTickOwnedPose(
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "species")));
     ASSERT_TRUE(File::write_file(String(R"([
-      {"op":"add","path":"/buildScripts","value":["/humanoid/opensb/build.lua"]}
+      {"op":"add","path":"/buildScripts","value":["/humanoid/asterbound/build.lua"]}
     ])"),
                                  File::relative_to(overlay, "species/human.species.patch")));
     auto settings = fixture.rootSettings();

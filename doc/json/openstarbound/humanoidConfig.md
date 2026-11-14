@@ -45,7 +45,7 @@ The animation must contain these stateTypes and states for some hardcoded behavi
 
 All other animation data is entirely configurable.
 
-For example, the hardcoded humanoid animations require fields such as `walkBob` and `armWalkSeq` to behave in a fixed way. The bundled [`/humanoid/opensb/build.lua`](../../../assets/asterbound/humanoid/opensb/build.lua) generates animation frame properties that imitate this behavior, but a custom build script can generate different output.
+For example, the hardcoded humanoid animations require fields such as `walkBob` and `armWalkSeq` to behave in a fixed way. The bundled [`/humanoid/asterbound/build.lua`](../../../assets/asterbound/humanoid/asterbound/build.lua) generates animation frame properties that imitate this behavior, but a custom build script can generate different output.
 
 ## `JsonObject` stateAnimations
 Each key must be a humanoid state `idle`, `walk`, `run`, `jump`, `fall`, `swim`, `swimIdle`, `duck`, `sit`, `lay` for a JsonObject that will control what animation states defined in the animation config are triggered when each state is triggered, this is so that when connecting to a retail server, these animations will trigger locally on your client.

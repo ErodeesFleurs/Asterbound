@@ -85,12 +85,10 @@ class World;
 
 class BeamItem : public virtual NonRotatedDrawablesItem, public virtual ToolUserItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<BeamItem, NonRotatedDrawablesItem, ToolUserItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<BeamItem, NonRotatedDrawablesItem, ToolUserItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<BeamItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BeamItem>(); }
 
   enum class EndType { Invalid = -1, Object, Tile, TileGroup, Wire };
 

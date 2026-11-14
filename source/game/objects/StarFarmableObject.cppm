@@ -69,12 +69,10 @@ class Root;
 
 class FarmableObject : public Object {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<FarmableObject, Object>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<FarmableObject, Object>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<FarmableObject>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FarmableObject>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<FarmableObject>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters);
 

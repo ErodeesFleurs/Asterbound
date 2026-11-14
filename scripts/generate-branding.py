@@ -114,7 +114,7 @@ def main():
     write_ico(ROOT / "source/client/asterbound.ico", [icon(n, args.font) for n in SIZES])
     write_ico(ROOT / "source/server/asterbound_server.ico",
               [icon(n, args.font, SERVER) for n in SIZES])
-    icon(16, args.font).save(ROOT / "assets/asterbound/opensb/modicon.png")
+    icon(16, args.font).save(ROOT / "assets/asterbound/asterbound/modicon.png")
     installer = Image.new("RGBA", (138, 140), BACKGROUND)
     installer.alpha_composite(icon(128, args.font), (5, 6))
     installer.convert("RGB").save(ROOT / "scripts/inno/small.bmp")

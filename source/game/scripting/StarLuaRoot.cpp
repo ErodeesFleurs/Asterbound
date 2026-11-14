@@ -38,7 +38,7 @@ namespace Star {
 
 std::expected<std::reference_wrapper<Root>, StarException> luaExecutionRoot(LuaEngine& engine) {
   if (auto host = engine.executionHost()) {
-    if (auto scope = asRef<LuaExecutionScope>(host->get()))
+    if (auto scope = as_ref<LuaExecutionScope>(host->get()))
       return std::ref(scope->get().root());
   }
   return std::unexpected(LuaException("Game Lua conversion requires an explicit game execution scope"));
@@ -137,6 +137,8 @@ std::expected<void, StarException> LuaRoot::restart() {
   (*engine)->setInstructionMeasureInterval(*measureInterval);
   m_luaEngine = std::move(*engine);
   m_sourceDiagnostics = std::move(sourceDiagnostics);
+  if (m_generation != 0)
+    m_root.logger().reset_exception_repeats();
   ++m_generation;
   return {};
 }
@@ -227,7 +229,10 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
                 chain += " -> ";
               chain += entry;
             }
-            return std::unexpected(LuaException::format("Cyclic Lua require: {} -> {}", chain, path));
+            auto error = LuaException::format("Cyclic Lua require: {} -> {}", chain, path);
+            auto summary = *error.diagnostic_summary();
+            summary.kind = ExceptionSummaryKind::ScriptRuntime;
+            return std::unexpected(std::move(error).with_summary(std::move(summary)));
           }
           auto script = cache->script(environment.stack().engine(), path, revision, *sourceDiagnostics);
           if (!script)

@@ -26,12 +26,10 @@ namespace Star {
 // All ScriptedEntity methods should only be called on master entities
 class ScriptedEntity : public virtual Entity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ScriptedEntity, Entity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ScriptedEntity, Entity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ScriptedEntity>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScriptedEntity>(); }
 
   // Missing/unloaded script contexts return an empty optional; execution errors
   // are returned separately without losing the diagnostic.

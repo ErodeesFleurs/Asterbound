@@ -171,12 +171,11 @@ export namespace Star {
 
 class MaterialItem : public Item, public FireableItem, public PreviewTileTool, public RenderableItem, public PreviewableItem, public BeamItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<MaterialItem, Item, FireableItem, PreviewTileTool, RenderableItem, PreviewableItem, BeamItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<MaterialItem, Item, FireableItem, PreviewTileTool, RenderableItem, PreviewableItem, BeamItem>(
+      this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<MaterialItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MaterialItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<MaterialItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& settings);
@@ -386,7 +385,7 @@ std::expected<void, StarException> MaterialItem::init(ToolUserEntity& owner, Too
   auto sound = owner.addSound(root().random().randValueFrom(m_placeSounds), 1.0f, 2.0f);
   if (!sound)
     return std::unexpected(std::move(sound.error()));
-  if (auto player = asRef<Player>(owner))
+  if (auto player = as_ref<Player>(owner))
     return updatePropertiesFromPlayer(player->get());
   return {};
 }
@@ -416,7 +415,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  if (auto player = asRef<Player>(itemOwner->get())) {
+  if (auto player = as_ref<Player>(itemOwner->get())) {
     if (auto input = itemOwner->get().isMaster() ? player->get().input() : std::nullopt) {
       if (auto presses = input->get().bindDown("opensb", "materialCollisionCycle")) {
         auto database = root().materialDatabase();
@@ -680,7 +679,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  auto player = asRef<Player>(itemOwner->get());
+  auto player = as_ref<Player>(itemOwner->get());
   if (!player)
     return 0;
   
@@ -827,7 +826,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
       return std::unexpected(std::move(played.error()));
   }
 
-  if (auto item = asRef<FireableItem>(beamAxe))
+  if (auto item = as_ref<FireableItem>(beamAxe))
     setFireTimer(item->get().windupTime() + item->get().cooldownTime());
   
   return success;
@@ -1076,7 +1075,7 @@ std::expected<MaterialHue, StarException> MaterialItem::placementHueShift(Vec2I 
   auto itemWorld = world();
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
-  if (auto worldClient = asRef<WorldClient>(itemWorld->get())) {
+  if (auto worldClient = as_ref<WorldClient>(itemWorld->get())) {
     auto worldTemplate = worldClient->get().currentTemplate();
     auto biomeIndex = worldTemplate->blockBiomeIndex(pos[0], pos[1]);
     if (!biomeIndex)

@@ -325,7 +325,7 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
     return std::unexpected(std::move(musicDelta.error()));
   if (auto result = m_musicSlider->setRange(m_musicRange, *musicDelta); !result)
     return std::unexpected(std::move(result.error()));
-  auto voicePath = config->getString("voiceSettingsPanePath", "/interface/opensb/voicechat/voicechat.config");
+  auto voicePath = config->getString("voiceSettingsPanePath", "/interface/asterbound/voicechat/voicechat.config");
   if (!voicePath)
     return std::unexpected(std::move(voicePath.error()));
   auto voiceConfig = (*assets)->json(*voicePath);
@@ -335,7 +335,7 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   if (!voiceMenu)
     return std::unexpected(std::move(voiceMenu.error()));
   m_voiceSettingsMenu = std::move(*voiceMenu);
-  auto bindingsPath = config->getString("bindingsPanePath", "/interface/opensb/bindings/bindings.config");
+  auto bindingsPath = config->getString("bindingsPanePath", "/interface/asterbound/bindings/bindings.config");
   if (!bindingsPath)
     return std::unexpected(std::move(bindingsPath.error()));
   auto bindingsConfig = (*assets)->json(*bindingsPath);

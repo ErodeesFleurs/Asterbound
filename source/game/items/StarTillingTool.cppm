@@ -90,12 +90,10 @@ export namespace Star {
 
 class TillingTool : public Item, public SwingableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<TillingTool, Item, SwingableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<TillingTool, Item, SwingableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<TillingTool>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TillingTool>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<TillingTool>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());

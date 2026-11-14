@@ -1,4 +1,7 @@
 @echo off
+cmake -P cmake\AsterboundVersion.cmake
+if errorlevel 1 exit /b %errorlevel%
+
 set client=client_distribution
 if exist %client% rmdir %client% /S /Q
 
@@ -16,6 +19,7 @@ xcopy %client% %server% /E /I
 
 .\dist\asset_packer.exe -c scripts\packing.config assets\asterbound %client%\assets\asterbound.pak
 .\dist\asset_packer.exe -c scripts\packing.config assets\asterbound-compat %client%\assets\asterbound-compat.pak
+.\dist\asset_packer.exe -c scripts\packing.config assets\asterbound-legacy %client%\assets\asterbound-legacy.pak
 
 for /f "delims=" %%f in (scripts\ci\windows\files_client.txt) do (
     xcopy "%%f" "%client%\win\" /Y
@@ -23,6 +27,7 @@ for /f "delims=" %%f in (scripts\ci\windows\files_client.txt) do (
 
 .\dist\asset_packer.exe -c scripts\packing.config -s assets\asterbound %server%\assets\asterbound.pak
 .\dist\asset_packer.exe -c scripts\packing.config -s assets\asterbound-compat %server%\assets\asterbound-compat.pak
+.\dist\asset_packer.exe -c scripts\packing.config -s assets\asterbound-legacy %server%\assets\asterbound-legacy.pak
 
 for /f "delims=" %%f in (scripts\ci\windows\files_server.txt) do (
     xcopy "%%f" "%server%\win\" /Y

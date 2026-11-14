@@ -52,12 +52,10 @@ class UniverseClient;
 
 class ScriptPane : public BaseScriptPane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ScriptPane, BaseScriptPane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ScriptPane, BaseScriptPane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ScriptPane>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScriptPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ScriptPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, Json config, EntityId sourceEntityId = NullEntityId);
 

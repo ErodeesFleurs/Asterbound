@@ -147,8 +147,10 @@ class LuaRoot;
 
 class UniverseClient : public Universe {
 public:
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<UniverseClient, Universe>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<UniverseClient>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<UniverseClient, Universe>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseClient>(); }
 
   using ScriptComponent = LuaMessageScript;
 

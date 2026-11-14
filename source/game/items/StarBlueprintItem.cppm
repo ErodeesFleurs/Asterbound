@@ -109,12 +109,10 @@ export namespace Star {
 
 class BlueprintItem : public Item, public SwingableItem {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<BlueprintItem, Item, SwingableItem>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<BlueprintItem, Item, SwingableItem>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<BlueprintItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BlueprintItem>(); }
 
   [[nodiscard]]
   static std::expected<std::shared_ptr<BlueprintItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& data);
@@ -201,7 +199,7 @@ std::expected<void, StarException> BlueprintItem::fireTriggered() {
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    if (auto player = asRef<Player>(itemOwner->get())) {
+    if (auto player = as_ref<Player>(itemOwner->get())) {
       auto learned = player->get().addBlueprint(m_recipe, true);
       if (!learned)
         return std::unexpected(std::move(learned.error()));

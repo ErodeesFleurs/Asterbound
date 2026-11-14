@@ -49,12 +49,8 @@ namespace Star {
 
 class FuelWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<FuelWidget, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<FuelWidget>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<FuelWidget, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FuelWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<FuelWidget>, StarException> create(GuiContext& context);
   ~FuelWidget() override = default;

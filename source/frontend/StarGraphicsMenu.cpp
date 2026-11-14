@@ -403,7 +403,7 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     return std::unexpected(std::move(result.error()));
   if (auto result = syncGui(); !result)
     return std::unexpected(std::move(result.error()));
-  auto shadersPath = config->getString("shadersPanePath", "/interface/opensb/shaders/shaders.config");
+  auto shadersPath = config->getString("shadersPanePath", "/interface/asterbound/shaders/shaders.config");
   if (!shadersPath)
     return std::unexpected(std::move(shadersPath.error()));
   auto shadersConfig = (*assets)->json(*shadersPath);

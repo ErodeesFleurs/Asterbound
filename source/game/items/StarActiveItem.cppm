@@ -117,12 +117,10 @@ class ActiveItem :
   public virtual ToolUserItem,
   public virtual NetElementGroup {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<ActiveItem, Item, DurabilityItem, ToolUserItem, NetElementGroup>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<ActiveItem, Item, DurabilityItem, ToolUserItem, NetElementGroup>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<ActiveItem>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ActiveItem>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ActiveItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters = JsonObject());
 

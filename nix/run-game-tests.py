@@ -20,7 +20,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 GAME_TESTS = "@gameTests@"
-BUNDLED_ASSETS = ("@bundledAssets@/asterbound", "@bundledAssets@/asterbound-compat")
+BUNDLED_ASSETS = (
+    "@bundledAssets@/asterbound",
+    "@bundledAssets@/asterbound-compat",
+    "@bundledAssets@/asterbound-legacy",
+)
 # Only this test binds a fixed TCP port. TestUniverse/ServerTest leave TCP
 # listening disabled; the other connection tests bind ephemeral port 0.
 FIXED_PORT_CASE = "UniverseConnections.All"

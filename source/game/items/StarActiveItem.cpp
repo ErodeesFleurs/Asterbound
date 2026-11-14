@@ -223,7 +223,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto movementCallbacks = m_script.addActorMovementCallbacks(owner.movementController());
     if (!movementCallbacks)
       return std::unexpected(std::move(movementCallbacks.error()));
-    if (auto player = asRef<Player>(owner)) {
+    if (auto player = as_ref<Player>(owner)) {
       auto playerCallbacks = LuaBindings::makePlayerCallbacks(root(), player->get()).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("player", std::move(callbacks)); });
       if (!playerCallbacks)
         return std::unexpected(std::move(playerCallbacks.error()));
@@ -928,7 +928,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      if (auto entity = asRef<EmoteEntity>(itemOwner->get()))
+      if (auto entity = as_ref<EmoteEntity>(itemOwner->get()))
         return entity->get().playEmote(emote->get());
       return {};
     }); !added)

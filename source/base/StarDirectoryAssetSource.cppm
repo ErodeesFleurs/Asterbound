@@ -16,13 +16,11 @@ class Logger;
 
 class DirectoryAssetSource : public AssetSource {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<DirectoryAssetSource, AssetSource>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<DirectoryAssetSource, AssetSource>(this, key);
   }
 
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<DirectoryAssetSource>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DirectoryAssetSource>(); }
 
   // Any file that forms an asset path that matches any of the patterns in
   // 'ignorePatterns' is ignored.

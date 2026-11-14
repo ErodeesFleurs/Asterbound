@@ -67,12 +67,10 @@ enum class HttpTrustReply {
 
 class HttpTrustDialog final : public Pane {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<HttpTrustDialog, Pane>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<HttpTrustDialog, Pane>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<HttpTrustDialog>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HttpTrustDialog>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<HttpTrustDialog>, StarException> create(GuiContext& guiContext);
 

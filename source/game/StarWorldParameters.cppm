@@ -55,8 +55,10 @@ enum class WorldEdgeForceRegionType : std::uint8_t {
 extern std::expected<EnumMap<WorldEdgeForceRegionType>, StarException> const WorldEdgeForceRegionTypeNames;
 
 struct VisitableWorldParameters {
-  virtual void const* queryType(TypeKey key) const noexcept { return queryTypeOf<VisitableWorldParameters>(this, key); }
-  virtual std::string_view dynamicTypeName() const noexcept { return Star::typeName<VisitableWorldParameters>(); }
+  virtual void const* query_type(TypeKey key) const noexcept {
+    return query_type_of<VisitableWorldParameters>(this, key);
+  }
+  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<VisitableWorldParameters>(); }
 
   VisitableWorldParameters() = default;
   VisitableWorldParameters(VisitableWorldParameters const& visitableWorldParameters) = default;
@@ -87,8 +89,10 @@ struct VisitableWorldParameters {
 };
 
 struct TerrestrialWorldParameters : VisitableWorldParameters {
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<TerrestrialWorldParameters, VisitableWorldParameters>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<TerrestrialWorldParameters>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<TerrestrialWorldParameters, VisitableWorldParameters>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TerrestrialWorldParameters>(); }
 
   struct TerrestrialRegion {
     String biome;
@@ -161,8 +165,10 @@ struct TerrestrialWorldParameters : VisitableWorldParameters {
 };
 
 struct AsteroidsWorldParameters : VisitableWorldParameters {
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<AsteroidsWorldParameters, VisitableWorldParameters>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<AsteroidsWorldParameters>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<AsteroidsWorldParameters, VisitableWorldParameters>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AsteroidsWorldParameters>(); }
 
   AsteroidsWorldParameters();
   [[nodiscard]] static std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> create(Json const& store);
@@ -182,8 +188,12 @@ struct AsteroidsWorldParameters : VisitableWorldParameters {
 };
 
 struct FloatingDungeonWorldParameters : VisitableWorldParameters {
-  void const* queryType(TypeKey key) const noexcept override { return queryTypeOf<FloatingDungeonWorldParameters, VisitableWorldParameters>(this, key); }
-  std::string_view dynamicTypeName() const noexcept override { return Star::typeName<FloatingDungeonWorldParameters>(); }
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<FloatingDungeonWorldParameters, VisitableWorldParameters>(this, key);
+  }
+  std::string_view dynamic_type_name() const noexcept override {
+    return Star::type_name<FloatingDungeonWorldParameters>();
+  }
 
   FloatingDungeonWorldParameters() = default;
   [[nodiscard]] static std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> create(Json const& store);

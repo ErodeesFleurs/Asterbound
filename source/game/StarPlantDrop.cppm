@@ -55,12 +55,10 @@ class RenderCallback;
 
 class PlantDrop : public virtual MobileEntity {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<PlantDrop, MobileEntity>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<PlantDrop, MobileEntity>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<PlantDrop>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlantDrop>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<PlantDrop>, StarException> create(Root& rootContext, List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
       bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig,

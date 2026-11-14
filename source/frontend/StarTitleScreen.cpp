@@ -791,44 +791,55 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
     return {};
   });
   readerConnect.registerCallback("address", [this](Widget& obj) -> std::expected<void, StarException> {
-    auto widget = rconvert<TextBoxWidget>(obj);
-    if (!widget) return std::unexpected(std::move(widget.error()));
+    auto widget = convert_ref<TextBoxWidget>(obj);
+    if (!widget)
+      return std::unexpected(std::move(widget.error()));
     auto text = widget->get().getText().trim();
-    if (!text) return std::unexpected(std::move(text.error()));
+    if (!text)
+      return std::unexpected(std::move(text.error()));
     m_connectionAddress = std::move(*text);
     auto save = m_serverSelectPane->fetchChild<ButtonWidget>("save");
-    if (!save) return std::unexpected(std::move(save.error()));
+    if (!save)
+      return std::unexpected(std::move(save.error()));
     auto length = m_connectionAddress.length();
-    if (!length) return std::unexpected(std::move(length.error()));
+    if (!length)
+      return std::unexpected(std::move(length.error()));
     return (*save)->setVisibility(*length > 0);
   });
   readerConnect.registerCallback("port", [this](Widget& obj) -> std::expected<void, StarException> {
-    auto widget = rconvert<TextBoxWidget>(obj);
-    if (!widget) return std::unexpected(std::move(widget.error()));
+    auto widget = convert_ref<TextBoxWidget>(obj);
+    if (!widget)
+      return std::unexpected(std::move(widget.error()));
     auto text = widget->get().getText().trim();
-    if (!text) return std::unexpected(std::move(text.error()));
+    if (!text)
+      return std::unexpected(std::move(text.error()));
     m_connectionPort = std::move(*text);
     return {};
   });
   readerConnect.registerCallback("account", [this](Widget& obj) -> std::expected<void, StarException> {
-    auto widget = rconvert<TextBoxWidget>(obj);
-    if (!widget) return std::unexpected(std::move(widget.error()));
+    auto widget = convert_ref<TextBoxWidget>(obj);
+    if (!widget)
+      return std::unexpected(std::move(widget.error()));
     auto text = widget->get().getText().trim();
-    if (!text) return std::unexpected(std::move(text.error()));
+    if (!text)
+      return std::unexpected(std::move(text.error()));
     m_account = std::move(*text);
     return {};
   });
   readerConnect.registerCallback("password", [this](Widget& obj) -> std::expected<void, StarException> {
-    auto widget = rconvert<TextBoxWidget>(obj);
-    if (!widget) return std::unexpected(std::move(widget.error()));
+    auto widget = convert_ref<TextBoxWidget>(obj);
+    if (!widget)
+      return std::unexpected(std::move(widget.error()));
     auto text = widget->get().getText().trim();
-    if (!text) return std::unexpected(std::move(text.error()));
+    if (!text)
+      return std::unexpected(std::move(text.error()));
     m_password = std::move(*text);
     return {};
   });
   readerConnect.registerCallback("legacyCheckbox", [this](Widget& obj) -> std::expected<void, StarException> {
-    auto widget = rconvert<ButtonWidget>(obj);
-    if (!widget) return std::unexpected(std::move(widget.error()));
+    auto widget = convert_ref<ButtonWidget>(obj);
+    if (!widget)
+      return std::unexpected(std::move(widget.error()));
     m_forceLegacy = widget->get().isChecked();
     return {};
   });

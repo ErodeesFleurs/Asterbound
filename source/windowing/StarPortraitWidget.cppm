@@ -55,12 +55,10 @@ class Player;
 
 class PortraitWidget : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<PortraitWidget, Widget>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<PortraitWidget, Widget>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<PortraitWidget>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PortraitWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<PortraitWidget>, StarException> create(GuiContext& context, std::shared_ptr<PortraitEntity> entity = {}, PortraitMode mode = PortraitMode::Full);
   ~PortraitWidget() override = default;

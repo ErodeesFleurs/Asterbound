@@ -14,12 +14,10 @@ namespace Star {
 // synchronize with working data.
 class NetElementSyncGroup : public NetElementGroup {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<NetElementSyncGroup, NetElementGroup>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<NetElementSyncGroup, NetElementGroup>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<NetElementSyncGroup>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NetElementSyncGroup>(); }
 
   [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
@@ -49,12 +47,10 @@ private:
 // optional callback functions.
 class NetElementCallbackGroup : public NetElementSyncGroup {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<NetElementCallbackGroup, NetElementSyncGroup>(this, key);
+  void const* query_type(TypeKey key) const noexcept override {
+    return query_type_of<NetElementCallbackGroup, NetElementSyncGroup>(this, key);
   }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<NetElementCallbackGroup>();
-  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NetElementCallbackGroup>(); }
 
   void setNeedsLoadCallback(std::function<std::expected<void, StarException>(bool)> needsLoadCallback);
   void setNeedsStoreCallback(std::function<std::expected<void, StarException>()> needsStoreCallback);

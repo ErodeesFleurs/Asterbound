@@ -73,12 +73,8 @@ Vec2I paneAnchorBase(PaneAnchor anchor, Vec2I windowSize, Vec2I paneSize);
 
 class Pane : public Widget {
 public:
-  void const* queryType(TypeKey key) const noexcept override {
-    return queryTypeOf<Pane, Widget>(this, key);
-  }
-  std::string_view dynamicTypeName() const noexcept override {
-    return Star::typeName<Pane>();
-  }
+  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Pane, Widget>(this, key); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Pane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<Pane>, StarException> create(GuiContext& context);
   ~Pane() override;

@@ -133,7 +133,7 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
       if (!setScripts)
         return std::unexpected(std::move(setScripts.error()));
     }
-    auto item = rconvert<Item>(*this);
+    auto item = convert_ref<Item>(*this);
     if (!item)
       return std::unexpected(std::move(item.error()));
     auto configCallbacks = LuaBindings::makeConfigCallbacks(

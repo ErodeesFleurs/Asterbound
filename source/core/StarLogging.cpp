@@ -42,13 +42,21 @@ std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogL
   return Star::print("[{}] {}\n", *name, msg);
 }
 
-std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(String const& filename, LogLevel level,
-                                                                               bool truncate) {
-  auto sink = std::make_shared<FileLogSink>(ConstructionKey{}, filename);
+std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
+    String const& filename, LogLevel level, bool truncate, std::uint64_t sizeLimit, unsigned backups,
+    std::optional<String> backupFilename) {
+  auto sink = std::make_shared<FileLogSink>(
+      ConstructionKey{}, filename, sizeLimit, backups, backupFilename.value_or(filename));
   auto opened =
     sink->m_output.open(truncate ? IOMode::Write | IOMode::Append | IOMode::Truncate : IOMode::Write | IOMode::Append);
   if (!opened)
     return std::unexpected(std::move(opened.error()));
+  if (sizeLimit && !truncate) {
+    auto size = sink->m_output.size();
+    if (!size)
+      return std::unexpected(std::move(size.error()));
+    sink->m_size = static_cast<std::uint64_t>(*size);
+  }
   sink->set_level(level);
   return sink;
 }
@@ -62,7 +70,31 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto line = Star::format("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
-  return m_output.write_full(line);
+  if (m_sizeLimit) {
+    if (!m_size) {
+      auto size = m_output.size();
+      if (!size)
+        return std::unexpected(std::move(size.error()));
+      m_size = static_cast<std::uint64_t>(*size);
+    }
+    if (*m_size && (*m_size >= m_sizeLimit || line.size() > m_sizeLimit - *m_size)) {
+      auto backup = File::backup_file_in_sequence(m_output.file_name(), m_backupFilename, m_backups);
+      if (!backup)
+        return std::unexpected(std::move(backup.error()));
+      auto opened = m_output.open(IOMode::Write | IOMode::Append | IOMode::Truncate);
+      if (!opened)
+        return std::unexpected(std::move(opened.error()));
+      m_size = 0;
+    }
+  }
+  auto written = m_output.write_full(line);
+  if (m_sizeLimit) {
+    if (written)
+      *m_size += line.size();
+    else
+      m_size.reset();
+  }
+  return written;
 }
 
 void Logger::add_sink(std::shared_ptr<LogSink> sink) {
@@ -132,17 +164,74 @@ std::expected<void, StarException> Logger::log_exception(LogLevel level, std::st
                                                          ExceptionDiagnostic const& diagnostic) {
   auto sinks = sink_snapshot(std::nullopt);
   auto first = first_loggable(*sinks, level);
-  if (first != sinks->end()) {
-    auto summary = Star::format("{}: {}", operation, Star::exception_summary(diagnostic));
-    if (auto result = dispatch(*sinks, level, summary); !result)
-      return std::unexpected(std::move(result.error()));
+  bool debug = first_loggable(*sinks, LogLevel::Debug) != sinks->end();
+  if (first == sinks->end() && !debug)
+    return {};
+
+  // Serialize the decision with emission, including same-thread sink reentry.
+  std::lock_guard locker(s_dispatchMutex);
+  auto const& summary = diagnostic.diagnostic_summary();
+  bool limited = summary->kind == ExceptionSummaryKind::ScriptRuntime
+      || summary->kind == ExceptionSummaryKind::ScriptSyntax
+      || summary->kind == ExceptionSummaryKind::PatchRuntime
+      || summary->kind == ExceptionSummaryKind::PatchSyntax;
+  auto matches = [&](RepeatedException const& entry) {
+    auto const& other = *entry.summary;
+    return entry.level == level && entry.debug == debug && entry.operation == operation
+        && other.kind == summary->kind && other.category == summary->category
+        && other.reason == summary->reason && other.operation == summary->operation
+        && other.asset == summary->asset && other.assetProvider == summary->assetProvider
+        && other.patch == summary->patch && other.patchProvider == summary->patchProvider
+        && std::ranges::equal(other.locations, summary->locations, [](auto const& a, auto const& b) {
+             return a.source == b.source && a.line == b.line && a.provider == b.provider;
+           });
+  };
+  std::uint64_t repeats = 0;
+  if (limited) {
+    auto now = std::chrono::steady_clock::now();
+    auto entry = std::ranges::find_if(s_repeatedExceptions, matches);
+    if (entry != s_repeatedExceptions.end()) {
+      if (entry->repeats != std::numeric_limits<std::uint64_t>::max())
+        ++entry->repeats;
+      if (now - entry->reported < std::chrono::seconds(5))
+        return {};
+      repeats = std::exchange(entry->repeats, 0);
+      entry->reported = now;
+    } else {
+      // Bound retained identities; never retain full exception stacks.
+      if (s_repeatedExceptions.size() == 128) {
+        auto oldest = std::ranges::min_element(s_repeatedExceptions, {}, &RepeatedException::reported);
+        s_repeatedExceptions.erase(oldest);
+      }
+      s_repeatedExceptions.push_back({level, debug, std::string(operation), summary, now});
+    }
   }
-  auto debugSink = first_loggable(*sinks, LogLevel::Debug);
-  if (debugSink != sinks->end()) {
-    auto details = Star::format("{} details:\n{}", operation, Star::output_exception(diagnostic, true));
-    return dispatch(*sinks, LogLevel::Debug, details);
-  }
-  return {};
+  auto emit = [&]() -> std::expected<void, StarException> {
+    if (repeats != 0)
+      return dispatch(*sinks, level, Star::format("{}: repeated {} additional times: {}",
+          operation, repeats, Star::exception_summary(diagnostic)));
+    if (first != sinks->end()) {
+      auto message = Star::format("{}: {}", operation, Star::exception_summary(diagnostic));
+      if (auto result = dispatch(*sinks, level, message); !result)
+        return std::unexpected(std::move(result.error()));
+    }
+    if (debug) {
+      auto details = Star::format("{} details:\n{}", operation, Star::output_exception(diagnostic, true));
+      return dispatch(*sinks, LogLevel::Debug, details);
+    }
+    return {};
+  };
+  auto result = emit();
+  // A failed write must not make the next attempt silently succeed.
+  // Sink callbacks may have changed the vector: do not retain an iterator.
+  if (!result && limited)
+    std::erase_if(s_repeatedExceptions, matches);
+  return result;
+}
+
+void Logger::reset_exception_repeats() {
+  std::lock_guard locker(s_dispatchMutex);
+  s_repeatedExceptions.clear();
 }
 
 std::expected<void, StarException> Logger::error_exception(std::string_view operation,

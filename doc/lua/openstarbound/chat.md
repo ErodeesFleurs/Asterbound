@@ -2,7 +2,7 @@
 
 [Lua API](../README.md#openstarbound-compatible-extensions) · [Modding guide](../../modding.md)
 
-The `chat` table is accessible from almost every client-side script. Network messages, command execution and logging are native services; the bundled chat window is a Lua-managed `"chat"` instance registered under `/interface.config:panes`, with layout and scripts in `/interface/opensb/chat/`. There is no native Chat window fallback.
+The `chat` table is accessible from almost every client-side script. Network messages, command execution and logging are native services; the bundled chat window is a Lua-managed `"chat"` instance registered under `/interface.config:panes`, with layout and scripts in `/interface/asterbound/chat/`. There is no native Chat window fallback.
 
 ---
 
