@@ -64,7 +64,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
   if (m_generating)
     return std::unexpected(DungeonException("Not reentrant."));
   m_generating = true;
-  auto generatingGuard = finally([this]() { m_generating = false; });
+  auto generatingGuard = make_scope_exit([this]() { m_generating = false; });
   auto dungeonGenerator = DungeonGenerator::create(m_root, dungeonName, seed, threatLevel, BiomeMicroDungeonId);
   if (!dungeonGenerator) return std::unexpected(std::move(dungeonGenerator.error()));
 

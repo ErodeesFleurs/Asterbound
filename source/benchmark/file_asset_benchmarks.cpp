@@ -42,7 +42,7 @@ void asset_lengths(benchmark::State& state, asset_kind kind) {
     state.SkipWithError(temporary.error().what());
     return;
   }
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     auto removed = Star::File::remove_all(*temporary);
     if (!removed)
       state.SkipWithError(removed.error().what());
@@ -338,7 +338,7 @@ void btree_transactions(benchmark::State& state, bool commit) {
     state.SkipWithError(temporary.error().what());
     return;
   }
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     auto removed = Star::File::remove_all(*temporary);
     if (!removed)
       state.SkipWithError(removed.error().what());

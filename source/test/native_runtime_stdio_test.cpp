@@ -159,7 +159,7 @@ int redirectedPipe(unsigned missing) {
   if (pipe(pipeFds) != 0)
 #endif
     return 40;
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     if (pipeFds[0] >= 0)
       closeDescriptor(pipeFds[0]);
     if (pipeFds[1] >= 0)
@@ -200,7 +200,7 @@ int fileLoggerWithoutConsole() {
   auto directory = File::temporary_directory(**random);
   if (!directory)
     return 51;
-  auto cleanup = finally([&] { (void)File::remove_all(*directory); });
+  auto cleanup = make_scope_exit([&] { (void)File::remove_all(*directory); });
   auto path = File::relative_to(*directory, "without-console.log");
   if (!removeOutput(stdout) || !removeOutput(stderr))
     return 52;

@@ -206,7 +206,7 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
     return std::unexpected(LuaException("Cannot create a context from a shut down Lua root"));
   LuaEnginePtr engine = m_luaEngine;
   auto previousLifetime = engine->setPromiseLifetime(loadLifetime);
-  auto restored = finally([&] { engine->setPromiseLifetime(std::move(previousLifetime)); });
+  auto restored = make_scope_exit([&] { engine->setPromiseLifetime(std::move(previousLifetime)); });
   auto created = engine->createContext();
   if (!created)
     return std::unexpected(std::move(created.error()));
@@ -233,7 +233,7 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
           if (!script)
             return std::unexpected(std::move(script.error()));
           loading.push_back(path);
-          auto popped = finally([&] { loading.pop_back(); });
+          auto popped = make_scope_exit([&] { loading.pop_back(); });
           if (auto result = environment.stack().load(environment, (*script)->span(), path); !result)
             return std::unexpected(std::move(result.error()));
           if (cache->revision() != revision)

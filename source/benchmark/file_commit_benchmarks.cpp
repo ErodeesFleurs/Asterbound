@@ -227,7 +227,7 @@ void btree_commit_phase_diagnostic(benchmark::State& state) {
     return;
   }
   commit_diagnostic_fixture fixture;
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     if (auto result = fixture.close(); !result)
       state.SkipWithError(result.error().what());
     if (auto result = Star::File::remove_all(*temporary); !result)

@@ -874,7 +874,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
       }
     }
   }
-  sortByComputedValue(result, [](Note const& note) { return note.timecode; });
+  sort_by_key(result, [](Note const& note) { return note.timecode; });
   return result;
 }
 

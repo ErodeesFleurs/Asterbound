@@ -640,8 +640,8 @@ template <typename LiquidId>
     }
   }
 
-  eraseWhere(m_activeCells, [](auto const& p) { return p.second.empty(); });
-  eraseWhere(m_unlimitedActiveCells, [this](auto const& p) { return !m_activeCells.contains(p.first); });
+  Star::erase_if(m_activeCells, [](auto const& p) { return p.second.empty(); });
+  Star::erase_if(m_unlimitedActiveCells, [this](auto const& p) { return !m_activeCells.contains(p.first); });
   return {};
 }
 

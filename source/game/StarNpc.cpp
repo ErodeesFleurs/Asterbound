@@ -457,7 +457,7 @@ return JsonObject{
     {"uniqueId", jsonFromOptional(uniqueId())},
     {"team", std::move(*result78)},
     {"deathParticleBurst", jsonFromOptional(m_deathParticleBurst.get())},
-    {"dropPools", m_dropPools.get().transformed(construct<Json>())},
+    {"dropPools", m_dropPools.get().transformed(Construct<Json>())},
     {"aggressive", m_aggressive.get()}
   };
 }

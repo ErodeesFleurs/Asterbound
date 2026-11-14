@@ -272,7 +272,7 @@ std::expected<void, StarException> Spawner::update(float dt) {
       if (!activated) return std::unexpected(std::move(activated.error()));
     }
   }
-  eraseWhere(m_activeSpawnCells, [dt](auto&& p) { return (p.second -= dt) < 0.0f; });
+  Star::erase_if(m_activeSpawnCells, [dt](auto&& p) { return (p.second -= dt) < 0.0f; });
   for (auto it = m_spawnedEntities.begin(); it != m_spawnedEntities.end();) {
     auto entity = m_facade->getEntity(*it);
     if (!entity) it = m_spawnedEntities.erase(it);
@@ -516,7 +516,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
 }
 
 std::expected<void, StarException> Spawner::debugShowSpawnCells() {
-  eraseWhere(m_debugSpawnInfo, [&cells = m_activeSpawnCells](auto&& p) { return !cells.contains(p.first); });
+  Star::erase_if(m_debugSpawnInfo, [&cells = m_activeSpawnCells](auto&& p) { return !cells.contains(p.first); });
   auto visible = [&facade = *m_facade](RectF const& region) -> std::expected<bool, StarException> {
     for (auto const& window : facade.clientWindows()) {
       auto intersects = facade.geometry().rectIntersectsRect(window, region);

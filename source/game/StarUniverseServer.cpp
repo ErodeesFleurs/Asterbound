@@ -2132,7 +2132,7 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
         return std::unexpected(std::move(sent.error()));
     }
   }
-  eraseWhere(m_pendingCelestialRequests, [](auto const& entry) { return entry.second.empty(); });
+  Star::erase_if(m_pendingCelestialRequests, [](auto const& entry) { return entry.second.empty(); });
   return {};
 }
 

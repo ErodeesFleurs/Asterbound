@@ -79,7 +79,7 @@ void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
     };
     std::sort(liveTextures.begin(), liveTextures.end(), textureLess);
 
-    eraseWhere(m_textureDeduplicationMap, [&](auto const& p) {
+    Star::erase_if(m_textureDeduplicationMap, [&](auto const& p) {
         return !std::binary_search(liveTextures.begin(), liveTextures.end(), std::cref(*p.second), textureLess);
       });
   }

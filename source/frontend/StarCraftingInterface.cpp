@@ -1693,7 +1693,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
   if (!itemDatabaseResult559)
     return std::unexpected(std::move(itemDatabaseResult559.error()));
   auto itemDatabase = std::move(*itemDatabaseResult559);
-  auto sortByComputedValueResult563 = sortByComputedValue(sortedRecipes, [itemDatabase](ItemRecipe const& recipe) -> std::expected<std::tuple<String, String>, StarException> {
+  auto sortByComputedValueResult563 = sort_by_key(sortedRecipes, [itemDatabase](ItemRecipe const& recipe) -> std::expected<std::tuple<String, String>, StarException> {
       auto itemFriendlyNameResult560 = itemDatabase->itemFriendlyName(recipe.output.name());
       if (!itemFriendlyNameResult560)
         return std::unexpected(std::move(itemFriendlyNameResult560.error()));

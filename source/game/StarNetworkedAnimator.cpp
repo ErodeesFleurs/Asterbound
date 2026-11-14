@@ -461,7 +461,7 @@ void NetworkedAnimator::DynamicTarget::clearFinishedAudio() {
   for (auto&& p : independentSounds)
     p.second.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
 
-  eraseWhere(currentAudioBasePositions, [](std::pair<std::shared_ptr<AudioInstance>, Vec2F> const& pair) {
+  Star::erase_if(currentAudioBasePositions, [](std::pair<std::shared_ptr<AudioInstance>, Vec2F> const& pair) {
       return pair.first->finished();
     });
 }
@@ -2214,7 +2214,9 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
 
   if (auto registered = addNetElement(m_globalTags); !registered) return std::unexpected(std::move(registered.error()));
 
-  for (auto const& part : sorted(m_animatedParts.partNames()))
+  auto partNames = m_animatedParts.partNames();
+  partNames.sort();
+  for (auto const& part : partNames)
     if (auto registered = addNetElement(m_partTags[part]); !registered) return std::unexpected(std::move(registered.error()));
 
   for (auto& pair : m_stateInfo) {

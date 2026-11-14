@@ -46,11 +46,11 @@ const GameTestRegistration
     ASSERT_TRUE(configuration);
     auto clear_files = (*configuration)->get("clearPlayerFiles");
     ASSERT_TRUE(clear_files);
-    auto restore_configuration = finally([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
+    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
     ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
     auto temporary = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(temporary);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
     auto directory = File::relative_to(*temporary, "player");
     auto storage = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(storage) << storage.error().what();
@@ -96,11 +96,11 @@ const GameTestRegistration changedSaveRetry(
     ASSERT_TRUE(configuration);
     auto clear_files = (*configuration)->get("clearPlayerFiles");
     ASSERT_TRUE(clear_files);
-    auto restore_configuration = finally([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
+    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
     ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
     auto temporary = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(temporary);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
     auto directory = File::relative_to(*temporary, "player");
     auto storage = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(storage);
@@ -144,11 +144,11 @@ const GameTestRegistration metadataRetry(
     ASSERT_TRUE(configuration);
     auto clear_files = (*configuration)->get("clearPlayerFiles");
     ASSERT_TRUE(clear_files);
-    auto restore_configuration = finally([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
+    auto restore_configuration = make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
     ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
     auto temporary = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(temporary);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
     auto directory = File::relative_to(*temporary, "player");
     auto storage = PlayerStorage::create(fixture.root(), directory);
     ASSERT_TRUE(storage);
@@ -200,11 +200,11 @@ const GameTestRegistration
                auto clear_files = (*configuration)->get("clearPlayerFiles");
                ASSERT_TRUE(clear_files);
                auto restore_configuration =
-                 finally([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
+                 make_scope_exit([&] { EXPECT_TRUE((*configuration)->set("clearPlayerFiles", *clear_files)); });
                ASSERT_TRUE((*configuration)->set("clearPlayerFiles", false));
                auto temporary = File::temporary_directory(fixture.root().random());
                ASSERT_TRUE(temporary);
-               auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
+               auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temporary)); });
                auto directory = File::relative_to(*temporary, "player");
                auto storage = PlayerStorage::create(fixture.root(), directory);
                ASSERT_TRUE(storage);

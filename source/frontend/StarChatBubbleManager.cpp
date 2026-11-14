@@ -342,7 +342,7 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
   if (m_world.lock() != world) {
     // Actions queued for the new world have not bound an entity yet.
     m_bubbles.filter([](BubbleState<Bubble> const&, Bubble const& bubble) { return !bubble.instance; });
-    filter(m_portraitBubbles, [](PortraitBubble const& bubble) { return !bubble.instance; });
+    m_portraitBubbles.filter([](PortraitBubble const& bubble) { return !bubble.instance; });
     m_world = world;
   }
   auto updated = m_bubbles.updateDestinations([this, dt, &world](BubbleState<Bubble>& bubbleState, Bubble& bubble) -> std::expected<void, StarException> {
@@ -388,7 +388,7 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
 
   auto& count = m_entityBubbleCounts;
   count.clear();
-  filter(m_portraitBubbles, [&](PortraitBubble const& portraitBubble) -> bool {
+  m_portraitBubbles.filter([&](PortraitBubble const& portraitBubble) -> bool {
       count[portraitBubble.entity] += m_maxMessagePerEntity;
       if (count[portraitBubble.entity] > m_maxMessagePerEntity)
         return false;

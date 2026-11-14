@@ -35,7 +35,7 @@ const GameTestRegistration
     auto created = WorldServer::create(fixture.root(), worldSize, *storage);
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto closeWorld = finally([&] { EXPECT_TRUE(world->close()); });
+    auto closeWorld = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     EntityMap entities(worldSize, 1, 100);
 
     // A minimal configuration is input to the real PhysicsObject implementation,
@@ -96,7 +96,7 @@ const GameTestRegistration
         ASSERT_TRUE(id) << id.error().what();
         auto initialized = object->init(*world, *id, EntityMode::Master);
         ASSERT_TRUE(initialized) << initialized.error().what();
-        auto uninitObject = finally([&] {
+        auto uninitObject = make_scope_exit([&] {
           entities.removeEntity(*id);
           EXPECT_TRUE(object->uninit());
         });

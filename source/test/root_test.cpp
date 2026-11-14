@@ -265,7 +265,7 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
 const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto settings = isolationSettings(fixture.rootSettings(), *directory, "http");
   ASSERT_TRUE(settings) << settings.error().what();
   auto root = Root::create(std::move(*settings));
@@ -506,7 +506,7 @@ const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplat
 const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
-  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto settings = isolationSettings(fixture.rootSettings(), *directory, "bush-shapes");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
@@ -631,7 +631,7 @@ const GameTestRegistration
   luaModulesExecuteOncePerContext("RootTest", "LuaModulesExecuteOncePerContext", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "modules");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
@@ -689,7 +689,7 @@ const GameTestRegistration
   luaModulesRetryFailuresAndCycles("RootTest", "LuaModulesRetryFailuresAndCycles", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-retries");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
@@ -801,7 +801,7 @@ const GameTestRegistration
   luaModulesRejectStaleContexts("RootTest", "LuaModulesRejectStaleContexts", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-revisions");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
@@ -875,7 +875,7 @@ const GameTestRegistration
   luaModulesRejectReentrantInvalidation("RootTest", "LuaModulesRejectReentrantInvalidation", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-reentrancy");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
@@ -933,10 +933,10 @@ const GameTestRegistration
 const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", [](GameTest& fixture) {
   auto directoryA = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();
-  auto cleanupA = finally([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
+  auto cleanupA = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
   auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
-  auto cleanupB = finally([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
+  auto cleanupB = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
   auto settingsResultA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsResultA) << settingsResultA.error().what();
   auto settingsA = std::move(*settingsResultA);
@@ -1145,10 +1145,10 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
 
   auto directoryA = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();
-  auto cleanupA = finally([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
+  auto cleanupA = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryA)); });
   auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
-  auto cleanupB = finally([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
+  auto cleanupB = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
   auto settingsA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsA) << settingsA.error().what();
   auto settingsB = isolationSettings(fixture.rootSettings(), *directoryB, "B");
@@ -1171,13 +1171,13 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   auto createdWorldA = WorldServer::create(*rootA, Vec2U(2048, 2048), *storageA);
   ASSERT_TRUE(createdWorldA) << createdWorldA.error().what();
   auto worldA = std::move(*createdWorldA);
-  auto closeWorldA = finally([&] { if (worldA) EXPECT_TRUE(worldA->close()); });
+  auto closeWorldA = make_scope_exit([&] { if (worldA) EXPECT_TRUE(worldA->close()); });
   auto storageB = File::ephemeral_file(rootB->random());
   ASSERT_TRUE(storageB) << storageB.error().what();
   auto createdWorldB = WorldServer::create(*rootB, Vec2U(2048, 2048), *storageB);
   ASSERT_TRUE(createdWorldB) << createdWorldB.error().what();
   auto worldB = std::move(*createdWorldB);
-  auto closeWorldB = finally([&] { EXPECT_TRUE(worldB->close()); });
+  auto closeWorldB = make_scope_exit([&] { EXPECT_TRUE(worldB->close()); });
   {
     auto materialsA = rootA->materialDatabase();
     ASSERT_TRUE(materialsA) << materialsA.error().what();
@@ -1463,7 +1463,7 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
   ASSERT_TRUE(storage) << storage.error().what();
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(world) << world.error().what();
-  auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
   auto database = root.npcDatabase();
   ASSERT_TRUE(database) << database.error().what();
   auto variant = (*database)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject());

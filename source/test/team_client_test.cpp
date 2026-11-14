@@ -38,7 +38,7 @@ const GameTestRegistration teamStatusSynchronization(
   "TeamClientTest", "AppearanceSyncRetainsDynamicStatusAndPendingForceAcrossReplies", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(overlay));
     // Drive each RPC explicitly; ordinary polling must not add unrelated requests.

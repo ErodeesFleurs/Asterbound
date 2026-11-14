@@ -186,7 +186,7 @@ const GameTestRegistration
     auto created = createSchedulingWorld(fixture.root());
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto close = finally([&] { EXPECT_TRUE(world->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     using Timing = WorldServerTestAccess::Timing;
     constexpr std::array<std::string_view, 7> names{"wiringUpdate",      "liquidUpdate",     "fallingBlocksUpdate",
                                                     "blockDamageUpdate", "worldStorageTick", "worldStorageGenerate",
@@ -222,7 +222,7 @@ const GameTestRegistration
     auto created = createSchedulingWorld(fixture.root());
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto close = finally([&] { EXPECT_TRUE(world->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     using Timing = WorldServerTestAccess::Timing;
     using Limit = WorldServerTestAccess::Limit;
     auto settings = Json::parse(R"({
@@ -288,7 +288,7 @@ const GameTestRegistration
     auto created = createSchedulingWorld(fixture.root());
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto close = finally([&] { EXPECT_TRUE(world->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     using Timing = WorldServerTestAccess::Timing;
     using Limit = WorldServerTestAccess::Limit;
     auto settings = Json::parse(R"({
@@ -351,7 +351,7 @@ const GameTestRegistration
     auto created = createSchedulingWorld(fixture.root());
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto close = finally([&] { EXPECT_TRUE(world->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     world->setSpawningEnabled(false);
     unsigned triggered = 0;
     world->timer(0, [&](World&) -> std::expected<void, StarException> {

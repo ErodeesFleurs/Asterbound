@@ -1102,6 +1102,7 @@ std::expected<void, StarException> OpenGlRenderer::finishFrame() {
       if (!compressed) return std::unexpected(std::move(compressed.error()));
     }
   }
+  // Keep immediate destruction: later predicates observe shared ownership and atlas state.
   filter(m_liveTextureGroups, [](auto const& group) {
     return group.use_count() != 1 || group->textureAtlasSet.totalTextures() > 0;
   });

@@ -88,7 +88,7 @@ const GameTestRegistration
   assetsReferenceCacheRetainsBlendAndMask("AssetsTest", "ReferenceCacheRetainsBlendAndMask", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings());
     ASSERT_TRUE(assets) << assets.error().what();
@@ -117,7 +117,7 @@ const GameTestRegistration assetsReferenceCacheExtensionCanBeDisabled(
   "AssetsTest", "ReferenceCacheExtensionCanBeDisabled", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     for (auto const& settings :
          std::array{referenceCacheSettings(0), referenceCacheSettings(4, -1), referenceCacheSettings(4, -2)}) {
@@ -139,7 +139,7 @@ const GameTestRegistration assetsReferenceCacheSkipsOversizedCandidates(
   "AssetsTest", "ReferenceCacheSkipsOversizedCandidates", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
@@ -162,7 +162,7 @@ const GameTestRegistration assetsReferenceCacheRecentReferenceHitWinsBudget(
   "AssetsTest", "ReferenceCacheRecentReferenceHitWinsBudget", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
@@ -189,7 +189,7 @@ const GameTestRegistration assetsReferenceCacheClearDisregardsExtendedTtl(
   "AssetsTest", "ReferenceCacheClearDisregardsExtendedTtl", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(4));
     ASSERT_TRUE(assets) << assets.error().what();
@@ -208,7 +208,7 @@ const GameTestRegistration assetsReferenceCacheExternalHandlesPersist(
   "AssetsTest", "ReferenceCacheExternalHandlesPersist", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     for (std::uint64_t budget : {0u, 4u}) {
       SCOPED_TRACE(::testing::Message() << "budget=" << budget);
@@ -254,7 +254,7 @@ const GameTestRegistration assetsFontClonesRetainCache(
     ASSERT_TRUE(bytes) << bytes.error().what();
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     ASSERT_TRUE(File::write_file(**bytes, File::relative_to(*directory, "sample.woff2")));
     auto assets = referenceCacheAssets(fixture, *directory, referenceCacheSettings(0));

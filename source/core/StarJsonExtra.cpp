@@ -359,7 +359,7 @@ std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float 
       return std::unexpected(std::move(minimum.error()));
     ordered.push_back({*minimum, entry});
   }
-  sortByComputedValue(ordered, [](auto const& entry) { return -entry.first; });
+  sort_by_key(ordered, [](auto const& entry) { return -entry.first; });
   for (auto const& entry : ordered)
     if (entry.first <= target)
       return entry.second.get(1);

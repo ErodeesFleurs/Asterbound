@@ -119,7 +119,7 @@ public:
   template <typename Filter>
     requires cache_filter<Filter, key_type, mapped_type>
   void erase_if(Filter&& filter) {
-    eraseWhere(
+    Star::erase_if(
       m_map, [&filter](typename Storage::value_type& entry) { return std::invoke(filter, entry.first, entry.second); });
   }
 

@@ -502,10 +502,10 @@ void Input::reset(bool clear) {
       return !p.second.held;
     };
 
-    eraseWhere(m_keyStates,        eraseCond);
-    eraseWhere(m_mouseStates,      eraseCond);
-    eraseWhere(m_controllerStates, eraseCond);
-    eraseWhere(m_bindStates, [&](auto&& p) {
+    Star::erase_if(m_keyStates,        eraseCond);
+    Star::erase_if(m_mouseStates,      eraseCond);
+    Star::erase_if(m_controllerStates, eraseCond);
+    Star::erase_if(m_bindStates, [&](auto&& p) {
       if (p.second.held)
         p.second.reset();
       else {

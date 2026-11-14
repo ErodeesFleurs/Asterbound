@@ -223,7 +223,7 @@ const GameTestRegistration terrainNamedSelector(
   "TerrainDatabaseTest", "UnknownNamesAndSeededNamedSelectorsPreserveSampling", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     ASSERT_TRUE(File::write_file(String(R"({
       "name":"seeded","type":"perlin","function":"perlin","octaves":3,"freq":0.03,"amp":5
@@ -280,7 +280,7 @@ const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
     auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto closeWorld = finally([&] { EXPECT_TRUE(world->close()); });
+    auto closeWorld = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     std::vector<int> fired;
     world->timer(0, [&](World& owner) -> std::expected<void, StarException> {
       fired.push_back(1);
@@ -317,11 +317,11 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
   "WorldSnapshot", "FixedCoordinateGenerationIsDeterministic", [](GameTest& fixture) {
     auto storagePath = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(storagePath) << storagePath.error().what();
-    auto finallyGuard = finally([&storagePath]() { EXPECT_TRUE(File::remove_all(*storagePath)); });
+    auto finallyGuard = make_scope_exit([&storagePath]() { EXPECT_TRUE(File::remove_all(*storagePath)); });
     auto celestialDatabase =
       CelestialMasterDatabase::create(fixture.root(), File::relative_to(*storagePath, "universe.chunks"));
     ASSERT_TRUE(celestialDatabase) << celestialDatabase.error().what();
-    auto closeDatabase = finally([&]() { EXPECT_TRUE((*celestialDatabase)->close()); });
+    auto closeDatabase = make_scope_exit([&]() { EXPECT_TRUE((*celestialDatabase)->close()); });
 
     // Find a real planet: the celestial generator places systems sparsely, and a
     // hand picked coordinate is most likely empty.
@@ -361,10 +361,10 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     };
     auto firstWorld = makeWorld();
     ASSERT_TRUE(firstWorld) << firstWorld.error().what();
-    auto closeFirst = finally([&]() { EXPECT_TRUE((*firstWorld)->close()); });
+    auto closeFirst = make_scope_exit([&]() { EXPECT_TRUE((*firstWorld)->close()); });
     auto secondWorld = makeWorld();
     ASSERT_TRUE(secondWorld) << secondWorld.error().what();
-    auto closeSecond = finally([&]() { EXPECT_TRUE((*secondWorld)->close()); });
+    auto closeSecond = make_scope_exit([&]() { EXPECT_TRUE((*secondWorld)->close()); });
 
     auto firstHash = sampleWorld(**firstWorld, surfaceLevel);
     ASSERT_TRUE(firstHash) << firstHash.error().what();
@@ -414,10 +414,10 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
   };
   auto firstWorld = makeWorld();
   ASSERT_TRUE(firstWorld) << firstWorld.error().what();
-  auto closeFirst = finally([&]() { EXPECT_TRUE((*firstWorld)->close()); });
+  auto closeFirst = make_scope_exit([&]() { EXPECT_TRUE((*firstWorld)->close()); });
   auto secondWorld = makeWorld();
   ASSERT_TRUE(secondWorld) << secondWorld.error().what();
-  auto closeSecond = finally([&]() { EXPECT_TRUE((*secondWorld)->close()); });
+  auto closeSecond = make_scope_exit([&]() { EXPECT_TRUE((*secondWorld)->close()); });
 
   // The ship structure is placed around the middle of the world.
   Vec2I center((int)worldSize[0] / 2, (int)worldSize[1] / 2);
@@ -455,14 +455,14 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     ASSERT_TRUE(storageResult) << storageResult.error().what();
     auto storage = *storageResult;
     auto path = storage->file_name();
-    auto cleanup = finally([&]() {
+    auto cleanup = make_scope_exit([&]() {
       EXPECT_TRUE(storage->close());
       EXPECT_TRUE(File::remove(path));
     });
     auto worldResult = WorldServer::create(fixture.root(), Vec2U(2048, 2048), storage);
     ASSERT_TRUE(worldResult) << worldResult.error().what();
     auto world = *worldResult;
-    auto closeWorld = finally([&]() { EXPECT_TRUE(world->close()); });
+    auto closeWorld = make_scope_exit([&]() { EXPECT_TRUE(world->close()); });
     auto assets = fixture.root().assets();
     ASSERT_TRUE(assets) << assets.error().what();
     auto speciesShips = (*assets)->json("/universe_server.config:speciesShips");
@@ -546,7 +546,7 @@ const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions
   auto worldResult = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(worldResult) << worldResult.error().what();
   auto world = *worldResult;
-  auto closeWorld = finally([&]() { EXPECT_TRUE(world->close()); });
+  auto closeWorld = make_scope_exit([&]() { EXPECT_TRUE(world->close()); });
   Vec2I tilePosition(1024, 1024);
   ASSERT_TRUE(world->generateRegion(RectI::withSize(tilePosition - Vec2I(4, 4), Vec2I(9, 9))));
   world->setTileProtectionEnabled(false);
@@ -600,7 +600,7 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
   auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(created) << created.error().what();
   auto world = *created;
-  auto closeWorld = finally([&] { EXPECT_TRUE(world->close()); });
+  auto closeWorld = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
   world->setSpawningEnabled(false);
   world->setTileProtectionEnabled(false);
   Vec2I ground(1024, 1024);
@@ -708,7 +708,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
     auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto close = finally([&] { EXPECT_TRUE(world->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     world->setSpawningEnabled(false);
     ASSERT_TRUE(world->setFidelity(WorldServerFidelity::High));
     ASSERT_TRUE(world->generateRegion(RectI(896, 896, 1728, 1152)));

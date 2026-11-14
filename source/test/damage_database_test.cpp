@@ -60,7 +60,7 @@ const GameTestRegistration
   damageLookup("DamageDatabaseTest", "CaseInsensitiveKindsAndIndependentElementalTypes", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database = damageFixture(fixture, *directory,
                                   {{"damage/default.damage", R"({"kind":"DeFaUlT"})"},
                                    {"damage/mixed.damage", R"({"kind":"MiXeD","elementalType":"ElementOnly"})"},
@@ -98,7 +98,7 @@ const GameTestRegistration
   damageDuplicates("DamageDatabaseTest", "RejectsExactAndCaseOnlyKindDuplicates", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     for (String const& duplicate : {String("MiXeD"), String("mIxEd")}) {
       SCOPED_TRACE(duplicate.utf8());
       auto caseDirectory = File::relative_to(*directory, duplicate);
@@ -116,7 +116,7 @@ const GameTestRegistration
   damageUndefinedElement("DamageDatabaseTest", "RejectsUndefinedElementalTypeDuringLoad", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database =
       damageFixture(fixture, *directory,
                     {{"damage/invalid.damage", R"({"kind":"MissingElementKind","elementalType":"MissingElement"})"}});
@@ -130,7 +130,7 @@ const GameTestRegistration
   damageNestedEffects("DamageDatabaseTest", "NestedEffectsPreservePayloadsAndNullDefaults", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto database = damageFixture(fixture, *directory,
                                   {{"damage/elementaltypes.config", R"({
         "default":{"resistanceStat":"health","damageNumberParticles":{"hIt":"normal","kIlL":"finish"}}
@@ -178,7 +178,7 @@ const GameTestRegistration
   damageNestedFailures("DamageDatabaseTest", "NestedTypesAndHitNamesRetainFirstErrorOrder", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     struct Failure {
       String elements;
       String damage;

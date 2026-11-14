@@ -284,7 +284,7 @@ std::expected<void, StarException> File::overwrite_file_with_rename(std::span<ch
   staging.m_file = *acquired;
   staging.set_mode(IOMode::Write);
   bool owns_stage = true;
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     if (!owns_stage)
       return;
     auto closed = staging.close();

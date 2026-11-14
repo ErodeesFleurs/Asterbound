@@ -213,6 +213,14 @@ private:
 };
 
 namespace LuaDetail {
+// Only signature-deducing entrypoints require metadata; generic and overloaded
+// callables can use the explicit-signature APIs without probing their bodies.
+template <typename Function>
+concept signature_deducible = requires {
+  typename FunctionTraits<Function>::result_type;
+  typename FunctionTraits<Function>::argument_types;
+};
+
 [[nodiscard]] std::expected<void, StarException> insertJsonMetatable(LuaEngine& engine, LuaTable const& table,
                                                                      Json::Type type);
 struct LuaRegistryReference {
@@ -320,7 +328,7 @@ public:
   [[nodiscard]] std::expected<LuaInt, StarException> length() const;
 
   // If iteration function returns bool, returning false signals stopping.
-  template <typename Function>
+  template <LuaDetail::signature_deducible Function>
   [[nodiscard]] std::expected<void, StarException> iterate(Function&& iterator) const;
 
   template <typename Return, typename... Args, typename Function>
@@ -387,7 +395,7 @@ class LuaCallbacks {
 public:
   [[nodiscard]] std::expected<void, StarException> copyCallback(String srcName, String dstName);
 
-  template <typename Function>
+  template <LuaDetail::signature_deducible Function>
   [[nodiscard]] std::expected<void, StarException> registerCallback(String name, Function&& func);
 
   bool removeCallback(String name);
@@ -410,7 +418,7 @@ private:
 template <typename T>
 class LuaMethods {
 public:
-  template <typename Function>
+  template <LuaDetail::signature_deducible Function>
   [[nodiscard]] std::expected<void, StarException> registerMethod(String name, Function&& func);
 
   template <typename Return, typename... Args, typename Function>
@@ -508,7 +516,7 @@ public:
   template <typename Container>
   [[nodiscard]] std::expected<LuaTable, StarException> createArrayTable(Container const& array);
 
-  template <typename Function>
+  template <LuaDetail::signature_deducible Function>
   [[nodiscard]] std::expected<LuaFunction, StarException> createFunction(Function&& func);
 
   template <typename Return, typename... Args, typename Function>
@@ -684,15 +692,15 @@ public:
   [[nodiscard]] std::expected<LuaTable, StarException> createArrayTable(Container const& array);
 
   // Creates a function and deduces the signature of the function using
-  // FunctionTraits.  As a convenience, the given function may optionally take
+  // FunctionTraits. As a convenience, the given function may optionally take
   // a LuaEngine& parameter as the first parameter, and if it does, when called
   // the function will get a reference to the calling LuaEngine.
-  template <typename Function>
+  template <LuaDetail::signature_deducible Function>
   [[nodiscard]] std::expected<LuaFunction, StarException> createFunction(Function&& func);
 
-  // If the function signature is not deducible using FunctionTraits, you can
-  // specify the return and argument types manually using this createFunction
-  // version.
+  // If the signature is not deducible using FunctionTraits (for example, a
+  // generic or overloaded callable), specify the return and argument types
+  // manually with createFunctionWithSignature.
   template <typename Return, typename... Args, typename Function>
   [[nodiscard]] std::expected<LuaFunction, StarException> createFunctionWithSignature(Function&& func);
 
@@ -1349,7 +1357,7 @@ namespace LuaDetail {
   }
   template <typename Return, typename Function, typename... Args>
   [[nodiscard]] std::expected<int, StarException> invokeWrapped(LuaStack stack, Function&& function, Args&&... args) {
-    using DeclaredReturn = typename AlgorithmResultInfo<std::remove_cvref_t<Return>>::Value;
+    using DeclaredReturn = typename AlgorithmResultInfo<std::remove_cvref_t<Return>>::value_type;
     using ActualReturn = std::remove_cvref_t<std::invoke_result_t<Function, Args...>>;
     using ActualResultInfo = AlgorithmResultInfo<ActualReturn>;
     if constexpr (std::is_void_v<ActualReturn>) {
@@ -1358,12 +1366,12 @@ namespace LuaDetail {
       return toWrappedReturn(stack, LuaNil);
     } else {
       auto&& result = std::invoke(std::forward<Function>(function), std::forward<Args>(args)...);
-      if constexpr (ActualResultInfo::Fallible) {
+      if constexpr (ActualResultInfo::is_fallible) {
         if (!result)
           return std::unexpected(std::move(result.error()));
         if constexpr (std::is_void_v<DeclaredReturn>) {
           return toWrappedReturn(stack, LuaNil);
-        } else if constexpr (std::is_same_v<DeclaredReturn, typename ActualResultInfo::Value>) {
+        } else if constexpr (std::is_same_v<DeclaredReturn, typename ActualResultInfo::value_type>) {
           return toWrappedReturn(stack, *result);
         } else {
           return toWrappedReturn(stack, static_cast<DeclaredReturn>(std::move(*result)));
@@ -1422,10 +1430,10 @@ namespace LuaDetail {
   LuaWrappedFunction wrapFunctionArgs(Function&& function, std::type_identity<std::tuple<Args...>>) {
     return wrapFunctionWithSignature<Return, Args...>(std::forward<Function>(function));
   }
-  template <typename Function>
+  template <signature_deducible Function>
   LuaWrappedFunction wrapFunction(Function&& function) {
-    return wrapFunctionArgs<typename FunctionTraits<Function>::Return>(
-      std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+    return wrapFunctionArgs<typename FunctionTraits<Function>::result_type>(
+      std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::argument_types>{});
   }
 
   template <typename Return, typename T, typename... Args>
@@ -1470,10 +1478,10 @@ namespace LuaDetail {
   LuaWrappedFunction wrapMethodArgs(Function&& function, std::type_identity<std::tuple<Args...>>) {
     return wrapMethodWithSignature<Return, Args...>(std::forward<Function>(function));
   }
-  template <typename Function>
+  template <signature_deducible Function>
   LuaWrappedFunction wrapMethod(Function&& function) {
-    return wrapMethodArgs<typename FunctionTraits<Function>::Return>(
-      std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+    return wrapMethodArgs<typename FunctionTraits<Function>::result_type>(
+      std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::argument_types>{});
   }
 
   template <typename Function, typename... Args>
@@ -1482,11 +1490,11 @@ namespace LuaDetail {
     if constexpr (std::is_void_v<Return>) {
       std::invoke(function, std::forward<Args>(args)...);
       return true;
-    } else if constexpr (AlgorithmResultInfo<Return>::Fallible) {
+    } else if constexpr (AlgorithmResultInfo<Return>::is_fallible) {
       auto result = std::invoke(function, std::forward<Args>(args)...);
       if (!result)
         return std::unexpected(std::move(result.error()));
-      if constexpr (std::is_void_v<typename AlgorithmResultInfo<Return>::Value>)
+      if constexpr (std::is_void_v<typename AlgorithmResultInfo<Return>::value_type>)
         return true;
       else
         return *result;
@@ -1534,9 +1542,9 @@ namespace LuaDetail {
   auto wrapTableIteratorArgs(LuaEngine& engine, Function&& function, std::type_identity<std::tuple<Args...>>) {
     return wrapTableIteratorWithSignature<Return, Args...>(engine, std::forward<Function>(function));
   }
-  template <typename Function> auto wrapTableIterator(LuaEngine& engine, Function&& function) {
-    return wrapTableIteratorArgs<typename FunctionTraits<Function>::Return>(
-      engine, std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+  template <signature_deducible Function> auto wrapTableIterator(LuaEngine& engine, Function&& function) {
+    return wrapTableIteratorArgs<typename FunctionTraits<Function>::result_type>(
+      engine, std::forward<Function>(function), std::type_identity<typename FunctionTraits<Function>::argument_types>{});
   }
 
   // Like lua_setfield but raw; used inside protected Lua calls.
@@ -2037,7 +2045,7 @@ template <typename K>
 [[nodiscard]] std::expected<void, StarException> LuaTable::remove(K key) const {
   return set(std::move(key), LuaNil);
 }
-template <typename Function>
+template <LuaDetail::signature_deducible Function>
 [[nodiscard]] std::expected<void, StarException> LuaTable::iterate(Function&& function) const {
   auto& eng = engine();
   LuaDetail::LuaStackRestore restore(eng.m_state);
@@ -2116,7 +2124,7 @@ template <typename T>
   return engine().getUserData<T>(handleIndex());
 }
 
-template <typename Function>
+template <LuaDetail::signature_deducible Function>
 [[nodiscard]] std::expected<void, StarException> LuaCallbacks::registerCallback(String name, Function&& func) {
   if (!m_callbacks.insert(name, LuaDetail::wrapFunction(std::forward<Function>(func))).second)
     return std::unexpected(LuaException::format("Lua callback '{}' was registered twice", name));
@@ -2131,7 +2139,7 @@ template <typename Return, typename... Args, typename Function>
 }
 
 template <typename T>
-template <typename Function>
+template <LuaDetail::signature_deducible Function>
 [[nodiscard]] std::expected<void, StarException> LuaMethods<T>::registerMethod(String name, Function&& func) {
   if (!m_methods.insert(name, LuaDetail::wrapMethod(std::forward<Function>(func))).second)
     return std::unexpected(LuaException::format("Lua method '{}' was registered twice", name));
@@ -2254,7 +2262,7 @@ template <typename Container>
   return engine().createArrayTable(array);
 }
 
-template <typename Function>
+template <LuaDetail::signature_deducible Function>
 [[nodiscard]] std::expected<LuaFunction, StarException> LuaContext::createFunction(Function&& func) {
   return engine().createFunction(std::forward<Function>(func));
 }
@@ -2385,7 +2393,7 @@ template <typename Container>
   return stack.read<LuaTable>(-1);
 }
 
-template <typename Function>
+template <LuaDetail::signature_deducible Function>
 [[nodiscard]] std::expected<LuaFunction, StarException> LuaEngine::createFunction(Function&& func) {
   return createWrappedFunction(LuaDetail::wrapFunction(std::forward<Function>(func)));
 }

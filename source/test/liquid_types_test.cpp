@@ -74,7 +74,7 @@ const GameTestRegistration
   liquidEngineConfig("LiquidsDatabaseTest", "RequiredFloatFieldsUseAssetConfiguration", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     Json engine = JsonObject{{"lateralMoveFactor", 1},
                              {"spreadOverfillUpFactor", 2},
                              {"spreadOverfillLateralFactor", 3},

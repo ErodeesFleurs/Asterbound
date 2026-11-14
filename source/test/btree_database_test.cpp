@@ -225,7 +225,7 @@ namespace {
     auto tmpFileResult = File::temporary_file(random);
     ASSERT_TRUE(tmpFileResult);
     auto tmpFile = std::move(*tmpFileResult);
-    auto finallyGuard = finally([&tmpFile]() { EXPECT_TRUE(tmpFile->remove()); });
+    auto finallyGuard = make_scope_exit([&tmpFile]() { EXPECT_TRUE(tmpFile->remove()); });
 
     Set<std::uint32_t> keySet;
     BTreeDatabase db(logger, "TestDB", 4);
@@ -337,7 +337,7 @@ TEST(BTreeDatabaseTest, Threading) {
   auto tmpFileResult = File::temporary_file(random);
   ASSERT_TRUE(tmpFileResult);
   auto tmpFile = std::move(*tmpFileResult);
-  auto finallyGuard = finally([&tmpFile]() { EXPECT_TRUE(tmpFile->remove()); });
+  auto finallyGuard = make_scope_exit([&tmpFile]() { EXPECT_TRUE(tmpFile->remove()); });
 
   BTreeDatabase db(logger, "TestDB", 4);
   ASSERT_TRUE(db.setAutoCommit(false));
@@ -434,7 +434,7 @@ TEST(BTreeDatabaseTest, FullBlockReplacementDoesNotReadDiscardedPayload) {
   auto temporary_result = File::temporary_file(**random_result);
   ASSERT_TRUE(temporary_result);
   auto temporary = std::move(*temporary_result);
-  auto cleanup = finally([&]() { EXPECT_TRUE(temporary->remove()); });
+  auto cleanup = make_scope_exit([&]() { EXPECT_TRUE(temporary->remove()); });
   auto device = std::make_shared<ReadBudgetFile>(temporary->file_name());
   Logger logger;
   BTreeDatabase db(logger, "TestDB", 4);
@@ -484,7 +484,7 @@ TEST(BTreeDatabaseTest, PartialFreeIndexWritesPreservePayloadAndRollback) {
   auto temporary_result = File::temporary_file(**random_result);
   ASSERT_TRUE(temporary_result);
   auto temporary = std::move(*temporary_result);
-  auto cleanup = finally([&]() { EXPECT_TRUE(temporary->remove()); });
+  auto cleanup = make_scope_exit([&]() { EXPECT_TRUE(temporary->remove()); });
   auto device = std::make_shared<ReadBudgetFile>(temporary->file_name());
   Logger logger;
   BTreeDatabase db(logger, "TestDB", 4);
@@ -576,7 +576,7 @@ TEST(BTreeDatabaseTest, CommitPhaseFailuresPreservePendingDataAndRecover) {
       auto temporary_result = File::temporary_file(**random_result);
       ASSERT_TRUE(temporary_result);
       auto temporary = std::move(*temporary_result);
-      auto cleanup = finally([&]() { EXPECT_TRUE(temporary->remove()); });
+      auto cleanup = make_scope_exit([&]() { EXPECT_TRUE(temporary->remove()); });
       auto device = std::make_shared<CommitFaultFile>(temporary->file_name());
       Logger logger;
       BTreeDatabase db(logger, "TestDB", 4);

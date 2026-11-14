@@ -477,7 +477,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   if (!toObjectResult38)
     return std::unexpected(std::move(toObjectResult38.error()));
   auto bagOrder = std::move(*toObjectResult38).keys();
-  auto sortByComputedValueResult41 = sortByComputedValue(bagOrder, [&itemBagConfig](String const& name) -> std::expected<std::int64_t, StarException> {
+  auto sortByComputedValueResult41 = sort_by_key(bagOrder, [&itemBagConfig](String const& name) -> std::expected<std::int64_t, StarException> {
       auto getResult39 = itemBagConfig.get(name);
       if (!getResult39)
         return std::unexpected(std::move(getResult39.error()));

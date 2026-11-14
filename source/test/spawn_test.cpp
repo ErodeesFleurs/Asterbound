@@ -224,7 +224,7 @@ const GameTestRegistration presentationRemovalLifecycle(
     // the shared fixture's sink that fails on every expected Error record.
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};

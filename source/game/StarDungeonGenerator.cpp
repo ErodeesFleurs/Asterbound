@@ -1424,7 +1424,7 @@ namespace Dungeon {
       if (auto applied = m_facade->setBackgroundMod(displace(iter->first), iter->second.mod, iter->second.hueshift); !applied) return std::unexpected(std::move(applied.error()));
 
     List<Vec2I> sortedPositions = m_objects.keys();
-    sortByComputedValue(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
+    sort_by_key(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
     for (auto pos : sortedPositions) {
       auto& object = m_objects[pos];
       if (auto applied = m_facade->placeObject(displace(pos), object.objectName, object.direction, object.parameters); !applied) return std::unexpected(std::move(applied.error()));
@@ -1438,13 +1438,13 @@ namespace Dungeon {
     }
 
     sortedPositions = List<Vec2I>::from(m_biomeTrees);
-    sortByComputedValue(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
+    sort_by_key(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
     for (auto pos : sortedPositions) {
       if (auto applied = m_facade->placeBiomeTree(pos); !applied) return std::unexpected(std::move(applied.error()));
     }
 
     sortedPositions = List<Vec2I>::from(m_biomeItems);
-    sortByComputedValue(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
+    sort_by_key(sortedPositions, [](Vec2I pos) { return pos[1] + pos[0] / 1000.0f; });
     for (auto pos : sortedPositions) {
       if (auto applied = m_facade->placeSurfaceBiomeItems(pos); !applied) return std::unexpected(std::move(applied.error()));
     }

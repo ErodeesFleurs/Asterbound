@@ -402,7 +402,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase:
   if (!level)
     return std::unexpected(std::move(level.error()));
   auto boxSet = set->get();
-  eraseWhere(boxSet, [&](TreasureChest const& chest) { return *level < chest.minimumLevel; });
+  Star::erase_if(boxSet, [&](TreasureChest const& chest) { return *level < chest.minimumLevel; });
   if (boxSet.empty())
     return std::shared_ptr<ContainerObject>();
   auto chest = static_random_from(boxSet, seed, "TreasureChest");

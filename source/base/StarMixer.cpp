@@ -549,7 +549,7 @@ void Mixer::setGroupVolume(MixerGroup group, float targetValue, float rampTime) 
 std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFunction positionalAttenuationFunction) {
   {
     std::lock_guard locker(m_queueMutex);
-    eraseWhere(m_audios, [](auto const& p) {
+    Star::erase_if(m_audios, [](auto const& p) {
       return p.first->m_finished;
     });
     for (auto&& p : m_audios) {
@@ -569,7 +569,7 @@ std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFun
 
   {
     std::lock_guard locker(m_effectsMutex);
-    eraseWhere(m_effects, [](auto const& p) {
+    Star::erase_if(m_effects, [](auto const& p) {
         return p.second->finished;
       });
   }

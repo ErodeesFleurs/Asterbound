@@ -42,7 +42,7 @@ void storage_updates(benchmark::State& state, Root& root, bool& failed, storage_
     fail(temporary.error());
     return;
   }
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     if (auto removed = File::remove_all(*temporary); !removed)
       fail(removed.error());
   });

@@ -739,8 +739,8 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
     m_edgeKeyEvents.push_back(keyDown);
   } else if (std::holds_alternative<KeyUpEvent>(event)) {
     auto const& keyUp = std::get<KeyUpEvent>(event);
-    eraseWhere(m_heldKeyEvents, [&](auto& keyEvent) {
-      return keyEvent.key == keyUp.key;
+    m_heldKeyEvents.filter([&](auto const& keyEvent) {
+      return keyEvent.key != keyUp.key;
     });
 
     auto keyName = enumName<KeyNames>(keyUp.key);

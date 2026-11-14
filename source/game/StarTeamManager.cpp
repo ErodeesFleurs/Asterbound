@@ -160,17 +160,17 @@ void TeamManager::purgeInvitationsFor(Uuid const& playerUuid) {
 }
 
 void TeamManager::purgeInvitationsFrom(Uuid const& playerUuid) {
-  eraseWhere(m_invitations, [playerUuid](auto const& invitation) {
+  Star::erase_if(m_invitations, [playerUuid](auto const& invitation) {
     return invitation.second.inviterUuid == playerUuid;
   });
-  eraseWhere(m_polledInvitations, [playerUuid](auto const& polled) {
+  Star::erase_if(m_polledInvitations, [playerUuid](auto const& polled) {
     return polled.second.inviterUuid == playerUuid;
   });
 }
 
 void TeamManager::expirePolledInvitations() {
   auto now = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
-  eraseWhere(m_polledInvitations, [&](auto const& entry) {
+  Star::erase_if(m_polledInvitations, [&](auto const& entry) {
     return (now - entry.second.polledAt) >= m_polledInvitationTimeout;
   });
 }

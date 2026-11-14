@@ -51,7 +51,7 @@ void assetWorkers(benchmark::State& state, PerformanceBenchmarkSession& session,
     session.fail(state, directory.error());
     return;
   }
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     auto removed = File::remove_all(*directory);
     if (!removed)
       session.fail(state, removed.error());

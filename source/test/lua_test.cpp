@@ -487,7 +487,7 @@ TEST(LuaTest, UserMethodTest) {
   auto luaEngineResult = LuaEngine::create();
   ASSERT_TRUE(luaEngineResult);
   auto& luaEngine = *luaEngineResult;
-  auto callbackResult4 = luaEngine->createFunctionWithSignature<Vec3F, float, float, float>(construct<Vec3F>());
+  auto callbackResult4 = luaEngine->createFunctionWithSignature<Vec3F, float, float, float>(Construct<Vec3F>());
   ASSERT_TRUE(callbackResult4);
   ASSERT_TRUE((luaEngine->setGlobal("vec3", *callbackResult4)));
 
@@ -1678,6 +1678,73 @@ TEST(LuaTest, Errors) {
   auto errorText = luaEngine->luaTo<String>(error);
   ASSERT_TRUE(errorText);
   EXPECT_EQ(errorText->contains("lua caught the error"), true);
+}
+
+TEST(LuaTest, QualifiedCallbacksPreserveStateAndCheckedVoidFailures) {
+  struct DepositTotal {
+    int total = 0;
+
+    std::expected<int, StarException> operator()(int amount) & noexcept {
+      if (amount < 0)
+        return std::unexpected(StarException("negative-deposit"));
+      total += amount;
+      return total;
+    }
+  };
+  struct Fee {
+    int operator()(int cents) const noexcept { return cents / 10; }
+    double operator()(double amount) const noexcept { return amount / 10.0; }
+  };
+
+  auto engineResult = LuaEngine::create();
+  ASSERT_TRUE(engineResult);
+  auto& engine = *engineResult;
+  auto contextResult = engine->createContext();
+  ASSERT_TRUE(contextResult);
+  auto context = std::move(*contextResult);
+
+  auto twice = context.createFunction([](int amount) noexcept { return amount * 2; });
+  ASSERT_TRUE(twice);
+  ASSERT_TRUE(context.set("twice", *twice));
+
+  int charged = 0;
+  LuaCallbacks callbacks;
+  ASSERT_TRUE(callbacks.registerCallback("deposit", DepositTotal{}));
+  ASSERT_TRUE((callbacks.registerCallbackWithSignature<int, int>("fee", Fee{})));
+  // The declared void return must not discard this generic callback's error.
+  ASSERT_TRUE((callbacks.registerCallbackWithSignature<void, int>("charge",
+      [&](auto amount) -> std::expected<void, StarException> {
+        if (amount < 0)
+          return std::unexpected(StarException("negative-charge"));
+        charged += amount;
+        return {};
+      })));
+  ASSERT_TRUE(context.setCallbacks("account", callbacks));
+  ASSERT_TRUE(context.load(R"SCRIPT(
+    function checkout(amount)
+      account.charge(amount)
+      return twice(account.deposit(amount - account.fee(amount)))
+    end
+    function rejectDeposit()
+      return account.deposit(-5)
+    end
+  )SCRIPT"));
+
+  EXPECT_EQ(context.invokePath<int>("checkout", 20), 36);
+  EXPECT_EQ(context.invokePath<int>("checkout", 10), 54);
+  EXPECT_EQ(charged, 30);
+
+  auto chargeFailure = context.invokePath<int>("checkout", -5);
+  ASSERT_FALSE(chargeFailure);
+  EXPECT_NE(std::string(chargeFailure.error().what()).find("negative-charge"), std::string::npos);
+  EXPECT_EQ(charged, 30);
+
+  auto depositFailure = context.invokePath<int>("rejectDeposit");
+  ASSERT_FALSE(depositFailure);
+  EXPECT_NE(std::string(depositFailure.error().what()).find("negative-deposit"), std::string::npos);
+
+  EXPECT_EQ(context.invokePath<int>("checkout", 5), 64);
+  EXPECT_EQ(charged, 35);
 }
 
 TEST(LuaTest, ErrorDiagnosticsLeaveBothCBoundariesClean) {

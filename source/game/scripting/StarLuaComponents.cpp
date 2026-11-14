@@ -77,7 +77,7 @@ std::expected<void, StarException> LuaBaseComponent::addCallbacks(String groupNa
   CallbackGroup group{.callbacks = std::move(callbacks), .scope = {}};
   // Installation can run Lua metamethods; revoke escaped values on rollback or session retirement.
   auto retire = [scope = group.scope]() mutable { scope.request_stop(); };
-  auto rollback = finally([&] { retire(); });
+  auto rollback = make_scope_exit([&] { retire(); });
   std::stop_callback duringInstallation(m_context ? m_callbackScope.get_token() : std::stop_token{}, retire);
   if (m_context) {
     // Component-owned groups override inherited root/script tables.
@@ -91,7 +91,7 @@ std::expected<void, StarException> LuaBaseComponent::addCallbacks(String groupNa
     return std::unexpected(LuaComponentException("Lua session retired during callback installation"));
   if (!m_callbacks.insert(std::move(groupName), std::move(group)).second)
     return std::unexpected(LuaComponentException("Callback group changed during installation"));
-  rollback.cancel();
+  rollback.release();
   return {};
 }
 
@@ -209,7 +209,7 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
       m_context = std::move(*context);
       LuaEnginePtr engine(&m_context->engine());
       auto previousLifetime = engine->setPromiseLifetime(m_callbackScope.get_token());
-      auto restoreLifetime = finally([&] { engine->setPromiseLifetime(previousLifetime); });
+      auto restoreLifetime = make_scope_exit([&] { engine->setPromiseLifetime(previousLifetime); });
       if (auto setup = contextSetup(); !setup)
         return std::unexpected(std::move(setup.error()));
       if (auto invoked = invoke<LuaValue>("init"); !invoked)
@@ -249,7 +249,7 @@ std::expected<void, StarException> LuaBaseComponent::uninit(String const& before
 
 std::expected<void, StarException> LuaBaseComponent::shutdownContext(String const& beforeUninit) {
   m_shuttingDown = true;
-  auto finished = finally([this] { m_shuttingDown = false; });
+  auto finished = make_scope_exit([this] { m_shuttingDown = false; });
   std::optional<StarException> error;
   auto remember = [&](std::expected<void, StarException> result) {
     if (!result) {
@@ -362,7 +362,7 @@ std::expected<void, StarException> LuaBaseComponent::retireContext() {
 std::expected<void, StarException> LuaBaseComponent::finishExecution() {
   // Teardown callbacks may reenter, but cannot recursively finish the boundary.
   ++m_activeCalls;
-  auto finished = finally([this] { --m_activeCalls; });
+  auto finished = make_scope_exit([this] { --m_activeCalls; });
   std::expected<void, StarException> cleanup;
   if (m_pendingUninit) {
     auto hook = std::move(*m_pendingUninit);

@@ -49,7 +49,7 @@ TEST(FileTest, LogSinkRejectsShortWriteWithoutRetrying) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto path = File::relative_to(*directory, "short-log-write.log");
   auto sink = FileLogSink::create(path, LogLevel::Info, true);
   ASSERT_TRUE(sink);
@@ -140,7 +140,7 @@ TEST(FileTest, DirectoryOpenFailsWithoutPreventingSubsequentFileReads) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
 
   auto opened = File::open(*directory, IOMode::Read);
   ASSERT_FALSE(opened);
@@ -160,7 +160,7 @@ TEST(FileTest, ClonePreservesTruncatedFileAndIndependentPosition) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "clone");
   auto opened = File::open(path, IOMode::ReadWrite | IOMode::Truncate | IOMode::Append);
   ASSERT_TRUE(opened);
@@ -192,7 +192,7 @@ TEST(FileTest, CloneDoesNotRecreateAnUnlinkedOriginal) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "unlinked");
   auto opened = File::open(path, IOMode::ReadWrite);
   ASSERT_TRUE(opened);
@@ -222,7 +222,7 @@ TEST(FileTest, WholeReadsPreserveEmptyBinaryLargeAndUtf8Contents) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "whole");
   for (std::size_t size :
        {std::size_t(0), std::size_t(1), std::size_t(1024), std::size_t(4095), std::size_t(4096), std::size_t(4097),
@@ -308,7 +308,7 @@ TEST(FileTest, ClosedResizeDoesNotOpenOrAlterAFile) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "closed");
   ASSERT_TRUE(File::write_file(String("unchanged"), path));
   File file(path);
@@ -381,7 +381,7 @@ TEST(FileTest, CopyOverwritesBinaryFilesAndRotatesBackups) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto source = File::relative_to(*directory, "source-日");
   auto target = File::relative_to(*directory, "target-日");
   std::string bytes(8193, '\0');
@@ -412,7 +412,7 @@ TEST(FileTest, CopyErrorsDoNotTruncateSourceOrExistingTarget) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto source = File::relative_to(*directory, "source");
   auto target = File::relative_to(*directory, "target");
   ASSERT_TRUE(File::write_file(String("source bytes"), source));
@@ -439,7 +439,7 @@ TEST(FileTest, DirectoryHelpersPreserveFailureBoundaries) {
   ASSERT_TRUE(randomResult);
   auto directory = File::temporary_directory(**randomResult);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto child = File::relative_to(*directory, "nested/child");
   ASSERT_TRUE(File::create_directories(child));
   EXPECT_TRUE(File::create_directories(child));
@@ -484,8 +484,8 @@ TEST(FileTest, CurrentDirectoryChangesAndReportsErrors) {
   ASSERT_TRUE(randomResult);
   auto directory = File::temporary_directory(**randomResult);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
-  auto restore = finally([&]() { EXPECT_TRUE(File::change_directory(*original)); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
+  auto restore = make_scope_exit([&]() { EXPECT_TRUE(File::change_directory(*original)); });
   auto child = File::relative_to(*directory, "目录-é");
   ASSERT_TRUE(File::create_directory(child));
   ASSERT_TRUE(File::change_directory(child));
@@ -505,7 +505,7 @@ TEST(FileTest, DirectoryListingPreservesDotsAndUtf8Names) {
   ASSERT_TRUE(randomResult);
   auto directory = File::temporary_directory(**randomResult);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   String child = "目录-é";
   String file = "данные.txt";
   ASSERT_TRUE(File::create_directory(File::relative_to(*directory, child)));
@@ -537,7 +537,7 @@ TEST(FileTest, FullPathRequiresExistingTargetsAndResolvesSymlinks) {
   ASSERT_TRUE(randomResult);
   auto directory = File::temporary_directory(**randomResult);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto real = File::relative_to(*directory, "real");
   ASSERT_TRUE(File::create_directory(real));
   auto resolved = File::full_path(real + "/../real/");
@@ -582,7 +582,7 @@ TEST(FileTest, RemoveDirectoryRecursiveKeepsSymlinkTargets) {
   auto outsideResult = File::temporary_directory(random);
   ASSERT_TRUE(outsideResult);
   auto outside = std::move(*outsideResult);
-  auto finallyGuard = finally([&dir, &outside]() {
+  auto finallyGuard = make_scope_exit([&dir, &outside]() {
     removeTree(dir);
     removeTree(outside);
   });
@@ -624,7 +624,7 @@ TEST(FileTest, RemoveDirectoryRecursiveHandlesSymlinkLoops) {
   auto dirResult = File::temporary_directory(random);
   ASSERT_TRUE(dirResult);
   auto dir = std::move(*dirResult);
-  auto finallyGuard = finally([&dir]() { removeTree(dir); });
+  auto finallyGuard = make_scope_exit([&dir]() { removeTree(dir); });
 
   std::error_code ec;
   std::filesystem::create_directories(fsPath(File::relative_to(dir, "real")), ec);
@@ -701,7 +701,7 @@ TEST(FileTest, WholeReadsConsumeStreamsWhoseMetadataSizeIsZero) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&]() { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "whole-read-pipe");
   ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
   std::string bytes(4096, '\0');
@@ -761,7 +761,7 @@ TEST(FileTest, AppendSeekFailureReleasesDescriptor) {
   auto dirResult = File::temporary_directory(random);
   ASSERT_TRUE(dirResult);
   auto dir = std::move(*dirResult);
-  auto cleanup = finally([&]() { removeTree(dir); });
+  auto cleanup = make_scope_exit([&]() { removeTree(dir); });
   auto path = File::relative_to(dir, "pipe");
   ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
   // Exception symbolization may cache ELF descriptors; only this FIFO is owned here.
@@ -781,7 +781,7 @@ TEST(FileTest, FailedCloseConsumesDescriptorOwnership) {
   ASSERT_TRUE(fileResult);
   auto file = std::move(*fileResult);
   auto path = file->file_name();
-  auto cleanup = finally([&]() { EXPECT_TRUE(File::remove(path)); });
+  auto cleanup = make_scope_exit([&]() { EXPECT_TRUE(File::remove(path)); });
   int descriptor = descriptorForFile(path);
   ASSERT_GE(descriptor, 0);
   ASSERT_EQ(::close(descriptor), 0);
@@ -803,7 +803,7 @@ TEST(FileTest, DestructorReportsCloseFailureWithoutTerminating) {
   ASSERT_TRUE(fileResult);
   auto file = std::move(*fileResult);
   auto path = file->file_name();
-  auto cleanup = finally([&]() { EXPECT_TRUE(File::remove(path)); });
+  auto cleanup = make_scope_exit([&]() { EXPECT_TRUE(File::remove(path)); });
   int descriptor = descriptorForFile(path);
   ASSERT_GE(descriptor, 0);
   ASSERT_EQ(::close(descriptor), 0);

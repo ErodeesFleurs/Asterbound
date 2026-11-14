@@ -36,14 +36,115 @@ TEST(Take, DefaultConstructionFollowsOwnershipTransfer) {
 
   Value::sequence() = 0;
   Value source(42);
-  auto* identity = source.owner.get();
+  auto identity = std::ref(*source.owner);
   auto taken = take(source);
-  EXPECT_EQ(taken.owner.get(), identity);
+  EXPECT_EQ(taken.owner.get(), std::addressof(identity.get()));
   ASSERT_TRUE(taken.owner);
   EXPECT_EQ(*taken.owner, 42);
   EXPECT_FALSE(source.owner);
   EXPECT_EQ(taken.moveOrder, 1);
   EXPECT_EQ(source.defaultOrder, 2);
+}
+
+TEST(ScopeExit, CleanupRunsOnceAndMovePreservesReleaseState) {
+  std::vector<int> cleaned;
+  auto namedCleanup = [&] { cleaned.push_back(1); };
+  {
+    auto guard = make_scope_exit(namedCleanup);
+    EXPECT_TRUE(cleaned.empty());
+  }
+  EXPECT_EQ(cleaned, (std::vector<int>{1}));
+
+  struct Cleanup {
+    std::unique_ptr<int> value;
+    std::reference_wrapper<std::vector<int>> cleaned;
+    void operator()() & { cleaned.get().push_back((*value)++); }
+  };
+  Cleanup callback{std::make_unique<int>(2), std::ref(cleaned)};
+  {
+    auto guard = make_scope_exit(std::ref(callback));
+  }
+  EXPECT_EQ(*callback.value, 3);
+  EXPECT_EQ(cleaned, (std::vector<int>{1, 2}));
+
+  {
+    auto guard = make_scope_exit(Cleanup{std::make_unique<int>(3), std::ref(cleaned)});
+    {
+      auto moved = std::move(guard);
+      EXPECT_EQ(cleaned, (std::vector<int>{1, 2}));
+    }
+    EXPECT_EQ(cleaned, (std::vector<int>{1, 2, 3}));
+  }
+  EXPECT_EQ(cleaned, (std::vector<int>{1, 2, 3}));
+
+  {
+    auto guard = make_scope_exit(Cleanup{std::make_unique<int>(4), std::ref(cleaned)});
+    guard.release();
+    auto moved = std::move(guard);
+  }
+  {
+    auto guard = make_scope_exit(Cleanup{std::make_unique<int>(5), std::ref(cleaned)});
+    auto moved = std::move(guard);
+    moved.release();
+  }
+  EXPECT_EQ(cleaned, (std::vector<int>{1, 2, 3}));
+}
+
+TEST(ContainerErasure, FirstFailurePreservesImmediateMutationAndObservedSizes) {
+  struct Truth {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  auto expectPrefix = [](auto operation, bool keepEven) {
+    std::vector<int> values{1, 2, 3, 4, 5, 6};
+    std::vector<int> visited;
+    std::vector<std::size_t> observedSizes;
+    auto predicate = [&](int value) -> std::expected<Truth, StarException> {
+      visited.push_back(value);
+      observedSizes.push_back(values.size());
+      if (value == 5)
+        return std::unexpected(OutOfRangeException("erase boundary", false));
+      return Truth{keepEven ? value % 2 == 0 : value % 2 != 0};
+    };
+    auto result = operation(values, predicate);
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().template is<OutOfRangeException>());
+    EXPECT_EQ(visited, (std::vector<int>{1, 2, 3, 4, 5}));
+    EXPECT_EQ(observedSizes, (std::vector<std::size_t>{6, 5, 5, 4, 4}));
+    EXPECT_EQ(values, (std::vector<int>{2, 4, 5, 6}));
+  };
+  expectPrefix([](auto& values, auto& predicate) { return Star::erase_if(values, predicate); }, false);
+  expectPrefix([](auto& values, auto& predicate) { return Star::filter(values, predicate); }, true);
+
+  std::vector<int> values{1, 2, 3, 4};
+  Star::erase_if(values, [](int value) { return Truth{value % 2 != 0}; });
+  EXPECT_EQ(values, (std::vector<int>{2, 4}));
+  Star::filter(values, [](int value) { return Truth{value == 4}; });
+  EXPECT_EQ(values, (std::vector<int>{4}));
+}
+
+TEST(MapEquality, HeterogeneousIterationOrderAndExplicitBooleanValues) {
+  struct Truth {
+    bool value;
+    explicit operator bool() const { return value; }
+    bool operator!() const { return value; }
+  };
+  struct Value {
+    int value;
+    Truth operator==(Value const& other) const { return {value == other.value}; }
+  };
+  std::map<int, Value> ascending{{1, {10}}, {2, {20}}, {3, {30}}};
+  std::map<int, Value, std::greater<int>> descending{{1, {10}}, {2, {20}}, {3, {30}}};
+  EXPECT_TRUE(maps_equal(ascending, descending));
+  EXPECT_TRUE(maps_equal(descending, ascending));
+  descending.find(2)->second.value = 99;
+  EXPECT_FALSE(maps_equal(ascending, descending));
+  EXPECT_FALSE(maps_equal(descending, ascending));
+  descending.erase(2);
+  descending.emplace(4, Value{20});
+  EXPECT_FALSE(maps_equal(ascending, descending));
+  EXPECT_FALSE(maps_equal(descending, ascending));
 }
 
 TEST(ListPredicates, MembershipConvertsToElementType) {
@@ -265,14 +366,14 @@ TEST(ComputedSort, MoveOnlyNonDefaultKeysAndStableTies) {
   };
   List<int> values{21, 10, 22, 11, 20};
   List<int> visited;
-  stableSortByComputedValue(values, [&](int value) {
+  stable_sort_by_key(values, [&](int value) {
     visited.push_back(value);
     return Key(value / 10);
   });
   EXPECT_EQ(visited, (List<int>{21, 10, 22, 11, 20}));
   EXPECT_EQ(values, (List<int>{10, 11, 21, 22, 20}));
 
-  auto result = sortByComputedValue(values, [](int value) -> std::expected<Key, StarException> { return Key(value); });
+  auto result = sort_by_key(values, [](int value) -> std::expected<Key, StarException> { return Key(value); });
   ASSERT_TRUE(result);
   EXPECT_EQ(values, (List<int>{10, 11, 20, 21, 22}));
 }
@@ -282,7 +383,7 @@ TEST(ComputedSort, FirstKeyFailureLeavesInputUnreordered) {
   for (std::size_t failure = 0; failure < original.size(); ++failure) {
     auto values = original;
     List<int> visited;
-    auto result = stableSortByComputedValue(values, [&](int value) -> std::expected<int, StarException> {
+    auto result = stable_sort_by_key(values, [&](int value) -> std::expected<int, StarException> {
       visited.push_back(value);
       if (visited.size() == failure + 1)
         return std::unexpected(OutOfRangeException("sort key boundary", false));
@@ -299,9 +400,86 @@ TEST(ComputedSort, FirstKeyFailureLeavesInputUnreordered) {
   std::function<std::expected<int, StarException>(int)> emptyGetter;
   List<int> empty;
   List<int> singleton{3};
-  EXPECT_TRUE(sortByComputedValue(empty, emptyGetter));
-  EXPECT_TRUE(sortByComputedValue(singleton, emptyGetter));
+  EXPECT_TRUE(sort_by_key(empty, emptyGetter));
+  EXPECT_TRUE(sort_by_key(singleton, emptyGetter));
   EXPECT_EQ(singleton, (List<int>{3}));
+}
+
+TEST(ComputedSort, MoveOnlyNonDefaultValuesFollowVariedPermutationCycles) {
+  struct Value {
+    explicit Value(int identity) : identity(std::make_unique<int>(identity)) {}
+    Value(Value&&) = default;
+    Value& operator=(Value&&) = default;
+    std::unique_ptr<int> identity;
+  };
+  std::vector<std::vector<int>> permutations{
+      {0, 1, 2, 3, 4, 5}, {5, 4, 3, 2, 1, 0}, {1, 2, 3, 4, 5, 0},
+      {1, 0, 3, 2, 5, 4}, {2, 0, 1, 4, 3, 5}};
+  for (auto const& permutation : permutations) {
+    SCOPED_TRACE(testing::PrintToString(permutation));
+    for (bool stable : {false, true}) {
+      SCOPED_TRACE(stable);
+      std::vector<Value> values;
+      for (int identity : permutation)
+        values.emplace_back(identity);
+      auto key = [](Value const& value) { return *value.identity; };
+      if (stable)
+        stable_sort_by_key(values, key);
+      else
+        sort_by_key(values, key);
+      ASSERT_EQ(values.size(), permutation.size());
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        ASSERT_TRUE(values[i].identity);
+        EXPECT_EQ(*values[i].identity, static_cast<int>(i));
+      }
+    }
+  }
+
+  std::vector<Value> ties;
+  for (int identity : {21, 10, 22, 11, 20})
+    ties.emplace_back(identity);
+  stable_sort_by_key(ties, [](Value const& value) { return *value.identity / 10; });
+  std::vector<int> expected{10, 11, 21, 22, 20};
+  ASSERT_EQ(ties.size(), expected.size());
+  for (std::size_t i = 0; i < ties.size(); ++i) {
+    ASSERT_TRUE(ties[i].identity);
+    EXPECT_EQ(*ties[i].identity, expected[i]);
+  }
+}
+
+TEST(ComputedSort, IndexedProxyReferencesRetainOriginalKeyVisitOrder) {
+  struct IndexedOnly {
+    std::array<int, 2> values;
+    std::size_t size() const { return values.size(); }
+    int& operator[](std::size_t index) { return values[index]; }
+  };
+  static_assert(algorithm_key_sortable<IndexedOnly, decltype([](int value) { return value; })>);
+
+  std::vector<bool> const original{true, false, true, false, false, true};
+  for (bool stable : {false, true}) {
+    SCOPED_TRACE(stable);
+    auto check = [&]<bool ReturnProxy>() {
+      SCOPED_TRACE(ReturnProxy);
+      auto values = original;
+      std::vector<bool> visited;
+      auto key = [&](auto value) {
+        bool bit = static_cast<bool>(value);
+        visited.push_back(bit);
+        if constexpr (ReturnProxy)
+          return value;
+        else
+          return bit;
+      };
+      if (stable)
+        stable_sort_by_key(values, key);
+      else
+        sort_by_key(values, key);
+      EXPECT_EQ(visited, original);
+      EXPECT_EQ(values, (std::vector<bool>{false, false, false, true, true, true}));
+    };
+    check.template operator()<false>();
+    check.template operator()<true>();
+  }
 }
 
 TEST(ListTransformed, MutableAndConstMoveOnlyCallbacksRemainBorrowed) {
@@ -369,7 +547,7 @@ TEST(ContainerTransform, BoundedOutputStopsAtInsertionFailure) {
   StaticList<int, 2> output;
   ASSERT_TRUE(output.push_back(99));
   calls = 0;
-  auto appended = transformInto(output, values, [&](int value) {
+  auto appended = transform_into(output, values, [&](int value) {
     ++calls;
     return value * 10;
   });

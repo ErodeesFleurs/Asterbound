@@ -747,7 +747,7 @@ const GameTestRegistration paneErrorIsolation(
   "ScriptPane", "ManagerIsolatesScriptFailuresAndCompletesLifecycle", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     // This renderer-free script/config pair also serves as a native PaneManager probe fixture.
@@ -2363,7 +2363,7 @@ const GameTestRegistration
   songbookPresentation("LuaSongbook", "NativeListLiteralFilteringResourceBytesBandAndReload", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "songs")));
@@ -2985,7 +2985,7 @@ const GameTestRegistration
   codexPresentation("LuaCodex", "DomainIdentityReadReorderPageBoundsModalDeferralAndReload", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
@@ -3224,7 +3224,7 @@ const GameTestRegistration questTrackerPresentation(
   "LuaQuestTracker", "EffectiveDomainOptionalValuesNativeBoundsSpringAndReload", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
@@ -3550,7 +3550,7 @@ const GameTestRegistration questLogPresentation(
   "LuaQuestLog", "StableSelectionReadOrderPresentationDeltasReplacementReloadAndPlayerScope", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::write_file(String(R"LUA(
@@ -3790,13 +3790,13 @@ const GameTestRegistration questLogPresentation(
       ASSERT_TRUE(storage) << storage.error().what();
       auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
       ASSERT_TRUE(world) << world.error().what();
-      auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+      auto closeWorld = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
       ASSERT_TRUE((*lockedQuest)->init(**player, **world, {}));
-      auto uninitQuest = finally([&] { EXPECT_TRUE((*lockedQuest)->uninit()); });
+      auto uninitQuest = make_scope_exit([&] { EXPECT_TRUE((*lockedQuest)->uninit()); });
       auto failingQuest = domain->getQuest("zzlog-side");
       ASSERT_TRUE(failingQuest);
       ASSERT_TRUE((*failingQuest)->init(**player, **world, {}));
-      auto uninitFailingQuest = finally([&] { EXPECT_TRUE((*failingQuest)->uninit()); });
+      auto uninitFailingQuest = make_scope_exit([&] { EXPECT_TRUE((*failingQuest)->uninit()); });
       ASSERT_TRUE((*failingQuest)->callScript("enableAbandonError", {}));
       ASSERT_TRUE(probe->eval<LuaValue>("player.abandonQuest('zzlog-side')"));
       EXPECT_EQ((*failingQuest)->state(), QuestState::Failed);
@@ -3961,7 +3961,7 @@ const GameTestRegistration
   questDialogs("QuestDialogs", "LuaModalDecisionsReloadIdentityTemplatesAndCinema", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "quests")));
@@ -4093,9 +4093,9 @@ const GameTestRegistration
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto closeWorld = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     ASSERT_TRUE(domain->init(**player, **world));
-    auto uninitDomain = finally([&] { EXPECT_TRUE(domain->uninit()); });
+    auto uninitDomain = make_scope_exit([&] { EXPECT_TRUE(domain->uninit()); });
     auto failed = domain->getQuest("zzdialog-failed");
     auto complete = domain->getQuest("zzdialog-complete");
     auto offered = domain->getQuest("zzdialog-offer");
@@ -4433,7 +4433,7 @@ const GameTestRegistration
   planetTextPresentation("LuaPlanetText", "NativeTimerDomainAndPersistentSessionPresentation", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     auto patchPath = File::relative_to(overlay, "interface.config.patch");
@@ -4549,7 +4549,7 @@ const GameTestRegistration
     auto worldB = makeWorld(*templateB);
     auto emptyWorld = makeWorld(*blankTemplate);
     ASSERT_TRUE(worldA && worldB && emptyWorld);
-    auto closeWorlds = finally([&] {
+    auto closeWorlds = make_scope_exit([&] {
       if ((*player)->inWorld())
         EXPECT_TRUE((*player)->uninit());
       EXPECT_TRUE((*worldA)->close());

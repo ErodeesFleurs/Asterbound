@@ -161,7 +161,7 @@ const GameTestRegistration itemFallbackDiagnostics(
       };
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       auto settings = fixture.rootSettings();
       settings.storageDirectory = File::relative_to(*directory, "storage");
       settings.runtimeConfigFile = {};
@@ -880,7 +880,7 @@ const GameTestRegistration
     auto temporaryDirectory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(temporaryDirectory);
     auto directory = std::move(*temporaryDirectory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(directory)); });
     auto overlay = File::relative_to(directory, "assets");
     auto writeAsset = [&](String const& path, String const& contents) -> std::expected<void, StarException> {
       auto absolute = path.starts_with("/");
@@ -1137,7 +1137,7 @@ const GameTestRegistration
   beamPresentationBoundary("ItemTest", "BeamTransitionsBelongToTicksNotDisplaySampling", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
@@ -1151,7 +1151,7 @@ const GameTestRegistration
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     auto factory = root.playerFactory();
     ASSERT_TRUE(factory);
@@ -1165,14 +1165,14 @@ const GameTestRegistration
     ASSERT_TRUE(context);
     player.setClientContext(*context);
     ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninitPlayer = finally([&] { EXPECT_TRUE(player.uninit()); });
+    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     Vec2F const origin(1024, 1024);
     ASSERT_TRUE(player.moveTo(origin));
     auto tools = ToolUser::create(root);
     ASSERT_TRUE(tools);
     ASSERT_TRUE((*tools)->init(player));
-    auto uninitTools = finally([&] { EXPECT_TRUE((*tools)->uninit()); });
+    auto uninitTools = make_scope_exit([&] { EXPECT_TRUE((*tools)->uninit()); });
     auto database = root.itemDatabase();
     ASSERT_TRUE(database);
     auto item = inventoryTestItem(**database, "painttool");
@@ -1280,7 +1280,7 @@ const GameTestRegistration activeItemScriptRecovery(
   "ItemTest", "ActiveItemScriptErrorsStayLocalAndAllowCleanReequip", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(overlay));
     ASSERT_TRUE(File::write_file(String(R"(
@@ -1317,7 +1317,7 @@ function uninit() visit("uninit") end
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     auto factory = root.playerFactory();
     ASSERT_TRUE(factory);
@@ -1331,7 +1331,7 @@ function uninit() visit("uninit") end
     ASSERT_TRUE(context);
     player.setClientContext(*context);
     ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninitPlayer = finally([&] { EXPECT_TRUE(player.uninit()); });
+    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
 
@@ -1359,7 +1359,7 @@ function uninit() visit("uninit") end
       auto item = ActiveItem::create(root, config, "/", JsonObject{});
       ASSERT_TRUE(item);
       ASSERT_TRUE((*item)->init(player, ToolHand::Primary));
-      auto uninitItem = finally([&] {
+      auto uninitItem = make_scope_exit([&] {
         if ((*item)->initialized())
           EXPECT_TRUE((*item)->uninit());
       });
@@ -1409,7 +1409,7 @@ const GameTestRegistration blueprintLearning(
   "ItemTest", "BlueprintLearningConstructsOnlyWhenNeededAndPreservesFailureState", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(overlay));
     auto patchPath = File::relative_to(overlay, "player.config.patch");
@@ -1519,7 +1519,7 @@ const GameTestRegistration
   itemScriptLifecycle("ItemTest", "AugmentAndAgingSettleScriptLifecycleBeforeCommittingItems", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::write_file(String(R"({
@@ -1672,7 +1672,7 @@ const GameTestRegistration
     ASSERT_TRUE(original) << original.error().what();
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     auto relativeDirectory = AssetPath::directory((*original)->path).substr(1);
     ASSERT_TRUE(relativeDirectory);

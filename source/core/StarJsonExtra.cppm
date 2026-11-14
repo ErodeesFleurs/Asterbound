@@ -180,7 +180,7 @@ std::expected<List<Value>, StarException> jsonToList(Json const& v, Converter&& 
 }
 template <typename Value>
 std::expected<List<Value>, StarException> jsonToList(Json const& v) {
-  return jsonToList<Value>(v, construct<Value>());
+  return jsonToList<Value>(v, Construct<Value>());
 }
 
 template <typename Value, typename Converter>
@@ -197,7 +197,7 @@ std::expected<Json, StarException> jsonFromList(List<Value> const& list, Convert
 }
 template <typename Value>
 std::expected<Json, StarException> jsonFromList(List<Value> const& list) {
-  return jsonFromList(list, construct<Json>());
+  return jsonFromList(list, Construct<Json>());
 }
 
 template <typename SetType, typename Converter>
@@ -216,7 +216,7 @@ std::expected<SetType, StarException> jsonToSet(Json const& v, Converter&& conve
 }
 template <typename SetType>
 std::expected<SetType, StarException> jsonToSet(Json const& v) {
-  return jsonToSet<SetType>(v, construct<typename SetType::value_type>());
+  return jsonToSet<SetType>(v, Construct<typename SetType::value_type>());
 }
 template <typename SetType, typename Converter>
 std::expected<Json, StarException> jsonFromSet(SetType const& set, Converter&& converter) {
@@ -232,7 +232,7 @@ std::expected<Json, StarException> jsonFromSet(SetType const& set, Converter&& c
 }
 template <typename SetType>
 std::expected<Json, StarException> jsonFromSet(SetType const& set) {
-  return jsonFromSet(set, construct<Json>());
+  return jsonFromSet(set, Construct<Json>());
 }
 
 template <typename MapType, typename KeyConverter, typename ValueConverter>
@@ -256,15 +256,15 @@ std::expected<MapType, StarException> jsonToMapKV(Json const& v, KeyConverter&& 
 }
 template <typename MapType, typename KeyConverter>
 std::expected<MapType, StarException> jsonToMapK(Json const& v, KeyConverter&& converter) {
-  return jsonToMapKV<MapType>(v, std::forward<KeyConverter>(converter), construct<typename MapType::mapped_type>());
+  return jsonToMapKV<MapType>(v, std::forward<KeyConverter>(converter), Construct<typename MapType::mapped_type>());
 }
 template <typename MapType, typename ValueConverter>
 std::expected<MapType, StarException> jsonToMapV(Json const& v, ValueConverter&& converter) {
-  return jsonToMapKV<MapType>(v, construct<typename MapType::key_type>(), std::forward<ValueConverter>(converter));
+  return jsonToMapKV<MapType>(v, Construct<typename MapType::key_type>(), std::forward<ValueConverter>(converter));
 }
 template <typename MapType>
 std::expected<MapType, StarException> jsonToMap(Json const& v) {
-  return jsonToMapKV<MapType>(v, construct<typename MapType::key_type>(), construct<typename MapType::mapped_type>());
+  return jsonToMapKV<MapType>(v, Construct<typename MapType::key_type>(), Construct<typename MapType::mapped_type>());
 }
 template <typename MapType, typename KeyConverter, typename ValueConverter>
 std::expected<Json, StarException> jsonFromMapKV(MapType const& map, KeyConverter&& keyConvert, ValueConverter&& valueConvert) {
@@ -282,15 +282,15 @@ std::expected<Json, StarException> jsonFromMapKV(MapType const& map, KeyConverte
 }
 template <typename MapType, typename KeyConverter>
 std::expected<Json, StarException> jsonFromMapK(MapType const& map, KeyConverter&& converter) {
-  return jsonFromMapKV(map, std::forward<KeyConverter>(converter), construct<Json>());
+  return jsonFromMapKV(map, std::forward<KeyConverter>(converter), Construct<Json>());
 }
 template <typename MapType, typename ValueConverter>
 std::expected<Json, StarException> jsonFromMapV(MapType const& map, ValueConverter&& converter) {
-  return jsonFromMapKV(map, construct<String>(), std::forward<ValueConverter>(converter));
+  return jsonFromMapKV(map, Construct<String>(), std::forward<ValueConverter>(converter));
 }
 template <typename MapType>
 std::expected<Json, StarException> jsonFromMap(MapType const& map) {
-  return jsonFromMapKV(map, construct<String>(), construct<Json>());
+  return jsonFromMapKV(map, Construct<String>(), Construct<Json>());
 }
 
 template <typename T, typename Converter>
@@ -314,7 +314,7 @@ std::expected<std::optional<T>, StarException> jsonToOptional(Json const& v, Con
 }
 template <typename T>
 std::expected<std::optional<T>, StarException> jsonToOptional(Json const& v) {
-  return jsonToOptional<T>(v, construct<T>());
+  return jsonToOptional<T>(v, Construct<T>());
 }
 
 template <typename T, typename Converter>
@@ -341,7 +341,7 @@ std::expected<WeightedPool<T>, StarException> jsonToWeightedPool(Json const& sou
 }
 template <typename T>
 std::expected<WeightedPool<T>, StarException> jsonToWeightedPool(Json const& source) {
-  return jsonToWeightedPool<T>(source, construct<T>());
+  return jsonToWeightedPool<T>(source, Construct<T>());
 }
 template <typename T, typename Converter>
 std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& pool, Converter&& converter) {
@@ -356,7 +356,7 @@ std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& p
 }
 template <typename T>
 std::expected<Json, StarException> jsonFromWeightedPool(WeightedPool<T> const& pool) {
-  return jsonFromWeightedPool(pool, construct<Json>());
+  return jsonFromWeightedPool(pool, Construct<Json>());
 }
 
 template <> std::expected<WeightedPool<int>, StarException> jsonToWeightedPool(Json const& source);

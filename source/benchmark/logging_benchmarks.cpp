@@ -133,7 +133,7 @@ void concurrent_callers(benchmark::State& state) {
   std::atomic<bool> stop{false};
   std::atomic<bool> success{true};
   std::array<Star::ThreadFunction<void>, caller_count> threads;
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     stop.store(true, std::memory_order_relaxed);
     generation.fetch_add(1, std::memory_order_release);
     generation.notify_all();
@@ -224,7 +224,7 @@ void file_lines(benchmark::State& state) {
     state.SkipWithError(temporary.error().what());
     return;
   }
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     auto removed = Star::File::remove_all(*temporary);
     if (!removed)
       state.SkipWithError(removed.error().what());

@@ -262,13 +262,13 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
   // Keep the original engine alive even if a lifecycle call replaces it.
   LuaEnginePtr engine = m_context ? LuaEnginePtr(&m_context->engine()) : LuaEnginePtr{};
   auto previousLifetime = engine ? engine->setPromiseLifetime(m_callbackScope.get_token()) : std::stop_token{};
-  auto restoreLifetime = finally([&] {
+  auto restoreLifetime = make_scope_exit([&] {
     if (engine)
       engine->setPromiseLifetime(previousLifetime);
   });
   ++m_activeCalls;
   auto previousComponent = std::exchange(s_activeComponent, std::ref(*this));
-  auto restoreComponent = finally([&] { s_activeComponent = previousComponent; });
+  auto restoreComponent = make_scope_exit([&] { s_activeComponent = previousComponent; });
   auto propagateFailure = [&](StarException error) {
     // Nested host failures can cross a native callback before reaching the
     // caller. Preserve their non-recoverable identity through that Lua hop.

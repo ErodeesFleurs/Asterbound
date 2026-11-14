@@ -2131,7 +2131,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     std::chrono::duration<float, std::milli>(static_cast<float>((m_latency + std::chrono::milliseconds(800)).count())),
     std::chrono::duration<float, std::milli>(2000.f));
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  eraseWhere(m_predictedTiles, [&, &self = *this](auto&& pair) {
+  Star::erase_if(m_predictedTiles, [&, &self = *this](auto&& pair) {
     float expiry = std::chrono::duration<float, std::milli>(float((now - pair.second.time).count())) / expireTime;
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);

@@ -1,311 +1,372 @@
 module;
 import star.format;
 import std;
-import star.output_proxy;
 
 namespace Star {
 
-// Recognize only the project's checked result, without changing payload or
-// reference semantics. Callable wrappers retain their own invocation policies.
+// Recognize only the project's checked result. Each algorithm defines its own
+// ownership and invocation policy rather than flattening arbitrary wrappers.
 template <typename T>
 struct AlgorithmResultInfo {
-  using Value = T;
-  static constexpr bool Fallible = false;
+  using value_type = T;
+  static constexpr bool is_fallible = false;
 };
 
 template <typename T>
 struct AlgorithmResultInfo<std::expected<T, StarException>> {
-  using Value = T;
-  static constexpr bool Fallible = true;
+  using value_type = T;
+  static constexpr bool is_fallible = true;
 };
 
-// Functional constructor call / casting.
+template <typename Function, typename... Args>
+concept algorithm_invocable = std::invocable<Function, Args...>;
+
+template <typename Function, typename... Args>
+concept algorithm_predicate = algorithm_invocable<Function, Args...>
+  && ((!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::is_fallible
+       && requires(Function&& function, Args&&... args) {
+            static_cast<bool>(std::invoke(std::forward<Function>(function), std::forward<Args>(args)...));
+          })
+      || (AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::is_fallible
+          && requires(Function&& function, Args&&... args) {
+               static_cast<bool>(*std::invoke(std::forward<Function>(function), std::forward<Args>(args)...));
+             }));
+
 template <typename ToType>
-struct construct {
+struct Construct {
   template <typename... FromTypes>
-  ToType operator()(FromTypes&&... fromTypes) const {
-    return ToType(std::forward<FromTypes>(fromTypes)...);
+    requires requires(FromTypes&&... args) { ToType(std::forward<FromTypes>(args)...); }
+  constexpr ToType operator()(FromTypes&&... args) const
+    noexcept(noexcept(ToType(std::forward<FromTypes>(args)...))) {
+    return ToType(std::forward<FromTypes>(args)...);
   }
 };
 
-template <typename MapType1, typename MapType2>
-[[nodiscard]] auto map_merge(MapType1& targetMap, MapType2 const& sourceMap, bool overwrite = false) {
-  using Insertion = std::remove_cvref_t<decltype(targetMap.insert(*sourceMap.begin()))>;
-  constexpr bool fallible = AlgorithmResultInfo<Insertion>::Fallible;
-  using Result = std::conditional_t<fallible, std::expected<bool, StarException>, bool>;
-  bool noCommonKeys = true;
-  for (auto i = sourceMap.begin(); i != sourceMap.end(); ++i) {
-    auto res = targetMap.insert(*i);
+template <typename Target, typename Source>
+concept algorithm_merge_target = std::ranges::input_range<Source const>
+  && requires(Target& target, std::ranges::range_reference_t<Source const> entry) {
+       target.insert(entry);
+     }
+  && requires(Target& target, std::ranges::range_reference_t<Source const> entry,
+              typename AlgorithmResultInfo<
+                std::remove_cvref_t<decltype(target.insert(entry))>>::value_type& inserted) {
+       static_cast<bool>(inserted.second);
+       inserted.first->second = entry.second;
+     };
+
+template <typename Target, typename Source>
+  requires algorithm_merge_target<Target, Source>
+[[nodiscard]] auto map_merge(Target& target, Source const& source, bool overwrite = false) {
+  using insertion = std::remove_cvref_t<decltype(target.insert(*std::ranges::begin(source)))>;
+  constexpr bool fallible = AlgorithmResultInfo<insertion>::is_fallible;
+  using result_type = std::conditional_t<fallible, std::expected<bool, StarException>, bool>;
+  bool disjoint = true;
+  for (auto const& entry : source) {
+    auto inserted = target.insert(entry);
     if constexpr (fallible) {
-      if (!res)
-        return Result(std::unexpected(std::move(res.error())));
-      if (!res->second) {
-        noCommonKeys = false;
+      if (!inserted)
+        return result_type(std::unexpected(std::move(inserted.error())));
+      if (!static_cast<bool>(inserted->second)) {
+        disjoint = false;
         if (overwrite)
-          res->first->second = i->second;
+          inserted->first->second = entry.second;
       }
-    } else {
-      if (!res.second) {
-        noCommonKeys = false;
-        if (overwrite)
-          res.first->second = i->second;
-      }
+    } else if (!static_cast<bool>(inserted.second)) {
+      disjoint = false;
+      if (overwrite)
+        inserted.first->second = entry.second;
     }
   }
-  return Result(noCommonKeys);
+  return result_type(disjoint);
 }
 
-template <typename MapType1, typename MapType2> bool maps_equal(MapType1 const& m1, MapType2 const& m2) {
-  if (&m1 == &m2)
-    return true;
+template <typename Left, typename Right>
+concept algorithm_comparable_maps = std::ranges::input_range<Left const>
+  && requires(Left const& left, Right const& right, std::ranges::range_reference_t<Left const> entry) {
+       static_cast<bool>(left.size() != right.size());
+       right.find(entry.first);
+       static_cast<bool>(right.find(entry.first) == right.end());
+       static_cast<bool>(right.find(entry.first)->second == entry.second);
+     };
 
-  if (m1.size() != m2.size())
+template <typename Left, typename Right>
+  requires algorithm_comparable_maps<Left, Right>
+[[nodiscard]] bool maps_equal(Left const& left, Right const& right) {
+  if constexpr (std::same_as<Left, Right>) {
+    if (std::addressof(left) == std::addressof(right))
+      return true;
+  }
+  if (left.size() != right.size())
     return false;
-
-  for (auto const& m1pair : m1) {
-    auto m2it = m2.find(m1pair.first);
-    if (m2it == m2.end() || !(m2it->second == m1pair.second))
+  for (auto const& entry : left) {
+    auto found = right.find(entry.first);
+    if (found == right.end() || !static_cast<bool>(found->second == entry.second))
       return false;
   }
-
   return true;
 }
 
-template <typename Container, typename Filter>
-[[nodiscard]] auto filter(Container& container, Filter&& filter) {
-  using Predicate = std::remove_cvref_t<std::invoke_result_t<Filter&, decltype(*std::begin(container))>>;
-  using Result = std::conditional_t<AlgorithmResultInfo<Predicate>::Fallible, std::expected<void, StarException>, void>;
-  auto p = std::begin(container);
-  while (p != std::end(container)) {
-    if constexpr (AlgorithmResultInfo<Predicate>::Fallible && requires { filter == nullptr; }) {
-      if (filter == nullptr)
-        return Result(std::unexpected(StarException("Cannot invoke an empty filter")));
+template <typename Container, typename Predicate>
+concept algorithm_erase_target = std::ranges::input_range<Container>
+  && algorithm_predicate<Predicate&, std::ranges::range_reference_t<Container>>
+  && requires(Container& container, std::ranges::iterator_t<Container> position) {
+       { container.erase(position) } -> std::same_as<std::ranges::iterator_t<Container>>;
+     };
+
+namespace AlgorithmDetail {
+
+// Immediate erase is intentional: callbacks can observe each destruction and
+// size change, and a checked failure leaves exactly the processed prefix.
+template <bool Keep, typename Container, typename Predicate>
+  requires algorithm_erase_target<Container, Predicate>
+[[nodiscard]] auto erase_matching(Container& container, Predicate&& predicate) {
+  using invocation = std::remove_cvref_t<
+    std::invoke_result_t<Predicate&, std::ranges::range_reference_t<Container>>>;
+  constexpr bool fallible = AlgorithmResultInfo<invocation>::is_fallible;
+  using result_type = std::conditional_t<fallible, std::expected<void, StarException>, void>;
+  auto position = std::ranges::begin(container);
+  while (position != std::ranges::end(container)) {
+    if constexpr (fallible && requires { predicate == nullptr; }) {
+      if (predicate == nullptr)
+        return result_type(std::unexpected(StarException("Cannot invoke an empty erase predicate")));
     }
-    auto decision = std::invoke(filter, *p);
-    bool keep;
-    if constexpr (AlgorithmResultInfo<Predicate>::Fallible) {
+    auto decision = std::invoke(predicate, *position);
+    bool accepted;
+    if constexpr (fallible) {
       if (!decision)
-        return Result(std::unexpected(std::move(decision.error())));
-      keep = *decision;
+        return result_type(std::unexpected(std::move(decision.error())));
+      accepted = static_cast<bool>(*decision);
     } else {
-      keep = decision;
+      accepted = static_cast<bool>(decision);
     }
-    if (!keep)
-      p = container.erase(p);
+    if (accepted != Keep)
+      position = container.erase(position);
     else
-      ++p;
+      ++position;
   }
-  if constexpr (AlgorithmResultInfo<Predicate>::Fallible)
-    return Result();
+  if constexpr (fallible)
+    return result_type();
 }
 
-template <typename OutContainer, typename InContainer, typename Filter>
-[[nodiscard]] auto filtered(InContainer const& input, Filter&& filter) {
-  using Predicate = std::remove_cvref_t<std::invoke_result_t<Filter&, decltype(*std::begin(input))>>;
-  using Insertion = decltype(std::declval<OutContainer&>().insert(std::declval<OutContainer&>().end(), *std::begin(input)));
-  constexpr bool fallible = AlgorithmResultInfo<Predicate>::Fallible || AlgorithmResultInfo<std::remove_cvref_t<Insertion>>::Fallible;
-  using Result = std::conditional_t<fallible, std::expected<OutContainer, StarException>, OutContainer>;
-  OutContainer out;
-  auto p = std::begin(input);
-  while (p != std::end(input)) {
-    if constexpr (fallible && requires { filter == nullptr; }) {
-      if (filter == nullptr)
-        return Result(std::unexpected(StarException("Cannot invoke an empty filter")));
-    }
-    auto decision = std::invoke(filter, *p);
-    bool keep;
-    if constexpr (AlgorithmResultInfo<Predicate>::Fallible) {
-      if (!decision)
-        return Result(std::unexpected(std::move(decision.error())));
-      keep = *decision;
-    } else {
-      keep = decision;
-    }
-    if (keep) {
-      if constexpr (AlgorithmResultInfo<std::remove_cvref_t<Insertion>>::Fallible) {
-        auto inserted = out.insert(out.end(), *p);
-        if (!inserted)
-          return Result(std::unexpected(std::move(inserted.error())));
-      } else {
-        out.insert(out.end(), *p);
-      }
-    }
-    ++p;
-  }
-  return Result(std::move(out));
+}// namespace AlgorithmDetail
+
+template <typename Container, typename Predicate>
+  requires algorithm_erase_target<Container, Predicate>
+[[nodiscard]] auto filter(Container& container, Predicate&& predicate) {
+  return AlgorithmDetail::erase_matching<true>(container, std::forward<Predicate>(predicate));
 }
 
-template <typename Container, typename Cond>
-[[nodiscard]] auto eraseWhere(Container& container, Cond&& cond) {
-  using Predicate = std::remove_cvref_t<std::invoke_result_t<Cond&, decltype(*std::begin(container))>>;
-  using Result = std::conditional_t<AlgorithmResultInfo<Predicate>::Fallible, std::expected<void, StarException>, void>;
-  auto p = std::begin(container);
-  while (p != std::end(container)) {
-    if constexpr (AlgorithmResultInfo<Predicate>::Fallible && requires { cond == nullptr; }) {
-      if (cond == nullptr)
-        return Result(std::unexpected(StarException("Cannot invoke an empty erase predicate")));
-    }
-    auto decision = std::invoke(cond, *p);
-    bool erase;
-    if constexpr (AlgorithmResultInfo<Predicate>::Fallible) {
-      if (!decision)
-        return Result(std::unexpected(std::move(decision.error())));
-      erase = *decision;
-    } else {
-      erase = decision;
-    }
-    if (erase)
-      p = container.erase(p);
-    else
-      ++p;
-  }
-  if constexpr (AlgorithmResultInfo<Predicate>::Fallible)
-    return Result();
-}
-
-template <typename Container, typename Compare>
-Container sorted(Container const& c, Compare comp) {
-  static_assert(std::is_invocable_r_v<bool, Compare&, typename Container::value_type const&, typename Container::value_type const&>,
-      "Sort comparison must be nonfallible; check fallible keys with sortByComputedValue first");
-  auto c2 = c;
-  std::sort(c2.begin(), c2.end(), comp);
-  return c2;
+template <typename Container, typename Predicate>
+  requires algorithm_erase_target<Container, Predicate>
+[[nodiscard]] auto erase_if(Container& container, Predicate&& predicate) {
+  return AlgorithmDetail::erase_matching<false>(container, std::forward<Predicate>(predicate));
 }
 
 
-template <typename Container>
-Container sorted(Container const& c) {
-  auto c2 = c;
-  std::sort(c2.begin(), c2.end(), std::less<typename Container::value_type>());
-  return c2;
-}
-
-
-// Sort a container by the output of a computed value. The computed value is
-// only computed *once* per item in the container, which is useful both for
-// when the computed value is costly, and to avoid sorting instability with
-// floating point values.  Container must have size() and operator[], and also
-// must be constructable with Container(size_t).
 template <typename Container, typename Getter>
-[[nodiscard]] auto sortByComputedValue(Container& container, Getter&& valueGetter, bool stable = false)
-    -> std::conditional_t<AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Getter&, typename Container::value_type&>>>::Fallible,
-        std::expected<void, StarException>, void> {
-  using Invocation = std::remove_cvref_t<std::invoke_result_t<Getter&, typename Container::value_type&>>;
-  using ComputedValue = typename AlgorithmResultInfo<Invocation>::Value;
-  using ComputedPair = std::pair<ComputedValue, std::size_t>;
-  static_assert(std::is_convertible_v<decltype(std::declval<ComputedValue const&>() < std::declval<ComputedValue const&>()), bool>,
-      "Computed sort keys must provide a nonfallible bool ordering");
+concept algorithm_key_source = requires(Container& container, std::size_t index) {
+  { container.size() } -> std::convertible_to<std::size_t>;
+  container[index];
+} && algorithm_invocable<Getter&, decltype(std::declval<Container&>()[std::size_t{}])>;
 
-  std::size_t containerSize = container.size();
-  if (containerSize <= 1) {
-    if constexpr (AlgorithmResultInfo<Invocation>::Fallible)
-      return {};
+namespace AlgorithmDetail {
+
+// Indexed proxies must become logical values before sorting the key cache.
+// Keep range metadata lazy: indexed-only containers need no iterators.
+template <typename Container, typename Key>
+struct SortKeyValue {
+  using value_type = Key;
+};
+
+template <typename Container, typename Key>
+  requires (!std::is_reference_v<decltype(std::declval<Container&>()[std::size_t{}])>)
+  && std::same_as<Key, std::remove_cvref_t<decltype(std::declval<Container&>()[std::size_t{}])>>
+  && requires { typename std::ranges::range_value_t<Container>; }
+  && std::is_constructible_v<std::ranges::range_value_t<Container>, Key>
+struct SortKeyValue<Container, Key> {
+  using value_type = std::ranges::range_value_t<Container>;
+};
+
+}// namespace AlgorithmDetail
+
+template <typename Container, typename Getter>
+  requires algorithm_key_source<Container, Getter>
+using algorithm_sort_key = typename AlgorithmDetail::SortKeyValue<Container,
+  typename AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<
+    Getter&, decltype(std::declval<Container&>()[std::size_t{}])>>>::value_type>::value_type;
+
+template <typename Container, typename Getter>
+concept algorithm_key_sortable = algorithm_key_source<Container, Getter>
+  && std::is_object_v<algorithm_sort_key<Container, Getter>>
+  && std::is_move_constructible_v<algorithm_sort_key<Container, Getter>>
+  && std::is_move_assignable_v<algorithm_sort_key<Container, Getter>>
+  && requires(Container& container, std::size_t index,
+              algorithm_sort_key<Container, Getter> const& left,
+              algorithm_sort_key<Container, Getter> const& right) {
+       static_cast<bool>(left < right);
+       std::ranges::swap(container[index], container[index]);
+     }
+  && (!AlgorithmResultInfo<std::remove_cvref_t<decltype(
+       std::declval<algorithm_sort_key<Container, Getter> const&>()
+       < std::declval<algorithm_sort_key<Container, Getter> const&>())>>::is_fallible);
+
+namespace AlgorithmDetail {
+
+// Snapshot every key once, before reordering any values. Keys remain owned even
+// when getters return references; later getter calls can mutate their sources.
+template <bool Stable, typename Container, typename Getter>
+  requires algorithm_key_sortable<Container, Getter>
+[[nodiscard]] auto sort_by_key(Container& container, Getter&& getter) {
+  using invocation = std::remove_cvref_t<
+    std::invoke_result_t<Getter&, decltype(container[std::size_t{}])>>;
+  constexpr bool fallible = AlgorithmResultInfo<invocation>::is_fallible;
+  using result_type = std::conditional_t<fallible, std::expected<void, StarException>, void>;
+  using entry_type = std::pair<algorithm_sort_key<Container, Getter>, std::size_t>;
+  std::size_t count = container.size();
+  if (count <= 1) {
+    if constexpr (fallible)
+      return result_type();
     else
       return;
   }
-
-  std::vector<ComputedPair> work;
-  work.reserve(containerSize);
-  for (std::size_t i = 0; i < containerSize; ++i) {
-    if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
-      if constexpr (requires { valueGetter == nullptr; }) {
-        if (valueGetter == nullptr)
-          return std::unexpected(StarException("Cannot invoke an empty sort key getter"));
+  std::vector<entry_type> work;
+  work.reserve(count);
+  for (std::size_t index = 0; index < count; ++index) {
+    if constexpr (fallible) {
+      if constexpr (requires { getter == nullptr; }) {
+        if (getter == nullptr)
+          return result_type(std::unexpected(StarException("Cannot invoke an empty sort key getter")));
       }
-      auto computed = std::invoke(valueGetter, container[i]);
-      if (!computed)
-        return std::unexpected(std::move(computed.error()));
-      work.emplace_back(std::move(*computed), i);
+      auto key = std::invoke(getter, container[index]);
+      if (!key)
+        return result_type(std::unexpected(std::move(key.error())));
+      work.emplace_back(std::move(*key), index);
     } else {
-      work.emplace_back(std::invoke(valueGetter, container[i]), i);
+      work.emplace_back(std::invoke(getter, container[index]), index);
     }
   }
-
-  auto compare = [](ComputedPair const& a, ComputedPair const& b) { return a.first < b.first; };
-
-  // Sort the comptued values and the associated indexes
-  if (stable)
+  auto compare = [](entry_type const& left, entry_type const& right) {
+    return static_cast<bool>(left.first < right.first);
+  };
+  if constexpr (Stable)
     std::stable_sort(work.begin(), work.end(), compare);
   else
     std::sort(work.begin(), work.end(), compare);
 
-  Container result(containerSize);
-  for (std::size_t i = 0; i < containerSize; ++i) {
-    if constexpr (requires { swap(result[i], container[work[i].second]); })
-      swap(result[i], container[work[i].second]);
-    else
-      std::swap(result[i], container[work[i].second]);
+  // Follow each source-index cycle, marking it in the existing index storage.
+  // Fixed points never move; no second element buffer or default values.
+  for (std::size_t start = 0; start < count; ++start) {
+    auto current = start;
+    auto next = work[current].second;
+    while (next != start) {
+      std::ranges::swap(container[current], container[next]);
+      work[current].second = current;
+      current = next;
+      next = work[current].second;
+    }
+    work[current].second = current;
   }
+  if constexpr (fallible)
+    return result_type();
+}
 
-  if constexpr (requires { swap(container, result); })
-    swap(container, result);
-  else
-    std::swap(container, result);
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible)
-    return {};
+}// namespace AlgorithmDetail
+
+template <typename Container, typename Getter>
+  requires algorithm_key_sortable<Container, Getter>
+[[nodiscard]] auto sort_by_key(Container& container, Getter&& getter) {
+  return AlgorithmDetail::sort_by_key<false>(container, std::forward<Getter>(getter));
 }
 
 template <typename Container, typename Getter>
-[[nodiscard]] auto stableSortByComputedValue(Container& container, Getter&& valueGetter) {
-  return sortByComputedValue(container, std::forward<Getter>(valueGetter), true);
+  requires algorithm_key_sortable<Container, Getter>
+[[nodiscard]] auto stable_sort_by_key(Container& container, Getter&& getter) {
+  return AlgorithmDetail::sort_by_key<true>(container, std::forward<Getter>(getter));
 }
 
+template <typename Range>
+  requires std::ranges::input_range<Range>
+using algorithm_source_reference =
+  decltype(std::forward_like<Range>(*std::ranges::begin(std::declval<Range&>())));
+
+template <typename Invocation>
+using algorithm_insert_value = std::conditional_t<
+  AlgorithmResultInfo<std::remove_cvref_t<Invocation>>::is_fallible,
+  std::add_rvalue_reference_t<typename AlgorithmResultInfo<std::remove_cvref_t<Invocation>>::value_type>,
+  Invocation>;
+
+template <typename Container, typename Value>
+concept algorithm_insert_target = requires(Container& container) {
+  container.insert(container.end(), std::declval<Value>());
+};
+
 template <typename OutContainer, typename InContainer, typename Function>
-[[nodiscard]] auto transformInto(OutContainer& outContainer, InContainer&& inContainer, Function&& function) {
-  using Input = decltype(std::forward_like<InContainer>(*std::begin(inContainer)));
-  using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, Input>>;
-  using Value = typename AlgorithmResultInfo<Invocation>::Value;
-  using Insertion = decltype(outContainer.insert(outContainer.end(), std::declval<Value>()));
-  constexpr bool fallible = AlgorithmResultInfo<Invocation>::Fallible || AlgorithmResultInfo<std::remove_cvref_t<Insertion>>::Fallible;
-  using Result = std::conditional_t<fallible, std::expected<void, StarException>, void>;
-  for (auto&& elem : inContainer) {
+concept algorithm_transform_target = std::ranges::input_range<InContainer>
+  && algorithm_invocable<Function&, algorithm_source_reference<InContainer>>
+  && algorithm_insert_target<OutContainer, algorithm_insert_value<
+       std::invoke_result_t<Function&, algorithm_source_reference<InContainer>>>>;
+
+// Source and destination must not alias. On failure, retain the inserted prefix
+// and any source mutations/moves already performed by the callback.
+template <typename OutContainer, typename InContainer, typename Function>
+  requires algorithm_transform_target<OutContainer, InContainer, Function>
+[[nodiscard]] auto transform_into(OutContainer& output, InContainer&& input, Function&& function) {
+  using invocation = std::invoke_result_t<Function&, algorithm_source_reference<InContainer>>;
+  using insertion = decltype(output.insert(output.end(), std::declval<algorithm_insert_value<invocation>>()));
+  constexpr bool callback_fallible = AlgorithmResultInfo<std::remove_cvref_t<invocation>>::is_fallible;
+  constexpr bool insert_fallible = AlgorithmResultInfo<std::remove_cvref_t<insertion>>::is_fallible;
+  constexpr bool fallible = callback_fallible || insert_fallible;
+  using result_type = std::conditional_t<fallible, std::expected<void, StarException>, void>;
+  for (auto&& element : input) {
     if constexpr (fallible && requires { function == nullptr; }) {
       if (function == nullptr)
-        return Result(std::unexpected(StarException("Cannot invoke an empty transform callback")));
+        return result_type(std::unexpected(StarException("Cannot invoke an empty transform callback")));
     }
-    if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
-      auto value = std::invoke(function, std::forward_like<InContainer>(elem));
+    if constexpr (callback_fallible) {
+      auto value = std::invoke(function, std::forward_like<InContainer>(element));
       if (!value)
-        return Result(std::unexpected(std::move(value.error())));
-      if constexpr (AlgorithmResultInfo<std::remove_cvref_t<Insertion>>::Fallible) {
-        auto inserted = outContainer.insert(outContainer.end(), std::move(*value));
+        return result_type(std::unexpected(std::move(value.error())));
+      if constexpr (insert_fallible) {
+        auto inserted = output.insert(output.end(), std::move(*value));
         if (!inserted)
-          return Result(std::unexpected(std::move(inserted.error())));
+          return result_type(std::unexpected(std::move(inserted.error())));
       } else {
-        outContainer.insert(outContainer.end(), std::move(*value));
+        output.insert(output.end(), std::move(*value));
       }
     } else {
-      if constexpr (AlgorithmResultInfo<std::remove_cvref_t<Insertion>>::Fallible) {
-        auto inserted = outContainer.insert(outContainer.end(), std::invoke(function, std::forward_like<InContainer>(elem)));
+      if constexpr (insert_fallible) {
+        auto inserted = output.insert(output.end(), std::invoke(function, std::forward_like<InContainer>(element)));
         if (!inserted)
-          return Result(std::unexpected(std::move(inserted.error())));
+          return result_type(std::unexpected(std::move(inserted.error())));
       } else {
-        outContainer.insert(outContainer.end(), std::invoke(function, std::forward_like<InContainer>(elem)));
+        output.insert(output.end(), std::invoke(function, std::forward_like<InContainer>(element)));
       }
     }
   }
   if constexpr (fallible)
-    return Result();
+    return result_type();
 }
 
 template <typename OutContainer, typename InContainer, typename Function>
-[[nodiscard]] auto transform(InContainer&& container, Function&& function) {
-  OutContainer res;
+  requires algorithm_transform_target<OutContainer, InContainer, Function>
+  && requires { OutContainer(); }
+[[nodiscard]] auto transform(InContainer&& input, Function&& function) {
+  OutContainer output;
   if constexpr (std::ranges::sized_range<InContainer>) {
     if constexpr (requires {
-                    { res.reserve(std::ranges::size(container)) } -> std::same_as<void>;
+                    { output.reserve(std::ranges::size(input)) } -> std::same_as<void>;
                   })
-      res.reserve(std::ranges::size(container));
+      output.reserve(std::ranges::size(input));
   }
-  using Status = decltype(transformInto(res, std::forward<InContainer>(container), std::forward<Function>(function)));
-  if constexpr (std::is_void_v<Status>) {
-    transformInto(res, std::forward<InContainer>(container), std::forward<Function>(function));
-    return res;
+  using status = decltype(Star::transform_into(output, std::forward<InContainer>(input), std::forward<Function>(function)));
+  if constexpr (std::is_void_v<status>) {
+    Star::transform_into(output, std::forward<InContainer>(input), std::forward<Function>(function));
+    return output;
   } else {
-    auto transformed = transformInto(res, std::forward<InContainer>(container), std::forward<Function>(function));
+    auto transformed = Star::transform_into(output, std::forward<InContainer>(input), std::forward<Function>(function));
     if (!transformed)
       return std::expected<OutContainer, StarException>(std::unexpected(std::move(transformed.error())));
-    return std::expected<OutContainer, StarException>(std::move(res));
+    return std::expected<OutContainer, StarException>(std::move(output));
   }
 }
 
@@ -314,117 +375,173 @@ template <typename OutContainer, typename InContainer, typename Function>
 // sequencing for replacements with observable construction side effects,
 // including allocation; no-exceptions builds do not make those effects inert.
 template <typename T>
-T take(T& t) {
-  T t2 = std::move(t);
-  t = T();
-  return t2;
+  requires std::is_convertible_v<T&&, T> && requires(T& value) { value = T(); }
+T take(T& value) {
+  T result = std::move(value);
+  value = T();
+  return result;
 }
 
-template <typename Functor>
-class FinallyGuard {
+template <typename Function>
+concept algorithm_cleanup = std::is_object_v<Function> && algorithm_invocable<Function&>
+  && std::same_as<std::invoke_result_t<Function&>, void>;
+
+template <algorithm_cleanup Function>
+class ScopeExit {
 public:
-  FinallyGuard(Functor functor) : functor(std::move(functor)) {}
+  template <typename Callback>
+    requires std::is_constructible_v<Function, Callback&&>
+  explicit ScopeExit(Callback&& callback) noexcept(std::is_nothrow_constructible_v<Function, Callback&&>)
+    : m_callback(std::forward<Callback>(callback)) {}
 
-  FinallyGuard(FinallyGuard&& o) : functor(std::move(o.functor)), dismiss(o.dismiss) {
-    o.cancel();
+  ScopeExit(ScopeExit const&) = delete;
+  ScopeExit& operator=(ScopeExit const&) = delete;
+  ScopeExit& operator=(ScopeExit&&) = delete;
+
+  ScopeExit(ScopeExit&& other) noexcept(std::is_nothrow_constructible_v<Function, Function&&>)
+    requires std::is_constructible_v<Function, Function&&>
+    : m_callback(std::move(other.m_callback)), m_active(std::exchange(other.m_active, false)) {}
+
+  ~ScopeExit() noexcept {
+    if (m_active)
+      std::invoke(m_callback);
   }
 
-  FinallyGuard& operator=(FinallyGuard&& o) {
-    functor = std::move(o.functor);
-    dismiss = o.dismiss;
-    o.cancel();
-    return *this;
-  }
-
-  ~FinallyGuard() {
-    static_assert(std::is_void_v<std::invoke_result_t<Functor&>>,
-        "Cleanup callbacks must handle their errors at the cleanup boundary");
-    if (!dismiss)
-      functor();
-  }
-
-  void cancel() {
-    dismiss = true;
+  void release() noexcept {
+    m_active = false;
   }
 
 private:
-  Functor functor;
-  bool dismiss = false;
+  Function m_callback;
+  bool m_active = true;
 };
 
-template <typename Functor> FinallyGuard<std::decay_t<Functor>> finally(Functor&& f) {
-  return FinallyGuard<Functor>(std::forward<Functor>(f));
+template <typename Function>
+  requires requires(Function&& function) { ScopeExit<std::decay_t<Function>>(std::forward<Function>(function)); }
+[[nodiscard]] auto make_scope_exit(Function&& function) {
+  return ScopeExit<std::decay_t<Function>>(std::forward<Function>(function));
 }
 
-// For generic types, directly use the result of the signature of its
-// 'operator()'
+namespace AlgorithmDetail {
+
 template <typename T>
-struct FunctionTraits : public FunctionTraits<decltype(&T::operator())> {};
+struct FunctionTraits {};
 
-template <typename ReturnType, typename... ArgsTypes>
-struct FunctionTraits<ReturnType(ArgsTypes...)> {
-  // arity is the number of arguments.
-  static constexpr std::size_t Arity = sizeof...(ArgsTypes);
+template <typename T>
+  requires requires { &T::operator(); }
+struct FunctionTraits<T> : FunctionTraits<decltype(&T::operator())> {};
 
-  using Return = ReturnType;
+template <typename Return, typename... Args>
+struct FunctionSignature {
+  using result_type = Return;
+  using argument_types = std::tuple<Args...>;
+  static constexpr std::size_t arity = sizeof...(Args);
 
-  using ArgTuple = std::tuple<ArgsTypes...>;
-
-  template <std::size_t i>
-  struct Arg {
-    // the i-th argument is equivalent to the i-th tuple element of a tuple
-    // composed of those arguments.
-    using type = std::tuple_element_t<i, ArgTuple>;
-  };
+  template <std::size_t Index>
+    requires(Index < arity)
+  using argument_type = std::tuple_element_t<Index, argument_types>;
 };
 
-template <typename ReturnType, typename... Args>
-struct FunctionTraits<ReturnType (*)(Args...)> : public FunctionTraits<ReturnType(Args...)> {};
+template <typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {};
 
-template <typename FunctionType>
-struct FunctionTraits<std::function<FunctionType>> : public FunctionTraits<FunctionType> {};
+template <typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (*)(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {};
 
-template <typename ClassType, typename ReturnType, typename... Args>
-struct FunctionTraits<ReturnType (ClassType::*)(Args...)> : public FunctionTraits<ReturnType(Args...)> {
-  using OwnerType = ClassType&;
+template <typename Return, typename... Args>
+struct FunctionTraits<std::function<Return(Args...)>> : FunctionSignature<Return, Args...> {};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner&;
 };
 
-template <typename ClassType, typename ReturnType, typename... Args>
-struct FunctionTraits<ReturnType (ClassType::*)(Args...) const> : public FunctionTraits<ReturnType(Args...)> {
-  using OwnerType = ClassType const&;
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const&;
 };
 
-template <typename T>
-struct FunctionTraits<T&> : public FunctionTraits<T> {};
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner volatile&;
+};
 
-template <typename T>
-struct FunctionTraits<T const&> : public FunctionTraits<T> {};
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const volatile&;
+};
 
-template <typename T>
-struct FunctionTraits<T&&> : public FunctionTraits<T> {};
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner&;
+};
 
-template <typename T>
-struct FunctionTraits<T const&&> : public FunctionTraits<T> {};
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner volatile&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const volatile&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner&&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const&&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner volatile&&;
+};
+
+template <typename Owner, typename Return, typename... Args, bool Noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+  using owner_type = Owner const volatile&&;
+};
+
+}// namespace AlgorithmDetail
+
+template <typename Function>
+struct FunctionTraits : AlgorithmDetail::FunctionTraits<std::remove_cvref_t<Function>> {};
 
 }
 
 export module star.algorithm;
 
 export namespace Star {
+  using ::Star::algorithm_cleanup;
+  using ::Star::algorithm_comparable_maps;
+  using ::Star::algorithm_erase_target;
+  using ::Star::algorithm_insert_target;
+  using ::Star::algorithm_invocable;
+  using ::Star::algorithm_key_sortable;
+  using ::Star::algorithm_merge_target;
+  using ::Star::algorithm_predicate;
   using ::Star::AlgorithmResultInfo;
-  using ::Star::construct;
-  using ::Star::eraseWhere;
+  using ::Star::algorithm_transform_target;
+  using ::Star::Construct;
+  using ::Star::erase_if;
   using ::Star::filter;
-  using ::Star::filtered;
-  using ::Star::finally;
-  using ::Star::FinallyGuard;
   using ::Star::FunctionTraits;
+  using ::Star::make_scope_exit;
   using ::Star::map_merge;
   using ::Star::maps_equal;
-  using ::Star::sortByComputedValue;
-  using ::Star::sorted;
-  using ::Star::stableSortByComputedValue;
+  using ::Star::ScopeExit;
+  using ::Star::sort_by_key;
+  using ::Star::stable_sort_by_key;
   using ::Star::take;
   using ::Star::transform;
-  using ::Star::transformInto;
+  using ::Star::transform_into;
 }

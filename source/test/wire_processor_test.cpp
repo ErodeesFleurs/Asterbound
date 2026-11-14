@@ -57,7 +57,7 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
   auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(created) << created.error().what();
   auto world = *created;
-  auto close = finally([&] { EXPECT_TRUE(world->close()); });
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
   world->setSpawningEnabled(false);
   ASSERT_TRUE(world->setFidelity(WorldServerFidelity::High));
   ASSERT_TRUE(world->generateRegion(RectI::withSize(Vec2I(992, 992), Vec2I(128, 64))));

@@ -57,7 +57,8 @@ Worker cancellation uses `std::stop_source`/`std::stop_token`, with stable token
 
 ### Collections, names and value semantics
 
-- Reuse the checked `Star::transform` for owning transforms. `transformInto` appends and preserves the committed prefix on insertion failure; do not introduce eager capacity errors. Computed-key sorting constructs keys only after successful evaluation.
+- Reuse the checked `Star::transform` for owning transforms. `transform_into` appends to a distinct destination and preserves the committed prefix on insertion failure; do not introduce eager capacity errors. `sort_by_key` and `stable_sort_by_key` snapshot each key once in input order before reordering values in place; checked key failure leaves the input unreordered.
+- Free `Star::filter` and `Star::erase_if` erase immediately, retaining callback-observed destruction/size changes and checked-failure prefixes. Explicitly qualify `Star::erase_if` to avoid standard-library ADL changing those semantics. Use owning sequence member filtering for audited linear-compaction paths only; associative containers and ownership-observing predicates retain immediate erasure.
 - Fixed ASCII enum labels use `sortedEnumNames`, `enumName<Names>` and `enumValue<Names>`. Retain canonical output spelling and case-insensitive input; runtime-extensible tables still need `EnumMap`.
 - Payload-free alternatives use `std::monostate`. Preserve JSON/Lua nil, variant ordering, and network/inventory marker tags and zero-byte payloads; named inventory wrappers still distinguish swap and trash slots.
 - Use `auto(expr)` for owning traversal snapshots and `std::views::zip` for synchronous read-only iteration over retained ranges. Pane dismissal callbacks may modify the original collection, so these snapshots must not become borrowed views.

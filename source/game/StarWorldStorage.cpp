@@ -483,7 +483,7 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
 std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<std::reference_wrapper<String const>> worldId) {
   auto result = [&]() -> std::expected<void, StarException> {
     // Tick down generation queue entries, and erase any that are expired.
-    eraseWhere(m_generationQueue, [dt](auto& p) {
+    Star::erase_if(m_generationQueue, [dt](auto& p) {
         p.second -= dt;
         return p.second <= 0.0f;
       });

@@ -177,8 +177,12 @@ struct ScopedMemberCallback {
 
 std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas>::make() {
   LuaMethods<LuaCanvas> methods;
-  auto registerCanvasMethod = [&]<typename Function>(String name, Function function) {
-    using Return = typename AlgorithmResultInfo<typename FunctionTraits<Function>::Return>::Value;
+  auto registerCanvasMethod = [&]<typename Function>(String name, Function function)
+      requires requires {
+        typename FunctionTraits<Function>::result_type;
+        typename FunctionTraits<Function>::argument_types;
+      } {
+    using Return = typename AlgorithmResultInfo<typename FunctionTraits<Function>::result_type>::value_type;
     auto guarded = [function = std::move(function)]<typename... Args>(
                      std::type_identity<std::tuple<std::shared_ptr<CanvasWidget>, Args...>>) mutable {
       return [function = std::move(function)](LuaCanvas const& handle,
@@ -188,14 +192,14 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
         auto owner = handle.owner ? handle.owner->lock() : std::shared_ptr<Widget>{};
         if (handle.owner && !owner)
           return std::unexpected(GuiException("Canvas callback target no longer exists"));
-        if constexpr (std::is_void_v<typename FunctionTraits<Function>::Return>) {
+        if constexpr (std::is_void_v<typename FunctionTraits<Function>::result_type>) {
           std::invoke(function, handle.canvas, std::forward<Args>(args)...);
           return {};
         } else {
           return std::invoke(function, handle.canvas, std::forward<Args>(args)...);
         }
       };
-    }(std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+    }(std::type_identity<typename FunctionTraits<Function>::argument_types>{});
     return methods.registerMethod(std::move(name), std::move(guarded));
   };
   if (auto registered =

@@ -246,7 +246,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
   "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
@@ -280,7 +280,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
     ASSERT_TRUE(storage) << storage.error().what();
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto closeWorld = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto closeWorld = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     Vec2I const position(1024, 1024);
     ASSERT_TRUE((*world)->generateRegion(RectI::withSize(position - Vec2I(64, 64), Vec2I(128, 128))));
@@ -314,7 +314,7 @@ const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "Symlink
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory);
   auto tempDir = std::move(*directory);
-  auto finallyGuard = finally([&tempDir]() { EXPECT_TRUE(File::remove_all(tempDir)); });
+  auto finallyGuard = make_scope_exit([&tempDir]() { EXPECT_TRUE(File::remove_all(tempDir)); });
 
   std::error_code ec;
   std::filesystem::create_directories(fsPath(File::relative_to(tempDir, "real")), ec);
@@ -349,7 +349,7 @@ const GameTestRegistration
   assetMetadataLengths("AssetsTest", "MetadataLengthsStayFreshAndRejectMissingOrReplacedFiles", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto path = File::relative_to(*directory, "mutable.json");
     ASSERT_TRUE(File::write_file(String("{}"), path));
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
@@ -443,7 +443,7 @@ const GameTestRegistration packedMetadataLengths(
   "AssetsTest", "PackedMetadataLengthsValidateFreshExtentAndMalformedEntries", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     std::error_code ec;
     ASSERT_TRUE(std::filesystem::create_directory(fsPath(original), ec));
@@ -543,7 +543,7 @@ const GameTestRegistration
   packedEmptyReadExtent("AssetsTest", "PackedEmptyReadsValidateFreshExtentBeforeReturning", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto path = File::relative_to(*directory, "empty.pak");
     DataStreamBuffer bytes;
     ASSERT_TRUE(bytes.write_data(std::span("SBAsset6", 8)));
@@ -580,7 +580,7 @@ const GameTestRegistration
                               [](GameTest& fixture) {
                                 auto directory = File::temporary_directory(fixture.root().random());
                                 ASSERT_TRUE(directory);
-                                auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+                                auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
                                 auto path = File::relative_to(*directory, "command-line");
                                 std::error_code ec;
                                 std::filesystem::create_symlink("/proc/self/cmdline", fsPath(path), ec);
@@ -598,7 +598,7 @@ const GameTestRegistration assetMetadataDigest(
   "AssetsTest", "MetadataDigestMatchesFormerReaderBytesForDirectoryAndPackedSources", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     std::error_code ec;
     ASSERT_TRUE(std::filesystem::create_directory(fsPath(original), ec));
@@ -654,7 +654,7 @@ const GameTestRegistration assetBatchDigestPatchProviders(
   "AssetsTest", "BatchDigestMatchesReaderOracleWithInlineAndMemoryPatchProviders", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     auto patches = File::relative_to(*directory, "patches");
     ASSERT_TRUE(File::create_directory(original));
@@ -707,7 +707,7 @@ const GameTestRegistration assetBatchDigestErrorOrder(
   "AssetsTest", "BatchDigestRetainsGlobalFirstErrorAcrossInterleavedProvidersAndPatches", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     using Index = StringMap<std::pair<std::uint64_t, std::uint64_t>>;
     auto write_packed = [](String const& path, Index const& index) -> std::expected<void, StarException> {
       DataStreamBuffer bytes;
@@ -1342,7 +1342,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto tempDir = std::move(*directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
     Assets::Settings settings{};
     settings.workerPoolSize = 4;
     settings.assetTimeToLive = 10;
@@ -1385,7 +1385,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto tempDir = std::move(*directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(tempDir, "preload.config")));
     auto bytes = pngTestBytes(fixture.root().logger());
     ASSERT_TRUE(bytes);
@@ -1405,7 +1405,7 @@ const GameTestRegistration
   assetsQueuedLuaPatches("AssetsTest", "QueuedLuaPatchErrorsDoNotDiscardOtherResults", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "broken.json")));
     ASSERT_TRUE(File::write_file(String("function patch() error('deliberate patch failure') end"),
@@ -1447,7 +1447,7 @@ const GameTestRegistration assetsSharedPatchStateAcrossDrains(
   "AssetsTest", "SharedPatchStateSurvivesQueueDrainsAndErrors", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     StringList paths;
     JsonArray targets;
@@ -1619,7 +1619,7 @@ const GameTestRegistration assetsFailureCacheReload(
   "AssetsTest", "QueuedFailureSurvivesCacheClearAndRecoversAfterReload", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     auto path = File::relative_to(*directory, "failure.json");
     ASSERT_TRUE(File::write_file(String("{ invalid json"), path));
@@ -1653,7 +1653,7 @@ const GameTestRegistration recoverableDatabaseProvider(
   "AssetsTest", "RecoverableDatabaseFailureReportsProviderAndKeepsFallback", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     ASSERT_TRUE(File::write_file(String(R"({"name":"dance_recovery","friendlyName":"Dance Recovery Provider"})"),
                                  File::relative_to(*directory, "_metadata")));

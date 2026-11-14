@@ -77,7 +77,7 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
     state.SkipWithError(temporary.error().what());
     return;
   }
-  auto cleanup = Star::finally([&] {
+  auto cleanup = Star::make_scope_exit([&] {
     auto removed = Star::File::remove_all(*temporary);
     if (!removed)
       state.SkipWithError(removed.error().what());

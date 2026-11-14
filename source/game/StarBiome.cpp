@@ -224,7 +224,7 @@ std::expected<Json, StarException> Biome::toJson() const {
     }
   }
   return JsonObject{{"baseName", baseName}, {"description", description}, {"mainBlock", mainBlock},
-      {"subBlocks", subBlocks.transformed(construct<Json>())},
+      {"subBlocks", subBlocks.transformed(Construct<Json>())},
       {"ores", ores.transformed([](std::pair<ModId, float> const& p) -> Json { return JsonArray{p.first, p.second}; })},
       {"hueShift", hueShift}, {"materialHueShift", materialHueShift}, {"surfacePlaceables", std::move(*surface)},
       {"undergroundPlaceables", std::move(*underground)}, {"spawnProfile", spawnProfile.toJson()},

@@ -2492,7 +2492,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
 std::expected<bool, StarException> WorldServer::placeDungeon(String const& dungeonName, Vec2I const& position, std::optional<DungeonId> dungeonId, bool forcePlacement) {
   m_generatingDungeon = true;
   m_tileProtectionEnabled = false;
-  auto generationScope = finally([&world = *this] {
+  auto generationScope = make_scope_exit([&world = *this] {
     world.m_tileProtectionEnabled = true;
     world.m_generatingDungeon = false;
   });

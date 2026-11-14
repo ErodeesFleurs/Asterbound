@@ -117,7 +117,7 @@ const GameTestRegistration transientMovementAnimation(
   "HumanoidRenderTest", "PlayerMovementRequestIsTransientRotatedAndNetworked", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(overlay));
     ASSERT_TRUE(File::write_file(String(R"([
@@ -148,7 +148,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     auto factory = (*root)->playerFactory();
     ASSERT_TRUE(factory);
@@ -162,7 +162,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(client) << client.error().what();
     player.setClientContext(*client);
     ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninit = finally([&] { EXPECT_TRUE(player.uninit()); });
+    auto uninit = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     auto& movement = player.movementController();
     ActorMovementParameters parameters;
@@ -201,7 +201,7 @@ const GameTestRegistration transientMovementAnimation(
     std::array rules{NetCompatibilityRules(LegacyVersion), NetCompatibilityRules(OpenProtocolVersion)};
     std::array<std::shared_ptr<Player>, 2> remotes;
     std::array<std::uint64_t, 2> versions{};
-    auto uninitRemotes = finally([&] {
+    auto uninitRemotes = make_scope_exit([&] {
       for (auto const& remote : remotes)
         if (remote)
           EXPECT_TRUE(remote->uninit());
@@ -771,7 +771,7 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(storage);
     auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world) << world.error().what();
-    auto close = finally([&] { EXPECT_TRUE((*world)->close()); });
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     auto factory = root.playerFactory();
     ASSERT_TRUE(factory);
@@ -785,7 +785,7 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(client);
     player.setClientContext(*client);
     ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninit = finally([&] { EXPECT_TRUE(player.uninit()); });
+    auto uninit = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
 
@@ -966,7 +966,7 @@ const GameTestRegistration humanoidTickOwnedPose(
     // builder rather than using its incomplete base animation by itself.
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "species")));
     ASSERT_TRUE(File::write_file(String(R"([

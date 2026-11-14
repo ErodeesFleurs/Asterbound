@@ -28,28 +28,21 @@ concept sequence_less =
   requires(Left&& left, Right&& right) { static_cast<bool>(std::forward<Left>(left) < std::forward<Right>(right)); };
 
 template <typename Function, typename... Args>
-concept sequence_callable = std::invocable<Function, Args...>;
+concept sequence_callable = algorithm_invocable<Function, Args...>;
 
 template <typename Function, typename... Args>
-concept sequence_predicate = sequence_callable<Function, Args...>
-  && ((!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::Fallible
-       && requires(Function function,
-                   Args... args) { static_cast<bool>(std::invoke(function, std::forward<Args>(args)...)); })
-      || (AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::Fallible
-          && requires(Function function, Args... args) {
-               static_cast<bool>(*std::invoke(function, std::forward<Args>(args)...));
-             }));
+concept sequence_predicate = algorithm_predicate<Function, Args...>;
 
 template <typename Function, typename... Args>
 concept sequence_comparator = sequence_predicate<Function, Args...>
-  && (!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::Fallible);
+  && (!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Args...>>>::is_fallible);
 
 template <typename Function, typename Reference>
 concept sequence_transform = sequence_callable<Function, Reference>
-  && ((!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::Fallible
+  && ((!AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::is_fallible
        && requires(Function function,
                    Reference value) { value = std::invoke(function, std::forward<Reference>(value)); })
-      || (AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::Fallible
+      || (AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::is_fallible
           && requires(Function function, Reference value) {
                value = *std::invoke(function, std::forward<Reference>(value));
              }));
@@ -58,9 +51,9 @@ template <typename Function, typename Reference>
 concept sequence_mapping =
   sequence_callable<Function, Reference>
   && std::is_object_v<
-    typename AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::Value>
+    typename AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::value_type>
   && std::is_move_constructible_v<
-    typename AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::Value>;
+    typename AlgorithmResultInfo<std::remove_cvref_t<std::invoke_result_t<Function, Reference>>>::value_type>;
 
 template <typename Range>
 using sequence_source_reference =
@@ -349,8 +342,8 @@ template <std::ranges::forward_range Range, typename Filter>
 auto filter(Range& list, Filter&& filter) {
   using reference = std::ranges::range_reference_t<Range>;
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Filter&, reference>>;
-  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::Fallible, std::expected<void, StarException>, void>;
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
+  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::is_fallible, std::expected<void, StarException>, void>;
+  if constexpr (AlgorithmResultInfo<Invocation>::is_fallible) {
     auto destination = list.begin();
     for (auto source = list.begin(); source != list.end(); ++source) {
       auto accepted = std::invoke(filter, *source);
@@ -377,8 +370,8 @@ template <std::ranges::forward_range Range, typename Function>
 auto exec(Range& list, Function&& function) {
   using reference = std::ranges::range_reference_t<Range>;
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::Fallible, std::expected<void, StarException>, void>;
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
+  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::is_fallible, std::expected<void, StarException>, void>;
+  if constexpr (AlgorithmResultInfo<Invocation>::is_fallible) {
     for (auto&& e : list) {
       auto result = std::invoke(function, std::forward<decltype(e)>(e));
       if (!result)
@@ -396,8 +389,8 @@ template <std::ranges::forward_range Range, typename Function>
 auto transform(Range& list, Function&& function) {
   using reference = std::ranges::range_reference_t<Range>;
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::Fallible, std::expected<void, StarException>, void>;
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
+  using Status = std::conditional_t<AlgorithmResultInfo<Invocation>::is_fallible, std::expected<void, StarException>, void>;
+  if constexpr (AlgorithmResultInfo<Invocation>::is_fallible) {
     for (auto&& e : list) {
       auto result = std::invoke(function, std::forward<decltype(e)>(e));
       if (!result)
@@ -416,8 +409,8 @@ template <std::ranges::forward_range Range, typename Function>
 auto any(Range& list, Function&& function) {
   using const_reference = std::ranges::range_reference_t<Range>;
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function const&, const_reference>>;
-  using Result = std::conditional_t<AlgorithmResultInfo<Invocation>::Fallible, std::expected<bool, StarException>, bool>;
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
+  using Result = std::conditional_t<AlgorithmResultInfo<Invocation>::is_fallible, std::expected<bool, StarException>, bool>;
+  if constexpr (AlgorithmResultInfo<Invocation>::is_fallible) {
     for (auto const& e : list) {
       decltype(auto) accepted = std::invoke(std::as_const(function), e);
       if (!accepted)
@@ -438,8 +431,8 @@ template <std::ranges::forward_range Range, typename Function>
 auto all(Range& list, Function&& function) {
   using const_reference = std::ranges::range_reference_t<Range>;
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function const&, const_reference>>;
-  using Result = std::conditional_t<AlgorithmResultInfo<Invocation>::Fallible, std::expected<bool, StarException>, bool>;
-  if constexpr (AlgorithmResultInfo<Invocation>::Fallible) {
+  using Result = std::conditional_t<AlgorithmResultInfo<Invocation>::is_fallible, std::expected<bool, StarException>, bool>;
+  if constexpr (AlgorithmResultInfo<Invocation>::is_fallible) {
     for (auto const& e : list) {
       decltype(auto) accepted = std::invoke(std::as_const(function), e);
       if (!accepted)
@@ -3054,7 +3047,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename List<Element, Allocator>::reference>
 auto List<Element, Allocator>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Output = List<typename AlgorithmResultInfo<Invocation>::Value>;
+  using Output = List<typename AlgorithmResultInfo<Invocation>::value_type>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3063,7 +3056,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename List<Element, Allocator>::const_reference>
 auto List<Element, Allocator>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  using Output = List<typename AlgorithmResultInfo<Invocation>::Value>;
+  using Output = List<typename AlgorithmResultInfo<Invocation>::value_type>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3139,7 +3132,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename StaticList<Element, MaxSize>::reference>
 auto StaticList<Element, MaxSize>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::Value, MaxSize>;
+  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, MaxSize>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3148,7 +3141,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename StaticList<Element, MaxSize>::const_reference>
 auto StaticList<Element, MaxSize>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::Value, MaxSize>;
+  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, MaxSize>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3190,7 +3183,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename SmallList<Element, MaxStackSize>::reference>
 auto SmallList<Element, MaxStackSize>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::Value, MaxStackSize>;
+  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, MaxStackSize>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3199,7 +3192,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename SmallList<Element, MaxStackSize>::const_reference>
 auto SmallList<Element, MaxStackSize>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::Value, MaxStackSize>;
+  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, MaxStackSize>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3241,7 +3234,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename Deque<Element, Allocator>::reference>
 auto Deque<Element, Allocator>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  return Star::transform<Deque<typename AlgorithmResultInfo<Invocation>::Value>>(*this, std::forward<Function>(function));
+  return Star::transform<Deque<typename AlgorithmResultInfo<Invocation>::value_type>>(*this, std::forward<Function>(function));
 }
 
 template <typename Element, typename Allocator>
@@ -3249,7 +3242,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename Deque<Element, Allocator>::const_reference>
 auto Deque<Element, Allocator>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  return Star::transform<Deque<typename AlgorithmResultInfo<Invocation>::Value>>(*this, std::forward<Function>(function));
+  return Star::transform<Deque<typename AlgorithmResultInfo<Invocation>::value_type>>(*this, std::forward<Function>(function));
 }
 
 template <typename Element, typename Allocator>
@@ -3307,7 +3300,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename LinkedList<Element, Allocator>::reference>
 auto LinkedList<Element, Allocator>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  return Star::transform<LinkedList<typename AlgorithmResultInfo<Invocation>::Value>>(*this, std::forward<Function>(function));
+  return Star::transform<LinkedList<typename AlgorithmResultInfo<Invocation>::value_type>>(*this, std::forward<Function>(function));
 }
 
 template <typename Element, typename Allocator>
@@ -3315,7 +3308,7 @@ template <typename Function>
   requires sequence_mapping<Function&, typename LinkedList<Element, Allocator>::const_reference>
 auto LinkedList<Element, Allocator>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  return Star::transform<LinkedList<typename AlgorithmResultInfo<Invocation>::Value>>(*this, std::forward<Function>(function));
+  return Star::transform<LinkedList<typename AlgorithmResultInfo<Invocation>::value_type>>(*this, std::forward<Function>(function));
 }
 
 template <typename Sequence>

@@ -95,7 +95,7 @@ const GameTestRegistration assetsRemovedLooseJsonPatches(
       SCOPED_TRACE(suffix.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       auto patch = suffix == ".patch" ? String(R"({"removed":true})")
                                       : String("function patch(data) data.removed = true return data end");
       ASSERT_TRUE(writeJsonPatchFixture(*directory, suffix, patch));
@@ -114,7 +114,7 @@ const GameTestRegistration
   assetsNestedPatchGroups("AssetsPatchReadTest", "NestedGroupsCommitOnlySuccessfulGroups", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(writeJsonPatchFixture(*directory, ".patch", R"([
       {"op":"add","path":"/before","value":true},
       [
@@ -141,7 +141,7 @@ const GameTestRegistration assetsRemovedCachedLuaPatch(
   "AssetsPatchReadTest", "RemovedCachedLuaPatchIsNotInvokedForAnotherTarget", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(
       writeJsonPatchFixture(*directory, ".patch.lua", "function patch(data) data.removed = true return data end"));
     ASSERT_TRUE(File::write_file(String(R"({"warmup":true})"), File::relative_to(*directory, "warmup.json")));
@@ -169,7 +169,7 @@ const GameTestRegistration assetsPatchSyntaxAndRuntimeErrors(
       SCOPED_TRACE(patch.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(*directory, suffix, patch));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
@@ -186,7 +186,7 @@ const GameTestRegistration assetsPatchReplacedWithDirectory(
       SCOPED_TRACE(suffix.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
@@ -208,7 +208,7 @@ const GameTestRegistration assetsPatchReplacedWithBrokenSymlink(
       SCOPED_TRACE(suffix.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
@@ -236,7 +236,7 @@ const GameTestRegistration
       SCOPED_TRACE(suffix.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeJsonPatchFixture(
         *directory, suffix, suffix == ".patch" ? String("{}") : String("function patch(data) return data end")));
       Logger logger;
@@ -246,7 +246,7 @@ const GameTestRegistration
       std::error_code ec;
       auto original = std::filesystem::status(path, ec).permissions();
       ASSERT_FALSE(ec) << ec.message();
-      auto restorePermissions = finally([&] {
+      auto restorePermissions = make_scope_exit([&] {
         std::error_code restoreError;
         std::filesystem::permissions(path, original, restoreError);
         EXPECT_FALSE(restoreError) << restoreError.message();
@@ -267,7 +267,7 @@ const GameTestRegistration assetsRemovedLooseImageLuaPatch(
   "AssetsPatchReadTest", "RemovedLooseImageLuaPatchKeepsPixelsAndLaterPatch", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(
       writeImagePatchFixture(fixture, *directory, "function patch(image) return image:process('?flipx') end"));
     Logger logger;
@@ -292,7 +292,7 @@ const GameTestRegistration assetsImageLuaPatchErrors(
       SCOPED_TRACE(patch.utf8());
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       ASSERT_TRUE(writeImagePatchFixture(fixture, *directory, patch));
       Logger logger;
       auto assets = patchTestAssets(fixture, *directory, logger);
@@ -314,7 +314,7 @@ const GameTestRegistration assetsLuaPatchProvider(
         ASSERT_TRUE(target);
         ASSERT_TRUE(failing);
         ASSERT_TRUE(shadow);
-        auto cleanup = finally([&] {
+        auto cleanup = make_scope_exit([&] {
           EXPECT_TRUE(File::remove_all(*target));
           EXPECT_TRUE(File::remove_all(*failing));
           EXPECT_TRUE(File::remove_all(*shadow));
@@ -403,7 +403,7 @@ const GameTestRegistration assetsMissingResourceSummary(
   "AssetsPatchReadTest", "MissingResourceKeepsUnderlyingReasonInStructuredSummary", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     Logger logger;
     auto assets = patchTestAssets(fixture, *directory, logger);
@@ -423,7 +423,7 @@ const GameTestRegistration assetsSourceSpecificPatchReplacement(
   "AssetsPatchReadTest", "SourceSpecificReplacementPreservesOrderAndSameContextReads", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto base = File::relative_to(*directory, "base");
     auto original = File::relative_to(*directory, "original");
     auto shadow = File::relative_to(*directory, "shadow");
@@ -503,7 +503,7 @@ const GameTestRegistration assetsReplacePreviouslyFailedPatch(
   "AssetsPatchReadTest", "SourceSpecificReplacementInvalidatesEarlierFailure", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto base = File::relative_to(*directory, "base");
     auto repair = File::relative_to(*directory, "repair");
     ASSERT_TRUE(writePatchProvider(base, {
@@ -536,7 +536,7 @@ const GameTestRegistration assetsReplacementPatchProvider(
   "AssetsPatchReadTest", "ReplacementFailureUsesHeldReplacementProvider", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto base = File::relative_to(*directory, "base");
     auto replacement = File::relative_to(*directory, "replacement");
     auto shadow = File::relative_to(*directory, "shadow");
@@ -587,7 +587,7 @@ const GameTestRegistration assetsSourceBytesReadFailure(
   "AssetsPatchReadTest", "SourceBytesReadFailureKeepsRequestedProvider", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     auto shadow = File::relative_to(*directory, "shadow");
     ASSERT_TRUE(writePatchProvider(original, {
@@ -632,7 +632,7 @@ const GameTestRegistration assetsRetargetSourceSpecificPatch(
   "AssetsPatchReadTest", "SourceSpecificRetargetAppendsAndPreservesForeignPatches", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto base = File::relative_to(*directory, "base");
     auto original = File::relative_to(*directory, "original");
     auto foreign = File::relative_to(*directory, "foreign");
@@ -700,7 +700,7 @@ const GameTestRegistration assetsLoadScriptReplacement(
   "AssetsPatchReadTest", "LoadScriptReplacementPreservesDeclarationsAndProviderIsolation", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     auto shadow = File::relative_to(*directory, "shadow");
     auto repair = File::relative_to(*directory, "repair");
@@ -774,7 +774,7 @@ const GameTestRegistration assetsLoadScriptReplacementProvider(
       SCOPED_TRACE(syntax ? "compile" : "invoke");
       auto directory = File::temporary_directory(fixture.root().random());
       ASSERT_TRUE(directory);
-      auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
       auto original = File::relative_to(*directory, "original");
       auto replacement = File::relative_to(*directory, "replacement");
       auto shadow = File::relative_to(*directory, "shadow");
@@ -847,7 +847,7 @@ const GameTestRegistration assetsPackedSourceBytes(
   "AssetsPatchReadTest", "SourceBytesPreservesExactPackedMembershipAndRawBinary", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
-    auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto original = File::relative_to(*directory, "original");
     auto shadow = File::relative_to(*directory, "shadow");
     auto packed = File::relative_to(*directory, "original.pak");

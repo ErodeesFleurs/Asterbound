@@ -163,9 +163,9 @@ Json WorldRegion::toJson() const {
     {"encloseLiquids", regionLiquids.encloseLiquids},
     {"fillMicrodungeons", regionLiquids.fillMicrodungeons},
 
-    {"subBlockSelectorIndexes", subBlockSelectorIndexes.transformed(construct<Json>())},
-    {"foregroundOreSelectorIndexes", foregroundOreSelectorIndexes.transformed(construct<Json>())},
-    {"backgroundOreSelectorIndexes", backgroundOreSelectorIndexes.transformed(construct<Json>())}
+    {"subBlockSelectorIndexes", subBlockSelectorIndexes.transformed(Construct<Json>())},
+    {"foregroundOreSelectorIndexes", foregroundOreSelectorIndexes.transformed(Construct<Json>())},
+    {"backgroundOreSelectorIndexes", backgroundOreSelectorIndexes.transformed(Construct<Json>())}
   };
 }
 
@@ -705,7 +705,7 @@ std::expected<Json, StarException> WorldLayout::toJson() const {
     {"layers", m_layers.transformed([](WorldLayer const& layer) -> Json {
         JsonArray boundaries;
         boundaries.reserve(layer.boundaries.size());
-        std::ranges::transform(layer.boundaries, std::back_inserter(boundaries), construct<Json>());
+        std::ranges::transform(layer.boundaries, std::back_inserter(boundaries), Construct<Json>());
         JsonArray cells;
         cells.reserve(layer.cells.size());
         std::ranges::transform(layer.cells, std::back_inserter(cells), std::mem_fn(&WorldRegion::toJson));

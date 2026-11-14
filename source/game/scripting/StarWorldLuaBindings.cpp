@@ -624,7 +624,7 @@ namespace LuaBindings {
           nearestPosition = rectQuery->center();
         else if (radiusQuery)
           nearestPosition = radiusQuery->first;
-        sortByComputedValue(entities,
+        sort_by_key(entities,
             [&world, nearestPosition](std::shared_ptr<EntityT> const& entity) {
               return world.geometry().diff(entity->position(), nearestPosition).magnitude();
             });

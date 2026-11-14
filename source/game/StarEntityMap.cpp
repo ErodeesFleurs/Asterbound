@@ -252,7 +252,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityQue
 std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entitiesAt(Vec2F const& pos, EntityFilter const& filter) const {
   auto entityList = entityQuery(RectF::withCenter(pos, {0, 0}), filter);
   if (!entityList) return std::unexpected(std::move(entityList.error()));
-  sortByComputedValue(*entityList, [&](std::shared_ptr<Entity> const& entity) -> float {
+  sort_by_key(*entityList, [&](std::shared_ptr<Entity> const& entity) -> float {
     return vmag_squared(entity->position() - pos);
   });
   return std::move(*entityList);

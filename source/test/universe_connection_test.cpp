@@ -760,7 +760,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     }
     auto drain = ConnectionTestAsync<bool>::create([&] { return (*transport)->writeData(); });
     ASSERT_TRUE(drain) << drain.error().what();
-    auto cleanup = finally([&] {
+    auto cleanup = make_scope_exit([&] {
       incoming->close();
       outgoing->shutdown();
     });
@@ -953,7 +953,7 @@ const GameTestRegistration universeConnectionsTcpCloseInterruptsBlockingReceive(
   ASSERT_TRUE(receiveTask) << receiveTask.error().what();
   // Peer shutdown is only a failure-cleanup escape hatch, never the wake being
   // measured. Keep it before the asynchronous receiver's joining destructor.
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     sender->close();
     socket->close();
   });
@@ -1160,7 +1160,7 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
       List<std::shared_ptr<Packet>> packets) -> std::expected<void, StarException> {
     if (id == 2) {
       EXPECT_EQ(active.fetch_add(1), 0u);
-      auto leave = finally([&]() { --active; });
+      auto leave = make_scope_exit([&]() { --active; });
       if (calls++ == 0) {
         EXPECT_TRUE(server.hasConnection(id));
         auto connection = server.removeConnection(id);

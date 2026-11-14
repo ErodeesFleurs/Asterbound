@@ -321,7 +321,7 @@ std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root,
   if (!world)
     return std::unexpected(std::move(world.error()));
   fixture.world = std::move(*world);
-  auto cleanup = finally([&] {
+  auto cleanup = make_scope_exit([&] {
     if (fixture.world)
       (void)fixture.world->close();
   });
@@ -417,7 +417,7 @@ void snapshotManyClients(benchmark::State& state, PerformanceBenchmarkSession& s
       break;
     }
     auto& fixture = *prepared;
-    auto close = finally([&] {
+    auto close = make_scope_exit([&] {
       auto closed = fixture.world->close();
       if (!closed)
         session.fail(state, closed.error());
@@ -480,7 +480,7 @@ void snapshotManyClients(benchmark::State& state, PerformanceBenchmarkSession& s
       ++wireDigestChanges;
     previousWireDigest = fixture.sourceWireDigest;
     auto closed = fixture.world->close();
-    close.cancel();
+    close.release();
     if (!closed) {
       session.fail(state, closed.error());
       success = false;

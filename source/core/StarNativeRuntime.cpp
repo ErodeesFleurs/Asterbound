@@ -32,7 +32,7 @@ std::expected<void, StarException> prepare_optional_output(FILE* stream) {
   // confine that CRT policy to this thread and this recovery operation.
   auto previous = ::_set_thread_local_invalid_parameter_handler(
     [](wchar_t const*, wchar_t const*, wchar_t const*, unsigned, std::uintptr_t) {});
-  auto restore = finally([previous] { ::_set_thread_local_invalid_parameter_handler(previous); });
+  auto restore = make_scope_exit([previous] { ::_set_thread_local_invalid_parameter_handler(previous); });
   if (descriptor >= 0) {
     auto existing = ::_get_osfhandle(descriptor);
     if (existing != -1 && existing != -2)

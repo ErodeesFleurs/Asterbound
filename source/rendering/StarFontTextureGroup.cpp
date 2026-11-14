@@ -30,7 +30,7 @@ void FontTextureGroup::cleanup(std::int64_t timeout) {
   auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto timeToLive = std::chrono::milliseconds(timeout);
-  eraseWhere(m_glyphs, [&](auto const& p) { return currentTime - p.second.time > timeToLive; });
+  Star::erase_if(m_glyphs, [&](auto const& p) { return currentTime - p.second.time > timeToLive; });
 }
 
 std::expected<void, StarException> FontTextureGroup::switchFont(String const& font) {

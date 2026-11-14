@@ -558,7 +558,8 @@ std::expected<std::optional<std::shared_ptr<Item>>, StarException> Pane::shiftIt
 std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
   LuaCallbacks callbacks;
   // Lua can retain these callbacks after their pane has been released.
-  auto registerPaneCallback = [&]<typename Function>(String name, Function function) {
+  auto registerPaneCallback = [&]<typename Function>(String name, Function function)
+      requires requires { typename FunctionTraits<Function>::argument_types; } {
     auto guarded = [owner = weak_from_this(), function = std::move(function)]<typename... Args>(
                        std::type_identity<std::tuple<Pane&, Args...>>) mutable {
       return [owner, function = std::move(function)](Args... args) mutable
@@ -568,7 +569,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
           return std::unexpected(GuiException("Pane callback target no longer exists"));
         return std::invoke(function, *pane, std::forward<Args>(args)...);
       };
-    }(std::type_identity<typename FunctionTraits<Function>::ArgTuple>{});
+    }(std::type_identity<typename FunctionTraits<Function>::argument_types>{});
     return callbacks.registerCallback(std::move(name), std::move(guarded));
   };
 

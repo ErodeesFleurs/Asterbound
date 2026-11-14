@@ -253,7 +253,7 @@ TEST(JsonTest, UnicodeFile) {
   auto result31 = File::temporary_file_name(random);
   ASSERT_TRUE(result31);
   String file = (*result31);
-  auto finallyGuard = finally([&file]() { EXPECT_TRUE(File::remove(file)); });
+  auto finallyGuard = make_scope_exit([&file]() { EXPECT_TRUE(File::remove(file)); });
 
   auto result32 = v.printJson();
   ASSERT_TRUE(result32);

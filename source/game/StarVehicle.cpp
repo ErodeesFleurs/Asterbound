@@ -678,7 +678,7 @@ if (!result1204) return std::unexpected(std::move(result1204.error()));
     auto result1205 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
 
-    eraseWhere(m_aliveMasterConnections, [this](auto& p) {
+    Star::erase_if(m_aliveMasterConnections, [this](auto& p) {
         return p.second.tick(this->root().timing().timestep);
       });
 

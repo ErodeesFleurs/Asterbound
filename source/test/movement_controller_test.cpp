@@ -30,7 +30,7 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(created) << created.error().what();
     auto world = *created;
-    auto closeWorld = finally([&] { EXPECT_TRUE(world->close()); });
+    auto closeWorld = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
     world->setSpawningEnabled(false);
     world->setTileProtectionEnabled(false);
     Vec2I origin(1024, 1024);
@@ -100,7 +100,7 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
       ASSERT_TRUE(made) << made.error().what();
       auto controller = *made;
       controller->init(*world);
-      auto uninit = finally([&] { controller->uninit(); });
+      auto uninit = make_scope_exit([&] { controller->uninit(); });
       controller->setPosition(Vec2F(origin) + contact.position);
       controller->setVelocity(contact.velocity);
       ASSERT_TRUE(controller->tickMaster(1.0f / 60.0f));
@@ -122,7 +122,7 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     ASSERT_TRUE(made) << made.error().what();
     auto controller = *made;
     controller->init(*world);
-    auto uninit = finally([&] { controller->uninit(); });
+    auto uninit = make_scope_exit([&] { controller->uninit(); });
     controller->setPosition(Vec2F(origin) + Vec2F(4, 6));
     controller->setVelocity(Vec2F(0, -600));
     ASSERT_TRUE(controller->tickMaster(1.0f / 60.0f));

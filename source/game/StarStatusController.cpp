@@ -207,8 +207,8 @@ std::expected<Json, StarException> StatusController::diskStore() const {
   for (auto const& pair : m_persistentEffects) {
     List<PersistentStatusEffect> persistentEffects;
     persistentEffects.reserve(pair.second.statModifiers.size() + pair.second.uniqueEffects.size());
-    std::ranges::transform(pair.second.statModifiers, std::back_inserter(persistentEffects), construct<PersistentStatusEffect>());
-    std::ranges::transform(pair.second.uniqueEffects, std::back_inserter(persistentEffects), construct<PersistentStatusEffect>());
+    std::ranges::transform(pair.second.statModifiers, std::back_inserter(persistentEffects), Construct<PersistentStatusEffect>());
+    std::ranges::transform(pair.second.uniqueEffects, std::back_inserter(persistentEffects), Construct<PersistentStatusEffect>());
     JsonArray effects;
     for (auto const& effect : persistentEffects) {
       auto json = jsonFromPersistentStatusEffect(effect);
@@ -397,8 +397,8 @@ List<PersistentStatusEffect> StatusController::getPersistentEffects(String const
   auto category = m_persistentEffects.maybe(statEffectCategory).value_or(PersistentEffectCategory{});
   List<PersistentStatusEffect> persistentEffects;
   persistentEffects.reserve(category.statModifiers.size() + category.uniqueEffects.size());
-  std::ranges::transform(category.statModifiers, std::back_inserter(persistentEffects), construct<PersistentStatusEffect>());
-  std::ranges::transform(category.uniqueEffects, std::back_inserter(persistentEffects), construct<PersistentStatusEffect>());
+  std::ranges::transform(category.statModifiers, std::back_inserter(persistentEffects), Construct<PersistentStatusEffect>());
+  std::ranges::transform(category.uniqueEffects, std::back_inserter(persistentEffects), Construct<PersistentStatusEffect>());
   return persistentEffects;
 }
 
