@@ -248,7 +248,7 @@ m_periodicActions.push_back(std::make_tuple(GameTimer(std::move(*result952)), st
   if (isMaster()) {
     auto result957 = m_parameters.get("scripts", Json());
 if (!result957) return std::unexpected(std::move(result957.error()));
-auto result958 = jsonToOptional<StringList>(std::move(*result957), jsonToStringList);
+auto result958 = json_to_optional<StringList>(std::move(*result957), jsonToStringList);
 if (!result958) return std::unexpected(std::move(result958.error()));
 auto parameterScripts = std::move(*result958);
     auto scripts = parameterScripts ? *parameterScripts : m_config->scripts;
@@ -315,7 +315,7 @@ std::expected<void, StarException> Projectile::uninit() {
   if (isMaster()) {
     auto result940 = configValue("scripts", Json());
 if (!result940) return std::unexpected(std::move(result940.error()));
-auto result941 = jsonToOptional<StringList>(std::move(*result940), jsonToStringList);
+auto result941 = json_to_optional<StringList>(std::move(*result940), jsonToStringList);
 if (!result941) return std::unexpected(std::move(result941.error()));
 auto scripts = std::move(*result941);
     if (scripts && !(*scripts).empty()) {

@@ -739,7 +739,7 @@ std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::
     if (*index == NullBiomeIndex) return std::nullopt;
     auto biome = worldTemplate.m_layout->getBiome(*index);
     if (!biome) return std::unexpected(std::move(biome.error()));
-    return optionalRef(biome->get());
+    return optional_ref(biome->get());
   };
 
   auto lowerBlockBiome = blockBiome(x, y - 1);

@@ -454,9 +454,9 @@ return JsonObject{
     {"effectEmitter", std::move(*result76)},
     {"disableWornArmor", m_disableWornArmor.get()},
     {"scriptStorage", std::move(*result77)},
-    {"uniqueId", jsonFromOptional(uniqueId())},
+    {"uniqueId", json_from_optional(uniqueId())},
     {"team", std::move(*result78)},
-    {"deathParticleBurst", jsonFromOptional(m_deathParticleBurst.get())},
+    {"deathParticleBurst", json_from_optional(m_deathParticleBurst.get())},
     {"dropPools", m_dropPools.get().transformed(Construct<Json>())},
     {"aggressive", m_aggressive.get()}
   };

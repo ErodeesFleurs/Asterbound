@@ -1252,7 +1252,7 @@ std::shared_ptr<LuaRoot> UniverseClient::luaRoot() {
 std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data, Uuid const&, bool resetInterfaces, bool showIndicator) {
   auto player = mainPlayer();
   bool playerInWorld = player->inWorld();
-  auto world = optionalRef(m_worldClient);
+  auto world = optional_ref(m_worldClient);
   if (playerInWorld) {
     auto playerWorldResult = player->world();
     if (!playerWorldResult)

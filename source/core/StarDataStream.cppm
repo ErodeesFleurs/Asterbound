@@ -35,6 +35,16 @@ template <typename T>
 concept stream_writable = requires(DataStream& stream, T const& value) {
   { stream << value } -> stream_result;
 };
+
+// Non-default wire factories opt in before declaring read<T>() specializations.
+// The ordinary factory must actually be able to initialize and return T.
+template <typename T>
+struct HasStreamReadFactory : std::false_type {};
+
+template <typename T>
+concept stream_read_factory = stream_readable<T>
+  && (HasStreamReadFactory<T>::value
+      || (requires { ::new T; } && std::is_convertible_v<T&&, std::expected<T, StarException>>));
 template <typename Function, typename... Args>
 concept stream_callback = requires(Function& function, DataStream& stream, Args... args) {
   { function(stream, args...) } -> stream_result;
@@ -142,7 +152,7 @@ public:
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(EnumType& e);
 
   template <typename T>
-    requires(stream_readable<T>)
+    requires(stream_read_factory<T>)
   [[nodiscard]] std::expected<T, StarException> read();
   template <typename Data>
     requires(stream_readable<Data>)
@@ -291,7 +301,7 @@ template <stream_enum EnumType>
   return std::ref(*this);
 }
 template <typename T>
-  requires(stream_readable<T>)
+  requires(stream_read_factory<T>)
 [[nodiscard]] std::expected<T, StarException> DataStream::read() {
   T value;
   auto result = *this >> value;
@@ -563,6 +573,8 @@ using ::Star::stream_map;
 using ::Star::stream_pointer;
 using ::Star::stream_range;
 using ::Star::stream_readable;
+using ::Star::stream_read_factory;
+using ::Star::HasStreamReadFactory;
 using ::Star::stream_result;
 using ::Star::stream_sequence;
 using ::Star::stream_writable;

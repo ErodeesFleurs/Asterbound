@@ -251,12 +251,12 @@ std::expected<Json, StarException> SkyParameters::toJson() const {
   Json light;
   if (auto value = skyColoring.maybeRightRef()) light = jsonFromColor(value->get());
   return JsonObject{
-      {"seed", seed}, {"dayLength", jsonFromOptional<float>(dayLength)},
+      {"seed", seed}, {"dayLength", json_from_optional<float>(dayLength)},
       {"planet", std::move(planet)}, {"satellites", std::move(satellites)},
       {"horizonImages", std::move(horizons)}, {"horizonClouds", horizonClouds},
       {"skyType", typeName->get()}, {"skyColoring", std::move(coloring)},
-      {"ambientLightLevel", std::move(light)}, {"spaceLevel", jsonFromOptional<float>(spaceLevel)},
-      {"surfaceLevel", jsonFromOptional<float>(surfaceLevel)}, {"sunType", sunType}, {"settings", settings}};
+      {"ambientLightLevel", std::move(light)}, {"spaceLevel", json_from_optional<float>(spaceLevel)},
+      {"surfaceLevel", json_from_optional<float>(surfaceLevel)}, {"sunType", sunType}, {"settings", settings}};
 }
 
 std::expected<void, StarException> SkyParameters::read(DataStream& ds) {

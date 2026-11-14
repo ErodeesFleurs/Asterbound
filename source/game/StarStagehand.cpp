@@ -92,7 +92,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
 std::expected<Json, StarException> Stagehand::diskStore() const {
   auto saveData = m_config.setAll({
       {"position", jsonFromVec2F({m_xPosition.get(), m_yPosition.get()})},
-      {"uniqueId", jsonFromOptional(uniqueId())}
+      {"uniqueId", json_from_optional(uniqueId())}
     });
   if (!saveData)
     return std::unexpected(std::move(saveData.error()));
@@ -276,7 +276,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
   auto areaJson = m_config.opt("broadcastArea");
   if (!areaJson)
     return std::unexpected(std::move(areaJson.error()));
-  auto broadcastArea = jsonToOptional<RectF>(areaJson->value_or(Json()), jsonToRectF);
+  auto broadcastArea = json_to_optional<RectF>(areaJson->value_or(Json()), jsonToRectF);
   if (!broadcastArea)
     return std::unexpected(std::move(broadcastArea.error()));
   if (*broadcastArea && ((**broadcastArea).size()[0] < 0.0 || (**broadcastArea).size()[1] < 0.0))

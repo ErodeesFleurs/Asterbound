@@ -166,6 +166,7 @@ let
     "logging_benchmarks"
     "array_benchmarks"
     "algorithm_benchmarks"
+    "optional_benchmarks"
     "hash_benchmarks"
     "flat_hash_benchmarks"
     "image_benchmarks"

@@ -83,7 +83,9 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
         } else if (*action == "rotate" || *action == "rotateDegrees") {
           auto angle = v.getFloat(1);
           if (!angle) return std::unexpected(std::move(angle.error()));
-          auto defaultCenter = properties.maybe("rotationCenter").value_or(JsonArray{0, 0}).toArray();
+          auto configuredCenter = properties.maybe("rotationCenter");
+          auto defaultCenter = configuredCenter ? configuredCenter->toArray()
+            : std::expected<JsonArray, StarException>(JsonArray{0, 0});
           if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
           auto centerJson = v.getArray(2, *defaultCenter);
           if (!centerJson) return std::unexpected(std::move(centerJson.error()));
@@ -95,7 +97,9 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
           if (!scaleJson) return std::unexpected(std::move(scaleJson.error()));
           auto scale = jsonToVec2F(*scaleJson);
           if (!scale) return std::unexpected(std::move(scale.error()));
-          auto defaultCenter = properties.maybe("scalingCenter").value_or(JsonArray{0, 0}).toArray();
+          auto configuredCenter = properties.maybe("scalingCenter");
+          auto defaultCenter = configuredCenter ? configuredCenter->toArray()
+            : std::expected<JsonArray, StarException>(JsonArray{0, 0});
           if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
           auto centerJson = v.getArray(2, *defaultCenter);
           if (!centerJson) return std::unexpected(std::move(centerJson.error()));

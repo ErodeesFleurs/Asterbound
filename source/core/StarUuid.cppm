@@ -22,6 +22,9 @@ class Uuid;
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Uuid& uuid);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Uuid const& uuid);
 
+
+template <>
+struct HasStreamReadFactory<Uuid> : std::true_type {};
 class Uuid {
 public:
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Uuid& uuid);
@@ -69,6 +72,8 @@ template <>
 export module star.uuid;
 
 export namespace Star {
+  template <>
+  struct HasStreamReadFactory<Uuid>;
   template <>
   struct hash<Uuid>;
 }

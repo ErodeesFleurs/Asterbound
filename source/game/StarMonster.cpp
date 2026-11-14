@@ -312,7 +312,7 @@ if (!result40) return std::unexpected(std::move(result40.error()));
 auto result41 = getTeam().toJson();
 if (!result41) return std::unexpected(std::move(result41.error()));
 return JsonObject{
-    {"monsterLevel", jsonFromOptional(m_monsterLevel)},
+    {"monsterLevel", json_from_optional(m_monsterLevel)},
     {"movementState", std::move(*result35)},
     {"statusController", std::move(*result36)},
     {"damageOnTouch", m_damageOnTouch},
@@ -324,7 +324,7 @@ return JsonObject{
     {"effectEmitter", std::move(*result37)},
     {"monsterVariant", std::move(*result39)},
     {"scriptStorage", std::move(*result40)},
-    {"uniqueId", jsonFromOptional(uniqueId())},
+    {"uniqueId", json_from_optional(uniqueId())},
     {"team", std::move(*result41)}
   };
 }

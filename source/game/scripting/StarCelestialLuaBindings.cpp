@@ -468,7 +468,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto object = systemWorld->getObject(*id))
-      return jsonFromOptional<CelestialOrbit>(object->orbit(), [](CelestialOrbit const& orbit) { return orbit.toJson(); });
+      return json_from_optional<CelestialOrbit>(object->orbit(), [](CelestialOrbit const& orbit) { return orbit.toJson(); });
     return Json();
   }); !registration)
       return std::unexpected(std::move(registration.error()));

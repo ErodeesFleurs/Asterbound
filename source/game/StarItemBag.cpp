@@ -199,7 +199,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::putItems(std::size_
     return std::unexpected(std::move(slot.error()));
   auto& storedItem = slot->get();
   if (storedItem) {
-    storedItem->stackWith(optionalRef(items));
+    storedItem->stackWith(optional_ref(items));
     if (!items->empty())
       return items;
   } else {
@@ -237,7 +237,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::swapItems(std::size
   } else if (storedItem) {
     // If something is there, try to stack with it first.  If we can't stack,
     // then swap.
-    if (!tryCombine || !storedItem->stackWith(optionalRef(swapItems)))
+    if (!tryCombine || !storedItem->stackWith(optional_ref(swapItems)))
       std::swap(storedItem, swapItems);
   } else {
     // Otherwise just place the given items in the slot.
@@ -313,7 +313,7 @@ std::uint64_t ItemBag::itemsCanStack(std::optional<std::reference_wrapper<Item c
   std::uint64_t stackable = 0;
   for (auto slot : itemsFit.slots)
     if (m_items[slot])
-      stackable += stackTransfer(!m_items[slot]->empty() ? optionalRef(m_items[slot]) : std::nullopt, items);
+      stackable += stackTransfer(!m_items[slot]->empty() ? optional_ref(m_items[slot]) : std::nullopt, items);
   return stackable;
 }
 
@@ -339,7 +339,7 @@ auto ItemBag::itemsFitWhere(std::optional<std::reference_wrapper<Item const>> it
       taken.insert(slot);
     }
 
-    std::uint64_t available = stackTransfer(m_items[slot] && !m_items[slot]->empty() ? optionalRef(m_items[slot]) : std::nullopt, items);
+    std::uint64_t available = stackTransfer(m_items[slot] && !m_items[slot]->empty() ? optional_ref(m_items[slot]) : std::nullopt, items);
     if (available != 0)
       count -= std::min(available, count);
     else
@@ -362,7 +362,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::addItems(std::share
     if (storedItem && storedItem->empty())
       storedItem.reset();
     if (storedItem) {
-      storedItem->stackWith(optionalRef(items));
+      storedItem->stackWith(optional_ref(items));
       if (items->empty())
         return std::shared_ptr<Item>();
     } else {
@@ -385,7 +385,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::stackItems(std::sha
     if (storedItem && storedItem->empty())
       storedItem.reset();
     if (storedItem) {
-      storedItem->stackWith(optionalRef(items));
+      storedItem->stackWith(optional_ref(items));
       if (items->empty())
         return std::shared_ptr<Item>();
     } else {
@@ -402,7 +402,7 @@ std::expected<void, StarException> ItemBag::condenseStacks() {
     if (auto& item = m_items[i]) {
       for (std::size_t j = 0; j < i; ++j) {
         if (auto& stackWithItem = m_items[j])
-          item->stackWith(optionalRef(stackWithItem));
+          item->stackWith(optional_ref(stackWithItem));
         if (item->empty())
           break;
       }
@@ -475,7 +475,7 @@ std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly, std::f
     if (!test(i))
       continue;
     auto const& storedItem = m_items[i];
-    if (storedItem && !storedItem->empty() && stackTransfer(optionalRef(storedItem), std::cref(item)) != 0)
+    if (storedItem && !storedItem->empty() && stackTransfer(optional_ref(storedItem), std::cref(item)) != 0)
       return i;
   }
 

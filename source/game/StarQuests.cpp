@@ -429,15 +429,15 @@ std::expected<Json, StarException> Quest::diskStore() const {
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   JsonObject result{{"state", state->get()}, {"arc", *arc}, {"arcPos", m_arcPos},
       {"parameters", *parameters}, {"money", m_money}};
-  auto world = jsonFromOptional(m_worldId, Star::print_world_id);
+  auto world = json_from_optional(m_worldId, Star::print_world_id);
   if (!world) return std::unexpected(std::move(world.error()));
   result["worldId"] = std::move(*world);
-  auto location = jsonFromOptional(m_location, [](std::pair<Vec3I, SystemLocation> const& location) -> Json {
+  auto location = json_from_optional(m_location, [](std::pair<Vec3I, SystemLocation> const& location) -> Json {
     return JsonObject{{"system", jsonFromVec3I(location.first)}, {"location", jsonFromSystemLocation(location.second)}};
   });
   if (!location) return std::unexpected(std::move(location.error()));
   result["location"] = std::move(*location);
-  result["serverUuid"] = jsonFromOptional(m_serverUuid.transform(std::mem_fn(&Uuid::hex)));
+  result["serverUuid"] = json_from_optional(m_serverUuid.transform(std::mem_fn(&Uuid::hex)));
   auto items = m_root.itemDatabase();
   if (!items) return std::unexpected(std::move(items.error()));
   auto rewards = jsonFromList(m_rewards, [&items](auto const& item) { return (*items)->diskStore(item); });

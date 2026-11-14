@@ -190,7 +190,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
       return SystemLocation(std::move(*uuid));
     }
   } else {
-    auto position = jsonToOptional<Vec2F>(location, jsonToVec2F);
+    auto position = json_to_optional<Vec2F>(location, jsonToVec2F);
     if (!position)
       return std::unexpected(std::move(position.error()));
     if (*position)
@@ -733,7 +733,7 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
   auto orbitData = diskStore.get("orbit");
   if (!orbitData)
     return std::unexpected(std::move(orbitData.error()));
-  auto orbit = jsonToOptional<CelestialOrbit>(*orbitData, CelestialOrbit::fromJson);
+  auto orbit = json_to_optional<CelestialOrbit>(*orbitData, CelestialOrbit::fromJson);
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   object->m_orbit.set(std::move(*orbit));
@@ -898,7 +898,7 @@ std::expected<ByteArray, StarException> SystemObject::netStore() const {
 }
 
 std::expected<Json, StarException> SystemObject::diskStore() const {
-  auto orbit = jsonFromOptional<CelestialOrbit>(m_orbit.get(), [](CelestialOrbit const& o) { return o.toJson(); });
+  auto orbit = json_from_optional<CelestialOrbit>(m_orbit.get(), [](CelestialOrbit const& o) { return o.toJson(); });
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   return JsonObject{{"uuid", m_uuid.hex()}, {"name", m_config.name}, {"orbit", std::move(*orbit)},

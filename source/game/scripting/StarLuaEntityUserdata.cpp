@@ -1199,7 +1199,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                      auto item = (*itemDb)->fromJson(items);
                                      if (!item)
                                        return std::unexpected(std::move(item.error()));
-                                     return container->get().itemBag()->itemsCanFit(optionalRef(*item));
+                                     return container->get().itemBag()->itemsCanFit(optional_ref(*item));
                                    }
                                    return {};
                                  });
@@ -1216,7 +1216,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               auto item = (*itemDb)->fromJson(items);
               if (!item)
                 return std::unexpected(std::move(item.error()));
-              auto result = container->get().itemBag()->itemsFitWhere(optionalRef(*item));
+              auto result = container->get().itemBag()->itemsFitWhere(optional_ref(*item));
               auto slots = jsonFromList<std::size_t>(result.slots);
               if (!slots)
                 return std::unexpected(std::move(slots.error()));

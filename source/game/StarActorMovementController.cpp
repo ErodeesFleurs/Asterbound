@@ -128,15 +128,15 @@ std::expected<ActorJumpProfile, StarException> ActorJumpProfile::create(Json con
 
 Json ActorJumpProfile::toJson() const {
   return JsonObject{
-    {"jumpSpeed", jsonFromOptional(jumpSpeed)},
-    {"jumpControlForce", jsonFromOptional(jumpControlForce)},
-    {"jumpInitialPercentage", jsonFromOptional(jumpInitialPercentage)},
-    {"jumpHoldTime", jsonFromOptional(jumpHoldTime)},
-    {"jumpTotalHoldTime", jsonFromOptional(jumpTotalHoldTime)},
-    {"multiJump", jsonFromOptional(multiJump)},
-    {"reJumpDelay", jsonFromOptional(reJumpDelay)},
-    {"autoJump", jsonFromOptional(autoJump)},
-    {"collisionCancelled", jsonFromOptional(collisionCancelled)}
+    {"jumpSpeed", json_from_optional(jumpSpeed)},
+    {"jumpControlForce", json_from_optional(jumpControlForce)},
+    {"jumpInitialPercentage", json_from_optional(jumpInitialPercentage)},
+    {"jumpHoldTime", json_from_optional(jumpHoldTime)},
+    {"jumpTotalHoldTime", json_from_optional(jumpTotalHoldTime)},
+    {"multiJump", json_from_optional(multiJump)},
+    {"reJumpDelay", json_from_optional(reJumpDelay)},
+    {"autoJump", json_from_optional(autoJump)},
+    {"collisionCancelled", json_from_optional(collisionCancelled)}
   };
 }
 
@@ -381,54 +381,54 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::c
 }
 
 std::expected<Json, StarException> ActorMovementParameters::toJson() const {
-  auto standingPolyJson = jsonFromOptional(standingPoly, jsonFromPolyF);
+  auto standingPolyJson = json_from_optional(standingPoly, jsonFromPolyF);
   if (!standingPolyJson) return std::unexpected(std::move(standingPolyJson.error()));
-  auto crouchingPolyJson = jsonFromOptional(crouchingPoly, jsonFromPolyF);
+  auto crouchingPolyJson = json_from_optional(crouchingPoly, jsonFromPolyF);
   if (!crouchingPolyJson) return std::unexpected(std::move(crouchingPolyJson.error()));
-  auto physicsEffectCategoriesJson = jsonFromOptional(physicsEffectCategories, jsonFromStringSet);
+  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, jsonFromStringSet);
   if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
 
-  return JsonObject{{"mass", jsonFromOptional(mass)},
-      {"gravityMultiplier", jsonFromOptional(gravityMultiplier)},
-      {"liquidBuoyancy", jsonFromOptional(liquidBuoyancy)},
-      {"airBuoyancy", jsonFromOptional(airBuoyancy)},
-      {"bounceFactor", jsonFromOptional(bounceFactor)},
-      {"stopOnFirstBounce", jsonFromOptional(stopOnFirstBounce)},
-      {"enableSurfaceSlopeCorrection", jsonFromOptional(enableSurfaceSlopeCorrection)},
-      {"slopeSlidingFactor", jsonFromOptional(slopeSlidingFactor)},
-      {"maxMovementPerStep", jsonFromOptional(maxMovementPerStep)},
-      {"maximumCorrection", jsonFromOptional(maximumCorrection)},
-      {"speedLimit", jsonFromOptional(speedLimit)},
+  return JsonObject{{"mass", json_from_optional(mass)},
+      {"gravityMultiplier", json_from_optional(gravityMultiplier)},
+      {"liquidBuoyancy", json_from_optional(liquidBuoyancy)},
+      {"airBuoyancy", json_from_optional(airBuoyancy)},
+      {"bounceFactor", json_from_optional(bounceFactor)},
+      {"stopOnFirstBounce", json_from_optional(stopOnFirstBounce)},
+      {"enableSurfaceSlopeCorrection", json_from_optional(enableSurfaceSlopeCorrection)},
+      {"slopeSlidingFactor", json_from_optional(slopeSlidingFactor)},
+      {"maxMovementPerStep", json_from_optional(maxMovementPerStep)},
+      {"maximumCorrection", json_from_optional(maximumCorrection)},
+      {"speedLimit", json_from_optional(speedLimit)},
       {"standingPoly", *standingPolyJson},
       {"crouchingPoly", *crouchingPolyJson},
-      {"stickyCollision", jsonFromOptional(stickyCollision)},
-      {"stickyForce", jsonFromOptional(stickyForce)},
-      {"walkSpeed", jsonFromOptional(walkSpeed)},
-      {"runSpeed", jsonFromOptional(runSpeed)},
-      {"flySpeed", jsonFromOptional(flySpeed)},
-      {"airFriction", jsonFromOptional(airFriction)},
-      {"liquidFriction", jsonFromOptional(liquidFriction)},
-      {"minimumLiquidPercentage", jsonFromOptional(minimumLiquidPercentage)},
-      {"liquidImpedance", jsonFromOptional(liquidImpedance)},
-      {"normalGroundFriction", jsonFromOptional(normalGroundFriction)},
-      {"ambulatingGroundFriction", jsonFromOptional(ambulatingGroundFriction)},
-      {"groundForce", jsonFromOptional(groundForce)},
-      {"airForce", jsonFromOptional(airForce)},
-      {"liquidForce", jsonFromOptional(liquidForce)},
+      {"stickyCollision", json_from_optional(stickyCollision)},
+      {"stickyForce", json_from_optional(stickyForce)},
+      {"walkSpeed", json_from_optional(walkSpeed)},
+      {"runSpeed", json_from_optional(runSpeed)},
+      {"flySpeed", json_from_optional(flySpeed)},
+      {"airFriction", json_from_optional(airFriction)},
+      {"liquidFriction", json_from_optional(liquidFriction)},
+      {"minimumLiquidPercentage", json_from_optional(minimumLiquidPercentage)},
+      {"liquidImpedance", json_from_optional(liquidImpedance)},
+      {"normalGroundFriction", json_from_optional(normalGroundFriction)},
+      {"ambulatingGroundFriction", json_from_optional(ambulatingGroundFriction)},
+      {"groundForce", json_from_optional(groundForce)},
+      {"airForce", json_from_optional(airForce)},
+      {"liquidForce", json_from_optional(liquidForce)},
       {"airJumpProfile", airJumpProfile.toJson()},
       {"liquidJumpProfile", liquidJumpProfile.toJson()},
-      {"fallStatusSpeedMin", jsonFromOptional(fallStatusSpeedMin)},
-      {"fallThroughSustainFrames", jsonFromOptional(fallThroughSustainFrames)},
-      {"maximumPlatformCorrection", jsonFromOptional(maximumPlatformCorrection)},
-      {"maximumPlatformCorrectionVelocityFactor", jsonFromOptional(maximumPlatformCorrectionVelocityFactor)},
+      {"fallStatusSpeedMin", json_from_optional(fallStatusSpeedMin)},
+      {"fallThroughSustainFrames", json_from_optional(fallThroughSustainFrames)},
+      {"maximumPlatformCorrection", json_from_optional(maximumPlatformCorrection)},
+      {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximumPlatformCorrectionVelocityFactor)},
       {"physicsEffectCategories", *physicsEffectCategoriesJson},
-      {"groundMovementMinimumSustain", jsonFromOptional(groundMovementMinimumSustain)},
-      {"groundMovementMaximumSustain", jsonFromOptional(groundMovementMaximumSustain)},
-      {"groundMovementCheckDistance", jsonFromOptional(groundMovementCheckDistance)},
-      {"collisionEnabled", jsonFromOptional(collisionEnabled)},
-      {"frictionEnabled", jsonFromOptional(frictionEnabled)},
-      {"gravityEnabled", jsonFromOptional(gravityEnabled)},
-      {"pathExploreRate", jsonFromOptional(pathExploreRate)}};
+      {"groundMovementMinimumSustain", json_from_optional(groundMovementMinimumSustain)},
+      {"groundMovementMaximumSustain", json_from_optional(groundMovementMaximumSustain)},
+      {"groundMovementCheckDistance", json_from_optional(groundMovementCheckDistance)},
+      {"collisionEnabled", json_from_optional(collisionEnabled)},
+      {"frictionEnabled", json_from_optional(frictionEnabled)},
+      {"gravityEnabled", json_from_optional(gravityEnabled)},
+      {"pathExploreRate", json_from_optional(pathExploreRate)}};
 }
 
 ActorMovementParameters ActorMovementParameters::merge(ActorMovementParameters const& rhs) const {

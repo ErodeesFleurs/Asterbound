@@ -151,8 +151,8 @@ std::expected<Json, StarException> VisitableWorldParameters::store() const {
       {"airless", airless},
       {"weatherPool", std::move(*weather)},
       {"environmentStatusEffects", jsonFromStringList(environmentStatusEffects)},
-      {"overrideTech", jsonFromOptional(overrideTech.transform(&jsonFromStringList))},
-      {"globalDirectives", jsonFromOptional(globalDirectives.transform(&jsonFromDirectivesList))},
+      {"overrideTech", json_from_optional(overrideTech.transform(&jsonFromStringList))},
+      {"globalDirectives", json_from_optional(globalDirectives.transform(&jsonFromDirectivesList))},
       {"beamUpRule", beam->get()},
       {"disableDeathDrops", disableDeathDrops},
       {"terraformed", terraformed},
@@ -1017,12 +1017,12 @@ std::expected<Json, StarException> FloatingDungeonWorldParameters::store() const
       {"dungeonSurfaceHeight", dungeonSurfaceHeight},
       {"dungeonUndergroundLevel", dungeonUndergroundLevel},
       {"primaryDungeon", primaryDungeon},
-      {"biome", jsonFromOptional(biome)},
+      {"biome", json_from_optional(biome)},
       {"ambientLightLevel", jsonFromColor(ambientLightLevel)},
-      {"dayMusicTrack", jsonFromOptional(dayMusicTrack)},
-      {"nightMusicTrack", jsonFromOptional(nightMusicTrack)},
-      {"dayAmbientNoises", jsonFromOptional(dayAmbientNoises)},
-      {"nightAmbientNoises", jsonFromOptional(nightAmbientNoises)}});
+      {"dayMusicTrack", json_from_optional(dayMusicTrack)},
+      {"nightMusicTrack", json_from_optional(nightMusicTrack)},
+      {"dayAmbientNoises", json_from_optional(dayAmbientNoises)},
+      {"nightAmbientNoises", json_from_optional(nightAmbientNoises)}});
 }
 
 std::expected<void, StarException> FloatingDungeonWorldParameters::read(DataStream& ds) {

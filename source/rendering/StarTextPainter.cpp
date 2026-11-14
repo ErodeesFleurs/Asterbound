@@ -132,7 +132,7 @@ std::expected<Json, StarException> TextPositioning::toJson() const {
     {"position", jsonFromVec2F(pos)},
     {"horizontalAnchor", horizontal->get()},
     {"verticalAnchor", vertical->get()},
-    {"wrapWidth", jsonFromOptional(wrapWidth)}
+    {"wrapWidth", json_from_optional(wrapWidth)}
   };
 }
 
@@ -156,7 +156,7 @@ std::expected<std::shared_ptr<TextPainter>, StarException> TextPainter::create(R
 
 std::expected<RectF, StarException> TextPainter::renderText(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  auto rect = doRenderText(s, position, true, optionalRef(charLimit));
+  auto rect = doRenderText(s, position, true, optional_ref(charLimit));
   if (!rect)
     return std::unexpected(std::move(rect.error()));
   renderPrimitives();
@@ -165,7 +165,7 @@ std::expected<RectF, StarException> TextPainter::renderText(StringView s, TextPo
 
 std::expected<RectF, StarException> TextPainter::renderLine(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  auto rect = doRenderLine(s, position, true, optionalRef(charLimit));
+  auto rect = doRenderLine(s, position, true, optional_ref(charLimit));
   if (!rect)
     return std::unexpected(std::move(rect.error()));
   renderPrimitives();
@@ -182,12 +182,12 @@ std::expected<RectF, StarException> TextPainter::renderGlyph(String::Char c, Tex
 
 std::expected<RectF, StarException> TextPainter::determineTextSize(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  return doRenderText(s, position, false, optionalRef(charLimit));
+  return doRenderText(s, position, false, optional_ref(charLimit));
 }
 
 std::expected<RectF, StarException> TextPainter::determineLineSize(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  return doRenderLine(s, position, false, optionalRef(charLimit));
+  return doRenderLine(s, position, false, optional_ref(charLimit));
 }
 
 std::expected<RectF, StarException> TextPainter::determineGlyphSize(String::Char c, TextPositioning const& position) {
@@ -372,7 +372,7 @@ std::expected<List<StringView>, StarException> TextPainter::wrapTextViews(String
     return true;
   };
 
-  auto wrapped = processWrapText(s, optionalRef(wrapWidth), textCallback);
+  auto wrapped = processWrapText(s, optional_ref(wrapWidth), textCallback);
   if (!wrapped)
     return std::unexpected(std::move(wrapped.error()));
 
@@ -393,7 +393,7 @@ std::expected<StringList, StarException> TextPainter::wrapText(StringView s, std
     return true;
   };
 
-  auto wrapped = processWrapText(s, optionalRef(wrapWidth), textCallback);
+  auto wrapped = processWrapText(s, optional_ref(wrapWidth), textCallback);
   if (!wrapped)
     return std::unexpected(std::move(wrapped.error()));
 

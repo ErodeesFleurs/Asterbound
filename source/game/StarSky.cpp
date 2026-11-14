@@ -259,7 +259,7 @@ std::expected<void, StarException> Sky::update(double dt) {
       if (m_warpPhase == WarpPhase::SpeedingUp && m_flyingTimer >= speedupTime()
           && !m_enterHyperspace
           && m_destWorld) {
-        auto destination = takeOptional(m_destWorld);
+        auto destination = take_optional(m_destWorld);
         if (!destination) return std::unexpected(std::move(destination.error()));
         auto jumped = jumpTo(std::move(*destination));
         if (!jumped) return std::unexpected(std::move(jumped.error()));
@@ -268,7 +268,7 @@ std::expected<void, StarException> Sky::update(double dt) {
         m_warpPhase = WarpPhase::Maintain;
       } else if (m_warpPhase == WarpPhase::Maintain && m_flyingTimer >= m_numericSettings.flyingTimer
           && m_destWorld) {
-        auto destination = takeOptional(m_destWorld);
+        auto destination = take_optional(m_destWorld);
         if (!destination) return std::unexpected(std::move(destination.error()));
         auto jumped = jumpTo(std::move(*destination));
         if (!jumped) return std::unexpected(std::move(jumped.error()));

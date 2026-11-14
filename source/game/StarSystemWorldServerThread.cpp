@@ -210,7 +210,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
   }
   for (auto const& entry : std::exchange(m_clientShipActions, {})) {
     auto ship = m_systemWorld->clientShip(entry.first);
-    auto acted = entry.second(optionalRef(ship));
+    auto acted = entry.second(optional_ref(ship));
     if (!acted)
       return std::unexpected(std::move(acted.error()));
   }

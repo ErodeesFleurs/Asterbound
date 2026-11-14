@@ -141,7 +141,7 @@ std::expected<EpochTimer, StarException> EpochTimer::create(Json json) {
 }
 
 Json EpochTimer::toJson() const {
-  return JsonObject{{"lastEpochTime", jsonFromOptional(m_lastSeenEpochTime)}, {"elapsedTime", m_elapsedTime}};
+  return JsonObject{{"lastEpochTime", json_from_optional(m_lastSeenEpochTime)}, {"elapsedTime", m_elapsedTime}};
 }
 
 void EpochTimer::update(double newEpochTime) {

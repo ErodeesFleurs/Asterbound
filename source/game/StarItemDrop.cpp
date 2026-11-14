@@ -507,12 +507,12 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
             if (!*closeTakeable || vmag(position() - closeDrop.position()) >= m_combineRadius || !closeDrop.isMaster())
               return false;
             auto const& closeItem = closeDrop.m_item;
-            if (m_item->couldStack(optionalRef(closeItem)) != closeItem->count())
+            if (m_item->couldStack(optional_ref(closeItem)) != closeItem->count())
               return false;
             auto taken = closeDrop.take();
             if (!taken)
               return std::unexpected(std::move(taken.error()));
-            m_item->stackWith(optionalRef(*taken));
+            m_item->stackWith(optional_ref(*taken));
             m_dropAge.setElapsedTime(std::min(m_dropAge.elapsedTime(), closeDrop.m_dropAge.elapsedTime()));
             m_movementController->setPosition(
               m_movementController->position()

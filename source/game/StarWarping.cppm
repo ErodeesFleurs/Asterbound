@@ -362,6 +362,12 @@ using WarpAction = std::variant<std::monostate, WarpToWorld, WarpToPlayer, WarpA
 
 // Construct identity-bearing values from their wire fields, never a generated ID.
 template <>
+struct HasStreamReadFactory<ClientShipWorldId> : std::true_type {};
+template <>
+struct HasStreamReadFactory<ClientCustomWorldId> : std::true_type {};
+template <>
+struct HasStreamReadFactory<WarpToPlayer> : std::true_type {};
+template <>
 [[nodiscard]] std::expected<ClientShipWorldId, StarException> DataStream::read<ClientShipWorldId>();
 template <>
 [[nodiscard]] std::expected<ClientCustomWorldId, StarException> DataStream::read<ClientCustomWorldId>();
@@ -373,6 +379,12 @@ template <>
 export module star.warping;
 
 export namespace Star {
+  template <>
+  struct HasStreamReadFactory<ClientShipWorldId>;
+  template <>
+  struct HasStreamReadFactory<ClientCustomWorldId>;
+  template <>
+  struct HasStreamReadFactory<WarpToPlayer>;
   template <>
   struct hash<InstanceWorldId>;
   template <>

@@ -384,6 +384,36 @@ TEST(LuaTest, OptionalConversionDistinguishesNilFromFailure) {
   };
 }
 
+TEST(LuaTest, OptionalRvalueIsConsumedBeforeForeignEnginePushFailure) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto function = context->eval<LuaFunction>("function() return 42 end");
+  ASSERT_TRUE(function);
+  auto foreignEngine = LuaEngine::create();
+  ASSERT_TRUE(foreignEngine);
+
+  std::optional<LuaFunction> value(*function);
+  auto borrowedFailure = (*foreignEngine)->luaFrom(value);
+  ASSERT_FALSE(borrowedFailure);
+  EXPECT_TRUE(borrowedFailure.error().is<LuaException>());
+  EXPECT_TRUE(value);
+
+  auto consumedFailure = (*foreignEngine)->luaFrom(std::move(value));
+  ASSERT_FALSE(consumedFailure);
+  EXPECT_TRUE(consumedFailure.error().is<LuaException>());
+  EXPECT_FALSE(value);
+
+  std::optional<LuaFunction> successfulValue(*function);
+  auto pushed = (*engine)->luaFrom(std::move(successfulValue));
+  ASSERT_TRUE(pushed);
+  EXPECT_FALSE(successfulValue);
+  auto roundTrip = (*engine)->luaTo<LuaFunction>(*pushed);
+  ASSERT_TRUE(roundTrip);
+  EXPECT_EQ(roundTrip->invoke<int>(), 42);
+}
+
 struct TestUserData1 {
   int field;
 };
@@ -1974,6 +2004,27 @@ TEST(LuaTest, VariantTest) {
   ASSERT_TRUE(*optionalNil);
   ASSERT_TRUE(std::holds_alternative<std::optional<int>>(**optionalNil));
   EXPECT_FALSE(std::get<std::optional<int>>(**optionalNil));
+}
+
+TEST(LuaTest, JsonContainerVariantMismatchReachesFunctionAlternative) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto value = context->eval<LuaValue>("function() return false end");
+  ASSERT_TRUE(value);
+
+  auto array = (*engine)->luaMaybeTo<std::variant<JsonArray, LuaFunction>>(*value);
+  ASSERT_TRUE(array);
+  ASSERT_TRUE(*array);
+  ASSERT_TRUE(std::holds_alternative<LuaFunction>(**array));
+  EXPECT_EQ(std::get<LuaFunction>(**array).invoke<bool>(), false);
+
+  auto object = (*engine)->luaMaybeTo<std::variant<JsonObject, LuaFunction>>(*value);
+  ASSERT_TRUE(object);
+  ASSERT_TRUE(*object);
+  ASSERT_TRUE(std::holds_alternative<LuaFunction>(**object));
+  EXPECT_EQ(std::get<LuaFunction>(**object).invoke<bool>(), false);
 }
 
 TEST(LuaTest, ProfilingTest) {

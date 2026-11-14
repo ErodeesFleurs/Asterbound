@@ -322,8 +322,8 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
         return std::unexpected(std::move(itemsAtResult14.error()));
       if (std::shared_ptr<Item> slotItem = std::move(*itemsAtResult14)) {
         auto swapItem = inventory->swapSlotItem();
-        if (!swapItem || swapItem->empty() || swapItem->couldStack(optionalRef(slotItem))) {
-          std::uint64_t count = swapItem ? swapItem->couldStack(optionalRef(slotItem)) : slotItem->maxStack();
+        if (!swapItem || swapItem->empty() || swapItem->couldStack(optional_ref(slotItem))) {
+          std::uint64_t count = swapItem ? swapItem->couldStack(optional_ref(slotItem)) : slotItem->maxStack();
           if (context().shiftHeld())
             count = std::max<std::uint64_t>(1, std::min<std::uint64_t>(count, slotItem->count() / 2));
           else
@@ -335,7 +335,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
               return std::unexpected(std::move(takeResult15.error()));
             if (auto taken = std::move(*takeResult15)) {
               if (swapItem)
-                swapItem->stackWith(optionalRef(taken));
+                swapItem->stackWith(optional_ref(taken));
               else
                 {
                   auto setSwapSlotItemResult16 = inventory->setSwapSlotItem(taken);

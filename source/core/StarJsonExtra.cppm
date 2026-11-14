@@ -103,20 +103,50 @@ std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random,
 std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float target, Json const& def = Json());
 
 namespace JsonExtraDetail {
+  template <typename Result>
+  concept checked_converter_result = requires {
+    typename std::remove_cvref_t<Result>::value_type;
+    typename std::remove_cvref_t<Result>::error_type;
+    requires std::same_as<std::remove_cvref_t<Result>,
+        std::expected<typename std::remove_cvref_t<Result>::value_type,
+                      typename std::remove_cvref_t<Result>::error_type>>;
+  };
+
+  template <typename T, typename Result>
+  concept converter_result = !std::is_void_v<Result>
+    && (!std::is_reference_v<Result> || std::is_constructible_v<std::remove_cvref_t<Result>, Result>)
+    && ((checked_converter_result<Result>
+         && requires(std::remove_cvref_t<Result>& converted) {
+              std::expected<T, StarException>(std::in_place, std::move(*converted));
+              { std::unexpected(std::move(converted.error())) } -> std::convertible_to<std::expected<T, StarException>>;
+            })
+        || (!checked_converter_result<Result>
+            && requires(std::remove_cvref_t<Result>& converted) {
+                 std::expected<T, StarException>(std::in_place, std::move(converted));
+               }));
+}
+
+template <typename T, typename Converter, typename Value>
+concept json_converter = std::invocable<Converter, Value const&>
+  && JsonExtraDetail::converter_result<T, std::invoke_result_t<Converter, Value const&>>;
+
+namespace JsonExtraDetail {
   // Nonfallible converters are allowed; fallible converters retain their error.
   template <typename T, typename Converter, typename Value>
+    requires(json_converter<T, Converter, Value>)
   std::expected<T, StarException> convert(Converter&& converter, Value const& value) {
-    if constexpr (requires { static_cast<bool>(converter); }) {
-      if (!static_cast<bool>(converter))
+    if constexpr (!std::is_function_v<std::remove_reference_t<Converter>>
+                  && requires { { converter == nullptr } -> std::convertible_to<bool>; }) {
+      if (converter == nullptr)
         return std::unexpected(JsonException("Cannot invoke an empty Json converter"));
     }
     auto converted = std::invoke(std::forward<Converter>(converter), value);
-    if constexpr (requires { converted.error(); }) {
+    if constexpr (checked_converter_result<decltype(converted)>) {
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      return T(std::move(*converted));
+      return std::expected<T, StarException>(std::in_place, std::move(*converted));
     } else {
-      return T(std::move(converted));
+      return std::expected<T, StarException>(std::in_place, std::move(converted));
     }
   }
 
@@ -294,27 +324,33 @@ std::expected<Json, StarException> jsonFromMap(MapType const& map) {
 }
 
 template <typename T, typename Converter>
-std::expected<Json, StarException> jsonFromOptional(std::optional<T> const& value, Converter&& converter) {
+  requires(json_converter<Json, Converter, T>)
+std::expected<Json, StarException> json_from_optional(std::optional<T> const& value, Converter&& converter) {
   if (!value)
     return Json();
   return JsonExtraDetail::convert<Json>(std::forward<Converter>(converter), *value);
 }
 template <typename T>
-Json jsonFromOptional(std::optional<T> const& value) {
+  requires requires(T const& value) { Json(value); }
+Json json_from_optional(std::optional<T> const& value) {
   return value ? Json(*value) : Json();
 }
 template <typename T, typename Converter>
-std::expected<std::optional<T>, StarException> jsonToOptional(Json const& v, Converter&& converter) {
+  requires(json_converter<T, Converter, Json>
+           && requires(std::optional<T>& value, T& payload) { value.emplace(std::move(payload)); })
+std::expected<std::optional<T>, StarException> json_to_optional(Json const& v, Converter&& converter) {
   if (v.isNull())
-    return std::optional<T>{};
+    return std::expected<std::optional<T>, StarException>(std::in_place);
   auto converted = JsonExtraDetail::convert<T>(std::forward<Converter>(converter), v);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
-  return std::optional<T>(std::move(*converted));
+  return std::expected<std::optional<T>, StarException>(std::in_place, std::in_place, std::move(*converted));
 }
 template <typename T>
-std::expected<std::optional<T>, StarException> jsonToOptional(Json const& v) {
-  return jsonToOptional<T>(v, Construct<T>());
+  requires(json_converter<T, Construct<T>, Json>
+           && requires(std::optional<T>& value, T& payload) { value.emplace(std::move(payload)); })
+std::expected<std::optional<T>, StarException> json_to_optional(Json const& v) {
+  return json_to_optional<T>(v, Construct<T>());
 }
 
 template <typename T, typename Converter>
@@ -455,8 +491,9 @@ export namespace Star {
   using ::Star::jsonFromMapK;
   using ::Star::jsonFromMapV;
   using ::Star::jsonFromMap;
-  using ::Star::jsonFromOptional;
-  using ::Star::jsonToOptional;
+  using ::Star::json_converter;
+  using ::Star::json_from_optional;
+  using ::Star::json_to_optional;
 
   extern "C++" {
   template <>

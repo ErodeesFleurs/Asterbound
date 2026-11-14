@@ -17,6 +17,47 @@ import star.uuid;
 
 using namespace Star;
 
+namespace {
+struct StagedOptionalPayload {
+  std::uint8_t value = 0;
+  StagedOptionalPayload() = default;
+  StagedOptionalPayload(StagedOptionalPayload&&) = default;
+  StagedOptionalPayload& operator=(StagedOptionalPayload&&) = delete;
+  ~StagedOptionalPayload() noexcept(false) {}
+};
+
+struct OptionalPayloadReader {
+  int calls = 0;
+  OptionalPayloadReader() = default;
+  OptionalPayloadReader(OptionalPayloadReader&&) = default;
+  OptionalPayloadReader(OptionalPayloadReader const&) = delete;
+  explicit operator bool() const { return false; }
+  std::expected<std::reference_wrapper<DataStream>, StarException>
+  operator()(DataStream& source, StagedOptionalPayload& payload) & {
+    ++calls;
+    return source >> payload.value;
+  }
+};
+
+struct ImmobileOptionalPayload {
+  ImmobileOptionalPayload() = default;
+  ImmobileOptionalPayload(ImmobileOptionalPayload&&) = delete;
+};
+
+template <typename T, typename Function>
+concept callback_optional_readable = requires(DataStream& stream, std::optional<T>& value, Function& function) {
+  read_optional(stream, value, function);
+};
+
+using OptionalProbeReader = decltype([](DataStream&, auto&) -> std::expected<void, StarException> { return {}; });
+static_assert(optional_stream_readable<Uuid>);
+static_assert(optional_stream_writable<Uuid>);
+static_assert(callback_optional_readable<StagedOptionalPayload, OptionalProbeReader>);
+static_assert(!callback_optional_readable<Uuid, OptionalProbeReader>);
+static_assert(!callback_optional_readable<ImmobileOptionalPayload, OptionalProbeReader>);
+static_assert(!callback_optional_readable<int, decltype([](DataStream&, int&) { return 1; })>);
+}
+
 template <typename T>
 void testMap(T const& map) {
   auto byteArray = DataStreamBuffer::serialize_map_container(map);
@@ -99,6 +140,9 @@ TEST(DataStreamTest, OptionalAndVariantCommitOnlyCompletePayloads) {
   ASSERT_FALSE(optionalRead);
   ASSERT_TRUE(optionalValue);
   EXPECT_EQ(*optionalValue, 0xaabbccddu);
+  auto optionalPosition = optionalStream.pos();
+  ASSERT_TRUE(optionalPosition);
+  EXPECT_EQ(*optionalPosition, 3u);
 
   using Value = std::variant<std::monostate, std::uint16_t, std::uint32_t>;
   Value variantValue(std::in_place_index<1>, 0xabcd);
@@ -114,6 +158,86 @@ TEST(DataStreamTest, OptionalAndVariantCommitOnlyCompletePayloads) {
   EXPECT_TRUE(invalidRead.error().is<DataStreamException>());
   ASSERT_EQ(variantValue.index(), 1u);
   EXPECT_EQ(std::get<1>(variantValue), 0xabcd);
+}
+
+TEST(DataStreamTest, OptionalPresenceFlagsPreserveOnMissingAndResetOnFalse) {
+  std::optional<std::uint8_t> value{0x7f};
+  DataStreamReader missing;
+  auto missingResult = missing >> value;
+  ASSERT_FALSE(missingResult);
+  EXPECT_TRUE(missingResult.error().is<EofException>());
+  ASSERT_TRUE(value);
+  EXPECT_EQ(*value, 0x7f);
+  EXPECT_EQ(missing.pos(), 0u);
+
+  ByteArray bytes({"\x00\x55", 2});
+  DataStreamReader absent(bytes.span());
+  ASSERT_TRUE(absent >> value);
+  EXPECT_FALSE(value);
+  EXPECT_EQ(absent.pos(), 1u);
+  EXPECT_EQ(absent.read<std::uint8_t>(), 0x55);
+}
+
+TEST(DataStreamTest, OptionalCallbackCommitsOnlySuccessfulPayloads) {
+  std::optional<StagedOptionalPayload> value(std::in_place);
+  value->value = 0x7f;
+  ByteArray bytes({"\x01\x22", 2});
+  DataStreamReader rejected(bytes.span());
+  auto result = read_optional(rejected, value, [](DataStream& source, StagedOptionalPayload& payload)
+      -> std::expected<void, StarException> {
+    auto decoded = source.read(payload.value);
+    if (!decoded)
+      return decoded;
+    return std::unexpected(DataStreamException("Rejected payload"));
+  });
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<DataStreamException>());
+  ASSERT_TRUE(value);
+  EXPECT_EQ(value->value, 0x7f);
+  EXPECT_EQ(rejected.pos(), 2u);
+
+  DataStreamReader accepted(bytes.span());
+  OptionalPayloadReader reader;
+  ASSERT_TRUE(read_optional(accepted, value, std::move(reader)));
+  EXPECT_EQ(reader.calls, 1);
+  ASSERT_TRUE(value);
+  EXPECT_EQ(value->value, 0x22);
+  EXPECT_EQ(accepted.pos(), 2u);
+}
+
+TEST(DataStreamTest, EmptyOptionalCallbacksAreCheckedOnlyAfterPresenceFlags) {
+  std::function<std::expected<void, StarException>(DataStream&, std::uint8_t&)> reader;
+  std::optional<std::uint8_t> value{0x7f};
+  DataStreamReader missing;
+  auto missingResult = read_optional(missing, value, reader);
+  ASSERT_FALSE(missingResult);
+  EXPECT_TRUE(missingResult.error().is<EofException>());
+  ASSERT_TRUE(value);
+  EXPECT_EQ(*value, 0x7f);
+
+  ByteArray falseBytes({"\x00", 1});
+  DataStreamReader absent(falseBytes.span());
+  ASSERT_TRUE(read_optional(absent, value, reader));
+  EXPECT_FALSE(value);
+  EXPECT_EQ(absent.pos(), 1u);
+
+  value.emplace(0x7f);
+  ByteArray trueBytes({"\x01\x22", 2});
+  DataStreamReader present(trueBytes.span());
+  auto presentResult = read_optional(present, value, reader);
+  ASSERT_FALSE(presentResult);
+  EXPECT_TRUE(presentResult.error().is<DataStreamException>());
+  ASSERT_TRUE(value);
+  EXPECT_EQ(*value, 0x7f);
+  EXPECT_EQ(present.pos(), 1u);
+
+  std::function<std::expected<void, StarException>(DataStream&, std::uint8_t const&)> writer;
+  DataStreamBuffer output;
+  ASSERT_TRUE(write_optional(output, std::optional<std::uint8_t>{}, writer));
+  auto writeResult = write_optional(output, value, writer);
+  ASSERT_FALSE(writeResult);
+  EXPECT_TRUE(writeResult.error().is<DataStreamException>());
+  EXPECT_EQ(output.data(), ByteArray({"\x00\x01", 2}));
 }
 
 TEST(DataStreamTest, OwnedBufferMovePreservesBytesCursorAndWireSettings) {

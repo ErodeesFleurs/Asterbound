@@ -1579,7 +1579,7 @@ std::expected<Json, StarException> Object::writeStoredData() const {
   auto storage = m_scriptComponent.getScriptStorage();
   if (!storage)
     return std::unexpected(std::move(storage.error()));
-  return JsonObject{{"uniqueId", jsonFromOptional(uniqueId())},
+  return JsonObject{{"uniqueId", json_from_optional(uniqueId())},
                     {"tilePosition", jsonFromVec2I(tilePosition())},
                     {"orientationIndex", jsonFromSize(m_orientationIndex)},
                     {"direction", String(*direction)},

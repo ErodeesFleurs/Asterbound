@@ -235,7 +235,7 @@ std::expected<Json, StarException> ObjectItem::objectParameters() const {
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  return objectParameters.set("owner", jsonFromOptional(itemOwner->get().uniqueId()));
+  return objectParameters.set("owner", json_from_optional(itemOwner->get().uniqueId()));
 }
 
 std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shifting) {

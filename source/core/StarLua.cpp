@@ -466,13 +466,15 @@ std::expected<void, StarException> LuaConverter<JsonObject>::from(LuaStack stack
 }
 
 std::expected<std::optional<JsonObject>, StarException> LuaConverter<JsonObject>::to(LuaStackValue v) {
-  auto j = v.to<Json>();
+  auto j = v.maybeTo<Json>();
   if (!j)
     return std::unexpected(std::move(j.error()));
-  if (j->type() == Json::Type::Object)
-    return j->toObject();
-  if (j->type() == Json::Type::Array) {
-    auto values = j->arrayPtr();
+  if (!*j)
+    return std::nullopt;
+  if ((**j).type() == Json::Type::Object)
+    return (**j).toObject();
+  if ((**j).type() == Json::Type::Array) {
+    auto values = (**j).arrayPtr();
     if (!values)
       return std::unexpected(std::move(values.error()));
     if ((*values)->empty())
@@ -486,13 +488,15 @@ std::expected<void, StarException> LuaConverter<JsonArray>::from(LuaStack stack,
 }
 
 std::expected<std::optional<JsonArray>, StarException> LuaConverter<JsonArray>::to(LuaStackValue v) {
-  auto j = v.to<Json>();
+  auto j = v.maybeTo<Json>();
   if (!j)
     return std::unexpected(std::move(j.error()));
-  if (j->type() == Json::Type::Array)
-    return j->toArray();
-  if (j->type() == Json::Type::Object) {
-    auto values = j->objectPtr();
+  if (!*j)
+    return std::nullopt;
+  if ((**j).type() == Json::Type::Array)
+    return (**j).toArray();
+  if ((**j).type() == Json::Type::Object) {
+    auto values = (**j).objectPtr();
     if (!values)
       return std::unexpected(std::move(values.error()));
     if ((*values)->empty())

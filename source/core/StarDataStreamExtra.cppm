@@ -20,14 +20,25 @@ import star.rect;
 import star.algorithm;
 namespace Star {
 
+template <typename T>
+concept optional_stream_writable = requires(DataStream& ds, T const& payload) {
+  { ds.write(payload) } -> std::same_as<std::expected<void, StarException>>;
+};
+
+template <typename T>
+concept optional_stream_readable = requires(DataStream& ds, std::optional<T>& value, T& payload) {
+  { ds.read<T>() } -> std::same_as<std::expected<T, StarException>>;
+  value.emplace(std::move(payload));
+};
+
 // Declare the std-owned optional codec before generic containers instantiate
 // dependent stream expressions; its payload need not associate namespace Star.
 template <typename T>
-  requires(stream_writable<T>)
+  requires(optional_stream_writable<T>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator<<(DataStream& ds, std::optional<T> const& value);
 template <typename T>
-  requires(stream_readable<T>)
+  requires(optional_stream_readable<T>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
                                                                                           std::optional<T>& value);
 
@@ -381,6 +392,11 @@ template <typename T, typename WriteFunction>
   auto tag = ds.write<bool>(maybe.has_value());
   if (!tag) return std::unexpected(std::move(tag.error()));
   if (maybe) {
+    if constexpr (!std::is_function_v<std::remove_reference_t<WriteFunction>>
+                  && requires { { writeFunction == nullptr } -> std::convertible_to<bool>; }) {
+      if (writeFunction == nullptr)
+        return std::unexpected(DataStreamException("Cannot invoke an empty optional writer"));
+    }
     auto result = writeFunction(ds, *maybe);
     if (!result) return std::unexpected(std::move(result.error()));
   }
@@ -388,13 +404,19 @@ template <typename T, typename WriteFunction>
 }
 
 template <typename T, typename ReadFunction>
-  requires(std::default_initializable<T> && stream_callback<ReadFunction, T&>)
+  requires(requires { ::new T; } && stream_callback<ReadFunction, T&>
+           && requires(std::optional<T>& value, T& payload) { value.emplace(std::move(payload)); })
 [[nodiscard]] std::expected<void, StarException> read_optional(DataStream& ds, std::optional<T>& maybe,
                                                                ReadFunction&& readFunction) {
   auto present = ds.read<bool>();
   if (!present)
     return std::unexpected(std::move(present.error()));
   if (*present) {
+    if constexpr (!std::is_function_v<std::remove_reference_t<ReadFunction>>
+                  && requires { { readFunction == nullptr } -> std::convertible_to<bool>; }) {
+      if (readFunction == nullptr)
+        return std::unexpected(DataStreamException("Cannot invoke an empty optional reader"));
+    }
     T payload;
     auto decoded = readFunction(ds, payload);
     if (!decoded)
@@ -407,7 +429,7 @@ template <typename T, typename ReadFunction>
 }
 
 template <typename T>
-  requires(stream_writable<T>)
+  requires(optional_stream_writable<T>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator<<(DataStream& ds, std::optional<T> const& maybe) {
   return write_optional(ds, maybe, [] [[nodiscard]] (DataStream & ds, T const& payload) { return ds.write(payload); })
@@ -415,7 +437,7 @@ operator<<(DataStream& ds, std::optional<T> const& maybe) {
 }
 
 template <typename T>
-  requires(stream_readable<T>)
+  requires(optional_stream_readable<T>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
                                                                                           std::optional<T>& maybe) {
   auto present = ds.read<bool>();
@@ -525,6 +547,8 @@ export module star.data_stream_extra;
 export namespace Star {
   using ::Star::DataStreamWriteFunctor;
   using ::Star::DataStreamReadFunctor;
+  using ::Star::optional_stream_readable;
+  using ::Star::optional_stream_writable;
   using ::Star::operator<<;
   using ::Star::operator>>;
   using ::Star::read_optional;

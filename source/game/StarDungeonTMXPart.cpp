@@ -340,12 +340,12 @@ std::expected<std::shared_ptr<TMXTilesets>, StarException> TMXTilesets::create(R
     for (std::size_t i = 0; i < (*tileset)->size(); ++i) {
       auto front = (*tileset)->getTile(i, TileLayer::Foreground);
       if (!front) return std::unexpected(std::move(front.error()));
-      auto storedFront = result->m_foregroundTilesByGid.set(*firstGid + i, optionalRef(*front));
+      auto storedFront = result->m_foregroundTilesByGid.set(*firstGid + i, optional_ref(*front));
       if (!storedFront)
         return std::unexpected(std::move(storedFront.error()));
       auto back = (*tileset)->getTile(i, TileLayer::Background);
       if (!back) return std::unexpected(std::move(back.error()));
-      auto storedBack = result->m_backgroundTilesByGid.set(*firstGid + i, optionalRef(*back));
+      auto storedBack = result->m_backgroundTilesByGid.set(*firstGid + i, optional_ref(*back));
       if (!storedBack)
         return std::unexpected(std::move(storedBack.error()));
     }

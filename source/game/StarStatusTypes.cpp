@@ -133,7 +133,7 @@ std::expected<EphemeralStatusEffect, StarException> jsonToEphemeralStatusEffect(
 }
 
 Json jsonFromEphemeralStatusEffect(EphemeralStatusEffect const& effect) {
-  return JsonObject{{"effect", effect.uniqueEffect}, {"duration", jsonFromOptional(effect.duration)}};
+  return JsonObject{{"effect", effect.uniqueEffect}, {"duration", json_from_optional(effect.duration)}};
 }
 
 }

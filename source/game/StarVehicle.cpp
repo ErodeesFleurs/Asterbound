@@ -241,7 +241,7 @@ if (!result1043) return std::unexpected(std::move(result1043.error()));
 loungePosition.partAnchor = std::move(*result1043);
     auto result1044 = pair.second.get("exitBottomOffset",Json());
 if (!result1044) return std::unexpected(std::move(result1044.error()));
-auto result1045 = jsonToOptional<Vec2F>(std::move(*result1044),jsonToVec2F);
+auto result1045 = json_to_optional<Vec2F>(std::move(*result1044),jsonToVec2F);
 if (!result1045) return std::unexpected(std::move(result1045.error()));
 loungePosition.exitBottomOffset = std::move(*result1045);
     auto result1046 = pair.second.getObject("armorCosmeticOverrides", JsonObject());

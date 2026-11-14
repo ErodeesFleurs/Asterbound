@@ -159,16 +159,16 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
       if (!name) return std::unexpected(std::move(name.error()));
       gender = String(*name);
     }
-    return JsonObject{{"type", "entity"}, {"uniqueId", jsonFromOptional(entity.uniqueId)}, {"species", jsonFromOptional(entity.species)}, {"gender", gender}};
+    return JsonObject{{"type", "entity"}, {"uniqueId", json_from_optional(entity.uniqueId)}, {"species", json_from_optional(entity.species)}, {"gender", gender}};
   } else if (std::holds_alternative<QuestLocation>(detail)) {
     auto const& location = std::get<QuestLocation>(detail);
-    return JsonObject{{"type", "location"}, {"uniqueId", jsonFromOptional(location.uniqueId)}, {"region", jsonFromRectF(location.region)}};
+    return JsonObject{{"type", "location"}, {"uniqueId", json_from_optional(location.uniqueId)}, {"region", jsonFromRectF(location.region)}};
   } else if (std::holds_alternative<QuestMonsterType>(detail)) {
     auto const& monster = std::get<QuestMonsterType>(detail);
     return JsonObject{{"type", "monsterType"}, {"typeName", monster.typeName}, {"parameters", monster.parameters}};
   } else if (std::holds_alternative<QuestNpcType>(detail)) {
     auto const& npc = std::get<QuestNpcType>(detail);
-    return JsonObject{{"type", "npcType"}, {"species", npc.species}, {"typeName", npc.typeName}, {"parameters", npc.parameters}, {"seed", jsonFromOptional(npc.seed)}};
+    return JsonObject{{"type", "npcType"}, {"species", npc.species}, {"typeName", npc.typeName}, {"parameters", npc.parameters}, {"seed", json_from_optional(npc.seed)}};
   } else if (std::holds_alternative<QuestCoordinate>(detail)) return JsonObject{{"type", "coordinate"}, {"coordinate", std::get<QuestCoordinate>(detail).coordinate.toJson()}};
   else if (std::holds_alternative<QuestJson>(detail)) return std::get<QuestJson>(detail).set("type", "json");
   return JsonObject{{"type", "noDetail"}};
@@ -197,9 +197,9 @@ std::expected<Json, StarException> QuestParam::toJson() const {
   if (!json) return std::unexpected(std::move(json.error()));
   auto object = json->toObject();
   if (!object) return std::unexpected(std::move(object.error()));
-  (*object)["name"] = jsonFromOptional(name);
-  (*object)["portrait"] = jsonFromOptional(portrait);
-  (*object)["indicator"] = jsonFromOptional(indicator);
+  (*object)["name"] = json_from_optional(name);
+  (*object)["portrait"] = json_from_optional(portrait);
+  (*object)["indicator"] = json_from_optional(indicator);
   return Json(std::move(*object));
 }
 std::expected<Json, StarException> QuestParam::diskStore(Root& root) const {
@@ -207,9 +207,9 @@ std::expected<Json, StarException> QuestParam::diskStore(Root& root) const {
   if (!json) return std::unexpected(std::move(json.error()));
   auto object = json->toObject();
   if (!object) return std::unexpected(std::move(object.error()));
-  (*object)["name"] = jsonFromOptional(name);
-  (*object)["portrait"] = jsonFromOptional(portrait);
-  (*object)["indicator"] = jsonFromOptional(indicator);
+  (*object)["name"] = json_from_optional(name);
+  (*object)["portrait"] = json_from_optional(portrait);
+  (*object)["indicator"] = json_from_optional(indicator);
   return Json(std::move(*object));
 }
 bool QuestParam::operator==(QuestParam const& rhs) const { return detail == rhs.detail && name == rhs.name && portrait == rhs.portrait && indicator == rhs.indicator; }
@@ -315,7 +315,7 @@ std::expected<Json, StarException> QuestArcDescriptor::toJson() const {
     if (!json) return std::unexpected(std::move(json.error()));
     array.push_back(std::move(*json));
   }
-  return JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", jsonFromOptional(stagehandUniqueId)}};
+  return JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", json_from_optional(stagehandUniqueId)}};
 }
 std::expected<Json, StarException> QuestArcDescriptor::diskStore(Root& root) const {
   auto database = root.versioningDatabase();
@@ -326,7 +326,7 @@ std::expected<Json, StarException> QuestArcDescriptor::diskStore(Root& root) con
     if (!json) return std::unexpected(std::move(json.error()));
     array.push_back(std::move(*json));
   }
-  auto result = (*database)->makeCurrentVersionedJson("QuestArcDescriptor", JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", jsonFromOptional(stagehandUniqueId)}});
+  auto result = (*database)->makeCurrentVersionedJson("QuestArcDescriptor", JsonObject{{"quests", std::move(array)}, {"stagehandUniqueId", json_from_optional(stagehandUniqueId)}});
   if (!result) return std::unexpected(std::move(result.error()));
   return result->toJson();
 }

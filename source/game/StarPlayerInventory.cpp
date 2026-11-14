@@ -271,7 +271,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
       dest = std::move(*taken);
     }
   } else {
-    if (dest && dest->stackableWith(optionalRef(items))) dest->stackWith(optionalRef(items));
+    if (dest && dest->stackableWith(optional_ref(items))) dest->stackWith(optional_ref(items));
     if (!dest) {
       auto taken = items->take(items->count());
       if (!taken) return std::unexpected(std::move(taken.error()));
@@ -408,7 +408,7 @@ bool PlayerInventory::slotValid(InventorySlot const& slot) const {
     auto primary = primaryHeldItem();
     if (!primary) return std::unexpected(std::move(primary.error()));
     if (*primary) {
-      (*primary)->stackWith(optionalRef(items));
+      (*primary)->stackWith(optional_ref(items));
       if (items->empty()) return std::shared_ptr<Item>();
     }
   }
@@ -469,7 +469,7 @@ bool PlayerInventory::slotValid(InventorySlot const& slot) const {
   for (auto const& pair : m_bags) {
     auto allowed = itemAllowedInBag(items, pair.first);
     if (!allowed) return std::unexpected(std::move(allowed.error()));
-    if (*allowed) canFit += pair.second->itemsCanFit(optionalRef(items));
+    if (*allowed) canFit += pair.second->itemsCanFit(optional_ref(items));
   }
 
   return std::min(canFit, items->count());

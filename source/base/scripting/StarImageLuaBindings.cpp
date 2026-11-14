@@ -69,7 +69,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
         auto resolved = engine.imageResolver()(path);
         if (!resolved)
           return std::unexpected(std::move(resolved.error()));
-        auto result = optionalRef(*resolved);
+        auto result = optional_ref(*resolved);
         resolvedImages.push_back(std::move(*resolved));
         return result;
       });

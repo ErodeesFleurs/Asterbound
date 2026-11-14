@@ -358,7 +358,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
     auto orbitJson = pair.second.get("orbit");
     if (!orbitJson)
       return std::unexpected(std::move(orbitJson.error()));
-    auto orbit = jsonToOptional<CelestialOrbit>(*orbitJson, [](Json const& value) { return CelestialOrbit::fromJson(value); });
+    auto orbit = json_to_optional<CelestialOrbit>(*orbitJson, [](Json const& value) { return CelestialOrbit::fromJson(value); });
     if (!orbit)
       return std::unexpected(std::move(orbit.error()));
     auto parameters = pair.second.getObject("parameters", {});
@@ -387,7 +387,7 @@ std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const 
     planets.push_back(planet.toJson());
   JsonObject objects;
   for (auto const& pair : mappedObjects) {
-    auto orbit = jsonFromOptional<CelestialOrbit>(pair.second.orbit, [](CelestialOrbit const& value) { return value.toJson(); });
+    auto orbit = json_from_optional<CelestialOrbit>(pair.second.orbit, [](CelestialOrbit const& value) { return value.toJson(); });
     if (!orbit)
       return std::unexpected(std::move(orbit.error()));
     objects.set(pair.first.hex(), JsonObject{{"typeName", pair.second.typeName},

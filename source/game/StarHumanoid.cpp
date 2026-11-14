@@ -260,7 +260,7 @@ auto checked21 = config.optString("emoteDirectives");
 if (!checked21) return std::unexpected(std::move(checked21.error()));
 if (auto jEmoteDirectives = std::move(*checked21)) // Passing Directives as a default arg would be inefficient
     {
-auto checked22 = takeOptional(jEmoteDirectives);
+auto checked22 = take_optional(jEmoteDirectives);
 if (!checked22) return std::unexpected(std::move(checked22.error()));
 identity.emoteDirectives = std::move(*checked22);
 }
@@ -4020,7 +4020,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
 }
 
 std::optional<std::reference_wrapper<NetworkedAnimator>> Humanoid::networkedAnimator() {
-  return optionalRef(m_networkedAnimator);
+  return optional_ref(m_networkedAnimator);
 }
 std::optional<std::reference_wrapper<NetworkedAnimator const>> Humanoid::networkedAnimator() const {
   if (!m_networkedAnimator)

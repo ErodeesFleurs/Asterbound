@@ -1075,7 +1075,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (!result90)
           return std::unexpected(std::move(result90.error()));
         auto interactResult = std::move(*result90);
-        auto result91 = takeOptional(interactResult);
+        auto result91 = take_optional(interactResult);
         if (!result91)
           return std::unexpected(std::move(result91.error()));
         clientInfo->outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
@@ -2316,7 +2316,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               auto result241 = sendEntityMessage(*sourceEntity, "tileEntityBroken", {
                                 jsonFromVec2I(pos),
                                 result240->get(),
-                                jsonFromOptional(name),
+                                json_from_optional(name),
                               });
               if (!result241)
                 return std::unexpected(std::move(result241.error()));

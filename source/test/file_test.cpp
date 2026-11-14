@@ -74,7 +74,7 @@ TEST(FileTest, LogSinkCountsPartialWritesBeforeTheNextRotation) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
   auto path = File::relative_to(*directory, "partial-size.log");
   {
     auto probe = FileLogSink::create(path, LogLevel::Info, true);
@@ -177,7 +177,7 @@ TEST(FileTest, LogSinkRotatesAtTheBoundaryAndRetainsOnlyNewestBackups) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   auto path = File::relative_to(*directory, "active.log");
   auto backupDirectory = File::relative_to(*directory, "logs");
   ASSERT_TRUE(File::create_directory(backupDirectory));
@@ -234,7 +234,7 @@ TEST(FileTest, LogSinkKeepsOversizedMultilineRecordsWhole) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   auto path = File::relative_to(*directory, "oversized.log");
   auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 2);
   ASSERT_TRUE(sink);
@@ -262,7 +262,7 @@ TEST(FileTest, LogSinkAppendsExistingBytesBeforeRotating) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   auto path = File::relative_to(*directory, "existing.log");
   String existing("existing bytes without a newline");
   ASSERT_TRUE(File::write_file(existing, path));
@@ -281,7 +281,7 @@ TEST(FileTest, LogSinkTruncationDoesNotCountReplacedBytes) {
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   auto path = File::relative_to(*directory, "truncated.log");
   ASSERT_TRUE(File::write_file(String(std::string(1024, '#')), path));
   auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 1);
@@ -300,7 +300,7 @@ TEST(FileTest, LogSinkZeroLimitDisablesRotationAndZeroBackupsDiscardsOldRecords)
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   for (bool disabled : {false, true}) {
     SCOPED_TRACE(disabled);
     auto path = File::relative_to(*directory, disabled ? String("disabled.log") : String("discard.log"));
@@ -325,7 +325,7 @@ TEST(FileTest, LogSinkRotationPropagatesBackupFailureWithoutLosingCurrentRecords
   ASSERT_TRUE(random);
   auto directory = File::temporary_directory(**random);
   ASSERT_TRUE(directory);
-  auto cleanup = finally([&] { removeTree(*directory); });
+  auto cleanup = make_scope_exit([&] { removeTree(*directory); });
   auto path = File::relative_to(*directory, "failure.log");
   auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 1);
   ASSERT_TRUE(sink);

@@ -76,7 +76,7 @@ std::expected<void, StarException> QuestManager::diskLoad(Json const& quests) {
 std::expected<Json, StarException> QuestManager::diskStore() {
   auto quests = jsonFromMapV(m_quests, [](std::shared_ptr<Quest> const& quest) { return quest->diskStore(); });
   if (!quests) return std::unexpected(std::move(quests.error()));
-  return JsonObject{{"quests", *quests}, {"currentQuest", jsonFromOptional(m_trackedQuestId)}};
+  return JsonObject{{"quests", *quests}, {"currentQuest", json_from_optional(m_trackedQuestId)}};
 }
 void QuestManager::setUniverseClient(std::optional<std::reference_wrapper<UniverseClient>> client) { m_client = client; }
 std::expected<void, StarException> QuestManager::init(Player& player, World& world) {

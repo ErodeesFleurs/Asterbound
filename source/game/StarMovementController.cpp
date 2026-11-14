@@ -201,37 +201,37 @@ MovementParameters MovementParameters::merge(MovementParameters const& rhs) cons
 }
 
 std::expected<Json, StarException> MovementParameters::toJson() const {
-  auto collisionPolyJson = jsonFromOptional(collisionPoly, jsonFromPolyF);
+  auto collisionPolyJson = json_from_optional(collisionPoly, jsonFromPolyF);
   if (!collisionPolyJson) return std::unexpected(std::move(collisionPolyJson.error()));
-  auto physicsEffectCategoriesJson = jsonFromOptional(physicsEffectCategories, jsonFromStringSet);
+  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, jsonFromStringSet);
   if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
 
   return JsonObject{
-    {"mass", jsonFromOptional(mass)},
-    {"gravityMultiplier", jsonFromOptional(gravityMultiplier)},
-    {"liquidBuoyancy", jsonFromOptional(liquidBuoyancy)},
-    {"airBuoyancy", jsonFromOptional(airBuoyancy)},
-    {"stopOnFirstBounce", jsonFromOptional(stopOnFirstBounce)},
-    {"enableSurfaceSlopeCorrection", jsonFromOptional(enableSurfaceSlopeCorrection)},
-    {"slopeSlidingFactor", jsonFromOptional(slopeSlidingFactor)},
-    {"maxMovementPerStep", jsonFromOptional(maxMovementPerStep)},
-    {"maximumCorrection", jsonFromOptional(maximumCorrection)},
-    {"speedLimit", jsonFromOptional(speedLimit)},
-    {"discontinuityThreshold", jsonFromOptional(discontinuityThreshold)},
+    {"mass", json_from_optional(mass)},
+    {"gravityMultiplier", json_from_optional(gravityMultiplier)},
+    {"liquidBuoyancy", json_from_optional(liquidBuoyancy)},
+    {"airBuoyancy", json_from_optional(airBuoyancy)},
+    {"stopOnFirstBounce", json_from_optional(stopOnFirstBounce)},
+    {"enableSurfaceSlopeCorrection", json_from_optional(enableSurfaceSlopeCorrection)},
+    {"slopeSlidingFactor", json_from_optional(slopeSlidingFactor)},
+    {"maxMovementPerStep", json_from_optional(maxMovementPerStep)},
+    {"maximumCorrection", json_from_optional(maximumCorrection)},
+    {"speedLimit", json_from_optional(speedLimit)},
+    {"discontinuityThreshold", json_from_optional(discontinuityThreshold)},
     {"collisionPoly", *collisionPolyJson},
-    {"stickyCollision", jsonFromOptional(stickyCollision)},
-    {"stickyForce", jsonFromOptional(stickyForce)},
-    {"airFriction", jsonFromOptional(airFriction)},
-    {"liquidFriction", jsonFromOptional(liquidFriction)},
-    {"groundFriction", jsonFromOptional(groundFriction)},
-    {"collisionEnabled", jsonFromOptional(collisionEnabled)},
-    {"frictionEnabled", jsonFromOptional(frictionEnabled)},
-    {"gravityEnabled", jsonFromOptional(gravityEnabled)},
-    {"ignorePlatformCollision", jsonFromOptional(ignorePlatformCollision)},
-    {"maximumPlatformCorrection", jsonFromOptional(maximumPlatformCorrection)},
-    {"maximumPlatformCorrectionVelocityFactor", jsonFromOptional(maximumPlatformCorrectionVelocityFactor)},
+    {"stickyCollision", json_from_optional(stickyCollision)},
+    {"stickyForce", json_from_optional(stickyForce)},
+    {"airFriction", json_from_optional(airFriction)},
+    {"liquidFriction", json_from_optional(liquidFriction)},
+    {"groundFriction", json_from_optional(groundFriction)},
+    {"collisionEnabled", json_from_optional(collisionEnabled)},
+    {"frictionEnabled", json_from_optional(frictionEnabled)},
+    {"gravityEnabled", json_from_optional(gravityEnabled)},
+    {"ignorePlatformCollision", json_from_optional(ignorePlatformCollision)},
+    {"maximumPlatformCorrection", json_from_optional(maximumPlatformCorrection)},
+    {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximumPlatformCorrectionVelocityFactor)},
     {"physicsEffectCategories", *physicsEffectCategoriesJson},
-    {"restDuration", jsonFromOptional(restDuration)}
+    {"restDuration", json_from_optional(restDuration)}
   };
 }
 

@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.json;
+import star.json_extra;
 import star.text_formatter;
 import star.string;
 import star.unicode;
@@ -16,6 +17,111 @@ import star.json_patch;
 
 import star.algorithm;
 using namespace Star;
+
+namespace {
+struct JsonValueWithError {
+  int value;
+  int error() const { return value; }
+};
+
+struct RvalueJsonConverter {
+  int& calls;
+  std::expected<bool, StarException> operator()(Json const& value) && {
+    ++calls;
+    return value.toBool();
+  }
+};
+
+template <typename T, typename Converter>
+concept optional_json_decodable = requires(Json const& value, Converter&& converter) {
+  json_to_optional<T>(value, std::forward<Converter>(converter));
+};
+
+using VoidJsonConverter = decltype([](Json const&) {});
+using FallibleVoidJsonConverter = decltype([](Json const&) -> std::expected<void, StarException> { return {}; });
+static_assert(!optional_json_decodable<int, VoidJsonConverter>);
+static_assert(!optional_json_decodable<int, FallibleVoidJsonConverter>);
+static_assert(!optional_json_decodable<int, decltype([](int) { return 1; })>);
+static_assert(optional_json_decodable<bool, RvalueJsonConverter>);
+static_assert(!optional_json_decodable<bool, RvalueJsonConverter&>);
+}
+
+TEST(JsonTest, OptionalNullSkipsConvertersAndFalseRemainsPresent) {
+  int calls = 0;
+  auto from_json = [&calls](Json const& value) {
+    ++calls;
+    return value.toBool();
+  };
+  auto empty = json_to_optional<bool>(Json(), RvalueJsonConverter{calls});
+  ASSERT_TRUE(empty);
+  EXPECT_FALSE(*empty);
+  EXPECT_EQ(calls, 0);
+  auto present = json_to_optional<bool>(Json(false), RvalueJsonConverter{calls});
+  ASSERT_TRUE(present);
+  ASSERT_TRUE(*present);
+  EXPECT_FALSE(**present);
+  EXPECT_EQ(calls, 1);
+  auto invalid = json_to_optional<bool>(Json("not a bool"), from_json);
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<JsonException>());
+  EXPECT_EQ(calls, 2);
+
+  auto to_json = [&calls](bool value) {
+    ++calls;
+    return Json(value);
+  };
+  auto absent_json = json_from_optional(std::optional<bool>{}, to_json);
+  ASSERT_TRUE(absent_json);
+  EXPECT_TRUE(absent_json->isNull());
+  EXPECT_EQ(calls, 2);
+  auto false_json = json_from_optional(std::optional<bool>{false}, to_json);
+  ASSERT_TRUE(false_json);
+  EXPECT_EQ(*false_json, Json(false));
+  EXPECT_EQ(calls, 3);
+}
+
+TEST(JsonTest, OptionalConvertersPreserveErrorsWithoutFlatteningOtherValues) {
+  std::function<std::expected<bool, StarException>(Json const&)> reader;
+  auto empty = json_to_optional<bool>(Json(), reader);
+  ASSERT_TRUE(empty);
+  EXPECT_FALSE(*empty);
+  auto missing_reader = json_to_optional<bool>(Json(false), reader);
+  ASSERT_FALSE(missing_reader);
+  EXPECT_TRUE(missing_reader.error().is<JsonException>());
+
+  std::function<std::expected<Json, StarException>(bool)> writer;
+  auto absent_json = json_from_optional(std::optional<bool>{}, writer);
+  ASSERT_TRUE(absent_json);
+  EXPECT_TRUE(absent_json->isNull());
+  auto missing_writer = json_from_optional(std::optional<bool>{false}, writer);
+  ASSERT_FALSE(missing_writer);
+  EXPECT_TRUE(missing_writer.error().is<JsonException>());
+
+  auto rejected = json_to_optional<bool>(Json(false), [](Json const&) -> std::expected<bool, StarException> {
+    return std::unexpected(OutOfRangeException("Rejected conversion"));
+  });
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(rejected.error().is<OutOfRangeException>());
+  auto rejected_json = json_from_optional(std::optional<bool>{false},
+      [](bool) -> std::expected<Json, StarException> {
+    return std::unexpected(OutOfRangeException("Rejected conversion"));
+  });
+  ASSERT_FALSE(rejected_json);
+  EXPECT_TRUE(rejected_json.error().is<OutOfRangeException>());
+
+  auto derived_error = json_to_optional<bool>(Json(false), [](Json const&) -> std::expected<bool, JsonException> {
+    return std::unexpected(JsonException("Rejected conversion"));
+  });
+  ASSERT_FALSE(derived_error);
+  EXPECT_TRUE(derived_error.error().is<JsonException>());
+
+  auto ordinary = json_to_optional<JsonValueWithError>(Json(false), [](Json const&) {
+    return JsonValueWithError{17};
+  });
+  ASSERT_TRUE(ordinary);
+  ASSERT_TRUE(*ordinary);
+  EXPECT_EQ((**ordinary).value, 17);
+}
 
 TEST(JsonTest, ImplicitSharing) {
   Json map1 = JsonObject{{"foo", 1}, {"bar", 10}};

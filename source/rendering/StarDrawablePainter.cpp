@@ -53,7 +53,7 @@ std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawab
       line.max() - left,
       line.max() + left,
       color, fullbright);
-    if (auto endColor = optionalRef(linePart.endColor)) {
+    if (auto endColor = optional_ref(linePart.endColor)) {
       RenderQuad& quad = std::get<RenderQuad>(primitive);
       quad.c.color = quad.d.color = endColor->get().toRgba();
     }

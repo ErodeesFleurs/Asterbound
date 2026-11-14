@@ -340,20 +340,20 @@ TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {
   EXPECT_EQ(sequence.size(), 1u);
 
   std::optional<std::reference_wrapper<int>> optional{std::ref(original)};
-  auto optionalSlot = optionalRef(optional);
+  auto optionalSlot = optional_ref(optional);
   ASSERT_TRUE(optionalSlot);
   optionalSlot->get() = std::ref(replacement);
   replacement = 23;
   ASSERT_TRUE(optional);
   EXPECT_EQ(optional->get(), 23);
   auto const& constOptional = optional;
-  auto optionalObserved = optionalRef(constOptional);
+  auto optionalObserved = optional_ref(constOptional);
   ASSERT_TRUE(optionalObserved);
   EXPECT_EQ(optionalObserved->get().get(), 23);
   EXPECT_EQ(original, 10);
   optional.reset();
-  EXPECT_FALSE(optionalRef(optional));
-  EXPECT_FALSE(optionalRef(constOptional));
+  EXPECT_FALSE(optional_ref(optional));
+  EXPECT_FALSE(optional_ref(constOptional));
 }
 
 TEST(IdMapTest, InclusiveNarrowRangesExhaustAndRecycleWithoutNarrowing) {

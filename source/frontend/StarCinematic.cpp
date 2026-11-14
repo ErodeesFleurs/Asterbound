@@ -938,7 +938,7 @@ std::expected<bool, StarException> Cinematic::handleInputEvent(InputEvent const&
     return false;
   if (std::holds_alternative<KeyDownEvent>(event)) {
     if (m_currentTimeSkip) {
-      auto timeSkip = takeOptional(m_currentTimeSkip);
+      auto timeSkip = take_optional(m_currentTimeSkip);
       if (!timeSkip)
         return std::unexpected(std::move(timeSkip.error()));
       setTime(timeSkip->skipToTime);

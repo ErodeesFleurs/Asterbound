@@ -571,7 +571,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   m_voice = std::move(*voice);
   m_guiContext->bindInput(*m_input);
   m_guiContext->bindVoice(*m_voice);
-  m_mainMixer->setVoice(optionalRef(m_voice));
+  m_mainMixer->setVoice(optional_ref(m_voice));
   auto assetsResult = m_root->assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -1544,7 +1544,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
     if (!m_player)
       return setError("Error loading player!").transform([] { return false; });
   }
-  m_player->setInput(optionalRef(m_input));
+  m_player->setInput(optional_ref(m_input));
   m_mainMixer->setUniverseClient(m_universeClient);
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
@@ -1554,7 +1554,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
 }
 
 std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
-  auto pending = takeOptional(m_pendingMultiPlayerConnection);
+  auto pending = take_optional(m_pendingMultiPlayerConnection);
   if (!pending)
     return std::unexpected(std::move(pending.error()));
   std::unique_ptr<PacketSocket> packetSocket;
@@ -1679,7 +1679,7 @@ std::expected<void, StarException> ClientApplication::prepareSessionInterface() 
     });
   if (auto started = m_universeClient->startLuaScripts(); !started)
     return started;
-  m_mainMixer->setWorldPainter(optionalRef(m_worldPainter));
+  m_mainMixer->setWorldPainter(optional_ref(m_worldPainter));
   if (auto renderer = Application::renderer()) {
     if (auto initialized = m_worldPainter->renderInit(renderer); !initialized)
       return initialized;

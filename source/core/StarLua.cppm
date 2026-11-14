@@ -592,7 +592,7 @@ public:
   void setImageResolver(ImageResolver resolver) { m_imageResolver = std::move(resolver); }
   ImageResolver const& imageResolver() const { return m_imageResolver; }
   void setExecutionHost(std::unique_ptr<LuaExecutionHost> host) { m_executionHost = std::move(host); }
-  std::optional<std::reference_wrapper<LuaExecutionHost>> executionHost() const { return optionalRef(m_executionHost); }
+  std::optional<std::reference_wrapper<LuaExecutionHost>> executionHost() const { return optional_ref(m_executionHost); }
   std::stop_token const& promiseLifetime() const { return m_promiseLifetime; }
   std::stop_token setPromiseLifetime(std::stop_token lifetime) {
     return std::exchange(m_promiseLifetime, std::move(lifetime));
@@ -1112,17 +1112,30 @@ template <> struct LuaConverter<LuaStackValue> {
 
 template <typename T>
 struct LuaConverter<std::optional<T>> {
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, std::optional<T> const& v) {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, std::optional<T> const& v)
+    requires ((std::is_pointer_v<T> && std::is_convertible_v<T const&, std::string_view>)
+      || requires(LuaStack target, T const& value) {
+        { LuaConverter<std::decay_t<T>>::from(target, value) } -> std::convertible_to<std::expected<void, StarException>>;
+      })
+  {
     return v ? stack.push(*v) : stack.push(LuaNil);
   }
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, std::optional<T>&& v) {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, std::optional<T>&& v)
+    requires (std::is_convertible_v<T&&, T>
+      && ((std::is_pointer_v<T> && std::is_convertible_v<T&&, std::string_view>)
+        || requires(LuaStack target, T&& value) {
+          { LuaConverter<std::decay_t<T>>::from(target, std::move(value)) } -> std::convertible_to<std::expected<void, StarException>>;
+        }))
+  {
     if (!v)
       return stack.push(LuaNil);
     T value = std::move(*v);
     v.reset();
     return stack.push(std::move(value));
   }
-  [[nodiscard]] static std::expected<std::optional<std::optional<T>>, StarException> to(LuaStackValue v) {
+  [[nodiscard]] static std::expected<std::optional<std::optional<T>>, StarException> to(LuaStackValue v)
+    requires (std::is_constructible_v<T, T&&> && requires(LuaStackValue value) { LuaConverter<T>::to(value); })
+  {
     if (v.is<LuaNilType>())
       return std::optional<std::optional<T>>(std::in_place);
     auto converted = v.maybeTo<T>();

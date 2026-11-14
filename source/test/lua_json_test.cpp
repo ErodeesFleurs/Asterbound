@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.lua;
+import star.lua_converters;
 import star.string;
 import star.string_view;
 import star.json;
@@ -166,6 +167,8 @@ TEST(LuaJsonTest, TypeConversion) {
   EXPECT_EQ(context.getPath<double>("var1"), 1.0);
   EXPECT_EQ(context.getPath<JsonArray>("var2"), JsonArray());
   EXPECT_EQ(context.getPath<JsonObject>("var2"), JsonObject());
+  EXPECT_EQ(context.eval<JsonObject>("jarray()"), JsonObject());
+  EXPECT_EQ(context.eval<JsonArray>("jobject()"), JsonArray());
 }
 
 TEST(LuaJsonTest, ChunkBoundaries) {
@@ -585,6 +588,12 @@ TEST(LuaJsonTest, UnsupportedFunctionsAreConversionMisses) {
     auto converted = (*engine)->luaMaybeTo<Json>(*value);
     ASSERT_TRUE(converted);
     EXPECT_FALSE(*converted);
+    auto array = (*engine)->luaMaybeTo<JsonArray>(*value);
+    ASSERT_TRUE(array);
+    EXPECT_FALSE(*array);
+    auto object = (*engine)->luaMaybeTo<JsonObject>(*value);
+    ASSERT_TRUE(object);
+    EXPECT_FALSE(*object);
   }
 }
 
@@ -612,6 +621,12 @@ TEST(LuaJsonTest, UnsupportedNativeValuesRemainErrorsBeforeConversionMisses) {
     auto converted = (*engine)->luaMaybeTo<Json>(*value);
     ASSERT_FALSE(converted);
     EXPECT_TRUE(converted.error().is<LuaException>());
+    auto array = (*engine)->luaMaybeTo<std::variant<JsonArray, LuaTable>>(*value);
+    ASSERT_FALSE(array);
+    EXPECT_TRUE(array.error().is<LuaException>());
+    auto object = (*engine)->luaMaybeTo<std::variant<JsonObject, LuaTable>>(*value);
+    ASSERT_FALSE(object);
+    EXPECT_TRUE(object.error().is<LuaException>());
   }
   EXPECT_EQ(context->eval<int>("6 * 7"), 42);
 }

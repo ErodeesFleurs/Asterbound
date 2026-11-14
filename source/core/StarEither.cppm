@@ -20,6 +20,15 @@ struct EitherRightValue {
   Value value;
 };
 
+// Moving a nullable payload consumes its value, not the active variant side.
+// This policy depends on reset itself, never on optional_ref overloads.
+template <typename T>
+concept either_resettable_payload = std::is_class_v<T> && requires(T& value) {
+  static_cast<bool>(value);
+  *value;
+  { value.reset() } -> std::same_as<void>;
+};
+
 template <typename Value>
 EitherLeftValue<Value> makeLeft(Value value);
 
@@ -130,7 +139,7 @@ template <typename Left, typename Right>
 Either<Left, Right>::Either(Either&& rhs)
   : m_value(std::move(rhs.m_value)) {
   std::visit([](auto& side) {
-    if constexpr (requires { optionalRef(side.value); })
+    if constexpr (either_resettable_payload<std::remove_cvref_t<decltype(side.value)>>)
       side.value.reset();
   }, rhs.m_value);
 }
@@ -144,7 +153,7 @@ Either<Left, Right>& Either<Left, Right>::operator=(Either&& rhs) {
     return *this;
   m_value = std::move(rhs.m_value);
   std::visit([](auto& side) {
-    if constexpr (requires { optionalRef(side.value); })
+    if constexpr (either_resettable_payload<std::remove_cvref_t<decltype(side.value)>>)
       side.value.reset();
   }, rhs.m_value);
   return *this;

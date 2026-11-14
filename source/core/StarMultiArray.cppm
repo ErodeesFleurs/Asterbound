@@ -471,7 +471,8 @@ void MultiArray<Element, Rank>::sub_print(TextBuffer& output, IndexArray index, 
   if (dim == Rank - 1) {
     for (std::size_t i = 0; i < m_shape[dim]; ++i) {
       index[dim] = i;
-      append_text(output, optional_diagnostic_value(m_data[storageIndex(index)]));
+      auto&& value = m_data[storageIndex(index)];
+      append_text(output, optional_diagnostic_value(value));
       output.push_back(' ');
     }
     output.push_back('\n');

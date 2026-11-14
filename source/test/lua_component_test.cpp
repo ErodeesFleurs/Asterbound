@@ -513,6 +513,8 @@ const GameTestRegistration scriptRecoveryCategories(
     auto luaRoot = LuaRoot::create(fixture.root());
     ASSERT_TRUE(luaRoot);
     for (bool failCleanup : {false, true}) {
+      // Independent scenarios must not share the five-second diagnostic repeat window.
+      fixture.root().logger().reset_exception_repeats();
       RecoveryBoundaryScript script(fixture.root());
       ASSERT_TRUE(script.setLuaRoot(*luaRoot));
       ASSERT_TRUE(script.init());

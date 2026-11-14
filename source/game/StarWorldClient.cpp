@@ -2049,7 +2049,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (pongPacket->time) {
         m_latency = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>(std::chrono::milliseconds(pongPacket->time));
       } else if (m_pingTime) {
-        auto result150 = takeOptional(m_pingTime);
+        auto result150 = take_optional(m_pingTime);
         if (!result150)
           return std::unexpected(std::move(result150.error()));
         m_latency = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - (std::move(*result150));

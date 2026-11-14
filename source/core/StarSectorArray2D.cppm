@@ -217,7 +217,7 @@ bool SectorArray2D<ElementT, SectorSize>::sectorLoaded(Sector const& id) const {
 
 template <typename ElementT, std::size_t SectorSize>
 auto SectorArray2D<ElementT, SectorSize>::sector(Sector const& id) -> std::optional<std::reference_wrapper<Array>> {
-  return optionalRef(m_sectors(id[0], id[1]));
+  return optional_ref(m_sectors(id[0], id[1]));
 }
 
 template <typename ElementT, std::size_t SectorSize>

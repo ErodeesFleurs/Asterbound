@@ -667,7 +667,7 @@ template <typename LiquidId>
       res.first->second = WorkingCell{{p, sourceCell.liquid, true, 1.0f, sourceCell.pressure}, {}, {}, {}, {}};
     }
   }
-  return optionalRef(res.first->second);
+  return optional_ref(res.first->second);
 }
 
 template <typename LiquidId>

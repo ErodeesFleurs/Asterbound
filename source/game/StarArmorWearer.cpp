@@ -360,7 +360,7 @@ bool ArmorWearer::setItem(std::uint8_t slot, std::shared_ptr<ArmorItem> item, bo
     return false;
   auto& armor = m_armors[slot];
 
-  bool itemChanged = !Item::itemsEqual(optionalRef(armor.item), optionalRef(item));
+  bool itemChanged = !Item::itemsEqual(optional_ref(armor.item), optional_ref(item));
   bool visChanged = visible != armor.visible;
 
   if (itemChanged)

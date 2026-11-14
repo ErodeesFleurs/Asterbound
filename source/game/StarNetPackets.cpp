@@ -1752,7 +1752,7 @@ std::expected<void, StarException> SetDungeonGravityPacket::readJson(Json const&
 std::expected<Json, StarException> SetDungeonGravityPacket::writeJson() const {
   return JsonObject{
     {"dungeonId", dungeonId},
-    {"gravity", jsonFromOptional<float>(gravity)}
+    {"gravity", json_from_optional<float>(gravity)}
   };
 }
 
@@ -1790,7 +1790,7 @@ std::expected<void, StarException> SetDungeonBreathablePacket::readJson(Json con
 std::expected<Json, StarException> SetDungeonBreathablePacket::writeJson() const {
   return JsonObject{
     {"dungeonId", dungeonId},
-    {"breathable", jsonFromOptional<bool>(breathable)}
+    {"breathable", json_from_optional<bool>(breathable)}
   };
 }
 
