@@ -204,10 +204,7 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   if (!digestOverride)
     return std::unexpected(std::move(digestOverride.error()));
   if (*digestOverride) {
-    auto digest = hexDecode(**digestOverride);
-    if (!digest)
-      return std::unexpected(std::move(digest.error()));
-    m_assetsDigest = std::move(*digest);
+    m_assetsDigest = hex_decode((**digestOverride).utf8());
     if (auto result = m_root.logger().info("UniverseServer: Overriding assets digest as '{}'", **digestOverride); !result)
       return std::unexpected(std::move(result.error()));
   } else {

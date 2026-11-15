@@ -116,7 +116,7 @@ std::expected<String, StarException> File::full_path(String const& fileName) {
 }
 
 std::expected<String, StarException> File::temporary_file_name(RandomService& random) {
-  return relative_to(P_tmpdir, Star::format("starbound.tmpfile.{}", hexEncode(random.random_bytes(16))));
+  return relative_to(P_tmpdir, Star::format("starbound.tmpfile.{}", hex_encode(random.random_bytes(16))));
 }
 
 std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomService& random) {
@@ -161,7 +161,7 @@ std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomS
 
 std::expected<String, StarException> File::temporary_directory(RandomService& random) {
   for (;;) {
-    auto directory = relative_to(P_tmpdir, Star::format("starbound.tmpdir.{}", hexEncode(random.random_bytes(16))));
+    auto directory = relative_to(P_tmpdir, Star::format("starbound.tmpdir.{}", hex_encode(random.random_bytes(16))));
     int result;
     do {
       result = ::mkdir(directory.utf8_data(), 0777);

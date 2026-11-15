@@ -233,16 +233,15 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
     if (!compression) return std::unexpected(std::move(compression.error()));
     auto data = layer.getString("data");
     if (!data) return std::unexpected(std::move(data.error()));
-    auto base64Data = base64Decode(*data);
-    if (!base64Data) return std::unexpected(std::move(base64Data.error()));
+    auto base64Data = base64_decode(data->utf8());
     ByteArray bytes;
     if (*compression == "") {
-      bytes = std::move(*base64Data);
+      bytes = std::move(base64Data);
     } else {
       auto decoded = [&]() -> std::expected<ByteArray, StarException> {
-        if (*compression == "gzip") return uncompressDataGzip(*base64Data, MaxUncompressedSize);
-        if (*compression == "zlib") return uncompressData(*base64Data, MaxUncompressedSize);
-        if (*compression == "zstd") return ZstdCompression::decompress(*base64Data);
+        if (*compression == "gzip") return uncompressDataGzip(base64Data, MaxUncompressedSize);
+        if (*compression == "zlib") return uncompressData(base64Data, MaxUncompressedSize);
+        if (*compression == "zstd") return ZstdCompression::decompress(base64Data);
         return std::unexpected(StarException::format("TMXTileLayer does not support compression mode {}", *compression));
       }();
       if (!decoded) return std::unexpected(std::move(decoded.error()));

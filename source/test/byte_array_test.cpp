@@ -16,32 +16,23 @@ TEST(ByteArrayTest, All) {
   res.insert(9, 'd');
   EXPECT_EQ(res, ByteArray::from_string("foaobabrcd"));
 
-  auto a = hexDecode("0a0a0a");
-  auto b = hexDecode("a0a0a0");
-  auto c = hexDecode("818181");
-  auto d = hexDecode("aaaaaa");
-  auto e = hexDecode("000000");
-  auto f = hexDecode("212121");
+  auto a = hex_decode("0a0a0a");
+  auto b = hex_decode("a0a0a0");
+  auto c = hex_decode("818181");
+  auto d = hex_decode("aaaaaa");
+  auto e = hex_decode("000000");
+  auto f = hex_decode("212121");
 
-  auto g = hexDecode("a0a0a0");
-  auto h = hexDecode("8181818181");
-  auto i = hexDecode("2121218181");
-  ASSERT_TRUE(a);
-  ASSERT_TRUE(b);
-  ASSERT_TRUE(c);
-  ASSERT_TRUE(d);
-  ASSERT_TRUE(e);
-  ASSERT_TRUE(f);
-  ASSERT_TRUE(g);
-  ASSERT_TRUE(h);
-  ASSERT_TRUE(i);
+  auto g = hex_decode("a0a0a0");
+  auto h = hex_decode("8181818181");
+  auto i = hex_decode("2121218181");
 
-  EXPECT_EQ(a->bit_and(*b), *e);
-  EXPECT_EQ(a->bit_or(*b), *d);
-  EXPECT_EQ(b->bit_xor(*c), *f);
-  EXPECT_EQ(g->bit_xor(*h), *f);
-  EXPECT_EQ(g->bit_xor(*h, true), *i);
-  EXPECT_EQ(h->bit_xor(*g, true), *i);
+  EXPECT_EQ(a.bit_and(b), e);
+  EXPECT_EQ(a.bit_or(b), d);
+  EXPECT_EQ(b.bit_xor(c), f);
+  EXPECT_EQ(g.bit_xor(h), f);
+  EXPECT_EQ(g.bit_xor(h, true), i);
+  EXPECT_EQ(h.bit_xor(g, true), i);
 }
 
 TEST(ByteArrayTest, CompareNormalizesUnsignedBinaryAndPrefixOrdering) {

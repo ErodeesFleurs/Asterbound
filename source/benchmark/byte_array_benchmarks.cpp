@@ -156,16 +156,15 @@ void measure_decode(benchmark::State& state, bool base64, bool permissive) {
     }
   }
   Star::String text{std::string_view(encoded)};
-  auto evaluate = [&]() { return base64 ? Star::base64Decode(text) : Star::hexDecode(text); };
+  auto evaluate = [&]() { return base64 ? Star::base64_decode(text.utf8()) : Star::hex_decode(text.utf8()); };
   auto validation = evaluate();
-  if (!checked(state, validation) || !require(state, equal_bytes(validation->span(), expected), "complete decoded bytes differ from independent fixture")) return;
-  label(state, std::span<char const>(encoded), validation->span(), batch_size);
+  if (!require(state, equal_bytes(validation.span(), expected), "complete decoded bytes differ from independent fixture")) return;
+  label(state, std::span<char const>(encoded), validation.span(), batch_size);
   for (auto _ : state) {
     (void)_;
     for (std::size_t i = 0; i != batch_size; ++i) {
       auto output = evaluate();
-      if (!checked(state, output)) return;
-      benchmark::DoNotOptimize(output->data()); benchmark::DoNotOptimize(output->size());
+      benchmark::DoNotOptimize(output.data()); benchmark::DoNotOptimize(output.size());
       benchmark::ClobberMemory();
     }
   }

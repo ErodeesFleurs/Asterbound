@@ -4522,7 +4522,8 @@ std::expected<std::optional<String>, StarException> Player::inspectionLogName() 
   auto identifier = uniqueId();
   if (identifier) {
     auto hash = xx_hash3_128(std::span<char const>(identifier->utf8()));
-    return String("Player #") + hexEncode(std::span(reinterpret_cast<char const*>(&hash), sizeof(hash)));
+    auto bytes = std::bit_cast<std::array<char, sizeof(hash)>>(hash);
+    return String("Player #") + hex_encode(std::span<char const>(bytes));
   }
   return identifier;
 }

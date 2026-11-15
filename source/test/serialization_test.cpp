@@ -548,6 +548,28 @@ TEST(DataStreamTest, MultiArrayRejectsOverflowingDimensionsAndRecovers) {
   EXPECT_EQ(array(0, 1), 0x7b);
 }
 
+TEST(UuidTest, HexParsingPreservesPermissiveNibblesOddTailAndLengthErrors) {
+  std::array<unsigned char, 16> const expected{
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
+  for (std::string_view text : {"0123456789abcdef0123456789abcdef", "0123456789ABCDEF0123456789ABCDEFf"}) {
+    auto decoded = Uuid::create(String(text));
+    ASSERT_TRUE(decoded);
+    for (std::size_t i = 0; i < expected.size(); ++i)
+      EXPECT_EQ(static_cast<unsigned char>(decoded->span()[i]), expected[i]);
+  }
+  std::string invalid(32, 'g');
+  EXPECT_EQ(Uuid::create(String(std::string_view(invalid))), Uuid::nil());
+  invalid[0] = '\0';
+  EXPECT_EQ(Uuid::create(String(std::string_view(invalid))), Uuid::nil());
+  for (std::size_t length : {0u, 1u, 30u, 31u, 34u, 35u}) {
+    auto rejected = Uuid::create(String(std::string(length, '0')));
+    ASSERT_FALSE(rejected);
+    EXPECT_TRUE(rejected.error().is<UuidException>());
+  }
+  EXPECT_EQ(Uuid::create(String("00000000000000000000000000000000")), Uuid::nil());
+}
+
 TEST(DataStreamTest, UuidTruncatedReadsKeepIdentityAndConsumeAvailablePrefix) {
   std::array<char, 17> bytes;
   for (std::size_t i = 0; i < bytes.size(); ++i)

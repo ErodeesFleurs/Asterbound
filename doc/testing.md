@@ -189,6 +189,24 @@ RGB[A] arrays and their existing coercions; binary colors remain four sequential
 RGBA float scalars in the selected byte order, not packed ARGB32 words.
 Retain independent byte oracles, failed-decode destination state and recovery.
 
+### Hex and Base64
+
+`hex_encode` / `base64_encode` and their decoders borrow bounded spans;
+owning decoders accept a counted `std::string_view` and return `ByteArray`.
+Span results count bytes written, not input consumed, and append no terminator.
+Hex writes complete pairs, maps invalid nibbles to zero and ignores an odd tail.
+Base64 accepts unpadded tails, may write a partial encoded group, and stops at
+the first `=` or nonalphabet byte, including whitespace and NUL. Classification
+is ASCII-only, independent of locale; URL-safe characters are not accepted.
+
+Encoders require disjoint buffers; decoders additionally support the same starting
+address, not arbitrary overlap. Retain independent full-byte and untouched-tail
+oracles across capacities. Owning encoding checks exact lengths before allocating;
+unrepresentable sizes follow the existing fatal allocation policy. UUID text
+decodes directly into fixed storage after checking decoded length, preserving
+32/33-character acceptance and permissive nibbles rather than truncating oversized
+input. Reuse the existing ByteArray valid/permissive decode benchmarks.
+
 ### Random stream compatibility
 
 `RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's

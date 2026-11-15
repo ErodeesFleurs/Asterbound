@@ -578,7 +578,7 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
       auto loaded = Assets::create(m_logger, m_random, m_logMap, m_settings.assetsSettings, std::move(*assetSources));
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
-      auto logged = m_logger.info("Assets digest is {}", hexEncode((*loaded)->digest()));
+      auto logged = m_logger.info("Assets digest is {}", hex_encode((*loaded)->digest()));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       return loaded;

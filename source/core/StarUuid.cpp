@@ -23,10 +23,12 @@ std::expected<Uuid, StarException> Uuid::create(ByteArray const& bytes) {
 }
 
 std::expected<Uuid, StarException> Uuid::create(String const& hex) {
-  auto bytes = hexDecode(hex);
-  if (!bytes)
-    return std::unexpected(std::move(bytes.error()));
-  return create(*bytes);
+  auto size = hex.utf8_size() / 2;
+  if (size != UuidSize)
+    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from hex: {} vs {}", size, UuidSize)));
+  auto uuid = nil();
+  (void)hex_decode(std::span<char const>(hex.utf8()), std::span(uuid.m_data));
+  return uuid;
 }
 
 std::span<char const> Uuid::span() const {
@@ -38,7 +40,7 @@ ByteArray Uuid::bytes() const {
 }
 
 String Uuid::hex() const {
-  return hexEncode(span());
+  return hex_encode(span());
 }
 
 bool Uuid::operator==(Uuid const& u) const {

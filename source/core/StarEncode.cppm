@@ -1,35 +1,38 @@
 module;
 import std;
 import star.string;
-import star.format;
 import star.byte_array;
 
 namespace Star {
 
-std::size_t hexEncode(std::span<char const> data, std::span<char> output);
-[[nodiscard]] std::expected<std::size_t, StarException> hexDecode(std::span<char const> data, std::span<char> output);
-[[nodiscard]] std::expected<std::size_t, StarException> nibbleDecode(std::span<char const> data, std::span<char> output);
+// Span operations return the number of bytes written and leave the remaining
+// output untouched. Encoders require nonoverlapping input and output; hex emits
+// only complete pairs, while Base64 may emit a partial four-character group.
+std::size_t hex_encode(std::span<char const> data, std::span<char> output);
+std::size_t base64_encode(std::span<char const> data, std::span<char> output);
 
-std::size_t base64Encode(std::span<char const> data, std::span<char> output);
-[[nodiscard]] std::expected<std::size_t, StarException> base64Decode(std::span<char const> data, std::span<char> output);
+// Decoders permit disjoint buffers or exactly the same starting address (each
+// input group is read before its shorter output is written). Other overlap is
+// unsupported. Hex maps invalid nibbles to zero and ignores an odd final nibble.
+// Base64 accepts unpadded tails and stops at the first nonalphabet byte, including
+// '=', whitespace and NUL; its alphabet is ASCII and does not include '-' or '_'.
+[[nodiscard]] std::size_t hex_decode(std::span<char const> data, std::span<char> output);
+[[nodiscard]] std::size_t base64_decode(std::span<char const> data, std::span<char> output);
 
-String hexEncode(std::span<char const> data);
-String base64Encode(std::span<char const> data);
-
-String hexEncode(ByteArray const& data);
-[[nodiscard]] std::expected<ByteArray, StarException> hexDecode(String const& encodedData);
-
-String base64Encode(ByteArray const& data);
-[[nodiscard]] std::expected<ByteArray, StarException> base64Decode(String const& encodedData);
+String hex_encode(std::span<char const> data);
+String base64_encode(std::span<char const> data);
+String hex_encode(ByteArray const& data);
+String base64_encode(ByteArray const& data);
+[[nodiscard]] ByteArray hex_decode(std::string_view data);
+[[nodiscard]] ByteArray base64_decode(std::string_view data);
 
 }
 
 export module star.encode;
 
 export namespace Star {
-  using ::Star::hexEncode;
-  using ::Star::hexDecode;
-  using ::Star::nibbleDecode;
-  using ::Star::base64Encode;
-  using ::Star::base64Decode;
+  using ::Star::hex_encode;
+  using ::Star::hex_decode;
+  using ::Star::base64_encode;
+  using ::Star::base64_decode;
 }

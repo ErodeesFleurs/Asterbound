@@ -18,6 +18,56 @@ import star.sha256;
 
 using namespace Star;
 
+namespace {
+
+void expect_decoding_capacities(std::string_view input, std::string_view expected, bool hex) {
+  auto owned = hex ? hex_decode(input) : base64_decode(input);
+  EXPECT_TRUE(std::ranges::equal(owned.span(), expected));
+  for (std::size_t capacity = 0; capacity <= expected.size() + 2; ++capacity) {
+    SCOPED_TRACE(capacity);
+    std::string output(expected.size() + 4, '\x5a');
+    auto destination = std::span(output).first(capacity);
+    auto written = hex ? hex_decode(std::span(input), destination) : base64_decode(std::span(input), destination);
+    EXPECT_EQ(written, std::min(capacity, expected.size()));
+    EXPECT_EQ(std::string_view(output).substr(0, written), expected.substr(0, written));
+    EXPECT_TRUE(std::ranges::all_of(std::span(output).subspan(written), [](char byte) { return byte == '\x5a'; }));
+
+    // Exactly same-start overlap is supported, including truncated destinations.
+    std::string inplace(input);
+    inplace.resize(std::max(input.size(), capacity) + 2, '\x5a');
+    auto before = inplace;
+    auto source = std::span<char const>(inplace).first(input.size());
+    auto target = std::span(inplace).first(capacity);
+    auto inplaceWritten = hex ? hex_decode(source, target) : base64_decode(source, target);
+    EXPECT_EQ(inplaceWritten, written);
+    EXPECT_EQ(std::string_view(inplace).substr(0, inplaceWritten), expected.substr(0, inplaceWritten));
+    EXPECT_EQ(std::string_view(inplace).substr(inplaceWritten), std::string_view(before).substr(inplaceWritten));
+  }
+}
+
+void expect_encoding_capacities(std::string_view input, std::string_view hex, std::string_view base64) {
+  auto source = std::span(input);
+  EXPECT_EQ(hex_encode(source), String(hex));
+  EXPECT_EQ(base64_encode(source), String(base64));
+  for (bool useHex : {true, false}) {
+    auto expected = useHex ? hex : base64;
+    for (std::size_t capacity = 0; capacity <= expected.size() + 2; ++capacity) {
+      SCOPED_TRACE(useHex);
+      SCOPED_TRACE(capacity);
+      std::string output(expected.size() + 4, '\x5a');
+      auto destination = std::span(output).first(capacity);
+      auto written = useHex ? hex_encode(source, destination) : base64_encode(source, destination);
+      EXPECT_EQ(written, useHex ? std::min(capacity / 2, input.size()) * 2 : std::min(capacity, expected.size()));
+      EXPECT_EQ(std::string_view(output).substr(0, written), expected.substr(0, written));
+      EXPECT_TRUE(std::ranges::all_of(std::span(output).subspan(written), [](char byte) { return byte == '\x5a'; }));
+    }
+  }
+  expect_decoding_capacities(hex, input, true);
+  expect_decoding_capacities(base64, input, false);
+}
+
+}
+
 TEST(EncodeTest, Base64) {
   std::string_view data =
       "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust "
@@ -30,10 +80,8 @@ TEST(EncodeTest, Base64) {
       "dGludWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRoZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55"
       "IGNhcm5hbCBwbGVhc3VyZS4=";
 
-  String encoded = base64Encode(testSource);
-  auto result1 = base64Decode(encoded);
-  ASSERT_TRUE(result1) << result1.error().what();
-  ByteArray decoded = (*result1);
+  String encoded = base64_encode(testSource);
+  ByteArray decoded = base64_decode(encoded.utf8());
 
   EXPECT_EQ(encoded, testEncoded);
   EXPECT_EQ(decoded, testSource);
@@ -45,118 +93,135 @@ TEST(EncodeTest, SHA256) {
       "of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, "
       "exceeds the short vehemence of any carnal pleasure.";
   ByteArray testSource{std::span(data)};
-  auto result2 = hexDecode("78fe75026c4390ceccc4e9e6a9428ba8ae5968b458e60b5eebecd682cf24bbf2");
-  ASSERT_TRUE(result2) << result2.error().what();
-  ByteArray testHash = (*result2);
+  ByteArray testHash = hex_decode("78fe75026c4390ceccc4e9e6a9428ba8ae5968b458e60b5eebecd682cf24bbf2");
 
   EXPECT_EQ(sha256(testSource), testHash);
 }
 
-TEST(EncodeTest, BorrowedSpans) {
-  char output[8]{};
-  EXPECT_EQ(hexEncode(std::span<char const>{}, std::span<char>{}), 0u);
-  auto result3 = hexDecode(std::span<char const>{}, std::span<char>{});
-  ASSERT_TRUE(result3) << result3.error().what();
-  EXPECT_EQ((*result3), 0u);
-  auto result4 = nibbleDecode(std::span<char const>{}, std::span<char>{});
-  ASSERT_TRUE(result4) << result4.error().what();
-  EXPECT_EQ((*result4), 0u);
-  EXPECT_EQ(base64Encode(std::span<char const>{}, std::span<char>{}), 0u);
-  auto result5 = base64Decode(std::span<char const>{}, std::span<char>{});
-  ASSERT_TRUE(result5) << result5.error().what();
-  EXPECT_EQ((*result5), 0u);
-
-  EXPECT_EQ(hexEncode({"ab", 2}, {output, 3}), 2u);
-  EXPECT_EQ(std::string_view(output, 2), "61");
-  auto result6 = hexDecode({"g1f", 3}, output);
-  ASSERT_TRUE(result6) << result6.error().what();
-  EXPECT_EQ((*result6), 1u);
-  EXPECT_EQ(static_cast<unsigned char>(output[0]), 1u);
-  auto result7 = nibbleDecode({"gF1", 3}, {output, 2});
-  ASSERT_TRUE(result7) << result7.error().what();
-  EXPECT_EQ((*result7), 2u);
-  EXPECT_EQ(output[0], 0);
-  EXPECT_EQ(output[1], 15);
-
-  EXPECT_EQ(base64Encode({"M", 1}, output), 4u);
-  EXPECT_EQ(std::string_view(output, 4), "TQ==");
-  EXPECT_EQ(base64Encode({"Man", 3}, {output, 2}), 2u);
-  EXPECT_EQ(std::string_view(output, 2), "TW");
-  auto result8 = base64Decode({"TWE", 3}, output);
-  ASSERT_TRUE(result8) << result8.error().what();
-  EXPECT_EQ((*result8), 2u);
-  EXPECT_EQ(std::string_view(output, 2), "Ma");
-  auto result9 = base64Decode({"TQ=ignored", 10}, output);
-  ASSERT_TRUE(result9) << result9.error().what();
-  EXPECT_EQ((*result9), 1u);
-  EXPECT_EQ(output[0], 'M');
-  auto result10 = base64Decode({"TQ!ignored", 10}, output);
-  ASSERT_TRUE(result10) << result10.error().what();
-  EXPECT_EQ((*result10), 1u);
-  EXPECT_EQ(output[0], 'M');
-  auto result11 = base64Decode({"TWFu", 4}, {output, 1});
-  ASSERT_TRUE(result11) << result11.error().what();
-  EXPECT_EQ((*result11), 1u);
-  EXPECT_EQ(output[0], 'M');
+TEST(EncodeTest, EmptySpans) {
+  EXPECT_EQ(hex_encode(std::span<char const>{}, std::span<char>{}), 0u);
+  EXPECT_EQ(hex_decode(std::span<char const>{}, std::span<char>{}), 0u);
+  EXPECT_EQ(base64_encode(std::span<char const>{}, std::span<char>{}), 0u);
+  EXPECT_EQ(base64_decode(std::span<char const>{}, std::span<char>{}), 0u);
 }
 
-TEST(EncodeTest, OwningEncodersPreserveEmptyBinaryAndPaddingBoundaries) {
+TEST(EncodeTest, FixedRfcVectorsAndEveryOutputCapacity) {
   struct Case {
     std::string_view input;
     std::string_view hex;
     std::string_view base64;
   };
   Case const cases[]{{"", "", ""},
+                     {"f", "66", "Zg=="},
+                     {"fo", "666f", "Zm8="},
+                     {"foo", "666f6f", "Zm9v"},
+                     {"foob", "666f6f62", "Zm9vYg=="},
+                     {"fooba", "666f6f6261", "Zm9vYmE="},
+                     {"foobar", "666f6f626172", "Zm9vYmFy"},
                      {"M", "4d", "TQ=="},
                      {"Ma", "4d61", "TWE="},
                      {"Man", "4d616e", "TWFu"},
                      {std::string_view("\0\x7f\x80\xff", 4), "007f80ff", "AH+A/w=="}};
   for (auto const& test : cases) {
     SCOPED_TRACE(test.hex);
-    auto input = std::span<char const>(test.input.data(), test.input.size());
-    EXPECT_EQ(hexEncode(input), String(test.hex));
-    EXPECT_EQ(base64Encode(input), String(test.base64));
+    expect_encoding_capacities(test.input, test.hex, test.base64);
   }
 }
 
-TEST(EncodeTest, OwningHexDecoderPreservesPermissiveNibblesAndOddTails) {
+TEST(EncodeTest, AllByteValuesAndEveryOutputCapacity) {
+  std::array<char, 256> input;
+  for (std::size_t i = 0; i < input.size(); ++i)
+    input[i] = static_cast<char>(i);
+  std::string_view const hex =
+      "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+      "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+      "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"
+      "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"
+      "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+      "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
+      "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
+  std::string_view const base64 =
+      "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4v"
+      "MDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5f"
+      "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6P"
+      "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/"
+      "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v"
+      "8PHy8/T19vf4+fr7/P3+/w==";
+  expect_encoding_capacities(std::string_view(input), hex, base64);
+}
+
+TEST(EncodeTest, HexPermissiveNibblesAndOddTails) {
   struct Case {
-    String input;
-    ByteArray expected;
+    std::string_view input;
+    std::string_view expected;
   };
-  Case const cases[]{{"", {}},
-                     {"f", {}},
-                     {"g1f", ByteArray({"\x01", 1})},
-                     {"Fg?fZZ1", ByteArray({"\xf0\x0f\0", 3})},
-                     {String(std::string_view("a\0Ff0", 5)), ByteArray({"\xa0\xff", 2})}};
-  for (auto const& test : cases) {
-    auto decoded = hexDecode(test.input);
-    ASSERT_TRUE(decoded) << decoded.error().what();
-    EXPECT_EQ(*decoded, test.expected);
+  Case const cases[]{{"", ""},
+                     {"f", ""},
+                     {"g1f", std::string_view("\x01", 1)},
+                     {"Fg?fZZ1", std::string_view("\xf0\x0f\0", 3)},
+                     {std::string_view("a\0Ff0", 5), std::string_view("\xa0\xff", 2)}};
+  for (auto const& test : cases)
+    expect_decoding_capacities(test.input, test.expected, true);
+
+  std::string_view const digits = "0123456789abcdef0123456789ABCDEF";
+  for (unsigned byte = 0; byte < 256; ++byte) {
+    SCOPED_TRACE(byte);
+    auto position = digits.find(static_cast<char>(byte));
+    auto nibble = position == std::string_view::npos ? 0 : position % 16;
+    std::array<char, 4> input{static_cast<char>(byte), '1', '1', static_cast<char>(byte)};
+    std::array<char, 2> expected{static_cast<char>((nibble << 4) | 1), static_cast<char>(0x10 | nibble)};
+    expect_decoding_capacities(std::string_view(input), std::string_view(expected), true);
   }
 }
 
-TEST(EncodeTest, OwningBase64DecoderPublishesOnlyAcceptedPartialGroups) {
+TEST(EncodeTest, Base64PublishesOnlyAcceptedPartialGroups) {
   struct Case {
-    String input;
-    ByteArray expected;
+    std::string_view input;
+    std::string_view expected;
   };
-  Case const cases[]{{"", {}},
-                     {"T", {}},
-                     {"TQ", ByteArray({"M", 1})},
-                     {"TWE", ByteArray({"Ma", 2})},
-                     {"TWFu", ByteArray({"Man", 3})},
-                     {"TWFuT", ByteArray({"Man", 3})},
-                     {"TWFuTQ", ByteArray({"ManM", 4})},
-                     {"TQ=ignored", ByteArray({"M", 1})},
-                     {"TWE!ignored", ByteArray({"Ma", 2})},
-                     {"!TWFu", {}},
-                     {String(std::string_view("TQ\0TWFu", 7)), ByteArray({"M", 1})},
-                     {"AH+A/w==", ByteArray({"\0\x7f\x80\xff", 4})}};
+  Case const cases[]{{"", ""},
+                     {"T", ""},
+                     {"TQ", "M"},
+                     {"TWE", "Ma"},
+                     {"TWFu", "Man"},
+                     {"TWFuT", "Man"},
+                     {"TWFuTQ", "ManM"},
+                     {"TWFuTWE", "ManMa"},
+                     {"TWFuTWFu", "ManMan"},
+                     {"TQ=ignored", "M"},
+                     {"TWE!ignored", "Ma"},
+                     {"!TWFu", ""},
+                     {"T=TWFu", ""},
+                     {"TWFu=TQ", "Man"},
+                     {"TWFu TQ", "Man"},
+                     {" TWFu", ""},
+                     {"TQ\\nTWFu", "M"},
+                     {"TQ\nTWFu", "M"},
+                     {"TQ\rTWFu", "M"},
+                     {"TQ\tTWFu", "M"},
+                     {"TQ-TWFu", "M"},
+                     {"TQ_TWFu", "M"},
+                     {std::string_view("TQ\0TWFu", 7), "M"},
+                     {"AH+A/w==", std::string_view("\0\x7f\x80\xff", 4)},
+                     {"Zh==", "f"},
+                     {"Zm9=", "fo"}};
   for (auto const& test : cases) {
-    auto decoded = base64Decode(test.input);
-    ASSERT_TRUE(decoded) << decoded.error().what();
-    EXPECT_EQ(*decoded, test.expected);
+    SCOPED_TRACE(test.input);
+    expect_decoding_capacities(test.input, test.expected, false);
+  }
+}
+
+TEST(EncodeTest, Base64StopsAtEveryNonalphabetByte) {
+  std::string_view const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  for (unsigned byte = 0; byte < 256; ++byte) {
+    if (alphabet.find(static_cast<char>(byte)) != std::string_view::npos)
+      continue;
+    SCOPED_TRACE(byte);
+    std::string input = "TWE";
+    input.push_back(static_cast<char>(byte));
+    input += "TWFu";
+    expect_decoding_capacities(input, "Ma", false);
   }
 }
 

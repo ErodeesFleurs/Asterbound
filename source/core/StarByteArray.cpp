@@ -242,7 +242,7 @@ void write_text(TextBuffer& buffer, ByteArray const& b) {
   auto remaining = b.span();
   while (!remaining.empty()) {
     auto input = remaining.first(std::min(remaining.size(), encoded.size() / 2));
-    auto size = hexEncode(input, encoded);
+    auto size = hex_encode(input, encoded);
     buffer.append(std::string_view(encoded.data(), size));
     remaining = remaining.subspan(input.size());
   }
