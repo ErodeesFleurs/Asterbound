@@ -214,7 +214,8 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
   if (!indexes) return std::unexpected(std::move(indexes.error()));
   std::size_t customBarGroups = *groups;
   std::size_t customBarIndexes = *indexes;
-  m_customBar.resize(customBarGroups, customBarIndexes);
+  auto customBarResized = m_customBar.resize(customBarGroups, customBarIndexes);
+  if (!customBarResized) return std::unexpected(std::move(customBarResized.error()));
 
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
   for (auto slot : *EquipmentSlotNames) {
@@ -236,7 +237,8 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     auto added = addNetElement(element.get());
     if (!added) return std::unexpected(std::move(added.error()));
   }
-  m_customBarNetState.resize(customBarGroups, customBarIndexes);
+  auto netStateResized = m_customBarNetState.resize(customBarGroups, customBarIndexes);
+  if (!netStateResized) return std::unexpected(std::move(netStateResized.error()));
   for (std::size_t i = 0; i < customBarGroups; ++i) {
     for (std::size_t j = 0; j < customBarIndexes; ++j) {
       auto added = addNetElement(m_customBarNetState(i, j));
@@ -679,8 +681,8 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
   if (!entry) return std::unexpected(ItemException("Invalid inventory bag"));
   auto condensed = entry->get()->condenseStacks();
   if (!condensed) return std::unexpected(std::move(condensed.error()));
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto& link = m_customBar(i, j);
       for (auto slotRef : {std::ref(link.first), std::ref(link.second)}) {
         auto& slot = slotRef.get();
@@ -701,9 +703,9 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
   auto entry = m_bags.find_ref(bagType);
   if (!entry) return std::unexpected(ItemException("Invalid inventory bag"));
   auto& bag = *entry->get();
-  MultiArray<std::pair<std::shared_ptr<Item>, std::shared_ptr<Item>>, 2> saved(m_customBar.size());
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+  MultiArray<std::pair<std::shared_ptr<Item>, std::shared_ptr<Item>>, 2> saved(m_customBar.extents());
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto const& link = m_customBar(i, j);
       for (bool primary : {true, false}) {
         auto const& slot = primary ? link.first : link.second;
@@ -742,8 +744,8 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
   Map<std::shared_ptr<Item>, std::size_t> indexes;
   for (std::size_t i = 0; i < bag.size(); ++i)
     if (bag.items()[i]) indexes[bag.items()[i]] = i;
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto const& old = saved(i, j);
       if (old.first) m_customBar(i, j).first.emplace(BagSlot(bagType, indexes.value(old.first)));
       if (old.second) m_customBar(i, j).second.emplace(BagSlot(bagType, indexes.value(old.second)));
@@ -963,7 +965,7 @@ std::expected<void, StarException> PlayerInventory::clearCustomBarLink(CustomBar
 }
 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::addToCustomBar(InventorySlot slot) {
-  for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+  for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
     auto result = m_customBar.at(m_customBarGroup, j);
     if (!result) return std::unexpected(std::move(result.error()));
     auto& cbl = result->get();
@@ -984,11 +986,11 @@ void PlayerInventory::setCustomBarGroup(std::uint8_t group) {
 }
 
 std::uint8_t PlayerInventory::customBarGroups() const {
-  return m_customBar.size(0);
+  return m_customBar.extent(0);
 }
 
 std::uint8_t PlayerInventory::customBarIndexes() const {
-  return m_customBar.size(1);
+  return m_customBar.extent(1);
 }
 
 SelectedActionBarLocation PlayerInventory::selectedActionBarLocation() const {
@@ -1114,10 +1116,10 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   m_customBarGroup = *group;
   auto bar = store.get("customBar");
   if (!bar) return std::unexpected(std::move(bar.error()));
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
     auto row = bar->get(i, JsonArray());
     if (!row) return std::unexpected(std::move(row.error()));
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto links = row->get(j, JsonArray());
       if (!links) return std::unexpected(std::move(links.error()));
       for (std::size_t hand = 0; hand < 2; ++hand) {
@@ -1154,9 +1156,9 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   auto database = m_root.itemDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   JsonArray bar;
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
     JsonArray row;
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto const& link = m_customBar(i, j);
       JsonArray hands;
       for (auto slotRef : {std::cref(link.first), std::cref(link.second)}) {
@@ -1289,8 +1291,8 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   for (auto& item : m_equipment) normalizeItem(item.second);
   normalizeItem(m_swapSlot);
   normalizeItem(m_trashSlot);
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i) {
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j) {
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i) {
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j) {
       auto& link = m_customBar(i, j);
       std::shared_ptr<Item> primary, secondary;
       if (link.first) {
@@ -1463,7 +1465,7 @@ void PlayerInventory::normalizeItem(std::shared_ptr<Item>& item) {
 }
 
 void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
-  m_customBar.forEach([&](Array2S const&, CustomBarLink& p) {
+  m_customBar.for_each([&](Array2S const&, CustomBarLink& p) {
       if (p.first == a)
         p.first = b;
       else if (p.first == b)
@@ -1521,8 +1523,8 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
   if (!trash) return std::unexpected(std::move(trash.error()));
   m_currencies = m_currenciesNetState.get();
   m_customBarGroup = m_customBarGroupNetState.get();
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i)
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j)
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i)
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j)
       m_customBar(i, j) = m_customBarNetState(i, j).get();
   m_selectedActionBar = m_selectedActionBarNetState.get();
   for (auto& entry : m_essentialNetState) {
@@ -1544,8 +1546,8 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
   m_trashSlotNetState.set(itemSafeDescriptor(m_trashSlot));
   m_currenciesNetState.set(m_currencies);
   m_customBarGroupNetState.set(m_customBarGroup);
-  for (std::size_t i = 0; i < m_customBar.size(0); ++i)
-    for (std::size_t j = 0; j < m_customBar.size(1); ++j)
+  for (std::size_t i = 0; i < m_customBar.extent(0); ++i)
+    for (std::size_t j = 0; j < m_customBar.extent(1); ++j)
       m_customBarNetState(i, j).set(m_customBar(i, j));
   m_selectedActionBarNetState.set(m_selectedActionBar);
   for (auto& entry : m_essentialNetState) entry.second.set(itemSafeDescriptor(m_essential.value(entry.first)));

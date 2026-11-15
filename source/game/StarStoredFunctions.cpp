@@ -420,7 +420,9 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
             return std::unexpected(std::move(value.error()));
           xaxis.push_back(*value);
         }
-        points.resize({(*row)->size() - 1, (*grid)->size() - 1});
+        auto sized = points.set_size({(*row)->size() - 1, (*grid)->size() - 1});
+        if (!sized)
+          return std::unexpected(std::move(sized.error()));
       } else {
         if ((*row)->size() < 2)
           return std::unexpected(StoredFunctionException("Function2 row must contain an axis and samples"));
@@ -450,11 +452,14 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
     if (!bound)
       return std::unexpected(std::move(bound.error()));
     MultiTable2D table;
-    table.set_range(0, xaxis);
-    table.set_range(1, yaxis);
+    MultiTable2D::RangeArray ranges;
+    ranges[0] = std::move(xaxis);
+    ranges[1] = std::move(yaxis);
+    auto assigned = table.assign(std::move(ranges), std::move(points));
+    if (!assigned)
+      return std::unexpected(std::move(assigned.error()));
     table.set_interpolation_mode(*interpolation);
     table.set_bound_mode(*bound);
-    table.array() = std::move(points);
     return table;
   }();
   if (!parsed)

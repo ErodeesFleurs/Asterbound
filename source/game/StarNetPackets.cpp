@@ -936,7 +936,9 @@ std::expected<void, StarException> TileArrayUpdatePacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  array.resize(width, height);
+  auto resized = array.set_size(width, height);
+  if (!resized)
+    return std::unexpected(std::move(resized.error()));
   for (std::size_t y = 0; y < height; ++y) {
     for (std::size_t x = 0; x < width; ++x)
       {
@@ -960,17 +962,17 @@ std::expected<void, StarException> TileArrayUpdatePacket::write(DataStream& ds) 
       return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.vuwrite(array.size(0));
+    auto result = ds.vuwrite(array.extent(0));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds.vuwrite(array.size(1));
+    auto result = ds.vuwrite(array.extent(1));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  for (std::size_t y = 0; y < array.size(1); ++y) {
-    for (std::size_t x = 0; x < array.size(0); ++x)
+  for (std::size_t y = 0; y < array.extent(1); ++y) {
+    for (std::size_t x = 0; x < array.extent(0); ++x)
       {
         auto result = ds.write(array(x, y));
         if (!result)

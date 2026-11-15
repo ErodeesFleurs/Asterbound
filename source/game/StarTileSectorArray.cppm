@@ -16,6 +16,29 @@ import star.worker_pool;
 import star.math_common;
 namespace Star {
 
+template <typename Target, typename Function, typename Tile>
+concept tile_array_writer = std::is_copy_constructible_v<std::remove_cvref_t<Function>>
+    && requires(Target& target, std::remove_cvref_t<Function> const& function,
+                Vec2I const& position, Tile const& tile, Vec2S const& shape, std::size_t index) {
+      { target.set_size(shape) } -> std::same_as<std::expected<void, StarException>>;
+      { target.extent(index) } -> std::convertible_to<std::size_t>;
+      { std::invoke(function, target[index], position, tile) } -> std::same_as<std::expected<void, StarException>>;
+      { std::invoke(function, target(0, 0), position, tile) } -> std::same_as<std::expected<void, StarException>>;
+    };
+
+template <typename Function, typename Tile>
+concept tile_array_result = std::invocable<Function&, Vec2I const&, Tile const&>
+    && requires {
+      typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type;
+    }
+    && std::same_as<std::invoke_result_t<Function&, Vec2I const&, Tile const&>,
+        std::expected<typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type, StarException>>
+    && requires(MultiArray<typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type, 2>& target,
+                typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type value) {
+      target.set_size(Vec2S{});
+      target[0] = std::move(value);
+    };
+
 // Storage container for world tiles that understands the sector based
 // non-euclidean nature of the World.
 //
@@ -90,8 +113,8 @@ public:
 
   // Behaves like tileEach, but gathers the results of calling the function into
   // a MultiArray. The callback returns expected<T, StarException>.
-  template <typename Function>
-  [[nodiscard]] std::expected<MultiArray<typename std::invoke_result_t<Function, Vec2I, Tile>::value_type, 2>, StarException> tileEachResult(WorkerPool& workers, RectI const& region, Function&& function) const;
+  template <typename Function> requires tile_array_result<Function, Tile>
+  [[nodiscard]] std::expected<MultiArray<typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type, 2>, StarException> tileEachResult(WorkerPool& workers, RectI const& region, Function&& function) const;
 
   // Fastest way to copy data from the tile array to a given target array.
   // Takes a multi-array and a region and a function, resizes the multi-array
@@ -99,7 +122,7 @@ public:
   // each tile in the region with this signature:
   // function(MultiArray::Element& target, Vec2I const& position, Tile const& source);
   // Called with the defaultTile for out of range positions.
-  template <typename MultiArray, typename Function>
+  template <typename MultiArray, typename Function> requires tile_array_writer<MultiArray, Function, Tile>
   [[nodiscard]] std::expected<void, StarException> tileEachTo(WorkerPool& workers, MultiArray& results, RectI const& region, Function&& function) const;
 
   // Function signature here is (Vec2I const&, Tile&).  If a tile position
@@ -331,11 +354,11 @@ template <typename Function>
 }
 
 template <typename Tile, unsigned SectorSize>
-template <typename Function>
-[[nodiscard]] std::expected<MultiArray<typename std::invoke_result_t<Function, Vec2I, Tile>::value_type, 2>, StarException> TileSectorArray<Tile, SectorSize>::tileEachResult(WorkerPool& workers, RectI const& region, Function&& function) const {
-  MultiArray<typename std::invoke_result_t<Function, Vec2I, Tile>::value_type, 2> res;
-  auto result = tileEachTo(workers, res, region, [&](auto& target, Vec2I const& pos, Tile const& tile) -> std::expected<void, StarException> {
-    auto value = function(pos, tile);
+template <typename Function> requires tile_array_result<Function, Tile>
+[[nodiscard]] std::expected<MultiArray<typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type, 2>, StarException> TileSectorArray<Tile, SectorSize>::tileEachResult(WorkerPool& workers, RectI const& region, Function&& function) const {
+  MultiArray<typename std::invoke_result_t<Function&, Vec2I const&, Tile const&>::value_type, 2> res;
+  auto result = tileEachTo(workers, res, region, [&](auto&& target, Vec2I const& pos, Tile const& tile) -> std::expected<void, StarException> {
+    auto value = std::invoke(function, pos, tile);
     if (!value) return std::unexpected(std::move(value.error()));
     target = std::move(*value);
     return {};
@@ -345,16 +368,16 @@ template <typename Function>
 }
 
 template <typename Tile, unsigned SectorSize>
-template <typename MultiArray, typename Function>
+template <typename MultiArray, typename Function> requires tile_array_writer<MultiArray, Function, Tile>
 [[nodiscard]] std::expected<void, StarException> TileSectorArray<Tile, SectorSize>::tileEachTo(WorkerPool& workers, MultiArray& results, RectI const& region, Function&& function) const {
   if (region.isEmpty()) {
-    results.setSize({0, 0});
-    return {};
+    return results.set_size({0, 0});
   }
 
   int xArrayOffset = -region.xMin();
   int yArrayOffset = -region.yMin();
-  results.setSize(Vec2S(region.size()));
+  auto resized = results.set_size(Vec2S(region.size()));
+  if (!resized) return std::unexpected(std::move(resized.error()));
 
   auto splits = splitRect(region);
   if (!splits) return std::unexpected(std::move(splits.error()));
@@ -362,17 +385,17 @@ template <typename MultiArray, typename Function>
     auto clampedRect = yClampRect(split.rect);
     if (!clampedRect.isEmpty()) {
       auto evaluated = m_tileSectors.evalColumnsParallel(workers, clampedRect.xMin(), clampedRect.yMin(), clampedRect.width(), clampedRect.height(), [&, function](std::size_t x, std::size_t y, std::optional<std::span<Tile const>> column, std::size_t columnSize) -> std::expected<bool, StarException> {
-          std::size_t arrayColumnIndex = (x + split.xOffset + xArrayOffset) * results.size(1) + y + yArrayOffset;
+          std::size_t arrayColumnIndex = (x + split.xOffset + xArrayOffset) * results.extent(1) + y + yArrayOffset;
           if (column) {
             for (std::size_t i = 0; i < columnSize; ++i)
-              if (auto r = function(results.atIndex(arrayColumnIndex + i),
-                                    Vec2I(static_cast<int>(x) + split.xOffset, y + i), (*column)[i]);
+              if (auto r = std::invoke(function, results[arrayColumnIndex + i],
+                                      Vec2I(static_cast<int>(x) + split.xOffset, y + i), (*column)[i]);
                   !r)
                 return std::unexpected(std::move(r.error()));
           } else {
             for (std::size_t i = 0; i < columnSize; ++i)
-              if (auto r = function(results.atIndex(arrayColumnIndex + i),
-                                    Vec2I(static_cast<int>(x) + split.xOffset, y + i), m_default);
+              if (auto r = std::invoke(function, results[arrayColumnIndex + i],
+                                      Vec2I(static_cast<int>(x) + split.xOffset, y + i), m_default);
                   !r)
                 return std::unexpected(std::move(r.error()));
             }
@@ -385,12 +408,12 @@ template <typename MultiArray, typename Function>
     // every index in the rect gets called)
     for (int x = split.rect.xMin(); x < split.rect.xMax(); ++x) {
       for (int y = split.rect.yMin(); y < std::min<int>(split.rect.yMax(), 0); ++y)
-        if (auto r = function(results(x + split.xOffset + xArrayOffset, y + yArrayOffset), Vec2I(x + split.xOffset, y), m_default); !r) return std::unexpected(std::move(r.error()));
+        if (auto r = std::invoke(function, results(x + split.xOffset + xArrayOffset, y + yArrayOffset), Vec2I(x + split.xOffset, y), m_default); !r) return std::unexpected(std::move(r.error()));
     }
 
     for (int x = split.rect.xMin(); x < split.rect.xMax(); ++x) {
       for (int y = std::max<int>(split.rect.yMin(), m_worldSize[1]); y < split.rect.yMax(); ++y)
-        if (auto r = function(results(x + split.xOffset + xArrayOffset, y + yArrayOffset), Vec2I(x + split.xOffset, y), m_default); !r) return std::unexpected(std::move(r.error()));
+        if (auto r = std::invoke(function, results(x + split.xOffset + xArrayOffset, y + yArrayOffset), Vec2I(x + split.xOffset, y), m_default); !r) return std::unexpected(std::move(r.error()));
     }
   }
   return {};
@@ -562,5 +585,7 @@ RectI TileSectorArray<Tile, SectorSize>::yClampRect(RectI const& r) const {
 export module star.tile_sector_array;
 
 export namespace Star {
+  using ::Star::tile_array_writer;
+  using ::Star::tile_array_result;
   using ::Star::TileSectorArray;
 }

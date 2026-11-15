@@ -98,8 +98,8 @@ const GameTestRegistration tileSectorArrayAll("TileSectorArrayTest", "All", [](G
   ASSERT_TRUE(res1);
   MultiArray<int, 2> res1comp({10, 10}, 1);
 
-  EXPECT_TRUE(res1->size() == res1comp.size());
-  res1->forEach([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
+  EXPECT_TRUE(res1->extents() == res1comp.extents());
+  res1->for_each([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
 
   auto res2 = tileSectorArray.tileEachResult(workers->get(), RectI(32, 32, 64, 64),
       [](Vec2I const& pos, int tile) -> std::expected<int, StarException> {
@@ -108,8 +108,8 @@ const GameTestRegistration tileSectorArrayAll("TileSectorArrayTest", "All", [](G
   ASSERT_TRUE(res2);
   MultiArray<int, 2> res2comp({32, 32}, 1);
 
-  EXPECT_TRUE(res2->size() == res2comp.size());
-  res2->forEach([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
+  EXPECT_TRUE(res2->extents() == res2comp.extents());
+  res2->for_each([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
 
   auto res3 = tileSectorArray.tileEachResult(workers->get(), RectI(-10, -10, 1, 1),
       [](Vec2I const& pos, int tile) -> std::expected<int, StarException> {
@@ -121,6 +121,6 @@ const GameTestRegistration tileSectorArrayAll("TileSectorArrayTest", "All", [](G
   ASSERT_TRUE(res3);
   MultiArray<int, 2> res3comp({11, 11}, 1);
 
-  EXPECT_TRUE(res3->size() == res3comp.size());
-  res3->forEach([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
+  EXPECT_TRUE(res3->extents() == res3comp.extents());
+  res3->for_each([](Array2S const&, int elem) { EXPECT_TRUE(elem == 1); });
 });

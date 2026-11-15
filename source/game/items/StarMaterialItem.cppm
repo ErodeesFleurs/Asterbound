@@ -851,7 +851,8 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       auto locker = tileDrawer->get().lockRenderData();
       WorldRenderData& renderData = tileDrawer->get().renderData();
       renderData.geometry = WorldGeometry(3, 3);
-      renderData.tiles.resize({ 3, 3 });
+      auto resized = renderData.tiles.set_size({3, 3});
+      if (!resized) return std::unexpected(std::move(resized.error()));
       renderData.tiles.fill(TileDrawer::DefaultRenderTile);
       renderData.tileMinPosition = { 0, 0 };
       auto tile = renderData.tiles.at({1, 1});

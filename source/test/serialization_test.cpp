@@ -8,6 +8,7 @@ import star.list;
 import star.data_stream_extra;
 import star.byte_array;
 import star.multi_array;
+import star.array;
 import star.bytes;
 import star.io_device;
 import star.data_stream;
@@ -492,6 +493,27 @@ TEST(DataStreamTest, MultiArrayPreservesDimensionsAndLastIndexContiguousWireOrde
   EXPECT_EQ((view[0, 2]), 0x12);
   EXPECT_EQ((view[1, 0]), 0x20);
   EXPECT_EQ((view[1, 2]), 0x22);
+}
+
+TEST(DataStreamTest, MultiArrayRejectsOverflowingDimensionsAndRecovers) {
+  MultiArray<std::uint8_t, 2> array({2, 2}, std::uint8_t{0x42});
+  DataStreamBuffer stream;
+  ASSERT_TRUE(stream.write_vlq_u(std::numeric_limits<std::size_t>::max()));
+  ASSERT_TRUE(stream.write_vlq_u(2));
+  ASSERT_TRUE(stream.seek(0));
+
+  auto rejected = stream >> array;
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(rejected.error().is<MultiArrayException>());
+  EXPECT_EQ(array.extents(), (Array2S{2, 2}));
+  for (auto value : array.elements())
+    EXPECT_EQ(value, 0x42);
+
+  stream.reset(ByteArray({"\x01\x02\x7a\x7b", 4}));
+  ASSERT_TRUE(stream >> array);
+  EXPECT_EQ(array.extents(), (Array2S{1, 2}));
+  EXPECT_EQ(array(0, 0), 0x7a);
+  EXPECT_EQ(array(0, 1), 0x7b);
 }
 
 TEST(DataStreamTest, UuidTruncatedReadsKeepIdentityAndConsumeAvailablePrefix) {

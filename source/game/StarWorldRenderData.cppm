@@ -100,7 +100,7 @@ struct WorldRenderData {
 };
 
 inline void WorldRenderData::prepareFrame() {
-  tiles.resize({0, 0}); // keep reserved
+  tiles.clear(); // Retain storage for the next frame.
 
   for (auto& entity : entityDrawables) {
     entity.highlightEffect = {};

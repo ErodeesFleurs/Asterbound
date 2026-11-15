@@ -13,137 +13,558 @@ struct MultiArrayExceptionTag {
 };
 using MultiArrayException = StarError<MultiArrayExceptionTag, StarException>;
 
-// Multidimensional array class that wraps a vector as a simple contiguous N
-// dimensional array. The last index is contiguous (stride 1), matching
-// std::layout_right; the first index has the largest stride.
-//
-// Due to usage of std::vector, ElementT = bool means that the user must use
-// set() and get() rather than operator()
+template <std::size_t Rank, typename... Dimensions>
+concept multi_array_dimensions = sizeof...(Dimensions) == Rank
+    && ((std::integral<Dimensions> && !std::same_as<std::remove_cv_t<Dimensions>, bool>
+         && std::convertible_to<Dimensions, std::size_t>) && ...);
+
+template <typename Reference, typename Source>
+concept multi_array_assignable = requires(Reference&& element, Source&& source) {
+  std::forward<Reference>(element) = std::forward<Source>(source);
+};
+
+template <typename Op, typename Index, typename Reference>
+concept multi_array_callback = requires(Op& op, Index& index, Reference&& element) {
+  std::invoke(op, index, std::forward<Reference>(element));
+};
+
+// Owning, last-axis-contiguous storage, matching std::layout_right. Element
+// references follow the storage's reference type, including vector<bool> proxies.
 template <typename ElementT, std::size_t RankN>
+  requires (RankN > 0)
 class MultiArray {
 public:
   using Storage = List<ElementT>;
-
   using Element = ElementT;
-  static std::size_t const Rank = RankN;
-
+  static constexpr std::size_t Rank = RankN;
   using IndexArray = Array<std::size_t, Rank>;
   using SizeArray = Array<std::size_t, Rank>;
-
   using Extents = std::dextents<std::size_t, Rank>;
   using View = std::mdspan<Element, Extents, std::layout_right>;
   using ConstView = std::mdspan<Element const, Extents, std::layout_right>;
-
   using iterator = typename Storage::iterator;
   using const_iterator = typename Storage::const_iterator;
   using value_type = Element;
+  using reference = typename Storage::reference;
+  using const_reference = typename Storage::const_reference;
 
-  MultiArray();
-  template <typename... T>
-  explicit MultiArray(std::size_t i, T... rest);
-  explicit MultiArray(SizeArray const& shape);
-  explicit MultiArray(SizeArray const& shape, Element const& c);
+  MultiArray() = default;
+  MultiArray(MultiArray const&) requires std::is_copy_constructible_v<Element> = default;
+  MultiArray& operator=(MultiArray const&)
+      requires (std::is_copy_constructible_v<Element> && std::is_copy_assignable_v<Element>) = default;
 
-  SizeArray const& size() const;
-  std::size_t size(std::size_t dimension) const;
+  MultiArray(MultiArray&& other) noexcept : m_data(std::move(other.m_data)), m_shape(other.m_shape) {
+    other.clear();
+  }
 
-  void clear();
+  MultiArray& operator=(MultiArray&& other) noexcept {
+    if (this != std::addressof(other)) {
+      m_data = std::move(other.m_data);
+      m_shape = other.m_shape;
+      other.clear();
+    }
+    return *this;
+  }
 
-  void resize(SizeArray const& shape);
-  void resize(SizeArray const& shape, Element const& c);
+  explicit MultiArray(SizeArray const& shape)
+      requires (std::is_default_constructible_v<Element>
+          && std::is_move_constructible_v<Element>) {
+    require_success(set_size(shape));
+  }
 
-  template <typename... T>
-  void resize(std::size_t i, T... rest);
+  explicit MultiArray(SizeArray const& shape, Element const& value)
+      requires (std::is_copy_constructible_v<Element> && std::is_move_constructible_v<Element>) {
+    require_success(set_size(shape, value));
+  }
 
-  void fill(Element const& element);
+  template <typename... Dimensions>
+    requires (multi_array_dimensions<Rank, Dimensions...>
+        && std::is_default_constructible_v<Element>
+        && std::is_move_constructible_v<Element>)
+  explicit MultiArray(Dimensions... dimensions) {
+    auto shape = checked_dimensions(dimensions...);
+    if (!shape) {
+      Star::fatal_error(shape.error().what(), false);
+      return;
+    }
+    require_success(set_size(*shape));
+  }
 
-  // Does not preserve previous element position, array contents will be
-  // invalid.
-  void setSize(SizeArray const& shape);
-  void setSize(SizeArray const& shape, Element const& c);
+  SizeArray const& extents() const noexcept { return m_shape; }
+  std::size_t extent(std::size_t dimension) const noexcept { return m_shape[dimension]; }
+  std::size_t size() const noexcept { return m_data.size(); }
+  bool empty() const noexcept { return m_data.empty(); }
+  std::size_t capacity() const noexcept { return m_data.capacity(); }
+  std::size_t max_size() const noexcept { return m_data.max_size(); }
 
-  template <typename... T>
-  void setSize(std::size_t i, T... rest);
+  void clear() {
+    m_data.clear();
+    m_shape.fill(0);
+  }
 
-  Element& operator()(IndexArray const& index);
-  Element const& operator()(IndexArray const& index) const;
+  // Preserve the coordinate intersection; initialize only newly added cells.
+  [[nodiscard]] std::expected<void, StarException> resize(SizeArray const& shape)
+      requires (std::is_default_constructible_v<Element>
+          && std::is_move_constructible_v<Element>
+          && (std::is_constructible_v<Element, const_reference>
+              || multi_array_assignable<reference, const_reference>)) {
+    auto count = checked_size(shape);
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    return resize_impl(shape, *count, [](Storage& data, std::size_t count) {
+      data.resize(data.size() + count);
+    });
+  }
 
-  template <typename... T>
-  Element& operator()(std::size_t i1, T... rest);
-  template <typename... T>
-  Element const& operator()(std::size_t i1, T... rest) const;
+  [[nodiscard]] std::expected<void, StarException> resize(SizeArray const& shape, Element const& value)
+      requires (std::is_copy_constructible_v<Element> && std::is_move_constructible_v<Element>) {
+    auto count = checked_size(shape);
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    return resize_impl(shape, *count, [&](Storage& data, std::size_t count) {
+      data.resize(data.size() + count, value);
+    });
+  }
 
-  // Returns an error if out of bounds.
-  [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(IndexArray const& index);
-  [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(IndexArray const& index) const;
+  template <typename... Dimensions>
+    requires (multi_array_dimensions<Rank, Dimensions...>
+        && std::is_default_constructible_v<Element>
+        && std::is_move_constructible_v<Element>
+        && (std::is_constructible_v<Element, const_reference>
+            || multi_array_assignable<reference, const_reference>))
+  [[nodiscard]] std::expected<void, StarException> resize(Dimensions... dimensions) {
+    auto shape = checked_dimensions(dimensions...);
+    if (!shape)
+      return std::unexpected(std::move(shape.error()));
+    return resize(*shape);
+  }
 
-  template <typename... T>
-  [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(std::size_t i1, T... rest);
-  template <typename... T>
-  [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(std::size_t i1, T... rest) const;
+  void fill(Element const& element) requires multi_array_assignable<reference, Element const&> {
+    std::fill(m_data.begin(), m_data.end(), element);
+  }
 
-  // Returns an error if out of bounds.
-  [[nodiscard]] std::expected<void, StarException> set(IndexArray const& index, Element element);
+  // Linear vector resize: retain the old prefix, initialize appended cells only.
+  // Unlike resize(), this does not preserve multidimensional coordinates.
+  [[nodiscard]] std::expected<void, StarException> set_size(SizeArray const& shape)
+      requires (std::is_default_constructible_v<Element>
+          && std::is_move_constructible_v<Element>) {
+    auto count = checked_size(shape);
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    m_data.resize(*count);
+    m_shape = shape;
+    return {};
+  }
 
-  // Returns default element if out of bounds.
-  Element get(IndexArray const& index, Element def = Element());
+  [[nodiscard]] std::expected<void, StarException> set_size(SizeArray const& shape, Element const& value)
+      requires (std::is_copy_constructible_v<Element> && std::is_move_constructible_v<Element>) {
+    auto count = checked_size(shape);
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    m_data.resize(*count, value);
+    m_shape = shape;
+    return {};
+  }
 
-  // Auto-resizes array if out of bounds
-  void setResize(IndexArray const& index, Element element);
+  template <typename... Dimensions>
+    requires (multi_array_dimensions<Rank, Dimensions...>
+        && std::is_default_constructible_v<Element>
+        && std::is_move_constructible_v<Element>)
+  [[nodiscard]] std::expected<void, StarException> set_size(Dimensions... dimensions) {
+    auto shape = checked_dimensions(dimensions...);
+    if (!shape)
+      return std::unexpected(std::move(shape.error()));
+    return set_size(*shape);
+  }
 
-  // Copy the given array element for element into this array.  The shape of
-  // this array must be at least as large in every dimension as the source
-  // array
-  void copy(MultiArray const& source);
-  void copy(MultiArray const& source, IndexArray const& sourceMin, IndexArray const& sourceMax, IndexArray const& targetMin);
+  reference operator[](std::size_t index) { return m_data[index]; }
+  const_reference operator[](std::size_t index) const { return m_data[index]; }
+  reference operator()(IndexArray const& index) { return m_data[linear_index(index)]; }
+  const_reference operator()(IndexArray const& index) const { return m_data[linear_index(index)]; }
 
-  // op will be called with IndexArray and Element parameters.
-  template <typename OpType>
-  void forEach(IndexArray const& min, SizeArray const& size, OpType&& op);
-  template <typename OpType>
-  void forEach(IndexArray const& min, SizeArray const& size, OpType&& op) const;
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  reference operator()(Dimensions... dimensions) {
+    return (*this)(unchecked_dimensions(dimensions...));
+  }
 
-  // Shortcut for calling forEach on the entire array
-  template <typename OpType>
-  void forEach(OpType&& op);
-  template <typename OpType>
-  void forEach(OpType&& op) const;
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  const_reference operator()(Dimensions... dimensions) const {
+    return (*this)(unchecked_dimensions(dimensions...));
+  }
 
-  void print(TextBuffer& output) const
-      requires std::same_as<optional_diagnostic_result<Element>, void>;
+  [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(IndexArray const& index) &
+      requires std::same_as<reference, Element&> {
+    if (!contains(index))
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
+    return std::reference_wrapper<Element>(m_data[linear_index(index)]);
+  }
 
-  // Api for more direct access to elements.
+  [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(IndexArray const& index) const &
+      requires std::same_as<const_reference, Element const&> {
+    if (!contains(index))
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
+    return std::reference_wrapper<Element const>(m_data[linear_index(index)]);
+  }
 
-  std::size_t count() const;
+  void at(IndexArray const&) && = delete;
+  void at(IndexArray const&) const && = delete;
 
-  Element const& atIndex(std::size_t index) const;
-  Element& atIndex(std::size_t index);
+  template <typename... Dimensions>
+    requires (multi_array_dimensions<Rank, Dimensions...> && std::same_as<reference, Element&>)
+  [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(Dimensions... dimensions) & {
+    auto index = checked_dimensions(dimensions...);
+    if (!index)
+      return std::unexpected(std::move(index.error()));
+    return at(*index);
+  }
 
-  Element const* data() const;
-  Element* data();
+  template <typename... Dimensions>
+    requires (multi_array_dimensions<Rank, Dimensions...> && std::same_as<const_reference, Element const&>)
+  [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(Dimensions... dimensions) const & {
+    auto index = checked_dimensions(dimensions...);
+    if (!index)
+      return std::unexpected(std::move(index.error()));
+    return at(*index);
+  }
 
-  // Unchecked, non-owning views of ordinary contiguous storage (not bool proxies).
-  // Keep the owner alive and do not resize, clear, move or replace it while borrowed.
-  // Reacquire the view after any operation that changes storage or shape.
-  View view() & requires std::same_as<typename Storage::reference, Element&>;
-  ConstView view() const & requires std::same_as<typename Storage::reference, Element&>;
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  void at(Dimensions...) && = delete;
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  void at(Dimensions...) const && = delete;
+
+  [[nodiscard]] std::expected<void, StarException> set(IndexArray const& index, Element element)
+      requires multi_array_assignable<reference, Element&&> {
+    if (!contains(index))
+      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::set({})", index)));
+    m_data[linear_index(index)] = std::move(element);
+    return {};
+  }
+
+  Element get(IndexArray const& index, Element def = Element()) const
+      requires std::is_constructible_v<Element, const_reference> {
+    if (!contains(index)) {
+      if constexpr (std::is_move_constructible_v<Element>)
+        return Element(std::move(def));
+      else
+        return Element(std::as_const(def));
+    }
+    return Element(m_data[linear_index(index)]);
+  }
+
+  [[nodiscard]] std::expected<void, StarException> set_resize(IndexArray const& index, Element element)
+      requires (std::is_default_constructible_v<Element>
+          && std::is_move_constructible_v<Element>
+          && (std::is_constructible_v<Element, const_reference>
+              || multi_array_assignable<reference, const_reference>)
+          && multi_array_assignable<reference, Element&&>) {
+    SizeArray shape;
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if (index[dim] >= max_size())
+        return std::unexpected(MultiArrayException("MultiArray::set_resize index exceeds max_size"));
+      shape[dim] = std::max(m_shape[dim], index[dim] + 1);
+    }
+    auto resized = resize(shape);
+    if (!resized)
+      return std::unexpected(std::move(resized.error()));
+    m_data[linear_index(index)] = std::move(element);
+    return {};
+  }
+
+  // Copy assignment, clipped to the coordinate intersection of both arrays.
+  [[nodiscard]] std::expected<void, StarException> copy_from(MultiArray const& source)
+      requires multi_array_assignable<reference, const_reference> {
+    SizeArray widths;
+    for (std::size_t dim = 0; dim < Rank; ++dim)
+      widths[dim] = std::min(m_shape[dim], source.m_shape[dim]);
+    return copy_region(source, IndexArray::filled(0), widths, IndexArray::filled(0));
+  }
+
+  // source_max is exclusive. Empty regions still require valid bounds. Identical
+  // self-regions are no-ops; other overlapping self-regions are rejected.
+  [[nodiscard]] std::expected<void, StarException> copy_region(MultiArray const& source,
+      IndexArray const& source_min, IndexArray const& source_max, IndexArray const& target_min)
+      requires multi_array_assignable<reference, const_reference> {
+    SizeArray widths;
+    bool is_empty = false;
+    bool identical = true;
+    bool overlaps = true;
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if (source_min[dim] > source_max[dim] || source_max[dim] > source.m_shape[dim]
+          || target_min[dim] > m_shape[dim])
+        return std::unexpected(MultiArrayException("MultiArray::copy_region bounds are invalid"));
+      widths[dim] = source_max[dim] - source_min[dim];
+      if (widths[dim] > m_shape[dim] - target_min[dim])
+        return std::unexpected(MultiArrayException("MultiArray::copy_region exceeds target extents"));
+      is_empty = is_empty || widths[dim] == 0;
+      identical = identical && source_min[dim] == target_min[dim];
+      overlaps = overlaps && source_min[dim] < target_min[dim] + widths[dim]
+          && target_min[dim] < source_max[dim];
+    }
+    if (is_empty)
+      return {};
+    if (this == std::addressof(source)) {
+      if (identical)
+        return {};
+      if (overlaps)
+        return std::unexpected(MultiArrayException("MultiArray::copy_region overlapping self-copy"));
+    }
+    auto source_strides = strides(source.m_shape);
+    auto target_strides = strides(m_shape);
+    copy_region_impl(source, widths, source_strides, target_strides,
+        source.linear_index(source_min), linear_index(target_min), 0);
+    return {};
+  }
+
+  // Unchecked region traversal: min and widths must describe an in-bounds region.
+  // Callbacks are borrowed and invoked as lvalues, never copied or moved.
+  template <typename Self, typename Op>
+    requires (std::same_as<std::remove_cvref_t<Self>, MultiArray>
+        && multi_array_callback<Op, IndexArray, decltype(std::declval<Self&>().m_data[std::size_t{}])>)
+  void for_each(this Self&& self, IndexArray const& min, SizeArray const& widths, Op&& op) {
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if constexpr (Star::DebugEnabled)
+        Star::star_assert_failed(min[dim] <= self.m_shape[dim] && widths[dim] <= self.m_shape[dim] - min[dim]);
+      if (widths[dim] == 0)
+        return;
+    }
+    auto array_strides = strides(self.m_shape);
+    IndexArray index = min;
+    for_each_impl<0>(self, min, widths, array_strides, op, index, self.linear_index(min));
+  }
+
+  template <typename Self, typename Op>
+    requires (std::same_as<std::remove_cvref_t<Self>, MultiArray>
+        && multi_array_callback<Op, IndexArray, decltype(std::declval<Self&>().m_data[std::size_t{}])>)
+  void for_each(this Self&& self, Op&& op) {
+    self.for_each(IndexArray::filled(0), self.m_shape, std::forward<Op>(op));
+  }
+
+  void print(TextBuffer& output) const requires std::same_as<optional_diagnostic_result<Element>, void> {
+    sub_print(output, IndexArray(), 0);
+  }
+
+  // Bounded non-owning borrows of real-reference storage (not bool proxies).
+  // Keep the owner alive; reacquire after resize, clear, move or replacement.
+  std::span<Element> elements() & requires std::same_as<reference, Element&> {
+    return std::span<Element>(m_data.data(), m_data.size());
+  }
+  std::span<Element const> elements() const & requires std::same_as<const_reference, Element const&> {
+    return std::span<Element const>(m_data.data(), m_data.size());
+  }
+  std::span<Element> elements() && = delete;
+  std::span<Element const> elements() const && = delete;
+
+  View view() & requires std::same_as<reference, Element&> {
+    return View(elements().data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
+  }
+  ConstView view() const & requires std::same_as<const_reference, Element const&> {
+    return ConstView(elements().data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
+  }
   View view() && = delete;
   ConstView view() const && = delete;
 
 private:
-  std::size_t storageIndex(IndexArray const& index) const;
+  static void require_success(std::expected<void, StarException> result) {
+    if (!result)
+      Star::fatal_error(result.error().what(), false);
+  }
+
+  template <std::integral Dimension>
+  static bool dimension_representable(Dimension value) {
+    if constexpr (std::is_signed_v<Dimension>)
+      if (value < 0)
+        return false;
+    if constexpr (std::numeric_limits<Dimension>::digits > std::numeric_limits<std::size_t>::digits)
+      if (value > static_cast<Dimension>(std::numeric_limits<std::size_t>::max()))
+        return false;
+    return true;
+  }
+
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  static std::expected<SizeArray, StarException> checked_dimensions(Dimensions... dimensions) {
+    if (!(dimension_representable(dimensions) && ...))
+      return std::unexpected(MultiArrayException("MultiArray dimensions must be representable nonnegative integers"));
+    return SizeArray{static_cast<std::size_t>(dimensions)...};
+  }
+
+  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  static IndexArray unchecked_dimensions(Dimensions... dimensions) {
+    if constexpr (Star::DebugEnabled)
+      Star::star_assert_failed((dimension_representable(dimensions) && ...));
+    return IndexArray{static_cast<std::size_t>(dimensions)...};
+  }
+
+  std::expected<std::size_t, StarException> checked_size(SizeArray const& shape) const {
+    bool is_empty = false;
+    auto maximum = max_size();
+    for (auto extent : shape) {
+      if (extent > maximum)
+        return std::unexpected(MultiArrayException("MultiArray extent exceeds max_size"));
+      is_empty = is_empty || extent == 0;
+    }
+    if (is_empty)
+      return 0;
+    std::size_t count = 1;
+    for (auto extent : shape) {
+      if (count > maximum / extent)
+        return std::unexpected(MultiArrayException("MultiArray extent product exceeds max_size"));
+      count *= extent;
+    }
+    return count;
+  }
+
+  bool contains(IndexArray const& index) const {
+    for (std::size_t dim = 0; dim < Rank; ++dim)
+      if (index[dim] >= m_shape[dim])
+        return false;
+    return true;
+  }
+
+  std::size_t linear_index(IndexArray const& index) const {
+    std::size_t offset = 0;
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if constexpr (Star::DebugEnabled)
+        Star::star_assert_failed(index[dim] < m_shape[dim]);
+      offset = offset * m_shape[dim] + index[dim];
+    }
+    return offset;
+  }
+
+  // Only needed for nonempty shapes, whose checked cardinality bounds all strides.
+  static SizeArray strides(SizeArray const& shape) {
+    SizeArray result;
+    result[Rank - 1] = 1;
+    for (std::size_t dim = Rank - 1; dim != 0; --dim)
+      result[dim - 1] = result[dim] * shape[dim];
+    return result;
+  }
+
+  template <typename Append> requires std::invocable<Append&, Storage&, std::size_t>
+  std::expected<void, StarException> resize_impl(SizeArray const& shape, std::size_t count, Append&& append) {
+    if (shape == m_shape)
+      return {};
+    if (count == 0) {
+      m_data.clear();
+      m_shape = shape;
+      return {};
+    }
+    bool linear = m_data.empty();
+    if (!linear) {
+      linear = true;
+      for (std::size_t dim = 1; dim < Rank; ++dim)
+        linear = linear && shape[dim] == m_shape[dim];
+    }
+    if (linear) {
+      if (count < m_data.size()) {
+        if constexpr (std::is_default_constructible_v<Element>) {
+          m_data.resize(count);
+        } else {
+          while (m_data.size() > count)
+            m_data.pop_back();
+        }
+      } else {
+        append(m_data, count - m_data.size());
+      }
+      m_shape = shape;
+      return {};
+    }
+
+    Storage data;
+    data.reserve(count);
+    auto source_strides = strides(m_shape);
+    resize_region_impl<0>(data, shape, source_strides, append, 0, true);
+    m_data = std::move(data);
+    m_shape = shape;
+    return {};
+  }
+
+  template <std::size_t Dimension, typename Append>
+    requires (Dimension < Rank && std::invocable<Append&, Storage&, std::size_t>)
+  void resize_region_impl(Storage& data, SizeArray const& shape, SizeArray const& source_strides,
+      Append& append, std::size_t source_offset, bool source_valid) const {
+    if constexpr (Dimension == Rank - 1) {
+      auto copied = source_valid ? std::min(shape[Dimension], m_shape[Dimension]) : 0;
+      if (copied != 0) {
+        auto first = m_data.cbegin() + source_offset;
+        if constexpr (std::is_constructible_v<Element, const_reference>
+            && std::is_copy_assignable_v<Element> && std::is_move_assignable_v<Element>) {
+          // Construct the preserved row in bulk without initializing it first.
+          data.insert(data.end(), first, first + copied);
+        } else if constexpr (std::is_constructible_v<Element, const_reference>) {
+          for (std::size_t i = 0; i < copied; ++i, ++first)
+            data.emplace_back(*first);
+        } else {
+          // Copy-assignment-only elements need live destination objects.
+          auto target_offset = data.size();
+          append(data, copied);
+          std::copy_n(first, copied, data.begin() + target_offset);
+        }
+      }
+      append(data, shape[Dimension] - copied);
+    } else {
+      for (std::size_t i = 0; i < shape[Dimension]; ++i) {
+        bool valid = source_valid && i < m_shape[Dimension];
+        resize_region_impl<Dimension + 1>(data, shape, source_strides, append,
+            valid ? source_offset + i * source_strides[Dimension] : 0, valid);
+      }
+    }
+  }
+
+  void copy_region_impl(MultiArray const& source, SizeArray const& widths,
+      SizeArray const& source_strides, SizeArray const& target_strides,
+      std::size_t source_offset, std::size_t target_offset, std::size_t dim)
+      requires multi_array_assignable<reference, const_reference> {
+    if (dim == Rank - 1) {
+      std::copy_n(source.m_data.cbegin() + source_offset, widths[dim], m_data.begin() + target_offset);
+      return;
+    }
+    for (std::size_t i = 0; i < widths[dim]; ++i) {
+      copy_region_impl(source, widths, source_strides, target_strides, source_offset, target_offset, dim + 1);
+      if (i + 1 < widths[dim]) {
+        source_offset += source_strides[dim];
+        target_offset += target_strides[dim];
+      }
+    }
+  }
+
+  template <std::size_t Dimension, typename Self, typename Op>
+    requires (Dimension < Rank && (std::same_as<Self, MultiArray> || std::same_as<Self, MultiArray const>)
+        && multi_array_callback<Op, IndexArray, decltype(std::declval<Self&>().m_data[std::size_t{}])>)
+  static void for_each_impl(Self& self, IndexArray const& min, SizeArray const& widths,
+      SizeArray const& array_strides, Op& op, IndexArray& index, std::size_t offset) {
+    if constexpr (Dimension == Rank - 1) {
+      auto element = self.m_data.begin() + offset;
+      for (std::size_t i = 0; i < widths[Dimension]; ++i, ++element) {
+        index[Dimension] = min[Dimension] + i;
+        std::invoke(op, index, *element);
+      }
+    } else {
+      for (std::size_t i = 0; i < widths[Dimension]; ++i) {
+        index[Dimension] = min[Dimension] + i;
+        for_each_impl<Dimension + 1>(self, min, widths, array_strides, op, index,
+            offset + i * array_strides[Dimension]);
+      }
+    }
+  }
 
   void sub_print(TextBuffer& output, IndexArray index, std::size_t dim) const
-      requires std::same_as<optional_diagnostic_result<Element>, void>;
-
-  template <typename OpType>
-  void subForEach(IndexArray const& min, SizeArray const& size, OpType&& op, IndexArray& index, std::size_t offset, std::size_t dim) const;
-
-  template <typename OpType>
-  void subForEach(IndexArray const& min, SizeArray const& size, OpType&& op, IndexArray& index, std::size_t offset, std::size_t dim);
-
-  void subCopy(MultiArray const& source, IndexArray const& sourceMin, IndexArray const& sourceMax,
-      IndexArray const& targetMin, IndexArray& sourceIndex, IndexArray& targetIndex, std::size_t dim);
+      requires std::same_as<optional_diagnostic_result<Element>, void> {
+    if (dim == Rank - 1) {
+      for (std::size_t i = 0; i < m_shape[dim]; ++i) {
+        index[dim] = i;
+        auto&& value = m_data[linear_index(index)];
+        append_text(output, optional_diagnostic_value(value));
+        output.push_back(' ');
+      }
+      output.push_back('\n');
+    } else {
+      for (std::size_t i = 0; i < m_shape[dim]; ++i) {
+        index[dim] = i;
+        sub_print(output, index, dim + 1);
+      }
+      output.push_back('\n');
+    }
+  }
 
   Storage m_data;
   SizeArray m_shape;
@@ -154,13 +575,11 @@ using MultiArray2S = MultiArray<std::size_t, 2>;
 using MultiArray2U = MultiArray<unsigned, 2>;
 using MultiArray2F = MultiArray<float, 2>;
 using MultiArray2D = MultiArray<double, 2>;
-
 using MultiArray3I = MultiArray<int, 3>;
 using MultiArray3S = MultiArray<std::size_t, 3>;
 using MultiArray3U = MultiArray<unsigned, 3>;
 using MultiArray3F = MultiArray<float, 3>;
 using MultiArray3D = MultiArray<double, 3>;
-
 using MultiArray4I = MultiArray<int, 4>;
 using MultiArray4S = MultiArray<std::size_t, 4>;
 using MultiArray4U = MultiArray<unsigned, 4>;
@@ -168,373 +587,7 @@ using MultiArray4F = MultiArray<float, 4>;
 using MultiArray4D = MultiArray<double, 4>;
 
 template <typename Element, std::size_t Rank>
-  requires std::same_as<optional_diagnostic_result<Element>, void>
-void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array);
-
-template <typename Element, std::size_t Rank>
-MultiArray<Element, Rank>::MultiArray() {
-  m_shape = SizeArray::filled(0);
-}
-
-template <typename Element, std::size_t Rank>
-MultiArray<Element, Rank>::MultiArray(SizeArray const& shape) {
-  setSize(shape);
-}
-
-template <typename Element, std::size_t Rank>
-MultiArray<Element, Rank>::MultiArray(SizeArray const& shape, Element const& c) {
-  setSize(shape, c);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-MultiArray<Element, Rank>::MultiArray(std::size_t i, T... rest) {
-  setSize(SizeArray{i, rest...});
-}
-
-template <typename Element, std::size_t Rank>
-typename MultiArray<Element, Rank>::SizeArray const& MultiArray<Element, Rank>::size() const {
-  return m_shape;
-}
-
-template <typename Element, std::size_t Rank>
-std::size_t MultiArray<Element, Rank>::size(std::size_t dimension) const {
-  return m_shape[dimension];
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::clear() {
-  setSize(SizeArray::filled(0));
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::resize(SizeArray const& shape) {
-  if (m_data.empty()) {
-    setSize(shape);
-    return;
-  }
-
-  bool equal = true;
-  for (std::size_t i = 0; i < Rank; ++i)
-    equal = equal && (m_shape[i] == shape[i]);
-
-  if (equal)
-    return;
-
-  MultiArray newArray(shape);
-  newArray.copy(*this);
-  std::swap(*this, newArray);
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::resize(SizeArray const& shape, Element const& c) {
-  if (m_data.empty()) {
-    setSize(shape, c);
-    return;
-  }
-
-  bool equal = true;
-  for (std::size_t i = 0; i < Rank; ++i)
-    equal = equal && (m_shape[i] == shape[i]);
-
-  if (equal)
-    return;
-
-  MultiArray newArray(shape, c);
-  newArray.copy(*this);
-  *this = std::move(newArray);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-void MultiArray<Element, Rank>::resize(std::size_t i, T... rest) {
-  resize(SizeArray{i, rest...});
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::fill(Element const& element) {
-  std::fill(m_data.begin(), m_data.end(), element);
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::setSize(SizeArray const& shape) {
-  std::size_t storageSize = 1;
-  for (std::size_t i = 0; i < Rank; ++i) {
-    m_shape[i] = shape[i];
-    storageSize *= shape[i];
-  }
-
-  m_data.resize(storageSize);
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::setSize(SizeArray const& shape, Element const& c) {
-  std::size_t storageSize = 1;
-  for (std::size_t i = 0; i < Rank; ++i) {
-    m_shape[i] = shape[i];
-    storageSize *= shape[i];
-  }
-  m_data.resize(storageSize, c);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-void MultiArray<Element, Rank>::setSize(std::size_t i, T... rest) {
-  setSize({i, rest...});
-}
-
-template <typename Element, std::size_t Rank>
-Element& MultiArray<Element, Rank>::operator()(IndexArray const& index) {
-  return m_data[storageIndex(index)];
-}
-
-template <typename Element, std::size_t Rank>
-Element const& MultiArray<Element, Rank>::operator()(IndexArray const& index) const {
-  return m_data[storageIndex(index)];
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-Element& MultiArray<Element, Rank>::operator()(std::size_t i1, T... rest) {
-  return m_data[storageIndex(IndexArray(i1, rest...))];
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-Element const& MultiArray<Element, Rank>::operator()(std::size_t i1, T... rest) const {
-  return m_data[storageIndex(IndexArray(i1, rest...))];
-}
-
-template <typename Element, std::size_t Rank>
-std::expected<std::reference_wrapper<Element const>, StarException> MultiArray<Element, Rank>::at(IndexArray const& index) const {
-  for (std::size_t i = Rank; i != 0; --i) {
-    if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
-  }
-
-  return std::reference_wrapper<Element const>(m_data[storageIndex(index)]);
-}
-
-template <typename Element, std::size_t Rank>
-std::expected<std::reference_wrapper<Element>, StarException> MultiArray<Element, Rank>::at(IndexArray const& index) {
-  for (std::size_t i = Rank; i != 0; --i) {
-    if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::at({})", index)));
-  }
-
-  return std::reference_wrapper<Element>(m_data[storageIndex(index)]);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-std::expected<std::reference_wrapper<Element>, StarException> MultiArray<Element, Rank>::at(std::size_t i1, T... rest) {
-  return at(IndexArray(i1, rest...));
-}
-
-template <typename Element, std::size_t Rank>
-template <typename... T>
-std::expected<std::reference_wrapper<Element const>, StarException> MultiArray<Element, Rank>::at(std::size_t i1, T... rest) const {
-  return at(IndexArray(i1, rest...));
-}
-
-template <typename Element, std::size_t Rank>
-std::expected<void, StarException> MultiArray<Element, Rank>::set(IndexArray const& index, Element element) {
-  for (std::size_t i = Rank; i != 0; --i) {
-    if (index[i - 1] >= m_shape[i - 1])
-      return std::unexpected(MultiArrayException(Star::format("Out of bounds on MultiArray::set({})", index)));
-  }
-
-  m_data[storageIndex(index)] = std::move(element);
-  return {};
-}
-
-template <typename Element, std::size_t Rank>
-Element MultiArray<Element, Rank>::get(IndexArray const& index, Element def) {
-  for (std::size_t i = Rank; i != 0; --i) {
-    if (index[i - 1] >= m_shape[i - 1])
-      return std::move(def);
-  }
-
-  return m_data[storageIndex(index)];
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::setResize(IndexArray const& index, Element element) {
-  SizeArray newShape;
-  for (std::size_t i = 0; i < Rank; ++i)
-    newShape[i] = std::max(m_shape[i], index[i] + 1);
-  resize(newShape);
-
-  m_data[storageIndex(index)] = std::move(element);
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::copy(MultiArray const& source) {
-  IndexArray max;
-  for (std::size_t i = 0; i < Rank; ++i)
-    max[i] = std::min(size(i), source.size(i));
-
-  copy(source, IndexArray::filled(0), max, IndexArray::filled(0));
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::copy(MultiArray const& source, IndexArray const& sourceMin, IndexArray const& sourceMax, IndexArray const& targetMin) {
-  IndexArray sourceIndex;
-  IndexArray targetIndex;
-  subCopy(source, sourceMin, sourceMax, targetMin, sourceIndex, targetIndex, 0);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::forEach(IndexArray const& min, SizeArray const& size, OpType&& op) {
-  IndexArray index;
-  subForEach(min, size, std::forward<OpType>(op), index, 0, 0);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::forEach(IndexArray const& min, SizeArray const& size, OpType&& op) const {
-  IndexArray index;
-  subForEach(min, size, std::forward<OpType>(op), index, 0, 0);
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::forEach(OpType&& op) {
-  forEach(IndexArray::filled(0), size(), std::forward<OpType>(op));
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::forEach(OpType&& op) const {
-  forEach(IndexArray::filled(0), size(), std::forward<OpType>(op));
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::print(TextBuffer& output) const
-    requires std::same_as<optional_diagnostic_result<Element>, void> {
-  sub_print(output, IndexArray(), 0);
-}
-
-template <typename Element, std::size_t Rank>
-std::size_t MultiArray<Element, Rank>::count() const {
-  return m_data.size();
-}
-
-template <typename Element, std::size_t Rank>
-Element const& MultiArray<Element, Rank>::atIndex(std::size_t index) const {
-  return m_data[index];
-}
-
-template <typename Element, std::size_t Rank>
-Element& MultiArray<Element, Rank>::atIndex(std::size_t index) {
-  return m_data[index];
-}
-
-template <typename Element, std::size_t Rank>
-Element const* MultiArray<Element, Rank>::data() const {
-  return m_data.data();
-}
-
-template <typename Element, std::size_t Rank> Element* MultiArray<Element, Rank>::data() { return m_data.data(); }
-
-template <typename Element, std::size_t Rank>
-typename MultiArray<Element, Rank>::View MultiArray<Element, Rank>::view() &
-    requires std::same_as<typename Storage::reference, Element&> {
-  return View(data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
-}
-
-template <typename Element, std::size_t Rank>
-typename MultiArray<Element, Rank>::ConstView MultiArray<Element, Rank>::view() const &
-    requires std::same_as<typename Storage::reference, Element&> {
-  return ConstView(data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
-}
-
-template <typename Element, std::size_t Rank>
-std::size_t MultiArray<Element, Rank>::storageIndex(IndexArray const& index) const {
-  std::size_t loc = index[0];
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((index[0] < m_shape[0]));
-  }
-  for (std::size_t i = 1; i < Rank; ++i) {
-    loc = loc * m_shape[i] + index[i];
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((index[i] < m_shape[i]));
-    }
-  }
-  return loc;
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::sub_print(TextBuffer& output, IndexArray index, std::size_t dim) const
-    requires std::same_as<optional_diagnostic_result<Element>, void> {
-  if (dim == Rank - 1) {
-    for (std::size_t i = 0; i < m_shape[dim]; ++i) {
-      index[dim] = i;
-      auto&& value = m_data[storageIndex(index)];
-      append_text(output, optional_diagnostic_value(value));
-      output.push_back(' ');
-    }
-    output.push_back('\n');
-  } else {
-    for (std::size_t i = 0; i < m_shape[dim]; ++i) {
-      index[dim] = i;
-      sub_print(output, index, dim + 1);
-    }
-    output.push_back('\n');
-  }
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::subForEach(IndexArray const& min, SizeArray const& size, OpType&& op, IndexArray& index, std::size_t offset, std::size_t dim) {
-  std::size_t minIndex = min[dim];
-  std::size_t maxIndex = minIndex + size[dim];
-  for (std::size_t i = minIndex; i < maxIndex; ++i) {
-    index[dim] = i;
-    if (dim == Rank - 1)
-      op(index, m_data[offset + i]);
-    else
-      subForEach(min, size, std::forward<OpType>(op), index, (offset + i) * m_shape[dim + 1], dim + 1);
-  }
-}
-
-template <typename Element, std::size_t Rank>
-template <typename OpType>
-void MultiArray<Element, Rank>::subForEach(IndexArray const& min, SizeArray const& size, OpType&& op, IndexArray& index, std::size_t offset, std::size_t dim) const {
-  std::size_t minIndex = min[dim];
-  std::size_t maxIndex = minIndex + size[dim];
-  for (std::size_t i = minIndex; i < maxIndex; ++i) {
-    index[dim] = i;
-    if (dim == Rank - 1)
-      op(index, m_data[offset + i]);
-    else
-      subForEach(min, size, std::forward<OpType>(op), index, (offset + i) * m_shape[dim + 1], dim + 1);
-  }
-}
-
-template <typename Element, std::size_t Rank>
-void MultiArray<Element, Rank>::subCopy(MultiArray const& source, IndexArray const& sourceMin, IndexArray const& sourceMax,
-    IndexArray const& targetMin, IndexArray& sourceIndex, IndexArray& targetIndex, std::size_t dim) {
-  std::size_t w = sourceMax[dim] - sourceMin[dim];
-  if (dim < Rank - 1) {
-    for (std::size_t i = 0; i < w; ++i) {
-      sourceIndex[dim] = i + sourceMin[dim];
-      targetIndex[dim] = i + targetMin[dim];
-      subCopy(source, sourceMin, sourceMax, targetMin, sourceIndex, targetIndex, dim + 1);
-    }
-  } else {
-    sourceIndex[dim] = sourceMin[dim];
-    targetIndex[dim] = targetMin[dim];
-    std::size_t sourceStorageStart = source.storageIndex(sourceIndex);
-    std::size_t targetStorageStart = storageIndex(targetIndex);
-    for (std::size_t i = 0; i < w; ++i)
-      m_data[targetStorageStart + i] = source.m_data[sourceStorageStart + i];
-  }
-}
-
-template <typename Element, std::size_t Rank>
-  requires std::same_as<optional_diagnostic_result<Element>, void>
+  requires (Rank > 0 && std::same_as<optional_diagnostic_result<Element>, void>)
 void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array) {
   array.print(output);
 }
@@ -544,12 +597,15 @@ void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array) {
 export module star.multi_array;
 
 export template <typename Element, std::size_t Rank>
-  requires std::same_as<Star::optional_diagnostic_result<Element>, void>
+  requires (Rank > 0 && std::same_as<Star::optional_diagnostic_result<Element>, void>)
 struct std::formatter<Star::MultiArray<Element, Rank>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::MultiArrayExceptionTag;
   using ::Star::MultiArrayException;
+  using ::Star::multi_array_dimensions;
+  using ::Star::multi_array_assignable;
+  using ::Star::multi_array_callback;
   using ::Star::MultiArray;
   using ::Star::MultiArray2I;
   using ::Star::MultiArray2S;

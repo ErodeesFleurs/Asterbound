@@ -1299,8 +1299,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
 
   for (auto&& pair : m_predictedTiles) {
     Vec2I tileArrayPos(m_geometry.pdiff(pair.first[0], renderData.tileMinPosition[0]), pair.first[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.size(0)) && tileArrayPos[1] >= 0
-        && tileArrayPos[1] < static_cast<int>(renderData.tiles.size(1))) {
+    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.extent(0)) && tileArrayPos[1] >= 0
+        && tileArrayPos[1] < static_cast<int>(renderData.tiles.extent(1))) {
       RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
       PredictedTile& p = pair.second;
       if (p.liquid) {
@@ -1320,8 +1320,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
 
   for (auto const& previewTile : m_previewTiles) {
     Vec2I tileArrayPos(m_geometry.pdiff(previewTile.position[0], renderData.tileMinPosition[0]), previewTile.position[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.size(0)) && tileArrayPos[1] >= 0
-        && tileArrayPos[1] < static_cast<int>(renderData.tiles.size(1))) {
+    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.extent(0)) && tileArrayPos[1] >= 0
+        && tileArrayPos[1] < static_cast<int>(renderData.tiles.extent(1))) {
       RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
       
       auto material = previewTile.matId;
@@ -1703,7 +1703,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result112.error()));
       m_centralStructure = (std::move(*result112));
     } else if (auto tileArrayUpdate = as<TileArrayUpdatePacket>(packet)) {
-      RectI tileRegion = RectI::withSize(tileArrayUpdate->min, Vec2I(tileArrayUpdate->array.size()));
+      RectI tileRegion = RectI::withSize(tileArrayUpdate->min, Vec2I(tileArrayUpdate->array.extents()));
       
       // NOTE: We're creating client side sectors on tileArrayUpdate here, and
       // at no other time, and this is sort of a big assumption that

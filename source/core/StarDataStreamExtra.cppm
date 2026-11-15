@@ -106,19 +106,19 @@ operator>>(DataStream& ds, Array<ElementT, SizeN>& array) {
 }
 
 template <typename ElementT, std::size_t RankN>
-  requires(stream_writable<ElementT>)
+  requires(RankN > 0 && stream_writable<ElementT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator<<(DataStream& ds, MultiArray<ElementT, RankN> const& array) {
-  auto size = array.size();
+  auto const& size = array.extents();
   for (std::size_t i = 0; i < RankN; ++i) {
     auto dimensionWritten = ds.write_vlq_u(size[i]);
     if (!dimensionWritten)
       return std::unexpected(std::move(dimensionWritten.error()));
   }
 
-  std::size_t count = array.count();
+  std::size_t count = array.size();
   for (std::size_t i = 0; i < count; ++i) {
-    auto result = ds << array.atIndex(i);
+    auto result = ds << array[i];
     if (!result)
       return result;
   }
@@ -127,7 +127,12 @@ operator<<(DataStream& ds, MultiArray<ElementT, RankN> const& array) {
 }
 
 template <typename ElementT, std::size_t RankN>
-  requires(stream_readable<ElementT>)
+  requires(RankN > 0 && stream_readable<ElementT>
+      && requires(DataStream& stream, MultiArray<ElementT, RankN>& array,
+                  typename MultiArray<ElementT, RankN>::SizeArray const& shape) {
+        { array.set_size(shape) } -> std::same_as<std::expected<void, StarException>>;
+        { stream >> array[0] } -> stream_result;
+      })
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator>>(DataStream& ds, MultiArray<ElementT, RankN>& array) {
   typename MultiArray<ElementT, RankN>::SizeArray size;
@@ -135,13 +140,17 @@ operator>>(DataStream& ds, MultiArray<ElementT, RankN>& array) {
     auto dimension = ds.read_vlq_u();
     if (!dimension)
       return std::unexpected(std::move(dimension.error()));
-    size[i] = *dimension;
+    if (*dimension > std::numeric_limits<std::size_t>::max())
+      return std::unexpected(MultiArrayException("MultiArray extent exceeds size_t"));
+    size[i] = static_cast<std::size_t>(*dimension);
   }
 
-  array.setSize(size);
-  std::size_t count = array.count();
+  auto resized = array.set_size(size);
+  if (!resized)
+    return std::unexpected(std::move(resized.error()));
+  std::size_t count = array.size();
   for (std::size_t i = 0; i < count; ++i) {
-    auto result = ds >> array.atIndex(i);
+    auto result = ds >> array[i];
     if (!result)
       return result;
   }

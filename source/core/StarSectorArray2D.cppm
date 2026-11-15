@@ -155,23 +155,25 @@ SectorArray2D<ElementT, SectorSize>::SectorArray2D(std::size_t numSectorsWide, s
 template <typename ElementT, std::size_t SectorSize>
 void SectorArray2D<ElementT, SectorSize>::init(std::size_t numSectorsWide, std::size_t numSectorsHigh) {
   m_sectors.clear();
-  m_sectors.setSize(numSectorsWide, numSectorsHigh);
+  auto resized = m_sectors.set_size(numSectorsWide, numSectorsHigh);
+  if (!resized)
+    Star::fatal_error(resized.error().what(), false);
   m_loadedSectors.clear();
 }
 
 template <typename ElementT, std::size_t SectorSize>
 std::size_t SectorArray2D<ElementT, SectorSize>::width() const {
-  return m_sectors.size(0) * SectorSize;
+  return m_sectors.extent(0) * SectorSize;
 }
 
 template <typename ElementT, std::size_t SectorSize>
 std::size_t SectorArray2D<ElementT, SectorSize>::height() const {
-  return m_sectors.size(1) * SectorSize;
+  return m_sectors.extent(1) * SectorSize;
 }
 
 template <typename ElementT, std::size_t SectorSize>
 bool SectorArray2D<ElementT, SectorSize>::sectorValid(Sector const& sector) const {
-  return sector[0] < m_sectors.size(0) && sector[1] < m_sectors.size(1);
+  return sector[0] < m_sectors.extent(0) && sector[1] < m_sectors.extent(1);
 }
 
 template <typename ElementT, std::size_t SectorSize>
@@ -195,7 +197,7 @@ Vec2S SectorArray2D<ElementT, SectorSize>::sectorCorner(Sector const& id) const 
 template <typename ElementT, std::size_t SectorSize>
 bool SectorArray2D<ElementT, SectorSize>::hasSector(Sector const& id) const {
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((id[0] < m_sectors.size(0) && id[1] < m_sectors.size(1)));
+    Star::star_assert_failed((id[0] < m_sectors.extent(0) && id[1] < m_sectors.extent(1)));
   }
   return (bool)m_sectors(id[0], id[1]);
 }

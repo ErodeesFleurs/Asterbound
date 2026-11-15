@@ -142,6 +142,31 @@ See [native output rules](development.md#logging-and-native-process-output).
   Keep low-rank bound collection separate from weight evaluation and retain
   the local fast-math inlining/reassociation boundaries.
 
+### Multidimensional storage
+
+`MultiArray` owns composed storage with last-index-contiguous layout. `extents()`
+and `extent(dim)` describe shape; `size()` counts elements. `resize` preserves the
+coordinate intersection and initializes new cells; `set_size` retains the linear
+prefix instead. Use the latter before full overwrites, not as uninitialized storage.
+Checked shape/growth operations reject invalid dimensions and overflowing products
+before mutation. Trusted constructors use the existing fatal policy for bad shapes.
+
+Retain zero-axis, clipped-copy and recovery coverage. `clear` and empty resizes
+retain capacity; other reshapes need not. Region copies reject overlapping
+self-copies before writing; identical regions are no-ops and disjoint ones work.
+`view`, `elements` and checked `at` borrow only from lvalues and require real
+references; proxy storage uses indexing, `set`/`get` and traversal. Reacquire borrows
+after structural changes. Visitors and table evaluators are borrowed, including
+noncopyable mutable callables; moved-from owners retain valid empty shapes.
+
+`MultiTable` validates nondecreasing axes once when configuring or adopting data.
+Duplicates and empty axes remain supported; failed configuration preserves the
+old table. `assign` move-adopts matching axes and data without a second grid.
+The owning array is read-only; bounded value views remain writable. Preserve
+inverse-lower duplicate selection, including flat-domain boundaries.
+Generic array serialization writes dimensions then last-index-contiguous values;
+tile-update packets keep their distinct y-outer/x-inner traversal.
+
 ### Random stream compatibility
 
 `RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's

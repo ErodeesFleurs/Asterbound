@@ -227,8 +227,9 @@ std::expected<void, StarException> CollisionGenerator::populateCollisionBuffer(R
   int ymax = region.yMax() + BlockInfluenceRadius;
 
   if (!m_accessor) return std::unexpected(StarException("CollisionGenerator not initialized"));
+  auto resized = m_collisionBuffer.set_size(xmax - xmin, ymax - ymin);
+  if (!resized) return std::unexpected(std::move(resized.error()));
   m_collisionBufferCorner = {xmin, ymin};
-  m_collisionBuffer.resize(xmax - xmin, ymax - ymin);
   for (int x = xmin; x < xmax; ++x)
     for (int y = ymin; y < ymax; ++y) {
       auto kind = m_accessor(x, y);

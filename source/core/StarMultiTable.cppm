@@ -11,6 +11,16 @@ import star.array;
 import star.math_common;
 namespace Star {
 
+template <typename Op, typename Point, typename Reference>
+concept multi_table_evaluator = requires(Op& op, Point& point, Reference element) {
+  element = std::invoke(op, point);
+};
+
+template <typename Range>
+concept multi_table_ordered_range = requires(typename Range::value_type const& left, typename Range::value_type const& right) {
+  (left < right) ? true : false;
+};
+
 // Provides a method for storing, retrieving, and interpolating uneven
 // n-variate data.  Access times involve a binary search over the domain of
 // each dimension, so is O(log(n)*m) where n is the size of the largest
@@ -36,51 +46,140 @@ public:
   using RangeArray = Array<Range, Rank>;
 
   MultiTable() = default;
+  MultiTable(MultiTable const&) = default;
+  MultiTable& operator=(MultiTable const&) = default;
 
-  // Set input ranges on a particular dimension.  Will resize underlying storage
-  // to fit range. Ranges must be sorted in ascending order.
-  void set_range(std::size_t dim, Range const& range) {
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((std::is_sorted(range.begin(), range.end())));
+  MultiTable(MultiTable&&) = default;
+
+  MultiTable& operator=(MultiTable&& other)
+      noexcept(std::is_nothrow_move_assignable_v<RangeArray> && std::is_nothrow_move_assignable_v<MultiArray>) {
+    if (this != std::addressof(other)) {
+      m_ranges = std::move(other.m_ranges);
+      m_array = std::move(other.m_array);
+      m_interpolation_mode = other.m_interpolation_mode;
+      m_bound_mode = other.m_bound_mode;
     }
-    SizeArray sizes = m_array.size();
+    return *this;
+  }
+
+  // Axes are nondecreasing: duplicates and empty ranges are supported.
+  // Validate before changing either the axes or the coordinate-preserving grid.
+  [[nodiscard]] std::expected<void, StarException> set_range(std::size_t dim, Range range)
+    requires (multi_table_ordered_range<Range>
+        && requires(MultiArray& array, SizeArray const& shape, Range& target, Range&& source) {
+          array.resize(shape);
+          target = std::move(source);
+        })
+  {
+    if (dim >= Rank)
+      return std::unexpected(MathException("MultiTable range dimension is out of bounds"));
+    if (!std::is_sorted(range.begin(), range.end()))
+      return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
+    SizeArray sizes = m_array.extents();
     sizes[dim] = range.size();
-    m_array.resize(sizes);
-
-    m_ranges[dim] = range;
+    auto resized = m_array.resize(sizes);
+    if (!resized)
+      return std::unexpected(std::move(resized.error()));
+    m_ranges[dim] = std::move(range);
+    return {};
   }
 
-  void set_ranges(RangeArray const& ranges) {
-    SizeArray arraySize;
-
+  [[nodiscard]] std::expected<void, StarException> set_ranges(RangeArray ranges)
+    requires (multi_table_ordered_range<Range>
+        && requires(MultiArray& array, SizeArray const& shape, RangeArray& target, RangeArray&& source) {
+          array.resize(shape);
+          target = std::move(source);
+        })
+  {
+    SizeArray sizes;
     for (std::size_t dim = 0; dim < Rank; ++dim) {
-      if constexpr (Star::DebugEnabled) {
-        Star::star_assert_failed((std::is_sorted(ranges[dim].begin(), ranges[dim].end())));
-      }
-      arraySize[dim] = ranges[dim].size();
-      m_ranges[dim] = ranges[dim];
+      if (!std::is_sorted(ranges[dim].begin(), ranges[dim].end()))
+        return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
+      sizes[dim] = ranges[dim].size();
     }
-
-    m_array.resize(arraySize);
+    auto resized = m_array.resize(sizes);
+    if (!resized)
+      return std::unexpected(std::move(resized.error()));
+    m_ranges = std::move(ranges);
+    return {};
   }
 
-  // Set array element based on index.
-  [[nodiscard]] std::expected<void, StarException> set(IndexArray const& index, Element const& element) {
-    return m_array.set(index, element);
+  // Adopt an already populated grid without allocating another one.
+  [[nodiscard]] std::expected<void, StarException> assign(RangeArray ranges, MultiArray data)
+    requires (multi_table_ordered_range<Range>
+        && requires(RangeArray& target_ranges, RangeArray&& source_ranges, MultiArray& target_data, MultiArray&& source_data) {
+          target_ranges = std::move(source_ranges);
+          target_data = std::move(source_data);
+        })
+  {
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if (!std::is_sorted(ranges[dim].begin(), ranges[dim].end()))
+        return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
+      if (ranges[dim].size() != data.extent(dim))
+        return std::unexpected(MathException("MultiTable ranges do not match the data extents"));
+    }
+    m_ranges = std::move(ranges);
+    m_array = std::move(data);
+    return {};
   }
 
-  // Get array element based on index.
-  Element const& get(IndexArray const& index) const {
+  void clear() {
+    for (auto& range : m_ranges)
+      range.clear();
+    m_array.clear();
+  }
+
+  [[nodiscard]] std::expected<void, StarException> set(IndexArray const& index, Element element)
+    requires requires(MultiArray& array, Element&& value) { array.set(index, std::move(value)); }
+  {
+    return m_array.set(index, std::move(element));
+  }
+
+  typename MultiArray::Storage::reference operator[](IndexArray const& index) {
     return m_array(index);
   }
 
-  MultiArray const& array() const {
-    return m_array;
+  typename MultiArray::Storage::const_reference operator[](IndexArray const& index) const {
+    return m_array(index);
   }
 
-  MultiArray& array() {
+  [[nodiscard]] auto at(IndexArray const& index) &
+    requires requires(MultiArray& array) { array.at(index); }
+  {
+    return m_array.at(index);
+  }
+
+  [[nodiscard]] auto at(IndexArray const& index) const &
+    requires requires(MultiArray const& array) { array.at(index); }
+  {
+    return m_array.at(index);
+  }
+
+  void at(IndexArray const&) && = delete;
+  void at(IndexArray const&) const && = delete;
+
+  MultiArray const& array() const & {
     return m_array;
   }
+  MultiArray const& array() const && = delete;
+
+  auto view() & requires requires(MultiArray& array) { array.view(); } {
+    return m_array.view();
+  }
+  auto view() const & requires requires(MultiArray const& array) { array.view(); } {
+    return m_array.view();
+  }
+  void view() && = delete;
+  void view() const && = delete;
+
+  auto elements() & requires requires(MultiArray& array) { array.elements(); } {
+    return m_array.elements();
+  }
+  auto elements() const & requires requires(MultiArray const& array) { array.elements(); } {
+    return m_array.elements();
+  }
+  void elements() && = delete;
+  void elements() const && = delete;
 
   InterpolationMode interpolation_mode() const { return m_interpolation_mode; }
 
@@ -99,7 +198,7 @@ public:
     }
   {
     for (std::size_t dim = 0; dim < Rank; ++dim) {
-      if (m_ranges[dim].empty() || m_array.size(dim) == 0)
+      if (m_ranges[dim].empty() || m_array.extent(dim) == 0)
         return std::unexpected(MathException("Cannot interpolate a MultiTable with an empty axis"));
     }
 
@@ -131,9 +230,16 @@ public:
 
   // op should take a PositionArray parameter and return an element.
   template <typename OpType>
-    requires requires(OpType& op, PositionArray& point, Element& element) { element = std::invoke(op, point); }
+    requires (multi_table_evaluator<OpType, PositionArray, typename MultiArray::Storage::reference>
+        && std::is_default_constructible_v<PositionArray>
+        && requires(Position& target, typename Range::reference source) { target = source; })
   void eval(OpType&& op) {
-    m_array.forEach(EvalWrapper<OpType>(op, *this));
+    m_array.for_each([&](IndexArray const& index, auto&& element) {
+      PositionArray point;
+      for (std::size_t dim = 0; dim < Rank; ++dim)
+        point[dim] = m_ranges[dim][index[dim]];
+      element = std::invoke(op, point);
+    });
   }
 
 private:
@@ -144,22 +250,6 @@ private:
     return indexCoord;
   }
 
-  template <typename OpType>
-  struct EvalWrapper {
-    EvalWrapper(OpType& o, MultiTable const& t)
-      : op(o), table(t) {}
-
-    void operator()(IndexArray const& indexArray, Element& element) {
-      PositionArray rangeArray;
-      for (std::size_t i = 0; i < Rank; ++i)
-        rangeArray[i] = table.m_ranges[i][indexArray[i]];
-
-      element = std::invoke(op, rangeArray);
-    }
-
-    OpType& op;
-    MultiTable const& table;
-  };
 
   RangeArray m_ranges;
   MultiArray m_array;
@@ -180,6 +270,8 @@ using MultiTable4D = MultiTable<double, double, 4>;
 export module star.multi_table;
 
 export namespace Star {
+  using ::Star::multi_table_evaluator;
+  using ::Star::multi_table_ordered_range;
   using ::Star::MultiTable;
   using ::Star::MultiTable2F;
   using ::Star::MultiTable2D;

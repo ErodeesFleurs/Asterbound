@@ -67,10 +67,10 @@ struct MultiArrayInterpolator2 {
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_linear_value<Element, Position> && requires {
       array.view();
-      get_bound2(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound2(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList imin;
@@ -78,7 +78,7 @@ struct MultiArrayInterpolator2 {
     Array<WeightList, Rank> axis_weights;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto binfo = get_bound2(coord[i], array.size(i), bound_mode);
+      auto binfo = get_bound2(coord[i], array.extent(i), bound_mode);
       imin[i] = binfo.i0;
       imax[i] = binfo.i1;
       axis_weights[i] = weight_function(Position(binfo.offset));
@@ -134,10 +134,10 @@ struct MultiArrayInterpolator4 {
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_cubic_value<Element, Position> && requires {
       array.view();
-      get_bound4(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound4(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList index0;
@@ -147,12 +147,12 @@ struct MultiArrayInterpolator4 {
     Array<WeightList, Rank> axis_weights;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto bound = get_bound4(coord[i], array.size(i), bound_mode);
+      auto bound = get_bound4(coord[i], array.extent(i), bound_mode);
       index0[i] = bound.i0;
       index1[i] = bound.i1;
       index2[i] = bound.i2;
       index3[i] = bound.i3;
-      axis_weights[i] = array.size(i) == 1 || (array.size(i) < 4 && bound_mode != BoundMode::Wrap)
+      axis_weights[i] = array.extent(i) == 1 || (array.extent(i) < 4 && bound_mode != BoundMode::Wrap)
         ? WeightList{0, 1 - bound.offset, bound.offset, 0}
         : weight_function(Position(bound.offset));
     }
@@ -227,10 +227,10 @@ struct MultiArrayPiecewiseInterpolator {
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_piecewise_value<Element, Position> && requires {
       array.view();
-      get_bound2(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound2(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     PiecewiseRangeList piecewiseRangeList;
@@ -242,7 +242,7 @@ struct MultiArrayPiecewiseInterpolator {
         PiecewiseRange range;
         range.dim = i;
 
-        auto bound = get_bound2(coord[i], array.size(i), bound_mode);
+        auto bound = get_bound2(coord[i], array.extent(i), bound_mode);
         minIndex[i] = bound.i0;
         maxIndex[i] = bound.i1;
         range.offset = bound.offset;
@@ -299,10 +299,10 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 2>, PositionT, WeightFunctio
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_linear_value<Element, Position> && requires {
       array.view();
-      get_bound2(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound2(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList imin;
@@ -310,7 +310,7 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 2>, PositionT, WeightFunctio
     PositionList offset;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto bound = get_bound2(coord[i], array.size(i), bound_mode);
+      auto bound = get_bound2(coord[i], array.extent(i), bound_mode);
       imin[i] = bound.i0;
       imax[i] = bound.i1;
       offset[i] = bound.offset;
@@ -356,10 +356,10 @@ struct MultiArrayInterpolator4<MultiArray<ElementT, 2>, PositionT, WeightFunctio
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_cubic_value<Element, Position> && requires {
       array.view();
-      get_bound4(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound4(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList index0;
@@ -369,7 +369,7 @@ struct MultiArrayInterpolator4<MultiArray<ElementT, 2>, PositionT, WeightFunctio
     PositionList offset;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto bound = get_bound4(coord[i], array.size(i), bound_mode);
+      auto bound = get_bound4(coord[i], array.extent(i), bound_mode);
       index0[i] = bound.i0;
       index1[i] = bound.i1;
       index2[i] = bound.i2;
@@ -441,10 +441,10 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 3>, PositionT, WeightFunctio
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_linear_value<Element, Position> && requires {
       array.view();
-      get_bound2(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound2(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList imin;
@@ -452,7 +452,7 @@ struct MultiArrayInterpolator2<MultiArray<ElementT, 3>, PositionT, WeightFunctio
     PositionList offset;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto bound = get_bound2(coord[i], array.size(i), bound_mode);
+      auto bound = get_bound2(coord[i], array.extent(i), bound_mode);
       imin[i] = bound.i0;
       imax[i] = bound.i1;
       offset[i] = bound.offset;
@@ -505,10 +505,10 @@ struct MultiArrayInterpolator4<MultiArray<ElementT, 3>, PositionT, WeightFunctio
   Element interpolate(MultiArray const& array, PositionList const& coord) const
     requires tensor_cubic_value<Element, Position> && requires {
       array.view();
-      get_bound4(coord[0], array.size(0), BoundMode::Clamp);
+      get_bound4(coord[0], array.extent(0), BoundMode::Clamp);
     }
   {
-    if (array.count() == 0)
+    if (array.empty())
       return Element{};
 
     IndexList index0;
@@ -518,7 +518,7 @@ struct MultiArrayInterpolator4<MultiArray<ElementT, 3>, PositionT, WeightFunctio
     PositionList offset;
 
     for (std::size_t i = 0; i < Rank; ++i) {
-      auto bound = get_bound4(coord[i], array.size(i), bound_mode);
+      auto bound = get_bound4(coord[i], array.extent(i), bound_mode);
       index0[i] = bound.i0;
       index1[i] = bound.i1;
       index2[i] = bound.i2;

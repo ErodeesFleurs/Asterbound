@@ -827,8 +827,8 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
             if (!first)
               EXPECT_EQ(source, shared->second);
             retainedSnapshots.push_back({source, wire.data(), rules});
-            for (std::size_t x = 0; x < array->array.size(0); ++x) {
-              for (std::size_t y = 0; y < array->array.size(1); ++y) {
+            for (std::size_t x = 0; x < array->array.extent(0); ++x) {
+              for (std::size_t y = 0; y < array->array.extent(1); ++y) {
                 auto pos = array->min + Vec2I(x, y);
                 auto server = world->getServerTile(pos);
                 ASSERT_TRUE(server) << server.error().what();

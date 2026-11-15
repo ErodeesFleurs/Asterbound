@@ -3738,7 +3738,9 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
       auto tileArrayUpdate = std::make_shared<TileArrayUpdatePacket>();
       auto sectorTiles = m_tileArray->sectorRegion(sector);
       tileArrayUpdate->min = sectorTiles.min();
-      tileArrayUpdate->array.resize(Vec2S(sectorTiles.width(), sectorTiles.height()));
+      auto resized = tileArrayUpdate->array.set_size(Vec2S(sectorTiles.width(), sectorTiles.height()));
+      if (!resized)
+        return std::unexpected(std::move(resized.error()));
       for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
         for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
           auto result400 = writeNetTile({x, y}, tileArrayUpdate->array(x - sectorTiles.xMin(), y - sectorTiles.yMin()));
