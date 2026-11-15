@@ -563,7 +563,7 @@ if (!result303) return std::unexpected(std::move(result303.error()));
 particle = std::move(*result303);
     auto result304 = mainConfig.getFloat("hueshift", 0);
 if (!result304) return std::unexpected(std::move(result304.error()));
-particle.color.hueShift(std::move(*result304) / 360.0f);
+particle.color.hue_shift(std::move(*result304) / 360.0f);
     for (Directives const& directives : piece.image.directives.list())
       particle.directives.append(directives);
 

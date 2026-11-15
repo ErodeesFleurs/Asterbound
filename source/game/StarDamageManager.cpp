@@ -120,10 +120,10 @@ std::expected<void, StarException> DamageManager::update(float dt) {
 
       if (std::holds_alternative<PolyF>(damageSource.damageArea))
         self.m_world.get().root().spatialLogger().log_poly("world", std::get<PolyF>(damageSource.damageArea),
-                                                           Color::Orange.toRgba());
+                                                           Color::Orange.to_rgba());
       else if (std::holds_alternative<Line2F>(damageSource.damageArea))
         self.m_world.get().root().spatialLogger().log_line("world", std::get<Line2F>(damageSource.damageArea),
-                                                           Color::Orange.toRgba());
+                                                           Color::Orange.to_rgba());
 
       auto hits = self.queryHit(damageSource, causingEntity->entityId());
       if (!hits) return std::unexpected(std::move(hits.error()));

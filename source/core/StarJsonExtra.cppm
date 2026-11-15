@@ -58,8 +58,8 @@ Json jsonFromRectI(RectI const& rect);
 std::expected<RectU, StarException> jsonToRectU(Json const& v);
 Json jsonFromRectU(RectU const& rect);
 
-// Can be a string, array of size 3 or 4 of doubles or ints.  If double, range
-// is 0.0 to 1.0, if int range is 0-255
+// A named/hex string or an RGB[A] array. Numeric channels convert through
+// getInt (fractional values truncate), then narrow to bytes; absent alpha is 255.
 std::expected<Color, StarException> jsonToColor(Json const& v);
 Json jsonFromColor(Color const& color);
 

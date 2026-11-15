@@ -38,14 +38,14 @@ std::expected<std::reference_wrapper<TextStyle>, StarException> TextStyle::loadJ
   if (*jColor) {
     auto converted = jsonToColor(**jColor);
     if (!converted) return std::unexpected(std::move(converted.error()));
-    color = converted->toRgba();
+    color = converted->to_rgba();
   }
   auto jShadow = config.opt("shadow");
   if (!jShadow) return std::unexpected(std::move(jShadow.error()));
   if (*jShadow) {
     auto converted = jsonToColor(**jShadow);
     if (!converted) return std::unexpected(std::move(converted.error()));
-    shadow = converted->toRgba();
+    shadow = converted->to_rgba();
   }
   auto size = config.getUInt("fontSize", fontSize);
   if (!size) return std::unexpected(std::move(size.error()));

@@ -36,7 +36,7 @@ std::expected<void, StarException> DrawablePainter::drawDrawable(Drawable const&
 }
 
 std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawable const& drawable, Vec2F position, float scale, float lineWidthScale) {
-  Vec4B color = drawable.color.toRgba();
+  Vec4B color = drawable.color.to_rgba();
   auto& primitives = m_renderer->immediatePrimitives();
 
   if (std::holds_alternative<Drawable::LinePart>(drawable.part)) {
@@ -55,7 +55,7 @@ std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawab
       color, fullbright);
     if (auto endColor = optional_ref(linePart.endColor)) {
       RenderQuad& quad = std::get<RenderQuad>(primitive);
-      quad.c.color = quad.d.color = endColor->get().toRgba();
+      quad.c.color = quad.d.color = endColor->get().to_rgba();
     }
   } else if (std::holds_alternative<Drawable::PolyPart>(drawable.part)) {
     auto const& polyPart = std::get<Drawable::PolyPart>(drawable.part);

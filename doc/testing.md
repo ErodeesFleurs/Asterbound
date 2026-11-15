@@ -167,6 +167,28 @@ inverse-lower duplicate selection, including flat-domain boundaries.
 Generic array serialization writes dimensions then last-index-contiguous values;
 tile-update packets keep their distinct y-outer/x-inner traversal.
 
+### Colors and byte codecs
+
+`Color` uses finite straight RGBA floats and defaults to transparent black.
+RGB byte getters round; alpha and the shared float-to-byte helpers truncate.
+Gamma conversion changes RGB only; mixing does not implicitly convert color
+spaces or premultiply alpha. `data()` borrows only from lvalues; `to_rgba_f()`
+returns an owned value.
+
+HSV hue uses turns: factories and `set_hue` clamp, while shifts wrap.
+Image hue directives take degrees. Placement warnings retain their original
+clamped red hue. Keep getter/setter saturation arithmetic in image kernels:
+reusing the HSV tuple can change half-byte rounding under optimized fast-math.
+Color hue shifts compute hue once and reconstruct through scalar saturation/value
+getters, retaining the old float and byte results without a second HSV conversion.
+
+Hex parsing accepts only 3/4/6/8 ASCII digits; malformed digits fail rather than
+silently becoming zero. Named lookup preserves the custom palette, ASCII case
+folding, full UTF-8 validation and embedded-NUL extent. JSON/Lua retain byte
+RGB[A] arrays and their existing coercions; binary colors remain four sequential
+RGBA float scalars in the selected byte order, not packed ARGB32 words.
+Retain independent byte oracles, failed-decode destination state and recovery.
+
 ### Random stream compatibility
 
 `RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's

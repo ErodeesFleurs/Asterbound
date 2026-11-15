@@ -37,22 +37,22 @@ std::expected<String, StarException> palette_swap_directives_from_config(Json co
   if (!object)
     return std::unexpected(std::move(object.error()));
   for (auto const& swap : *object) {
-    auto from = Color::fromHex(swap.first);
+    auto from = Color::from_hex(swap.first);
     if (!from)
       return std::unexpected(std::move(from.error()));
     auto text = swap.second.toString();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto to = Color::fromHex(*text);
+    auto to = Color::from_hex(*text);
     if (!to)
       return std::unexpected(std::move(to.error()));
-    paletteSwaps.colorReplaceMap[from->toRgba()] = to->toRgba();
+    paletteSwaps.colorReplaceMap[from->to_rgba()] = to->to_rgba();
   }
   return "?" + image_operation_to_string(paletteSwaps);
 }
 
 HueShiftImageOperation HueShiftImageOperation::hue_shift_degrees(float degrees) {
-  return HueShiftImageOperation{degrees / 360.0f};
+  return HueShiftImageOperation{positive_mod(degrees / 360.0f, 1.0f)};
 }
 
 SaturationShiftImageOperation SaturationShiftImageOperation::saturation_shift_100(float amount) {
@@ -67,10 +67,17 @@ FadeToColorImageOperation::FadeToColorImageOperation(Vec3B color, float amount)
   : color(color), amount(amount), m_color_tables(std::make_shared<ColorLookupTables const>(color, amount)) {}
 
 ColorLookupTables::ColorLookupTables(Vec3B color, float amount) {
-
-  auto fcl = Color::rgb(color).toLinear();
+  auto fcl = Color::rgb(color).to_linear();
+  // Decode through the byte Color path once, retaining its exact rounding.
+  static std::array<float, 256> const decoded_gray = [] {
+    std::array<float, 256> values;
+    for (int i = 0; i <= 255; ++i)
+      values[i] = Color::rgb(Vec3B(i, i, i)).to_linear().red_f();
+    return values;
+  }();
   for (int i = 0; i <= 255; ++i) {
-    auto r = Color::rgb(Vec3B(i, i, i)).toLinear().mix(fcl, amount).toSRGB().toRgb();
+    float gray = decoded_gray[i];
+    auto r = Color::rgb_f(gray, gray, gray).mix(fcl, amount).to_srgb().to_rgb();
     r_table[i] = r[0];
     g_table[i] = r[1];
     b_table[i] = r[2];
@@ -96,10 +103,10 @@ ImageOperation image_operation_from_string(StringView string) {
         if (!source)
           source = hex;
         else {
-          auto from = Color::hexToVec4B(*source);
+          auto from = Color::parse_rgba_hex(*source);
           if (!from)
             return ErrorImageOperation{.cause = std::move(from.error())};
-          auto to = Color::hexToVec4B(hex);
+          auto to = Color::parse_rgba_hex(hex);
           if (!to)
             return ErrorImageOperation{.cause = std::move(to.error())};
           operation.colorReplaceMap[*from] = *to;
@@ -142,31 +149,31 @@ ImageOperation image_operation_from_string(StringView string) {
   if (type == "flipxy")
     return FlipImageOperation{FlipImageOperation::FlipXY};
   if (type == "setcolor" || type == "multiply") {
-    auto color = Color::fromHex(bits[1]);
+    auto color = Color::from_hex(bits[1]);
     if (!color)
       return error(std::move(color.error()));
     if (type == "setcolor")
-      return SetColorImageOperation{color->toRgb()};
-    return MultiplyImageOperation{color->toRgba()};
+      return SetColorImageOperation{color->to_rgb()};
+    return MultiplyImageOperation{color->to_rgba()};
   }
   if (type == "fade" || type == "scanlines") {
-    auto color = Color::fromHex(bits[1]);
+    auto color = Color::from_hex(bits[1]);
     if (!color)
       return error(std::move(color.error()));
     auto amount = lexical_cast<float>(bits[2]);
     if (!amount)
       return error(std::move(amount.error()));
-    FadeToColorImageOperation fade(color->toRgb(), *amount);
+    FadeToColorImageOperation fade(color->to_rgb(), *amount);
     if (type == "fade")
       return fade;
-    auto secondColor = Color::fromHex(bits[3]);
+    auto secondColor = Color::from_hex(bits[3]);
     if (!secondColor)
       return error(std::move(secondColor.error()));
     auto secondAmount = lexical_cast<float>(bits[4]);
     if (!secondAmount)
       return error(std::move(secondAmount.error()));
     return ScanLinesImageOperation{.fade1 = fade,
-                                   .fade2 = FadeToColorImageOperation(secondColor->toRgb(), *secondAmount)};
+                                   .fade2 = FadeToColorImageOperation(secondColor->to_rgb(), *secondAmount)};
   }
   if (type == "addmask" || type == "submask" || type == "blendmult" || type == "blendscreen") {
     StringList references;
@@ -200,15 +207,15 @@ ImageOperation image_operation_from_string(StringView string) {
     auto pixels = lexical_cast<unsigned>(bits[1]);
     if (!pixels)
       return error(std::move(pixels.error()));
-    auto start = Color::fromHex(bits[2]);
+    auto start = Color::from_hex(bits[2]);
     if (!start)
       return error(std::move(start.error()));
-    auto end = bits.size() > 3 ? Color::fromHex(bits[3]) : start;
+    auto end = bits.size() > 3 ? Color::from_hex(bits[3]) : start;
     if (!end)
       return error(std::move(end.error()));
     return BorderImageOperation{.pixels = *pixels,
-                                .startColor = start->toRgba(),
-                                .endColor = end->toRgba(),
+                                .startColor = start->to_rgba(),
+                                .endColor = end->to_rgba(),
                                 .outlineOnly = type == "outline",
                                 .includeTransparent = false};
   }
@@ -251,19 +258,19 @@ String image_operation_to_string(ImageOperation const& operation) {
   } else if (auto op = (std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<BrightnessMultiplyImageOperation>(operation))} : std::nullopt)) {
     return Star::format("brightness={}", (op->get().brightnessMultiply - 1.0f) * 100.0f);
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
-    return Star::format("fade={}={}", Color::rgb(op->get().color).toHex(), op->get().amount);
+    return Star::format("fade={}={}", Color::rgb(op->get().color).to_hex(), op->get().amount);
   } else if (auto op = (std::holds_alternative<ScanLinesImageOperation>(operation) ? std::optional{std::cref(std::get<ScanLinesImageOperation>(operation))} : std::nullopt)) {
     return Star::format("scanlines={}={}={}={}",
-        Color::rgb(op->get().fade1.color).toHex(),
+        Color::rgb(op->get().fade1.color).to_hex(),
         op->get().fade1.amount,
-        Color::rgb(op->get().fade2.color).toHex(),
+        Color::rgb(op->get().fade2.color).to_hex(),
         op->get().fade2.amount);
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
-    return Star::format("setcolor={}", Color::rgb(op->get().color).toHex());
+    return Star::format("setcolor={}", Color::rgb(op->get().color).to_hex());
   } else if (auto op = (std::holds_alternative<ColorReplaceImageOperation>(operation) ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))} : std::nullopt)) {
     String str = "replace";
     for (auto const& pair : op->get().colorReplaceMap)
-      str += Star::format(";{}={}", Color::rgba(pair.first).toHex(), Color::rgba(pair.second).toHex());
+      str += Star::format(";{}={}", Color::rgba(pair.first).to_hex(), Color::rgba(pair.second).to_hex());
     return str;
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == AlphaMaskImageOperation::Additive)
@@ -276,12 +283,12 @@ String image_operation_to_string(ImageOperation const& operation) {
     else if (op->get().mode == BlendImageOperation::Screen)
       return Star::format("blendscreen={};{};{}", op->get().blendImages.join("+"), op->get().offset[0], op->get().offset[1]);
   } else if (auto op = (std::holds_alternative<MultiplyImageOperation>(operation) ? std::optional{std::cref(std::get<MultiplyImageOperation>(operation))} : std::nullopt)) {
-    return Star::format("multiply={}", Color::rgba(op->get().color).toHex());
+    return Star::format("multiply={}", Color::rgba(op->get().color).to_hex());
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
     if (op->get().outlineOnly)
-      return Star::format("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("outline={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).to_hex(), Color::rgba(op->get().endColor).to_hex());
     else
-      return Star::format("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).toHex(), Color::rgba(op->get().endColor).toHex());
+      return Star::format("border={};{};{}", op->get().pixels, Color::rgba(op->get().startColor).to_hex(), Color::rgba(op->get().endColor).to_hex());
   } else if (auto op = (std::holds_alternative<ScaleImageOperation>(operation) ? std::optional{std::cref(std::get<ScaleImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == ScaleImageOperation::Nearest)
       return Star::format("scalenearest={}", op->get().scale);
@@ -392,9 +399,10 @@ static void process_saturation_shift(Image& image, SaturationShiftImageOperation
   image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
     if (pixel[3] != 0) {
       recent.apply(pixel, [&op](Vec4B const& input) {
+        // Retain getter/setter arithmetic: HSV-tuple reuse changes half-byte rounding under fast-math.
         Color color = Color::rgba(input);
-        color.setSaturation(std::clamp(color.saturation() + op.saturationShiftAmount, 0.0f, 1.0f));
-        return color.toRgba();
+        color.set_saturation(std::clamp(color.saturation() + op.saturationShiftAmount, 0.0f, 1.0f));
+        return color.to_rgba();
       });
     }
   });
@@ -564,10 +572,10 @@ static std::expected<PixelRect, StarException> apply_blend(BlendImageOperation c
   {
     auto blendPixel = [&](unsigned x, unsigned y, Vec4B& pixel) {
       std::int64_t px = std::int64_t(x) + offsetX, py = std::int64_t(y) + offsetY;
-      Vec4F fpixel = Color::v4bToFloat(pixel);
+      Vec4F fpixel = Color::rgba_bytes_to_float(pixel);
       for (auto const& blend : sources) {
         if (px >= 0 && py >= 0 && px < blend.width && py < blend.height) {
-          Vec4F other = Color::v4bToFloat(blend.read(px, py));
+          Vec4F other = Color::rgba_bytes_to_float(blend.read(px, py));
           if constexpr (Mode == BlendImageOperation::Multiply)
             fpixel = fpixel.piecewise_multiply(other);
           else if constexpr (Mode == BlendImageOperation::Screen)
@@ -575,7 +583,7 @@ static std::expected<PixelRect, StarException> apply_blend(BlendImageOperation c
               Vec4F::filled(1.0f) - (Vec4F::filled(1.0f) - fpixel).piecewise_multiply(Vec4F::filled(1.0f) - other);
         }
       }
-      pixel = Color::v4fToByte(fpixel);
+      pixel = Color::rgba_float_to_bytes(fpixel);
     };
     if (image.bytes_per_pixel() == 4) {
       auto data = image.data();
@@ -620,7 +628,7 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
     RecentColors recent;
     image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0)
-        recent.apply(pixel, [&](Vec4B const& input) { return Color::hueShiftVec4B(input, op->get().hueShiftAmount); });
+        recent.apply(pixel, [&](Vec4B const& input) { return Color::hue_shift_rgba(input, op->get().hueShiftAmount); });
     });
   } else if (auto op = (std::holds_alternative<SaturationShiftImageOperation>(operation) ? std::optional{std::cref(std::get<SaturationShiftImageOperation>(operation))} : std::nullopt)) {
     if (op->get().saturationShiftAmount != 0.0f)
@@ -632,9 +640,9 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
     image.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
       if (pixel[3] != 0) {
         recent.apply(pixel, [&](Vec4B const& input) {
-          Color color = Color::rgba(input);
-          color.setValue(std::clamp(color.value() * op->get().brightnessMultiply, 0.0f, 1.0f));
-          return color.toRgba();
+          auto hsva = Color::rgba(input).to_hsva();
+          hsva[2] = std::clamp(hsva[2] * op->get().brightnessMultiply, 0.0f, 1.0f);
+          return Color::hsva(hsva).to_rgba();
         });
       }
     });
@@ -773,19 +781,19 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
             Color color = Color::rgba(op->get().startColor).mix(Color::rgba(op->get().endColor), percent);
             if (op->get().outlineOnly) {
               float pixelA = byte_to_float(pixel[3]);
-              color.setAlphaF((1.0f - pixelA) * std::fminf(pixelA, 0.5f) * 2.0f);
+              color.set_alpha_f((1.0f - pixelA) * std::fminf(pixelA, 0.5f) * 2.0f);
             }
             else {
               Color pixelF = Color::rgba(pixel);
-              float pixelA = pixelF.alphaF(), colorA = color.alphaF();
+              float pixelA = pixelF.alpha_f(), colorA = color.alpha_f();
               colorA += pixelA * (1.0f - colorA);
-              pixelF.convertToLinear(); //Mix in linear color space as it is more perceptually accurate
-              color.convertToLinear();
+              pixelF.convert_to_linear(); //Mix in linear color space as it is more perceptually accurate
+              color.convert_to_linear();
               color = color.mix(pixelF, pixelA);
-              color.convertToSRGB();
-              color.setAlphaF(colorA);
+              color.convert_to_srgb();
+              color.set_alpha_f(colorA);
             }
-            pixel = color.toRgba();
+            pixel = color.to_rgba();
           } else {
             pixel = Vec4B(Vec4F(op->get().startColor) * (1 - percent) + Vec4F(op->get().endColor) * percent);
           }

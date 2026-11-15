@@ -160,13 +160,13 @@ void CellularLightingCalculator::calculate(Image& output) {
   if (m_monochrome) {
     for (std::size_t x = arrayMin[0]; x < arrayMax[0]; ++x) {
       for (std::size_t y = arrayMin[1]; y < arrayMax[1]; ++y) {
-        output.set24(x - arrayMin[0], y - arrayMin[1], Color::grayf(m_lightArray.rightRef().getLight(x, y)).toRgb());
+        output.set24(x - arrayMin[0], y - arrayMin[1], Color::gray_f(m_lightArray.rightRef().getLight(x, y)).to_rgb());
       }
     }
   } else {
     for (std::size_t x = arrayMin[0]; x < arrayMax[0]; ++x) {
       for (std::size_t y = arrayMin[1]; y < arrayMax[1]; ++y) {
-        output.set24(x - arrayMin[0], y - arrayMin[1], Color::v3fToByte(m_lightArray.leftRef().getLight(x, y)));
+        output.set24(x - arrayMin[0], y - arrayMin[1], Color::rgb_float_to_bytes(m_lightArray.leftRef().getLight(x, y)));
       }
     }
   }

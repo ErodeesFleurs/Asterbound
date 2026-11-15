@@ -159,13 +159,13 @@ operator>>(DataStream& ds, MultiArray<ElementT, RankN>& array) {
 }
 
 [[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Color const& color) {
-  return ds << color.toRgbaF();
+  return ds << color.to_rgba_f();
 }
 
 [[nodiscard]] inline std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Color& color) {
   auto rgba = ds.read<Vec4F>();
   if (!rgba) return std::unexpected(std::move(rgba.error()));
-  color = Color::rgbaf(*rgba);
+  color = Color::rgba_f(*rgba);
   return std::ref(ds);
 }
 

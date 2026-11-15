@@ -1330,7 +1330,7 @@ if (!result610) return std::unexpected(std::move(result610.error()));
 auto result611 = std::move(*result610)->particle(config);
 if (!result611) return std::unexpected(std::move(result611.error()));
 auto particle = std::move(*result611);
-        particle.color.hueShift(hueshift);
+        particle.color.hue_shift(hueshift);
         if (!particle.string.empty()) {
           particle.string = Star::format("{}?hueshift={}", particle.string, hueshift);
           particle.image = particle.string;

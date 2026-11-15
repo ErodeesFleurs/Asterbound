@@ -347,13 +347,13 @@ auto paletteName = std::move(*result44);
     auto result46 = swapSet.iterateObject();
     if (!result46) return std::unexpected(std::move(result46.error()));
     for (auto const& swap : std::move(*result46)) {
-              auto result47 = Color::fromHex(swap.first);
+              auto result47 = Color::from_hex(swap.first);
     if (!result47) return std::unexpected(std::move(result47.error()));
     auto result48 = swap.second.toString();
     if (!result48) return std::unexpected(std::move(result48.error()));
-    auto result49 = Color::fromHex(*result48);
+    auto result49 = Color::from_hex(*result48);
     if (!result49) return std::unexpected(std::move(result49.error()));
-    colorSwaps[std::move(*result47).toRgba()] = std::move(*result49).toRgba();
+    colorSwaps[std::move(*result47).to_rgba()] = std::move(*result49).to_rgba();
             }
   }
   self.get().m_colorSwaps[paletteName].push_back(colorSwaps);
@@ -850,13 +850,13 @@ variant.nametagColor = std::move(*result143);
   if (*colorSwaps) {
     ColorReplaceMap swaps;
     for (auto const& pair : **colorSwaps) {
-      auto from = Color::fromHex(pair.first);
+      auto from = Color::from_hex(pair.first);
       if (!from) return std::unexpected(std::move(from.error()));
       auto text = pair.second.toString();
       if (!text) return std::unexpected(std::move(text.error()));
-      auto to = Color::fromHex(*text);
+      auto to = Color::from_hex(*text);
       if (!to) return std::unexpected(std::move(to.error()));
-      swaps.insert(from->toRgba(), to->toRgba());
+      swaps.insert(from->to_rgba(), to->to_rgba());
     }
     variant.colorSwap = std::move(swaps);
   }

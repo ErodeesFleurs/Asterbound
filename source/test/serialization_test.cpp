@@ -15,6 +15,7 @@ import star.data_stream;
 import star.uuid;
 import star.matrix3;
 import star.vector;
+import star.color;
 
 #include "gtest/gtest.h"
 
@@ -96,6 +97,37 @@ TEST(DataStreamTest, MatrixRowMajorWireBytesAndDefaultReadFactory) {
     EXPECT_EQ(*decoded, matrix);
     EXPECT_EQ(stream.read<std::uint8_t>(), 0x7e);
   }
+}
+
+TEST(DataStreamTest, ColorRetainsFourFloatChannelsInBothByteOrders) {
+  std::array<std::uint8_t, 16> const big_endian{
+      0x3f, 0x80, 0, 0, 0x3f, 0, 0, 0, 0, 0, 0, 0, 0x3e, 0x80, 0, 0};
+  auto const color = Color::rgba_f(1.0f, 0.5f, 0.0f, 0.25f);
+  for (auto order : {ByteOrder::BigEndian, ByteOrder::LittleEndian}) {
+    DataStreamBuffer stream;
+    stream.set_byte_order(order);
+    ASSERT_TRUE(stream << color);
+    ASSERT_TRUE(stream << std::uint8_t{0x7e});
+    ASSERT_EQ(stream.size(), 17u);
+    for (std::size_t i = 0; i < big_endian.size(); ++i)
+      EXPECT_EQ(static_cast<std::uint8_t>(stream.data()[i]),
+                big_endian[order == ByteOrder::BigEndian ? i : i ^ 3u]);
+    ASSERT_TRUE(stream.seek(0));
+    auto decoded = stream.read<Color>();
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->to_rgba_f(), Vec4F(1.0f, 0.5f, 0.0f, 0.25f));
+    EXPECT_EQ(stream.read<std::uint8_t>(), 0x7e);
+  }
+}
+
+TEST(DataStreamTest, TruncatedColorLeavesDestinationUnchanged) {
+  DataStreamBuffer stream(ByteArray({"\x3f\x80\x00\x00\x3f\x00\x00\x00\x00\x00\x00\x00\x3e\x80\x00", 15}));
+  stream.set_byte_order(ByteOrder::BigEndian);
+  Color color = Color::Blue;
+  auto decoded = stream >> color;
+  ASSERT_FALSE(decoded);
+  EXPECT_TRUE(decoded.error().is<EofException>());
+  EXPECT_EQ(color, Color::Blue);
 }
 
 TEST(DataStreamTest, MatrixTruncationKeepsCompletedRowPrefixAndReportsFailure) {

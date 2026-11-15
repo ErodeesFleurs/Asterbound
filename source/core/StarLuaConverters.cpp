@@ -8,9 +8,10 @@ import star.string_view;
 namespace Star {
 
 std::expected<void, StarException> LuaConverter<Color>::from(LuaStack stack, Color const& c) {
-  return c.alpha() == 255
+  auto alpha = c.alpha();
+  return alpha == 255
     ? stack.pushArray(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue()})
-    : stack.pushArray(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue(), c.alpha()});
+    : stack.pushArray(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue(), alpha});
 }
 
 std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaStackValue v) {
@@ -29,7 +30,7 @@ std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaSt
     if (!alpha)
       return std::unexpected(std::move(alpha.error()));
     if (*alpha)
-      c.setAlpha(**alpha);
+      c.set_alpha(**alpha);
     return c;
   } else if (v.is<LuaString>()) {
     auto text = v.stringView().utf8();

@@ -162,7 +162,7 @@ void CanvasWidget::drawText(String s, TextPositioning position, unsigned fontSiz
   TextStyle style;
   style.fontSize = fontSize;
   style.color = color;
-  style.shadow = fontModeToColor(mode).toRgba();
+  style.shadow = fontModeToColor(mode).to_rgba();
   style.lineSpacing = lineSpacing;
   style.font = std::move(font);
   style.directives = processingDirectives;

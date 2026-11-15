@@ -2109,7 +2109,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
         auto renderer = context().renderer();
         if (!renderer) return std::unexpected(std::move(renderer.error()));
         RenderQuad& quad = std::get<RenderQuad>(renderer->get().immediatePrimitives()
-            .emplace_back(std::in_place_type_t<RenderQuad>(), m_debugTextRect, m_config->debugBackgroundColor.toRgba(), 0.0f));
+            .emplace_back(std::in_place_type_t<RenderQuad>(), m_debugTextRect, m_config->debugBackgroundColor.to_rgba(), 0.0f));
         quad.b.color[3] = quad.c.color[3] = 0;
       }
       m_debugTextRect = RectF::null();

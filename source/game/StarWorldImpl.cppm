@@ -645,7 +645,7 @@ namespace WorldImpl {
     // tileEach can't handle rects that are WAY out of range.
     pos = worldGeometry.xwrap(pos);
 
-    Vec3F environmentLight = sky->environmentLight().toRgbF();
+    Vec3F environmentLight = sky->environmentLight().to_rgb_f();
     float undergroundLevel = worldTemplate->undergroundLevel();
     auto materialDatabase = root.materialDatabase();
     if (!materialDatabase)

@@ -150,7 +150,7 @@ std::expected<TextStyle, StarException> canvasTextStyle(Json const& sizeOrStyle,
     return std::unexpected(std::move(size.error()));
   TextStyle style;
   style.fontSize = *size;
-  style.color = color.value_or(Color::White).toRgba();
+  style.color = color.value_or(Color::White).to_rgba();
   style.lineSpacing = spacing.value_or(DefaultLineSpacing);
   style.font = font.value_or("");
   style.directives = directives.value_or("");
@@ -274,9 +274,9 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
         [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position, std::optional<float> scale,
            std::optional<Color> color, std::optional<bool> centered) {
           if (centered.value_or(false))
-            canvas->drawImageCentered(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
+            canvas->drawImageCentered(image, position, scale.value_or(1.0f), color.value_or(Color::White).to_rgba());
           else
-            canvas->drawImage(image, position, scale.value_or(1.0f), color.value_or(Color::White).toRgba());
+            canvas->drawImage(image, position, scale.value_or(1.0f), color.value_or(Color::White).to_rgba());
         });
       !registered)
     return std::unexpected(std::move(registered.error()));
@@ -306,7 +306,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
                                              [](std::shared_ptr<CanvasWidget> canvas, String image, RectF texture,
                                                 RectF screen, std::optional<Color> color) {
                                                canvas->drawImageRect(std::move(image), texture, screen,
-                                                                     color.value_or(Color::White).toRgba());
+                                                                     color.value_or(Color::White).to_rgba());
                                              });
       !registered)
     return std::unexpected(std::move(registered.error()));
@@ -314,14 +314,14 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
                                              [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2D offset,
                                                 RectF screen, std::optional<float> scale, std::optional<Color> color) {
                                                canvas->drawTiledImage(std::move(image), scale.value_or(1.0f), offset,
-                                                                      screen, color.value_or(Color::White).toRgba());
+                                                                      screen, color.value_or(Color::White).to_rgba());
                                              });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = registerCanvasMethod("drawLine",
                                              [](std::shared_ptr<CanvasWidget> canvas, Vec2F begin, Vec2F end,
                                                 std::optional<Color> color, std::optional<float> width) {
-                                               canvas->drawLine(begin, end, color.value_or(Color::White).toRgba(),
+                                               canvas->drawLine(begin, end, color.value_or(Color::White).to_rgba(),
                                                                 width.value_or(1.0f));
                                              });
       !registered)
@@ -329,14 +329,14 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
   if (auto registered =
         registerCanvasMethod("drawRect",
                              [](std::shared_ptr<CanvasWidget> canvas, RectF rect, std::optional<Color> color) {
-                               canvas->drawRect(rect, color.value_or(Color::White).toRgba());
+                               canvas->drawRect(rect, color.value_or(Color::White).to_rgba());
                              });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = registerCanvasMethod(
         "drawPoly",
         [](std::shared_ptr<CanvasWidget> canvas, PolyF poly, std::optional<Color> color, std::optional<float> width) {
-          canvas->drawPoly(poly, color.value_or(Color::White).toRgba(), width.value_or(1.0f));
+          canvas->drawPoly(poly, color.value_or(Color::White).to_rgba(), width.value_or(1.0f));
         });
       !registered)
     return std::unexpected(std::move(registered.error()));
@@ -351,7 +351,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
                                    return std::unexpected(StarException("Triangle must have exactly 3 sides"));
                                  triangles.emplace_back(polygon.vertex(0), polygon.vertex(1), polygon.vertex(2));
                                }
-                               canvas->drawTriangles(triangles, color.value_or(Color::White).toRgba());
+                               canvas->drawTriangles(triangles, color.value_or(Color::White).to_rgba());
                                return {};
                              });
       !registered)
@@ -670,7 +670,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("setFontColor", [parentWidget](String const& widgetName, Color color, std::optional<float> alpha) -> std::expected<void, StarException> {
     if (alpha)
-      color.setAlphaF(*alpha);
+      color.set_alpha_f(*alpha);
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       if (auto label = as<LabelWidget>(widget))
         label->setColor(color);

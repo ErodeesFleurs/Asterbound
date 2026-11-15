@@ -416,7 +416,7 @@ void TextPainter::setLineSpacing(float lineSpacing) {
 }
 
 void TextPainter::setMode(FontMode mode) {
-  m_renderSettings.shadow = fontModeToColor(mode).toRgba();
+  m_renderSettings.shadow = fontModeToColor(mode).to_rgba();
 }
 
 void TextPainter::setFontColor(Vec4B color) {
@@ -521,15 +521,15 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
         m_savedRenderSettings = m_renderSettings;
       } else if (command.starts_with("shadow")) {
         if (command.size() == 6) {
-          m_renderSettings.shadow = Color::Black.toRgba();
+          m_renderSettings.shadow = Color::Black.to_rgba();
         } else if (command[6] == '=') {
           auto color = Color::create(StringView(command.substr(7)));
           if (!color)
             return std::unexpected(std::move(color.error()));
-          m_renderSettings.shadow = color->toRgba();
+          m_renderSettings.shadow = color->to_rgba();
         }
       } else if (command == "noshadow") {
-        m_renderSettings.shadow = Color::Clear.toRgba();
+        m_renderSettings.shadow = Color::Clear.to_rgba();
       } else if (command.starts_with("font=")) {
         return setFont(String(command.substr(5)));
       } else if (command.starts_with("directives=")) {
@@ -540,8 +540,8 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
         auto color = Color::create(StringView(command));
         if (!color)
           return std::unexpected(std::move(color.error()));
-        color->setAlphaF(color->alphaF() * (static_cast<float>(m_savedRenderSettings.color[3])) / 255);
-        m_renderSettings.color = color->toRgba();
+        color->set_alpha_f(color->alpha_f() * (static_cast<float>(m_savedRenderSettings.color[3])) / 255);
+        m_renderSettings.color = color->to_rgba();
       }
       return {};
     };

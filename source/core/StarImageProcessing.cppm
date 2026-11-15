@@ -31,10 +31,10 @@ struct ErrorImageOperation {
 };
 
 struct HueShiftImageOperation {
-  // Specify hue shift angle as -360 to 360 rather than -1 to 1
+  // Finite angle in degrees, wrapped to one turn.
   static HueShiftImageOperation hue_shift_degrees(float degrees);
 
-  // value here is normalized to 1.0
+  // Value here is normalized to [0, 1).
   float hueShiftAmount;
 };
 

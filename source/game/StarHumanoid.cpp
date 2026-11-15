@@ -329,7 +329,7 @@ auto checked35 = config.get("color", JsonArray({51, 117, 237, 255}));
 if (!checked35) return std::unexpected(std::move(checked35.error()));
 auto checked36 = jsonToColor(std::move(*checked35));
 if (!checked36) return std::unexpected(std::move(checked36.error()));
-identity.color = checked36->toRgba();
+identity.color = checked36->to_rgba();
 }
 
   {

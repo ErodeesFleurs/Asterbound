@@ -13,6 +13,7 @@ import star.json_parser;
 import star.random;
 import star.matrix3;
 import star.vector;
+import star.color;
 
 #include "gtest/gtest.h"
 import star.json_patch;
@@ -58,6 +59,30 @@ TEST(JsonTest, MatrixRowsRetainAllNineScalars) {
   EXPECT_EQ((*decoded)[2], Vec3F(7, 8, 9));
   EXPECT_FALSE(json_to_mat3f(JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}}));
   EXPECT_FALSE(json_to_mat3f(JsonArray{JsonArray{1, 2, 3}, JsonArray{4, 5, 6}, JsonArray{7, "bad", 9}}));
+}
+
+TEST(JsonTest, ColorChannelsRetainIntegerCoercionAndAlphaQuantization) {
+  auto fractional = jsonToColor(JsonArray{0.5, 1.0, 255.9});
+  ASSERT_TRUE(fractional);
+  EXPECT_EQ(fractional->to_rgba(), Vec4B(0, 1, 255, 255));
+  auto narrowed = jsonToColor(JsonArray{256, -1, 258, 128});
+  ASSERT_TRUE(narrowed);
+  EXPECT_EQ(narrowed->to_rgba(), Vec4B(0, 255, 2, 128));
+  EXPECT_EQ(jsonFromColor(Color::rgba_f(0.5f, 0.0f, 1.0f, 0.5f)), (Json(JsonArray{128, 0, 255, 127})));
+  EXPECT_EQ(jsonFromColor(Color::rgba_f(0.5f, 0.0f, 1.0f, 1.0f)), (Json(JsonArray{128, 0, 255})));
+}
+
+TEST(JsonTest, ColorErrorsRetainTypeAndValidParsingRecovers) {
+  for (auto const& value : {Json(), Json(JsonArray{1, 2}), Json(JsonArray{1, "bad", 3})}) {
+    auto decoded = jsonToColor(value);
+    ASSERT_FALSE(decoded);
+    EXPECT_TRUE(decoded.error().is<JsonException>());
+  }
+  auto malformed = jsonToColor(Json("#ggg"));
+  ASSERT_FALSE(malformed);
+  EXPECT_TRUE(malformed.error().is<ColorException>());
+  EXPECT_EQ(jsonToColor(Json("RED")), Color::Red);
+  EXPECT_EQ(jsonToColor(Json("#1234")), Color::rgba(0x11, 0x22, 0x33, 0x44));
 }
 
 TEST(JsonTest, OptionalNullSkipsConvertersAndFalseRemainsPresent) {

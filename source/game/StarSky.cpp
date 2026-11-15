@@ -508,12 +508,12 @@ Color Sky::environmentLight() const {
     auto const& skyColoring = m_skyParameters.skyColoring.leftRef();
 
     Array<Vec4F, 4> colors;
-    colors[0] = skyColoring.morningLightColor.toRgbaF();
-    colors[1] = skyColoring.dayLightColor.toRgbaF();
-    colors[2] = skyColoring.eveningLightColor.toRgbaF();
-    colors[3] = skyColoring.nightLightColor.toRgbaF();
+    colors[0] = skyColoring.morningLightColor.to_rgba_f();
+    colors[1] = skyColoring.dayLightColor.to_rgba_f();
+    colors[2] = skyColoring.eveningLightColor.to_rgba_f();
+    colors[3] = skyColoring.nightLightColor.to_rgba_f();
 
-    return Color::rgbaf(list_interpolate2(colors, dayCycle(), SinWeightOperator<float>(), BoundMode::Wrap));
+    return Color::rgba_f(list_interpolate2(colors, dayCycle(), SinWeightOperator<float>(), BoundMode::Wrap));
   } else {
     return m_skyParameters.skyColoring.rightRef();
   }
@@ -531,25 +531,25 @@ std::pair<Color, Color> Sky::skyRectColors() const {
     auto const& skyColoring = m_skyParameters.skyColoring.leftRef();
 
     Array<Vec4F, 4> topColorList;
-    topColorList[0] = skyColoring.morningColors.first.toRgbaF();
-    topColorList[1] = skyColoring.dayColors.first.toRgbaF();
-    topColorList[2] = skyColoring.eveningColors.first.toRgbaF();
-    topColorList[3] = skyColoring.nightColors.first.toRgbaF();
+    topColorList[0] = skyColoring.morningColors.first.to_rgba_f();
+    topColorList[1] = skyColoring.dayColors.first.to_rgba_f();
+    topColorList[2] = skyColoring.eveningColors.first.to_rgba_f();
+    topColorList[3] = skyColoring.nightColors.first.to_rgba_f();
 
     Array<Vec4F, 4> bottomColorList;
-    bottomColorList[0] = skyColoring.morningColors.second.toRgbaF();
-    bottomColorList[1] = skyColoring.dayColors.second.toRgbaF();
-    bottomColorList[2] = skyColoring.eveningColors.second.toRgbaF();
-    bottomColorList[3] = skyColoring.nightColors.second.toRgbaF();
+    bottomColorList[0] = skyColoring.morningColors.second.to_rgba_f();
+    bottomColorList[1] = skyColoring.dayColors.second.to_rgba_f();
+    bottomColorList[2] = skyColoring.eveningColors.second.to_rgba_f();
+    bottomColorList[3] = skyColoring.nightColors.second.to_rgba_f();
 
     float cycle = dayCycle();
-    auto topColor = Color::rgbaf(list_interpolate2(topColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
+    auto topColor = Color::rgba_f(list_interpolate2(topColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
     auto bottomColor =
-      Color::rgbaf(list_interpolate2(bottomColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
+      Color::rgba_f(list_interpolate2(bottomColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
 
     float skyAlpha = Sky::skyAlpha();
-    topColor.setAlpha(topColor.alpha() * skyAlpha);
-    bottomColor.setAlpha(bottomColor.alpha() * skyAlpha);
+    topColor.set_alpha(topColor.alpha() * skyAlpha);
+    bottomColor.set_alpha(bottomColor.alpha() * skyAlpha);
 
     return {topColor, bottomColor};
   }
@@ -560,7 +560,7 @@ std::pair<Color, Color> Sky::skyRectColors() const {
 Color Sky::skyFlashColor() const {
   Color res = Color::White;
   float duration = m_numericSettings.flashTimer;
-  res.setAlphaF(duration == 0.0f ? 0.0f : m_flashTimer / duration);
+  res.set_alpha_f(duration == 0.0f ? 0.0f : m_flashTimer / duration);
   return res;
 }
 

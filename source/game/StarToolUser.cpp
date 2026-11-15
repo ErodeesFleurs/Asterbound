@@ -346,23 +346,23 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     Color opacityMask = Color::White;
     auto opacity = item->getAppropriateOpacity();
     if (!opacity) return std::unexpected(std::move(opacity.error()));
-    opacityMask.setAlphaF(*opacity);
+    opacityMask.set_alpha_f(*opacity);
     Color favoriteColorTrans = favoriteColor;
-    if (!inToolRange) favoriteColorTrans.setHue(favoriteColor.hue() + 120);
+    if (!inToolRange) favoriteColorTrans.set_hue(0.0f);
     else {
       auto placementObjectName = item->objectName();
       if (!placementObjectName) return std::unexpected(std::move(placementObjectName.error()));
       auto canPlace = (*objectDatabase)->canPlaceObject(world->get(), aimPos, *placementObjectName);
       if (!canPlace) return std::unexpected(std::move(canPlace.error()));
-      if (!*canPlace) favoriteColorTrans.setHue(favoriteColor.hue() + 120);
+      if (!*canPlace) favoriteColorTrans.set_hue(0.0f);
     }
 
-    favoriteColorTrans.setAlphaF(m_objectPreviewOuterAlpha);
+    favoriteColorTrans.set_alpha_f(m_objectPreviewOuterAlpha);
     Color nearWhite = favoriteColorTrans;
-    nearWhite.setValue(1 - (1 - nearWhite.value()) / 5);
-    nearWhite.setSaturation(nearWhite.saturation() / 5);
-    nearWhite.setAlphaF(m_objectPreviewInnerAlpha);
-    ImageOperation op = BorderImageOperation{m_beamGunGlowBorder, nearWhite.toRgba(), favoriteColorTrans.toRgba(), false, false};
+    nearWhite.set_value(1 - (1 - nearWhite.value()) / 5);
+    nearWhite.set_saturation(nearWhite.saturation() / 5);
+    nearWhite.set_alpha_f(m_objectPreviewInnerAlpha);
+    ImageOperation op = BorderImageOperation{m_beamGunGlowBorder, nearWhite.to_rgba(), favoriteColorTrans.to_rgba(), false, false};
 
     auto imageMetadata = m_root.get().imageMetadataDatabase();
     if (!imageMetadata) return std::unexpected(std::move(imageMetadata.error()));

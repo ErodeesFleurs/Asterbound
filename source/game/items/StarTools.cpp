@@ -798,8 +798,8 @@ std::expected<List<PreviewTile>, StarException> BeamMiningTool::previewTiles(boo
   if (inRange) {
     Color lightColor = ownerp->get().favoriteColor();
     if (!ready())
-      lightColor *= Color::rgbaf(0.75f, 0.75f, 0.75f, 1.0f);
-    Vec3B light = lightColor.toRgb();
+      lightColor *= Color::rgba_f(0.75f, 0.75f, 0.75f, 1.0f);
+    Vec3B light = lightColor.to_rgb();
     int radius = !shifting ? m_blockRadius : m_altBlockRadius;
     auto aimPosition = ownerp->get().aimPosition();
     if (!aimPosition)
@@ -1109,7 +1109,7 @@ std::expected<List<PreviewTile>, StarException> PaintingBeamTool::previewTiles(b
   if (!worldResult)
     return std::unexpected(std::move(worldResult.error()));
   auto& worldp = worldResult->get();
-  Vec3B light = Color::White.toRgb();
+  Vec3B light = Color::White.to_rgb();
   bool inRange = ownerp.isAdmin();
   if (!inRange) {
     auto range = ownerp.inToolRange();

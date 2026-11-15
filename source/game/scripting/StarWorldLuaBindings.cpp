@@ -3022,17 +3022,17 @@ namespace LuaBindings {
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugPoint(Root& root, Vec2F const& arg1, Color const& arg2) {
-    root.spatialLogger().log_point("world", arg1, arg2.toRgba());
+    root.spatialLogger().log_point("world", arg1, arg2.to_rgba());
     return {};
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugLine(Root& root, Vec2F const& arg1, Vec2F const& arg2, Color const& arg3) {
-    root.spatialLogger().log_line("world", arg1, arg2, arg3.toRgba());
+    root.spatialLogger().log_line("world", arg1, arg2, arg3.to_rgba());
     return {};
   }
 
   std::expected<void, StarException> WorldDebugCallbacks::debugPoly(Root& root, PolyF const& poly, Color const& color) {
-    root.spatialLogger().log_poly("world", poly, color.toRgba());
+    root.spatialLogger().log_poly("world", poly, color.to_rgba());
     return {};
   }
 
@@ -3055,7 +3055,7 @@ namespace LuaBindings {
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
-    root.spatialLogger().log_text("world", text, position, color.toRgba());
+    root.spatialLogger().log_text("world", text, position, color.to_rgba());
     return {};
   }
 

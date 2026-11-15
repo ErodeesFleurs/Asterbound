@@ -268,7 +268,7 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     m_beamCanPlace = *canPlace;
     m_lastUpdateColor = m_color;
     if (!m_beamCanPlace)
-      m_lastUpdateColor.setHue(m_lastUpdateColor.hue() + 120);
+      m_lastUpdateColor.set_hue(0.0f);
     m_inRangeLastUpdate = true;
     return {};
   }
@@ -287,11 +287,11 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     auto valueScale = beamRoot().random().uniform_float(1, 4);
     if (!valueScale)
       return std::unexpected(std::move(valueScale.error()));
-    randomColor.setValue(1 - (1 - randomColor.value()) / *valueScale);
+    randomColor.set_value(1 - (1 - randomColor.value()) / *valueScale);
     auto saturationScale = beamRoot().random().uniform_float(1, 4);
     if (!saturationScale)
       return std::unexpected(std::move(saturationScale.error()));
-    randomColor.setSaturation(randomColor.saturation() / *saturationScale);
+    randomColor.set_saturation(randomColor.saturation() / *saturationScale);
     beamParticle.color = randomColor;
     beamParticle.velocity = Vec2F::filled(beamRoot().random().uniform_float());
     beamParticle.finalVelocity = Vec2F(0.0f, -20.0f);
@@ -417,7 +417,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         auto opacity = getAppropriateOpacity();
         if (!opacity)
           return std::unexpected(std::move(opacity.error()));
-        ballColor.setAlphaF(*opacity);
+        ballColor.set_alpha_f(*opacity);
         ball->color = ballColor;
         res.push_back(std::move(*ball));
       }
@@ -431,15 +431,15 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         if (!transparency)
           return std::unexpected(std::move(transparency.error()));
         float beamTransparency = *transparency;
-        mainColor.setAlphaF(mainColor.alphaF() * beamTransparency);
+        mainColor.set_alpha_f(mainColor.alpha_f() * beamTransparency);
         Vec2F previousLoc = m_beamCurve.origin(); // lines meet at origin and dest.
         Color innerStripe = mainColor;
-        innerStripe.setValue(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
-        innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
-        Vec4B firstStripe = innerStripe.toRgba();
-        innerStripe.setValue(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
-        innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
-        Vec4B secondStripe = innerStripe.toRgba();
+        innerStripe.set_value(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
+        innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
+        Color const firstStripe = Color::rgba(innerStripe.to_rgba());
+        innerStripe.set_value(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
+        innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
+        Color const secondStripe = Color::rgba(innerStripe.to_rgba());
 
         for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun - .5); i++) {// one less than full length
           float pos = static_cast<float>(i)
@@ -457,11 +457,11 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
               Drawable::makeLine(Line2F(previousLoc, currentLoc), lineThickness, mainColor, Vec2F()));
           res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),
               lineThickness * m_firstStripeThickness,
-              Color::rgba(firstStripe),
+              firstStripe,
               Vec2F()));
           res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),
               lineThickness * m_secondStripeThickness,
-              Color::rgba(secondStripe),
+              secondStripe,
               Vec2F()));
           previousLoc = std::move(currentLoc);
         }
@@ -469,11 +469,11 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
             Line2F(previousLoc, m_beamCurve.dest()), lineThickness, mainColor, Vec2F()));
         res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beamCurve.dest()),
             lineThickness * m_firstStripeThickness,
-            Color::rgba(firstStripe),
+            firstStripe,
             Vec2F()));
         res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beamCurve.dest()),
             lineThickness * m_secondStripeThickness,
-            Color::rgba(secondStripe),
+            secondStripe,
             Vec2F()));
       }
   }

@@ -2846,7 +2846,7 @@ if (!result547) return std::unexpected(std::move(result547.error()));
 }
 
 std::expected<void, StarException> Npc::setFavoriteColor(Color color) {
-  m_npcVariant.humanoidIdentity.color = color.toRgba();
+  m_npcVariant.humanoidIdentity.color = color.to_rgba();
   auto result548 = updateIdentity();
 if (!result548) return std::unexpected(std::move(result548.error()));
 

@@ -371,7 +371,7 @@ std::expected<void, StarException> TitleScreen::render(float interpolation) {
   auto darken = jsonToColor(*darkenConfig);
   if (!darken)
     return std::unexpected(std::move(darken.error()));
-  m_renderer->render(renderFlatRect(RectF(0, 0, screenSize[0], screenSize[1]), darken->toRgba(), 0.0f));
+  m_renderer->render(renderFlatRect(RectF(0, 0, screenSize[0], screenSize[1]), darken->to_rgba(), 0.0f));
   if (auto r = m_renderer->flush(); !r) return std::unexpected(std::move(r.error()));
   auto interfaceSize = m_guiContext.windowInterfaceSize();
   if (!interfaceSize)

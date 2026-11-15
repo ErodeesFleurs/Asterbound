@@ -111,15 +111,20 @@ private:
   static float const RayMinUnscaledAlpha;
   static Vec3B const RayColor;
 
-  [[nodiscard]] std::expected<void, StarException> drawRays(float pixelRatio, SkyRenderData const& sky, Vec2F start, float length, double time, float alpha);
-  [[nodiscard]] std::expected<void, StarException> drawRay(float pixelRatio,
-      SkyRenderData const& sky,
+  struct RayStyle {
+    Vec3B color;
+    float intensity;
+    float sun_scale;
+  };
+
+  [[nodiscard]] std::expected<void, StarException> draw_rays(float pixelRatio, SkyRenderData const& sky, Vec2F start, float length, double time, float alpha);
+  [[nodiscard]] std::expected<void, StarException> draw_ray(float pixelRatio,
       Vec2F start,
       float width,
       float length,
       float angle,
       double time,
-      Vec3B color,
+      RayStyle const& style,
       float alpha);
   [[nodiscard]] std::expected<void, StarException> drawOrbiter(float pixelRatio, Vec2F const& screenSize, SkyRenderData const& sky, SkyOrbiter const& orbiter);
 

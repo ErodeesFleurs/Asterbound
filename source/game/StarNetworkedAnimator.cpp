@@ -1831,9 +1831,9 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
 
     Color color = pair.second.color.get();
     if (pair.second.flicker)
-      color.setValue(std::clamp(color.value() * pair.second.flicker->value(SinWeightOperator<float>()), 0.0f, 1.0f));
+      color.set_value(std::clamp(color.value() * pair.second.flicker->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
-    lightSources.push_back(LightSource{position + translate, color.toRgbF(),
+    lightSources.push_back(LightSource{position + translate, color.to_rgb_f(),
                                        pair.second.pointLight ? LightType::Point : LightType::Spread,
                                        pair.second.pointBeam, pointAngle, pair.second.beamAmbience});
   }

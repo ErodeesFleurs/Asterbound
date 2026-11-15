@@ -176,7 +176,7 @@ std::expected<List<LightSource>, StarException> Flashlight::lightSources() const
   LightSource lightSource;
   lightSource.type = LightType::Point;
   lightSource.position = ownerResult->get().position() + *ownerHandPosition;
-  lightSource.color = m_lightColor.toRgbF();
+  lightSource.color = m_lightColor.to_rgb_f();
   lightSource.pointBeam = m_beamWidth;
   lightSource.beamAngle = angle;
   lightSource.beamAmbience = m_ambientFactor;

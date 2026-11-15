@@ -2479,7 +2479,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   if (isClient)
     root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
-                                    isMaster() ? Color::Orange.toRgba() : Color::Yellow.toRgba());
+                                    isMaster() ? Color::Orange.to_rgba() : Color::Yellow.to_rgba());
   return {};
 }
 
@@ -4075,7 +4075,7 @@ bool Player::isAdmin() const {
 }
 
 std::expected<void, StarException> Player::setFavoriteColor(Color color) {
-  m_identity.color = color.toRgba();
+  m_identity.color = color.to_rgba();
   return updateIdentity();
 }
 

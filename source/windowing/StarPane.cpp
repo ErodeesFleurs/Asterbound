@@ -801,7 +801,7 @@ std::expected<void, StarException> Pane::renderImpl() {
     if (!style)
       return std::unexpected(std::move(style.error()));
     auto drawTitles = [&]() -> std::expected<void, StarException> {
-      auto color = m_context.setFontColor(m_titleColor.toRgba());
+      auto color = m_context.setFontColor(m_titleColor.to_rgba());
       if (!color)
         return std::unexpected(std::move(color.error()));
       auto mode = m_context.setFontMode(FontMode::Shadow);
@@ -810,7 +810,7 @@ std::expected<void, StarException> Pane::renderImpl() {
       auto title = m_context.renderInterfaceText(m_title, {headerPos + Vec2F(m_titleOffset)});
       if (!title)
         return std::unexpected(std::move(title.error()));
-      auto subtitleColor = m_context.setFontColor(m_subTitleColor.toRgba());
+      auto subtitleColor = m_context.setFontColor(m_subTitleColor.to_rgba());
       if (!subtitleColor)
         return std::unexpected(std::move(subtitleColor.error()));
       auto subtitle = m_context.renderInterfaceText(m_subTitle, {headerPos + Vec2F(m_subTitleOffset)});

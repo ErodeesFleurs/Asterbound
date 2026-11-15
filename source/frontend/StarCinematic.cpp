@@ -529,7 +529,7 @@ std::expected<void, StarException> Cinematic::render() {
       if (!values.alpha)
         continue;
       auto frame = Star::to_string(static_cast<int>(values.frame) % panel->animationFrames);
-      auto alphaColor = Color::rgbaf(1.0f, 1.0f, 1.0f, values.alpha);
+      auto alphaColor = Color::rgba_f(1.0f, 1.0f, 1.0f, values.alpha);
       for (auto const& d : panel->drawables) {
         auto metadata = m_guiContext.get().root().imageMetadataDatabase();
         if (!metadata)
@@ -671,7 +671,7 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
         imagePart.transformation.transform_point(Vec2F(imageRect.xMin(), imageRect.yMax())) * drawableScale
         + screenTranslation;
 
-    Vec4B drawableColor = drawable.color.toRgba();
+    Vec4B drawableColor = drawable.color.to_rgba();
 
     primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
         lowerLeft,  Vec2F{0, 0},

@@ -25,6 +25,8 @@ import star.poly;
 import star.math_common;
 import star.algorithm;
 import star.matrix3;
+import star.color;
+import star.unicode;
 using namespace Star;
 
 struct BorrowedCrossStateProbe {
@@ -77,6 +79,39 @@ void expectLuaNil(std::expected<LuaValue, StarException> result) {
     ADD_FAILURE() << "Expected Lua nil; actual result: " << rendered->utf8();
   }
 }
+}
+
+TEST(LuaTest, ColorCodecRetainsByteArraysCoercionAndOptionalAlpha) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->set("translucent", Color::rgba_f(0.5f, 0.0f, 1.0f, 0.5f)));
+  EXPECT_EQ(context->eval<Json>("return translucent"), (Json(JsonArray{128, 0, 255, 127})));
+  ASSERT_TRUE(context->set("opaque", Color::rgba_f(0.5f, 0.0f, 1.0f, 1.0f)));
+  EXPECT_EQ(context->eval<Json>("return opaque"), (Json(JsonArray{128, 0, 255})));
+
+  auto coercion = context->eval<Color>("return {12.9, '34', 255.9, 'bad-alpha', 'ignored'}");
+  ASSERT_TRUE(coercion);
+  EXPECT_EQ(coercion->to_rgba(), Vec4B(12, 34, 255, 255));
+  auto extra = context->eval<Color>("return {1, 2, 3, 64, 99}");
+  ASSERT_TRUE(extra);
+  EXPECT_EQ(extra->to_rgba(), Vec4B(1, 2, 3, 64));
+  EXPECT_EQ(context->eval<Color>("return 'RED\\0ignored'"), Color::Red);
+}
+
+TEST(LuaTest, ColorCodecDistinguishesMalformedColorAndUnicodeFailures) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->createContext();
+  ASSERT_TRUE(context);
+  auto malformed = context->eval<Color>("return '#ggg'");
+  ASSERT_FALSE(malformed);
+  EXPECT_TRUE(malformed.error().is<LuaConversionException>());
+  auto malformed_utf8 = context->eval<Color>("return 'red\\xff'");
+  ASSERT_FALSE(malformed_utf8);
+  EXPECT_TRUE(malformed_utf8.error().is<UnicodeException>());
+  EXPECT_EQ(context->eval<Color>("return '#1234'"), Color::rgba(0x11, 0x22, 0x33, 0x44));
 }
 
 TEST(LuaTest, RandomCallbacksPreserveNamesAndPropagateCheckedFailures) {

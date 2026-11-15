@@ -167,12 +167,12 @@ const GameTestRegistration wrappedParticleSampling(
       ASSERT_TRUE(current.update(fixture.root(), 0.5f));
       sample.samplePresentation(current, previous, WorldGeometry(), 0.25f, 0.5f, 2);
       EXPECT_FLOAT_EQ(sample.size, 2);
-      EXPECT_FLOAT_EQ(sample.color.alphaF(), 1);
+      EXPECT_FLOAT_EQ(sample.color.alpha_f(), 1);
       sample.samplePresentation(current, previous, WorldGeometry(), 0.75f, 0.5f, 2);
       if (action == Particle::DestructionAction::Shrink)
         EXPECT_FLOAT_EQ(sample.size, 1.75f);
       else
-        EXPECT_FLOAT_EQ(sample.color.alphaF(), 0.875f);
+        EXPECT_FLOAT_EQ(sample.color.alpha_f(), 0.875f);
     }
 
     // A textured destruction image is a discrete payload change even when

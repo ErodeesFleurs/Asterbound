@@ -724,14 +724,14 @@ std::expected<List<LightSource>, StarException> Object::lightSources(NetworkedAn
     return std::unexpected(std::move(lightsResult.error()));
   auto lights = std::move(*lightsResult);
   auto orientation = currentOrientation();
-  if (!m_lightSourceColor.get().isClear() && orientation) {
+  if (!m_lightSourceColor.get().is_clear() && orientation) {
     Color color = m_lightSourceColor.get();
     if (m_lightFlickering)
-      color.setValue(std::clamp(color.value() * m_lightFlickering->value(SinWeightOperator<float>()), 0.0f, 1.0f));
+      color.set_value(std::clamp(color.value() * m_lightFlickering->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
     LightSource lightSource;
     lightSource.position = position() + centerOfTile(orientation->lightPosition);
-    lightSource.color = color.toRgbF();
+    lightSource.color = color.to_rgb_f();
     lightSource.type = m_config->lightType;
     lightSource.pointBeam = m_config->pointBeam;
     lightSource.beamAngle = orientation->beamAngle;

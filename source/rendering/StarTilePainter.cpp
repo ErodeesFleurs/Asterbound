@@ -169,7 +169,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
     if (!movement)
       return std::unexpected(std::move(movement.error()));
     auto stored = painter->m_liquids.set(
-      liquid->id, LiquidInfo{std::move(*texture), color->toRgba(), bottomLight->toRgbF(), *movement});
+      liquid->id, LiquidInfo{std::move(*texture), color->to_rgba(), bottomLight->to_rgb_f(), *movement});
     if (!stored)
       return std::unexpected(std::move(stored.error()));
   }

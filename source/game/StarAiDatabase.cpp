@@ -210,13 +210,13 @@ std::expected<Animation, StarException> AiDatabase::staticAnimation(String const
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   animation.setTag("image", parameters->get().staticFrames);
-  animation.setColor(Color::rgbaf(1.0f, 1.0f, 1.0f, m_animationConfig.staticOpacity));
+  animation.setColor(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animationConfig.staticOpacity));
   return animation;
 }
 
 Animation AiDatabase::scanlineAnimation() const {
   auto animation = m_animationConfig.scanlineAnimation;
-  animation.setColor(Color::rgbaf(1.0f, 1.0f, 1.0f, m_animationConfig.scanlineOpacity));
+  animation.setColor(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animationConfig.scanlineOpacity));
   return animation;
 }
 

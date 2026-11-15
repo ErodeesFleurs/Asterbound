@@ -641,7 +641,7 @@ if (!result914) return std::unexpected(std::move(result914.error()));
   auto result915 = world();
 if (!result915) return std::unexpected(std::move(result915.error()));
 if (result915->get().isClient())
-  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::Red.toRgba());
+  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::Red.to_rgba());
   return {};
 }
 
@@ -698,7 +698,7 @@ std::expected<void, StarException> Projectile::renderLightSources(RenderCallback
   auto lights = renderCallback.addLightSources(m_renderLights);
   if (!lights)
     return std::unexpected(std::move(lights.error()));
-  auto result899 = renderCallback.addLightSource({position(), m_config->lightColor.toRgbF(), m_config->lightType, 0.0f, 0.0f, 0.0f});
+  auto result899 = renderCallback.addLightSource({position(), m_config->lightColor.to_rgb_f(), m_config->lightType, 0.0f, 0.0f, 0.0f});
 if (!result899) return std::unexpected(std::move(result899.error()));
   return {};
 }
@@ -1506,7 +1506,7 @@ auto result871 = jsonToColor(std::move(*result870));
 if (!result871) return std::unexpected(std::move(result871.error()));
 auto result872 = parameters.getBool("pointLight", true);
 if (!result872) return std::unexpected(std::move(result872.error()));
-m_pendingRenderables.push_back(LightSource{position(), std::move(*result871).toRgbF(),
+m_pendingRenderables.push_back(LightSource{position(), std::move(*result871).to_rgb_f(),
                                            static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
 
   } else if (command == "option") {

@@ -587,7 +587,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     if (!takeable)
       return std::unexpected(std::move(takeable.error()));
     root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
-                                    (*takeable ? Color::Green : Color::Red).toRgba());
+                                    (*takeable ? Color::Green : Color::Red).to_rgba());
   }
   return {};
 }
@@ -620,11 +620,11 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
       beamColor = Color::White;
     }
 
-    beamColor.setAlphaF(0.8f);
+    beamColor.set_alpha_f(0.8f);
     Line2F line = { Vec2F(), Vec2F(0.0f, 1.0f + m_boundBox.height() / 2) };
     float width = std::min(2.0f, m_boundBox.width() * TilePixels);
     auto drawable = Drawable::makeLine(line, width, beamColor, position());
-    (drawable.linePart().endColor = beamColor)->setAlphaF(0.0f);
+    (drawable.linePart().endColor = beamColor)->set_alpha_f(0.0f);
     drawable.fullbright = true;
     if (auto added = renderCallback.addDrawable(std::move(drawable), RenderLayerItemDrop); !added)
       return std::unexpected(std::move(added.error()));

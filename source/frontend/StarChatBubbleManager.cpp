@@ -172,7 +172,7 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
   if (!colorJson) return std::unexpected(std::move(colorJson.error()));
   auto color = jsonToColor(*colorJson);
   if (!color) return std::unexpected(std::move(color.error()));
-  m_textStyle.color = color->toRgba();
+  m_textStyle.color = color->to_rgba();
   auto styleJson = config->get("textStyle");
   if (!styleJson) return std::unexpected(std::move(styleJson.error()));
   auto style = m_textStyle.loadJson(*styleJson);
@@ -519,7 +519,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         auto color = jsonToColor(**jColor);
         if (!color)
           return std::unexpected(std::move(color.error()));
-        textStyle.color = color->toRgba();
+        textStyle.color = color->to_rgba();
       }
       auto styleJson = config.get("style", Json());
       if (!styleJson)

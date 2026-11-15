@@ -144,7 +144,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
         auto light = jsonToVec3B(**lightConfig);
         if (!light)
           return std::unexpected(std::move(light.error()));
-        entry->radiantLightLevel = Color::rgb(*light).toRgbF();
+        entry->radiantLightLevel = Color::rgb(*light).to_rgb_f();
       }
       auto dropConfig = config->get("itemDrop", {});
       if (!dropConfig)

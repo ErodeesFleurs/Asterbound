@@ -391,7 +391,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
     if (particle.type == Particle::Type::Ember) {
       m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(),
         RectF(position - size / 2, position + size / 2),
-        particle.color.toRgba(),
+        particle.color.to_rgba(),
         particle.fullbright ? 0.0f : 1.0f);
 
     } else if (particle.type == Particle::Type::Streak) {
@@ -400,7 +400,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       Vec2F dir = particle.velocity.normalized();
       Vec2F sideHalf = dir.rot90() * m_camera.pixelRatio() * particle.size / 2;
       float length = particle.length * m_camera.pixelRatio();
-      Vec4B color = particle.color.toRgba();
+      Vec4B color = particle.color.to_rgba();
       float lightMapMultiplier = particle.fullbright ? 0.0f : 1.0f;
       m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(),
         position - sideHalf,
@@ -434,7 +434,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       int size = std::min(128.0f, std::round((float)textParticleFontSize * m_camera.pixelRatio() * particle.size));
       if (size > 0) {
         m_textPainter->setFontSize(size);
-        m_textPainter->setFontColor(particle.color.toRgba());
+        m_textPainter->setFontColor(particle.color.to_rgba());
         if (auto result = m_textPainter->setProcessingDirectives(""); !result) return std::unexpected(std::move(result.error()));
         if (auto result = m_textPainter->setFont(""); !result)
           return std::unexpected(std::move(result.error()));
@@ -484,7 +484,7 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
                              Directives const& highlightDirectives) -> std::expected<void, StarException> {
       auto highlightDrawable = Drawable(drawable);
       highlightDrawable.fullbright = true;
-      highlightDrawable.color = Color::rgbaf(1, 1, 1, highlightEffect.level * drawable.color.alphaF());
+      highlightDrawable.color = Color::rgba_f(1, 1, 1, highlightEffect.level * drawable.color.alpha_f());
       if (auto result = highlightDrawable.imagePart().addDirectives(*m_imageMetadata, highlightDirectives, true);
           !result)
         return std::unexpected(std::move(result.error()));

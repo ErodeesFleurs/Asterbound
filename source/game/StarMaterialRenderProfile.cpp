@@ -195,7 +195,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   if (!lightConfig) return std::unexpected(std::move(lightConfig.error()));
   auto light = jsonToVec3B(*lightConfig);
   if (!light) return std::unexpected(std::move(light.error()));
-  profile.radiantLight = Color::rgb(*light).toRgbF();
+  profile.radiantLight = Color::rgb(*light).to_rgb_f();
   {
     auto value = spec.getString("representativePiece");
     if (!value) return std::unexpected(std::move(value.error()));

@@ -192,8 +192,9 @@ std::expected<Color, StarException> jsonToColor(Json const& v) {
 }
 Json jsonFromColor(Color const& color) {
   JsonArray result{color.red(), color.green(), color.blue()};
-  if (color.alpha() < 255)
-    result.push_back(color.alpha());
+  auto alpha = color.alpha();
+  if (alpha < 255)
+    result.push_back(alpha);
   return result;
 }
 

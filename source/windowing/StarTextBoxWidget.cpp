@@ -169,8 +169,8 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
   }
   auto color = Color::rgba(m_textStyle.color);
   if (m_text.empty())
-    color = color.mix(Color::rgbf(0.3f, 0.3f, 0.3f), 0.8f);
-  auto colored = context().setFontColor(color.mix(Color::rgbf(0, 0, 1), blueRate).toRgba());
+    color = color.mix(Color::rgb_f(0.3f, 0.3f, 0.3f), 0.8f);
+  auto colored = context().setFontColor(color.mix(Color::rgb_f(0, 0, 1), blueRate).to_rgba());
   if (!colored)
     return std::unexpected(std::move(colored.error()));
   auto text = m_text.empty() ? std::expected<String, StarException>(m_hint) : displayText();
@@ -210,7 +210,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
     return std::unexpected(std::move(focused.error()));
   if (*focused) {
     float cc = 0.6f + 0.4f * std::sin(static_cast<double>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count()) / 300.0);
-    auto cursorColor = Color::rgbf(cc, cc, cc).toRgba();
+    auto cursorColor = Color::rgb_f(cc, cc, cc).to_rgba();
     float fontSize = m_textStyle.fontSize;
     auto vertical = context().drawInterfaceLine(
         pos + Vec2F(cursorOffset, fontSize * m_cursorVert[0]),
@@ -224,7 +224,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
       return std::unexpected(std::move(horizontal.error()));
   }
   if (m_drawBorder)
-    return context().drawInterfacePolyLines(PolyF(screenBoundRect()), Color::White.toRgba());
+    return context().drawInterfacePolyLines(PolyF(screenBoundRect()), Color::White.to_rgba());
   return {};
 }
 
@@ -395,7 +395,7 @@ void TextBoxWidget::setRegex(String const& regex) {
 }
 
 void TextBoxWidget::setColor(Color const& color) {
-  m_textStyle.color = color.toRgba();
+  m_textStyle.color = color.to_rgba();
 }
 
 void TextBoxWidget::setDirectives(String const& directives) {

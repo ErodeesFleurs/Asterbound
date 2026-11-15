@@ -432,7 +432,7 @@ void Particle::samplePresentation(Particle const& current, PresentationState con
     else if (current.destructionAction == DestructionAction::Fade) {
       color = previous.color;
       if (timeToLive < 0)
-        color.setAlphaF(factor);
+        color.set_alpha_f(factor);
     }
   }
   if (animation && previous.animation && sameState)
@@ -477,7 +477,7 @@ void Particle::destructionUpdate() {
     if (destructionAction == DestructionAction::Shrink) {
       size = baseSize * destructionFactor;
     } else if (destructionAction == DestructionAction::Fade) {
-      color.setAlphaF(destructionFactor);
+      color.set_alpha_f(destructionFactor);
     } else if (destructionAction == DestructionAction::Image) {
       if (!destructionSet) {
         size = 1.0f;

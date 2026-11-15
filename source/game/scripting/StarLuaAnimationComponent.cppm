@@ -144,7 +144,7 @@ private:
     if (!ambience)
       return std::unexpected(std::move(ambience.error()));
     self.m_lightSources.push_back({.position = *position,
-                                   .color = color->toRgbF(),
+                                   .color = color->to_rgb_f(),
                                    .type = static_cast<LightType>(point->value_or(false)),
                                    .pointBeam = beam->value_or(float{}),
                                    .beamAngle = angle->value_or(float{}),

@@ -1095,7 +1095,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       m_pendingParticleLights.clear();
       for (auto const& particle : renderData.particles)
         if (particle.light != Color::Clear)
-          m_pendingParticleLights.push_back({particle.position, particle.light.toRgbF()});
+          m_pendingParticleLights.push_back({particle.position, particle.light.to_rgb_f()});
       m_pendingLightRange = window.padded(1);
       m_pendingLightReady = true;
     }
@@ -1209,7 +1209,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
               return std::unexpected(std::move(result65.error()));
             image = Star::format("/rendering/sprites/error_{}.png", *result65);
           }
-          Color color = Color::rgbf(
+          Color color = Color::rgb_f(
             0.8f + static_cast<float>(std::sin(self.m_currentTime * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
           auto result66 = self.root().imageMetadataDatabase();
           if (!result66)
@@ -2136,7 +2136,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
     auto poly = PolyF(RectF::withCenter(center, size));
-    self.root().spatialLogger().log_poly("world", poly, Color::Cyan.mix(Color::Red, expiry).toRgba());
+    self.root().spatialLogger().log_poly("world", poly, Color::Cyan.mix(Color::Red, expiry).to_rgba());
     if (expiry >= 1.0f) {
       self.dirtyCollision(RectI::withSize(pair.first, { 1, 1 }));
       return true;
@@ -2804,7 +2804,7 @@ std::expected<bool, StarException> WorldClient::waitForLighting(std::optional<st
         Vec2I lightArrayPos(m_geometry.pdiff(previewTile.position[0], m_lightMinPosition[0]), previewTile.position[1] - m_lightMinPosition[1]);
         if (lightArrayPos[0] >= 0 && lightArrayPos[0] < static_cast<int>(m_lightMap.width()) && lightArrayPos[1] >= 0
             && lightArrayPos[1] < static_cast<int>(m_lightMap.height())) {
-          auto result202 = m_lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::v3bToFloat(previewTile.light));
+          auto result202 = m_lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::rgb_bytes_to_float(previewTile.light));
           if (!result202)
             return std::unexpected(std::move(result202.error()));
         }
@@ -3211,7 +3211,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
 
 std::expected<void, StarException> WorldClient::lightingTileGather() {
   auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  Vec3F environmentLight = m_sky->environmentLight().toRgbF();
+  Vec3F environmentLight = m_sky->environmentLight().to_rgb_f();
   float undergroundLevel = m_worldTemplate->undergroundLevel();
   auto result234 = this->root().liquidsDatabase();
   if (!result234)

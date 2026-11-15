@@ -319,7 +319,7 @@ std::expected<List<LightSource>, StarException> InspectionTool::lightSources() c
   LightSource lightSource;
   lightSource.type = LightType::Point;
   lightSource.position = itemOwner->get().position() + *position;
-  lightSource.color = m_lightColor.toRgbF();
+  lightSource.color = m_lightColor.to_rgb_f();
   lightSource.pointBeam = m_beamWidth;
   lightSource.beamAngle = angle;
   lightSource.beamAmbience = m_ambientFactor;

@@ -245,7 +245,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autocolorResult2 = jsonToColor((*autocolorResult1));
     if (!autocolorResult2) return std::unexpected(std::move(autocolorResult2.error()));
     auto color = std::move((*autocolorResult2));
-    blockKeys[color.toRgba()] = std::move(blockKey);
+    blockKeys[color.to_rgba()] = std::move(blockKey);
   }
   std::optional<Vec2I> anchorPosition;
   auto autohasBlockImageResult1 = settings.contains("blockImage");

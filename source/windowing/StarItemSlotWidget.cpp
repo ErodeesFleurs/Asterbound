@@ -324,7 +324,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
     if (!m_newItemIndicator.isComplete()) {
       auto drawable = m_newItemIndicator.drawable(1.0);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.toRgba());
+      auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.to_rgba());
       if (!result) return std::unexpected(std::move(result.error()));
     }
     if (m_showDurability) {
@@ -359,7 +359,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
   if (m_highlightEnabled) {
     auto drawable = m_highlightAnimation.drawable(1.0);
     if (!drawable) return std::unexpected(std::move(drawable.error()));
-    auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.toRgba());
+    auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.to_rgba());
     if (!result) return std::unexpected(std::move(result.error()));
   }
   if (!m_item) return m_durabilityBar->hide();

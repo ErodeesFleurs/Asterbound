@@ -173,7 +173,7 @@ void ParallaxLayer::addImageDirectives(Directives const& newDirectives) {
 
 std::expected<void, StarException> ParallaxLayer::fadeToSkyColor(Color skyColor) {
   if (fadePercent > 0) {
-    auto hex = skyColor.toHex().slice(0, 6);
+    auto hex = skyColor.to_hex().slice(0, 6);
     if (!hex) return std::unexpected(std::move(hex.error()));
     String fade = "fade=" + *hex + "=" + Star::to_string(fadePercent);
     addImageDirectives(fade);

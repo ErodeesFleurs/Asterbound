@@ -203,7 +203,7 @@ std::expected<void, StarException> NameplatePainter::initialize() {
   if (!colorJson) return std::unexpected(std::move(colorJson.error()));
   auto color = jsonToColor(*colorJson);
   if (!color) return std::unexpected(std::move(color.error()));
-  m_statusTextStyle.color = color->toRgba();
+  m_statusTextStyle.color = color->to_rgba();
   auto tween = config->getFloat("tweenFactor");
   if (!tween) return std::unexpected(std::move(tween.error()));
   m_nametags.setTweenFactor(*tween);
@@ -312,8 +312,8 @@ std::expected<void, StarException> NameplatePainter::render(WorldClient const& w
     auto style = context.setTextStyle(m_textStyle);
     if (!style) return std::unexpected(std::move(style.error()));
     auto color = Color::rgb(nametag.color);
-    color.setAlphaF(nametag.opacity);
-    style->get().color = color.toRgba();
+    color.set_alpha_f(nametag.opacity);
+    style->get().color = color.to_rgba();
     auto name = context.renderText(nametag.name, namePosition(position));
     if (!name) return std::unexpected(std::move(name.error()));
     if (nametag.statusText) {

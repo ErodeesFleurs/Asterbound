@@ -303,18 +303,18 @@ std::expected<void, StarException> WirePane::renderWire(Vec2F from, Vec2F to, Co
   if (!transparency)
     return std::unexpected(std::move(transparency.error()));
   float beamTransparency = *transparency;
-  baseColor.setAlphaF(baseColor.alphaF() * beamTransparency);
+  baseColor.set_alpha_f(baseColor.alpha_f() * beamTransparency);
   Color innerStripe = baseColor;
-  innerStripe.setValue(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
-  innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
+  innerStripe.set_value(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
+  innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
   Color firstStripe = innerStripe;
-  innerStripe.setValue(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
-  innerStripe.setSaturation(innerStripe.saturation() / m_innerBrightnessScale);
+  innerStripe.set_value(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
+  innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
   Color secondStripe = innerStripe;
 
-  { auto drawn = context().drawLine(from, to, baseColor.toRgba(), lineThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
-  { auto drawn = context().drawLine(from, to, firstStripe.toRgba(), lineThickness * m_firstStripeThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
-  { auto drawn = context().drawLine(from, to, secondStripe.toRgba(), lineThickness * m_secondStripeThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+  { auto drawn = context().drawLine(from, to, baseColor.to_rgba(), lineThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+  { auto drawn = context().drawLine(from, to, firstStripe.to_rgba(), lineThickness * m_firstStripeThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+  { auto drawn = context().drawLine(from, to, secondStripe.to_rgba(), lineThickness * m_secondStripeThickness); if (!drawn) return std::unexpected(std::move(drawn.error())); }
   return {};
 }
 
@@ -324,7 +324,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
   auto entities = m_worldClient->query<WireEntity>(RectF(m_worldClient->clientWindow()));
   if (!entities) return std::unexpected(std::move(entities.error()));
   auto badWire =
-    Color::rgbf(0.6f + static_cast<float>(std::sin(Time::monotonicTime() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
+    Color::rgb_f(0.6f + static_cast<float>(std::sin(Time::monotonicTime() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
   float phase = 0.5f + 0.5f * std::sin(static_cast<double>(Time::monotonicMilliseconds()) / 100.0);
   auto drawLineColor = Color::Red.mix(Color::White, phase);
   for (auto const& entity : *entities) {
@@ -339,7 +339,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
         if (!icon) return std::unexpected(std::move(icon.error()));
         auto size = context().textureSize(*icon);
         if (!size) return std::unexpected(std::move(size.error()));
-        auto drawn = context().drawQuad(*icon, camera.worldToScreen(centerOfTile(position) - ((Vec2F(*size) / TilePixels) / 2.0f)), camera.pixelRatio(), Color::White.toRgba());
+        auto drawn = context().drawQuad(*icon, camera.worldToScreen(centerOfTile(position) - ((Vec2F(*size) / TilePixels) / 2.0f)), camera.pixelRatio(), Color::White.to_rgba());
         if (!drawn) return std::unexpected(std::move(drawn.error()));
       }
     }

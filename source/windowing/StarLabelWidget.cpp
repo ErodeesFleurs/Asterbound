@@ -71,7 +71,7 @@ std::expected<std::shared_ptr<LabelWidget>, StarException> LabelWidget::create(G
   auto style = TextStyle::create(*json);
   if (!style) return std::unexpected(std::move(style.error()));
   widget->m_style = std::move(*style);
-  widget->m_style.color = color.toRgba();
+  widget->m_style.color = color.to_rgba();
   if (lineSpacing) widget->m_style.lineSpacing = *lineSpacing;
   auto result = widget->setText(std::move(text));
   if (!result) return std::unexpected(std::move(result.error()));
@@ -97,11 +97,11 @@ std::expected<void, StarException> LabelWidget::setFontSize(int fontSize) {
 }
 
 void LabelWidget::setFontMode(FontMode fontMode) {
-  m_style.shadow = fontModeToColor(fontMode).toRgba();
+  m_style.shadow = fontModeToColor(fontMode).to_rgba();
 }
 
 void LabelWidget::setColor(Color newColor) {
-  m_style.color = newColor.toRgba();
+  m_style.color = newColor.to_rgba();
 }
 
 std::expected<void, StarException> LabelWidget::setFont(String const& font) {

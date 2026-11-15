@@ -16,6 +16,7 @@ struct ColorExceptionTag {
 using ColorException = StarError<ColorExceptionTag, StarException>;
 
 class Color {
+  // Floating-point operations require finite inputs.
 public:
   static Color const Red;
   static Color const Orange;
@@ -38,18 +39,16 @@ public:
   static Color const Pink;
   static Color const Clear;
 
-  static std::expected<CaseInsensitiveStringMap<Color>, StarException> const NamedColors;
-
   // Some useful conversion methods for dealing with Vec3 / Vec4 as colors
-  static Vec3F v3bToFloat(Vec3B const& b);
-  static Vec3B v3fToByte(Vec3F const& f, bool doClamp = true);
-  static Vec4F v4bToFloat(Vec4B const& b);
-  static Vec4B v4fToByte(Vec4F const& f, bool doClamp = true);
+  static Vec3F rgb_bytes_to_float(Vec3B const& b);
+  static Vec3B rgb_float_to_bytes(Vec3F const& f, bool do_clamp = true);
+  static Vec4F rgba_bytes_to_float(Vec4B const& b);
+  static Vec4B rgba_float_to_bytes(Vec4F const& f, bool do_clamp = true);
 
-  static Color rgbf(float r, float g, float b);
-  static Color rgbaf(float r, float g, float b, float a);
-  static Color rgbf(Vec3F const& c);
-  static Color rgbaf(Vec4F const& c);
+  static Color rgb_f(float r, float g, float b);
+  static Color rgba_f(float r, float g, float b, float a);
+  static Color rgb_f(Vec3F const& c);
+  static Color rgba_f(Vec4F const& c);
 
   static Color rgb(std::uint8_t r, std::uint8_t g, std::uint8_t b);
   static Color rgba(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a);
@@ -61,21 +60,22 @@ public:
   static Color hsv(Vec3F const& c);
   static Color hsva(Vec4F const& c);
 
-  static Color grayf(float g);
+  static Color gray_f(float g);
   static Color gray(std::uint8_t g);
 
-  // Only supports 8 bit color
-  [[nodiscard]] static std::expected<Color, StarException> fromHex(StringView s);
+  // Strict ASCII RGB/RGBA hex: 3, 4, 6 or 8 digits, without '#'.
+  [[nodiscard]] static std::expected<Color, StarException> from_hex(StringView s);
 
-  // #AARRGGBB
-  static Color fromUint32(std::uint32_t v);
+  // Numeric AARRGGBB, independent of host byte order.
+  static Color from_argb32(std::uint32_t v);
 
   // Color from temperature in Kelvin
   static Color temperature(float temp);
 
-  static Vec4B hueShiftVec4B(Vec4B color, float hue);
-  [[nodiscard]] static std::expected<Vec4B, StarException> hexToVec4B(StringView s);
-  // Black
+  // Finite shift in turns; preserves input alpha byte exactly.
+  static Vec4B hue_shift_rgba(Vec4B color, float hue);
+  [[nodiscard]] static std::expected<Vec4B, StarException> parse_rgba_hex(StringView s);
+  // Transparent black.
   Color();
 
   [[nodiscard]] static std::expected<Color, StarException> create(StringView name);
@@ -85,59 +85,57 @@ public:
   std::uint8_t blue() const;
   std::uint8_t alpha() const;
 
-  void setRed(std::uint8_t r);
-  void setGreen(std::uint8_t g);
-  void setBlue(std::uint8_t b);
-  void setAlpha(std::uint8_t a);
+  void set_red(std::uint8_t r);
+  void set_green(std::uint8_t g);
+  void set_blue(std::uint8_t b);
+  void set_alpha(std::uint8_t a);
 
-  float redF() const;
-  float greenF() const;
-  float blueF() const;
-  float alphaF() const;
+  float red_f() const;
+  float green_f() const;
+  float blue_f() const;
+  float alpha_f() const;
 
-  void setRedF(float r);
-  void setGreenF(float b);
-  void setBlueF(float g);
-  void setAlphaF(float a);
+  void set_red_f(float r);
+  void set_green_f(float g);
+  void set_blue_f(float b);
+  void set_alpha_f(float a);
 
-  bool isClear() const;
+  bool is_clear() const;
 
-  // Returns a 4 byte value equal to #AARRGGBB
-  std::uint32_t toUint32() const;
+  // Numeric AARRGGBB, independent of host byte order.
+  std::uint32_t to_argb32() const;
 
-  Vec4B toRgba() const;
-  Vec3B toRgb() const;
-  Vec4F toRgbaF() const;
-  Vec3F toRgbF() const;
+  Vec4B to_rgba() const;
+  Vec3B to_rgb() const;
+  Vec4F to_rgba_f() const;
+  Vec3F to_rgb_f() const;
 
-  Vec4F const& data() const;
+  Vec4F const& data() const &;
+  Vec4F const& data() const && = delete;
 
-  Vec4F toHsva() const;
+  Vec4F to_hsva() const;
 
   float hue() const;
   float saturation() const;
   float value() const;
 
-  void setHue(float hue);
-  void setSaturation(float saturation);
-  void setValue(float value);
+  void set_hue(float hue);
+  void set_saturation(float saturation);
+  void set_value(float value);
 
-  // Shift the current hue by the given value, with hue wrapping.
-  void hueShift(float hue);
+  // Shift by finite normalized turns, wrapping negative and multiple cycles.
+  void hue_shift(float hue);
 
   // Reduce the color toward black by the given amount, from 0.0 to 1.0.
   void fade(float value);
 
-  String toHex() const;
+  String to_hex() const;
 
-  void convertToLinear();
-  void convertToSRGB();
+  void convert_to_linear();
+  void convert_to_srgb();
 
-  Color toLinear();
-  Color toSRGB();
-
-  Color contrasting();
-  Color complementary();
+  Color to_linear() const;
+  Color to_srgb() const;
 
   // Mix two colors, giving the second color the given amount
   Color mix(Color const& c, float amount = 0.5f) const;
@@ -150,28 +148,28 @@ public:
   Color& operator+=(Color const& c);
   Color& operator*=(Color const& c);
 
-  static float toLinear(float in);
-  static float fromLinear(float in);
+  static float srgb_to_linear(float in);
+  static float linear_to_srgb(float in);
 private:
   Vec4F m_data;
 };
 
 void write_text(TextBuffer& buffer, Color const& c);
 
-inline Vec3F Color::v3bToFloat(Vec3B const& b) {
+inline Vec3F Color::rgb_bytes_to_float(Vec3B const& b) {
   return Vec3F(byte_to_float(b[0]), byte_to_float(b[1]), byte_to_float(b[2]));
 }
 
-inline Vec3B Color::v3fToByte(Vec3F const& f, bool doClamp) {
-  return Vec3B(float_to_byte(f[0], doClamp), float_to_byte(f[1], doClamp), float_to_byte(f[2], doClamp));
+inline Vec3B Color::rgb_float_to_bytes(Vec3F const& f, bool do_clamp) {
+  return Vec3B(float_to_byte(f[0], do_clamp), float_to_byte(f[1], do_clamp), float_to_byte(f[2], do_clamp));
 }
 
-inline Vec4F Color::v4bToFloat(Vec4B const& b) {
+inline Vec4F Color::rgba_bytes_to_float(Vec4B const& b) {
   return Vec4F(byte_to_float(b[0]), byte_to_float(b[1]), byte_to_float(b[2]), byte_to_float(b[3]));
 }
 
-inline Vec4B Color::v4fToByte(Vec4F const& f, bool doClamp) {
-  return Vec4B(float_to_byte(f[0], doClamp), float_to_byte(f[1], doClamp), float_to_byte(f[2], doClamp), float_to_byte(f[3], doClamp));
+inline Vec4B Color::rgba_float_to_bytes(Vec4F const& f, bool do_clamp) {
+  return Vec4B(float_to_byte(f[0], do_clamp), float_to_byte(f[1], do_clamp), float_to_byte(f[2], do_clamp), float_to_byte(f[3], do_clamp));
 }
 
 }

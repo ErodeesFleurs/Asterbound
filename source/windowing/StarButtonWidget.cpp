@@ -197,7 +197,7 @@ std::expected<void, StarException> ButtonWidget::renderImpl() {
     if (!style)
       return std::unexpected(std::move(style.error()));
     auto color = gui.setFontColor((m_disabled ? m_fontColorDisabled
-        : m_fontColorChecked && m_checked ? *m_fontColorChecked : m_fontColor).toRgba());
+        : m_fontColorChecked && m_checked ? *m_fontColorChecked : m_fontColor).to_rgba());
     if (!color)
       return std::unexpected(std::move(color.error()));
     auto rendered = gui.renderInterfaceText(m_text, {textPosition, m_hTextAnchor, VerticalAnchor::VMidAnchor});
@@ -518,7 +518,7 @@ void ButtonWidget::setTextAlign(HorizontalAnchor hAnchor) {
 }
 
 void ButtonWidget::setFontColor(Color color) {
-  m_textStyle.color = (m_fontColor = color).toRgba();
+  m_textStyle.color = (m_fontColor = color).to_rgba();
 }
 
 void ButtonWidget::setFontColorDisabled(Color color) {

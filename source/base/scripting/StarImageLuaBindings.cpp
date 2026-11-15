@@ -42,7 +42,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
       !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = methods.registerMethod("set", [](Image& image, unsigned x, unsigned y, Color const& color) {
-    return image.set(x, y, color.toRgba());
+    return image.set(x, y, color.to_rgba());
   }); !result)
     return std::unexpected(std::move(result.error()));
 

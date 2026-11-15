@@ -502,8 +502,8 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
     float pulseA = 0.85 - pulse * 0.15f;
     float pulseB = 0.85 + pulse * 0.15f;
     Color color = itemOwner->get().favoriteColor().mix(Color::White);
-    float alpha = color.alphaF();
-    color.setAlphaF(alpha * pulseA * 0.95f);
+    float alpha = color.alpha_f();
+    color.set_alpha_f(alpha * pulseA * 0.95f);
     auto addIndicator = [&](String const& path) -> std::expected<void, StarException> {
       Vec2F basePosition = Vec2F(0.5f, 0.5f);
       auto metadata = root().imageMetadataDatabase();
@@ -528,8 +528,8 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
 
     if (m_blockSwap) {
       auto prev = color;
-      color.hueShift(0.167f);
-      color.setAlphaF(alpha * pulseB * 0.95f);
+      color.hue_shift(0.167f);
+      color.set_alpha_f(alpha * pulseB * 0.95f);
       auto added = addIndicator("/interface/building/blockswap.png");
       if (!added)
         return std::unexpected(std::move(added.error()));
@@ -1034,7 +1034,7 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::previewTiles(bool 
     if (!itemWorld)
       return std::unexpected(std::move(itemWorld.error()));
     Color lightColor = itemOwner->get().favoriteColor();
-    Vec3B light = lightColor.toRgb();
+    Vec3B light = lightColor.to_rgb();
     auto material = materialId();
     auto color = DefaultMaterialColorVariant;
     std::size_t c = 0;

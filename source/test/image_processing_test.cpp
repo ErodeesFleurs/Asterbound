@@ -29,15 +29,15 @@ Vec4B scalarHsv(Vec4B pixel, ImageOperation const& operation) {
   if (pixel[3] == 0)
     return pixel;
   if (std::holds_alternative<HueShiftImageOperation>(operation))
-    return Color::hueShiftVec4B(pixel, std::get<HueShiftImageOperation>(operation).hueShiftAmount);
+    return Color::hue_shift_rgba(pixel, std::get<HueShiftImageOperation>(operation).hueShiftAmount);
   Color color = Color::rgba(pixel);
   if (std::holds_alternative<SaturationShiftImageOperation>(operation))
-    color.setSaturation(std::clamp(
+    color.set_saturation(std::clamp(
       color.saturation() + std::get<SaturationShiftImageOperation>(operation).saturationShiftAmount, 0.0f, 1.0f));
   else
-    color.setValue(
+    color.set_value(
       std::clamp(color.value() * std::get<BrightnessMultiplyImageOperation>(operation).brightnessMultiply, 0.0f, 1.0f));
-  return color.toRgba();
+  return color.to_rgba();
 }
 
 void expectPixels(Image const& actual, Image const& expected) {
@@ -141,6 +141,21 @@ TEST(ImageProcessingTest, ExactHsvIdentitiesKeepBytesAfterFormatConversion) {
   }
 }
 
+TEST(ImageProcessingTest, ParsedNegativeAndMultipleHueTurnsUseIndependentPixelValues) {
+  for (auto format : {PixelFormat::RGBA32, PixelFormat::BGRA32}) {
+    for (std::string_view directive : {"hueshift=-90", "hueshift=-450", "hueshift=630"}) {
+      Image image(3, 1, format);
+      ASSERT_TRUE(image.set(0, 0, Vec4B(255, 0, 0, 127)));
+      ASSERT_TRUE(image.set(1, 0, Vec4B(17, 91, 203, 0)));
+      ASSERT_TRUE(image.set(2, 0, Vec4B(255, 0, 0, 255)));
+      ASSERT_TRUE(process_image_operation(image_operation_from_string(StringView(directive)), image));
+      EXPECT_EQ(image.get32(0, 0), Vec4B(128, 0, 255, 127));
+      EXPECT_EQ(image.get32(1, 0), Vec4B(17, 91, 203, 0));
+      EXPECT_EQ(image.get32(2, 0), Vec4B(128, 0, 255, 255));
+    }
+  }
+}
+
 TEST(ImageProcessingTest, ReplaceThresholdRunsTransparentKeysAndSingleStepChains) {
   Vec4B a(19, 37, 83, 255), b(71, 43, 5, 255), c(11, 113, 79, 127);
   Vec4B transparent(91, 47, 213, 0), hidden(1, 2, 3, 0);
@@ -194,7 +209,7 @@ TEST(ImageProcessingTest, BlendMatchesOrderedFourChannelScalarSemantics) {
         // Full-image scalar oracle: no bounding-box or cache implementation.
         for (unsigned y = 0; y < expected.height(); ++y) {
           for (unsigned x = 0; x < expected.width(); ++x) {
-            Vec4F result = Color::v4bToFloat(expected.get32(x, y));
+            Vec4F result = Color::rgba_bytes_to_float(expected.get32(x, y));
             for (auto referenceWrapper : references) {
               auto const& reference = referenceWrapper.get();
               std::int64_t px = std::int64_t(x) + offset[0], py = std::int64_t(y) + offset[1];
@@ -202,13 +217,13 @@ TEST(ImageProcessingTest, BlendMatchesOrderedFourChannelScalarSemantics) {
                 continue;
               auto pixel = reference.get(Vec2U(px, py));
               ASSERT_TRUE(pixel);
-              Vec4F other = Color::v4bToFloat(*pixel);
+              Vec4F other = Color::rgba_bytes_to_float(*pixel);
               for (unsigned channel = 0; channel < 4; ++channel)
                 result[channel] = mode == BlendImageOperation::Multiply
                   ? result[channel] * other[channel]
                   : 1.0f - (1.0f - result[channel]) * (1.0f - other[channel]);
             }
-            expected.set32(x, y, Color::v4fToByte(result));
+            expected.set32(x, y, Color::rgba_float_to_bytes(result));
           }
         }
         unsigned calls = 0;
@@ -590,12 +605,12 @@ TEST(ImageProcessingTest, FadeAndScanLinesCopiesOutliveSourcesAndPreserveEveryCh
         // operation's retained tables, including hidden RGB and both parities.
         expected.for_each_pixel([&](unsigned, unsigned y, Vec4B& pixel) {
           bool second = scanlines && y % 2 != 0;
-          auto target = Color::rgb(second ? Vec3B(191, 37, 19) : Vec3B(13, 71, 131)).toLinear();
+          auto target = Color::rgb(second ? Vec3B(191, 37, 19) : Vec3B(13, 71, 131)).to_linear();
           float fade_amount = second ? 0.6f : amount;
           for (unsigned channel = 0; channel < 3; ++channel) {
             auto value = pixel[channel];
-            auto result = Color::rgb(Vec3B(value, value, value)).toLinear()
-                            .mix(target, fade_amount).toSRGB().toRgb();
+            auto result = Color::rgb(Vec3B(value, value, value)).to_linear()
+                            .mix(target, fade_amount).to_srgb().to_rgb();
             pixel[channel] = result[channel];
           }
         });

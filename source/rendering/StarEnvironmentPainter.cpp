@@ -328,13 +328,13 @@ std::expected<void, StarException> EnvironmentPainter::renderFrontOrbiters(float
 std::expected<void, StarException> EnvironmentPainter::renderSky(Vec2F const& screenSize, SkyRenderData const& sky) {
   auto& primitives = m_renderer->immediatePrimitives();
   primitives.emplace_back(std::in_place_type_t<RenderQuad>(), TexturePtr(),
-      RenderVertex{Vec2F(0, 0), Vec2F(), sky.bottomRectColor.toRgba(), 0.0f},
-      RenderVertex{Vec2F(screenSize[0], 0), Vec2F(), sky.bottomRectColor.toRgba(), 0.0f},
-      RenderVertex{screenSize, Vec2F(), sky.topRectColor.toRgba(), 0.0f},
-      RenderVertex{Vec2F(0, screenSize[1]), Vec2F(), sky.topRectColor.toRgba(), 0.0f});
+      RenderVertex{Vec2F(0, 0), Vec2F(), sky.bottomRectColor.to_rgba(), 0.0f},
+      RenderVertex{Vec2F(screenSize[0], 0), Vec2F(), sky.bottomRectColor.to_rgba(), 0.0f},
+      RenderVertex{screenSize, Vec2F(), sky.topRectColor.to_rgba(), 0.0f},
+      RenderVertex{Vec2F(0, screenSize[1]), Vec2F(), sky.topRectColor.to_rgba(), 0.0f});
 
   // Flash overlay for Interstellar travel
-  Vec4B flashColor = sky.flashColor.toRgba();
+  Vec4B flashColor = sky.flashColor.to_rgba();
   primitives.emplace_back(std::in_place_type_t<RenderQuad>(), RectF(Vec2F(), screenSize), flashColor, 0.0f);
 
   return m_renderer->flush();
@@ -356,7 +356,7 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
     if (layer.unlit || layer.lightMapped)
       drawColor = Vec4B(255, 255, 255, std::floor(255 * layer.alpha));
     else
-      drawColor = Vec4B(sky.environmentLight.toRgb(), std::floor(255 * layer.alpha));
+      drawColor = Vec4B(sky.environmentLight.to_rgb(), std::floor(255 * layer.alpha));
 
     Vec2F parallaxValue = layer.parallaxValue;
     Vec2B parallaxRepeat = layer.repeat;
@@ -468,85 +468,81 @@ void EnvironmentPainter::cleanup(std::int64_t textureTimeout) {
   m_textureGroup->cleanup(textureTimeout);
 }
 
-std::expected<void, StarException> EnvironmentPainter::drawRays(
+std::expected<void, StarException> EnvironmentPainter::draw_rays(
     float pixelRatio, SkyRenderData const& sky, Vec2F start, float length, double time, float alpha) {
-  // All magic constants are either 2PI or arbritrary to allow the Perlin to act
-  // as a PRNG
+  // All magic constants are either 2PI or arbitrary to allow the Perlin to act
+  // as a PRNG.
   float sectorWidth = 2 * std::numbers::pi / RayCount; // Radians
-  Vec3B color = sky.topRectColor.toRgb();
+  Vec3B color = sky.topRectColor.to_rgb();
+  std::optional<RayStyle> style;
 
   for (int i = 0; i < RayCount; i++) {
     auto widthNoise = m_rayPerlin.get(i * 25);
     if (!widthNoise) return std::unexpected(std::move(widthNoise.error()));
     auto angleNoise = m_rayPerlin.get(i * 314);
     if (!angleNoise) return std::unexpected(std::move(angleNoise.error()));
-    auto result = drawRay(pixelRatio,
-        sky,
+    if (!style) {
+      // Prepare once, after the first bounds/noise checks to retain error order.
+      float currentTime = sky.timeOfDay / sky.dayLength;
+      float timeSinceSunEvent = std::min(std::abs(currentTime - SunriseTime), std::abs(currentTime - SunsetTime));
+      float percentFaded = MaxFade * (1.0f - std::min(1.0f, std::pow(timeSinceSunEvent / SunFadeRate, 2.0f)));
+      color = (Vec3B)((Vec3F)color * (1 - percentFaded) + (Vec3F)sky.mainSkyColor.to_rgb() * percentFaded);
+      float intensity = std::pow((color[0] + color[1]) * RayColorDependenceScale, RayColorDependenceLevel);
+      auto dynamicImage = sky.settings.queryBool("sun.dynamicImage.enabled", false);
+      if (!dynamicImage) return std::unexpected(std::move(dynamicImage.error()));
+      auto rayColorJson = sky.settings.query("sun.rayColor", JsonArray{RayColor[0], RayColor[1], RayColor[2]});
+      if (!rayColorJson) return std::unexpected(std::move(rayColorJson.error()));
+      if (*dynamicImage && !sky.skyParameters.sunType.empty()) {
+        auto dynamicColor = sky.settings.query("sun.dynamicImage.rayColors." + sky.skyParameters.sunType, *rayColorJson);
+        if (!dynamicColor) return std::unexpected(std::move(dynamicColor.error()));
+        rayColorJson = std::move(dynamicColor);
+      }
+      auto rayColorResult = jsonToVec3B(*rayColorJson);
+      if (!rayColorResult) return std::unexpected(std::move(rayColorResult.error()));
+      auto scale = sky.settings.queryFloat("sun.scale", 1.0f);
+      if (!scale) return std::unexpected(std::move(scale.error()));
+      style.emplace(RayStyle{*rayColorResult, intensity, *scale});
+    }
+    auto result = draw_ray(pixelRatio,
         start,
         sectorWidth * (std::abs(*widthNoise) * RayWidthVariance + RayMinWidth),
         length,
         i * sectorWidth + *angleNoise * RayAngleVariance,
         time,
-        color,
+        *style,
         alpha);
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return m_renderer->flush();
 }
 
-std::expected<void, StarException> EnvironmentPainter::drawRay(float pixelRatio,
-    SkyRenderData const& sky,
+std::expected<void, StarException> EnvironmentPainter::draw_ray(float pixelRatio,
     Vec2F start,
     float width,
     float length,
     float angle,
     double time,
-    Vec3B color,
+    RayStyle const& style,
     float alpha) {
-  // All magic constants are arbritrary to allow the Perlin to act as a PRNG
-
-  float currentTime = sky.timeOfDay / sky.dayLength;
-  float timeSinceSunEvent = std::min(std::abs(currentTime - SunriseTime), std::abs(currentTime - SunsetTime));
-  float percentFaded = MaxFade * (1.0f - std::min(1.0f, std::pow(timeSinceSunEvent / SunFadeRate, 2.0f)));
-  // Gets the current average sky color
-  color = (Vec3B)((Vec3F)color * (1 - percentFaded) + (Vec3F)sky.mainSkyColor.toRgb() * percentFaded);
-  // Sum is used to vary the ray intensity based on sky color
-  // Rays show up more on darker backgrounds, so this scales to remove that
-  float sum = std::pow((color[0] + color[1]) * RayColorDependenceScale, RayColorDependenceLevel);
-  auto dynamicImage = sky.settings.queryBool("sun.dynamicImage.enabled", false);
-  if (!dynamicImage) return std::unexpected(std::move(dynamicImage.error()));
-  auto rayColorJson = sky.settings.query("sun.rayColor", JsonArray{RayColor[0], RayColor[1], RayColor[2]});
-  if (!rayColorJson) return std::unexpected(std::move(rayColorJson.error()));
-  if (*dynamicImage && !sky.skyParameters.sunType.empty()) {
-    auto dynamicColor = sky.settings.query("sun.dynamicImage.rayColors." + sky.skyParameters.sunType, *rayColorJson);
-    if (!dynamicColor) return std::unexpected(std::move(dynamicColor.error()));
-    rayColorJson = std::move(dynamicColor);
-  }
-  auto rayColorResult = jsonToVec3B(*rayColorJson);
-  if (!rayColorResult) return std::unexpected(std::move(rayColorResult.error()));
-  Vec3B rayColor = *rayColorResult;
-  auto scale = sky.settings.queryFloat("sun.scale", 1.0f);
-  if (!scale) return std::unexpected(std::move(scale.error()));
-  float sunScale = *scale;
   auto firstNoise = m_rayPerlin.get(angle * 896 + time * 30);
   if (!firstNoise) return std::unexpected(std::move(firstNoise.error()));
   auto secondNoise = m_rayPerlin.get(angle * 626 + time * 30);
   if (!secondNoise) return std::unexpected(std::move(secondNoise.error()));
   m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(), TexturePtr(),
-      RenderVertex{start + Vec2F(std::cos(angle + width), std::sin(angle + width)) * length, {}, Vec4B(rayColor, 0), 0.0f},
-      RenderVertex{start + Vec2F(std::cos(angle + width), std::sin(angle + width)) * SunRadius * sunScale * pixelRatio,
+      RenderVertex{start + Vec2F(std::cos(angle + width), std::sin(angle + width)) * length, {}, Vec4B(style.color, 0), 0.0f},
+      RenderVertex{start + Vec2F(std::cos(angle + width), std::sin(angle + width)) * SunRadius * style.sun_scale * pixelRatio,
           {},
-          Vec4B(rayColor,
+          Vec4B(style.color,
               (int)(RayMinUnscaledAlpha + std::abs(*firstNoise * RayUnscaledAlphaVariance))
-                  * sum
+                  * style.intensity
                   * alpha), 0.0f},
-      RenderVertex{start + Vec2F(std::cos(angle), std::sin(angle)) * SunRadius * sunScale * pixelRatio,
+      RenderVertex{start + Vec2F(std::cos(angle), std::sin(angle)) * SunRadius * style.sun_scale * pixelRatio,
           {},
-          Vec4B(rayColor,
+          Vec4B(style.color,
               (int)(RayMinUnscaledAlpha + std::abs(*secondNoise * RayUnscaledAlphaVariance))
-                  * sum
+                  * style.intensity
                   * alpha), 0.0f},
-      RenderVertex{start + Vec2F(std::cos(angle), std::sin(angle)) * length, {}, Vec4B(rayColor, 0), 0.0f});
+      RenderVertex{start + Vec2F(std::cos(angle), std::sin(angle)) * length, {}, Vec4B(style.color, 0), 0.0f});
   return {};
 }
 
@@ -569,7 +565,7 @@ std::expected<void, StarException> EnvironmentPainter::drawOrbiter(float pixelRa
 
   if (orbiter.type == SkyOrbiterType::Sun) {
     alpha = sky.dayLevel;
-    if (auto result = drawRays(pixelRatio, sky, position, std::max(screenSize[0], screenSize[1]), m_timer, sky.skyAlpha); !result)
+    if (auto result = draw_rays(pixelRatio, sky, position, std::max(screenSize[0], screenSize[1]), m_timer, sky.skyAlpha); !result)
       return std::unexpected(std::move(result.error()));
   }
 
