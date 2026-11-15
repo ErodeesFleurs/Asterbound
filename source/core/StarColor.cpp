@@ -163,9 +163,15 @@ Color Color::hsva(float h, float s, float v, float a) {
 
     var_i = std::floor(var_h);
 
-    var_1 = v * (1.0f - s);
-    var_2 = v * (1.0f - s * (var_h - var_i));
-    var_3 = v * (1.0f - s * (1.0f - (var_h - var_i)));
+    {
+#pragma float_control(precise, on)
+#pragma clang fp contract(off)
+      // Keep the legacy separate multiply/subtract rounding at byte boundaries.
+      // Fusing these terms can move a secondary channel across a half-byte.
+      var_1 = v * (1.0f - s);
+      var_2 = v * (1.0f - s * (var_h - var_i));
+      var_3 = v * (1.0f - s * (1.0f - (var_h - var_i)));
+    }
 
     if (var_i == 0) {
       var_r = v;

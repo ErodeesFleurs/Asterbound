@@ -83,6 +83,9 @@ constexpr T square(T const& value) noexcept(noexcept(MathDetail::implicit_result
   return value * value;
 }
 
+// The zero branch is part of the representation contract, not a fast-math
+// identity: -fno-signed-zeros can otherwise merge it with value - floor(value).
+#pragma float_control(precise, on, push)
 // Finite inputs; floor semantics give a nonnegative fraction for negatives too.
 template <std::floating_point T>
 constexpr T fractional_part(T value) {
@@ -90,6 +93,7 @@ constexpr T fractional_part(T value) {
     return value;
   return value - std::floor(value);
 }
+#pragma float_control(pop)
 
 template <typename T, typename U>
 concept magnitude_clampable = requires(T const& value, U const& magnitude) {

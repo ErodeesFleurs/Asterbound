@@ -131,3 +131,6 @@ set_target_properties (star_core PROPERTIES CXX_SCAN_FOR_MODULES ON)
 if(STAR_COMPILER_CLANG AND STAR_SYSTEM_MACOS)
   set_source_files_properties(StarColor.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math;-fassociative-math;-freciprocal-math")
 endif()
+# Preserve fast contraction elsewhere, but honor hsva's local rounding boundary.
+# Plain -ffp-contract=fast (implied by -ffast-math) overrides source pragmas.
+set_property(SOURCE StarColor.cpp APPEND PROPERTY COMPILE_OPTIONS "-ffp-contract=fast-honor-pragmas")

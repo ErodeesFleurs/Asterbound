@@ -181,6 +181,17 @@ clamped red hue. Keep getter/setter saturation arithmetic in image kernels:
 reusing the HSV tuple can change half-byte rounding under optimized fast-math.
 Color hue shifts compute hue once and reconstruct through scalar saturation/value
 getters, retaining the old float and byte results without a second HSV conversion.
+The secondary-channel interpolation in `Color::hsva` retains separate
+multiply/subtract rounding: ARM FMA can otherwise change a half-byte result.
+`StarColor.cpp` uses `-ffp-contract=fast-honor-pragmas` so its local precise,
+noncontracting region is honored without disabling fast contraction elsewhere.
+Plain `-ffp-contract=fast` overrides the source pragma, even when LLVM IR lacks
+contraction flags. Keep the non-primary exact-byte regression on ARM and x86.
+
+Angle boundary tests keep their independent `acos`/`remainder` oracle in a
+precise, non-inlined helper. Under fast-math, an approximated `acos(-1)` can
+shift the reference pi by one float ULP on macOS ARM; weakening the production
+interval checks would conceal that oracle error.
 
 Hex parsing accepts only 3/4/6/8 ASCII digits; malformed digits fail rather than
 silently becoming zero. Named lookup preserves the custom palette, ASCII case
