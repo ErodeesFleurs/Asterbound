@@ -15,31 +15,16 @@ struct DirectivesExceptionTag {
 };
 using DirectivesException = StarError<DirectivesExceptionTag, StarException>;
 
-// Kae: My attempt at reducing memory allocation and per-frame string parsing for extremely long directives
+template <typename Callback>
+concept directive_error_reporter = std::invocable<Callback&>
+  && std::same_as<std::invoke_result_t<Callback&>, std::expected<void, StarException>>;
+
 class Directives {
 public:
-  struct Shared;
   struct Entry {
-    mutable ImageOperation operation;
-    std::size_t begin;
-    std::size_t length;
-
-    ImageOperation const& loadOperation(Shared const& parent) const;
-    StringView string(Shared const& parent) const;
-    Entry(ImageOperation&& newOperation, std::size_t begin, std::size_t end);
-    Entry(ImageOperation const& newOperation, std::size_t begin, std::size_t end);
-    Entry(Entry const& other);
-  };
-
-  struct Shared {
-    List<Entry> entries;
-    String string;
-    std::size_t hash = 0;
-    mutable std::mutex mutex;
-
-    bool empty() const;
-    Shared();
-    Shared(List<Entry>&& givenEntries, String&& givenString);
+    std::size_t begin = 0;
+    std::size_t length = 0;
+    std::size_t index = 0;
   };
 
   Directives();
@@ -62,19 +47,39 @@ public:
   Directives& operator=(Directives&& other) noexcept;
   Directives& operator=(Directives const& other);
 
-  void loadOperations() const;
-  void parse(String&& directives);
-  StringView prefix() const;
+  void load_operations() const;
+  std::span<Entry const> entries() const &;
+  std::span<Entry const> entries() const && = delete;
+  std::span<ImageOperation const> operations() const &;
+  std::span<ImageOperation const> operations() const && = delete;
+  StringView entry_string(Entry const& entry) const &;
+  StringView entry_string(Entry const& entry) const && = delete;
+  ImageOperation const& entry_operation(Entry const& entry) const &;
+  ImageOperation const& entry_operation(Entry const& entry) const && = delete;
+  StringView prefix() const &;
+  StringView prefix() const && = delete;
   String string() const;
-  std::optional<std::reference_wrapper<String const>> maybeString() const;
-  String buildString() const;
-  String& addToString(String& out) const;
+  std::optional<std::reference_wrapper<String const>> maybe_string() const &;
+  std::optional<std::reference_wrapper<String const>> maybe_string() const && = delete;
+  String build_string() const;
+  String& append_to(String& out) const;
   std::size_t hash() const;
   std::size_t size() const;
   bool empty() const;
   operator bool() const;
 
-  [[nodiscard]] std::expected<std::reference_wrapper<Shared const>, StarException> get() const;
+  // Failed reports may be retried. Copies share successful suppression, while
+  // concurrent callers may both report; callbacks never run under a lock.
+  template <directive_error_reporter Callback>
+  [[nodiscard]] std::expected<void, StarException> report_error(Entry const& entry, Callback&& callback) const {
+    if (error_reported(entry))
+      return {};
+    Directives owner = *this;
+    auto result = std::invoke(callback);
+    if (result)
+      owner.mark_error_reported(entry);
+    return result;
+  }
 
   bool equals(Directives const& other) const;
   bool equals(String const& string) const;
@@ -87,9 +92,11 @@ public:
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Directives& directives);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Directives const& directives);
 
-  //friend bool operator==(Directives const& d1, String const& d2);
-  //friend bool operator==(Directives const& directives, String const& string);
-  //friend bool operator==(String const& string, Directives const& directives);
+private:
+  struct Shared;
+  void parse(String&& directives);
+  bool error_reported(Entry const& entry) const;
+  void mark_error_reported(Entry const& entry) const;
 
   std::shared_ptr<Shared const> m_shared;
 };
@@ -127,27 +134,26 @@ public:
   DirectivesGroup();
   DirectivesGroup(String const& directives);
   DirectivesGroup(String&& directives);
-  DirectivesGroup(DirectivesGroup const& directives) = default;
-  DirectivesGroup(DirectivesGroup&& directives) = default;
-  DirectivesGroup& operator=(DirectivesGroup const& directives) = default;
-  DirectivesGroup& operator=(DirectivesGroup&& directives) = default;
+  DirectivesGroup(DirectivesGroup const& directives);
+  DirectivesGroup(DirectivesGroup&& directives) noexcept;
+  DirectivesGroup& operator=(DirectivesGroup const& directives);
+  DirectivesGroup& operator=(DirectivesGroup&& directives) noexcept;
   // Keep destruction in the native companion for imported optional owners.
   ~DirectivesGroup();
 
   bool empty() const;
   operator bool() const;
   bool compare(DirectivesGroup const& other) const;
-  void append(Directives const& other);
+  void append(Directives other);
   void clear();
 
-  DirectivesGroup& operator+=(Directives const& other);
+  DirectivesGroup& operator+=(Directives other);
 
-  String toString() const;
-  void addToString(String& string) const;
+  String to_string() const;
+  void append_to(String& string) const;
 
-  template <directive_visitor Callback> [[nodiscard]] auto forEach(Callback&& callback) const;
-
-  template <abortable_directive_visitor Callback> [[nodiscard]] auto forEachAbortable(Callback&& callback) const;
+  template <directive_visitor Callback> [[nodiscard]] auto for_each(Callback&& callback) const;
+  template <abortable_directive_visitor Callback> [[nodiscard]] auto for_each_abortable(Callback&& callback) const;
 
   [[nodiscard]] std::expected<Image, StarException> apply_new_image(const Image& image,
                                                                     ImageReferenceCallback refCallback = {}) const;
@@ -155,7 +161,8 @@ public:
                                                                         ImageReferenceCallback refCallback = {}) const;
 
   std::size_t hash() const;
-  const List<Directives>& list() const;
+  List<Directives> const& list() const &;
+  List<Directives> const& list() const && = delete;
 
   friend bool operator==(DirectivesGroup const& a, DirectivesGroup const& b);
   friend bool operator!=(DirectivesGroup const& a, DirectivesGroup const& b);
@@ -163,10 +170,9 @@ public:
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DirectivesGroup& directives);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DirectivesGroup const& directives);
 private:
-  void buildString(String& string, const DirectivesGroup& directives) const;
-
   List<Directives> m_directives;
   std::size_t m_count = 0;
+  mutable std::atomic<std::size_t> m_hash = 0;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Directives& directives);
@@ -181,18 +187,10 @@ struct hash<DirectivesGroup> {
 
 using ImageDirectives = DirectivesGroup;
 
-inline std::expected<std::reference_wrapper<Directives::Shared const>, StarException> Directives::get() const {
-  if (!m_shared)
-    return std::unexpected(DirectivesException("Empty directives have no shared data"));
-  return std::cref(*m_shared);
-}
-
-template <directive_visitor Callback> [[nodiscard]] auto DirectivesGroup::forEach(Callback&& callback) const {
+template <directive_visitor Callback> [[nodiscard]] auto DirectivesGroup::for_each(Callback&& callback) const {
   using Result = std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>;
   for (auto const& directives : m_directives) {
-    if (!directives)
-      continue;
-    for (auto const& entry : directives.m_shared->entries) {
+    for (auto const& entry : directives.entries()) {
       if constexpr (std::is_void_v<Result>)
         callback(entry, directives);
       else {
@@ -207,12 +205,10 @@ template <directive_visitor Callback> [[nodiscard]] auto DirectivesGroup::forEac
 }
 
 template <abortable_directive_visitor Callback>
-[[nodiscard]] auto DirectivesGroup::forEachAbortable(Callback&& callback) const {
+[[nodiscard]] auto DirectivesGroup::for_each_abortable(Callback&& callback) const {
   using Result = std::invoke_result_t<Callback&, Directives::Entry const&, Directives const&>;
   for (auto const& directives : m_directives) {
-    if (!directives)
-      continue;
-    for (auto const& entry : directives.m_shared->entries) {
+    for (auto const& entry : directives.entries()) {
       auto result = callback(entry, directives);
       if constexpr (std::is_same_v<Result, bool>) {
         if (!result)
@@ -236,10 +232,10 @@ export namespace Star {
   struct hash<DirectivesGroup>;
 }
 
-
 export namespace Star {
 using ::Star::abortable_directive_result;
 using ::Star::abortable_directive_visitor;
+using ::Star::directive_error_reporter;
 using ::Star::directive_visit_result;
 using ::Star::directive_visitor;
 using ::Star::Directives;

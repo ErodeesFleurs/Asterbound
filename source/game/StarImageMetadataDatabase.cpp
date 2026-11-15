@@ -246,20 +246,21 @@ AssetPath ImageMetadataDatabase::filterProcessing(AssetPath const& path) {
   AssetPath newPath = { path.basePath, path.subPath, {} };
 
   String filtered;
-  for (auto& directives : path.directives.list())
-    directives.loadOperations();
-  path.directives.forEach([&](auto const& entry, Directives const& directives) {
-    ImageOperation const& operation = entry.operation;
-    if (!(std::holds_alternative<HueShiftImageOperation>(operation)           ||
-          std::holds_alternative<SaturationShiftImageOperation>(operation)    ||
-          std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ||
-          std::holds_alternative<FadeToColorImageOperation>(operation)        ||
-          std::holds_alternative<ScanLinesImageOperation>(operation)          ||
-          std::holds_alternative<SetColorImageOperation>(operation))) {
-      filtered += "?";
-      filtered += entry.string(*directives.m_shared);
+  for (auto const& directives : path.directives.list()) {
+    auto parsed = directives.operations();
+    for (auto const& entry : directives.entries()) {
+      ImageOperation const& operation = parsed[entry.index];
+      if (!(std::holds_alternative<HueShiftImageOperation>(operation)           ||
+            std::holds_alternative<SaturationShiftImageOperation>(operation)    ||
+            std::holds_alternative<BrightnessMultiplyImageOperation>(operation) ||
+            std::holds_alternative<FadeToColorImageOperation>(operation)        ||
+            std::holds_alternative<ScanLinesImageOperation>(operation)          ||
+            std::holds_alternative<SetColorImageOperation>(operation))) {
+        filtered += "?";
+        filtered += directives.entry_string(entry);
+      }
     }
-    });
+  }
 
   newPath.directives = std::move(filtered);
   return newPath;
@@ -387,13 +388,18 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
 
   OperationSizeAdjust osa(imageSize);
 
-  for (auto& directives : path.directives.list())
-    directives.loadOperations();
-
-  bool complete = path.directives.forEachAbortable([&](auto const& entry, Directives const&) -> bool {
-    std::visit(osa, entry.operation);
-    return !osa.hasError;
-  });
+  bool complete = true;
+  for (auto const& directives : path.directives.list()) {
+    for (auto const& operation : directives.operations()) {
+      std::visit(osa, operation);
+      if (osa.hasError) {
+        complete = false;
+        break;
+      }
+    }
+    if (!complete)
+      break;
+  }
 
   if (!complete)
     return fallback();

@@ -565,3 +565,55 @@ TEST(ImageProcessingTest, ListOperationsPreserveInputOnSuccessAndReferenceFailur
   EXPECT_EQ(calls, (std::vector<String>{"failure"}));
   ASSERT_NO_FATAL_FAILURE(expectPixels(original, before));
 }
+
+TEST(ImageProcessingTest, FadeAndScanLinesCopiesOutliveSourcesAndPreserveEveryChannelByte) {
+  for (float amount : {0.0f, 0.3f, 1.0f}) {
+    for (bool scanlines : {false, true}) {
+      std::optional<ImageOperation> copied;
+      {
+        FadeToColorImageOperation first(Vec3B(13, 71, 131), amount);
+        FadeToColorImageOperation second(Vec3B(191, 37, 19), 0.6f);
+        ImageOperation source = scanlines ? ImageOperation(ScanLinesImageOperation{first, second})
+                                         : ImageOperation(first);
+        copied = source;
+        source = NullImageOperation{};
+      }
+      for (auto format : {PixelFormat::RGB24, PixelFormat::BGR24, PixelFormat::RGBA32, PixelFormat::BGRA32}) {
+        Image original(256, 4, format);
+        for (unsigned y = 0; y < original.height(); ++y)
+          for (unsigned x = 0; x < original.width(); ++x)
+            ASSERT_TRUE(original.set(x, y, Vec4B(x, 255 - x, (x + 73) % 256, x)));
+        Image expected = original.convert(format == PixelFormat::BGR24     ? PixelFormat::BGRA32
+                                           : format == PixelFormat::RGB24 ? PixelFormat::RGBA32
+                                                                          : format);
+        // Recompute the original scalar color expression independently of the
+        // operation's retained tables, including hidden RGB and both parities.
+        expected.for_each_pixel([&](unsigned, unsigned y, Vec4B& pixel) {
+          bool second = scanlines && y % 2 != 0;
+          auto target = Color::rgb(second ? Vec3B(191, 37, 19) : Vec3B(13, 71, 131)).toLinear();
+          float fade_amount = second ? 0.6f : amount;
+          for (unsigned channel = 0; channel < 3; ++channel) {
+            auto value = pixel[channel];
+            auto result = Color::rgb(Vec3B(value, value, value)).toLinear()
+                            .mix(target, fade_amount).toSRGB().toRgb();
+            pixel[channel] = result[channel];
+          }
+        });
+        Image actual = original;
+        ASSERT_TRUE(process_image_operation(*copied, actual));
+        ASSERT_NO_FATAL_FAILURE(expectPixels(actual, expected));
+
+        // Two operations exercise the composed-table consumer as well.
+        List<ImageOperation> operations{*copied, MultiplyImageOperation{Vec4B(255, 127, 31, 79)}};
+        expected.for_each_pixel([](unsigned, unsigned, Vec4B& pixel) {
+          Vec4B multiplier(255, 127, 31, 79);
+          for (unsigned channel = 0; channel < 4; ++channel)
+            pixel[channel] = unsigned(pixel[channel]) * multiplier[channel] / 255;
+        });
+        auto optimized = process_image_operations(operations, original);
+        ASSERT_TRUE(optimized);
+        ASSERT_NO_FATAL_FAILURE(expectPixels(*optimized, expected));
+      }
+    }
+  }
+}

@@ -1175,8 +1175,8 @@ std::expected<void, StarException> Player::uninit() {
 std::expected<void, StarException> Player::updateHumanoidDirectives() {
   DirectivesGroup directives;
   Vec2F scale = Vec2F::filled(1.f);
-  for (auto const* group : {&m_techController->parentDirectives(), &m_statusController->parentDirectives()}) {
-    for (auto const& entry : group->list()) {
+  for (auto const& group : {std::cref(m_techController->parentDirectives()), std::cref(m_statusController->parentDirectives())}) {
+    for (auto const& entry : group.get().list()) {
       auto extracted = Humanoid::extractScaleFromDirectives(entry);
       if (!extracted)
         return std::unexpected(std::move(extracted.error()));

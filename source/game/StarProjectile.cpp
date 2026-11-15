@@ -897,7 +897,7 @@ void Projectile::setFrame(int frame) {
 
 std::expected<String, StarException> Projectile::drawableFrame() {
   String str = Star::format("{}:{}{}", m_config->image, m_frame, m_imageSuffix);
-  return m_imageDirectives.addToString(str);
+  return m_imageDirectives.append_to(str);
 }
 
 bool Projectile::ephemeral() const {

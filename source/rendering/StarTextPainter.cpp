@@ -425,7 +425,8 @@ void TextPainter::setFontColor(Vec4B color) {
 
 std::expected<void, StarException> TextPainter::setProcessingDirectives(StringView directives, bool back) {
   Directives& target = back ? m_renderSettings.backDirectives : m_renderSettings.directives;
-  return modifyDirectives(target = String(directives));
+  target = String(directives);
+  return {};
 }
 
 std::expected<void, StarException> TextPainter::setFont(String const& font) {
@@ -438,12 +439,6 @@ std::expected<void, StarException> TextPainter::setFont(String const& font) {
 
 std::expected<std::reference_wrapper<TextStyle>, StarException> TextPainter::setTextStyle(TextStyle const& textStyle) {
   TextStyle& style = m_renderSettings = textStyle;
-  auto front = modifyDirectives(style.directives);
-  if (!front)
-    return std::unexpected(std::move(front.error()));
-  auto back = modifyDirectives(style.backDirectives);
-  if (!back)
-    return std::unexpected(std::move(back.error()));
   auto switched = m_fontTextureGroup.switchFont(style.font);
   if (!switched)
     return std::unexpected(std::move(switched.error()));
@@ -560,19 +555,6 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
   return {};
 }
 
-std::expected<void, StarException> TextPainter::modifyDirectives(Directives& directives) {
-  if (directives) {
-    directives.loadOperations();
-    auto shared = directives.get();
-    if (!shared)
-      return std::unexpected(std::move(shared.error()));
-    for (auto& entry : shared->get().entries) {
-      if (std::holds_alternative<BorderImageOperation>(entry.operation))
-        std::get<BorderImageOperation>(entry.operation).includeTransparent = true;
-    }
-  }
-  return {};
-}
 
 std::expected<RectF, StarException> TextPainter::doRenderText(StringView s, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit) {
   Vec2F pos = position.pos;
@@ -757,7 +739,7 @@ std::expected<void, StarException> TextPainter::renderGlyph(String::Char c, Vec2
     float scale, Vec4B color, std::optional<std::reference_wrapper<Directives const>> processingDirectives) {
   if (!fontSize)
     return {};
-  auto glyph = m_fontTextureGroup.glyphTexture(c, fontSize, processingDirectives);
+  auto glyph = m_fontTextureGroup.glyphTexture(c, fontSize, processingDirectives, GlyphDirectivePolicy::Text);
   if (!glyph)
     return std::unexpected(std::move(glyph.error()));
   auto const& glyphTexture = glyph->get();

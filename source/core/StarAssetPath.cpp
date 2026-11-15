@@ -80,9 +80,9 @@ String AssetPath::join(AssetPath const& components) {
     result.append(":");
     result.append(*components.subPath);
   }
-  components.directives.forEach([&](Directives::Entry const& entry, Directives const& directives) {
+  components.directives.for_each([&](Directives::Entry const& entry, Directives const& directives) {
     result.append("?");
-    result += entry.string(*directives.m_shared);
+    result += directives.entry_string(entry);
   });
   return result;
 }
@@ -219,9 +219,9 @@ void write_text(TextBuffer& buffer, AssetPath const& rhs) {
     append_text(buffer, *rhs.subPath);
   }
 
-  rhs.directives.forEach([&](Directives::Entry const& entry, Directives const& directives) {
+  rhs.directives.for_each([&](Directives::Entry const& entry, Directives const& directives) {
     buffer.push_back('?');
-    append_text(buffer, entry.string(*directives.m_shared));
+    append_text(buffer, directives.entry_string(entry));
   });
 }
 

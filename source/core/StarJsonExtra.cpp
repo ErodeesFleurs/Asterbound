@@ -306,7 +306,7 @@ Json jsonFromDirectivesList(List<Directives> const& v) {
   JsonArray result;
   for (auto const& entry : v)
     if (entry)
-      if (auto text = entry.maybeString())
+      if (auto text = entry.maybe_string())
         result.push_back(text->get());
   return result;
 }

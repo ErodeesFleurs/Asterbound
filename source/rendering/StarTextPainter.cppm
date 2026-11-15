@@ -108,7 +108,6 @@ public:
   [[nodiscard]] std::expected<void, StarException> applyCommands(StringView unsplitCommands);
 private:
   TextPainter(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup);
-  [[nodiscard]] std::expected<void, StarException> modifyDirectives(Directives& directives);
   [[nodiscard]] std::expected<RectF, StarException> doRenderText(StringView s, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit);
   [[nodiscard]] std::expected<RectF, StarException> doRenderLine(StringView s, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit);
   [[nodiscard]] std::expected<RectF, StarException> doRenderGlyph(String::Char c, TextPositioning const& position, bool reallyRender);

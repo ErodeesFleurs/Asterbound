@@ -485,7 +485,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!directiveStringResult)
         return std::unexpected(std::move(directiveStringResult.error()));
       auto directiveString = std::move(*directiveStringResult);
-      m_directives.parse(std::move(directiveString));
+      m_directives = Directives(std::move(directiveString));
     }
     if (isMaster()) {
       setImageKey("color", colorName);

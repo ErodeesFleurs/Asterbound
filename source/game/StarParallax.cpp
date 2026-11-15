@@ -156,7 +156,7 @@ void ParallaxLayer::addImageDirectives(Directives const& newDirectives) {
     if (directives) {
       String dirString = directives.string();
 
-      auto newStringLease = newDirectives.maybeString();
+      auto newStringLease = newDirectives.maybe_string();
       auto const& newString = newStringLease->get();
       if (!newString.empty()) {
         if (newString.utf8().front() != '?')

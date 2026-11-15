@@ -23,21 +23,26 @@ import star.vector;
 namespace Star {
 class Root;
 
+enum class GlyphDirectivePolicy : std::uint8_t {
+  Default,
+  Text
+};
+
 
 class FontTextureGroup {
 public:
-  using GlyphDescriptor = std::tuple<String::Char, unsigned, std::size_t, std::reference_wrapper<Font>>;
+  using GlyphDescriptor = std::tuple<String::Char, unsigned, Directives, GlyphDirectivePolicy, std::reference_wrapper<Font>>;
   struct GlyphDescriptorHash {
     std::size_t operator()(GlyphDescriptor const& descriptor) const {
-      return hash_of(std::get<0>(descriptor), std::get<1>(descriptor), std::get<2>(descriptor),
-                     std::addressof(std::get<3>(descriptor).get()));
+      return hash_of(std::get<0>(descriptor), std::get<1>(descriptor), std::get<2>(descriptor).hash(),
+                     std::get<3>(descriptor), std::addressof(std::get<4>(descriptor).get()));
     }
   };
   struct GlyphDescriptorEqual {
     bool operator()(GlyphDescriptor const& lhs, GlyphDescriptor const& rhs) const {
       return std::get<0>(lhs) == std::get<0>(rhs) && std::get<1>(lhs) == std::get<1>(rhs)
-          && std::get<2>(lhs) == std::get<2>(rhs)
-          && std::addressof(std::get<3>(lhs).get()) == std::addressof(std::get<3>(rhs).get());
+          && std::get<2>(lhs).equals(std::get<2>(rhs)) && std::get<3>(lhs) == std::get<3>(rhs)
+          && std::addressof(std::get<4>(lhs).get()) == std::addressof(std::get<4>(rhs).get());
     }
   };
 
@@ -50,10 +55,10 @@ public:
 
   FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> textureGroup);
 
-  [[nodiscard]] std::expected<std::reference_wrapper<GlyphTexture const>, StarException> glyphTexture(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives = std::nullopt);
+  [[nodiscard]] std::expected<std::reference_wrapper<GlyphTexture const>, StarException> glyphTexture(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives = std::nullopt, GlyphDirectivePolicy policy = GlyphDirectivePolicy::Default);
 
   [[nodiscard]] std::expected<TexturePtr, StarException> glyphTexturePtr(String::Char, unsigned fontSize);
-  [[nodiscard]] std::expected<TexturePtr, StarException> glyphTexturePtr(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives);
+  [[nodiscard]] std::expected<TexturePtr, StarException> glyphTexturePtr(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy = GlyphDirectivePolicy::Default);
 
   [[nodiscard]] std::expected<unsigned, StarException> glyphWidth(String::Char c, unsigned fontSize);
 
@@ -87,4 +92,5 @@ export module star.font_texture_group;
 
 export namespace Star {
   using ::Star::FontTextureGroup;
+  using ::Star::GlyphDirectivePolicy;
 }

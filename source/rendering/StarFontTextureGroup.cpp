@@ -87,14 +87,17 @@ std::expected<void, StarException> FontTextureGroup::setFixedFonts(String const&
   return {};
 }
 
-std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, StarException> FontTextureGroup::glyphTexture(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives) {
+std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, StarException> FontTextureGroup::glyphTexture(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy) {
   auto fontResult = getFontForCharacter(c);
   if (!fontResult)
     return std::unexpected(std::move(fontResult.error()));
   Font& font = fontResult->get();
-  if (m_emojiFont && std::addressof(font) == std::addressof(*m_emojiFont))
+  if ((m_emojiFont && std::addressof(font) == std::addressof(*m_emojiFont))
+      || (processingDirectives && processingDirectives->get().empty()))
     processingDirectives.reset();
-  GlyphDescriptor descriptor{c, size, processingDirectives ? processingDirectives->get().hash() : 0, std::ref(font)};
+  if (!processingDirectives)
+    policy = GlyphDirectivePolicy::Default;
+  GlyphDescriptor descriptor{c, size, processingDirectives ? processingDirectives->get() : Directives{}, policy, std::ref(font)};
   if (auto cached = m_glyphs.find_ref(descriptor)) {
     cached->get().time = std::chrono::time_point_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() + std::chrono::microseconds(500));
@@ -113,21 +116,26 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
   if (processingDirectives) {
     Vec2F preSize = Vec2F(image.size());
     bool broken = false;
-    auto shared = processingDirectives->get().get();
-    if (!shared)
-      return std::unexpected(std::move(shared.error()));
-    for (auto& entry : shared->get().entries) {
-      if (std::holds_alternative<ErrorImageOperation>(entry.operation)) {
-        auto& error = std::get<ErrorImageOperation>(entry.operation);
-        if (!error.reported) {
-          auto logged = m_root.logger().error("Error in parsed font directives: {}", error.cause.what());
-          if (!logged)
-            return std::unexpected(std::move(logged.error()));
-          error.reported = true;
-        }
+    auto const& directives = std::get<2>(descriptor);
+    for (auto const& entry : directives.entries()) {
+      auto const& operation = directives.entry_operation(entry);
+      if (std::holds_alternative<ErrorImageOperation>(operation)) {
+        auto const& error = std::get<ErrorImageOperation>(operation);
+        auto reported = directives.report_error(entry, [&]() -> std::expected<void, StarException> {
+          return m_root.logger().error("Error in parsed font directives: {}", error.cause.what());
+        });
+        if (!reported)
+          return std::unexpected(std::move(reported.error()));
         broken = true;
       } else {
-        auto processed = process_image_operation(entry.operation, image);
+        auto processed = [&]() -> std::expected<void, StarException> {
+          if (policy == GlyphDirectivePolicy::Text && std::holds_alternative<BorderImageOperation>(operation)) {
+            ImageOperation text_operation = std::get<BorderImageOperation>(operation);
+            std::get<BorderImageOperation>(text_operation).includeTransparent = true;
+            return process_image_operation(text_operation, image);
+          }
+          return process_image_operation(operation, image);
+        }();
         if (!processed) {
           broken = true;
           auto character = String::create(c);
@@ -165,8 +173,8 @@ std::expected<TexturePtr, StarException> FontTextureGroup::glyphTexturePtr(Strin
   return glyphTexturePtr(c, size, std::nullopt);
 }
 
-std::expected<TexturePtr, StarException> FontTextureGroup::glyphTexturePtr(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives) {
-  auto glyph = glyphTexture(c, size, processingDirectives);
+std::expected<TexturePtr, StarException> FontTextureGroup::glyphTexturePtr(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy) {
+  auto glyph = glyphTexture(c, size, processingDirectives, policy);
   if (!glyph)
     return std::unexpected(std::move(glyph.error()));
   return glyph->get().texture;

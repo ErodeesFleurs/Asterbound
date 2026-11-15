@@ -1601,7 +1601,7 @@ void Humanoid::refreshWearables(Fashion& fashion) {
 
   if (m_useAnimation)
     {
-m_networkedAnimator->setLocalTag("helmetMaskDirectives", fashion.helmetMaskDirectivesGroup.toString());
+m_networkedAnimator->setLocalTag("helmetMaskDirectives", fashion.helmetMaskDirectivesGroup.to_string());
 }
 
   fashion.wornHeadsChanged = fashion.wornChestsLegsChanged = fashion.wornBacksChanged = fashion.helmetMasksChanged = false;
@@ -3983,18 +3983,16 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
   if (!directives)
     return std::make_pair(Vec2F::filled(1.f), Directives());
 
-  auto shared = directives.get();
-  if (!shared) return std::unexpected(std::move(shared.error()));
   List<std::reference_wrapper<Directives::Entry const>> entries;
   std::size_t toReserve = 0;
   std::optional<Vec2F> scale;
 
-  for (auto const& entry : shared->get().entries) {
-    auto string = entry.string(shared->get());
+  for (auto const& entry : directives.entries()) {
+    auto string = directives.entry_string(entry);
     auto scaleNearest = string.starts_with("scalenearest");
     if (!scaleNearest) return std::unexpected(std::move(scaleNearest.error()));
     if (*scaleNearest && string.utf8().find("skip") == NPos) {
-      auto const& operation = entry.loadOperation(shared->get());
+      auto const& operation = directives.entry_operation(entry);
       if (std::holds_alternative<ScaleImageOperation>(operation)) {
         auto const& op = std::get<ScaleImageOperation>(operation);
         scale = scale.value_or(Vec2F::filled(1.f)).piecewise_multiply(op.scale);
@@ -4013,7 +4011,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
   for (auto const& entry : entries) {
     if (entry.get().begin > 0)
       mergedDirectives.append("?");
-    mergedDirectives.append(entry.get().string(shared->get()));
+    mergedDirectives.append(directives.entry_string(entry.get()));
   }
 
   return std::make_pair(*scale, Directives(mergedDirectives));

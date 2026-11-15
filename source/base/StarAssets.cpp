@@ -2246,9 +2246,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     StringMap<std::shared_ptr<Image const>> references;
     StringList referencePaths;
     for (auto const& directives : path.directives.list())
-      directives.loadOperations();
-    path.directives.forEach(
-      [&](auto const& entry, Directives const&) { add_image_operation_references(entry.operation, referencePaths); });
+      for (auto const& operation : directives.operations())
+        add_image_operation_references(operation, referencePaths);
     for (auto const& ref : referencePaths) {
       auto components = AssetPath::split(ref);
       if (auto valid = validatePath(components, true, false); !valid)

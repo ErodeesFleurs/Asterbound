@@ -74,6 +74,11 @@ import star.main_thread_dispatcher;
 import star.fixed_scheduler;
 import star.voice;
 import star.unicode;
+import star.directives;
+import star.image;
+import star.image_processing;
+import star.text;
+import star.text_painter;
 
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -469,6 +474,62 @@ std::expected<std::shared_ptr<GuiContext>, StarException> textEditorContext(Game
     return std::unexpected(std::move(configured.error()));
   return GuiContext::create(fixture.root(), {}, {});
 }
+const GameTestRegistration text_directive_aliases(
+  "TextDirectives", "ApplyingStylesDoesNotMutateSharedBorderSyntax", [](GameTest& fixture) {
+    auto context = textEditorContext(fixture);
+    ASSERT_TRUE(context) << context.error().what();
+    // Style installation and measurement use real asset-backed fonts without a
+    // renderer. Pixel/cache policy is exercised separately in the native GUI gate.
+    auto painter = TextPainter::create((*context)->root(), {}, {});
+    ASSERT_TRUE(painter) << painter.error().what();
+    TextStyle style;
+    style.directives = String("?border=1;ff0000");
+    style.backDirectives = String("?outline=2;00ff00");
+    TextStyle alias = style;
+    auto const& front_entries = style.directives.entries();
+    auto const& back_entries = style.backDirectives.entries();
+    ASSERT_FALSE(front_entries.empty());
+    ASSERT_FALSE(back_entries.empty());
+    auto const& front = style.directives.entry_operation(front_entries.back());
+    auto const& back = style.backDirectives.entry_operation(back_entries.back());
+    ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(front));
+    ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(back));
+    EXPECT_FALSE(std::get<BorderImageOperation>(front).includeTransparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(back).includeTransparent);
+    Image before = Image::filled({2, 2}, {200, 100, 50, 128});
+    ASSERT_TRUE(process_image_operation(front, before));
+
+    auto applied = (*painter)->setTextStyle(style);
+    ASSERT_TRUE(applied) << applied.error().what();
+    auto measured = (*painter)->determineTextSize("Aliased style", TextPositioning{});
+    ASSERT_TRUE(measured) << measured.error().what();
+    for (auto const& candidate : {std::cref(style), std::cref(alias), std::cref(applied->get())}) {
+      for (auto const& directives : {std::cref(candidate.get().directives), std::cref(candidate.get().backDirectives)}) {
+        for (auto const& entry : directives.get().entries()) {
+          auto const& operation = directives.get().entry_operation(entry);
+          if (std::holds_alternative<BorderImageOperation>(operation))
+            EXPECT_FALSE(std::get<BorderImageOperation>(operation).includeTransparent);
+        }
+      }
+    }
+    Image after = Image::filled({2, 2}, {200, 100, 50, 128});
+    ASSERT_TRUE(process_image_operation(alias.directives.entry_operation(front_entries.back()), after));
+    EXPECT_EQ(before.size(), after.size());
+    EXPECT_TRUE(std::ranges::equal(before.data(), after.data()));
+
+    ASSERT_TRUE((*painter)->setProcessingDirectives("?border=3;0000ff"));
+    ASSERT_TRUE((*painter)->setProcessingDirectives("?outline=4;ffffff", true));
+    for (auto const& directives : {std::cref(applied->get().directives), std::cref(applied->get().backDirectives)}) {
+      auto const& entry = directives.get().entries().back();
+      auto const& operation = directives.get().entry_operation(entry);
+      ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(operation));
+      EXPECT_FALSE(std::get<BorderImageOperation>(operation).includeTransparent);
+    }
+    EXPECT_TRUE(style.directives.equals(alias.directives));
+    EXPECT_FALSE(std::get<BorderImageOperation>(front).includeTransparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(back).includeTransparent);
+  });
+
 
 TEST(PaneAnchorMath, OddDimensionsAndOversizedPanesKeepIntegerOrigins) {
   struct AnchorCase {

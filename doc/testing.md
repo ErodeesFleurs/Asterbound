@@ -198,6 +198,18 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
   `ImageScalingTest.*` uses narrowly scoped precise-FP scalar references;
   volatile loads alone do not prevent fast-math sampling changes. Keep independent
   nearest/directive checks on both sides of half-integer boundaries.
+- Directives retain exact child text and ordered nonempty-child identity; empty
+  appends preserve equality/hash and truth means nonempty. Entry ranges are UTF-8
+  byte ranges. Parsed operations publish once and remain immutable; long children
+  parse all operations on first operation access, not on metadata-only access.
+  Preserve first-error order, committed successful prefixes, callback aliasing,
+  source ownership and full pixels, including shared fade/scanline lookup tables.
+  Font text policy must not mutate shared border syntax; glyph keys compare
+  directive content and policy, not just hashes. Successful error reports suppress
+  later reports per owner; failed callbacks remain retryable, without holding a
+  lock across callbacks. Concurrent duplicate reports are permitted.
+  The unchanged flattened string codec is not a lossless round trip for arbitrary
+  group boundaries/prefixes; do not infer structural identity from flattened text.
 - Asset-backed damage, humanoid rendering and blueprint tests preserve catalog,
   lighting and state/error boundaries. Presentation checks retain wrapped and
   repeatable sampling, tick-owned effects and gameplay-RNG isolation. Frontend

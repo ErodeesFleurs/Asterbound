@@ -1048,7 +1048,7 @@ struct LuaConverter<char[s]> {
 template <>
 struct LuaConverter<Directives> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Directives const& v) {
-    auto string = v.maybeString();
+    auto string = v.maybe_string();
     return stack.pushString(string ? string->get().utf8() : std::string_view());
   }
 };

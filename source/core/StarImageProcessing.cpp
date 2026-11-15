@@ -63,16 +63,17 @@ BrightnessMultiplyImageOperation BrightnessMultiplyImageOperation::brightness_mu
   return BrightnessMultiplyImageOperation{amount / 100.0f + 1.0f};
 }
 
-FadeToColorImageOperation::FadeToColorImageOperation(Vec3B color, float amount) {
-  this->color = color;
-  this->amount = amount;
+FadeToColorImageOperation::FadeToColorImageOperation(Vec3B color, float amount)
+  : color(color), amount(amount), m_color_tables(std::make_shared<ColorLookupTables const>(color, amount)) {}
+
+ColorLookupTables::ColorLookupTables(Vec3B color, float amount) {
 
   auto fcl = Color::rgb(color).toLinear();
   for (int i = 0; i <= 255; ++i) {
     auto r = Color::rgb(Vec3B(i, i, i)).toLinear().mix(fcl, amount).toSRGB().toRgb();
-    rTable[i] = r[0];
-    gTable[i] = r[1];
-    bTable[i] = r[2];
+    r_table[i] = r[0];
+    g_table[i] = r[1];
+    b_table[i] = r[2];
   }
 }
 
@@ -638,22 +639,20 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
       }
     });
   } else if (auto op = (std::holds_alternative<FadeToColorImageOperation>(operation) ? std::optional{std::cref(std::get<FadeToColorImageOperation>(operation))} : std::nullopt)) {
-    image.for_each_pixel([&op](unsigned, unsigned, Vec4B& pixel) {
-      pixel[0] = op->get().rTable[pixel[0]];
-      pixel[1] = op->get().gTable[pixel[1]];
-      pixel[2] = op->get().bTable[pixel[2]];
+    auto const& tables = op->get().color_tables();
+    image.for_each_pixel([&tables](unsigned, unsigned, Vec4B& pixel) {
+      pixel[0] = tables.r_table[pixel[0]];
+      pixel[1] = tables.g_table[pixel[1]];
+      pixel[2] = tables.b_table[pixel[2]];
     });
   } else if (auto op = (std::holds_alternative<ScanLinesImageOperation>(operation) ? std::optional{std::cref(std::get<ScanLinesImageOperation>(operation))} : std::nullopt)) {
-    image.for_each_pixel([&op](unsigned, unsigned y, Vec4B& pixel) {
-      if (y % 2 == 0) {
-        pixel[0] = op->get().fade1.rTable[pixel[0]];
-        pixel[1] = op->get().fade1.gTable[pixel[1]];
-        pixel[2] = op->get().fade1.bTable[pixel[2]];
-      } else {
-        pixel[0] = op->get().fade2.rTable[pixel[0]];
-        pixel[1] = op->get().fade2.gTable[pixel[1]];
-        pixel[2] = op->get().fade2.bTable[pixel[2]];
-      }
+    auto const& even_tables = op->get().fade1.color_tables();
+    auto const& odd_tables = op->get().fade2.color_tables();
+    image.for_each_pixel([&even_tables, &odd_tables](unsigned, unsigned y, Vec4B& pixel) {
+      auto const& tables = y % 2 == 0 ? even_tables : odd_tables;
+      pixel[0] = tables.r_table[pixel[0]];
+      pixel[1] = tables.g_table[pixel[1]];
+      pixel[2] = tables.b_table[pixel[2]];
     });
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
     image.for_each_pixel([&op](unsigned, unsigned, Vec4B& pixel) {
@@ -966,10 +965,11 @@ static std::expected<void, StarException> process_color_segment(std::size_t begi
           fade = std::cref(parity == 0 ? scanlines.fade1 : scanlines.fade2);
         }
         if (fade) {
+          auto const& fade_tables = fade->get().color_tables();
           for (unsigned value = 0; value < 256; ++value) {
-            tables[parity][0][value] = fade->get().rTable[tables[parity][0][value]];
-            tables[parity][1][value] = fade->get().gTable[tables[parity][1][value]];
-            tables[parity][2][value] = fade->get().bTable[tables[parity][2][value]];
+            tables[parity][0][value] = fade_tables.r_table[tables[parity][0][value]];
+            tables[parity][1][value] = fade_tables.g_table[tables[parity][1][value]];
+            tables[parity][2][value] = fade_tables.b_table[tables[parity][2][value]];
           }
         } else if (std::holds_alternative<SetColorImageOperation>(operation)) {
           auto const& set = std::get<SetColorImageOperation>(operation);
