@@ -130,6 +130,17 @@ See [native output rules](development.md#logging-and-native-process-output).
   repaired hot reload. Collection repairs must preserve unknown providers,
   versions and bytes, reject partial matches, and cover CRLF, patch order and
   failure recovery through the real loader.
+- Interpolation preserves scalar/vector arithmetic, integer result conversion,
+  full-size sampling windows and inverse lower/upper duplicate selection.
+  Nonperiodic cubic axes of length two or three use linear fallback; periodic
+  axes retain cubic wrapping, including safe two-point neighbors. Empty lists
+  and raw tensors return default values; checked `MultiTable` sampling rejects
+  empty axes and recovers after reconfiguration. Tensor weight callables are
+  const-invocable, deterministic and side-effect-free, evaluated once per axis.
+  Retain non-affine rank-two/three/four and short-axis coverage, nested arithmetic
+  association, complete image bytes and the legacy shifted bicubic image window.
+  Keep low-rank bound collection separate from weight evaluation and retain
+  the local fast-math inlining/reassociation boundaries.
 
 ### Random stream compatibility
 

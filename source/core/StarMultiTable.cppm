@@ -16,6 +16,7 @@ namespace Star {
 // each dimension, so is O(log(n)*m) where n is the size of the largest
 // dimension, and m is the table_rank.
 template <typename ElementT, typename PositionT, std::size_t RankN>
+  requires(RankN > 0)
 class MultiTable {
 public:
   using Element = ElementT;
@@ -29,22 +30,19 @@ public:
   using PiecewiseInterpolator = Star::MultiArrayPiecewiseInterpolator<MultiArray, Position>;
 
   using PositionArray = Array<Position, Rank>;
-  using WeightArray2 = Array<Position, 2>;
-  using WeightArray4 = Array<Position, 4>;
   using SizeArray = typename MultiArray::SizeArray;
   using IndexArray = typename MultiArray::IndexArray;
   using Range = List<Position>;
   using RangeArray = Array<Range, Rank>;
 
-  using WeightFunction2 = std::function<WeightArray2(Position)>;
-  using WeightFunction4 = std::function<WeightArray4(Position)>;
-  using InterpolateFunction = std::function<Element(PositionArray const&)>;
-
-  MultiTable() {}
+  MultiTable() = default;
 
   // Set input ranges on a particular dimension.  Will resize underlying storage
-  // to fit range.
-  void setRange(std::size_t dim, Range const& range) {
+  // to fit range. Ranges must be sorted in ascending order.
+  void set_range(std::size_t dim, Range const& range) {
+    if constexpr (Star::DebugEnabled) {
+      Star::star_assert_failed((std::is_sorted(range.begin(), range.end())));
+    }
     SizeArray sizes = m_array.size();
     sizes[dim] = range.size();
     m_array.resize(sizes);
@@ -52,10 +50,13 @@ public:
     m_ranges[dim] = range;
   }
 
-  void setRanges(RangeArray const& ranges) {
+  void set_ranges(RangeArray const& ranges) {
     SizeArray arraySize;
 
     for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if constexpr (Star::DebugEnabled) {
+        Star::star_assert_failed((std::is_sorted(ranges[dim].begin(), ranges[dim].end())));
+      }
       arraySize[dim] = ranges[dim].size();
       m_ranges[dim] = ranges[dim];
     }
@@ -81,59 +82,65 @@ public:
     return m_array;
   }
 
-  InterpolationMode interpolationMode() const {
-    return m_interpolationMode;
-  }
+  InterpolationMode interpolation_mode() const { return m_interpolation_mode; }
 
-  void setInterpolationMode(InterpolationMode interpolationMode) {
-    m_interpolationMode = interpolationMode;
-  }
+  void set_interpolation_mode(InterpolationMode interpolation_mode) { m_interpolation_mode = interpolation_mode; }
 
-  BoundMode boundMode() const {
-    return m_boundMode;
-  }
+  BoundMode bound_mode() const { return m_bound_mode; }
 
-  void setBoundMode(BoundMode boundMode) {
-    m_boundMode = boundMode;
-  }
+  void set_bound_mode(BoundMode bound_mode) { m_bound_mode = bound_mode; }
 
-  [[nodiscard]] std::expected<Element, StarException> interpolate(PositionArray const& coord) const {
-    if (m_interpolationMode == InterpolationMode::HalfStep) {
-      PiecewiseInterpolator piecewiseInterpolator(StepWeightOperator<Position>(), m_boundMode);
-      return piecewiseInterpolator.interpolate(m_array, toIndexSpace(coord));
+  [[nodiscard]] std::expected<Element, StarException> interpolate(PositionArray const& coord) const
+    requires requires(Interpolator2 const& linear, Interpolator4 const& cubic, PiecewiseInterpolator const& piecewise,
+                      MultiArray const& array) {
+      linear.interpolate(array, coord);
+      cubic.interpolate(array, coord);
+      piecewise.interpolate(array, coord);
+    }
+  {
+    for (std::size_t dim = 0; dim < Rank; ++dim) {
+      if (m_ranges[dim].empty() || m_array.size(dim) == 0)
+        return std::unexpected(MathException("Cannot interpolate a MultiTable with an empty axis"));
+    }
 
-    } else if (m_interpolationMode == InterpolationMode::Linear) {
-      Interpolator2 interpolator2(LinearWeightOperator<Position>(), m_boundMode);
-      return interpolator2.interpolate(m_array, toIndexSpace(coord));
+    if (m_interpolation_mode == InterpolationMode::HalfStep) {
+      PiecewiseInterpolator piecewiseInterpolator(StepWeightOperator<Position>(), m_bound_mode);
+      return piecewiseInterpolator.interpolate(m_array, to_index_space(coord));
 
-    } else if (m_interpolationMode == InterpolationMode::Cubic) {
-      // MultiTable uses CubicWeights with linear extrapolation (not
+    } else if (m_interpolation_mode == InterpolationMode::Linear) {
+      Interpolator2 interpolator2(LinearWeightOperator<Position>(), m_bound_mode);
+      return interpolator2.interpolate(m_array, to_index_space(coord));
+
+    } else if (m_interpolation_mode == InterpolationMode::Cubic) {
+      // MultiTable uses cubic weights with linear extrapolation (not
       // configurable atm)
-      Interpolator4 interpolator4(Cubic4WeightOperator<Position>(true), m_boundMode);
-      return interpolator4.interpolate(m_array, toIndexSpace(coord));
+      Interpolator4 interpolator4(Cubic4WeightOperator<Position>(true), m_bound_mode);
+      return interpolator4.interpolate(m_array, to_index_space(coord));
 
     } else {
       return std::unexpected(MathException("Unsupported interpolation type in MultiTable::interpolate"));
     }
   }
 
-  // Synonym for inteprolate
-  [[nodiscard]] std::expected<Element, StarException> operator()(PositionArray const& coord) const {
+  // Synonym for interpolate
+  [[nodiscard]] std::expected<Element, StarException> operator()(PositionArray const& coord) const
+    requires requires { interpolate(coord); }
+  {
     return interpolate(coord);
   }
 
   // op should take a PositionArray parameter and return an element.
   template <typename OpType>
-  void eval(OpType op) {
+    requires requires(OpType& op, PositionArray& point, Element& element) { element = std::invoke(op, point); }
+  void eval(OpType&& op) {
     m_array.forEach(EvalWrapper<OpType>(op, *this));
   }
 
 private:
-  template <typename Coordinate>
-  inline PositionArray toIndexSpace(Coordinate const& coord) const {
+  PositionArray to_index_space(PositionArray const& coord) const {
     PositionArray indexCoord;
     for (std::size_t i = 0; i < Rank; ++i)
-      indexCoord[i] = inverseLinearInterpolateLower(m_ranges[i].begin(), m_ranges[i].end(), coord[i]);
+      indexCoord[i] = inverse_linear_interpolate_lower(m_ranges[i].begin(), m_ranges[i].end(), coord[i]);
     return indexCoord;
   }
 
@@ -142,13 +149,12 @@ private:
     EvalWrapper(OpType& o, MultiTable const& t)
       : op(o), table(t) {}
 
-    template <typename IndexArray>
     void operator()(IndexArray const& indexArray, Element& element) {
       PositionArray rangeArray;
       for (std::size_t i = 0; i < Rank; ++i)
         rangeArray[i] = table.m_ranges[i][indexArray[i]];
 
-      element = op(rangeArray);
+      element = std::invoke(op, rangeArray);
     }
 
     OpType& op;
@@ -157,8 +163,8 @@ private:
 
   RangeArray m_ranges;
   MultiArray m_array;
-  InterpolationMode m_interpolationMode = InterpolationMode::Linear;
-  BoundMode m_boundMode = BoundMode::Clamp;
+  InterpolationMode m_interpolation_mode = InterpolationMode::Linear;
+  BoundMode m_bound_mode = BoundMode::Clamp;
 };
 
 using MultiTable2F = MultiTable<float, float, 2>;

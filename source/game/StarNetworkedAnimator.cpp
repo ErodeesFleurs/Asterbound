@@ -61,8 +61,8 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
     return current;
   float xs = lerp(alpha, std::hypot(previous[0][0], previous[0][1]), std::hypot(current[0][0], current[0][1]));
   float ys = lerp(alpha, std::hypot(previous[1][0], previous[1][1]), std::hypot(current[1][0], current[1][1]));
-  float xa = angleLerp(alpha, std::atan2(previous[0][1], previous[0][0]), std::atan2(current[0][1], current[0][0]));
-  float ya = angleLerp(alpha, std::atan2(previous[1][0], previous[1][1]), std::atan2(current[1][0], current[1][1]));
+  float xa = angle_lerp(alpha, std::atan2(previous[0][1], previous[0][0]), std::atan2(current[0][1], current[0][0]));
+  float ya = angle_lerp(alpha, std::atan2(previous[1][0], previous[1][1]), std::atan2(current[1][0], current[1][1]));
   return Mat3F(xs * std::cos(xa), xs * std::sin(xa), lerp(alpha, previous[0][2], current[0][2]),
       ys * std::sin(ya), ys * std::cos(ya), lerp(alpha, previous[1][2], current[1][2]), 0, 0, 1);
 }
@@ -1039,7 +1039,8 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
       center = *configuredCenter;
     }
     auto const& value = rotation->get();
-    float angle = sample ? angleLerp(sample->interpolation(), value.previousAngle, value.currentAngle) : value.currentAngle;
+    float angle =
+      sample ? angle_lerp(sample->interpolation(), value.previousAngle, value.currentAngle) : value.currentAngle;
     transformation = Mat3F::rotation(angle, center) * transformation;
   }
   if (auto anchorJson = part.properties.find_ref("anchorPart")) {
@@ -1257,7 +1258,7 @@ std::expected<float, StarException> NetworkedAnimator::queryCurrentRotationAngle
   auto entry = m_rotationGroups.get(rotationGroup);
   if (!entry) return std::unexpected(std::move(entry.error()));
   auto const& group = entry->get();
-  return sample ? angleLerp(sample->interpolation(), group.previousAngle, group.currentAngle) : group.currentAngle;
+  return sample ? angle_lerp(sample->interpolation(), group.previousAngle, group.currentAngle) : group.currentAngle;
 }
 
 bool NetworkedAnimator::hasTransformationGroup(String const& transformationGroup) const {
@@ -1815,7 +1816,7 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
       auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
       if (!rotation) return std::unexpected(std::move(rotation.error()));
       auto const& rg = rotation->get();
-      float angle = sample ? angleLerp(sample->interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
+      float angle = sample ? angle_lerp(sample->interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
       position = (position - pair.second.rotationCenter.value_or(rg.rotationCenter)).rotate(angle)
           + pair.second.rotationCenter.value_or(rg.rotationCenter);
       pointAngle += angle;
@@ -2246,8 +2247,8 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
       pair.second.yTranslation.setInterpolator(lerp<float, float>);
       pair.second.xScale.setInterpolator(lerp<float, float>);
       pair.second.yScale.setInterpolator(lerp<float, float>);
-      pair.second.xShear.setInterpolator(angleLerp<float, float>);
-      pair.second.yShear.setInterpolator(angleLerp<float, float>);
+      pair.second.xShear.setInterpolator(angle_lerp<float, float>);
+      pair.second.yShear.setInterpolator(angle_lerp<float, float>);
     }
   }
 
@@ -2280,7 +2281,7 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
 
     pair.second.xPosition.setInterpolator(lerp<float, float>);
     pair.second.yPosition.setInterpolator(lerp<float, float>);
-    pair.second.pointAngle.setInterpolator(angleLerp<float, float>);
+    pair.second.pointAngle.setInterpolator(angle_lerp<float, float>);
   }
 
   for (auto& pair : m_sounds) {

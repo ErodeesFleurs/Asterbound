@@ -313,7 +313,7 @@ MovementController::MovementController(Root& root) : m_root(root) {
 
   m_xVelocity.setInterpolator(lerp<float, float>);
   m_yVelocity.setInterpolator(lerp<float, float>);
-  m_rotation.setInterpolator(angleLerp<float, float>);
+  m_rotation.setInterpolator(angle_lerp<float, float>);
   m_xRelativeSurfaceMovingCollisionPosition.setInterpolator(lerp<float, float>);
   m_yRelativeSurfaceMovingCollisionPosition.setInterpolator(lerp<float, float>);
 
@@ -1331,11 +1331,11 @@ void MovementController::updatePositionInterpolators() {
   else
     m_xPosition.setInterpolator(
       [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
-        return lerpWithLimit<float, float>(limit, offset, from, to);
+        return lerp_with_limit<float, float>(limit, offset, from, to);
       });
   m_yPosition.setInterpolator(
     [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
-      return lerpWithLimit<float, float>(limit, offset, from, to);
+      return lerp_with_limit<float, float>(limit, offset, from, to);
     });
 }
 

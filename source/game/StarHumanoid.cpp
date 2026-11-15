@@ -2090,9 +2090,10 @@ std::expected<void, StarException> Humanoid::prepareAnimatorPose(Animator& anima
     if (!m_presentationHistory || m_previousPose.facing != m_facingDirection || m_previousPose.twoHanded != m_twoHanded
         || hand.holdingItem != (primary ? m_previousPose.primaryHolding : m_previousPose.altHolding))
       return hand.angle;
-    return angleLerp(interpolation, primary ? m_previousPose.primaryAngle : m_previousPose.altAngle, hand.angle);
+    return angle_lerp(interpolation, primary ? m_previousPose.primaryAngle : m_previousPose.altAngle, hand.angle);
   };
-  float head = m_presentationHistory ? angleLerp(interpolation, m_previousPose.headRotation, m_headRotation) : m_headRotation;
+  float head =
+    m_presentationHistory ? angle_lerp(interpolation, m_previousPose.headRotation, m_headRotation) : m_headRotation;
   return applyAnimatorPose(animator, front, back, angle(front, frontPrimary), angle(back, backPrimary), head, danceStep, withItems);
 }
 
@@ -2103,8 +2104,9 @@ std::expected<List<Drawable>, StarException> Humanoid::render(bool withItems, bo
 
 std::expected<List<Drawable>, StarException> Humanoid::render(NetworkedAnimator::Sample& sample, bool withItems, bool withRotationAndScale) {
   float interpolation = sample.interpolation();
-  float headRotation = m_presentationHistory ? angleLerp(interpolation, m_previousPose.headRotation, m_headRotation) : m_headRotation;
-  float rotation = m_presentationHistory ? angleLerp(interpolation, m_previousPose.rotation, m_rotation) : m_rotation;
+  float headRotation =
+    m_presentationHistory ? angle_lerp(interpolation, m_previousPose.headRotation, m_headRotation) : m_headRotation;
+  float rotation = m_presentationHistory ? angle_lerp(interpolation, m_previousPose.rotation, m_rotation) : m_rotation;
   Vec2F scale = m_presentationHistory ? lerp(interpolation, m_previousPose.scale, m_scale) : m_scale;
   auto& fashion = *m_fashion;
   refreshWearables(fashion);
@@ -2142,7 +2144,7 @@ std::optional<std::shared_ptr<Dance>> dance = std::move(*checked291);
       return angle;
     float previous = item ? (primary ? m_previousPose.primaryItemAngle : m_previousPose.altItemAngle)
                           : (primary ? m_previousPose.primaryAngle : m_previousPose.altAngle);
-    return angleLerp(interpolation, previous, angle);
+    return angle_lerp(interpolation, previous, angle);
   };
   bool frontPrimary = m_facingDirection == Direction::Left || m_twoHanded;
   bool backPrimary = m_facingDirection == Direction::Right || m_twoHanded;

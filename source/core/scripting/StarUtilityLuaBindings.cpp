@@ -394,7 +394,7 @@ std::expected<LuaValue, StarException> LuaBindings::UtilityCallbacks::interpolat
     auto floatValue2 = engine.luaTo<double>(value2);
     if (!floatValue2)
       return std::unexpected(std::move(floatValue2.error()));
-    return engine.luaFrom(sinEase(offset, **floatValue1, *floatValue2));
+    return engine.luaFrom(sin_ease(offset, **floatValue1, *floatValue2));
   }
 
   auto vectorValue1 = engine.luaTo<Vec2F>(value1);
@@ -403,7 +403,7 @@ std::expected<LuaValue, StarException> LuaBindings::UtilityCallbacks::interpolat
   auto vectorValue2 = engine.luaTo<Vec2F>(value2);
   if (!vectorValue2)
     return std::unexpected(std::move(vectorValue2.error()));
-  return engine.luaFrom<Vec2F>(sinEase(offset, *vectorValue1, *vectorValue2));
+  return engine.luaFrom<Vec2F>(sin_ease(offset, *vectorValue1, *vectorValue2));
 }
 
 String LuaBindings::UtilityCallbacks::replace_tags(String const& str, StringMap<String> const& tags) {

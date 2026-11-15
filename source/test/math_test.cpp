@@ -70,6 +70,109 @@ struct ExplicitScalar {
   friend constexpr int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept { return 4; }
 };
 
+struct ExplicitInterpolationValue {
+  explicit ExplicitInterpolationValue(double) {}
+  friend double operator*(ExplicitInterpolationValue const&, double) { return 1; }
+};
+
+struct CopyOnlyEndpoint {
+  int value;
+  explicit CopyOnlyEndpoint(int value) : value(value) {}
+  CopyOnlyEndpoint(CopyOnlyEndpoint const&) = default;
+  CopyOnlyEndpoint(CopyOnlyEndpoint&&) = delete;
+  CopyOnlyEndpoint& operator=(CopyOnlyEndpoint const&) = delete;
+};
+
+struct SamplePosition {
+  double position;
+};
+
+using SamplePositionIterator = std::array<SamplePosition, 4>::const_iterator;
+
+struct LowerPositionCompare {
+  int calls = 0;
+  LowerPositionCompare() = default;
+  LowerPositionCompare(LowerPositionCompare const&) = delete;
+  ContextualBool operator()(SamplePosition const& sample, double position) {
+    ++calls;
+    return {sample.position < position};
+  }
+};
+
+struct UpperPositionCompare {
+  int calls = 0;
+  UpperPositionCompare() = default;
+  UpperPositionCompare(UpperPositionCompare const&) = delete;
+  ContextualBool operator()(double position, SamplePosition const& sample) {
+    ++calls;
+    return {position < sample.position};
+  }
+};
+
+struct SamplePositionGetter {
+  int calls = 0;
+  SamplePositionGetter() = default;
+  SamplePositionGetter(SamplePositionGetter const&) = delete;
+  double operator()(SamplePosition const& sample) {
+    ++calls;
+    return sample.position;
+  }
+};
+
+struct MutableLinearWeights {
+  int calls = 0;
+  MutableLinearWeights() = default;
+  MutableLinearWeights(MutableLinearWeights const&) = delete;
+  std::array<double, 2> operator()(double x) {
+    ++calls;
+    return {1 - x, x};
+  }
+};
+
+struct MutableCubicWeights {
+  int calls = 0;
+  MutableCubicWeights() = default;
+  MutableCubicWeights(MutableCubicWeights const&) = delete;
+  auto operator()(double x) {
+    ++calls;
+    return Cubic4WeightOperator<double>{}(x);
+  }
+};
+
+struct InvalidWeights {
+  void operator()(double) {}
+};
+
+static_assert(lerp_compatible<float, int> && lerp_compatible<float, Vec2F>);
+static_assert(lerp_compatible<AlgebraicScalar, AlgebraicScalar>);
+static_assert(!lerp_compatible<double, ExplicitInterpolationValue> && !lerp_compatible<double, NotNumeric>);
+static_assert(!cubic4_compatible<double, NotNumeric> && !hermite2_compatible<double, NotNumeric>
+              && !quintic2_compatible<double, NotNumeric> && !sin_ease_compatible<double, NotNumeric>);
+static_assert(!angle_lerp_compatible<double, int> && angle_lerp_compatible<float, float>);
+static_assert(step_compatible<int, CopyOnlyEndpoint> && half_step_compatible<double, CopyOnlyEndpoint>);
+static_assert(!step_compatible<NotNumeric, int> && !half_step_compatible<NotNumeric, int>);
+static_assert(linear_sequence_interpolatable<std::array<double, 2>, double, MutableLinearWeights>);
+static_assert(cubic_sequence_interpolatable<std::array<double, 4>, double, MutableCubicWeights>);
+static_assert(!linear_sequence_interpolatable<std::array<double, 2>, double, InvalidWeights>);
+static_assert(!cubic_sequence_interpolatable<std::array<double, 4>, double, InvalidWeights>);
+static_assert(lower_inverse_interpolatable<SamplePositionIterator, double, LowerPositionCompare, SamplePositionGetter>);
+static_assert(upper_inverse_interpolatable<SamplePositionIterator, double, UpperPositionCompare, SamplePositionGetter>);
+static_assert(
+  !lower_inverse_interpolatable<SamplePositionIterator, double, UpperPositionCompare, SamplePositionGetter>);
+static_assert(
+  !upper_inverse_interpolatable<SamplePositionIterator, double, LowerPositionCompare, SamplePositionGetter>);
+static_assert(
+  !lower_inverse_interpolatable<std::forward_list<double>::iterator, double, std::less<double>, std::identity>);
+static_assert(lerp(0.25, 2.0, 10.0) == 4.0);
+static_assert(hermite2(0.25, 3.0, 11.0) == 4.25);
+static_assert(quintic2(0.25, 3.0, 11.0) == 3.828125);
+static_assert(cubic4(0.25, 2.0, 5.0, -3.0, 11.0) == 3.2578125);
+static_assert(LinearWeightOperator<double>{}(0.25)[0] == 0.75);
+static_assert(Cubic4WeightOperator<double>{}(0.25)[0] == -0.0703125);
+static_assert(get_bound4(0.25, std::size_t{2}, BoundMode::Clamp).i3 == 1);
+static_assert(noexcept(lerp(std::declval<AlgebraicScalar const&>(), std::declval<AlgebraicScalar const&>(),
+                            std::declval<AlgebraicScalar const&>())));
+
 static_assert(has_near_equal<int, unsigned> && has_near_equal<float, long double>);
 static_assert(!has_near_equal<int, double> && !has_near_equal<double, int>);
 static_assert(!has_near_equal<NotNumeric, NotNumeric>);
@@ -273,6 +376,219 @@ TEST(Math, GenericLerpPreservesArithmetic) {
   EXPECT_EQ(lerp(0.25f, Vec2F(2.0f, -4.0f), Vec2F(10.0f, 4.0f)), Vec2F(4.0f, -2.0f));
   EXPECT_EQ(lerp(2.0f, Vec2F(2.0f, -4.0f), Vec2F(10.0f, 4.0f)), Vec2F(18.0f, 12.0f));
   EXPECT_EQ(lerp(0.25f, -3, 3), -1);
+}
+
+TEST(Interpolation, SelectedEndpointOwnsCopyOnlyAndTemporaryValues) {
+  CopyOnlyEndpoint a{3}, b{9};
+  auto first = step(5, 4, a, b);
+  EXPECT_EQ(first.value, 3);
+  auto second = half_step(0.5, a, b);
+  EXPECT_EQ(second.value, 9);
+  auto temporary = half_step(0.25, CopyOnlyEndpoint{7}, CopyOnlyEndpoint{12});
+  EXPECT_EQ(temporary.value, 7);
+  a.value = 21;
+  b.value = 34;
+  EXPECT_EQ(first.value, 3);
+  EXPECT_EQ(second.value, 9);
+  AlgebraicScalar zero{0}, one{1}, low{3}, high{9};
+  EXPECT_EQ(lerp(zero, low, high).value, 3);
+  EXPECT_EQ(lerp(one, low, high).value, 9);
+}
+
+TEST(Interpolation, BoundsAreSafeForShortSignedAndSizeExtents) {
+  auto check = []<typename Index>() {
+    for (auto mode : {BoundMode::Clamp, BoundMode::Wrap, BoundMode::Extrapolate}) {
+      for (Index extent : {Index{0}, Index{1}, Index{2}, Index{3}}) {
+        for (double x : {-8.25, -1.0, -0.25, 0.0, 0.75, 1.5, 2.75, 8.25}) {
+          auto linear = get_bound2(x, extent, mode);
+          auto cubic = get_bound4(x, extent, mode);
+          if (extent <= 1) {
+            EXPECT_EQ(linear.i0, 0);
+            EXPECT_EQ(linear.i1, 0);
+            EXPECT_EQ(cubic.i0, 0);
+            EXPECT_EQ(cubic.i1, 0);
+            EXPECT_EQ(cubic.i2, 0);
+            EXPECT_EQ(cubic.i3, 0);
+            EXPECT_EQ(cubic.offset, 0);
+          } else {
+            EXPECT_LT(cubic.i0, extent);
+            EXPECT_LT(cubic.i1, extent);
+            EXPECT_LT(cubic.i2, extent);
+            EXPECT_LT(cubic.i3, extent);
+            EXPECT_GE(cubic.i0, 0);
+            EXPECT_GE(cubic.i1, 0);
+            EXPECT_GE(cubic.i2, 0);
+            EXPECT_GE(cubic.i3, 0);
+            EXPECT_EQ(cubic.i1, linear.i0);
+            EXPECT_EQ(cubic.i2, linear.i1);
+            if (mode != BoundMode::Wrap) {
+              EXPECT_EQ(cubic.i0, linear.i0);
+              EXPECT_EQ(cubic.i3, linear.i1);
+            }
+            EXPECT_EQ(cubic.offset, linear.offset);
+          }
+        }
+      }
+    }
+    auto wrapped = get_bound2(-0.25, Index{3}, BoundMode::Wrap);
+    EXPECT_EQ(wrapped.i0, 2);
+    EXPECT_EQ(wrapped.i1, 0);
+    EXPECT_EQ(wrapped.offset, 0.75);
+    auto outside = get_bound2(-2, Index{3}, BoundMode::Extrapolate);
+    EXPECT_EQ(outside.i0, 0);
+    EXPECT_EQ(outside.i1, 1);
+    EXPECT_EQ(outside.offset, -2);
+  };
+  check.operator()<int>();
+  check.operator()<std::size_t>();
+  auto pair_start = get_bound4(0.25, 2, BoundMode::Wrap);
+  EXPECT_EQ(pair_start.i0, 1);
+  EXPECT_EQ(pair_start.i1, 0);
+  EXPECT_EQ(pair_start.i2, 1);
+  EXPECT_EQ(pair_start.i3, 0);
+  EXPECT_EQ(pair_start.offset, 0.25);
+  auto pair_end = get_bound4(1.25, std::size_t{2}, BoundMode::Wrap);
+  EXPECT_EQ(pair_end.i0, 0);
+  EXPECT_EQ(pair_end.i1, 1);
+  EXPECT_EQ(pair_end.i2, 0);
+  EXPECT_EQ(pair_end.i3, 1);
+  auto triple_start = get_bound4(0.25, 3, BoundMode::Wrap);
+  EXPECT_EQ(triple_start.i0, 2);
+  EXPECT_EQ(triple_start.i1, 0);
+  EXPECT_EQ(triple_start.i2, 1);
+  EXPECT_EQ(triple_start.i3, 2);
+  EXPECT_EQ(get_bound4(3.0, -1, BoundMode::Wrap).i3, 0);
+}
+
+TEST(Interpolation, CubicBoundsRetainFullWindowAndExtrapolationOffsets) {
+  auto start = get_bound4(-0.5, std::size_t{5}, BoundMode::Clamp);
+  EXPECT_EQ(start.i0, 0);
+  EXPECT_EQ(start.i1, 1);
+  EXPECT_EQ(start.i2, 2);
+  EXPECT_EQ(start.i3, 3);
+  EXPECT_EQ(start.offset, -1);
+  auto end = get_bound4(8.0, std::size_t{5}, BoundMode::Clamp);
+  EXPECT_EQ(end.i0, 1);
+  EXPECT_EQ(end.i1, 2);
+  EXPECT_EQ(end.i2, 3);
+  EXPECT_EQ(end.i3, 4);
+  EXPECT_EQ(end.offset, 2);
+  EXPECT_EQ(get_bound4(-0.5, 5, BoundMode::Extrapolate).offset, -1.5);
+  EXPECT_EQ(get_bound4(4.5, 5, BoundMode::Extrapolate).offset, 2.5);
+  auto wrapped = get_bound4(-0.25, 5, BoundMode::Wrap);
+  EXPECT_EQ(wrapped.i0, 3);
+  EXPECT_EQ(wrapped.i1, 4);
+  EXPECT_EQ(wrapped.i2, 0);
+  EXPECT_EQ(wrapped.i3, 1);
+  EXPECT_EQ(wrapped.offset, 0.75);
+}
+
+TEST(Interpolation, ShortNonPeriodicCubicSequencesUseLinearValuesWithoutCallingCustomWeights) {
+  std::array<double, 0> empty{};
+  std::array<double, 1> sole{7};
+  std::array<double, 2> pair{2, 10};
+  std::array<double, 3> triple{2, 10, -6};
+  MutableCubicWeights weights;
+  for (auto mode : {BoundMode::Clamp, BoundMode::Extrapolate}) {
+    EXPECT_EQ(list_interpolate4(empty, -3.25, weights, mode), 0);
+    EXPECT_EQ(list_interpolate4(sole, -3.25, weights, mode), 7);
+    EXPECT_EQ(list_interpolate4(pair, 0.25, weights, mode), 4);
+    EXPECT_EQ(list_interpolate4(triple, 1.5, weights, mode), 2);
+  }
+  EXPECT_EQ(list_interpolate4(pair, -1.0, weights), 2);
+  EXPECT_EQ(list_interpolate4(pair, 3.0, weights), 10);
+  EXPECT_EQ(list_interpolate4(pair, -1.0, weights, BoundMode::Extrapolate), -6);
+  EXPECT_EQ(list_interpolate4(pair, 3.0, weights, BoundMode::Extrapolate), 26);
+  EXPECT_EQ(list_interpolate4(triple, 3.0, weights, BoundMode::Extrapolate), -22);
+  EXPECT_EQ(weights.calls, 0);
+  std::array<Vec2F, 2> vectors{Vec2F{2, -4}, Vec2F{10, 4}};
+  EXPECT_EQ(list_interpolate4(vectors, 0.25f, Cubic4WeightOperator<float>{}), Vec2F(4, -2));
+  std::array<int, 2> integers{-3, 3};
+  EXPECT_EQ(list_interpolate4(integers, 0.25, weights), -1);
+}
+
+TEST(Interpolation, ShortPeriodicCubicSequencesKeepNonAffineCubicWeights) {
+  std::array<double, 2> pair{2, 10};
+  std::array<double, 3> triple{2, 10, -6};
+  MutableCubicWeights weights;
+  EXPECT_EQ(list_interpolate4(pair, 0.25, weights, BoundMode::Wrap), 3.25);
+  EXPECT_EQ(list_interpolate4(pair, -0.25, weights, BoundMode::Wrap), 3.25);
+  EXPECT_EQ(list_interpolate4(pair, 1.0, weights, BoundMode::Wrap), 10);
+  EXPECT_EQ(list_interpolate4(triple, 0.25, weights, BoundMode::Wrap), 4.5625);
+  EXPECT_EQ(list_interpolate4(triple, -0.25, weights, BoundMode::Wrap), -0.5625);
+  EXPECT_EQ(list_interpolate4(triple, 3.25, weights, BoundMode::Wrap), 4.5625);
+  std::array<double, 0> empty{};
+  std::array<double, 1> sole{7};
+  EXPECT_EQ(list_interpolate4(empty, -3.25, weights, BoundMode::Wrap), 0);
+  EXPECT_EQ(list_interpolate4(sole, -3.25, weights, BoundMode::Wrap), 7);
+}
+
+TEST(Interpolation, NonAffineCubicWeightsAndScalarEndpointsAgree) {
+  std::array<double, 4> values{2, 5, -3, 11};
+  auto weights = Cubic4WeightOperator<double>{}(0.25);
+  EXPECT_EQ(weights[0], -0.0703125);
+  EXPECT_EQ(weights[1], 0.8671875);
+  EXPECT_EQ(weights[2], 0.2265625);
+  EXPECT_EQ(weights[3], -0.0234375);
+  EXPECT_EQ(weights[0] + weights[1] + weights[2] + weights[3], 1);
+  EXPECT_EQ(cubic4(0.25, 2.0, 5.0, -3.0, 11.0), 3.2578125);
+  EXPECT_EQ(cubic4(0.0, 2.0, 5.0, -3.0, 11.0), 5);
+  EXPECT_EQ(cubic4(1.0, 2.0, 5.0, -3.0, 11.0), -3);
+  MutableCubicWeights callback;
+  EXPECT_EQ(list_interpolate4(values, 1.25, callback), 3.2578125);
+  EXPECT_EQ(list_interpolate4(values, 1.0, callback), 5);
+  EXPECT_EQ(list_interpolate4(values, 2.0, callback), -3);
+  auto below = Cubic4WeightOperator<double>{true}(-0.5);
+  auto above = Cubic4WeightOperator<double>{true}(1.5);
+  EXPECT_EQ(below[0], 0.5);
+  EXPECT_EQ(below[1], 0.5);
+  EXPECT_EQ(below[2], 0);
+  EXPECT_EQ(below[3], 0);
+  EXPECT_EQ(above[0], 0);
+  EXPECT_EQ(above[1], 0);
+  EXPECT_EQ(above[2], 0.5);
+  EXPECT_EQ(above[3], 0.5);
+  EXPECT_EQ(hermite2(0.25, 3.0, 11.0), 4.25);
+  EXPECT_EQ(quintic2(0.25, 3.0, 11.0), 3.828125);
+  EXPECT_EQ(hermite2(0.0, 3.0, 11.0), 3);
+  EXPECT_EQ(hermite2(1.0, 3.0, 11.0), 11);
+  EXPECT_EQ(quintic2(0.0, 3.0, 11.0), 3);
+  EXPECT_EQ(quintic2(1.0, 3.0, 11.0), 11);
+  EXPECT_EQ(lerp_with_limit(std::optional{4.0}, 0.25, 2.0, 10.0), 10);
+  EXPECT_EQ(lerp_with_limit(std::optional<double>{}, 0.25, 2.0, 10.0), 4);
+  EXPECT_NEAR(sin_ease(0.5, 2.0, 10.0), 6, 1e-12);
+  EXPECT_NEAR(angle_lerp(0.5, 3.0, -3.0), std::numbers::pi, 1e-12);
+}
+
+TEST(Interpolation, InverseMappingHonorsDirectionalMutableCallbacksAndDuplicatePolicy) {
+  std::array<SamplePosition, 4> samples{{{0}, {2}, {2}, {6}}};
+  LowerPositionCompare lower;
+  UpperPositionCompare upper;
+  SamplePositionGetter getter;
+  EXPECT_EQ(inverse_linear_interpolate_lower(samples.begin(), samples.end(), 2.0, lower, getter), 1);
+  EXPECT_EQ(inverse_linear_interpolate_upper(samples.begin(), samples.end(), 2.0, upper, getter), 2);
+  EXPECT_EQ(inverse_linear_interpolate_lower(samples.begin(), samples.end(), -2.0, lower, getter), -1);
+  EXPECT_EQ(inverse_linear_interpolate_upper(samples.begin(), samples.end(), 10.0, upper, getter), 4);
+  std::array<double, 3> start{0, 0, 1}, end{0, 1, 1};
+  EXPECT_EQ(inverse_linear_interpolate_lower(start.begin(), start.end(), 0.0), 0);
+  EXPECT_EQ(inverse_linear_interpolate_upper(start.begin(), start.end(), 0.0), 1);
+  EXPECT_EQ(inverse_linear_interpolate_lower(end.begin(), end.end(), 1.0), 1);
+  EXPECT_EQ(inverse_linear_interpolate_upper(end.begin(), end.end(), 1.0), 2);
+  EXPECT_EQ(inverse_linear_interpolate_lower(start.begin(), start.begin(), 4.0), 0);
+  EXPECT_EQ(inverse_linear_interpolate_upper(start.begin(), start.begin() + 1, 4.0), 0);
+}
+
+TEST(Interpolation, ParametricShortCubicAndLinearAcceptBorrowedMutableWeights) {
+  std::array<double, 3> positions{0, 2, 10}, values{2, 10, -6};
+  MutableLinearWeights linear;
+  EXPECT_EQ(parametric_interpolate2(positions, values, 1.0, linear, BoundMode::Clamp), 6);
+  MutableCubicWeights cubic;
+  EXPECT_EQ(parametric_interpolate4(positions, values, 1.0, cubic, BoundMode::Clamp), 6);
+  EXPECT_EQ(parametric_interpolate4(positions, values, 6.0, cubic, BoundMode::Clamp), 2);
+  EXPECT_EQ(parametric_interpolate4(positions, values, -2.0, cubic, BoundMode::Extrapolate), -6);
+  EXPECT_EQ(parametric_interpolate4(positions, values, 18.0, cubic, BoundMode::Extrapolate), -22);
+  EXPECT_EQ(cubic.calls, 0);
+  EXPECT_EQ(parametric_interpolate4(positions, values, 11.0, cubic, BoundMode::Wrap), -6.1484375);
 }
 
 TEST(Math, ClampedFloatToBytePreservesSaturationAndTruncation) {

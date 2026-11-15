@@ -277,17 +277,18 @@ std::expected<ValueType, StarException> ParametricFunction<IndexType, ValueType>
     return ValueType();
 
   if (m_interpolationMode == InterpolationMode::HalfStep) {
-    return parametricInterpolate2(Base::indexes(), Base::values(), index, StepWeightOperator<IndexType>(), m_boundMode);
+    return parametric_interpolate2(Base::indexes(), Base::values(), index, StepWeightOperator<IndexType>(),
+                                   m_boundMode);
 
   } else if (m_interpolationMode == InterpolationMode::Linear) {
-    return parametricInterpolate2(
-        Base::indexes(), Base::values(), index, LinearWeightOperator<IndexType>(), m_boundMode);
+    return parametric_interpolate2(Base::indexes(), Base::values(), index, LinearWeightOperator<IndexType>(),
+                                   m_boundMode);
 
   } else if (m_interpolationMode == InterpolationMode::Cubic) {
     // ParametricFunction uses CubicWeights with linear extrapolation (not
     // configurable atm)
-    return parametricInterpolate4(
-        Base::indexes(), Base::values(), index, Cubic4WeightOperator<IndexType>(true), m_boundMode);
+    return parametric_interpolate4(Base::indexes(), Base::values(), index, Cubic4WeightOperator<IndexType>(true),
+                                   m_boundMode);
 
   } else {
     return std::unexpected(MathException("Unsupported interpolation type in ParametricFunction::interpolate"));

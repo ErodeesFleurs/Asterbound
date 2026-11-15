@@ -681,8 +681,8 @@ void AnimatedPartSet::ActivePartInformation::setAnimationAffineTransform(Mat3F c
   yTranslationAnimation = lerp(progress, mat1[1][2], mat2[1][2]);
   xScaleAnimation = lerp(progress, std::sqrt(square(mat1[0][0]) + square(mat1[0][1])), std::sqrt(square(mat2[0][0]) + square(mat2[0][1])));
   yScaleAnimation = lerp(progress, std::sqrt(square(mat1[1][0]) + square(mat1[1][1])), std::sqrt(square(mat2[1][0]) + square(mat2[1][1])));
-  xShearAnimation = angleLerp(progress, std::atan2(mat1[0][1], mat1[0][0]), std::atan2(mat2[0][1], mat2[0][0]));
-  yShearAnimation = angleLerp(progress, std::atan2(mat1[1][0], mat1[1][1]), std::atan2(mat2[1][0], mat2[1][1]));
+  xShearAnimation = angle_lerp(progress, std::atan2(mat1[0][1], mat1[0][0]), std::atan2(mat2[0][1], mat2[0][0]));
+  yShearAnimation = angle_lerp(progress, std::atan2(mat1[1][0], mat1[1][1]), std::atan2(mat2[0][1], mat2[1][1]));
 }
 
 Mat3F AnimatedPartSet::ActivePartInformation::animationAffineTransform() const {

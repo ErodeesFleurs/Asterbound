@@ -276,13 +276,10 @@ template <typename T>
 T NetElementFloating<T>::interpolate() const {
   auto& dataPoints = *m_interpolationDataPoints;
 
-  float ipos = inverseLinearInterpolateUpper(dataPoints.begin(), dataPoints.end(), 0.0f,
-      [](float lhs, auto const& rhs) {
-        return lhs < rhs.first;
-      }, [](auto const& dataPoint) {
-        return dataPoint.first;
-      });
-  auto bound = getBound2(ipos, dataPoints.size(), BoundMode::Extrapolate);
+  float ipos = inverse_linear_interpolate_upper(
+    dataPoints.begin(), dataPoints.end(), 0.0f, [](float lhs, auto const& rhs) { return lhs < rhs.first; },
+    [](auto const& dataPoint) { return dataPoint.first; });
+  auto bound = get_bound2(ipos, dataPoints.size(), BoundMode::Extrapolate);
 
   if (m_interpolator) {
     auto const& minPoint = dataPoints[bound.i0];

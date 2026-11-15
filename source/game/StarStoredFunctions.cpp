@@ -450,10 +450,10 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
     if (!bound)
       return std::unexpected(std::move(bound.error()));
     MultiTable2D table;
-    table.setRange(0, xaxis);
-    table.setRange(1, yaxis);
-    table.setInterpolationMode(*interpolation);
-    table.setBoundMode(*bound);
+    table.set_range(0, xaxis);
+    table.set_range(1, yaxis);
+    table.set_interpolation_mode(*interpolation);
+    table.set_bound_mode(*bound);
     table.array() = std::move(points);
     return table;
   }();

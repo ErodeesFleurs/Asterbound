@@ -486,9 +486,9 @@ float Sky::dayCycle() const {
   // The values here are mid-night, mid-day, mid-day, mid-night, mid-night.
   Array<float, 5> transitionValues = {-1.0f, 1.0f, 1.0f, 3.0f, 3.0f};
 
-  return positive_mod(parametricInterpolate2(
-                   transitionPositions, transitionValues, shiftedTime, SinWeightOperator<float>(), BoundMode::Clamp),
-      4.0f);
+  return positive_mod(parametric_interpolate2(transitionPositions, transitionValues, shiftedTime,
+                                              SinWeightOperator<float>(), BoundMode::Clamp),
+                      4.0f);
 }
 
 float Sky::skyAlpha() const {
@@ -513,7 +513,7 @@ Color Sky::environmentLight() const {
     colors[2] = skyColoring.eveningLightColor.toRgbaF();
     colors[3] = skyColoring.nightLightColor.toRgbaF();
 
-    return Color::rgbaf(listInterpolate2(colors, dayCycle(), SinWeightOperator<float>(), BoundMode::Wrap));
+    return Color::rgbaf(list_interpolate2(colors, dayCycle(), SinWeightOperator<float>(), BoundMode::Wrap));
   } else {
     return m_skyParameters.skyColoring.rightRef();
   }
@@ -543,8 +543,9 @@ std::pair<Color, Color> Sky::skyRectColors() const {
     bottomColorList[3] = skyColoring.nightColors.second.toRgbaF();
 
     float cycle = dayCycle();
-    auto topColor = Color::rgbaf(listInterpolate2(topColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
-    auto bottomColor = Color::rgbaf(listInterpolate2(bottomColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
+    auto topColor = Color::rgbaf(list_interpolate2(topColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
+    auto bottomColor =
+      Color::rgbaf(list_interpolate2(bottomColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));
 
     float skyAlpha = Sky::skyAlpha();
     topColor.setAlpha(topColor.alpha() * skyAlpha);
@@ -620,9 +621,9 @@ std::expected<SkyRenderData, StarException> Sky::renderData(float interpolation)
         ? std::fmod(renderData.epochTime, static_cast<double>(renderData.dayLength)) : 0.0f;
     renderData.orbitAngle = 2 * std::numbers::pi * renderData.timeOfDay / renderData.dayLength;
     renderData.starOffset = lerp(alpha, previous.starOffset, renderData.starOffset);
-    renderData.starRotation = angleLerp(alpha, previous.starRotation, renderData.starRotation);
+    renderData.starRotation = angle_lerp(alpha, previous.starRotation, renderData.starRotation);
     renderData.worldOffset = lerp(alpha, previous.worldOffset, renderData.worldOffset);
-    renderData.worldRotation = angleLerp(alpha, previous.worldRotation, renderData.worldRotation);
+    renderData.worldRotation = angle_lerp(alpha, previous.worldRotation, renderData.worldRotation);
   }
 
   renderData.starFrames = m_starFrames;
