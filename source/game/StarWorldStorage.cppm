@@ -313,7 +313,7 @@ private:
   [[nodiscard]] static std::expected<SectorUniqueStore, StarException> readSectorUniqueStore(ByteArray const& data);
   [[nodiscard]] static std::expected<ByteArray, StarException> writeSectorUniqueStore(SectorUniqueStore const& store);
 
-  [[nodiscard]] static std::expected<void, StarException> openDatabase(BTreeDatabase& db, std::shared_ptr<IODevice> device);
+  [[nodiscard]] static std::expected<void, StarException> open_database(BTreeDatabase& db, std::shared_ptr<IODevice> device);
 
   WorldStorage(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();

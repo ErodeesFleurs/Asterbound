@@ -9,6 +9,7 @@ namespace Star {
   // Loads, stores, root changes and leaf deletion preserve their checked errors;
   // index deletion is deliberately infallible.  Next-leaf hooks may return no
   // pointer and do nothing, leaving traversal to the index.
+  // Key/data reads may own their result or borrow it from the retained node.
   template <typename Storage>
   concept btree_storage = requires(Storage& storage,
       typename Storage::Pointer pointer, typename Storage::Key key,
@@ -16,44 +17,44 @@ namespace Star {
       typename Storage::Index const& constIndex, typename Storage::Leaf& leaf,
       typename Storage::Leaf const& constLeaf, std::size_t i,
       std::optional<typename Storage::Pointer> next) {
-    { storage.rootPointer() } -> std::same_as<typename Storage::Pointer>;
-    { storage.rootIsLeaf() } -> std::same_as<bool>;
-    { storage.setNewRoot(pointer, true) } -> std::same_as<std::expected<void, StarException>>;
-    { storage.createIndex(pointer) } -> std::same_as<typename Storage::Index>;
-    { storage.loadIndex(pointer) } -> std::same_as<std::expected<typename Storage::Index, StarException>>;
-    { storage.indexPointerCount(constIndex) } -> std::same_as<std::size_t>;
-    { storage.indexPointer(constIndex, i) } -> std::same_as<typename Storage::Pointer>;
-    { storage.indexUpdatePointer(index, i, pointer) } -> std::same_as<void>;
-    { storage.indexKeyBefore(constIndex, i) } -> std::same_as<typename Storage::Key>;
-    { storage.indexUpdateKeyBefore(index, i, key) } -> std::same_as<void>;
-    { storage.indexRemoveBefore(index, i) } -> std::same_as<void>;
-    { storage.indexInsertAfter(index, i, key, pointer) } -> std::same_as<void>;
-    { storage.indexLevel(constIndex) } -> std::same_as<std::size_t>;
-    { storage.setIndexLevel(index, i) } -> std::same_as<void>;
-    { storage.indexNeedsShift(index) } -> std::same_as<bool>;
-    { storage.indexShift(index, key, index) } -> std::same_as<bool>;
-    { storage.indexSplit(index) } -> std::same_as<std::optional<std::pair<typename Storage::Key, typename Storage::Index>>>;
-    { storage.storeIndex(std::move(index)) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
-    { storage.deleteIndex(std::move(index)) } -> std::same_as<void>;
-    { storage.createLeaf() } -> std::same_as<typename Storage::Leaf>;
-    { storage.loadLeaf(pointer) } -> std::same_as<std::expected<typename Storage::Leaf, StarException>>;
-    { storage.leafElementCount(constLeaf) } -> std::same_as<std::size_t>;
-    { storage.leafKey(constLeaf, i) } -> std::same_as<typename Storage::Key>;
-    { storage.leafData(constLeaf, i) } -> std::same_as<typename Storage::Data>;
-    { storage.leafInsert(leaf, i, key, std::move(data)) } -> std::same_as<void>;
-    { storage.leafRemove(leaf, i) } -> std::same_as<void>;
-    { storage.nextLeaf(constLeaf) } -> std::same_as<std::optional<typename Storage::Pointer>>;
-    { storage.setNextLeaf(leaf, next) } -> std::same_as<void>;
-    { storage.setNextLeaf(leaf, pointer) } -> std::same_as<void>;
-    { storage.leafNeedsShift(leaf) } -> std::same_as<bool>;
-    { storage.leafShift(leaf, leaf) } -> std::same_as<bool>;
-    { storage.leafSplit(leaf) } -> std::same_as<std::optional<typename Storage::Leaf>>;
-    { storage.storeLeaf(std::move(leaf)) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
-    { storage.storeLeaf(storage.createLeaf()) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
-    { storage.deleteLeaf(std::move(leaf)) } -> std::same_as<std::expected<void, StarException>>;
+    { storage.root_pointer() } -> std::same_as<typename Storage::Pointer>;
+    { storage.root_is_leaf() } -> std::same_as<bool>;
+    { storage.set_new_root(pointer, true) } -> std::same_as<std::expected<void, StarException>>;
+    { storage.create_index(pointer) } -> std::same_as<typename Storage::Index>;
+    { storage.load_index(pointer) } -> std::same_as<std::expected<typename Storage::Index, StarException>>;
+    { storage.index_pointer_count(constIndex) } -> std::same_as<std::size_t>;
+    { storage.index_pointer(constIndex, i) } -> std::same_as<typename Storage::Pointer>;
+    { storage.index_update_pointer(index, i, pointer) } -> std::same_as<void>;
+    requires std::same_as<std::remove_cvref_t<decltype(storage.index_key_before(constIndex, i))>, typename Storage::Key>;
+    { storage.index_update_key_before(index, i, key) } -> std::same_as<void>;
+    { storage.index_erase_before(index, i) } -> std::same_as<void>;
+    { storage.index_insert_after(index, i, key, pointer) } -> std::same_as<void>;
+    { storage.index_level(constIndex) } -> std::same_as<std::size_t>;
+    { storage.set_index_level(index, i) } -> std::same_as<void>;
+    { storage.index_needs_shift(index) } -> std::same_as<bool>;
+    { storage.index_shift(index, key, index) } -> std::same_as<bool>;
+    { storage.index_split(index) } -> std::same_as<std::optional<std::pair<typename Storage::Key, typename Storage::Index>>>;
+    { storage.store_index(std::move(index)) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
+    { storage.delete_index(std::move(index)) } -> std::same_as<void>;
+    { storage.create_leaf() } -> std::same_as<typename Storage::Leaf>;
+    { storage.load_leaf(pointer) } -> std::same_as<std::expected<typename Storage::Leaf, StarException>>;
+    { storage.leaf_element_count(constLeaf) } -> std::same_as<std::size_t>;
+    requires std::same_as<std::remove_cvref_t<decltype(storage.leaf_key(constLeaf, i))>, typename Storage::Key>;
+    requires std::same_as<std::remove_cvref_t<decltype(storage.leaf_data(constLeaf, i))>, typename Storage::Data>;
+    { storage.leaf_insert(leaf, i, key, std::move(data)) } -> std::same_as<void>;
+    { storage.leaf_erase(leaf, i) } -> std::same_as<void>;
+    { storage.next_leaf(constLeaf) } -> std::same_as<std::optional<typename Storage::Pointer>>;
+    { storage.set_next_leaf(leaf, next) } -> std::same_as<void>;
+    { storage.set_next_leaf(leaf, pointer) } -> std::same_as<void>;
+    { storage.leaf_needs_shift(leaf) } -> std::same_as<bool>;
+    { storage.leaf_shift(leaf, leaf) } -> std::same_as<bool>;
+    { storage.leaf_split(leaf) } -> std::same_as<std::optional<typename Storage::Leaf>>;
+    { storage.store_leaf(std::move(leaf)) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
+    { storage.store_leaf(storage.create_leaf()) } -> std::same_as<std::expected<typename Storage::Pointer, StarException>>;
+    { storage.delete_leaf(std::move(leaf)) } -> std::same_as<std::expected<void, StarException>>;
     { std::as_const(key) < std::as_const(key) } -> std::convertible_to<bool>;
-    { pointer != storage.rootPointer() } -> std::convertible_to<bool>;
-    { pointer != storage.indexPointer(constIndex, i) } -> std::convertible_to<bool>;
+    { pointer != storage.root_pointer() } -> std::convertible_to<bool>;
+    { pointer != storage.index_pointer(constIndex, i) } -> std::convertible_to<bool>;
   } && std::default_initializable<typename Storage::Key>
       && std::default_initializable<typename Storage::Data>
       && std::default_initializable<typename Storage::Pointer>
@@ -65,6 +66,23 @@ namespace Star {
       && std::copyable<typename Storage::Index>
       && std::copyable<typename Storage::Leaf>
       && (!std::same_as<typename Storage::Index, typename Storage::Leaf>);
+
+  // Callbacks are borrowed and invoked as lvalues, including mutable visitors.
+  template <typename Visitor, typename Key, typename Data>
+  concept btree_record_visitor = requires(Visitor& visitor, Key const& key, Data const& data) {
+    { std::invoke(visitor, key, data) } -> std::same_as<std::expected<void, StarException>>;
+  };
+
+  template <typename ErrorHandler>
+  concept btree_error_handler = requires(ErrorHandler& error, ExceptionDiagnostic const& diagnostic) {
+    { std::invoke(error, std::string_view{}, diagnostic) } -> std::same_as<std::expected<void, StarException>>;
+  };
+
+  template <typename Visitor, typename Index, typename Leaf>
+  concept btree_node_visitor = requires(Visitor& visitor, Index const& index, Leaf const& leaf) {
+    { std::invoke(visitor, index) } -> std::same_as<std::expected<bool, StarException>>;
+    { std::invoke(visitor, leaf) } -> std::same_as<std::expected<bool, StarException>>;
+  };
 
   // B+ tree algorithms with an owned storage policy, not a public storage API.
   template <btree_storage Storage>
@@ -85,46 +103,53 @@ namespace Star {
 
     [[nodiscard]] std::expected<std::optional<Data>, StarException> find(Key const& k);
 
-    // Range is inclusve on lower bound and exclusive on upper bound.
+    // Range is inclusive on lower bound and exclusive on upper bound.
     [[nodiscard]] std::expected<List<std::pair<Key, Data>>, StarException> find(Key const& lower, Key const& upper);
 
     // Visitor returns expected<void, StarException> as visitor(key, data).
     template <typename Visitor>
-    [[nodiscard]] std::expected<void, StarException> forEach(Key const& lower, Key const& upper, Visitor&& visitor);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<void, StarException> for_each(Key const& lower, Key const& upper, Visitor&& visitor);
 
     // Visitor is called as visitor(key, data).
     template <typename Visitor>
-    [[nodiscard]] std::expected<void, StarException> forAll(Visitor&& visitor);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<void, StarException> for_all(Visitor&& visitor);
 
     // Recover all key value pairs possible, reporting node errors during scan and
     // reading as much data as possible.  Visitor is called as visitor(key, data),
     // ErrorHandler returns expected<void, StarException> as
     // error(std::string_view, ExceptionDiagnostic const&).
     template <typename Visitor, typename ErrorHandler>
-    [[nodiscard]] std::expected<void, StarException> recoverAll(Visitor&& visitor, ErrorHandler&& error);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+          && btree_error_handler<ErrorHandler>
+    [[nodiscard]] std::expected<void, StarException> recover_all(Visitor&& visitor, ErrorHandler&& error);
 
     // Visitor is called either as visitor(Index const&) or visitor(Leaf const&).
-    // Visitor returns expected<bool, StarException>: false halts traversal.
+    // False on an index prunes only its subtree. False on a leaf skips the
+    // remaining leaf siblings under its lowest-level parent; ancestor siblings
+    // continue. False is not a global stop signal. Errors always propagate.
     template <typename Visitor>
-    [[nodiscard]] std::expected<void, StarException> forAllNodes(Visitor&& visitor);
+      requires btree_node_visitor<Visitor, typename Storage::Index, typename Storage::Leaf>
+    [[nodiscard]] std::expected<void, StarException> for_all_nodes(Visitor&& visitor);
 
     // returns true if old value overwritten.
     [[nodiscard]] std::expected<bool, StarException> insert(Key k, Data data);
 
     // returns true if key was found.
-    [[nodiscard]] std::expected<bool, StarException> remove(Key k);
+    [[nodiscard]] std::expected<bool, StarException> erase(Key k);
 
     // Removes and returns the key/value pairs in the half-open range.
     // Uses separate mutations for each matching key.
-    [[nodiscard]] std::expected<List<std::pair<Key, Data>>, StarException> remove(Key const& lower, Key const& upper);
+    [[nodiscard]] std::expected<List<std::pair<Key, Data>>, StarException> erase(Key const& lower, Key const& upper);
 
-    [[nodiscard]] std::expected<std::uint64_t, StarException> indexCount();
-    [[nodiscard]] std::expected<std::uint64_t, StarException> leafCount();
-    [[nodiscard]] std::expected<std::uint64_t, StarException> recordCount();
+    [[nodiscard]] std::expected<std::uint64_t, StarException> index_count();
+    [[nodiscard]] std::expected<std::uint64_t, StarException> leaf_count();
+    [[nodiscard]] std::expected<std::uint64_t, StarException> record_count();
 
-    [[nodiscard]] std::expected<std::uint32_t, StarException> indexLevels();
+    [[nodiscard]] std::expected<std::uint32_t, StarException> index_levels();
 
-    [[nodiscard]] std::expected<void, StarException> createNewRoot();
+    [[nodiscard]] std::expected<void, StarException> create_new_root();
 
     private:
     struct DataElement {
@@ -165,7 +190,7 @@ namespace Star {
 
     enum ModifyAction {
       InsertAction,
-      RemoveAction
+      EraseAction
     };
 
     enum ModifyState {
@@ -198,48 +223,57 @@ namespace Star {
 
     // Returns the highest key for the last leaf we have searched
     template <typename Visitor>
-    [[nodiscard]] std::expected<Key, StarException> forEach(Index const& index, Key const& lower, Key const& upper, Visitor&& o);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<Key, StarException> for_each(Index const& index, Key const& lower, Key const& upper, Visitor&& o);
     template <typename Visitor>
-    [[nodiscard]] std::expected<Key, StarException> forEach(Leaf const& leaf, Key const& lower, Key const& upper, Visitor&& o);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<Key, StarException> for_each(Leaf const& leaf, Key const& lower, Key const& upper, Visitor&& o);
 
     // Returns the highest key for the last leaf we have searched
     template <typename Visitor>
-    [[nodiscard]] std::expected<Key, StarException> forAll(Index const& index, Visitor&& o);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<Key, StarException> for_all(Index const& index, Visitor&& o);
     template <typename Visitor>
-    [[nodiscard]] std::expected<Key, StarException> forAll(Leaf const& leaf, Visitor&& o);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+    [[nodiscard]] std::expected<Key, StarException> for_all(Leaf const& leaf, Visitor&& o);
 
     template <typename Visitor, typename ErrorHandler>
-    [[nodiscard]] std::expected<void, StarException> recoverAll(Index const& index, Visitor&& o, ErrorHandler&& error);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+          && btree_error_handler<ErrorHandler>
+    [[nodiscard]] std::expected<void, StarException> recover_all(Index const& index, Visitor&& o, ErrorHandler&& error);
     template <typename Visitor, typename ErrorHandler>
-    [[nodiscard]] std::expected<void, StarException> recoverAll(Leaf const& leaf, Visitor&& o, ErrorHandler&& error);
+      requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+          && btree_error_handler<ErrorHandler>
+    [[nodiscard]] std::expected<void, StarException> recover_all(Leaf const& leaf, Visitor&& o, ErrorHandler&& error);
 
     // Variable size values mean that merges can happen on inserts, so can't
-    // split up into insert / remove methods
+    // split up into insert / erase methods
     [[nodiscard]] std::expected<void, StarException> modify(Leaf& leafNode, ModifyInfo& info);
     [[nodiscard]] std::expected<void, StarException> modify(Index& indexNode, ModifyInfo& info);
     [[nodiscard]] std::expected<bool, StarException> modify(DataElement e, ModifyAction action);
 
     // Traverses Indexes down the tree on the left side to get the least valued
     // key that is pointed to by any leaf under this index.  Needed when joining.
-    [[nodiscard]] std::expected<Key, StarException> getLeftKey(Index const& index);
+    [[nodiscard]] std::expected<Key, StarException> leftmost_key(Index const& index);
 
     template <typename Visitor>
-    [[nodiscard]] std::expected<void, StarException> forAllNodes(Index const& index, Visitor&& visitor);
+      requires btree_node_visitor<Visitor, typename Storage::Index, typename Storage::Leaf>
+    [[nodiscard]] std::expected<void, StarException> for_all_nodes(Index const& index, Visitor&& visitor);
 
-    std::pair<std::size_t, bool> leafFind(Leaf const& leaf, Key const& key);
-    std::size_t indexFind(Index const& index, Key const& key);
+    std::pair<std::size_t, bool> leaf_lower_bound(Leaf const& leaf, Key const& key);
+    std::size_t index_upper_bound(Index const& index, Key const& key);
 
     Storage m_storage;
   };
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Key const& k) {
-    if (m_storage.rootIsLeaf()) {
-      auto leaf = m_storage.loadLeaf(m_storage.rootPointer());
+    if (m_storage.root_is_leaf()) {
+      auto leaf = m_storage.load_leaf(m_storage.root_pointer());
       if (!leaf) return std::unexpected(std::move(leaf.error()));
       return contains(*leaf, k);
     } else {
-      auto index = m_storage.loadIndex(m_storage.rootPointer());
+      auto index = m_storage.load_index(m_storage.root_pointer());
       if (!index) return std::unexpected(std::move(index.error()));
       return contains(*index, k);
     }
@@ -247,12 +281,12 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Key const& k) -> std::expected<std::optional<Data>, StarException> {
-    if (m_storage.rootIsLeaf()) {
-      auto leaf = m_storage.loadLeaf(m_storage.rootPointer());
+    if (m_storage.root_is_leaf()) {
+      auto leaf = m_storage.load_leaf(m_storage.root_pointer());
       if (!leaf) return std::unexpected(std::move(leaf.error()));
       return find(*leaf, k);
     } else {
-      auto index = m_storage.loadIndex(m_storage.rootPointer());
+      auto index = m_storage.load_index(m_storage.root_pointer());
       if (!index) return std::unexpected(std::move(index.error()));
       return find(*index, k);
     }
@@ -261,26 +295,27 @@ namespace Star {
   template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Key const& lower, Key const& upper) -> std::expected<List<std::pair<Key, Data>>, StarException> {
     DataCollector collector;
-    auto result94 = forEach(lower, upper, collector);
-    if (!result94) return std::unexpected(std::move(result94.error()));
+    auto visited = for_each(lower, upper, collector);
+    if (!visited) return std::unexpected(std::move(visited.error()));
 
     return std::move(collector.list);
   }
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forEach(Key const& lower, Key const& upper, Visitor&& visitor) {
-    if (m_storage.rootIsLeaf()) {
-      auto result90 = m_storage.loadLeaf(m_storage.rootPointer());
-      if (!result90) return std::unexpected(std::move(result90.error()));
-      auto result91 = forEach((*result90), lower, upper, std::forward<Visitor>(visitor));
-      if (!result91) return std::unexpected(std::move(result91.error()));
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::for_each(Key const& lower, Key const& upper, Visitor&& visitor) {
+    if (m_storage.root_is_leaf()) {
+      auto root_leaf = m_storage.load_leaf(m_storage.root_pointer());
+      if (!root_leaf) return std::unexpected(std::move(root_leaf.error()));
+      auto visited = for_each((*root_leaf), lower, upper, visitor);
+      if (!visited) return std::unexpected(std::move(visited.error()));
 
     } else {
-      auto result92 = m_storage.loadIndex(m_storage.rootPointer());
-      if (!result92) return std::unexpected(std::move(result92.error()));
-      auto result93 = forEach((*result92), lower, upper, std::forward<Visitor>(visitor));
-      if (!result93) return std::unexpected(std::move(result93.error()));
+      auto root_index = m_storage.load_index(m_storage.root_pointer());
+      if (!root_index) return std::unexpected(std::move(root_index.error()));
+      auto visited = for_each((*root_index), lower, upper, visitor);
+      if (!visited) return std::unexpected(std::move(visited.error()));
 
     }
     return {};
@@ -288,18 +323,19 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAll(Visitor&& visitor) {
-    if (m_storage.rootIsLeaf()) {
-      auto result86 = m_storage.loadLeaf(m_storage.rootPointer());
-      if (!result86) return std::unexpected(std::move(result86.error()));
-      auto result87 = forAll((*result86), std::forward<Visitor>(visitor));
-      if (!result87) return std::unexpected(std::move(result87.error()));
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::for_all(Visitor&& visitor) {
+    if (m_storage.root_is_leaf()) {
+      auto root_leaf = m_storage.load_leaf(m_storage.root_pointer());
+      if (!root_leaf) return std::unexpected(std::move(root_leaf.error()));
+      auto visited = for_all((*root_leaf), visitor);
+      if (!visited) return std::unexpected(std::move(visited.error()));
 
     } else {
-      auto result88 = m_storage.loadIndex(m_storage.rootPointer());
-      if (!result88) return std::unexpected(std::move(result88.error()));
-      auto result89 = forAll((*result88), std::forward<Visitor>(visitor));
-      if (!result89) return std::unexpected(std::move(result89.error()));
+      auto root_index = m_storage.load_index(m_storage.root_pointer());
+      if (!root_index) return std::unexpected(std::move(root_index.error()));
+      auto visited = for_all((*root_index), visitor);
+      if (!visited) return std::unexpected(std::move(visited.error()));
 
     }
     return {};
@@ -307,29 +343,38 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Visitor&& visitor, ErrorHandler&& error) {
-    if (m_storage.rootIsLeaf()) {
-      auto node = m_storage.loadLeaf(m_storage.rootPointer());
-      if (!node) return error("Error loading root index or leaf node", ExceptionDiagnostic(node.error()));
-      return recoverAll(*node, visitor, error);
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+        && btree_error_handler<ErrorHandler>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recover_all(Visitor&& visitor, ErrorHandler&& error) {
+    if (m_storage.root_is_leaf()) {
+      auto node = m_storage.load_leaf(m_storage.root_pointer());
+      if (!node) {
+        ExceptionDiagnostic const diagnostic(node.error());
+        return std::invoke(error, std::string_view("Error loading root index or leaf node"), diagnostic);
+      }
+      return recover_all(*node, visitor, error);
     }
-    auto node = m_storage.loadIndex(m_storage.rootPointer());
-    if (!node) return error("Error loading root index or leaf node", ExceptionDiagnostic(node.error()));
-    return recoverAll(*node, visitor, error);
+    auto node = m_storage.load_index(m_storage.root_pointer());
+    if (!node) {
+      ExceptionDiagnostic const diagnostic(node.error());
+      return std::invoke(error, std::string_view("Error loading root index or leaf node"), diagnostic);
+    }
+    return recover_all(*node, visitor, error);
   }
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAllNodes(Visitor&& visitor) {
-    if (m_storage.rootIsLeaf()) {
-      auto leaf = m_storage.loadLeaf(m_storage.rootPointer());
+    requires btree_node_visitor<Visitor, typename Storage::Index, typename Storage::Leaf>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::for_all_nodes(Visitor&& visitor) {
+    if (m_storage.root_is_leaf()) {
+      auto leaf = m_storage.load_leaf(m_storage.root_pointer());
       if (!leaf) return std::unexpected(std::move(leaf.error()));
-      if (auto visited = visitor(*leaf); !visited)
+      if (auto visited = std::invoke(visitor, std::as_const(*leaf)); !visited)
         return std::unexpected(std::move(visited.error()));
     } else {
-      auto index = m_storage.loadIndex(m_storage.rootPointer());
+      auto index = m_storage.load_index(m_storage.root_pointer());
       if (!index) return std::unexpected(std::move(index.error()));
-      return forAllNodes(*index, std::forward<Visitor>(visitor));
+      return for_all_nodes(*index, visitor);
     }
     return {};
   }
@@ -340,19 +385,19 @@ namespace Star {
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::remove(Key k) {
-    return modify(DataElement{std::move(k), Data()}, RemoveAction);
+  [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::erase(Key k) {
+    return modify(DataElement{std::move(k), Data()}, EraseAction);
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] auto BTree<Storage>::remove(Key const& lower, Key const& upper) -> std::expected<List<std::pair<Key, Data>>, StarException> {
+  [[nodiscard]] auto BTree<Storage>::erase(Key const& lower, Key const& upper) -> std::expected<List<std::pair<Key, Data>>, StarException> {
     DataCollector collector;
-    auto result78 = forEach(lower, upper, collector);
-    if (!result78) return std::unexpected(std::move(result78.error()));
+    auto visited = for_each(lower, upper, collector);
+    if (!visited) return std::unexpected(std::move(visited.error()));
 
     for (auto const& elem : collector.list) {
-      auto result79 = remove(elem.first);
-      if (!result79) return std::unexpected(std::move(result79.error()));
+      auto erased = erase(elem.first);
+      if (!erased) return std::unexpected(std::move(erased.error()));
 
     }
 
@@ -360,48 +405,48 @@ namespace Star {
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::indexCount() {
+  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::index_count() {
     IndexCounter counter = {*this, 0};
-    auto result77 = forAllNodes(counter);
-    if (!result77) return std::unexpected(std::move(result77.error()));
+    auto visited = for_all_nodes(counter);
+    if (!visited) return std::unexpected(std::move(visited.error()));
 
     return counter.count;
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::leafCount() {
+  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::leaf_count() {
     LeafCounter counter = {*this, 0};
-    auto result76 = forAllNodes(counter);
-    if (!result76) return std::unexpected(std::move(result76.error()));
+    auto visited = for_all_nodes(counter);
+    if (!visited) return std::unexpected(std::move(visited.error()));
 
     return counter.count;
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::recordCount() {
+  [[nodiscard]] std::expected<std::uint64_t, StarException> BTree<Storage>::record_count() {
     RecordCounter counter = {*this, 0};
-    auto result75 = forAllNodes(counter);
-    if (!result75) return std::unexpected(std::move(result75.error()));
+    auto visited = for_all_nodes(counter);
+    if (!visited) return std::unexpected(std::move(visited.error()));
 
     return counter.count;
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<std::uint32_t, StarException> BTree<Storage>::indexLevels() {
-    if (m_storage.rootIsLeaf()) {
+  [[nodiscard]] std::expected<std::uint32_t, StarException> BTree<Storage>::index_levels() {
+    if (m_storage.root_is_leaf()) {
       return 0;
     } else {
-      auto result74 = m_storage.loadIndex(m_storage.rootPointer());
-      if (!result74) return std::unexpected(std::move(result74.error()));
-      return m_storage.indexLevel((*result74)) + 1;
+      auto root_index = m_storage.load_index(m_storage.root_pointer());
+      if (!root_index) return std::unexpected(std::move(root_index.error()));
+      return m_storage.index_level((*root_index)) + 1;
     }
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::createNewRoot() {
-    auto rootPointer = m_storage.storeLeaf(m_storage.createLeaf());
-    if (!rootPointer) return std::unexpected(std::move(rootPointer.error()));
-    return m_storage.setNewRoot(*rootPointer, true);
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::create_new_root() {
+    auto root_pointer = m_storage.store_leaf(m_storage.create_leaf());
+    if (!root_pointer) return std::unexpected(std::move(root_pointer.error()));
+    return m_storage.set_new_root(*root_pointer, true);
   }
 
   template <btree_storage Storage>
@@ -417,14 +462,14 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::RecordCounter::operator()(Leaf const& leaf) {
-    count += parent.m_storage.leafElementCount(leaf);
+    count += parent.m_storage.leaf_element_count(leaf);
     return true;
   }
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::IndexCounter::operator()(Index const& index) {
     ++count;
-    if (parent.m_storage.indexLevel(index) == 0) {
+    if (parent.m_storage.index_level(index) == 0) {
       return false;
     } else {
       return true;
@@ -438,9 +483,9 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::LeafCounter::operator()(Index const& index) {
-    if (parent.m_storage.indexLevel(index) == 0) {
+    if (parent.m_storage.index_level(index) == 0) {
 
-      count += parent.m_storage.indexPointerCount(index);
+      count += parent.m_storage.index_pointer_count(index);
       return false;
     } else {
 
@@ -450,6 +495,7 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::LeafCounter::operator()(Leaf const&) {
+    ++count;
     return false;
   }
 
@@ -462,13 +508,13 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Index const& index, Key const& k) {
-    std::size_t i = indexFind(index, k);
-    if (m_storage.indexLevel(index) == 0) {
-      auto leaf = m_storage.loadLeaf(m_storage.indexPointer(index, i));
+    std::size_t i = index_upper_bound(index, k);
+    if (m_storage.index_level(index) == 0) {
+      auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
       if (!leaf) return std::unexpected(std::move(leaf.error()));
       return contains(*leaf, k);
     } else {
-      auto childIndex = m_storage.loadIndex(m_storage.indexPointer(index, i));
+      auto childIndex = m_storage.load_index(m_storage.index_pointer(index, i));
       if (!childIndex) return std::unexpected(std::move(childIndex.error()));
       return contains(*childIndex, k);
     }
@@ -476,18 +522,18 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<bool, StarException> BTree<Storage>::contains(Leaf const& leaf, Key const& k) {
-    return leafFind(leaf, k).second;
+    return leaf_lower_bound(leaf, k).second;
   }
 
   template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Index const& index, Key const& k) -> std::expected<std::optional<Data>, StarException> {
-    std::size_t i = indexFind(index, k);
-    if (m_storage.indexLevel(index) == 0) {
-      auto leaf = m_storage.loadLeaf(m_storage.indexPointer(index, i));
+    std::size_t i = index_upper_bound(index, k);
+    if (m_storage.index_level(index) == 0) {
+      auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
       if (!leaf) return std::unexpected(std::move(leaf.error()));
       return find(*leaf, k);
     } else {
-      auto childIndex = m_storage.loadIndex(m_storage.indexPointer(index, i));
+      auto childIndex = m_storage.load_index(m_storage.index_pointer(index, i));
       if (!childIndex) return std::unexpected(std::move(childIndex.error()));
       return find(*childIndex, k);
     }
@@ -495,9 +541,9 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] auto BTree<Storage>::find(Leaf const& leaf, Key const& k) -> std::expected<std::optional<Data>, StarException> {
-    std::pair<std::size_t, bool> res = leafFind(leaf, k);
+    std::pair<std::size_t, bool> res = leaf_lower_bound(leaf, k);
     if (res.second) {
-      return std::optional<Data>(std::in_place, m_storage.leafData(leaf, res.first));
+      return std::optional<Data>(std::in_place, m_storage.leaf_data(leaf, res.first));
     } else {
       return {};
     }
@@ -505,51 +551,52 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] auto BTree<Storage>::forEach(Index const& index, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
-    std::size_t i = indexFind(index, lower);
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] auto BTree<Storage>::for_each(Index const& index, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
+    std::size_t i = index_upper_bound(index, lower);
     Key lastKey;
 
-    if (m_storage.indexLevel(index) == 0) {
-      auto result56 = m_storage.loadLeaf(m_storage.indexPointer(index, i));
-      if (!result56) return std::unexpected(std::move(result56.error()));
-      auto result57 = forEach((*result56), lower, upper, std::forward<Visitor>(o));
-      if (!result57) return std::unexpected(std::move(result57.error()));
-      lastKey = std::move(*result57);
+    if (m_storage.index_level(index) == 0) {
+      auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
+      if (!leaf) return std::unexpected(std::move(leaf.error()));
+      auto visited = for_each((*leaf), lower, upper, o);
+      if (!visited) return std::unexpected(std::move(visited.error()));
+      lastKey = std::move(*visited);
     } else {
-      auto result58 = m_storage.loadIndex(m_storage.indexPointer(index, i));
-      if (!result58) return std::unexpected(std::move(result58.error()));
-      auto result59 = forEach((*result58), lower, upper, std::forward<Visitor>(o));
-      if (!result59) return std::unexpected(std::move(result59.error()));
-      lastKey = std::move(*result59);
+      auto child_index = m_storage.load_index(m_storage.index_pointer(index, i));
+      if (!child_index) return std::unexpected(std::move(child_index.error()));
+      auto visited = for_each((*child_index), lower, upper, o);
+      if (!visited) return std::unexpected(std::move(visited.error()));
+      lastKey = std::move(*visited);
     }
 
     if (!(lastKey < upper)) {
       return lastKey;
     }
 
-    while (i < m_storage.indexPointerCount(index) - 1) {
+    while (i < m_storage.index_pointer_count(index) - 1) {
 
       ++i;
 
       // We're visiting the right side of the key, so if lastKey >=
-      // indexKeyBefore(index, i), we have already visited this node via nextLeaf
+      // index_key_before(index, i), we have already visited this node via next_leaf
       // pointers, so skip it.
-      if (!(lastKey < m_storage.indexKeyBefore(index, i))) {
+      if (!(lastKey < m_storage.index_key_before(index, i))) {
         continue;
       }
 
-      if (m_storage.indexLevel(index) == 0) {
-        auto result60 = m_storage.loadLeaf(m_storage.indexPointer(index, i));
-        if (!result60) return std::unexpected(std::move(result60.error()));
-        auto result61 = forEach((*result60), lower, upper, std::forward<Visitor>(o));
-        if (!result61) return std::unexpected(std::move(result61.error()));
-        lastKey = std::move(*result61);
+      if (m_storage.index_level(index) == 0) {
+        auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
+        if (!leaf) return std::unexpected(std::move(leaf.error()));
+        auto visited = for_each((*leaf), lower, upper, o);
+        if (!visited) return std::unexpected(std::move(visited.error()));
+        lastKey = std::move(*visited);
       } else {
-        auto result62 = m_storage.loadIndex(m_storage.indexPointer(index, i));
-        if (!result62) return std::unexpected(std::move(result62.error()));
-        auto result63 = forEach((*result62), lower, upper, std::forward<Visitor>(o));
-        if (!result63) return std::unexpected(std::move(result63.error()));
-        lastKey = std::move(*result63);
+        auto child_index = m_storage.load_index(m_storage.index_pointer(index, i));
+        if (!child_index) return std::unexpected(std::move(child_index.error()));
+        auto visited = for_each((*child_index), lower, upper, o);
+        if (!visited) return std::unexpected(std::move(visited.error()));
+        lastKey = std::move(*visited);
       }
 
       if (!(lastKey < upper)) {
@@ -562,61 +609,65 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] auto BTree<Storage>::forEach(Leaf const& leaf, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
-    if (m_storage.leafElementCount(leaf) == 0) {
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] auto BTree<Storage>::for_each(Leaf const& leaf, Key const& lower, Key const& upper, Visitor&& o) -> std::expected<Key, StarException> {
+    if (m_storage.leaf_element_count(leaf) == 0) {
       return Key();
     }
 
-    std::size_t lowerIndex = leafFind(leaf, lower).first;
+    std::size_t lowerIndex = leaf_lower_bound(leaf, lower).first;
 
-    for (std::size_t i = lowerIndex; i != m_storage.leafElementCount(leaf); ++i) {
+    for (std::size_t i = lowerIndex; i != m_storage.leaf_element_count(leaf); ++i) {
 
-      Key currentKey = m_storage.leafKey(leaf, i);
-      if (!(currentKey < lower)) {
+      decltype(auto) current_key = m_storage.leaf_key(leaf, i);
+      auto const& key = current_key;
+      if (!(key < lower)) {
 
-        if (currentKey < upper) {
-          if (auto visited = o(currentKey, m_storage.leafData(leaf, i)); !visited)
+        if (key < upper) {
+          auto const& data = m_storage.leaf_data(leaf, i);
+          if (auto visited = std::invoke(o, key, data); !visited)
             return std::unexpected(std::move(visited.error()));
         } else {
-          return currentKey;
+          return Key(std::forward<decltype(current_key)>(current_key));
         }
       }
     }
 
-    if (auto nextLeafPointer = m_storage.nextLeaf(leaf)) {
-      auto nextLeaf = m_storage.loadLeaf(*nextLeafPointer);
-      if (!nextLeaf) return std::unexpected(std::move(nextLeaf.error()));
-      return forEach(*nextLeaf, lower, upper, o);
+    if (auto nextLeafPointer = m_storage.next_leaf(leaf)) {
+      auto next_leaf = m_storage.load_leaf(*nextLeafPointer);
+      if (!next_leaf) return std::unexpected(std::move(next_leaf.error()));
+      return for_each(*next_leaf, lower, upper, o);
     } else {
-      return m_storage.leafKey(leaf, m_storage.leafElementCount(leaf) - 1);
+      return m_storage.leaf_key(leaf, m_storage.leaf_element_count(leaf) - 1);
     }
   }
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] auto BTree<Storage>::forAll(Index const& index, Visitor&& o) -> std::expected<Key, StarException> {
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] auto BTree<Storage>::for_all(Index const& index, Visitor&& o) -> std::expected<Key, StarException> {
     Key lastKey;
-    for (std::size_t i = 0; i < m_storage.indexPointerCount(index); ++i) {
+    for (std::size_t i = 0; i < m_storage.index_pointer_count(index); ++i) {
 
       // If we're to the right of a given key, but lastKey >= this key, then we
-      // must have already visited this node via nextLeaf pointers, so we can
+      // must have already visited this node via next_leaf pointers, so we can
       // skip it.
-      if (i > 0 && !(lastKey < m_storage.indexKeyBefore(index, i))) {
+      if (i > 0 && !(lastKey < m_storage.index_key_before(index, i))) {
         continue;
       }
 
-      if (m_storage.indexLevel(index) == 0) {
-        auto result49 = m_storage.loadLeaf(m_storage.indexPointer(index, i));
-        if (!result49) return std::unexpected(std::move(result49.error()));
-        auto result50 = forAll((*result49), std::forward<Visitor>(o));
-        if (!result50) return std::unexpected(std::move(result50.error()));
-        lastKey = std::move(*result50);
+      if (m_storage.index_level(index) == 0) {
+        auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
+        if (!leaf) return std::unexpected(std::move(leaf.error()));
+        auto visited = for_all((*leaf), o);
+        if (!visited) return std::unexpected(std::move(visited.error()));
+        lastKey = std::move(*visited);
       } else {
-        auto result51 = m_storage.loadIndex(m_storage.indexPointer(index, i));
-        if (!result51) return std::unexpected(std::move(result51.error()));
-        auto result52 = forAll((*result51), std::forward<Visitor>(o));
-        if (!result52) return std::unexpected(std::move(result52.error()));
-        lastKey = std::move(*result52);
+        auto child_index = m_storage.load_index(m_storage.index_pointer(index, i));
+        if (!child_index) return std::unexpected(std::move(child_index.error()));
+        auto visited = for_all((*child_index), o);
+        if (!visited) return std::unexpected(std::move(visited.error()));
+        lastKey = std::move(*visited);
       }
     }
 
@@ -625,48 +676,54 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] auto BTree<Storage>::forAll(Leaf const& leaf, Visitor&& o) -> std::expected<Key, StarException> {
-    if (m_storage.leafElementCount(leaf) == 0) {
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+  [[nodiscard]] auto BTree<Storage>::for_all(Leaf const& leaf, Visitor&& o) -> std::expected<Key, StarException> {
+    if (m_storage.leaf_element_count(leaf) == 0) {
       return Key();
     }
 
-    for (std::size_t i = 0; i != m_storage.leafElementCount(leaf); ++i) {
+    for (std::size_t i = 0; i != m_storage.leaf_element_count(leaf); ++i) {
 
-      Key currentKey = m_storage.leafKey(leaf, i);
-      if (auto visited = o(m_storage.leafKey(leaf, i), m_storage.leafData(leaf, i)); !visited)
+      auto const& key = m_storage.leaf_key(leaf, i);
+      auto const& data = m_storage.leaf_data(leaf, i);
+      if (auto visited = std::invoke(o, key, data); !visited)
         return std::unexpected(std::move(visited.error()));
     }
 
-    if (auto nextLeafPointer = m_storage.nextLeaf(leaf)) {
-      auto nextLeaf = m_storage.loadLeaf(*nextLeafPointer);
-      if (!nextLeaf) return std::unexpected(std::move(nextLeaf.error()));
-      return forAll(*nextLeaf, std::forward<Visitor>(o));
+    if (auto nextLeafPointer = m_storage.next_leaf(leaf)) {
+      auto next_leaf = m_storage.load_leaf(*nextLeafPointer);
+      if (!next_leaf) return std::unexpected(std::move(next_leaf.error()));
+      return for_all(*next_leaf, o);
     } else {
-      return m_storage.leafKey(leaf, m_storage.leafElementCount(leaf) - 1);
+      return m_storage.leaf_key(leaf, m_storage.leaf_element_count(leaf) - 1);
     }
   }
 
   template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Index const& index, Visitor&& visitor, ErrorHandler&& error) {
-    for (std::size_t i = 0; i < m_storage.indexPointerCount(index); ++i) {
-      if (m_storage.indexLevel(index) == 0) {
-        auto node = m_storage.loadLeaf(m_storage.indexPointer(index, i));
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+        && btree_error_handler<ErrorHandler>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recover_all(Index const& index, Visitor&& visitor, ErrorHandler&& error) {
+    for (std::size_t i = 0; i < m_storage.index_pointer_count(index); ++i) {
+      if (m_storage.index_level(index) == 0) {
+        auto node = m_storage.load_leaf(m_storage.index_pointer(index, i));
         if (!node) {
-          auto reported = error("Error loading leaf node", ExceptionDiagnostic(node.error()));
+          ExceptionDiagnostic const diagnostic(node.error());
+          auto reported = std::invoke(error, std::string_view("Error loading leaf node"), diagnostic);
           if (!reported) return std::unexpected(std::move(reported.error()));
           continue;
         }
-        auto recovered = recoverAll(*node, visitor, error);
+        auto recovered = recover_all(*node, visitor, error);
         if (!recovered) return std::unexpected(std::move(recovered.error()));
       } else {
-        auto node = m_storage.loadIndex(m_storage.indexPointer(index, i));
+        auto node = m_storage.load_index(m_storage.index_pointer(index, i));
         if (!node) {
-          auto reported = error("Error loading index node", ExceptionDiagnostic(node.error()));
+          ExceptionDiagnostic const diagnostic(node.error());
+          auto reported = std::invoke(error, std::string_view("Error loading index node"), diagnostic);
           if (!reported) return std::unexpected(std::move(reported.error()));
           continue;
         }
-        auto recovered = recoverAll(*node, visitor, error);
+        auto recovered = recover_all(*node, visitor, error);
         if (!recovered) return std::unexpected(std::move(recovered.error()));
       }
     }
@@ -676,10 +733,17 @@ namespace Star {
 
   template <btree_storage Storage>
   template <typename Visitor, typename ErrorHandler>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recoverAll(Leaf const& leaf, Visitor&& visitor, ErrorHandler&& error) {
-    for (std::size_t i = 0; i != m_storage.leafElementCount(leaf); ++i) {
-      auto visited = visitor(m_storage.leafKey(leaf, i), m_storage.leafData(leaf, i));
-      if (!visited) return error("Error reading leaf node", ExceptionDiagnostic(visited.error()));
+    requires btree_record_visitor<Visitor, typename Storage::Key, typename Storage::Data>
+        && btree_error_handler<ErrorHandler>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::recover_all(Leaf const& leaf, Visitor&& visitor, ErrorHandler&& error) {
+    for (std::size_t i = 0; i != m_storage.leaf_element_count(leaf); ++i) {
+      auto const& key = m_storage.leaf_key(leaf, i);
+      auto const& data = m_storage.leaf_data(leaf, i);
+      auto visited = std::invoke(visitor, key, data);
+      if (!visited) {
+        ExceptionDiagnostic const diagnostic(visited.error());
+        return std::invoke(error, std::string_view("Error reading leaf node"), diagnostic);
+      }
     }
     return {};
 
@@ -689,36 +753,36 @@ namespace Star {
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::modify(Leaf& leafNode, ModifyInfo& info) {
     info.state = Done;
 
-    std::pair<std::size_t, bool> res = leafFind(leafNode, info.targetElement.key);
+    std::pair<std::size_t, bool> res = leaf_lower_bound(leafNode, info.targetElement.key);
     std::size_t i = res.first;
     if (res.second) {
 
       info.found = true;
-      m_storage.leafRemove(leafNode, i);
+      m_storage.leaf_erase(leafNode, i);
     }
 
     // No change necessary.
-    if (info.action == RemoveAction && !info.found) {
+    if (info.action == EraseAction && !info.found) {
       return {};
     }
 
     if (info.action == InsertAction) {
-      m_storage.leafInsert(leafNode, i, info.targetElement.key, std::move(info.targetElement.data));
+      m_storage.leaf_insert(leafNode, i, info.targetElement.key, std::move(info.targetElement.data));
     }
 
-    auto splitResult = m_storage.leafSplit(leafNode);
+    auto splitResult = m_storage.leaf_split(leafNode);
     if (splitResult) {
 
-      m_storage.setNextLeaf(*splitResult, m_storage.nextLeaf(leafNode));
-      info.newKey = m_storage.leafKey(*splitResult, 0);
-      auto result45 = m_storage.storeLeaf(std::move(*splitResult));
-      if (!result45) return std::unexpected(std::move(result45.error()));
-      info.newPointer = std::move(*result45);
+      m_storage.set_next_leaf(*splitResult, m_storage.next_leaf(leafNode));
+      info.newKey = m_storage.leaf_key(*splitResult, 0);
+      auto stored_leaf = m_storage.store_leaf(std::move(*splitResult));
+      if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+      info.newPointer = std::move(*stored_leaf);
 
-      m_storage.setNextLeaf(leafNode, info.newPointer);
+      m_storage.set_next_leaf(leafNode, info.newPointer);
       info.state = LeafSplit;
     } else {
-      if (m_storage.leafNeedsShift(leafNode)) {
+      if (m_storage.leaf_needs_shift(leafNode)) {
 
         info.state = LeafNeedsJoin;
       } else {
@@ -731,26 +795,26 @@ namespace Star {
 
   template <btree_storage Storage>
   [[nodiscard]] std::expected<void, StarException> BTree<Storage>::modify(Index& indexNode, ModifyInfo& info) {
-    std::size_t i = indexFind(indexNode, info.targetElement.key);
-    Pointer nextPointer = m_storage.indexPointer(indexNode, i);
+    std::size_t i = index_upper_bound(indexNode, info.targetElement.key);
+    Pointer nextPointer = m_storage.index_pointer(indexNode, i);
 
     Leaf lowerLeaf;
     Index lowerIndex;
-    if (m_storage.indexLevel(indexNode) == 0) {
+    if (m_storage.index_level(indexNode) == 0) {
 
-      auto result22 = m_storage.loadLeaf(nextPointer);
-      if (!result22) return std::unexpected(std::move(result22.error()));
-      lowerLeaf = std::move(*result22);
-      auto result23 = modify(lowerLeaf, info);
-      if (!result23) return std::unexpected(std::move(result23.error()));
+      auto loaded_leaf = m_storage.load_leaf(nextPointer);
+      if (!loaded_leaf) return std::unexpected(std::move(loaded_leaf.error()));
+      lowerLeaf = std::move(*loaded_leaf);
+      auto modified = modify(lowerLeaf, info);
+      if (!modified) return std::unexpected(std::move(modified.error()));
 
     } else {
 
-      auto result24 = m_storage.loadIndex(nextPointer);
-      if (!result24) return std::unexpected(std::move(result24.error()));
-      lowerIndex = std::move(*result24);
-      auto result25 = modify(lowerIndex, info);
-      if (!result25) return std::unexpected(std::move(result25.error()));
+      auto loaded_index = m_storage.load_index(nextPointer);
+      if (!loaded_index) return std::unexpected(std::move(loaded_index.error()));
+      lowerIndex = std::move(*loaded_index);
+      auto modified = modify(lowerIndex, info);
+      if (!modified) return std::unexpected(std::move(modified.error()));
 
     }
 
@@ -762,7 +826,7 @@ namespace Star {
 
     std::size_t left = 0;
     std::size_t right = 0;
-    if (i != 0 && i == m_storage.indexPointerCount(indexNode) - 1) {
+    if (i != 0 && i == m_storage.index_pointer_count(indexNode) - 1) {
 
       left = i - 1;
       right = i;
@@ -774,7 +838,7 @@ namespace Star {
 
     if (info.state == LeafNeedsJoin) {
 
-      if (m_storage.indexPointerCount(indexNode) < 2) {
+      if (m_storage.index_pointer_count(indexNode) < 2) {
 
         // Don't have enough leaves to join, just do the pending update.
         info.state = LeafNeedsUpdate;
@@ -786,55 +850,55 @@ namespace Star {
         if (left == i) {
 
           leftLeaf = lowerLeaf;
-          auto result26 = m_storage.loadLeaf(m_storage.indexPointer(indexNode, right));
-          if (!result26) return std::unexpected(std::move(result26.error()));
-          rightLeaf = std::move(*result26);
+          auto loaded_right_leaf = m_storage.load_leaf(m_storage.index_pointer(indexNode, right));
+          if (!loaded_right_leaf) return std::unexpected(std::move(loaded_right_leaf.error()));
+          rightLeaf = std::move(*loaded_right_leaf);
         } else {
 
-          auto result27 = m_storage.loadLeaf(m_storage.indexPointer(indexNode, left));
-          if (!result27) return std::unexpected(std::move(result27.error()));
-          leftLeaf = std::move(*result27);
+          auto loaded_left_leaf = m_storage.load_leaf(m_storage.index_pointer(indexNode, left));
+          if (!loaded_left_leaf) return std::unexpected(std::move(loaded_left_leaf.error()));
+          leftLeaf = std::move(*loaded_left_leaf);
           rightLeaf = lowerLeaf;
         }
 
-        if (!m_storage.leafShift(leftLeaf, rightLeaf)) {
+        if (!m_storage.leaf_shift(leftLeaf, rightLeaf)) {
 
           // Leaves not modified, just do the pending update.
           info.state = LeafNeedsUpdate;
         } else {
-          if (m_storage.leafElementCount(rightLeaf) == 0) {
+          if (m_storage.leaf_element_count(rightLeaf) == 0) {
 
             // Leaves merged.
-            m_storage.setNextLeaf(leftLeaf, m_storage.nextLeaf(rightLeaf));
-            auto result28 = m_storage.deleteLeaf(std::move(rightLeaf));
-            if (!result28) return std::unexpected(std::move(result28.error()));
+            m_storage.set_next_leaf(leftLeaf, m_storage.next_leaf(rightLeaf));
+            auto deleted_leaf = m_storage.delete_leaf(std::move(rightLeaf));
+            if (!deleted_leaf) return std::unexpected(std::move(deleted_leaf.error()));
 
             // Replace two sibling pointer elements with one pointing to merged
             // leaf.
             if (left != 0) {
-              m_storage.indexUpdateKeyBefore(indexNode, left, m_storage.leafKey(leftLeaf, 0));
+              m_storage.index_update_key_before(indexNode, left, m_storage.leaf_key(leftLeaf, 0));
             }
 
-            auto result29 = m_storage.storeLeaf(std::move(leftLeaf));
-            if (!result29) return std::unexpected(std::move(result29.error()));
-            m_storage.indexUpdatePointer(indexNode, left, (*result29));
-            m_storage.indexRemoveBefore(indexNode, right);
+            auto stored_left_leaf = m_storage.store_leaf(std::move(leftLeaf));
+            if (!stored_left_leaf) return std::unexpected(std::move(stored_left_leaf.error()));
+            m_storage.index_update_pointer(indexNode, left, (*stored_left_leaf));
+            m_storage.index_erase_before(indexNode, right);
 
             selfUpdated = true;
           } else {
 
             // Leaves shifted.
-            auto result30 = m_storage.storeLeaf(std::move(leftLeaf));
-            if (!result30) return std::unexpected(std::move(result30.error()));
-            m_storage.indexUpdatePointer(indexNode, left, (*result30));
+            auto stored_left_leaf = m_storage.store_leaf(std::move(leftLeaf));
+            if (!stored_left_leaf) return std::unexpected(std::move(stored_left_leaf.error()));
+            m_storage.index_update_pointer(indexNode, left, (*stored_left_leaf));
 
             // Right leaf first key changes on shift, so always need to update
             // left index node.
-            m_storage.indexUpdateKeyBefore(indexNode, right, m_storage.leafKey(rightLeaf, 0));
+            m_storage.index_update_key_before(indexNode, right, m_storage.leaf_key(rightLeaf, 0));
 
-            auto result31 = m_storage.storeLeaf(std::move(rightLeaf));
-            if (!result31) return std::unexpected(std::move(result31.error()));
-            m_storage.indexUpdatePointer(indexNode, right, (*result31));
+            auto stored_right_leaf = m_storage.store_leaf(std::move(rightLeaf));
+            if (!stored_right_leaf) return std::unexpected(std::move(stored_right_leaf.error()));
+            m_storage.index_update_pointer(indexNode, right, (*stored_right_leaf));
 
             selfUpdated = true;
           }
@@ -844,7 +908,7 @@ namespace Star {
 
     if (info.state == IndexNeedsJoin) {
 
-      if (m_storage.indexPointerCount(indexNode) < 2) {
+      if (m_storage.index_pointer_count(indexNode) < 2) {
 
         // Don't have enough indexes to join, just do the pending update.
         info.state = IndexNeedsUpdate;
@@ -856,59 +920,59 @@ namespace Star {
         if (left == i) {
 
           leftIndex = lowerIndex;
-          auto result32 = m_storage.loadIndex(m_storage.indexPointer(indexNode, right));
-          if (!result32) return std::unexpected(std::move(result32.error()));
-          rightIndex = std::move(*result32);
+          auto loaded_right_index = m_storage.load_index(m_storage.index_pointer(indexNode, right));
+          if (!loaded_right_index) return std::unexpected(std::move(loaded_right_index.error()));
+          rightIndex = std::move(*loaded_right_index);
         } else {
 
-          auto result33 = m_storage.loadIndex(m_storage.indexPointer(indexNode, left));
-          if (!result33) return std::unexpected(std::move(result33.error()));
-          leftIndex = std::move(*result33);
+          auto loaded_left_index = m_storage.load_index(m_storage.index_pointer(indexNode, left));
+          if (!loaded_left_index) return std::unexpected(std::move(loaded_left_index.error()));
+          leftIndex = std::move(*loaded_left_index);
           rightIndex = lowerIndex;
         }
 
-        auto result34 = getLeftKey(rightIndex);
-        if (!result34) return std::unexpected(std::move(result34.error()));
-        if (!m_storage.indexShift(leftIndex, (*result34), rightIndex)) {
+        auto right_key = leftmost_key(rightIndex);
+        if (!right_key) return std::unexpected(std::move(right_key.error()));
+        if (!m_storage.index_shift(leftIndex, (*right_key), rightIndex)) {
 
           // Indexes not modified, just do the pending update.
           info.state = IndexNeedsUpdate;
         } else {
-          if (m_storage.indexPointerCount(rightIndex) == 0) {
+          if (m_storage.index_pointer_count(rightIndex) == 0) {
 
             // Indexes merged.
-            m_storage.deleteIndex(std::move(rightIndex));
+            m_storage.delete_index(std::move(rightIndex));
 
             // Replace two sibling pointer elements with one pointing to merged
             // index.
             if (left != 0) {
-              auto result35 = getLeftKey(leftIndex);
-              if (!result35) return std::unexpected(std::move(result35.error()));
-              m_storage.indexUpdateKeyBefore(indexNode, left, (*result35));
+              auto left_key = leftmost_key(leftIndex);
+              if (!left_key) return std::unexpected(std::move(left_key.error()));
+              m_storage.index_update_key_before(indexNode, left, (*left_key));
             }
 
-            auto result36 = m_storage.storeIndex(std::move(leftIndex));
-            if (!result36) return std::unexpected(std::move(result36.error()));
-            m_storage.indexUpdatePointer(indexNode, left, (*result36));
-            m_storage.indexRemoveBefore(indexNode, right);
+            auto stored_left_index = m_storage.store_index(std::move(leftIndex));
+            if (!stored_left_index) return std::unexpected(std::move(stored_left_index.error()));
+            m_storage.index_update_pointer(indexNode, left, (*stored_left_index));
+            m_storage.index_erase_before(indexNode, right);
 
             selfUpdated = true;
           } else {
 
             // Indexes shifted.
-            auto result37 = m_storage.storeIndex(std::move(leftIndex));
-            if (!result37) return std::unexpected(std::move(result37.error()));
-            m_storage.indexUpdatePointer(indexNode, left, (*result37));
+            auto stored_left_index = m_storage.store_index(std::move(leftIndex));
+            if (!stored_left_index) return std::unexpected(std::move(stored_left_index.error()));
+            m_storage.index_update_pointer(indexNode, left, (*stored_left_index));
 
             // Right index first key changes on shift, so always need to update
             // right index node.
-            auto result38 = getLeftKey(rightIndex);
-            if (!result38) return std::unexpected(std::move(result38.error()));
-            Key keyForRight = std::move(*result38);
-            auto result39 = m_storage.storeIndex(std::move(rightIndex));
-            if (!result39) return std::unexpected(std::move(result39.error()));
-            m_storage.indexUpdatePointer(indexNode, right, (*result39));
-            m_storage.indexUpdateKeyBefore(indexNode, right, keyForRight);
+            auto right_key = leftmost_key(rightIndex);
+            if (!right_key) return std::unexpected(std::move(right_key.error()));
+            Key keyForRight = std::move(*right_key);
+            auto stored_right_index = m_storage.store_index(std::move(rightIndex));
+            if (!stored_right_index) return std::unexpected(std::move(stored_right_index.error()));
+            m_storage.index_update_pointer(indexNode, right, (*stored_right_index));
+            m_storage.index_update_key_before(indexNode, right, keyForRight);
 
             selfUpdated = true;
           }
@@ -918,57 +982,57 @@ namespace Star {
 
     if (info.state == LeafSplit) {
 
-      auto result40 = m_storage.storeLeaf(std::move(lowerLeaf));
-      if (!result40) return std::unexpected(std::move(result40.error()));
-      m_storage.indexUpdatePointer(indexNode, i, (*result40));
-      m_storage.indexInsertAfter(indexNode, i, info.newKey, info.newPointer);
+      auto stored_leaf = m_storage.store_leaf(std::move(lowerLeaf));
+      if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+      m_storage.index_update_pointer(indexNode, i, (*stored_leaf));
+      m_storage.index_insert_after(indexNode, i, info.newKey, info.newPointer);
       selfUpdated = true;
     }
 
     if (info.state == IndexSplit) {
 
-      auto result41 = m_storage.storeIndex(std::move(lowerIndex));
-      if (!result41) return std::unexpected(std::move(result41.error()));
-      m_storage.indexUpdatePointer(indexNode, i, (*result41));
-      m_storage.indexInsertAfter(indexNode, i, info.newKey, info.newPointer);
+      auto stored_index = m_storage.store_index(std::move(lowerIndex));
+      if (!stored_index) return std::unexpected(std::move(stored_index.error()));
+      m_storage.index_update_pointer(indexNode, i, (*stored_index));
+      m_storage.index_insert_after(indexNode, i, info.newKey, info.newPointer);
       selfUpdated = true;
     }
 
     if (info.state == LeafNeedsUpdate) {
 
-      auto result42 = m_storage.storeLeaf(std::move(lowerLeaf));
-      if (!result42) return std::unexpected(std::move(result42.error()));
-      Pointer lowerLeafPointer = std::move(*result42);
-      if (lowerLeafPointer != m_storage.indexPointer(indexNode, i)) {
+      auto stored_leaf = m_storage.store_leaf(std::move(lowerLeaf));
+      if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+      Pointer lowerLeafPointer = std::move(*stored_leaf);
+      if (lowerLeafPointer != m_storage.index_pointer(indexNode, i)) {
 
-        m_storage.indexUpdatePointer(indexNode, i, lowerLeafPointer);
+        m_storage.index_update_pointer(indexNode, i, lowerLeafPointer);
         selfUpdated = true;
       }
     }
 
     if (info.state == IndexNeedsUpdate) {
 
-      auto result43 = m_storage.storeIndex(std::move(lowerIndex));
-      if (!result43) return std::unexpected(std::move(result43.error()));
-      Pointer lowerIndexPointer = std::move(*result43);
-      if (lowerIndexPointer != m_storage.indexPointer(indexNode, i)) {
+      auto stored_index = m_storage.store_index(std::move(lowerIndex));
+      if (!stored_index) return std::unexpected(std::move(stored_index.error()));
+      Pointer lowerIndexPointer = std::move(*stored_index);
+      if (lowerIndexPointer != m_storage.index_pointer(indexNode, i)) {
 
-        m_storage.indexUpdatePointer(indexNode, i, lowerIndexPointer);
+        m_storage.index_update_pointer(indexNode, i, lowerIndexPointer);
         selfUpdated = true;
       }
     }
 
-    auto splitResult = m_storage.indexSplit(indexNode);
+    auto splitResult = m_storage.index_split(indexNode);
     if (splitResult) {
 
       info.newKey = splitResult->first;
-      auto result44 = m_storage.storeIndex(std::move(*splitResult).second);
-      if (!result44) return std::unexpected(std::move(result44.error()));
-      info.newPointer = std::move(*result44);
+      auto stored_index = m_storage.store_index(std::move(*splitResult).second);
+      if (!stored_index) return std::unexpected(std::move(stored_index.error()));
+      info.newPointer = std::move(*stored_index);
       info.state = IndexSplit;
       selfUpdated = true;
     } else {
-      if (m_storage.indexNeedsShift(indexNode)) {
+      if (m_storage.index_needs_shift(indexNode)) {
 
         info.state = IndexNeedsJoin;
       } else {
@@ -990,37 +1054,37 @@ namespace Star {
 
     Leaf lowerLeaf;
     Index lowerIndex;
-    if (m_storage.rootIsLeaf()) {
+    if (m_storage.root_is_leaf()) {
 
-      auto result9 = m_storage.loadLeaf(m_storage.rootPointer());
-      if (!result9) return std::unexpected(std::move(result9.error()));
-      lowerLeaf = std::move(*result9);
-      auto result10 = modify(lowerLeaf, info);
-      if (!result10) return std::unexpected(std::move(result10.error()));
+      auto loaded_leaf = m_storage.load_leaf(m_storage.root_pointer());
+      if (!loaded_leaf) return std::unexpected(std::move(loaded_leaf.error()));
+      lowerLeaf = std::move(*loaded_leaf);
+      auto modified = modify(lowerLeaf, info);
+      if (!modified) return std::unexpected(std::move(modified.error()));
 
     } else {
 
-      auto result11 = m_storage.loadIndex(m_storage.rootPointer());
-      if (!result11) return std::unexpected(std::move(result11.error()));
-      lowerIndex = std::move(*result11);
-      auto result12 = modify(lowerIndex, info);
-      if (!result12) return std::unexpected(std::move(result12.error()));
+      auto loaded_index = m_storage.load_index(m_storage.root_pointer());
+      if (!loaded_index) return std::unexpected(std::move(loaded_index.error()));
+      lowerIndex = std::move(*loaded_index);
+      auto modified = modify(lowerIndex, info);
+      if (!modified) return std::unexpected(std::move(modified.error()));
 
     }
 
     if (info.state == IndexNeedsJoin) {
 
-      if (m_storage.indexPointerCount(lowerIndex) == 1) {
+      if (m_storage.index_pointer_count(lowerIndex) == 1) {
 
         // If root index has single pointer, then make that the new root.
 
         // release index first (to support the common use case of delaying
-        // removes until setNewRoot)
-        Pointer pointer = m_storage.indexPointer(lowerIndex, 0);
-        std::size_t level = m_storage.indexLevel(lowerIndex);
-        m_storage.deleteIndex(std::move(lowerIndex));
-        auto result13 = m_storage.setNewRoot(pointer, level == 0);
-        if (!result13) return std::unexpected(std::move(result13.error()));
+        // removes until set_new_root)
+        Pointer pointer = m_storage.index_pointer(lowerIndex, 0);
+        std::size_t level = m_storage.index_level(lowerIndex);
+        m_storage.delete_index(std::move(lowerIndex));
+        auto root_changed = m_storage.set_new_root(pointer, level == 0);
+        if (!root_changed) return std::unexpected(std::move(root_changed.error()));
 
       } else {
 
@@ -1040,46 +1104,46 @@ namespace Star {
       Index newRoot;
       if (info.state == IndexSplit) {
 
-        auto rootIndexLevel = m_storage.indexLevel(lowerIndex) + 1;
-        auto result14 = m_storage.storeIndex(std::move(lowerIndex));
-        if (!result14) return std::unexpected(std::move(result14.error()));
-        newRoot = m_storage.createIndex((*result14));
-        m_storage.setIndexLevel(newRoot, rootIndexLevel);
+        auto rootIndexLevel = m_storage.index_level(lowerIndex) + 1;
+        auto stored_index = m_storage.store_index(std::move(lowerIndex));
+        if (!stored_index) return std::unexpected(std::move(stored_index.error()));
+        newRoot = m_storage.create_index((*stored_index));
+        m_storage.set_index_level(newRoot, rootIndexLevel);
       } else {
 
-        auto result15 = m_storage.storeLeaf(std::move(lowerLeaf));
-        if (!result15) return std::unexpected(std::move(result15.error()));
-        newRoot = m_storage.createIndex((*result15));
-        m_storage.setIndexLevel(newRoot, 0);
+        auto stored_leaf = m_storage.store_leaf(std::move(lowerLeaf));
+        if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+        newRoot = m_storage.create_index((*stored_leaf));
+        m_storage.set_index_level(newRoot, 0);
       }
-      m_storage.indexInsertAfter(newRoot, 0, info.newKey, info.newPointer);
-      auto result16 = m_storage.storeIndex(std::move(newRoot));
-      if (!result16) return std::unexpected(std::move(result16.error()));
-      auto result17 = m_storage.setNewRoot((*result16), false);
-      if (!result17) return std::unexpected(std::move(result17.error()));
+      m_storage.index_insert_after(newRoot, 0, info.newKey, info.newPointer);
+      auto stored_root = m_storage.store_index(std::move(newRoot));
+      if (!stored_root) return std::unexpected(std::move(stored_root.error()));
+      auto root_changed = m_storage.set_new_root((*stored_root), false);
+      if (!root_changed) return std::unexpected(std::move(root_changed.error()));
 
     }
 
     if (info.state == IndexNeedsUpdate) {
 
-      auto result18 = m_storage.storeIndex(std::move(lowerIndex));
-      if (!result18) return std::unexpected(std::move(result18.error()));
-      Pointer newRootPointer = std::move(*result18);
-      if (newRootPointer != m_storage.rootPointer()) {
-        auto result19 = m_storage.setNewRoot(newRootPointer, false);
-        if (!result19) return std::unexpected(std::move(result19.error()));
+      auto stored_index = m_storage.store_index(std::move(lowerIndex));
+      if (!stored_index) return std::unexpected(std::move(stored_index.error()));
+      Pointer newRootPointer = std::move(*stored_index);
+      if (newRootPointer != m_storage.root_pointer()) {
+        auto root_changed = m_storage.set_new_root(newRootPointer, false);
+        if (!root_changed) return std::unexpected(std::move(root_changed.error()));
 
       }
     }
 
     if (info.state == LeafNeedsUpdate) {
 
-      auto result20 = m_storage.storeLeaf(std::move(lowerLeaf));
-      if (!result20) return std::unexpected(std::move(result20.error()));
-      Pointer newRootPointer = std::move(*result20);
-      if (newRootPointer != m_storage.rootPointer()) {
-        auto result21 = m_storage.setNewRoot(newRootPointer, true);
-        if (!result21) return std::unexpected(std::move(result21.error()));
+      auto stored_leaf = m_storage.store_leaf(std::move(lowerLeaf));
+      if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+      Pointer newRootPointer = std::move(*stored_leaf);
+      if (newRootPointer != m_storage.root_pointer()) {
+        auto root_changed = m_storage.set_new_root(newRootPointer, true);
+        if (!root_changed) return std::unexpected(std::move(root_changed.error()));
 
       }
     }
@@ -1088,45 +1152,46 @@ namespace Star {
   }
 
   template <btree_storage Storage>
-  [[nodiscard]] auto BTree<Storage>::getLeftKey(Index const& index) -> std::expected<Key, StarException> {
-    if (m_storage.indexLevel(index) == 0) {
+  [[nodiscard]] auto BTree<Storage>::leftmost_key(Index const& index) -> std::expected<Key, StarException> {
+    if (m_storage.index_level(index) == 0) {
 
-      auto leaf = m_storage.loadLeaf(m_storage.indexPointer(index, 0));
+      auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, 0));
       if (!leaf) return std::unexpected(std::move(leaf.error()));
-      return m_storage.leafKey(*leaf, 0);
+      return m_storage.leaf_key(*leaf, 0);
     } else {
 
-      auto childIndex = m_storage.loadIndex(m_storage.indexPointer(index, 0));
+      auto childIndex = m_storage.load_index(m_storage.index_pointer(index, 0));
       if (!childIndex) return std::unexpected(std::move(childIndex.error()));
-      return getLeftKey(*childIndex);
+      return leftmost_key(*childIndex);
     }
   }
 
   template <btree_storage Storage>
   template <typename Visitor>
-  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::forAllNodes(Index const& index, Visitor&& visitor) {
-    auto result1 = visitor(index);
-    if (!result1) return std::unexpected(std::move(result1.error()));
-    if (!(*result1)) {
+    requires btree_node_visitor<Visitor, typename Storage::Index, typename Storage::Leaf>
+  [[nodiscard]] std::expected<void, StarException> BTree<Storage>::for_all_nodes(Index const& index, Visitor&& visitor) {
+    auto visited = std::invoke(visitor, index);
+    if (!visited) return std::unexpected(std::move(visited.error()));
+    if (!(*visited)) {
       return {};
     }
 
-    for (std::size_t i = 0; i < m_storage.indexPointerCount(index); ++i) {
+    for (std::size_t i = 0; i < m_storage.index_pointer_count(index); ++i) {
 
-      if (m_storage.indexLevel(index) != 0) {
+      if (m_storage.index_level(index) != 0) {
 
-        auto result2 = m_storage.loadIndex(m_storage.indexPointer(index, i));
-        if (!result2) return std::unexpected(std::move(result2.error()));
-        auto result3 = forAllNodes((*result2), std::forward<Visitor>(visitor));
-        if (!result3) return std::unexpected(std::move(result3.error()));
+        auto child_index = m_storage.load_index(m_storage.index_pointer(index, i));
+        if (!child_index) return std::unexpected(std::move(child_index.error()));
+        auto visited_child = for_all_nodes((*child_index), visitor);
+        if (!visited_child) return std::unexpected(std::move(visited_child.error()));
 
       } else {
 
-        auto result4 = m_storage.loadLeaf(m_storage.indexPointer(index, i));
-        if (!result4) return std::unexpected(std::move(result4.error()));
-        auto result5 = visitor((*result4));
-        if (!result5) return std::unexpected(std::move(result5.error()));
-        if (!(*result5)) {
+        auto leaf = m_storage.load_leaf(m_storage.index_pointer(index, i));
+        if (!leaf) return std::unexpected(std::move(leaf.error()));
+        auto visited_leaf = std::invoke(visitor, std::as_const(*leaf));
+        if (!visited_leaf) return std::unexpected(std::move(visited_leaf.error()));
+        if (!(*visited_leaf)) {
           return {};
         }
       }
@@ -1135,51 +1200,28 @@ namespace Star {
   }
 
   template <btree_storage Storage>
-  std::pair<std::size_t, bool> BTree<Storage>::leafFind(Leaf const& leaf, Key const& key) {
-    // Return lower bound binary search result.
-    std::size_t size = m_storage.leafElementCount(leaf);
-    if (size == 0)
-    return {0, false};
-
-    std::size_t len = size;
-    std::size_t first = 0;
-    std::size_t middle = 0;
-    std::size_t half;
-    while (len > 0) {
-      half = len / 2;
-      middle = first + half;
-      if (m_storage.leafKey(leaf, middle) < key) {
-        first = middle + 1;
-        len = len - half - 1;
-      } else {
-        len = half;
-      }
-    }
-    return std::make_pair(first, first < size && !(key < m_storage.leafKey(leaf, first)));
+  std::pair<std::size_t, bool> BTree<Storage>::leaf_lower_bound(Leaf const& leaf, Key const& key) {
+    auto const size = m_storage.leaf_element_count(leaf);
+    auto indices = std::views::iota(std::size_t{0}, size);
+    auto found = std::ranges::lower_bound(indices, key,
+        [](Key const& left, Key const& right) { return left < right; },
+        [&](std::size_t i) -> decltype(auto) { return m_storage.leaf_key(leaf, i); });
+    auto const position = static_cast<std::size_t>(found - indices.begin());
+    return {position, position < size && !(key < m_storage.leaf_key(leaf, position))};
   }
 
   template <btree_storage Storage>
-  std::size_t BTree<Storage>::indexFind(Index const& index, Key const& key) {
-    // Return upper bound binary search result of range [1, size];
-    std::size_t size = m_storage.indexPointerCount(index);
+  std::size_t BTree<Storage>::index_upper_bound(Index const& index, Key const& key) {
+    auto const size = m_storage.index_pointer_count(index);
     if (size == 0)
-    return 0;
+      return 0;
 
-    std::size_t len = size - 1;
-    std::size_t first = 1;
-    std::size_t middle = 1;
-    std::size_t half;
-    while (len > 0) {
-      half = len / 2;
-      middle = first + half;
-      if (key < m_storage.indexKeyBefore(index, middle)) {
-        len = half;
-      } else {
-        first = middle + 1;
-        len = len - half - 1;
-      }
-    }
-    return first - 1;
+    // Explicit < preserves the storage contract without totally_ordered keys.
+    auto indices = std::views::iota(std::size_t{1}, size);
+    auto found = std::ranges::upper_bound(indices, key,
+        [](Key const& left, Key const& right) { return left < right; },
+        [&](std::size_t i) -> decltype(auto) { return m_storage.index_key_before(index, i); });
+    return static_cast<std::size_t>(found - indices.begin());
   }
 
 }
@@ -1189,4 +1231,7 @@ export module star.btree;
 export namespace Star {
   using ::Star::BTree;
   using ::Star::btree_storage;
+  using ::Star::btree_record_visitor;
+  using ::Star::btree_error_handler;
+  using ::Star::btree_node_visitor;
 }

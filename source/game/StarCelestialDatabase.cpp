@@ -430,19 +430,19 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   if (!named)
     return std::unexpected(assets->withAssetContext(std::move(named.error()), "/celestial/names.config", "Loading celestial names"));
   if (databaseFile) {
-    auto identified = m_database.setContentIdentifier("Celestial2");
+    auto identified = m_database.set_content_identifier("Celestial2");
     if (!identified)
       return std::unexpected(std::move(identified.error()));
     auto file = File::open(*databaseFile, IOMode::ReadWrite);
     if (!file)
       return std::unexpected(std::move(file.error()));
-    auto device = m_database.setIODevice(std::move(*file));
+    auto device = m_database.set_io_device(std::move(*file));
     if (!device)
       return std::unexpected(std::move(device.error()));
     auto opened = m_database.open();
     if (!opened)
       return std::unexpected(std::move(opened.error()));
-    if (m_database.contentIdentifier() != "Celestial2") {
+    if (m_database.content_identifier() != "Celestial2") {
       auto logged = m_root.logger().error("CelestialMasterDatabase database content identifier is not 'Celestial2', moving out of the way and recreating");
       if (!logged)
         return std::unexpected(std::move(logged.error()));
@@ -455,14 +455,14 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
       auto replacement = File::open(*databaseFile, IOMode::ReadWrite);
       if (!replacement)
         return std::unexpected(std::move(replacement.error()));
-      auto replaced = m_database.setIODevice(std::move(*replacement));
+      auto replaced = m_database.set_io_device(std::move(*replacement));
       if (!replaced)
         return std::unexpected(std::move(replaced.error()));
       auto reopened = m_database.open();
       if (!reopened)
         return std::unexpected(std::move(reopened.error()));
     }
-    auto manualCommit = m_database.setAutoCommit(false);
+    auto manualCommit = m_database.set_auto_commit(false);
     if (!manualCommit)
       return std::unexpected(std::move(manualCommit.error()));
   }
@@ -507,7 +507,7 @@ std::expected<void, StarException> CelestialMasterDatabase::cleanupAndCommit() {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   m_chunkCache.cleanup();
-  if (m_database.isOpen() && m_commitTimer.timeUp()) {
+  if (m_database.is_open() && m_commitTimer.timeUp()) {
     auto committed = m_database.commit();
     if (!committed)
       return std::unexpected(std::move(committed.error()));
@@ -817,7 +817,7 @@ std::expected<void, StarException> CelestialMasterDatabase::updateParameters(
     }
     updated = true;
   }
-  if (!updated || !m_database.isOpen())
+  if (!updated || !m_database.is_open())
     return std::unexpected(CelestialException("CelestialMasterDatabase::updateParameters failed; coordinate is not a valid planet or satellite, or celestial database was not open for writing"));
   auto versioning = m_root.versioningDatabase();
   if (!versioning)
@@ -852,7 +852,7 @@ std::expected<void, StarException> CelestialMasterDatabase::markPersistent(Celes
     return std::unexpected(std::move(loaded.error()));
   if (loaded->get().persistent)
     return {};
-  if (m_database.isOpen()) {
+  if (m_database.is_open()) {
     auto versioning = m_root.versioningDatabase();
     if (!versioning)
       return std::unexpected(std::move(versioning.error()));
@@ -895,7 +895,7 @@ std::expected<std::reference_wrapper<CelestialChunk const>, StarException> Celes
     auto versioning = database.m_root.versioningDatabase();
     if (!versioning)
       return std::unexpected(std::move(versioning.error()));
-    if (database.m_database.isOpen()) {
+    if (database.m_database.is_open()) {
       auto key = DataStreamBuffer::serialize(index);
       if (!key)
         return std::unexpected(std::move(key.error()));
@@ -935,7 +935,7 @@ std::expected<std::reference_wrapper<CelestialChunk const>, StarException> Celes
     auto produced = unlockDuring ? unlockDuring(producer) : producer();
     if (!produced)
       return std::unexpected(std::move(produced.error()));
-    if (database.m_chunksAlwaysPersistent && database.m_database.isOpen()) {
+    if (database.m_chunksAlwaysPersistent && database.m_database.is_open()) {
       auto versioned = chunk.toJson().and_then([&](Json const& value) {
         return (*versioning)->makeCurrentVersionedJson("CelestialChunk", value);
       });

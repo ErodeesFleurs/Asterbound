@@ -13,7 +13,7 @@ import star.string;
 
 namespace {
 
-struct phase_metrics {
+struct PhaseMetrics {
   std::uint64_t write_calls = 0;
   std::uint64_t write_bytes = 0;
   std::uint64_t sync_calls = 0;
@@ -24,13 +24,13 @@ struct phase_metrics {
 // Investigation-only instrumentation: every measured operation delegates to the
 // real File. The three actual sync calls delimit block, inactive-root and
 // selector phases; no production hook, simulated latency or durability shortcut.
-class commit_diagnostic_file : public Star::File {
+class CommitDiagnosticFile : public Star::File {
 public:
   using File::File;
 
   bool measuring = false;
   unsigned phase = 0;
-  std::array<phase_metrics, 3> metrics{};
+  std::array<PhaseMetrics, 3> metrics{};
   std::uint64_t adjacent_block_writes = 0;
   std::optional<Star::StreamOffset> previous_block_end;
 
@@ -102,10 +102,10 @@ Star::ByteArray diagnostic_payload(std::size_t size, std::size_t key, unsigned g
 // Match File/BTree/Commit's 32 seeded + 32 new keys and two 64-key
 // mutation passes, but keep this instrumented workload separate from its A/B
 // throughput measurement. Snapshot restore, staging and readback are untimed.
-struct commit_diagnostic_fixture {
+struct CommitDiagnosticFixture {
   Star::Logger logger;
   Star::String path;
-  std::shared_ptr<commit_diagnostic_file> device;
+  std::shared_ptr<CommitDiagnosticFile> device;
   std::unique_ptr<Star::BTreeDatabase> database;
   Star::ByteArray seed_file;
   std::array<Star::ByteArray, 64> keys;
@@ -113,7 +113,7 @@ struct commit_diagnostic_fixture {
   std::array<Star::ByteArray, 64> overwritten;
 
   std::expected<void, Star::StarException> close() {
-    if (database && database->isOpen()) {
+    if (database && database->is_open()) {
       if (auto result = database->close(true); !result)
         return result;
     } else if (device && device->is_open()) {
@@ -126,13 +126,13 @@ struct commit_diagnostic_fixture {
   }
 
   std::expected<void, Star::StarException> open() {
-    device = std::make_shared<commit_diagnostic_file>(path);
+    device = std::make_shared<CommitDiagnosticFile>(path);
     database = std::make_unique<Star::BTreeDatabase>(logger, "FileBenchmark", 4);
-    if (auto result = database->setAutoCommit(false); !result)
+    if (auto result = database->set_auto_commit(false); !result)
       return result;
-    if (auto result = database->setBlockSize(4096); !result)
+    if (auto result = database->set_block_size(4096); !result)
       return result;
-    if (auto result = database->setIODevice(device); !result)
+    if (auto result = database->set_io_device(device); !result)
       return result;
     auto result = database->open();
     if (!result)
@@ -199,7 +199,7 @@ struct commit_diagnostic_fixture {
       return result;
     if (auto result = open(); !result)
       return result;
-    auto count = database->recordCount();
+    auto count = database->record_count();
     if (!count)
       return std::unexpected(std::move(count.error()));
     if (*count != keys.size())
@@ -226,7 +226,7 @@ void btree_commit_phase_diagnostic(benchmark::State& state) {
     state.SkipWithError(temporary.error().what());
     return;
   }
-  commit_diagnostic_fixture fixture;
+  CommitDiagnosticFixture fixture;
   auto cleanup = Star::make_scope_exit([&] {
     if (auto result = fixture.close(); !result)
       state.SkipWithError(result.error().what());
@@ -239,7 +239,7 @@ void btree_commit_phase_diagnostic(benchmark::State& state) {
     state.SkipWithError(initialized.error().what());
     return;
   }
-  std::array<phase_metrics, 3> totals{};
+  std::array<PhaseMetrics, 3> totals{};
   std::uint64_t adjacent = 0;
   std::uint64_t measured = 0;
   for (auto _ : state) {

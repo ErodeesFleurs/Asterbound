@@ -36,10 +36,10 @@ namespace Star {
     m_usingAltRoot = false;
   }
 
-  BTreeDatabase::BTreeDatabase(Logger& logger, String const& contentIdentifier, std::size_t keySize)
+  BTreeDatabase::BTreeDatabase(Logger& logger, String const& content_identifier, std::size_t key_size)
   : BTreeDatabase(logger) {
-    m_contentIdentifier = contentIdentifier;
-    m_keySize = keySize;
+    m_contentIdentifier = content_identifier;
+    m_keySize = key_size;
   }
 
   BTreeDatabase::~BTreeDatabase() noexcept {
@@ -52,86 +52,88 @@ namespace Star {
     }
   }
 
-  std::uint32_t BTreeDatabase::blockSize() const {
+  std::uint32_t BTreeDatabase::block_size() const {
     std::shared_lock readLocker(m_lock);
     return m_blockSize;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setBlockSize(std::uint32_t blockSize) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::set_block_size(std::uint32_t block_size) {
     std::unique_lock writeLocker(m_lock);
-    auto result296 = checkIfOpen("setBlockSize", false);
-    if (!result296) return std::unexpected(std::move(result296.error()));
+    if (auto state_checked = check_if_open("set_block_size", false); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
-    m_blockSize = blockSize;
+    m_blockSize = block_size;
     return {};
   }
 
-  std::uint32_t BTreeDatabase::keySize() const {
+  std::uint32_t BTreeDatabase::key_size() const {
     std::shared_lock readLocker(m_lock);
     return m_keySize;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setKeySize(std::uint32_t keySize) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::set_key_size(std::uint32_t key_size) {
     std::unique_lock writeLocker(m_lock);
-    auto result295 = checkIfOpen("setKeySize", false);
-    if (!result295) return std::unexpected(std::move(result295.error()));
+    if (auto state_checked = check_if_open("set_key_size", false); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
-    m_keySize = keySize;
+    m_keySize = key_size;
     return {};
   }
 
-  String BTreeDatabase::contentIdentifier() const {
+  String BTreeDatabase::content_identifier() const {
     std::shared_lock readLocker(m_lock);
     return m_contentIdentifier;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setContentIdentifier(String contentIdentifier) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::set_content_identifier(String content_identifier) {
     std::unique_lock writeLocker(m_lock);
-    auto result294 = checkIfOpen("setContentIdentifier", false);
-    if (!result294) return std::unexpected(std::move(result294.error()));
+    if (auto state_checked = check_if_open("set_content_identifier", false); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
-    m_contentIdentifier = std::move(contentIdentifier);
+    m_contentIdentifier = std::move(content_identifier);
     return {};
   }
 
-  std::uint32_t BTreeDatabase::indexCacheSize() const {
+  std::uint32_t BTreeDatabase::index_cache_size() const {
+    std::shared_lock readLocker(m_lock);
     std::lock_guard lock(m_indexCacheSpinLock);
     return m_indexCache.capacity();
   }
 
-  void BTreeDatabase::setIndexCacheSize(std::uint32_t indexCacheSize) {
+  void BTreeDatabase::set_index_cache_size(std::uint32_t index_cache_size) {
+    std::unique_lock writeLocker(m_lock);
     std::lock_guard lock(m_indexCacheSpinLock);
-    m_indexCache.set_capacity(indexCacheSize);
+    m_indexCache.set_capacity(index_cache_size);
   }
 
-  bool BTreeDatabase::autoCommit() const {
+  bool BTreeDatabase::auto_commit() const {
     std::shared_lock readLocker(m_lock);
     return m_autoCommit;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setAutoCommit(bool autoCommit) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::set_auto_commit(bool auto_commit) {
     std::unique_lock writeLocker(m_lock);
-    m_autoCommit = autoCommit;
+    m_autoCommit = auto_commit;
     if (m_autoCommit)
-      return doCommit();
+      return do_commit();
     return {};
   }
 
-  std::shared_ptr<IODevice> BTreeDatabase::ioDevice() const {
+  std::shared_ptr<IODevice> BTreeDatabase::io_device() const {
     std::shared_lock readLocker(m_lock);
     return m_device;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::setIODevice(std::shared_ptr<IODevice> device) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::set_io_device(std::shared_ptr<IODevice> device) {
     std::unique_lock writeLocker(m_lock);
-    auto result292 = checkIfOpen("setIODevice", false);
-    if (!result292) return std::unexpected(std::move(result292.error()));
+    if (auto state_checked = check_if_open("set_io_device", false); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
     m_device = std::move(device);
     return {};
   }
 
-  bool BTreeDatabase::isOpen() const {
+  bool BTreeDatabase::is_open() const {
     std::shared_lock readLocker(m_lock);
     return m_open;
   }
@@ -153,51 +155,51 @@ namespace Star {
       }
 
       if (!m_device->is_open()) {
-        auto result103 = m_device->open(IOMode::ReadWrite);
-        if (!result103) return std::unexpected(std::move(result103.error()));
+        if (auto opened = m_device->open(IOMode::ReadWrite); !opened)
+          return std::unexpected(std::move(opened.error()));
       }
 
-      auto result104 = m_device->size();
-      if (!result104) return std::unexpected(std::move(result104.error()));
-      initialDeviceSize = *result104;
-      if ((*result104) > 0) {
+      auto device_size = m_device->size();
+      if (!device_size) return std::unexpected(std::move(device_size.error()));
+      initialDeviceSize = *device_size;
+      if ((*device_size) > 0) {
 
         DataStreamIODevice ds(*m_device);
-        auto result105 = ds.seek(0);
-        if (!result105) return std::unexpected(std::move(result105.error()));
+        if (auto positioned = ds.seek(0); !positioned)
+          return std::unexpected(std::move(positioned.error()));
 
-        auto result106 = ds.read_bytes(VersionMagicSize);
-        if (!result106) return std::unexpected(std::move(result106.error()));
-        auto magic = std::move(*result106);
+        auto version_magic = ds.read_bytes(VersionMagicSize);
+        if (!version_magic) return std::unexpected(std::move(version_magic.error()));
+        auto magic = std::move(*version_magic);
         if (magic != ByteArray(std::span(VersionMagic))) {
           return std::unexpected(DBException("Device is not a valid BTreeDatabase file"));
         }
 
-        auto result107 = ds.read<std::uint32_t>();
-        if (!result107) return std::unexpected(std::move(result107.error()));
-        m_blockSize = (*result107);
+        auto block_size = ds.read<std::uint32_t>();
+        if (!block_size) return std::unexpected(std::move(block_size.error()));
+        m_blockSize = (*block_size);
         if (m_blockSize < 44) {
           return std::unexpected(DBException("Invalid database block size"));
         }
 
-        auto result108 = ds.read_bytes(ContentIdentifierStringSize);
-        if (!result108) return std::unexpected(std::move(result108.error()));
-        auto contentIdentifier = std::move(*result108);
-        auto identifierBytes = contentIdentifier.span();
+        auto identifier_bytes = ds.read_bytes(ContentIdentifierStringSize);
+        if (!identifier_bytes) return std::unexpected(std::move(identifier_bytes.error()));
+        auto content_identifier = std::move(*identifier_bytes);
+        auto identifierBytes = content_identifier.span();
         m_contentIdentifier = String(std::string_view(identifierBytes.begin(), std::ranges::find(identifierBytes, '\0')));
-        auto result109 = ds.read<std::uint32_t>();
-        if (!result109) return std::unexpected(std::move(result109.error()));
-        m_keySize = (*result109);
+        auto key_size = ds.read<std::uint32_t>();
+        if (!key_size) return std::unexpected(std::move(key_size.error()));
+        m_keySize = (*key_size);
         if (m_keySize == 0 || m_keySize > m_blockSize - 11) {
           return std::unexpected(DBException("Invalid database key size"));
         }
 
-        auto result110 = readRoot();
-        if (!result110) return std::unexpected(std::move(result110.error()));
+        if (auto root_read = read_root(); !root_read)
+          return std::unexpected(std::move(root_read.error()));
 
         if (m_device->is_writable()) {
-          auto result111 = m_device->resize(m_deviceSize);
-          if (!result111) return std::unexpected(std::move(result111.error()));
+          if (auto resized = m_device->resize(m_deviceSize); !resized)
+            return std::unexpected(std::move(resized.error()));
         }
 
         return false;
@@ -207,39 +209,39 @@ namespace Star {
           return std::unexpected(DBException("Opening new database and no content identifier set!"));
         }
         if (m_contentIdentifier.utf8_size() > ContentIdentifierStringSize) {
-          return std::unexpected(DBException("contentIdentifier in BTreeDatabase implementation is greater than maximum identifier length"));
+          return std::unexpected(DBException("content_identifier in BTreeDatabase implementation is greater than maximum identifier length"));
         }
         if (m_keySize == 0 || m_blockSize < 44 || m_keySize > m_blockSize - 11) {
           return std::unexpected(DBException("Invalid key or block size opening a new BTreeDatabase"));
         }
         m_deviceSize = HeaderSize;
-        auto result112 = m_device->resize(m_deviceSize);
-        if (!result112) return std::unexpected(std::move(result112.error()));
+        if (auto resized = m_device->resize(m_deviceSize); !resized)
+          return std::unexpected(std::move(resized.error()));
 
         m_headFreeIndexBlock = InvalidBlockIndex;
 
         DataStreamIODevice ds(*m_device);
-        auto result113 = ds.seek(0);
-        if (!result113) return std::unexpected(std::move(result113.error()));
+        if (auto positioned = ds.seek(0); !positioned)
+          return std::unexpected(std::move(positioned.error()));
 
-        auto result114 = ds.write_data(VersionMagic);
-        if (!result114) return std::unexpected(std::move(result114.error()));
+        if (auto magic_written = ds.write_data(VersionMagic); !magic_written)
+          return std::unexpected(std::move(magic_written.error()));
 
-        auto result115 = ds.write<std::uint32_t>(m_blockSize);
-        if (!result115) return std::unexpected(std::move(result115.error()));
+        if (auto block_size_written = ds.write<std::uint32_t>(m_blockSize); !block_size_written)
+          return std::unexpected(std::move(block_size_written.error()));
 
-        std::array<char, ContentIdentifierStringSize> contentIdentifier{};
-        std::ranges::copy(m_contentIdentifier.utf8(), contentIdentifier.begin());
-        auto result116 = ds.write_data(std::span<char const>(contentIdentifier));
-        if (!result116) return std::unexpected(std::move(result116.error()));
+        std::array<char, ContentIdentifierStringSize> content_identifier{};
+        std::ranges::copy(m_contentIdentifier.utf8(), content_identifier.begin());
+        if (auto identifier_written = ds.write_data(std::span<char const>(content_identifier)); !identifier_written)
+          return std::unexpected(std::move(identifier_written.error()));
 
-        auto result117 = ds.write(m_keySize);
-        if (!result117) return std::unexpected(std::move(result117.error()));
+        if (auto key_size_written = ds.write(m_keySize); !key_size_written)
+          return std::unexpected(std::move(key_size_written.error()));
 
-        auto createdRoot = m_impl.createNewRoot();
+        auto createdRoot = m_impl.create_new_root();
         if (!createdRoot) return std::unexpected(std::move(createdRoot.error()));
-        auto result118 = doCommit();
-        if (!result118) return std::unexpected(std::move(result118.error()));
+        if (auto committed = do_commit(); !committed)
+          return std::unexpected(std::move(committed.error()));
 
         return true;
       }
@@ -279,7 +281,7 @@ namespace Star {
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::contains(ByteArray const& k) {
     std::shared_lock readLocker(m_lock);
-    if (auto keyChecked = checkKeySize(k); !keyChecked)
+    if (auto keyChecked = check_key_size(k); !keyChecked)
       return std::unexpected(std::move(keyChecked.error()));
 
     return m_impl.contains(k);
@@ -287,7 +289,7 @@ namespace Star {
 
   [[nodiscard]] std::expected<std::optional<ByteArray>, StarException> BTreeDatabase::find(ByteArray const& k) {
     std::shared_lock readLocker(m_lock);
-    if (auto keyChecked = checkKeySize(k); !keyChecked)
+    if (auto keyChecked = check_key_size(k); !keyChecked)
       return std::unexpected(std::move(keyChecked.error()));
 
     return m_impl.find(k);
@@ -295,123 +297,127 @@ namespace Star {
 
   [[nodiscard]] std::expected<List<std::pair<ByteArray, ByteArray>>, StarException> BTreeDatabase::find(ByteArray const& lower, ByteArray const& upper) {
     std::shared_lock readLocker(m_lock);
-    if (auto lowerKeyChecked = checkKeySize(lower); !lowerKeyChecked)
+    if (auto lowerKeyChecked = check_key_size(lower); !lowerKeyChecked)
       return std::unexpected(std::move(lowerKeyChecked.error()));
 
-    if (auto upperKeyChecked = checkKeySize(upper); !upperKeyChecked)
+    if (auto upperKeyChecked = check_key_size(upper); !upperKeyChecked)
       return std::unexpected(std::move(upperKeyChecked.error()));
 
     return m_impl.find(lower, upper);
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::forEach(ByteArray const& lower, ByteArray const& upper, std::function<std::expected<void, StarException>(ByteArray, ByteArray)> v) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::for_each(ByteArray const& lower, ByteArray const& upper, std::function<std::expected<void, StarException>(ByteArray const&, ByteArray const&)> v) {
     if (!v) {
       return std::unexpected(DBException("Missing database visitor"));
     }
     std::shared_lock readLocker(m_lock);
-    if (auto lowerKeyChecked = checkKeySize(lower); !lowerKeyChecked)
+    if (auto lowerKeyChecked = check_key_size(lower); !lowerKeyChecked)
       return std::unexpected(std::move(lowerKeyChecked.error()));
 
-    if (auto upperKeyChecked = checkKeySize(upper); !upperKeyChecked)
+    if (auto upperKeyChecked = check_key_size(upper); !upperKeyChecked)
       return std::unexpected(std::move(upperKeyChecked.error()));
 
-    return m_impl.forEach(lower, upper, std::move(v));
+    return m_impl.for_each(lower, upper, std::move(v));
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::forAll(std::function<std::expected<void, StarException>(ByteArray, ByteArray)> v) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::for_all(std::function<std::expected<void, StarException>(ByteArray const&, ByteArray const&)> v) {
     if (!v) {
       return std::unexpected(DBException("Missing database visitor"));
     }
     std::shared_lock readLocker(m_lock);
-    if (auto stateChecked = checkIfOpen("forAll", true); !stateChecked)
+    if (auto stateChecked = check_if_open("for_all", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
-    return m_impl.forAll(std::move(v));
+    return m_impl.for_all(std::move(v));
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::recoverAll(std::function<std::expected<void, StarException>(ByteArray, ByteArray)> v, std::function<std::expected<void, StarException>(String const&, ExceptionDiagnostic const&)> e) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::recover_all(std::function<std::expected<void, StarException>(ByteArray const&, ByteArray const&)> v, std::function<std::expected<void, StarException>(String const&, ExceptionDiagnostic const&)> e) {
     if (!v || !e) {
       return std::unexpected(DBException("Missing database recovery callback"));
     }
     std::shared_lock readLocker(m_lock);
-    if (auto stateChecked = checkIfOpen("recoverAll", true); !stateChecked)
+    if (auto stateChecked = check_if_open("recover_all", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
-    return m_impl.recoverAll(std::move(v), std::move(e));
+    return m_impl.recover_all(std::move(v), std::move(e));
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::insert(ByteArray const& k, ByteArray const& data) {
     std::unique_lock writeLocker(m_lock);
-    auto keyChecked = checkKeySize(k);
+    auto keyChecked = check_key_size(k);
     if (!keyChecked) return std::unexpected(std::move(keyChecked.error()));
     auto modified = m_impl.insert(k, data);
     if (!modified) return std::unexpected(std::move(modified.error()));
     if (m_autoCommit) {
-      auto committed = doCommit();
+      auto committed = do_commit();
       if (!committed) return std::unexpected(std::move(committed.error()));
     }
     return modified;
   }
 
-  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::remove(ByteArray const& k) {
+  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::erase(ByteArray const& k) {
     std::unique_lock writeLocker(m_lock);
-    auto keyChecked = checkKeySize(k);
+    auto keyChecked = check_key_size(k);
     if (!keyChecked) return std::unexpected(std::move(keyChecked.error()));
-    auto modified = m_impl.remove(k);
+    auto modified = m_impl.erase(k);
     if (!modified) return std::unexpected(std::move(modified.error()));
     if (m_autoCommit) {
-      auto committed = doCommit();
+      auto committed = do_commit();
       if (!committed) return std::unexpected(std::move(committed.error()));
     }
     return modified;
   }
 
-  [[nodiscard]] std::expected<List<ByteArray>, StarException> BTreeDatabase::remove(ByteArray const& lower, ByteArray const& upper) {
-    auto matches = find(lower, upper);
-    if (!matches) return std::unexpected(std::move(matches.error()));
+  [[nodiscard]] std::expected<List<ByteArray>, StarException> BTreeDatabase::erase(ByteArray const& lower, ByteArray const& upper) {
+    List<ByteArray> keys;
+    auto collected = for_each(lower, upper, [&keys](ByteArray const& key, ByteArray const&) -> std::expected<void, StarException> {
+      keys.push_back(key);
+      return {};
+    });
+    if (!collected) return std::unexpected(std::move(collected.error()));
     List<ByteArray> removed;
-    removed.reserve(matches->size());
-    for (auto const& entry : *matches) {
-      auto erased = remove(entry.first);
+    removed.reserve(keys.size());
+    for (auto& key : keys) {
+      auto erased = erase(key);
       if (!erased) return std::unexpected(std::move(erased.error()));
       if (*erased)
-        removed.push_back(entry.first);
+        removed.push_back(std::move(key));
     }
     return removed;
   }
 
-  [[nodiscard]] std::expected<std::uint64_t, StarException> BTreeDatabase::recordCount() {
+  [[nodiscard]] std::expected<std::uint64_t, StarException> BTreeDatabase::record_count() {
     std::shared_lock readLocker(m_lock);
-    if (auto stateChecked = checkIfOpen("recordCount", true); !stateChecked)
+    if (auto stateChecked = check_if_open("record_count", true); !stateChecked)
       return std::unexpected(std::move(stateChecked.error()));
 
-    return m_impl.recordCount();
+    return m_impl.record_count();
   }
 
-  [[nodiscard]] std::expected<std::uint8_t, StarException> BTreeDatabase::indexLevels() {
+  [[nodiscard]] std::expected<std::uint8_t, StarException> BTreeDatabase::index_levels() {
     std::shared_lock readLocker(m_lock);
-    auto result269 = checkIfOpen("indexLevels", true);
-    if (!result269) return std::unexpected(std::move(result269.error()));
+    if (auto state_checked = check_if_open("index_levels", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
-    auto result270 = m_impl.indexLevels();
-    if (!result270) return std::unexpected(std::move(result270.error()));
-    return std::move(*result270);
+    auto levels = m_impl.index_levels();
+    if (!levels) return std::unexpected(std::move(levels.error()));
+    return std::move(*levels);
   }
 
-  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::totalBlockCount() {
+  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::total_block_count() {
     std::shared_lock readLocker(m_lock);
-    auto result267 = checkIfOpen("totalBlockCount", true);
-    if (!result267) return std::unexpected(std::move(result267.error()));
+    if (auto state_checked = check_if_open("total_block_count", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
-    auto result268 = m_device->size();
-    if (!result268) return std::unexpected(std::move(result268.error()));
-    return ((*result268) - HeaderSize) / m_blockSize;
+    auto device_size = m_device->size();
+    if (!device_size) return std::unexpected(std::move(device_size.error()));
+    return ((*device_size) - HeaderSize) / m_blockSize;
   }
 
-  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::freeBlockCount() {
+  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::free_block_count() {
     std::shared_lock readLocker(m_lock);
-    auto result264 = checkIfOpen("freeBlockCount", true);
-    if (!result264) return std::unexpected(std::move(result264.error()));
+    if (auto state_checked = check_if_open("free_block_count", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
     // Go through every FreeIndexBlock in the chain and count all of the tracked
     // free blocks.
@@ -419,9 +425,9 @@ namespace Star {
     BlockIndex indexBlockIndex = m_headFreeIndexBlock;
     while (indexBlockIndex != InvalidBlockIndex) {
 
-      auto result265 = readFreeIndexBlock(indexBlockIndex);
-      if (!result265) return std::unexpected(std::move(result265.error()));
-      FreeIndexBlock indexBlock = std::move(*result265);
+      auto free_index = read_free_index_block(indexBlockIndex);
+      if (!free_index) return std::unexpected(std::move(free_index.error()));
+      FreeIndexBlock indexBlock = std::move(*free_index);
       count += 1 + indexBlock.freeBlocks.size();
       indexBlockIndex = indexBlock.nextFreeBlock;
     }
@@ -429,28 +435,28 @@ namespace Star {
     count += m_availableBlocks.size();
 
     // Include untracked blocks at the end of the file in the free count.
-    auto result266 = m_device->size();
-    if (!result266) return std::unexpected(std::move(result266.error()));
-    count += ((*result266) - m_deviceSize) / m_blockSize;
+    auto device_size = m_device->size();
+    if (!device_size) return std::unexpected(std::move(device_size.error()));
+    count += ((*device_size) - m_deviceSize) / m_blockSize;
 
     return count;
   }
 
-  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::indexBlockCount() {
+  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::index_block_count() {
     std::shared_lock readLocker(m_lock);
-    auto result262 = checkIfOpen("indexBlockCount", true);
-    if (!result262) return std::unexpected(std::move(result262.error()));
+    if (auto state_checked = check_if_open("index_block_count", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
     // Indexes are simply one index per block
-    auto result263 = m_impl.indexCount();
-    if (!result263) return std::unexpected(std::move(result263.error()));
-    return (*result263);
+    auto index_count = m_impl.index_count();
+    if (!index_count) return std::unexpected(std::move(index_count.error()));
+    return (*index_count);
   }
 
-  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::leafBlockCount() {
+  [[nodiscard]] std::expected<std::uint32_t, StarException> BTreeDatabase::leaf_block_count() {
     std::unique_lock writeLocker(m_lock);
-    auto result260 = checkIfOpen("leafBlockCount", true);
-    if (!result260) return std::unexpected(std::move(result260.error()));
+    if (auto state_checked = check_if_open("leaf_block_count", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
     struct LeafBlocksVisitor {
       [[nodiscard]] std::expected<bool, StarException> operator()(std::shared_ptr<IndexNode> const&) {
@@ -458,31 +464,31 @@ namespace Star {
       }
 
       [[nodiscard]] std::expected<bool, StarException> operator()(std::shared_ptr<LeafNode> const& leaf) {
-        auto result129 = parent.leafTailBlocks(leaf->self);
-        if (!result129) return std::unexpected(std::move(result129.error()));
-        leafBlockCount += 1 + (*result129).size();
+        auto tail_blocks = parent.leaf_tail_blocks(leaf->self);
+        if (!tail_blocks) return std::unexpected(std::move(tail_blocks.error()));
+        leaf_block_count += 1 + (*tail_blocks).size();
         return true;
       }
 
       BTreeDatabase& parent;
-      BlockIndex leafBlockCount = 0;
+      BlockIndex leaf_block_count = 0;
     };
 
     LeafBlocksVisitor visitor{.parent = *this};
-    auto result261 = m_impl.forAllNodes(visitor);
-    if (!result261) return std::unexpected(std::move(result261.error()));
+    if (auto visited = m_impl.for_all_nodes(visitor); !visited)
+      return std::unexpected(std::move(visited.error()));
 
-    return visitor.leafBlockCount;
+    return visitor.leaf_block_count;
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::commit() {
     std::unique_lock writeLocker(m_lock);
-    return doCommit();
+    return do_commit();
   }
 
   [[nodiscard]] std::expected<void, StarException> BTreeDatabase::rollback() {
     std::unique_lock writeLocker(m_lock);
-    auto stateChecked = checkIfOpen("rollback", true);
+    auto stateChecked = check_if_open("rollback", true);
     if (!stateChecked) return std::unexpected(std::move(stateChecked.error()));
 
     m_availableBlocks.clear();
@@ -490,7 +496,7 @@ namespace Star {
     m_uncommittedWrites.clear();
     m_uncommitted.clear();
 
-    if (auto rootRead = readRoot(); !rootRead)
+    if (auto rootRead = read_root(); !rootRead)
       return std::unexpected(std::move(rootRead.error()));
 
     if (m_device->is_writable())
@@ -502,10 +508,10 @@ namespace Star {
     std::unique_lock writeLocker(m_lock);
     if (m_open) {
 
-      auto flattened = tryFlatten();
+      auto flattened = try_flatten();
       if (!flattened) return std::unexpected(std::move(flattened.error()));
       if (!*flattened) {
-        if (auto committed = doCommit(); !committed)
+        if (auto committed = do_commit(); !committed)
           return std::unexpected(std::move(committed.error()));
       }
 
@@ -529,7 +535,7 @@ namespace Star {
   std::size_t const BTreeDatabase::BTreeRootInfoStart;
   std::size_t const BTreeDatabase::BTreeRootInfoSize;
 
-  std::size_t BTreeDatabase::IndexNode::pointerCount() const {
+  std::size_t BTreeDatabase::IndexNode::pointer_count() const {
     // If no begin pointer is set then the index is simply uninitialized.
     if (!beginPointer)
     return 0;
@@ -544,20 +550,20 @@ namespace Star {
     return pointers[i - 1].pointer;
   }
 
-  void BTreeDatabase::IndexNode::updatePointer(std::size_t i, BlockIndex p) {
+  void BTreeDatabase::IndexNode::update_pointer(std::size_t i, BlockIndex p) {
     if (i == 0)
     *beginPointer = p;
     else
     pointers[i - 1].pointer = p;
   }
 
-  ByteArray const& BTreeDatabase::IndexNode::keyBefore(std::size_t i) const {
+  ByteArray const& BTreeDatabase::IndexNode::key_before(std::size_t i) const {
     return pointers[i - 1].key;
   }
 
-  void BTreeDatabase::IndexNode::updateKeyBefore(std::size_t i, ByteArray k) { pointers[i - 1].key = std::move(k); }
+  void BTreeDatabase::IndexNode::update_key_before(std::size_t i, ByteArray k) { pointers[i - 1].key = std::move(k); }
 
-  void BTreeDatabase::IndexNode::removeBefore(std::size_t i) {
+  void BTreeDatabase::IndexNode::erase_before(std::size_t i) {
     if (i == 0) {
       beginPointer = pointers[0].pointer;
       pointers.erase_at(0);
@@ -566,20 +572,20 @@ namespace Star {
     }
   }
 
-  void BTreeDatabase::IndexNode::insertAfter(std::size_t i, ByteArray k, BlockIndex p) {
+  void BTreeDatabase::IndexNode::insert_after(std::size_t i, ByteArray k, BlockIndex p) {
     pointers.insert_at(i, Element{.key = std::move(k), .pointer = p});
   }
 
-  std::uint8_t BTreeDatabase::IndexNode::indexLevel() const {
+  std::uint8_t BTreeDatabase::IndexNode::index_level() const {
     return level;
   }
 
-  void BTreeDatabase::IndexNode::setIndexLevel(std::uint8_t indexLevel) {
-    level = indexLevel;
+  void BTreeDatabase::IndexNode::set_index_level(std::uint8_t index_level) {
+    level = index_level;
   }
 
-  void BTreeDatabase::IndexNode::shiftLeft(ByteArray const& mid, IndexNode& right, std::size_t count) {
-    count = std::min(right.pointerCount(), count);
+  void BTreeDatabase::IndexNode::shift_left(ByteArray const& mid, IndexNode& right, std::size_t count) {
+    count = std::min(right.pointer_count(), count);
 
     if (count == 0)
     return;
@@ -588,7 +594,7 @@ namespace Star {
 
     ElementList::iterator s = right.pointers.begin();
     std::advance(s, count - 1);
-    pointers.insert(pointers.end(), right.pointers.begin(), s);
+    pointers.insert(pointers.end(), std::make_move_iterator(right.pointers.begin()), std::make_move_iterator(s));
 
     right.pointers.erase(right.pointers.begin(), s);
     if (right.pointers.size() != 0) {
@@ -599,8 +605,8 @@ namespace Star {
     }
   }
 
-  void BTreeDatabase::IndexNode::shiftRight(ByteArray const& mid, IndexNode& left, std::size_t count) {
-    count = std::min(left.pointerCount(), count);
+  void BTreeDatabase::IndexNode::shift_right(ByteArray const& mid, IndexNode& left, std::size_t count) {
+    count = std::min(left.pointer_count(), count);
 
     if (count == 0)
     return;
@@ -610,7 +616,7 @@ namespace Star {
 
     ElementList::iterator s = left.pointers.begin();
     std::advance(s, left.pointers.size() - count);
-    pointers.insert(pointers.begin(), s, left.pointers.end());
+    pointers.insert(pointers.begin(), std::make_move_iterator(s), std::make_move_iterator(left.pointers.end()));
 
     left.pointers.erase(s, left.pointers.end());
     if (left.pointers.size() != 0) {
@@ -626,11 +632,11 @@ namespace Star {
     std::advance(s, i - 1);
 
     right.beginPointer = s->pointer;
-    ByteArray midKey = s->key;
+    ByteArray midKey = std::move(s->key);
     right.level = level;
     ++s;
 
-    right.pointers.insert(right.pointers.begin(), s, pointers.end());
+    right.pointers.insert(right.pointers.begin(), std::make_move_iterator(s), std::make_move_iterator(pointers.end()));
     --s;
 
     pointers.erase(s, pointers.end());
@@ -650,13 +656,21 @@ namespace Star {
     return elements[i].data;
   }
 
-  void BTreeDatabase::LeafNode::insert(std::size_t i, ByteArray k, ByteArray d) {
-    elements.insert_at(i, Element{.key = std::move(k), .data = std::move(d)});
+  std::uint32_t BTreeDatabase::LeafNode::element_size(Element const& element) {
+    return element.key.size() + vlqUSize(element.data.size()) + element.data.size();
   }
 
-  void BTreeDatabase::LeafNode::remove(std::size_t i) { elements.erase_at(i); }
+  void BTreeDatabase::LeafNode::insert(std::size_t i, ByteArray k, ByteArray d) {
+    elements.insert_at(i, Element{.key = std::move(k), .data = std::move(d)});
+    encoded_size += element_size(elements[i]);
+  }
 
-  void BTreeDatabase::LeafNode::shiftLeft(LeafNode& right, std::size_t count) {
+  void BTreeDatabase::LeafNode::erase(std::size_t i) {
+    encoded_size -= element_size(elements[i]);
+    elements.erase_at(i);
+  }
+
+  void BTreeDatabase::LeafNode::shift_left(LeafNode& right, std::size_t count) {
     count = std::min(right.count(), count);
 
     if (count == 0)
@@ -665,11 +679,19 @@ namespace Star {
     ElementList::iterator s = right.elements.begin();
     std::advance(s, count);
 
-    elements.insert(elements.end(), right.elements.begin(), s);
+    std::uint32_t transferred_size = right.encoded_size - 6;
+    if (count != right.count()) {
+      transferred_size = 0;
+      for (auto current = right.elements.begin(); current != s; ++current)
+        transferred_size += element_size(*current);
+    }
+    elements.insert(elements.end(), std::make_move_iterator(right.elements.begin()), std::make_move_iterator(s));
+    encoded_size += transferred_size;
+    right.encoded_size -= transferred_size;
     right.elements.erase(right.elements.begin(), s);
   }
 
-  void BTreeDatabase::LeafNode::shiftRight(LeafNode& left, std::size_t count) {
+  void BTreeDatabase::LeafNode::shift_right(LeafNode& left, std::size_t count) {
     count = std::min(left.count(), count);
 
     if (count == 0)
@@ -678,7 +700,15 @@ namespace Star {
     ElementList::iterator s = left.elements.begin();
     std::advance(s, left.elements.size() - count);
 
-    elements.insert(elements.begin(), s, left.elements.end());
+    std::uint32_t transferred_size = left.encoded_size - 6;
+    if (count != left.count()) {
+      transferred_size = 0;
+      for (auto current = s; current != left.elements.end(); ++current)
+        transferred_size += element_size(*current);
+    }
+    elements.insert(elements.begin(), std::make_move_iterator(s), std::make_move_iterator(left.elements.end()));
+    encoded_size += transferred_size;
+    left.encoded_size -= transferred_size;
     left.elements.erase(s, left.elements.end());
   }
 
@@ -686,26 +716,30 @@ namespace Star {
     ElementList::iterator s = elements.begin();
     std::advance(s, i);
 
-    right.elements.insert(right.elements.begin(), s, elements.end());
+    std::uint32_t transferred_size = 0;
+    for (auto current = s; current != elements.end(); ++current)
+      transferred_size += element_size(*current);
+    right.elements.insert(right.elements.begin(), std::make_move_iterator(s), std::make_move_iterator(elements.end()));
+    encoded_size -= transferred_size;
+    right.encoded_size += transferred_size;
     elements.erase(s, elements.end());
   }
 
-  auto BTreeDatabase::BTreeImpl::rootPointer() -> Pointer {
+  auto BTreeDatabase::BTreeImpl::root_pointer() -> Pointer {
     return parent.m_root;
   }
 
-  bool BTreeDatabase::BTreeImpl::rootIsLeaf() {
+  bool BTreeDatabase::BTreeImpl::root_is_leaf() {
     return parent.m_rootIsLeaf;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::BTreeImpl::setNewRoot(Pointer pointer, bool isLeaf) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::BTreeImpl::set_new_root(Pointer pointer, bool isLeaf) {
     parent.m_root = pointer;
     parent.m_rootIsLeaf = isLeaf;
     return {};
-    return {};
   }
 
-  auto BTreeDatabase::BTreeImpl::createIndex(Pointer beginPointer) -> Index {
+  auto BTreeDatabase::BTreeImpl::create_index(Pointer beginPointer) -> Index {
     auto index = std::make_shared<IndexNode>();
     index->self = InvalidBlockIndex;
     index->level = 0;
@@ -713,7 +747,7 @@ namespace Star {
     return index;
   }
 
-  [[nodiscard]] auto BTreeDatabase::BTreeImpl::loadIndex(Pointer pointer) -> std::expected<Index, StarException> {
+  [[nodiscard]] auto BTreeDatabase::BTreeImpl::load_index(Pointer pointer) -> std::expected<Index, StarException> {
     std::unique_lock lock(parent.m_indexCacheSpinLock);
     if (auto index = parent.m_indexCache.find_ref(pointer)) {
       return index->get();
@@ -722,59 +756,61 @@ namespace Star {
 
     auto index = std::make_shared<IndexNode>();
 
-    auto result247 = parent.readBlock(pointer);
-    if (!result247) return std::unexpected(std::move(result247.error()));
-    DataStreamBuffer buffer(std::move(*result247));
+    auto block_bytes = parent.read_block(pointer);
+    if (!block_bytes) return std::unexpected(std::move(block_bytes.error()));
+    DataStreamBuffer buffer(std::move(*block_bytes));
 
-    auto result248 = buffer.read_bytes(2);
-    if (!result248) return std::unexpected(std::move(result248.error()));
-    if ((*result248) != ByteArray(std::span(IndexMagic))) {
+    auto magic = buffer.read_bytes(2);
+    if (!magic) return std::unexpected(std::move(magic.error()));
+    if ((*magic) != ByteArray(std::span(IndexMagic))) {
       return std::unexpected(DBException("Error, incorrect index block signature."));
     }
 
     index->self = pointer;
 
-    auto result249 = buffer.read<std::uint8_t>();
-    if (!result249) return std::unexpected(std::move(result249.error()));
-    index->level = (*result249);
-    auto result250 = buffer.read<std::uint32_t>();
-    if (!result250) return std::unexpected(std::move(result250.error()));
-    std::uint32_t s = (*result250);
-    auto result251 = buffer.read<BlockIndex>();
-    if (!result251) return std::unexpected(std::move(result251.error()));
-    index->beginPointer = (*result251);
-    if (s >= parent.maxIndexPointers()) return std::unexpected(DBException("Invalid index node pointer count"));
+    auto level = buffer.read<std::uint8_t>();
+    if (!level) return std::unexpected(std::move(level.error()));
+    index->level = (*level);
+    auto pointer_count = buffer.read<std::uint32_t>();
+    if (!pointer_count) return std::unexpected(std::move(pointer_count.error()));
+    std::uint32_t s = (*pointer_count);
+    auto begin_pointer = buffer.read<BlockIndex>();
+    if (!begin_pointer) return std::unexpected(std::move(begin_pointer.error()));
+    index->beginPointer = (*begin_pointer);
+    if (s >= parent.max_index_pointers()) return std::unexpected(DBException("Invalid index node pointer count"));
     index->pointers.resize(s);
     for (std::uint32_t i = 0; i < s; ++i) {
 
       auto& e = index->pointers[i];
-      auto result252 = buffer.read_bytes(parent.m_keySize);
-      if (!result252) return std::unexpected(std::move(result252.error()));
-      e.key = std::move(*result252);
-      auto result253 = buffer.read<BlockIndex>();
-      if (!result253) return std::unexpected(std::move(result253.error()));
-      e.pointer = (*result253);
+      auto key_bytes = buffer.read_bytes(parent.m_keySize);
+      if (!key_bytes) return std::unexpected(std::move(key_bytes.error()));
+      e.key = std::move(*key_bytes);
+      auto child_pointer = buffer.read<BlockIndex>();
+      if (!child_pointer) return std::unexpected(std::move(child_pointer.error()));
+      e.pointer = (*child_pointer);
     }
 
     lock.lock();
-    parent.m_indexCache.insert_or_assign(pointer, index);
-    return index;
+    // Decode without the spinlock; only the cheap shared-owner publication is locked.
+    auto cached = parent.m_indexCache.get(pointer, [&index](BlockIndex const&) { return std::move(index); });
+    if (!cached) return std::unexpected(std::move(cached.error()));
+    return cached->get();
   }
 
-  bool BTreeDatabase::BTreeImpl::indexNeedsShift(Index const& index) {
-    return index->pointerCount() < (parent.maxIndexPointers() + 1) / 2;
+  bool BTreeDatabase::BTreeImpl::index_needs_shift(Index const& index) {
+    return index->pointer_count() < (parent.max_index_pointers() + 1) / 2;
   }
 
-  bool BTreeDatabase::BTreeImpl::indexShift(Index const& left, Key const& mid, Index const& right) {
-    if (left->pointerCount() + right->pointerCount() <= parent.maxIndexPointers()) {
-      left->shiftLeft(mid, *right, right->pointerCount());
+  bool BTreeDatabase::BTreeImpl::index_shift(Index const& left, Key const& mid, Index const& right) {
+    if (left->pointer_count() + right->pointer_count() <= parent.max_index_pointers()) {
+      left->shift_left(mid, *right, right->pointer_count());
       return true;
     } else {
-      if (indexNeedsShift(right)) {
-        right->shiftRight(mid, *left, 1);
+      if (index_needs_shift(right)) {
+        right->shift_right(mid, *left, 1);
         return true;
-      } else if (indexNeedsShift(left)) {
-        left->shiftLeft(mid, *right, 1);
+      } else if (index_needs_shift(left)) {
+        left->shift_left(mid, *right, 1);
         return true;
       } else {
         return false;
@@ -782,90 +818,92 @@ namespace Star {
     }
   }
 
-  auto BTreeDatabase::BTreeImpl::indexSplit(Index const& index) -> std::optional<std::pair<Key, Index>> {
-    if (index->pointerCount() <= parent.maxIndexPointers())
+  auto BTreeDatabase::BTreeImpl::index_split(Index const& index) -> std::optional<std::pair<Key, Index>> {
+    if (index->pointer_count() <= parent.max_index_pointers())
     return {};
 
     auto right = std::make_shared<IndexNode>();
     right->self = InvalidBlockIndex;
-    Key k = index->split(*right, (index->pointerCount() + 1) / 2);
-    return std::make_pair(k, right);
+    Key k = index->split(*right, (index->pointer_count() + 1) / 2);
+    return std::make_pair(std::move(k), std::move(right));
   }
 
-  [[nodiscard]] auto BTreeDatabase::BTreeImpl::storeIndex(Index index) -> std::expected<Pointer, StarException> {
+  [[nodiscard]] auto BTreeDatabase::BTreeImpl::store_index(Index index) -> std::expected<Pointer, StarException> {
     if (index->self != InvalidBlockIndex) {
 
       if (!parent.m_uncommitted.contains(index->self)) {
 
-        parent.freeBlock(index->self);
+        parent.free_block(index->self);
         parent.m_indexCache.erase(index->self);
         index->self = InvalidBlockIndex;
       }
     }
 
     if (index->self == InvalidBlockIndex) {
-      auto result239 = parent.reserveBlock();
-      if (!result239) return std::unexpected(std::move(result239.error()));
-      index->self = (*result239);
+      auto reserved = parent.reserve_block();
+      if (!reserved) return std::unexpected(std::move(reserved.error()));
+      index->self = (*reserved);
     }
 
     DataStreamBuffer buffer(parent.m_blockSize);
-    auto result240 = buffer.write_data(IndexMagic);
-    if (!result240) return std::unexpected(std::move(result240.error()));
+    if (auto magic_written = buffer.write_data(IndexMagic); !magic_written)
+      return std::unexpected(std::move(magic_written.error()));
 
-    auto result241 = buffer.write<std::uint8_t>(index->level);
-    if (!result241) return std::unexpected(std::move(result241.error()));
+    if (auto level_written = buffer.write<std::uint8_t>(index->level); !level_written)
+      return std::unexpected(std::move(level_written.error()));
 
-    auto result242 = buffer.write<std::uint32_t>(index->pointers.size());
-    if (!result242) return std::unexpected(std::move(result242.error()));
+    if (auto pointer_count_written = buffer.write<std::uint32_t>(index->pointers.size()); !pointer_count_written)
+      return std::unexpected(std::move(pointer_count_written.error()));
 
-    auto result243 = buffer.write<BlockIndex>(*index->beginPointer);
-    if (!result243) return std::unexpected(std::move(result243.error()));
+    if (auto begin_pointer_written = buffer.write<BlockIndex>(*index->beginPointer); !begin_pointer_written)
+      return std::unexpected(std::move(begin_pointer_written.error()));
 
     for (auto i = index->pointers.begin(); i != index->pointers.end(); ++i) {
 
-      auto result244 = buffer.write_bytes(i->key);
-      if (!result244) return std::unexpected(std::move(result244.error()));
+      if (auto key_written = buffer.write_bytes(i->key); !key_written)
+        return std::unexpected(std::move(key_written.error()));
       if constexpr (Star::DebugEnabled) {
         Star::star_assert_failed((i->key.size() == parent.m_keySize));
       }
-      (*result244);
-      auto result245 = buffer.write<BlockIndex>(i->pointer);
-      if (!result245) return std::unexpected(std::move(result245.error()));
+      if (auto pointer_written = buffer.write<BlockIndex>(i->pointer); !pointer_written)
+        return std::unexpected(std::move(pointer_written.error()));
 
     }
 
-    auto result246 = parent.updateBlock(index->self, buffer.data());
-    if (!result246) return std::unexpected(std::move(result246.error()));
+    if (auto staged = parent.update_block(index->self, buffer.take_data()); !staged)
+      return std::unexpected(std::move(staged.error()));
 
-    parent.m_indexCache.insert_or_assign(index->self, index);
-    return index->self;
+    auto cached = parent.m_indexCache.get(index->self, [&index](BlockIndex const&) { return index; });
+    if (!cached) return std::unexpected(std::move(cached.error()));
+    cached->get() = std::move(index);
+    return cached->get()->self;
   }
 
-  void BTreeDatabase::BTreeImpl::deleteIndex(Index index) {
+  void BTreeDatabase::BTreeImpl::delete_index(Index index) {
     parent.m_indexCache.erase(index->self);
-    parent.freeBlock(index->self);
+    parent.free_block(index->self);
   }
 
-  auto BTreeDatabase::BTreeImpl::createLeaf() -> Leaf {
+  auto BTreeDatabase::BTreeImpl::create_leaf() -> Leaf {
     auto leaf = std::make_shared<LeafNode>();
     leaf->self = InvalidBlockIndex;
     return leaf;
   }
 
-  [[nodiscard]] auto BTreeDatabase::BTreeImpl::loadLeaf(Pointer pointer) -> std::expected<Leaf, StarException> {
+  [[nodiscard]] auto BTreeDatabase::BTreeImpl::load_leaf(Pointer pointer) -> std::expected<Leaf, StarException> {
     auto leaf = std::make_shared<LeafNode>();
     leaf->self = pointer;
 
     BlockIndex currentLeafBlock = leaf->self;
-    DataStreamBuffer leafBuffer;
-    leafBuffer.reset(parent.m_blockSize);
-    auto result232 = parent.readBlock(currentLeafBlock, 0, leafBuffer.span());
-    if (!result232) return std::unexpected(std::move(result232.error()));
+    ByteArray leaf_bytes;
+    leaf_bytes.resize(parent.m_blockSize);
+    DataStreamBuffer leafBuffer(std::move(leaf_bytes));
+    if (auto read = parent.read_block(currentLeafBlock, 0, leafBuffer.span()); !read)
+      return std::unexpected(std::move(read.error()));
 
-    auto result233 = leafBuffer.read_bytes(2);
-    if (!result233) return std::unexpected(std::move(result233.error()));
-    if ((*result233) != ByteArray(std::span(LeafMagic))) {
+    auto magic = leafBuffer.read_bytes(2);
+    if (!magic) return std::unexpected(std::move(magic.error()));
+    if ((*magic) != ByteArray(std::span(LeafMagic))) {
       return std::unexpected(DBException("Error, incorrect leaf block signature."));
     }
 
@@ -875,43 +913,44 @@ namespace Star {
 
       while (left > 0) {
 
-        auto result119 = leafBuffer.pos();
-        if (!result119) return std::unexpected(std::move(result119.error()));
-        if ((*result119) + left < parent.m_blockSize - sizeof(BlockIndex)) {
+        auto position = leafBuffer.pos();
+        if (!position) return std::unexpected(std::move(position.error()));
+        if ((*position) + left < parent.m_blockSize - sizeof(BlockIndex)) {
 
-          auto result120 = leafBuffer.read_data(data.subspan(pos, left));
-          if (!result120) return std::unexpected(std::move(result120.error()));
+          if (auto read = leafBuffer.read_data(data.subspan(pos, left)); !read)
+            return std::unexpected(std::move(read.error()));
 
           pos += left;
           left = 0;
         } else {
 
-          auto result121 = leafBuffer.pos();
-          if (!result121) return std::unexpected(std::move(result121.error()));
-          std::size_t toRead = parent.m_blockSize - sizeof(BlockIndex) - (*result121);
-          auto result122 = leafBuffer.read_data(data.subspan(pos, toRead));
-          if (!result122) return std::unexpected(std::move(result122.error()));
+          auto tail_position = leafBuffer.pos();
+          if (!tail_position) return std::unexpected(std::move(tail_position.error()));
+          std::size_t toRead = parent.m_blockSize - sizeof(BlockIndex) - (*tail_position);
+          if (auto read = leafBuffer.read_data(data.subspan(pos, toRead)); !read)
+            return std::unexpected(std::move(read.error()));
 
           pos += toRead;
           left -= toRead;
         }
 
-        auto result123 = leafBuffer.pos();
-        if (!result123) return std::unexpected(std::move(result123.error()));
-        if ((*result123) == (parent.m_blockSize - sizeof(BlockIndex)) && left > 0) {
+        auto next_position = leafBuffer.pos();
+        if (!next_position) return std::unexpected(std::move(next_position.error()));
+        if ((*next_position) == (parent.m_blockSize - sizeof(BlockIndex)) && left > 0) {
 
-          auto result124 = leafBuffer.read<BlockIndex>();
-          if (!result124) return std::unexpected(std::move(result124.error()));
-          currentLeafBlock = (*result124);
+          auto next_block = leafBuffer.read<BlockIndex>();
+          if (!next_block) return std::unexpected(std::move(next_block.error()));
+          currentLeafBlock = (*next_block);
           if (currentLeafBlock != InvalidBlockIndex) {
 
-            leafBuffer.reset(parent.m_blockSize);
-            auto result125 = parent.readBlock(currentLeafBlock, 0, leafBuffer.span());
-            if (!result125) return std::unexpected(std::move(result125.error()));
+            if (auto positioned = leafBuffer.seek(0); !positioned)
+              return std::unexpected(std::move(positioned.error()));
+            if (auto read = parent.read_block(currentLeafBlock, 0, leafBuffer.span()); !read)
+              return std::unexpected(std::move(read.error()));
 
-            auto result126 = leafBuffer.read_bytes(2);
-            if (!result126) return std::unexpected(std::move(result126.error()));
-            if ((*result126) != ByteArray(std::span(LeafMagic))) {
+            auto magic = leafBuffer.read_bytes(2);
+            if (!magic) return std::unexpected(std::move(magic.error()));
+            if ((*magic) != ByteArray(std::span(LeafMagic))) {
               return std::unexpected(DBException("Error, incorrect leaf block signature."));
             }
           } else {
@@ -924,117 +963,116 @@ namespace Star {
       return data.size();
     }, {});
 
-    auto result234 = leafInput.read<std::uint32_t>();
-    if (!result234) return std::unexpected(std::move(result234.error()));
-    std::uint32_t count = (*result234);
+    auto element_count = leafInput.read<std::uint32_t>();
+    if (!element_count) return std::unexpected(std::move(element_count.error()));
+    std::uint32_t count = (*element_count);
     if (count > static_cast<std::uint64_t>(parent.m_deviceSize - HeaderSize) / (parent.m_keySize + 1))
     return std::unexpected(DBException("Invalid leaf element count"));
     leaf->elements.resize(count);
     for (std::uint32_t i = 0; i < count; ++i) {
 
       auto& element = leaf->elements[i];
-      auto result235 = leafInput.read_bytes(parent.m_keySize);
-      if (!result235) return std::unexpected(std::move(result235.error()));
-      element.key = std::move(*result235);
-      auto result236 = leafInput.read<ByteArray>();
-      if (!result236) return std::unexpected(std::move(result236.error()));
-      element.data = std::move(*result236);
+      auto key_bytes = leafInput.read_bytes(parent.m_keySize);
+      if (!key_bytes) return std::unexpected(std::move(key_bytes.error()));
+      element.key = std::move(*key_bytes);
+      auto data_bytes = leafInput.read<ByteArray>();
+      if (!data_bytes) return std::unexpected(std::move(data_bytes.error()));
+      element.data = std::move(*data_bytes);
+      leaf->encoded_size += LeafNode::element_size(element);
     }
 
     return leaf;
   }
 
-  bool BTreeDatabase::BTreeImpl::leafNeedsShift(Leaf const& l) {
-    return parent.leafSize(l) < parent.m_blockSize / 2;
+  bool BTreeDatabase::BTreeImpl::leaf_needs_shift(Leaf const& l) {
+    return parent.leaf_size(l) < parent.m_blockSize / 2;
   }
 
-  bool BTreeDatabase::BTreeImpl::leafShift(Leaf& left, Leaf& right) {
+  bool BTreeDatabase::BTreeImpl::leaf_shift(Leaf& left, Leaf& right) {
     if (left->count() == 0) {
-      left->shiftLeft(*right, right->count());
+      left->shift_left(*right, right->count());
       return true;
     }
 
     if (right->count() == 0)
     return true;
 
-    std::uint32_t leftSize = parent.leafSize(left);
-    std::uint32_t rightSize = parent.leafSize(right);
+    std::uint32_t leftSize = parent.leaf_size(left);
+    std::uint32_t rightSize = parent.leaf_size(right);
     if (leftSize + rightSize < parent.m_blockSize) {
-      left->shiftLeft(*right, right->count());
+      left->shift_left(*right, right->count());
       return true;
     }
 
     // TODO: Shifting algorithm is bad, could potentially want to shift more
     // than one element here.
-    std::uint32_t rightBeginSize = parent.m_keySize + parent.dataSize(right->elements[0].data);
-    std::uint32_t leftEndSize = parent.m_keySize + parent.dataSize(left->elements[left->elements.size() - 1].data);
+    std::uint32_t rightBeginSize = parent.m_keySize + parent.data_size(right->elements[0].data);
+    std::uint32_t leftEndSize = parent.m_keySize + parent.data_size(left->elements[left->elements.size() - 1].data);
     if (leftSize < rightSize - rightBeginSize && leftSize + rightBeginSize < parent.m_blockSize) {
-      left->shiftLeft(*right, 1);
+      left->shift_left(*right, 1);
       return true;
     } else if (rightSize < leftSize - leftEndSize && rightSize + leftEndSize < parent.m_blockSize) {
-      right->shiftRight(*left, 1);
+      right->shift_right(*left, 1);
       return true;
     }
 
     return false;
   }
 
-  auto BTreeDatabase::BTreeImpl::leafSplit(Leaf& leaf) -> std::optional<Leaf> {
+  auto BTreeDatabase::BTreeImpl::leaf_split(Leaf& leaf) -> std::optional<Leaf> {
     if (leaf->elements.size() < 2)
     return {};
 
-    std::uint32_t size = 6;
-    bool boundaryFound = false;
+    std::uint32_t size = leaf->encoded_size;
+    if (size < parent.m_blockSize * 2 - 2 * sizeof(BlockIndex) - 4)
+      return {};
+    std::uint32_t prefix_size = 6;
     std::uint32_t boundary = 0;
     for (std::uint32_t i = 0; i < leaf->elements.size(); ++i) {
-      size += parent.m_keySize;
-      size += parent.dataSize(leaf->elements[i].data);
-      if (size > parent.m_blockSize - sizeof(BlockIndex) && !boundaryFound) {
+      prefix_size += parent.m_keySize;
+      prefix_size += parent.data_size(leaf->elements[i].data);
+      if (prefix_size > parent.m_blockSize - sizeof(BlockIndex)) {
         boundary = i;
-        boundaryFound = true;
+        break;
       }
     }
     if (boundary == 0)
     boundary = 1;
 
-    if (size < parent.m_blockSize * 2 - 2 * sizeof(BlockIndex) - 4) {
-      return {};
-    } else {
-      auto right = std::make_shared<LeafNode>();
-      right->self = InvalidBlockIndex;
-      leaf->split(*right, boundary);
-      return right;
-    }
+    auto right = std::make_shared<LeafNode>();
+    right->self = InvalidBlockIndex;
+    leaf->split(*right, boundary);
+    return right;
   }
 
-  [[nodiscard]] auto BTreeDatabase::BTreeImpl::storeLeaf(Leaf leaf) -> std::expected<Pointer, StarException> {
+  [[nodiscard]] auto BTreeDatabase::BTreeImpl::store_leaf(Leaf leaf) -> std::expected<Pointer, StarException> {
     if (leaf->self != InvalidBlockIndex) {
 
-      auto result222 = parent.leafTailBlocks(leaf->self);
-      if (!result222) return std::unexpected(std::move(result222.error()));
-      List<BlockIndex> tailBlocks = std::move(*result222);
+      auto tail_blocks = parent.leaf_tail_blocks(leaf->self);
+      if (!tail_blocks) return std::unexpected(std::move(tail_blocks.error()));
+      List<BlockIndex> tailBlocks = std::move(*tail_blocks);
       for (std::uint32_t i = 0; i < tailBlocks.size(); ++i) {
-        parent.freeBlock(tailBlocks[i]);
+        parent.free_block(tailBlocks[i]);
       }
 
       if (!parent.m_uncommitted.contains(leaf->self)) {
 
-        parent.freeBlock(leaf->self);
+        parent.free_block(leaf->self);
         leaf->self = InvalidBlockIndex;
       }
     }
 
     if (leaf->self == InvalidBlockIndex) {
-      auto result224 = parent.reserveBlock();
-      if (!result224) return std::unexpected(std::move(result224.error()));
-      leaf->self = (*result224);
+      auto reserved = parent.reserve_block();
+      if (!reserved) return std::unexpected(std::move(reserved.error()));
+      leaf->self = (*reserved);
     }
 
     BlockIndex currentLeafBlock = leaf->self;
     DataStreamBuffer leafBuffer;
     leafBuffer.reset(parent.m_blockSize);
-    auto result225 = leafBuffer.write_data(LeafMagic);
-    if (!result225) return std::unexpected(std::move(result225.error()));
+    if (auto magic_written = leafBuffer.write_data(LeafMagic); !magic_written)
+      return std::unexpected(std::move(magic_written.error()));
 
     DataStreamFunctions leafOutput({}, [&](std::span<char const> data) -> std::expected<std::size_t, StarException> {
       std::size_t pos = 0;
@@ -1056,11 +1094,11 @@ namespace Star {
           break;
 
         if (*bufferPosition + toWrite == parent.m_blockSize - sizeof(BlockIndex)) {
-          auto nextBlock = parent.reserveBlock();
+          auto nextBlock = parent.reserve_block();
           if (!nextBlock) return std::unexpected(std::move(nextBlock.error()));
           auto linked = leafBuffer.write<BlockIndex>(*nextBlock);
           if (!linked) return std::unexpected(std::move(linked.error()));
-          auto updated = parent.updateBlock(currentLeafBlock, leafBuffer.data());
+          auto updated = parent.update_block(currentLeafBlock, leafBuffer.data());
           if (!updated) return std::unexpected(std::move(updated.error()));
           currentLeafBlock = *nextBlock;
           leafBuffer.reset(parent.m_blockSize);
@@ -1072,130 +1110,140 @@ namespace Star {
       return data.size();
     });
 
-    auto result226 = leafOutput.write<std::uint32_t>(leaf->elements.size());
-    if (!result226) return std::unexpected(std::move(result226.error()));
+    if (auto count_written = leafOutput.write<std::uint32_t>(leaf->elements.size()); !count_written)
+      return std::unexpected(std::move(count_written.error()));
 
     for (LeafNode::ElementList::iterator i = leaf->elements.begin(); i != leaf->elements.end(); ++i) {
 
-      auto result227 = leafOutput.write_bytes(i->key);
-      if (!result227) return std::unexpected(std::move(result227.error()));
+      if (auto key_written = leafOutput.write_bytes(i->key); !key_written)
+        return std::unexpected(std::move(key_written.error()));
       if constexpr (Star::DebugEnabled) {
         Star::star_assert_failed((i->key.size() == parent.m_keySize));
       }
-      auto result228 = leafOutput.write(i->data);
-      if (!result228) return std::unexpected(std::move(result228.error()));
+      if (auto data_written = leafOutput.write(i->data); !data_written)
+        return std::unexpected(std::move(data_written.error()));
 
     }
 
-    auto result229 = leafBuffer.seek(parent.m_blockSize - sizeof(BlockIndex));
-    if (!result229) return std::unexpected(std::move(result229.error()));
+    if (auto tail_positioned = leafBuffer.seek(parent.m_blockSize - sizeof(BlockIndex)); !tail_positioned)
+      return std::unexpected(std::move(tail_positioned.error()));
 
-    auto result230 = leafBuffer.write<BlockIndex>(InvalidBlockIndex);
-    if (!result230) return std::unexpected(std::move(result230.error()));
+    if (auto tail_terminated = leafBuffer.write<BlockIndex>(InvalidBlockIndex); !tail_terminated)
+      return std::unexpected(std::move(tail_terminated.error()));
 
-    auto result231 = parent.updateBlock(currentLeafBlock, leafBuffer.data());
-    if (!result231) return std::unexpected(std::move(result231.error()));
+    if (auto staged = parent.update_block(currentLeafBlock, leafBuffer.data()); !staged)
+      return std::unexpected(std::move(staged.error()));
 
     return leaf->self;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::BTreeImpl::deleteLeaf(Leaf leaf) {
-    auto result221 = parent.leafTailBlocks(leaf->self);
-    if (!result221) return std::unexpected(std::move(result221.error()));
-    List<BlockIndex> tailBlocks = std::move(*result221);
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::BTreeImpl::delete_leaf(Leaf leaf) {
+    auto tail_blocks = parent.leaf_tail_blocks(leaf->self);
+    if (!tail_blocks) return std::unexpected(std::move(tail_blocks.error()));
+    List<BlockIndex> tailBlocks = std::move(*tail_blocks);
     for (std::uint32_t i = 0; i < tailBlocks.size(); ++i) {
-      parent.freeBlock(tailBlocks[i]);
+      parent.free_block(tailBlocks[i]);
     }
 
-    parent.freeBlock(leaf->self);
+    parent.free_block(leaf->self);
     return {};
   }
 
-  std::size_t BTreeDatabase::BTreeImpl::indexPointerCount(Index const& index) {
-    return index->pointerCount();
+  std::size_t BTreeDatabase::BTreeImpl::index_pointer_count(Index const& index) {
+    return index->pointer_count();
   }
 
-  auto BTreeDatabase::BTreeImpl::indexPointer(Index const& index, std::size_t i) -> Pointer {
+  auto BTreeDatabase::BTreeImpl::index_pointer(Index const& index, std::size_t i) -> Pointer {
     return index->pointer(i);
   }
 
-  void BTreeDatabase::BTreeImpl::indexUpdatePointer(Index& index, std::size_t i, Pointer p) {
-    index->updatePointer(i, p);
+  void BTreeDatabase::BTreeImpl::index_update_pointer(Index& index, std::size_t i, Pointer p) {
+    index->update_pointer(i, p);
   }
 
-  auto BTreeDatabase::BTreeImpl::indexKeyBefore(Index const& index, std::size_t i) -> Key {
-    return index->keyBefore(i);
+  auto BTreeDatabase::BTreeImpl::index_key_before(Index const& index, std::size_t i) -> Key const& {
+    return index->key_before(i);
   }
 
-  void BTreeDatabase::BTreeImpl::indexUpdateKeyBefore(Index& index, std::size_t i, Key k) {
-    index->updateKeyBefore(i, std::move(k));
+  void BTreeDatabase::BTreeImpl::index_update_key_before(Index& index, std::size_t i, Key k) {
+    index->update_key_before(i, std::move(k));
   }
 
-  void BTreeDatabase::BTreeImpl::indexRemoveBefore(Index& index, std::size_t i) {
-    index->removeBefore(i);
+  void BTreeDatabase::BTreeImpl::index_erase_before(Index& index, std::size_t i) {
+    index->erase_before(i);
   }
 
-  void BTreeDatabase::BTreeImpl::indexInsertAfter(Index& index, std::size_t i, Key k, Pointer p) {
-    index->insertAfter(i, std::move(k), p);
+  void BTreeDatabase::BTreeImpl::index_insert_after(Index& index, std::size_t i, Key k, Pointer p) {
+    index->insert_after(i, std::move(k), p);
   }
 
-  std::size_t BTreeDatabase::BTreeImpl::indexLevel(Index const& index) {
-    return index->indexLevel();
+  std::size_t BTreeDatabase::BTreeImpl::index_level(Index const& index) {
+    return index->index_level();
   }
 
-  void BTreeDatabase::BTreeImpl::setIndexLevel(Index& index, std::size_t indexLevel) {
-    index->setIndexLevel(indexLevel);
+  void BTreeDatabase::BTreeImpl::set_index_level(Index& index, std::size_t index_level) {
+    index->set_index_level(index_level);
   }
 
-  std::size_t BTreeDatabase::BTreeImpl::leafElementCount(Leaf const& leaf) {
+  std::size_t BTreeDatabase::BTreeImpl::leaf_element_count(Leaf const& leaf) {
     return leaf->count();
   }
 
-  auto BTreeDatabase::BTreeImpl::leafKey(Leaf const& leaf, std::size_t i) -> Key {
+  auto BTreeDatabase::BTreeImpl::leaf_key(Leaf const& leaf, std::size_t i) -> Key const& {
     return leaf->key(i);
   }
 
-  auto BTreeDatabase::BTreeImpl::leafData(Leaf const& leaf, std::size_t i) -> Data {
+  auto BTreeDatabase::BTreeImpl::leaf_data(Leaf const& leaf, std::size_t i) -> Data const& {
     return leaf->data(i);
   }
 
-  void BTreeDatabase::BTreeImpl::leafInsert(Leaf& leaf, std::size_t i, Key k, Data d) {
+  void BTreeDatabase::BTreeImpl::leaf_insert(Leaf& leaf, std::size_t i, Key k, Data d) {
     leaf->insert(i, std::move(k), std::move(d));
   }
 
-  void BTreeDatabase::BTreeImpl::leafRemove(Leaf& leaf, std::size_t i) {
-    leaf->remove(i);
+  void BTreeDatabase::BTreeImpl::leaf_erase(Leaf& leaf, std::size_t i) {
+    leaf->erase(i);
   }
 
-  auto BTreeDatabase::BTreeImpl::nextLeaf(Leaf const&) -> std::optional<Pointer> {
+  auto BTreeDatabase::BTreeImpl::next_leaf(Leaf const&) -> std::optional<Pointer> {
     return {};
   }
 
-  void BTreeDatabase::BTreeImpl::setNextLeaf(Leaf&, std::optional<Pointer>) {}
+  void BTreeDatabase::BTreeImpl::set_next_leaf(Leaf&, std::optional<Pointer>) {}
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::readBlock(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const {
-    if (auto blockChecked = checkBlockIndex(blockIndex); !blockChecked)
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::read_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const {
+    if (auto blockChecked = check_block_index(blockIndex); !blockChecked)
       return std::unexpected(std::move(blockChecked.error()));
 
-    return rawReadBlock(blockIndex, blockOffset, block);
+    return raw_read_block(blockIndex, blockOffset, block);
   }
 
-  [[nodiscard]] std::expected<ByteArray, StarException> BTreeDatabase::readBlock(BlockIndex blockIndex) const {
-    ByteArray block(m_blockSize, 0);
-    auto result218 = readBlock(blockIndex, 0, block.span());
-    if (!result218) return std::unexpected(std::move(result218.error()));
+  [[nodiscard]] std::expected<ByteArray, StarException> BTreeDatabase::read_block(BlockIndex blockIndex) const {
+    ByteArray block;
+    block.resize(m_blockSize);
+    if (auto read = read_block(blockIndex, 0, block.span()); !read)
+      return std::unexpected(std::move(read.error()));
 
     return block;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::updateBlock(BlockIndex blockIndex, ByteArray const& block) {
-    if (auto blockChecked = checkBlockIndex(blockIndex); !blockChecked)
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::update_block(BlockIndex blockIndex, ByteArray const& block) {
+    if (auto blockChecked = check_block_index(blockIndex); !blockChecked)
       return std::unexpected(std::move(blockChecked.error()));
 
-    return rawWriteBlock(blockIndex, 0, block.span());
+    return raw_write_block(blockIndex, 0, block.span());
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::rawReadBlock(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::update_block(BlockIndex blockIndex, ByteArray&& block) {
+    if (auto blockChecked = check_block_index(blockIndex); !blockChecked)
+      return std::unexpected(std::move(blockChecked.error()));
+    if (block.size() != m_blockSize)
+      return raw_write_block(blockIndex, 0, block.span());
+    m_uncommittedWrites.insert_or_assign(blockIndex, std::move(block));
+    return {};
+  }
+
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::raw_read_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const {
     auto size = block.size();
     if (blockOffset > m_blockSize || size > m_blockSize - blockOffset) {
       return std::unexpected(DBException::format("Read past end of block, offset: {} size {}", blockOffset, size));
@@ -1214,7 +1262,7 @@ namespace Star {
     return {};
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::rawWriteBlock(BlockIndex blockIndex, std::size_t blockOffset, std::span<char const> block) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::raw_write_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char const> block) {
     auto size = block.size();
     if (blockOffset > m_blockSize || size > m_blockSize - blockOffset) {
       return std::unexpected(DBException::format("Write past end of block, offset: {} size {}", blockOffset, size));
@@ -1238,141 +1286,89 @@ namespace Star {
     StreamOffset blockStart = HeaderSize + blockIndex * static_cast<StreamOffset>(m_blockSize);
     auto buffer = m_uncommittedWrites.find(blockIndex);
     if (buffer == m_uncommittedWrites.end()) {
-      auto result214 = m_device->read_bytes_absolute(blockStart, m_blockSize);
-      if (!result214) return std::unexpected(std::move(result214.error()));
-      buffer = m_uncommittedWrites.emplace(blockIndex, std::move(*result214)).first;
+      auto original_block = m_device->read_bytes_absolute(blockStart, m_blockSize);
+      if (!original_block) return std::unexpected(std::move(original_block.error()));
+      buffer = m_uncommittedWrites.emplace(blockIndex, std::move(*original_block)).first;
     }
 
     buffer->second.write_from(block, blockOffset);
     return {};
   }
 
-  [[nodiscard]] auto BTreeDatabase::readFreeIndexBlock(BlockIndex blockIndex) -> std::expected<FreeIndexBlock, StarException> {
-    auto result202 = checkBlockIndex(blockIndex);
-    if (!result202) return std::unexpected(std::move(result202.error()));
-
-    ByteArray magic(2, 0);
-    auto result203 = rawReadBlock(blockIndex, 0, magic.span());
-    if (!result203) return std::unexpected(std::move(result203.error()));
-
-    if (magic != ByteArray(std::span(FreeIndexMagic))) {
+  [[nodiscard]] auto BTreeDatabase::read_free_index_block(BlockIndex blockIndex) -> std::expected<FreeIndexBlock, StarException> {
+    auto block = read_block(blockIndex);
+    if (!block) return std::unexpected(std::move(block.error()));
+    DataStreamReader buffer(block->span());
+    auto magic = buffer.read_bytes(2);
+    if (!magic) return std::unexpected(std::move(magic.error()));
+    if (*magic != ByteArray(std::span(FreeIndexMagic)))
       return std::unexpected(DBException::format("Internal exception! block {} missing free index block marker!", blockIndex));
+
+    FreeIndexBlock free_index_block;
+    auto next = buffer.read<BlockIndex>();
+    if (!next) return std::unexpected(std::move(next.error()));
+    free_index_block.nextFreeBlock = *next;
+    auto count = buffer.read<std::uint32_t>();
+    if (!count) return std::unexpected(std::move(count.error()));
+    for (std::uint32_t i = 0; i < *count; ++i) {
+      // Keep the checked block-bound diagnostic of the former field reads.
+      std::size_t offset = 6 + sizeof(BlockIndex) + sizeof(BlockIndex) * static_cast<std::size_t>(i);
+      if (offset > m_blockSize || sizeof(BlockIndex) > m_blockSize - offset)
+        return std::unexpected(DBException::format("Read past end of block, offset: {} size {}", offset, sizeof(BlockIndex)));
+      auto free_block = buffer.read<BlockIndex>();
+      if (!free_block) return std::unexpected(std::move(free_block.error()));
+      free_index_block.freeBlocks.push_back(*free_block);
     }
-
-    FreeIndexBlock freeIndexBlock;
-    DataStreamBuffer buffer(std::max(sizeof(BlockIndex), static_cast<std::size_t>(4)));
-
-    auto result204 = rawReadBlock(blockIndex, 2, buffer.span().first(sizeof(BlockIndex)));
-    if (!result204) return std::unexpected(std::move(result204.error()));
-
-    auto result205 = buffer.seek(0);
-    if (!result205) return std::unexpected(std::move(result205.error()));
-
-    auto result206 = buffer.read<BlockIndex>();
-    if (!result206) return std::unexpected(std::move(result206.error()));
-    freeIndexBlock.nextFreeBlock = (*result206);
-
-    auto result207 = rawReadBlock(blockIndex, 2 + sizeof(BlockIndex), buffer.span().first(4));
-    if (!result207) return std::unexpected(std::move(result207.error()));
-
-    auto result208 = buffer.seek(0);
-    if (!result208) return std::unexpected(std::move(result208.error()));
-
-    auto result209 = buffer.read<std::uint32_t>();
-    if (!result209) return std::unexpected(std::move(result209.error()));
-    std::size_t numFree = (*result209);
-
-    for (std::size_t i = 0; i < numFree; ++i) {
-
-      auto result210 = rawReadBlock(blockIndex, 6 + sizeof(BlockIndex) + sizeof(BlockIndex) * i, buffer.span().first(sizeof(BlockIndex)));
-      if (!result210) return std::unexpected(std::move(result210.error()));
-
-      auto result211 = buffer.seek(0);
-      if (!result211) return std::unexpected(std::move(result211.error()));
-
-      auto result212 = buffer.read<BlockIndex>();
-      if (!result212) return std::unexpected(std::move(result212.error()));
-      freeIndexBlock.freeBlocks.push_back((*result212));
-    }
-
-    return freeIndexBlock;
+    return free_index_block;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::writeFreeIndexBlock(BlockIndex blockIndex, FreeIndexBlock indexBlock) {
-    auto result191 = checkBlockIndex(blockIndex);
-    if (!result191) return std::unexpected(std::move(result191.error()));
-
-    auto result192 = rawWriteBlock(blockIndex, 0, FreeIndexMagic);
-    if (!result192) return std::unexpected(std::move(result192.error()));
-
-    DataStreamBuffer buffer(std::max(sizeof(BlockIndex), static_cast<std::size_t>(4)));
-
-    auto result193 = buffer.seek(0);
-    if (!result193) return std::unexpected(std::move(result193.error()));
-
-    auto result194 = buffer.write<BlockIndex>(indexBlock.nextFreeBlock);
-    if (!result194) return std::unexpected(std::move(result194.error()));
-
-    auto result195 = rawWriteBlock(blockIndex, 2, buffer.span().first(sizeof(BlockIndex)));
-    if (!result195) return std::unexpected(std::move(result195.error()));
-
-    auto result196 = buffer.seek(0);
-    if (!result196) return std::unexpected(std::move(result196.error()));
-
-    auto result197 = buffer.write<std::uint32_t>(indexBlock.freeBlocks.size());
-    if (!result197) return std::unexpected(std::move(result197.error()));
-
-    auto result198 = rawWriteBlock(blockIndex, 2 + sizeof(BlockIndex), buffer.span().first(4));
-    if (!result198) return std::unexpected(std::move(result198.error()));
-
-    for (std::size_t i = 0; i < indexBlock.freeBlocks.size(); ++i) {
-
-      auto result199 = buffer.seek(0);
-      if (!result199) return std::unexpected(std::move(result199.error()));
-
-      auto result200 = buffer.write<BlockIndex>(indexBlock.freeBlocks[i]);
-      if (!result200) return std::unexpected(std::move(result200.error()));
-
-      auto result201 = rawWriteBlock(blockIndex, 6 + sizeof(BlockIndex) + sizeof(BlockIndex) * i, buffer.span().first(sizeof(BlockIndex)));
-      if (!result201) return std::unexpected(std::move(result201.error()));
-
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::write_free_index_block(BlockIndex blockIndex, FreeIndexBlock indexBlock) {
+    // Preserve old padding and acquire the complete old payload before staging
+    // any fields, exactly as the first partial write previously did.
+    auto block = read_block(blockIndex);
+    if (!block) return std::unexpected(std::move(block.error()));
+    DataStreamBuffer buffer(std::move(*block));
+    if (auto magic = buffer.write_data(FreeIndexMagic); !magic)
+      return std::unexpected(std::move(magic.error()));
+    if (auto next = buffer.write<BlockIndex>(indexBlock.nextFreeBlock); !next)
+      return std::unexpected(std::move(next.error()));
+    if (auto count = buffer.write<std::uint32_t>(indexBlock.freeBlocks.size()); !count)
+      return std::unexpected(std::move(count.error()));
+    for (auto free_block : indexBlock.freeBlocks) {
+      if (auto written = buffer.write<BlockIndex>(free_block); !written)
+        return std::unexpected(std::move(written.error()));
     }
-    return {};
+    return update_block(blockIndex, buffer.take_data());
   }
 
-  std::uint32_t BTreeDatabase::leafSize(std::shared_ptr<LeafNode> const& leaf) const {
-    std::size_t s = 6;
-    for (LeafNode::ElementList::iterator i = leaf->elements.begin(); i != leaf->elements.end(); ++i) {
-      s += m_keySize;
-      s += dataSize(i->data);
-    }
-    return s;
+  std::uint32_t BTreeDatabase::leaf_size(std::shared_ptr<LeafNode> const& leaf) const {
+    return leaf->encoded_size;
   }
 
-  std::uint32_t BTreeDatabase::maxIndexPointers() const {
+  std::uint32_t BTreeDatabase::max_index_pointers() const {
     // 2 for magic, 1 byte for level, sizeof(BlockIndex) for beginPointer, 4
     // for size.
     return (m_blockSize - 2 - 1 - sizeof(BlockIndex) - 4) / (m_keySize + sizeof(BlockIndex)) + 1;
   }
 
-  std::uint32_t BTreeDatabase::dataSize(ByteArray const& d) const {
+  std::uint32_t BTreeDatabase::data_size(ByteArray const& d) const {
     return vlqUSize(d.size()) + d.size();
   }
 
-  [[nodiscard]] auto BTreeDatabase::leafTailBlocks(BlockIndex leafPointer) -> std::expected<List<BlockIndex>, StarException> {
+  [[nodiscard]] auto BTreeDatabase::leaf_tail_blocks(BlockIndex leafPointer) -> std::expected<List<BlockIndex>, StarException> {
     List<BlockIndex> tailBlocks;
     DataStreamBuffer pointerBuffer(sizeof(BlockIndex));
     while (leafPointer != InvalidBlockIndex) {
 
-      auto result188 = readBlock(leafPointer, m_blockSize - sizeof(BlockIndex), pointerBuffer.span().first(sizeof(BlockIndex)));
-      if (!result188) return std::unexpected(std::move(result188.error()));
+      if (auto tail_read = read_block(leafPointer, m_blockSize - sizeof(BlockIndex), pointerBuffer.span().first(sizeof(BlockIndex))); !tail_read)
+        return std::unexpected(std::move(tail_read.error()));
 
-      auto result189 = pointerBuffer.seek(0);
-      if (!result189) return std::unexpected(std::move(result189.error()));
+      if (auto positioned = pointerBuffer.seek(0); !positioned)
+        return std::unexpected(std::move(positioned.error()));
 
-      auto result190 = pointerBuffer.read<BlockIndex>();
-      if (!result190) return std::unexpected(std::move(result190.error()));
-      leafPointer = (*result190);
+      auto next_block = pointerBuffer.read<BlockIndex>();
+      if (!next_block) return std::unexpected(std::move(next_block.error()));
+      leafPointer = (*next_block);
       if (leafPointer != InvalidBlockIndex) {
         tailBlocks.push_back(leafPointer);
       }
@@ -1380,7 +1376,7 @@ namespace Star {
     return tailBlocks;
   }
 
-  void BTreeDatabase::freeBlock(BlockIndex b) {
+  void BTreeDatabase::free_block(BlockIndex b) {
     m_uncommitted.remove(b);
     if (m_uncommittedWrites.contains(b))
     m_uncommittedWrites.remove(b);
@@ -1388,16 +1384,16 @@ namespace Star {
     m_availableBlocks.add(b);
   }
 
-  [[nodiscard]] auto BTreeDatabase::reserveBlock() -> std::expected<BlockIndex, StarException> {
+  [[nodiscard]] auto BTreeDatabase::reserve_block() -> std::expected<BlockIndex, StarException> {
     if (m_availableBlocks.empty()) {
 
       if (m_headFreeIndexBlock != InvalidBlockIndex) {
 
         // If available, make available all the blocks in the first free index
         // block.
-        auto result185 = readFreeIndexBlock(m_headFreeIndexBlock);
-        if (!result185) return std::unexpected(std::move(result185.error()));
-        FreeIndexBlock indexBlock = std::move(*result185);
+        auto free_index = read_free_index_block(m_headFreeIndexBlock);
+        if (!free_index) return std::unexpected(std::move(free_index.error()));
+        FreeIndexBlock indexBlock = std::move(*free_index);
         for (auto const& b : indexBlock.freeBlocks) {
           m_availableBlocks.add(b);
         }
@@ -1409,31 +1405,31 @@ namespace Star {
 
         // If we still don't have any available blocks, just add a block to the
         // end of the file.
-        auto result186 = makeEndBlock();
-        if (!result186) return std::unexpected(std::move(result186.error()));
-        m_availableBlocks.add((*result186));
+        auto appended = make_end_block();
+        if (!appended) return std::unexpected(std::move(appended.error()));
+        m_availableBlocks.add((*appended));
       }
     }
 
-    auto result187 = m_availableBlocks.take_first();
-    if (!result187) return std::unexpected(std::move(result187.error()));
-    BlockIndex block = (*result187);
+    auto available = m_availableBlocks.take_first();
+    if (!available) return std::unexpected(std::move(available.error()));
+    BlockIndex block = (*available);
     m_uncommitted.add(block);
     return block;
   }
 
-  [[nodiscard]] auto BTreeDatabase::makeEndBlock() -> std::expected<BlockIndex, StarException> {
+  [[nodiscard]] auto BTreeDatabase::make_end_block() -> std::expected<BlockIndex, StarException> {
     BlockIndex blockCount = (m_deviceSize - HeaderSize) / m_blockSize;
-    auto result184 = m_device->resize(m_deviceSize + m_blockSize);
-    if (!result184) return std::unexpected(std::move(result184.error()));
+    if (auto resized = m_device->resize(m_deviceSize + m_blockSize); !resized)
+      return std::unexpected(std::move(resized.error()));
 
     m_deviceSize += m_blockSize;
     return blockCount;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::writeRoot() {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::write_root() {
     DataStreamIODevice ds(*m_device);
-    // commitWrites() has already synchronized staged blocks. Serialize only the
+    // commit_writes() has already synchronized staged blocks. Serialize only the
     // inactive root's 4 + 8 + 4 + 1 bytes; the other root and reserved header
     // padding must not be rewritten. Keep the existing DataStream encodings.
     if (auto rootPositioned = ds.seek(BTreeRootInfoStart + (m_usingAltRoot ? 0 : BTreeRootInfoSize)); !rootPositioned)
@@ -1485,32 +1481,32 @@ namespace Star {
     return m_device->sync();
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::readRoot() {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::read_root() {
     DataStreamIODevice ds(*m_device);
-    auto result167 = ds.seek(BTreeRootSelectorBit);
-    if (!result167) return std::unexpected(std::move(result167.error()));
+    if (auto selector_positioned = ds.seek(BTreeRootSelectorBit); !selector_positioned)
+      return std::unexpected(std::move(selector_positioned.error()));
 
-    auto result168 = ds.read<bool>();
-    if (!result168) return std::unexpected(std::move(result168.error()));
-    auto usingAltRoot = std::move(*result168);
-    auto result169 = ds.seek(BTreeRootInfoStart + (usingAltRoot ? BTreeRootInfoSize : 0));
-    if (!result169) return std::unexpected(std::move(result169.error()));
+    auto selector = ds.read<bool>();
+    if (!selector) return std::unexpected(std::move(selector.error()));
+    auto usingAltRoot = std::move(*selector);
+    if (auto root_positioned = ds.seek(BTreeRootInfoStart + (usingAltRoot ? BTreeRootInfoSize : 0)); !root_positioned)
+      return std::unexpected(std::move(root_positioned.error()));
 
-    auto result170 = ds.read<BlockIndex>();
-    if (!result170) return std::unexpected(std::move(result170.error()));
-    auto head = std::move(*result170);
-    auto result171 = ds.read<StreamOffset>();
-    if (!result171) return std::unexpected(std::move(result171.error()));
-    auto size = std::move(*result171);
-    auto result172 = ds.read<BlockIndex>();
-    if (!result172) return std::unexpected(std::move(result172.error()));
-    auto root = std::move(*result172);
-    auto result173 = ds.read<bool>();
-    if (!result173) return std::unexpected(std::move(result173.error()));
-    auto rootIsLeaf = std::move(*result173);
-    auto result174 = m_device->size();
-    if (!result174) return std::unexpected(std::move(result174.error()));
-    auto deviceSize = std::move(*result174);
+    auto free_head = ds.read<BlockIndex>();
+    if (!free_head) return std::unexpected(std::move(free_head.error()));
+    auto head = std::move(*free_head);
+    auto committed_size = ds.read<StreamOffset>();
+    if (!committed_size) return std::unexpected(std::move(committed_size.error()));
+    auto size = std::move(*committed_size);
+    auto root_pointer = ds.read<BlockIndex>();
+    if (!root_pointer) return std::unexpected(std::move(root_pointer.error()));
+    auto root = std::move(*root_pointer);
+    auto leaf_flag = ds.read<bool>();
+    if (!leaf_flag) return std::unexpected(std::move(leaf_flag.error()));
+    auto root_is_leaf = std::move(*leaf_flag);
+    auto device_size = m_device->size();
+    if (!device_size) return std::unexpected(std::move(device_size.error()));
+    auto deviceSize = std::move(*device_size);
     if (size < HeaderSize || size > deviceSize || (size - HeaderSize) % m_blockSize != 0) {
       return std::unexpected(DBException("Invalid database root size"));
     }
@@ -1522,11 +1518,11 @@ namespace Star {
     m_headFreeIndexBlock = head;
     m_deviceSize = size;
     m_root = root;
-    m_rootIsLeaf = rootIsLeaf;
+    m_rootIsLeaf = root_is_leaf;
     return {};
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::doCommit() {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::do_commit() {
     if (m_availableBlocks.empty() && m_uncommitted.empty()) {
       return {};
     }
@@ -1539,34 +1535,34 @@ namespace Star {
       auto newBlock = [&]() -> std::expected<BlockIndex, StarException> {
         if (!m_availableBlocks.empty())
           return m_availableBlocks.take_first();
-        return makeEndBlock();
+        return make_end_block();
       };
 
       if (m_headFreeIndexBlock != InvalidBlockIndex) {
-        auto result159 = readFreeIndexBlock(m_headFreeIndexBlock);
-        if (!result159) return std::unexpected(std::move(result159.error()));
-        indexBlock = (*result159);
+        auto free_index = read_free_index_block(m_headFreeIndexBlock);
+        if (!free_index) return std::unexpected(std::move(free_index.error()));
+        indexBlock = (*free_index);
       } else {
-        auto result160 = newBlock();
-        if (!result160) return std::unexpected(std::move(result160.error()));
-        m_headFreeIndexBlock = (*result160);
+        auto head_reserved = newBlock();
+        if (!head_reserved) return std::unexpected(std::move(head_reserved.error()));
+        m_headFreeIndexBlock = (*head_reserved);
       }
 
       // Then, we need to write all the available blocks to the FreeIndexBlock chain.
       while (true) {
 
         // If we have room on our current FreeIndexBlock, just add a block to it.
-        if (!m_availableBlocks.empty() && indexBlock.freeBlocks.size() < maxFreeIndexLength()) {
+        if (!m_availableBlocks.empty() && indexBlock.freeBlocks.size() < max_free_index_length()) {
 
-          auto result161 = m_availableBlocks.take_first();
-          if (!result161) return std::unexpected(std::move(result161.error()));
-          BlockIndex toAdd = (*result161);
+          auto available = m_availableBlocks.take_first();
+          if (!available) return std::unexpected(std::move(available.error()));
+          BlockIndex toAdd = (*available);
           indexBlock.freeBlocks.push_back(toAdd);
         } else {
 
           // Update the current head free index block.
-          auto result162 = writeFreeIndexBlock(m_headFreeIndexBlock, indexBlock);
-          if (!result162) return std::unexpected(std::move(result162.error()));
+          if (auto free_index_written = write_free_index_block(m_headFreeIndexBlock, indexBlock); !free_index_written)
+            return std::unexpected(std::move(free_index_written.error()));
 
           // If we're out of blocks to free, then we're done
           if (m_availableBlocks.empty()) {
@@ -1575,74 +1571,74 @@ namespace Star {
 
           // If our head free index block is full, then
           // need to write a new head free index block.
-          if (indexBlock.freeBlocks.size() >= maxFreeIndexLength()) {
+          if (indexBlock.freeBlocks.size() >= max_free_index_length()) {
 
             indexBlock.nextFreeBlock = m_headFreeIndexBlock;
             indexBlock.freeBlocks.clear();
 
-            auto result163 = newBlock();
-            if (!result163) return std::unexpected(std::move(result163.error()));
-            m_headFreeIndexBlock = (*result163);
-            auto result164 = writeFreeIndexBlock(m_headFreeIndexBlock, indexBlock);
-            if (!result164) return std::unexpected(std::move(result164.error()));
+            auto head_reserved = newBlock();
+            if (!head_reserved) return std::unexpected(std::move(head_reserved.error()));
+            m_headFreeIndexBlock = (*head_reserved);
+            if (auto free_index_written = write_free_index_block(m_headFreeIndexBlock, indexBlock); !free_index_written)
+              return std::unexpected(std::move(free_index_written.error()));
 
           }
         }
       }
     }
 
-    auto result165 = commitWrites();
-    if (!result165) return std::unexpected(std::move(result165.error()));
+    if (auto blocks_committed = commit_writes(); !blocks_committed)
+      return std::unexpected(std::move(blocks_committed.error()));
 
-    auto result166 = writeRoot();
-    if (!result166) return std::unexpected(std::move(result166.error()));
+    if (auto root_published = write_root(); !root_published)
+      return std::unexpected(std::move(root_published.error()));
 
     m_uncommitted.clear();
     return {};
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::commitWrites() {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::commit_writes() {
     for (auto& write : m_uncommittedWrites) {
-      auto result157 = m_device->write_full_absolute(HeaderSize + write.first * static_cast<StreamOffset>(m_blockSize),
-                                                     write.second.span().first(m_blockSize));
-      if (!result157) return std::unexpected(std::move(result157.error()));
+      if (auto written = m_device->write_full_absolute(HeaderSize + write.first * static_cast<StreamOffset>(m_blockSize),
+                                                     write.second.span().first(m_blockSize)); !written)
+        return std::unexpected(std::move(written.error()));
 
     }
 
     // Barrier 1: keep staged bytes until every block write and this sync succeed.
     // Root publication must not cross this barrier, even on a retry.
-    auto result158 = m_device->sync();
-    if (!result158) return std::unexpected(std::move(result158.error()));
+    if (auto synced = m_device->sync(); !synced)
+      return std::unexpected(std::move(synced.error()));
 
     m_uncommittedWrites.clear();
     return {};
   }
 
-  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::tryFlatten() {
+  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::try_flatten() {
     if (m_headFreeIndexBlock == InvalidBlockIndex || m_rootIsLeaf || !m_device->is_writable()) {
       return false;
     }
 
-    BlockIndex freeBlockCount = 0;
+    BlockIndex free_block_count = 0;
     BlockIndex indexBlockIndex = m_headFreeIndexBlock;
     while (indexBlockIndex != InvalidBlockIndex) {
 
-      auto result147 = readFreeIndexBlock(indexBlockIndex);
-      if (!result147) return std::unexpected(std::move(result147.error()));
-      FreeIndexBlock indexBlock = std::move(*result147);
-      freeBlockCount += 1 + indexBlock.freeBlocks.size();
+      auto free_index = read_free_index_block(indexBlockIndex);
+      if (!free_index) return std::unexpected(std::move(free_index.error()));
+      FreeIndexBlock indexBlock = std::move(*free_index);
+      free_block_count += 1 + indexBlock.freeBlocks.size();
       indexBlockIndex = indexBlock.nextFreeBlock;
     }
 
     BlockIndex expectedBlockCount = (m_deviceSize - HeaderSize) / m_blockSize;
-    float free = float(freeBlockCount) / float(expectedBlockCount);
+    float free = float(free_block_count) / float(expectedBlockCount);
     if (free < 0.05f) {
       return false;
     }
 
-    auto result148 = m_device->device_name();
-    if (!result148) return std::unexpected(std::move(result148.error()));
-    auto flattenLogged = m_logger.info("[BTreeDatabase] File '{}' is {:.2f}% free space, flattening", *result148, free * 100.f);
+    auto initial_device_name = m_device->device_name();
+    if (!initial_device_name) return std::unexpected(std::move(initial_device_name.error()));
+    auto flattenLogged = m_logger.info("[BTreeDatabase] File '{}' is {:.2f}% free space, flattening", *initial_device_name, free * 100.f);
     if (!flattenLogged) return std::unexpected(std::move(flattenLogged.error()));
 
     indexBlockIndex = m_headFreeIndexBlock;
@@ -1650,7 +1646,7 @@ namespace Star {
 
       List<BlockIndex> availableBlocksList;
       do {
-        auto freeIndex = readFreeIndexBlock(indexBlockIndex);
+        auto freeIndex = read_free_index_block(indexBlockIndex);
         if (!freeIndex) return std::unexpected(std::move(freeIndex.error()));
         FreeIndexBlock indexBlock = std::move(*freeIndex);
         availableBlocksList.append_range(indexBlock.freeBlocks);
@@ -1669,18 +1665,18 @@ namespace Star {
 
     auto start = std::chrono::steady_clock::now();
     BTreeImpl storage(*this);
-    auto result150 = storage.loadIndex(storage.rootPointer());
-    if (!result150) return std::unexpected(std::move(result150.error()));
-    auto index = std::move(*result150);
-    auto result151 = flattenVisitor(index, count);
-    if (!result151) return std::unexpected(std::move(result151.error()));
-    if ((*result151)) {
+    auto root_index = storage.load_index(storage.root_pointer());
+    if (!root_index) return std::unexpected(std::move(root_index.error()));
+    auto index = std::move(*root_index);
+    auto relocated = flatten_visitor(index, count);
+    if (!relocated) return std::unexpected(std::move(relocated.error()));
+    if ((*relocated)) {
 
-      storage.deleteIndex(index);
+      storage.delete_index(index);
       index->self = InvalidBlockIndex;
-      auto result152 = storage.storeIndex(index);
-      if (!result152) return std::unexpected(std::move(result152.error()));
-      m_root = (*result152);
+      auto stored_root = storage.store_index(index);
+      if (!stored_root) return std::unexpected(std::move(stored_root.error()));
+      m_root = (*stored_root);
     }
 
     m_availableBlocks.clear();
@@ -1688,42 +1684,42 @@ namespace Star {
     m_deviceSize = flattenedSize;
 
     m_indexCache.clear();
-    auto result153 = commitWrites();
-    if (!result153) return std::unexpected(std::move(result153.error()));
+    if (auto blocks_committed = commit_writes(); !blocks_committed)
+      return std::unexpected(std::move(blocks_committed.error()));
 
-    auto result154 = writeRoot();
-    if (!result154) return std::unexpected(std::move(result154.error()));
+    if (auto root_published = write_root(); !root_published)
+      return std::unexpected(std::move(root_published.error()));
 
     m_uncommitted.clear();
 
-    auto result155 = m_device->resize(flattenedSize);
-    if (!result155) return std::unexpected(std::move(result155.error()));
+    if (auto resized = m_device->resize(flattenedSize); !resized)
+      return std::unexpected(std::move(resized.error()));
 
-    auto result156 = m_device->device_name();
-    if (!result156) return std::unexpected(std::move(result156.error()));
-    auto finishedLogged = m_logger.info("[BTreeDatabase] Finished flattening '{}' in {:.2f} milliseconds", *result156, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    auto finished_device_name = m_device->device_name();
+    if (!finished_device_name) return std::unexpected(std::move(finished_device_name.error()));
+    auto finishedLogged = m_logger.info("[BTreeDatabase] Finished flattening '{}' in {:.2f} milliseconds", *finished_device_name, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     if (!finishedLogged) return std::unexpected(std::move(finishedLogged.error()));
     return true;
   }
 
-  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::flattenVisitor(BTreeImpl::Index& index, BlockIndex& count) {
+  [[nodiscard]] std::expected<bool, StarException> BTreeDatabase::flatten_visitor(BTreeImpl::Index& index, BlockIndex& count) {
     BTreeImpl storage(*this);
-    auto pointerCount = index->pointerCount();
-    count += pointerCount;
+    auto pointer_count = index->pointer_count();
+    count += pointer_count;
     bool canStore = !m_availableBlocks.empty();
 
     bool needsStore = false;
-    if (storage.indexLevel(index) == 0) {
+    if (storage.index_level(index) == 0) {
 
-      for (std::size_t i = 0; i != pointerCount; ++i) {
+      for (std::size_t i = 0; i != pointer_count; ++i) {
 
-        auto indexPointer = index->pointer(i);
-        auto result139 = leafTailBlocks(indexPointer);
-        if (!result139) return std::unexpected(std::move(result139.error()));
-        auto tailBlocks = std::move(*result139);
+        auto index_pointer = index->pointer(i);
+        auto tail_blocks = leaf_tail_blocks(index_pointer);
+        if (!tail_blocks) return std::unexpected(std::move(tail_blocks.error()));
+        auto tailBlocks = std::move(*tail_blocks);
         if (canStore) {
 
-          bool leafNeedsStore = *m_availableBlocks.begin() < indexPointer;
+          bool leafNeedsStore = *m_availableBlocks.begin() < index_pointer;
 
           if (!leafNeedsStore) {
             for (std::size_t i = 0; !leafNeedsStore && i != tailBlocks.size(); ++i) {
@@ -1735,19 +1731,19 @@ namespace Star {
 
           if (leafNeedsStore) {
 
-            auto result140 = storage.loadLeaf(indexPointer);
-            if (!result140) return std::unexpected(std::move(result140.error()));
-            auto leaf = std::move(*result140);
-            auto result141 = storage.deleteLeaf(leaf);
-            if (!result141) return std::unexpected(std::move(result141.error()));
+            auto loaded_leaf = storage.load_leaf(index_pointer);
+            if (!loaded_leaf) return std::unexpected(std::move(loaded_leaf.error()));
+            auto leaf = std::move(*loaded_leaf);
+            if (auto deleted_leaf = storage.delete_leaf(leaf); !deleted_leaf)
+              return std::unexpected(std::move(deleted_leaf.error()));
 
             leaf->self = InvalidBlockIndex;
-            auto result142 = storage.storeLeaf(leaf);
-            if (!result142) return std::unexpected(std::move(result142.error()));
-            index->updatePointer(i, (*result142));
-            auto result143 = leafTailBlocks(leaf->self);
-            if (!result143) return std::unexpected(std::move(result143.error()));
-            tailBlocks = (*result143);
+            auto stored_leaf = storage.store_leaf(leaf);
+            if (!stored_leaf) return std::unexpected(std::move(stored_leaf.error()));
+            index->update_pointer(i, (*stored_leaf));
+            auto new_tail_blocks = leaf_tail_blocks(leaf->self);
+            if (!new_tail_blocks) return std::unexpected(std::move(new_tail_blocks.error()));
+            tailBlocks = (*new_tail_blocks);
             needsStore = true;
           }
           canStore = !m_availableBlocks.empty();
@@ -1756,22 +1752,22 @@ namespace Star {
       }
     } else {
 
-      for (std::size_t i = 0; i != pointerCount; ++i) {
+      for (std::size_t i = 0; i != pointer_count; ++i) {
 
-        auto result144 = storage.loadIndex(index->pointer(i));
-        if (!result144) return std::unexpected(std::move(result144.error()));
-        auto childIndex = std::move(*result144);
+        auto loaded_child = storage.load_index(index->pointer(i));
+        if (!loaded_child) return std::unexpected(std::move(loaded_child.error()));
+        auto childIndex = std::move(*loaded_child);
         if (canStore) {
 
-          auto result145 = flattenVisitor(childIndex, count);
-          if (!result145) return std::unexpected(std::move(result145.error()));
-          if ((*result145)) {
+          auto relocated = flatten_visitor(childIndex, count);
+          if (!relocated) return std::unexpected(std::move(relocated.error()));
+          if ((*relocated)) {
 
-            storage.deleteIndex(childIndex);
+            storage.delete_index(childIndex);
             childIndex->self = InvalidBlockIndex;
-            auto result146 = storage.storeIndex(childIndex);
-            if (!result146) return std::unexpected(std::move(result146.error()));
-            index->updatePointer(i, (*result146));
+            auto stored_child = storage.store_index(childIndex);
+            if (!stored_child) return std::unexpected(std::move(stored_child.error()));
+            index->update_pointer(i, (*stored_child));
             canStore = !m_availableBlocks.empty();
             needsStore = true;
           }
@@ -1781,7 +1777,7 @@ namespace Star {
     return needsStore || (canStore && *m_availableBlocks.begin() < index->self);
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::checkIfOpen(std::string_view methodName, bool shouldBeOpen) const {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::check_if_open(std::string_view methodName, bool shouldBeOpen) const {
     if (shouldBeOpen && !m_open) {
       return std::unexpected(DBException::format("BTreeDatabase method '{}' called when not open, must be open.", methodName));
     } else {
@@ -1792,7 +1788,7 @@ namespace Star {
     return {};
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::checkBlockIndex(std::size_t blockIndex) const {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::check_block_index(std::size_t blockIndex) const {
     BlockIndex blockCount = (m_deviceSize - HeaderSize) / m_blockSize;
     if (blockIndex >= blockCount) {
       return std::unexpected(DBException::format("blockIndex: {} out of block range", blockIndex));
@@ -1800,9 +1796,9 @@ namespace Star {
     return {};
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::checkKeySize(ByteArray const& k) const {
-    auto result138 = checkIfOpen("key access", true);
-    if (!result138) return std::unexpected(std::move(result138.error()));
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::check_key_size(ByteArray const& k) const {
+    if (auto state_checked = check_if_open("key access", true); !state_checked)
+      return std::unexpected(std::move(state_checked.error()));
 
     if (k.size() != m_keySize) {
       return std::unexpected(DBException::format("Wrong key size {}", k.size()));
@@ -1810,19 +1806,19 @@ namespace Star {
     return {};
   }
 
-  std::uint32_t BTreeDatabase::maxFreeIndexLength() const {
+  std::uint32_t BTreeDatabase::max_free_index_length() const {
     return (m_blockSize / sizeof(BlockIndex)) - 2 - sizeof(BlockIndex) - 4;
   }
 
   BTreeSha256Database::BTreeSha256Database(Logger& logger) : BTreeDatabase(logger, {}, 32) {}
 
-  [[nodiscard]] std::expected<std::unique_ptr<BTreeSha256Database>, StarException> BTreeSha256Database::create(Logger& logger, String const& contentIdentifier) {
+  [[nodiscard]] std::expected<std::unique_ptr<BTreeSha256Database>, StarException> BTreeSha256Database::create(Logger& logger, String const& content_identifier) {
     auto database = std::make_unique<BTreeSha256Database>(logger);
-    if (contentIdentifier.empty())
+    if (content_identifier.empty())
       return std::unexpected(DBException("Opening new database and no content identifier set!"));
-    if (contentIdentifier.utf8_size() > database->ContentIdentifierStringSize)
-      return std::unexpected(DBException("contentIdentifier in BTreeDatabase implementation is greater than maximum identifier length"));
-    auto configured = database->setContentIdentifier(contentIdentifier);
+    if (content_identifier.utf8_size() > database->ContentIdentifierStringSize)
+      return std::unexpected(DBException("content_identifier in BTreeDatabase implementation is greater than maximum identifier length"));
+    auto configured = database->set_content_identifier(content_identifier);
     if (!configured) return std::unexpected(std::move(configured.error()));
     return database;
   }
@@ -1839,8 +1835,8 @@ namespace Star {
     return BTreeDatabase::insert(sha256(key), value);
   }
 
-  [[nodiscard]] std::expected<bool, StarException> BTreeSha256Database::remove(ByteArray const& key) {
-    return BTreeDatabase::remove(sha256(key));
+  [[nodiscard]] std::expected<bool, StarException> BTreeSha256Database::erase(ByteArray const& key) {
+    return BTreeDatabase::erase(sha256(key));
   }
 
   [[nodiscard]] std::expected<bool, StarException> BTreeSha256Database::contains(String const& key) {
@@ -1855,8 +1851,8 @@ namespace Star {
     return BTreeDatabase::insert(sha256(key), value);
   }
 
-  [[nodiscard]] std::expected<bool, StarException> BTreeSha256Database::remove(String const& key) {
-    return BTreeDatabase::remove(sha256(key));
+  [[nodiscard]] std::expected<bool, StarException> BTreeSha256Database::erase(String const& key) {
+    return BTreeDatabase::erase(sha256(key));
   }
 
 }

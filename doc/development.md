@@ -51,6 +51,9 @@ owning standard containers; formatter/trait utility inheritance is intentional.
 Make ownership explicit, use optional reference wrappers for nullable borrows,
 and keep raw addresses at native/storage boundaries, not business interfaces.
 Borrows must not cross destruction, mutation or reentry that can replace owners.
+Name checked results by their operation or payload, never numeric suffixes.
+Use `if (auto written = ...; !written)` for status-only checks; keep decoded
+values in named locals and preserve first-error, ownership and transaction order.
 
 ### Modules and host integrations
 
@@ -88,6 +91,13 @@ Borrows must not cross destruction, mutation or reentry that can replace owners.
 
 - VLQ adapters accept integral/enum values. Synchronous `deserialize*` borrows unchanged, retained `span<const char>` input; decoded fields own storage and serializers transfer output with `take_data()`.
 - Prefer final `DataStreamReader` for contiguous decoding without read-ahead. Extensible buffers retain virtual `read_data` transformations/failures. Preserve container prefixes and complete-value commits on truncation; memory-device seeks, clone cursors and closed empty reads retain their own contracts, not file semantics.
+- B-tree comparisons and synchronous visitors borrow from retained node handles;
+  owning queries/exports still copy the bytes they retain. Move only node ranges
+  that are subsequently erased. Maintain the leaf encoded-size total at every
+  mutation; it is in-memory metadata, not a new disk field.
+- Database cache settings follow the main-lock-before-cache-lock order. Publish
+  decoded indexes through the bounded cache; keep disk I/O outside its spinlock.
+  Keep transaction staging, root publication barriers and explicit failure recovery.
 
 ### Images and pixel processing
 

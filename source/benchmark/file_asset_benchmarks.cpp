@@ -99,7 +99,7 @@ constexpr std::size_t btree_seed_count = btree_key_count / 2;
 constexpr std::size_t btree_block_size = 4096;
 constexpr std::size_t btree_seed_value_size = 12288;
 
-struct btree_fixture {
+struct BTreeFixture {
   Star::Logger logger;
   Star::String path;
   std::shared_ptr<Star::File> device;
@@ -114,11 +114,11 @@ struct btree_fixture {
   std::expected<void, Star::StarException> open_database() {
     device = std::make_shared<Star::File>(path);
     database = std::make_unique<Star::BTreeDatabase>(logger, "FileBenchmark", 4);
-    if (auto result = database->setAutoCommit(false); !result)
+    if (auto result = database->set_auto_commit(false); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = database->setBlockSize(btree_block_size); !result)
+    if (auto result = database->set_block_size(btree_block_size); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = database->setIODevice(device); !result)
+    if (auto result = database->set_io_device(device); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = database->open(); !result)
       return std::unexpected(std::move(result.error()));
@@ -126,7 +126,7 @@ struct btree_fixture {
   }
 
   std::expected<void, Star::StarException> close_database() {
-    if (database && database->isOpen()) {
+    if (database && database->is_open()) {
       if (auto result = database->close(true); !result)
         return std::unexpected(std::move(result.error()));
     } else if (device && device->is_open()) {
@@ -213,7 +213,7 @@ struct btree_fixture {
   }
 
   std::expected<void, Star::StarException> verify(bool staged) {
-    auto count = database->recordCount();
+    auto count = database->record_count();
     if (!count)
       return std::unexpected(std::move(count.error()));
     if (*count != (staged ? btree_key_count : btree_seed_count))
@@ -278,7 +278,7 @@ void btree_transactions(benchmark::State& state, bool commit) {
     if (!removed)
       state.SkipWithError(removed.error().what());
   });
-  btree_fixture fixture;
+  BTreeFixture fixture;
   auto initialized =
     fixture.initialize(Star::File::relative_to(*temporary, "database.db"), static_cast<std::size_t>(state.range(0)));
   if (!initialized) {

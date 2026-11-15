@@ -207,6 +207,30 @@ decodes directly into fixed storage after checking decoded length, preserving
 32/33-character acceptance and permissive nibbles rather than truncating oversized
 input. Reuse the existing ByteArray valid/permissive decode benchmarks.
 
+### B-tree storage and transactions
+
+`BTree` and `BTreeDatabase` use snake_case APIs and `erase`; record visitors
+receive borrowed const key/value references for the synchronous call. Retained
+records and `find` results own their bytes. Generic record, node and recovery
+callbacks are constrained by their checked result and invoked as lvalues.
+Callbacks run under the shared database lock: do not mutate, close or change
+cache capacity on the same database from a callback.
+
+`BTreeTest.*` covers owned/borrowed storage, less-than-only keys, mutable
+noncopyable visitors, ordered ranges, local node pruning and root-leaf counts.
+Node visitor `false` prunes locally, not globally. A root leaf counts as one,
+including an empty tree. Relocating linked leaves must preserve incoming links.
+`BTreeDatabaseTest.*` covers bounded index caching, concurrent configuration,
+VLQ-size transitions, empty values, record ownership, free-index padding and
+range erasure with per-key commit failures. Keep the commit fault matrix,
+explicit rollback/retry and reopen checks: failed sync does not prove rollback.
+Preserve the disk layout and all three durability barriers.
+
+Reuse `File/BTree/StageRollback` and `File/BTree/Commit` for matched timings;
+`CommitPhaseDiagnostic` is instrumented evidence, not throughput. Report cache
+pressure separately: the corrected capacity bound can increase misses compared
+with the former unbounded insertion path.
+
 ### Random stream compatibility
 
 `RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's

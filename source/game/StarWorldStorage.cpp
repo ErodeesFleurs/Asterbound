@@ -114,14 +114,14 @@ std::expected<void, StarException> WorldStorage::applyWorldChunksUpdateToFile(Lo
   BTreeDatabase db(logger);
   auto operationResult1 = File::open(file, IOMode::ReadWrite);
   if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  auto operationResult2 = openDatabase(db, (*operationResult1));
+  auto operationResult2 = open_database(db, (*operationResult1));
   if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
   for (auto const& pair : update) {
     if (pair.second) {
       auto operationResult1 = db.insert(pair.first, *pair.second);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     } else {
-      auto operationResult1 = db.remove(pair.first);
+      auto operationResult1 = db.erase(pair.first);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
   }
@@ -132,11 +132,11 @@ std::expected<WorldChunks, StarException> WorldStorage::getWorldChunksFromFile(L
   BTreeDatabase db(logger);
   auto operationResult1 = File::open(file, IOMode::Read);
   if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  auto operationResult2 = openDatabase(db, (*operationResult1));
+  auto operationResult2 = open_database(db, (*operationResult1));
   if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
   WorldChunks chunks;
-  auto read = db.forAll([&chunks](ByteArray key, ByteArray value) -> std::expected<void, StarException> {
-    auto added = chunks.add(std::move(key), std::move(value));
+  auto read = db.for_all([&chunks](ByteArray const& key, ByteArray const& value) -> std::expected<void, StarException> {
+    auto added = chunks.add(key, value);
     if (!added) return std::unexpected(std::move(added.error()));
     return {};
   });
@@ -160,7 +160,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = openDatabase(db, device);
+    auto operationResult1 = open_database(db, device);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
@@ -190,7 +190,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   result->m_generatorFacade = generatorFacade;
   result->m_floatingDungeonWorld = false;
   {
-    auto operationResult1 = openDatabase(db, device);
+    auto operationResult1 = open_database(db, device);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   auto autofoundResult1 = metadataKey();
@@ -219,7 +219,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
     auto storage_file = File::ephemeral_file(root.random());
     if (!storage_file)
       return std::unexpected(std::move(storage_file.error()));
-    auto database_opened = openDatabase(db, (*storage_file));
+    auto database_opened = open_database(db, (*storage_file));
     if (!database_opened)
       return std::unexpected(std::move(database_opened.error()));
   }
@@ -249,7 +249,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
 WorldStorage::~WorldStorage() = default;
 
 std::expected<void, StarException> WorldStorage::close() {
-  if (m_db.isOpen()) {
+  if (m_db.is_open()) {
     auto unloaded = unloadAll(true);
     if (!unloaded) return std::unexpected(std::move(unloaded.error()));
     return m_db.close(true);
@@ -682,8 +682,8 @@ std::expected<WorldChunks, StarException> WorldStorage::readChunks() {
       }
 
     WorldChunks chunks;
-    auto read = m_db.forAll([&chunks](ByteArray k, ByteArray v) -> std::expected<void, StarException> {
-        auto added = chunks.add(std::move(k), std::move(v));
+    auto read = m_db.for_all([&chunks](ByteArray const& k, ByteArray const& v) -> std::expected<void, StarException> {
+        auto added = chunks.add(k, v);
         if (!added) return std::unexpected(std::move(added.error()));
         return {};
       });
@@ -1003,25 +1003,25 @@ std::expected<ByteArray, StarException> WorldStorage::writeSectorUniqueStore(Sec
   return compressData(serialized);
 }
 
-std::expected<void, StarException> WorldStorage::openDatabase(BTreeDatabase& db, std::shared_ptr<IODevice> device) {
+std::expected<void, StarException> WorldStorage::open_database(BTreeDatabase& db, std::shared_ptr<IODevice> device) {
   {
-    auto operationResult1 = db.setContentIdentifier("World4");
+    auto operationResult1 = db.set_content_identifier("World4");
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = db.setKeySize(5);
+    auto operationResult1 = db.set_key_size(5);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = db.setIODevice(std::move(device));
+    auto operationResult1 = db.set_io_device(std::move(device));
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = db.setBlockSize(2048);
+    auto operationResult1 = db.set_block_size(2048);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
-    auto operationResult1 = db.setAutoCommit(false);
+    auto operationResult1 = db.set_auto_commit(false);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
@@ -1029,7 +1029,7 @@ std::expected<void, StarException> WorldStorage::openDatabase(BTreeDatabase& db,
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
 
-  if (db.contentIdentifier() != "World4" || db.keySize() != 5)
+  if (db.content_identifier() != "World4" || db.key_size() != 5)
     return std::unexpected(WorldStorageException::format("World database format is too old or unrecognized!"));
   return {};
 }
@@ -1481,7 +1481,7 @@ std::expected<void, StarException> WorldStorage::updateSectorUniques(Sector cons
     {
       auto operationResult1 = sectorUniqueKey(sector);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-      auto operationResult2 = m_db.remove((*operationResult1));
+      auto operationResult2 = m_db.erase((*operationResult1));
       if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
     }
   } else {
@@ -1520,7 +1520,7 @@ std::expected<void, StarException> WorldStorage::mergeSectorUniques(Sector const
     {
       auto operationResult1 = sectorUniqueKey(sector);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-      auto operationResult2 = m_db.remove((*operationResult1));
+      auto operationResult2 = m_db.erase((*operationResult1));
       if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
     }
   } else {
@@ -1596,7 +1596,7 @@ std::expected<void, StarException> WorldStorage::removeUniqueIndexEntry(String c
           {
             auto operationResult1 = uniqueIndexKey(uniqueId);
             if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-            auto operationResult2 = m_db.remove((*operationResult1));
+            auto operationResult2 = m_db.erase((*operationResult1));
             if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
           }
         } else {

@@ -23,7 +23,7 @@ import star.byte_array;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<int, StarException> repackBTree(int argc, char** argv) {
+static std::expected<int, StarException> repack_btree(int argc, char** argv) {
   Logger logger;
   auto startTime = std::chrono::steady_clock::now();
 
@@ -55,7 +55,7 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
   auto inputFile = File::open(bTreePath, IOMode::Read);
   if (!inputFile)
     return std::unexpected(std::move(inputFile.error()));
-  auto inputDevice = db.setIODevice(std::move(*inputFile));
+  auto inputDevice = db.set_io_device(std::move(*inputFile));
   if (!inputDevice)
     return std::unexpected(std::move(inputDevice.error()));
   auto openedInput = db.open();
@@ -64,23 +64,23 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
 
   // Make a new database with the original layout settings.
   BTreeDatabase newDb(logger);
-  auto blockSize = newDb.setBlockSize(db.blockSize());
+  auto blockSize = newDb.set_block_size(db.block_size());
   if (!blockSize)
     return std::unexpected(std::move(blockSize.error()));
-  auto contentIdentifier = newDb.setContentIdentifier(db.contentIdentifier());
+  auto contentIdentifier = newDb.set_content_identifier(db.content_identifier());
   if (!contentIdentifier)
     return std::unexpected(std::move(contentIdentifier.error()));
-  auto keySize = newDb.setKeySize(db.keySize());
+  auto keySize = newDb.set_key_size(db.key_size());
   if (!keySize)
     return std::unexpected(std::move(keySize.error()));
-  auto autoCommit = newDb.setAutoCommit(false);
+  auto autoCommit = newDb.set_auto_commit(false);
   if (!autoCommit)
     return std::unexpected(std::move(autoCommit.error()));
 
   auto outputFile = File::open(outputFilename, IOMode::ReadWrite | IOMode::Truncate);
   if (!outputFile)
     return std::unexpected(std::move(outputFile.error()));
-  auto outputDevice = newDb.setIODevice(std::move(*outputFile));
+  auto outputDevice = newDb.set_io_device(std::move(*outputFile));
   if (!outputDevice)
     return std::unexpected(std::move(outputDevice.error()));
   auto openedOutput = newDb.open();
@@ -90,7 +90,7 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
     return std::unexpected(std::move(written.error()));
 
   unsigned count = 0, overwritten = 0;
-  auto visitor = [&](ByteArray key, ByteArray data) -> std::expected<void, StarException> {
+  auto visitor = [&](ByteArray const& key, ByteArray const& data) -> std::expected<void, StarException> {
     auto inserted = newDb.insert(key, data);
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
@@ -104,7 +104,7 @@ static std::expected<int, StarException> repackBTree(int argc, char** argv) {
       return std::unexpected(std::move(written.error()));
     return {};
   };
-  auto recovered = db.recoverAll(visitor, errorHandler);
+  auto recovered = db.recover_all(visitor, errorHandler);
   if (!recovered)
     return std::unexpected(std::move(recovered.error()));
 
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto result = repackBTree(argc, argv);
+  auto result = repack_btree(argc, argv);
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
