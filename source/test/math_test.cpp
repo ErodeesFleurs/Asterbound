@@ -197,12 +197,12 @@ static_assert(noexcept(approach(std::declval<AlgebraicScalar const&>(), std::dec
   std::declval<AlgebraicScalar const&>())));
 static_assert(square(4) == 16 && clamp(4, 1, 3) == 3 && approach(8, 2, 3) == 5);
 
-// Keep the independent libm oracle precise too: fast-math may approximate
-// acos(-1) by a neighboring float, moving every pi/period boundary on ARM.
+// Precise caller flags do not change the imported std::acos wrapper's FP mode.
+// Bypass that wrapper and round a long-double oracle to the tested type.
 #pragma float_control(precise, on, push)
 template <std::floating_point T>
 [[gnu::noinline]] void expect_angle_boundaries() {
-  T pi = std::acos(T{-1});
+  T pi = static_cast<T>(__builtin_acosl(-1.0L));
   T below = std::nextafter(pi, T{0});
   T above = std::nextafter(pi, T{4});
   EXPECT_EQ(normalize_angle(pi), -pi);

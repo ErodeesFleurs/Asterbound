@@ -188,10 +188,11 @@ noncontracting region is honored without disabling fast contraction elsewhere.
 Plain `-ffp-contract=fast` overrides the source pragma, even when LLVM IR lacks
 contraction flags. Keep the non-primary exact-byte regression on ARM and x86.
 
-Angle boundary tests keep their independent `acos`/`remainder` oracle in a
-precise, non-inlined helper. Under fast-math, an approximated `acos(-1)` can
-shift the reference pi by one float ULP on macOS ARM; weakening the production
-interval checks would conceal that oracle error.
+Angle boundary tests use a precise, non-inlined helper and derive pi from
+`__builtin_acosl(-1.0L)`, rounded to the tested type. Caller pragmas do not
+retroactively change the FP mode of `std::acos` compiled into `import std`;
+the imported float wrapper can still reach an approximate macOS `acosf`.
+Keep the independent `remainder` oracle and exact interval checks unchanged.
 
 Hex parsing accepts only 3/4/6/8 ASCII digits; malformed digits fail rather than
 silently becoming zero. Named lookup preserves the custom palette, ASCII case
