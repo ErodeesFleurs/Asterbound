@@ -148,6 +148,9 @@ cpptrace demonstration executables are excluded from the default build; its
 integration and unit tests remain enabled.
 Known unsupported Nix-hook CMake variables are omitted before configuration;
 unsetting them with `-U` still leaves CMake's unused-command-line warning.
+The fixed-registry vcpkg overlays likewise omit obsolete CPR sanitizer-probe and
+SDL console variables, plus PCRE2's unused MSVC runtime option for our GNU ABI.
+They retain the registry's versions, source hashes and other build/install steps.
 
 Build variants into different result links when retaining more than one:
 

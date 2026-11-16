@@ -1,0 +1,15 @@
+--- a/ports/cpr/portfile.cmake
++++ b/ports/cpr/portfile.cmake
+@@ -19,12 +19,6 @@
+         -DCPR_BUILD_TESTS=OFF
+         -DCPR_USE_SYSTEM_CURL=ON
+         ${FEATURE_OPTIONS}
+-        # skip test for unused sanitizer flags
+-        -DTHREAD_SANITIZER_AVAILABLE=OFF
+-        -DADDRESS_SANITIZER_AVAILABLE=OFF
+-        -DLEAK_SANITIZER_AVAILABLE=OFF
+-        -DUNDEFINED_BEHAVIOUR_SANITIZER_AVAILABLE=OFF
+-        -DALL_SANITIZERS_AVAILABLE=OFF
+ )
+ 
+ vcpkg_cmake_install()

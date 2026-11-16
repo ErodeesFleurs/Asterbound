@@ -1,0 +1,11 @@
+--- a/ports/sdl3/portfile.cmake
++++ b/ports/sdl3/portfile.cmake
+@@ -49,8 +49,6 @@
+     endif()
+ endif()
+ 
+-# option for not need to show windows
+-list(APPEND FEATURE_OPTIONS -DSDL_UNIX_CONSOLE_BUILD=ON)
+ if (VCPKG_TARGET_IS_LINUX AND NOT "x11" IN_LIST FEATURES AND NOT "wayland" IN_LIST FEATURES)
+     message(WARNING "The selected features don't allow sdl3 to create windows, which is usually unintentional. You can get windowing support by installing the x11 and/or wayland features.")
+ endif()

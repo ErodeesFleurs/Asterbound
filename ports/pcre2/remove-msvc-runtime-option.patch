@@ -1,0 +1,18 @@
+--- a/ports/pcre2/portfile.cmake
++++ b/ports/pcre2/portfile.cmake
+@@ -23,7 +23,6 @@
+ 
+ string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" BUILD_STATIC)
+ string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "dynamic" INSTALL_PDB)
+-string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" BUILD_STATIC_CRT)
+ 
+ vcpkg_check_features(
+     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+@@ -36,7 +35,6 @@
+     OPTIONS
+         ${FEATURE_OPTIONS}
+         -DBUILD_STATIC_LIBS=${BUILD_STATIC}
+-        -DPCRE2_STATIC_RUNTIME=${BUILD_STATIC_CRT}
+         -DPCRE2_BUILD_PCRE2_8=ON
+         -DPCRE2_BUILD_PCRE2_16=ON
+         -DPCRE2_BUILD_PCRE2_32=ON
