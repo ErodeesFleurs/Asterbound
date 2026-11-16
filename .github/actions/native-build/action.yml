@@ -41,7 +41,7 @@ runs:
       env:
         CACHE_SCOPE: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-xclang23.1.5.2-${{ steps.sdk.outputs.sdk }}
         DEPENDENCIES: ${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'source/CMakePresets.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
-        COMPILER_CACHE_REVISION: ${{ runner.os == 'Windows' && format('win-clang-rsp-{0}', hashFiles('scripts/ci/install-sccache.py', 'scripts/ci/sccache-windows-clang-response.patch')) || 'v1' }}
+        COMPILER_CACHE_REVISION: ${{ runner.os == 'Windows' && format('win-clang-rsp-{0}', hashFiles('scripts/ci/install-sccache.py', 'scripts/ci/sccache-*.patch')) || 'v1' }}
         COMPILER_CACHE_SIZE: ${{ runner.os == 'Windows' && '2G' || '512M' }}
         LINK_CACHE_SIZE: ${{ runner.os == 'Windows' && '2g' || '512m' }}
       run: |
@@ -82,7 +82,7 @@ runs:
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
       with:
         path: ${{ runner.temp }}/patched-sccache/bin
-        key: sccache0.17.0-win-clang-rsp-${{ runner.arch }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-${{ hashFiles('scripts/ci/install-sccache.py', 'scripts/ci/sccache-windows-clang-response.patch') }}
+        key: sccache0.17.0-win-clang-rsp-${{ runner.arch }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-${{ hashFiles('scripts/ci/install-sccache.py', 'scripts/ci/sccache-*.patch') }}
 
     - name: Build patched Windows sccache
       if: ${{ runner.os == 'Windows' && steps.windows-sccache.outputs.cache-hit != 'true' }}

@@ -1,0 +1,119 @@
+--- a/src/cache/cache.rs
++++ b/src/cache/cache.rs
+@@ -46,12 +46,34 @@
+ #[cfg(feature = "webdav")]
+ use crate::cache::webdav::WebdavCache;
+ use crate::compiler::PreprocessorCacheEntry;
+-use crate::config::Config;
+-use crate::config::{self, CacheType, PreprocessorCacheModeConfig};
++use crate::config::{Config, PreprocessorCacheModeConfig};
++#[cfg(any(
++    feature = "azure",
++    feature = "gcs",
++    feature = "gha",
++    feature = "memcached",
++    feature = "redis",
++    feature = "s3",
++    feature = "webdav",
++    feature = "oss",
++    feature = "cos"
++))]
++use crate::config::{self, CacheType};
+ use async_trait::async_trait;
+ use bytes::Bytes;
+ use serde::{Deserialize, Serialize};
+ 
++#[cfg(any(
++    feature = "azure",
++    feature = "gcs",
++    feature = "gha",
++    feature = "memcached",
++    feature = "redis",
++    feature = "s3",
++    feature = "webdav",
++    feature = "oss",
++    feature = "cos"
++))]
+ use std::io;
+ use std::path::PathBuf;
+ use std::sync::Arc;
+--- a/src/compiler/rust.rs
++++ b/src/compiler/rust.rs
+@@ -206,16 +206,20 @@
+     /// All arguments passed to rustc
+     arguments: Vec<Argument<ArgData>>,
+     /// The compiler inputs.
++    #[cfg(feature = "dist-client")]
+     inputs: Vec<PathBuf>,
+     /// The compiler outputs.
+     outputs: HashMap<String, ArtifactDescriptor>,
+     /// The directories searched for rlibs
++    #[cfg(feature = "dist-client")]
+     crate_link_paths: Vec<PathBuf>,
+     /// The crate name being compiled.
+     crate_name: String,
+     /// The crate types that will be generated
++    #[cfg(feature = "dist-client")]
+     crate_types: CrateTypes,
+     /// If dependency info is being emitted, the name of the dep info file.
++    #[cfg(feature = "dist-client")]
+     dep_info: Option<PathBuf>,
+     /// The current working directory
+     cwd: PathBuf,
+@@ -1675,19 +1679,22 @@
+                 )
+             })
+             .collect::<HashMap<_, _>>();
+-        let dep_info = if let Some(dep_info) = &self.parsed_args.dep_info {
++        #[cfg(feature = "dist-client")]
++        let mut dist_dep_info = None;
++        if let Some(dep_info) = &self.parsed_args.dep_info {
+             let p = self.parsed_args.output_dir.join(dep_info);
++            #[cfg(feature = "dist-client")]
++            {
++                dist_dep_info = Some(p.clone());
++            }
+             outputs.insert(
+                 dep_info.to_string_lossy().into_owned(),
+                 ArtifactDescriptor {
+-                    path: p.clone(),
++                    path: p,
+                     optional: false,
+                 },
+             );
+-            Some(p)
+-        } else {
+-            None
+-        };
++        }
+         if let Some(profile) = &self.parsed_args.profile {
+             let p = self.parsed_args.output_dir.join(profile);
+             outputs.insert(
+@@ -1718,6 +1725,9 @@
+             ));
+         }
+ 
++        #[cfg(not(feature = "dist-client"))]
++        drop((source_files, abs_externs, abs_staticlibs));
++        #[cfg(feature = "dist-client")]
+         let inputs = source_files
+             .into_iter()
+             .chain(abs_externs)
+@@ -1731,12 +1741,16 @@
+                 host: self.host.clone(),
+                 sysroot: self.sysroot.clone(),
+                 arguments,
++                #[cfg(feature = "dist-client")]
+                 inputs,
+                 outputs,
++                #[cfg(feature = "dist-client")]
+                 crate_link_paths: self.parsed_args.crate_link_paths.clone(),
+                 crate_name: self.parsed_args.crate_name.clone(),
++                #[cfg(feature = "dist-client")]
+                 crate_types: self.parsed_args.crate_types.clone(),
+-                dep_info,
++                #[cfg(feature = "dist-client")]
++                dep_info: dist_dep_info,
+                 cwd,
+                 env_vars,
+                 #[cfg(feature = "dist-client")]

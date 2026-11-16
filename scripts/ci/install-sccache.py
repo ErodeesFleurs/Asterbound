@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the pinned, disk-cache-only Windows sccache with our Clang spawn patch."""
+"""Build pinned disk-cache-only Windows sccache with feature and Clang spawn fixes."""
 
 import argparse
 import hashlib
@@ -24,7 +24,10 @@ def main():
     args = parser.parse_args()
     if os.name != "nt":
         parser.error("this installer is only for native Windows x64 CI")
-    patch = Path(__file__).with_name("sccache-windows-clang-response.patch").resolve()
+    patches = [
+        Path(__file__).with_name(name).resolve()
+        for name in ("sccache-windows-clang-response.patch", "sccache-local-features.patch")
+    ]
     destination = args.install_dir.resolve()
     environment = os.environ.copy()
     # Build the cache itself directly, never through an inherited compiler wrapper.
@@ -41,7 +44,7 @@ def main():
         with tarfile.open(archive) as source:
             source.extractall(work, filter="data")
         source = work / "sccache-0.17.0"
-        subprocess.run(["git", "apply", "--whitespace=error-all", str(patch)],
+        subprocess.run(["git", "apply", "--whitespace=error-all"] + [str(p) for p in patches],
                        cwd=source, env=environment, check=True)
         subprocess.run(["rustup", "toolchain", "install", RUST_TOOLCHAIN,
                         "--profile", "minimal"], env=environment, check=True)
