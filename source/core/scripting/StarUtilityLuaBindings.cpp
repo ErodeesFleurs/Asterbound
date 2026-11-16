@@ -28,6 +28,8 @@ import star.text;
 import star.time;
 import star.version;
 
+import star.path_embed;
+import star.data_stream_devices;
 import star.static_random;
 namespace Star {
 
@@ -322,6 +324,35 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
       []() -> std::pair<RpcPromise<Json>, std::shared_ptr<AutoFailRpcPromiseKeeper<Json>>> {
         auto pair = RpcPromise<Json>::createPair();
         return std::make_pair(pair.first, std::make_shared<AutoFailRpcPromiseKeeper<Json>>(pair.second));
+      }); !result)
+    return std::unexpected(std::move(result.error()));
+
+  if (auto result = callbacks.registerCallback("embedData",
+      [](String const& data, String const& compression) -> std::expected<String, StarException> {
+        auto method = embeddedCompressionMethod(compression);
+        if (!method) return std::unexpected(std::move(method.error()));
+        auto payload = embedAndCompressData(std::span(data.utf8()), *method);
+        if (!payload) return std::unexpected(std::move(payload.error()));
+        return String("/opensb_data;bin;") + *payload;
+      }); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallback("embedJson",
+      [](Json const& data, String const& compression) -> std::expected<String, StarException> {
+        auto method = embeddedCompressionMethod(compression);
+        if (!method) return std::unexpected(std::move(method.error()));
+        DataStreamBuffer stream;
+        if (auto written = stream.write(data); !written)
+          return std::unexpected(std::move(written.error()));
+        auto payload = embedAndCompressData(stream.span(), *method);
+        if (!payload) return std::unexpected(std::move(payload.error()));
+        return String("/opensb_data;json;") + *payload;
+      }); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.registerCallback("embedText",
+      [](String const& data) -> std::expected<String, StarException> {
+        auto payload = embedEscapeText(data);
+        if (!payload) return std::unexpected(std::move(payload.error()));
+        return String("/opensb_data;text;") + *payload;
       }); !result)
     return std::unexpected(std::move(result.error()));
 

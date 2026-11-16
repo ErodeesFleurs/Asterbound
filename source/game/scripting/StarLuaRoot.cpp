@@ -258,6 +258,8 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
     if (!require)
       return std::unexpected(std::move(require.error()));
     for (auto const& path : scriptPaths) {
+      if (AssetPath::isRemote(path))
+        return std::unexpected(LuaException("Embedded assets cannot be loaded as scripts"));
       auto exists = (*assets)->assetExists(path);
       if (!exists)
         return std::unexpected(std::move(exists.error()));

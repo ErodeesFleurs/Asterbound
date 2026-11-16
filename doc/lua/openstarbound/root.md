@@ -61,9 +61,13 @@ By the way, here's a list of every file extension the game does Special Thingsâ„
 
 ---
 
-#### `String` root.assetData(`String` path)
+#### `String` root.assetData(`String` path, [`bool` allowRemote])
 
-Returns the raw data of an asset.
+Returns raw asset bytes as a binary-safe Lua string. `allowRemote` defaults to
+`false`: embedded paths require an explicit `true`, including on cache hits.
+This opt-in does not override `safe.allowRemoteAssets = false`.
+Do not execute untrusted returned data with `loadstring`. "Remote" here includes
+inline embedded data; it does not imply network downloading.
 
 ---
 
@@ -89,6 +93,35 @@ Returns the metadata of an asset source.
 #### `Image` root.assetImage(`String` image)
 
 Returns an image.
+
+##### `String` Image:embed(`String` compression, [`String|Json` frames], [`String` framesCompression])
+
+Encodes this Image's current pixels as PNG without changing the Image.
+Compression names are ASCII case-insensitive `none`, `zlib`, `zstd`;
+`gzip` is decode-only. With omitted or `nil` frames, returns a binary PNG
+path usable by image consumers. A string frames argument references an existing
+frames asset, or supplies an embedded JSON asset path. Ordinary frames paths
+must be nonempty and cannot contain raw `;`, `:` or `?`; embedded paths cannot
+contain a subpath or directives.
+A JSON frames argument embeds frames data: omitted `framesCompression` inherits
+the PNG compression, `text` selects escaped JSON text, and `none`, `zlib` or
+`zstd` independently compress binary JSON frames. The last argument is ignored
+when frames is absent or a string.
+
+Append `:frameName` to select a subframe and `?directives` to process the image,
+after all embedded fields. For example:
+
+```lua
+local image = root.assetImage("/example.png")
+local path = image:embed("zstd", {frameGrid = {size = {8, 8},
+  dimensions = {1, 1}, names = {{"idle"}}}}, "text")
+local frame = root.assetImage(path .. ":idle?flipx")
+```
+
+Embedded loading follows `safe.allowRemoteAssets` (default `true`).
+Decoded payloads and PNG expanded RGBA pixels each have a 64 MiB safety limit;
+embedded JSON parsing has depth limit 256. These paths are not compatible with
+vanilla or older clients and are not disk storage or network downloads.
 
 ---
 

@@ -123,6 +123,43 @@ Delegates the outcome to the provided promise, including cancellation. Chaining 
 Cancels an unassigned producer; returns whether cancellation won. To cancel a pending observation after its keeper has chained another promise, use the promise's `cancel()` instead. Late producer decisions after cancellation are discarded; other duplicate producer decisions remain errors.
 
 
+## Embedded asset generation
+
+These functions generate `/opensb_data;` paths; they do not read configuration,
+download anything or create disk storage. Use only with compatible peers:
+vanilla and older clients do not support these assets.
+
+#### `String` sb.embedData(`String` data, `String` compression)
+
+Encodes arbitrary bytes, including embedded NULs, as a binary asset path.
+
+#### `String` sb.embedJson(`Json` data, `String` compression)
+
+Encodes a value using the engine's binary JSON stream format, not JSON text.
+
+#### `String` sb.embedText(`String` data)
+
+Escapes plaintext into an embedded asset path without compression.
+
+Compression names are ASCII case-insensitive: `none`, `zlib`, `zstd`.
+`gzip` is accepted only when decoding existing paths; generation rejects it.
+Decoded/decompressed plaintext or binary output is limited to 64 MiB;
+PNG decoding also limits expanded RGBA pixels to 64 MiB.
+Embedded text/binary JSON parsing is limited to depth 256.
+
+```lua
+local path = sb.embedJson({message = "hello"}, "zstd")
+local value = root.assetJson(path)
+local raw = root.assetData(sb.embedData("A\0B", "none"), true)
+```
+
+Loading is controlled separately by `safe.allowRemoteAssets` (default `true`).
+When false, all embedded asset loading is refused; encoding still works.
+Typed JSON/image/audio/font consumers accept compatible embedded data.
+Script/raw byte reads require explicit opt-in; see
+[`root.assetData`](root.md#string-rootassetdatastring-path-bool-allowremote).
+Never pass untrusted decoded bytes to `loadstring`.
+
 ## Binding lifetimes
 
 Bindings are capabilities supplied by the script's host, not a universal service registry. Entity, pane, universe and worker contexts keep their existing method sets; forwarding a capability to a worker does not grant the full host API.

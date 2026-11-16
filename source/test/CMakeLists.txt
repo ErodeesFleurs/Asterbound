@@ -33,6 +33,7 @@ set (star_core_tests_SOURCES
       json_test.cpp
       json_contract_test.cpp
       json_path_patch_test.cpp
+      path_embed_test.cpp
       flat_hash_test.cpp
       formatted_json_test.cpp
       line_test.cpp
@@ -192,6 +193,7 @@ set (star_game_tests_SOURCES
       assets_test.cpp
       assets_patch_read_test.cpp
       assets_reference_cache_test.cpp
+      embedded_assets_test.cpp
       biome_placement_test.cpp
       camera_presentation_test.cpp
       damage_database_test.cpp

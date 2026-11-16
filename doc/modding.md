@@ -49,6 +49,26 @@ Asterbound repairs vanilla `/scripts/actions/flying.lua`, `/stagehands/coordinat
 
 Use the [Lua API index](lua/README.md) to find the script host and related tables, and the [stub setup guide](lua/stubs/README.md) for LuaLS. Editor completion is not proof that an API exists in a particular runtime context.
 
+## Embedded assets
+
+[`sb.embedData`, `sb.embedJson`, `sb.embedText`](lua/openstarbound/utility.md#embedded-asset-generation)
+and [`Image:embed`](lua/openstarbound/root.md#image-rootassetimagestring-image)
+generate inline `/opensb_data;` asset paths. This is not new disk storage and
+does not perform network downloads. Generation is independent of configuration;
+loading requires `safe.allowRemoteAssets`, which defaults to `true`. Set it to
+`false` to reject all such loads. Raw script byte reads remain disabled by
+default even when loading is enabled: use `root.assetData(path, true)` only for
+trusted data, never as an unchecked `loadstring` source.
+
+Typed JSON, image, audio and font consumers can use compatible embedded data.
+Images are encoded as PNG; optional frames may reference a frames asset or
+embed JSON frames, and subframe/directive suffixes follow the complete path.
+Generated compression modes are ASCII case-insensitive `none`, `zlib`, `zstd`;
+`gzip` is decoding-only. Decoded/decompressed payloads and PNG expanded RGBA
+pixels each have a 64 MiB limit; embedded JSON parsing is bounded to depth 256.
+Use matching capable clients and servers: vanilla and older clients cannot
+consume these paths.
+
 ## Persistent mod storage
 
 Use [`root.getModStorage`, `setModStorage`, `modStorageKeys`, `clearModStorage` and `flushModStorage`](lua/openstarbound/root.md#mod-storage) with `safeScripts` enabled. Default access follows the directly calling asset script's provider, not its Lua context; shared helpers and overrides therefore matter. Dynamically generated `loadstring` code has no default namespace. An optional mod name selects the first loaded `_metadata.name` match and errors if unknown. This is not a mod-to-mod sandbox.

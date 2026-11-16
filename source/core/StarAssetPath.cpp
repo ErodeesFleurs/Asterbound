@@ -87,6 +87,14 @@ String AssetPath::join(AssetPath const& components) {
   return result;
 }
 
+bool AssetPath::isEmbedded(String const& path) {
+  return path.utf8().starts_with("/opensb_data;");
+}
+
+bool AssetPath::isRemote(String const& path) {
+  return isEmbedded(path);
+}
+
 String AssetPath::setSubPath(String const& path, String const& subPath) {
   auto components = split(path);
   components.subPath = subPath;

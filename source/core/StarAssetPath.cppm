@@ -29,6 +29,9 @@ struct AssetPath {
   friend struct hash<AssetPath>;
   static AssetPath split(String const& path);
   static String join(AssetPath const& path);
+  // Embedded payloads are byte-sensitive, not filesystem assets.
+  static bool isEmbedded(String const& path);
+  static bool isRemote(String const& path);
 
   // Get / modify sub-path directly on a joined path string
   static String setSubPath(String const& joinedPath, String const& subPath);

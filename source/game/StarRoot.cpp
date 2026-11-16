@@ -573,13 +573,31 @@ String Root::toStoragePath(String const& path) const {
 }
 
 std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
-  return loadMemberFunction<Assets>(m_assets, m_assetsMutex, "Assets", [this]() -> std::expected<std::shared_ptr<Assets>, StarException> {
+  {
+    std::lock_guard locker(m_assetsMutex);
+    if (m_assets)
+      return m_assets;
+  }
+  // Read configuration without holding the assets lock: reload takes these
+  // two Root locks in configuration -> assets order.
+  auto config = configuration();
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto configured = (*config)->getPath("safe.allowRemoteAssets", true);
+  if (!configured)
+    return std::unexpected(std::move(configured.error()));
+  auto allowed = configured->toBool();
+  if (!allowed)
+    return std::unexpected(std::move(allowed.error()));
+  return loadMemberFunction<Assets>(m_assets, m_assetsMutex, "Assets", [this, allowRemote = *allowed]() -> std::expected<std::shared_ptr<Assets>, StarException> {
       StringList assetDirectories = m_settings.assetDirectories;
       assetDirectories.append_range(m_modDirectories);
       auto assetSources = scanForAssetSources(assetDirectories, m_settings.assetSources);
       if (!assetSources)
         return std::unexpected(std::move(assetSources.error()));
-      auto loaded = Assets::create(m_logger, m_random, m_logMap, m_settings.assetsSettings, std::move(*assetSources));
+      auto settings = m_settings.assetsSettings;
+      settings.allowRemoteAssets = settings.allowRemoteAssets && allowRemote;
+      auto loaded = Assets::create(m_logger, m_random, m_logMap, std::move(settings), std::move(*assetSources));
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
       auto logged = m_logger.info("Assets digest is {}", hex_encode((*loaded)->digest()));

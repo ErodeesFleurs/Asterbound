@@ -44,6 +44,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarNetElementGroup.cppm StarNetElementSignal.cppm
           StarNetElementSyncGroup.cppm StarNetElementSystem.cppm StarNetElementTop.cppm
           StarAssetPath.cppm
+          StarPathEmbed.cppm
           StarBTreeDatabase.cppm
           StarBuffer.cppm
           StarDirectives.cppm
@@ -96,6 +97,7 @@ target_sources (star_modules PRIVATE
     StarByteArray.cpp StarLexicalCast.cpp StarMemory.cpp
     StarNetCompatibility.cpp StarRandom.cpp
     StarAssetPath.cpp
+    StarPathEmbed.cpp
     StarBTreeDatabase.cpp
     StarBuffer.cpp
     StarDirectives.cpp

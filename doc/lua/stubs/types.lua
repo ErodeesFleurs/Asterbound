@@ -183,6 +183,9 @@
 ---@field get fun(self:Image, x:integer, y:integer):Color
 ---@field subImage fun(self:Image, min:Vec2U, size:Vec2U):Image
 ---@field process fun(self:Image, directives:string):Image
+--- PNG embedding; frames string forbids raw ; : ?. JSON frames use inherited compression or explicit text/none/zlib/zstd.
+--- Compression names are ASCII case-insensitive; gzip is decode-only. nil frames produces binary PNG.
+---@field embed fun(self:Image, compression:string, frames?:string|Json, framesCompression?:string):string
 
 ---@class TextStyle
 ---@field fontSize? integer

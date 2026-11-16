@@ -145,7 +145,7 @@ import star.material_database;
 
 namespace Star::LuaBindings {
   namespace RootCallbacks {
-    [[nodiscard]] std::expected<String, StarException> assetData(Root& root, String const& path);
+    [[nodiscard]] std::expected<String, StarException> assetData(Root& root, String const& path, std::optional<bool> allowRemote);
     [[nodiscard]] std::expected<Image, StarException> assetImage(Root& root, String const& path);
     [[nodiscard]] std::expected<Json, StarException> assetFrames(Root& root, String const& path);
     [[nodiscard]] std::expected<Json, StarException> assetJson(Root& root, String const& path);
@@ -296,8 +296,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   }); !r) return std::unexpected(std::move(r.error()));
 
 
-  if (auto r = callbacks.registerCallbackWithSignature<std::expected<String, StarException>, String>(
-        "assetData", [&root](String const& path) { return RootCallbacks::assetData(root, path); });
+  if (auto r = callbacks.registerCallbackWithSignature<std::expected<String, StarException>, String, std::optional<bool>>(
+        "assetData", [&root](String const& path, std::optional<bool> allowRemote) { return RootCallbacks::assetData(root, path, allowRemote); });
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallbackWithSignature<std::expected<Image, StarException>, String>(
@@ -906,10 +906,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   return callbacks;
 }
 
-std::expected<String, StarException> LuaBindings::RootCallbacks::assetData(Root& root, String const& path) {
+std::expected<String, StarException> LuaBindings::RootCallbacks::assetData(Root& root, String const& path, std::optional<bool> allowRemote) {
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto bytes = (*assets)->bytes(path);
+  auto bytes = (*assets)->bytes(path, allowRemote.value_or(false));
   if (!bytes) return std::unexpected(std::move(bytes.error()));
   return String(std::string_view((*bytes)->span().data(), (*bytes)->span().size()));
 }

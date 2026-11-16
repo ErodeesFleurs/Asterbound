@@ -94,6 +94,9 @@ public:
     // budget limits this extension, not total cache or externally held memory.
     float referenceImageTimeToLive = 300;
     std::uint64_t referenceImagePixelBudget = 16 * 1024 * 1024;
+
+    // Remote paths contain data, never scripts or implicitly readable bytes.
+    bool allowRemoteAssets = true;
   };
 
   enum class QueuePriority {
@@ -307,8 +310,8 @@ public:
   // Returns pointer to shared font asset
   [[nodiscard]] std::expected<std::shared_ptr<Font const>, StarException> font(String const& path) const;
 
-  // Returns a bytes asset (Reads asset as an opaque binary blob)
-  [[nodiscard]] std::expected<std::shared_ptr<ByteArray const>, StarException> bytes(String const& path) const;
+  // Embedded bytes require explicit permission, even after a cache hit.
+  [[nodiscard]] std::expected<std::shared_ptr<ByteArray const>, StarException> bytes(String const& path, bool allowRemote = false) const;
 
   // Bypass asset caching and open an asset file directly.
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> openFile(String const& basePath) const;

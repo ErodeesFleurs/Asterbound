@@ -19,10 +19,12 @@ function root.modVariant(tilePosition, layer, variants) end
 ---@return string[]
 function root.assetsByExtension(extension) end
 
---- Returns the raw data of an asset. ---
+--- Returns binary-safe raw bytes. Embedded paths require allowRemote=true and safe.allowRemoteAssets=true.
+--- Default opt-in is false, including cache hits. Never execute untrusted bytes.
 ---@param path string
+---@param allowRemote? boolean
 ---@return string
-function root.assetData(path) end
+function root.assetData(path, allowRemote) end
 
 --- Returns the asset source path of an asset, or nil if the asset doesn't exist. If you specify getPatches as true then also returns the patches for the asset as an array, each element containing the source path and patch path in indexes 1 and 2 respectively. ---
 ---@param path string

@@ -31,6 +31,8 @@ import star.casting;
 import star.lexical_cast;
 import star.data_stream_devices;
 import star.lua;
+import star.path_embed;
+import star.buffer;
 
 import star.assets;
 import star.asset_source;
@@ -98,6 +100,15 @@ static std::optional<std::string_view> validateBasePath(std::string_view const& 
   if (!canContainDirectives && !components.directives.empty())
     return std::unexpected(AssetException::format("Path '{}' cannot contain directives", components));
   return {};
+}
+
+static std::expected<EmbeddedData, StarException> readEmbedded(String const& path, bool allowed, bool asBytes = false) {
+  if (!allowed)
+    return std::unexpected(AssetException("Embedded assets are disabled by safe.allowRemoteAssets"));
+  auto data = decodeEmbeddedData(path, asBytes);
+  if (!data)
+    return std::unexpected(AssetException("Invalid embedded asset", std::move(data.error())));
+  return data;
 }
 
 // Only a confirmed vanished directory entry is optional. A dangling symlink,
@@ -367,8 +378,8 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("bytes", [this](String const& path) -> std::expected<String, StarException> {
-      auto assetBytes = bytes(path);
+    registered = callbacks.registerCallback("bytes", [this](String const& path, std::optional<bool> allowRemote) -> std::expected<String, StarException> {
+      auto assetBytes = bytes(path, allowRemote.value_or(false));
       if (!assetBytes)
         return std::unexpected(std::move(assetBytes.error()));
       return String(std::string_view((*assetBytes)->begin(), (*assetBytes)->end()));
@@ -1323,6 +1334,12 @@ std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets:
   auto components = AssetPath::split(path);
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
+  if (AssetPath::isEmbedded(components.basePath)) {
+    auto image = getAsset({.type = AssetType::Image, .path = std::move(components)});
+    if (!image)
+      return std::unexpected(std::move(image.error()));
+    return as_ref<ImageData>(**image)->get().frames;
+  }
   std::unique_lock assetsLocker(m_assetsMutex);
   return bestFramesSpecification(path);
 }
@@ -1383,8 +1400,10 @@ std::expected<std::shared_ptr<Font const>, StarException> Assets::font(String co
   return as_ref<FontData>(**data)->get().font;
 }
 
-std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path) const {
+std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path, bool allowRemote) const {
   auto components = AssetPath::split(path);
+  if (AssetPath::isRemote(components.basePath) && !allowRemote)
+    return std::unexpected(AssetException("Reading embedded bytes requires explicit allowRemote permission"));
   if (auto valid = validatePath(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
   auto data = getAsset({.type = AssetType::Bytes, .path = std::move(components)});
@@ -1813,6 +1832,12 @@ std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets:
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String const& path) const {
+  if (AssetPath::isEmbedded(path)) {
+    auto data = readEmbedded(path, m_settings.allowRemoteAssets, true);
+    if (!data)
+      return std::unexpected(std::move(data.error()));
+    return std::make_shared<Buffer>(std::move(data->bytes));
+  }
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
@@ -1822,6 +1847,12 @@ std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String cons
 }
 
 std::expected<ByteArray, StarException> Assets::read(String const& path) const {
+  if (AssetPath::isEmbedded(path)) {
+    auto data = readEmbedded(path, m_settings.allowRemoteAssets, true);
+    if (!data)
+      return std::unexpected(std::move(data.error()));
+    return std::move(data->bytes);
+  }
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
@@ -1989,6 +2020,12 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
 }
 
 std::expected<Json, StarException> Assets::readJson(String const& path) const {
+  if (AssetPath::isEmbedded(path)) {
+    auto data = readEmbedded(path, m_settings.allowRemoteAssets);
+    if (!data)
+      return std::unexpected(std::move(data.error()));
+    return embeddedDataToJson(*data);
+  }
   auto streamData = read(path);
   if (!streamData)
     return std::unexpected(std::move(streamData.error()));
@@ -2310,6 +2347,54 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       return data;
     });
   }
+  if (AssetPath::isEmbedded(path.basePath)) {
+    return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+      auto embedded = readEmbedded(path.basePath, m_settings.allowRemoteAssets);
+      if (!embedded)
+        return std::unexpected(std::move(embedded.error()));
+      if (embedded->type != EmbeddedAssetType::Binary && embedded->type != EmbeddedAssetType::Image)
+        return std::unexpected(AssetException("Embedded image requires PNG binary data"));
+      auto device = std::make_shared<ExternalBuffer>(embedded->bytes.span());
+      auto metadata = Image::read_png_metadata(m_logger, device);
+      if (!metadata)
+        return std::unexpected(std::move(metadata.error()));
+      auto size = std::get<0>(*metadata);
+      if (std::uint64_t(size[0]) * size[1] > MaxEmbeddedDataSize / 4)
+        return std::unexpected(AssetException("Embedded PNG exceeds the 64 MiB decoded pixel limit"));
+      auto rewound = device->seek(0);
+      if (!rewound)
+        return std::unexpected(std::move(rewound.error()));
+      auto image = Image::read_png(m_logger, std::move(device));
+      if (!image)
+        return std::unexpected(std::move(image.error()));
+      auto data = std::make_shared<ImageData>();
+      data->image = std::make_shared<Image>(std::move(*image));
+      std::optional<Json> frameConfig;
+      String frameName = "<embedded frames>";
+      if (embedded->framesPath) {
+        auto frames = json(*embedded->framesPath);
+        if (!frames)
+          return std::unexpected(std::move(frames.error()));
+        frameConfig = std::move(*frames);
+        frameName = *embedded->framesPath;
+      } else if (embedded->framesData) {
+        auto frames = readEmbedded(*embedded->framesData, m_settings.allowRemoteAssets);
+        if (!frames)
+          return std::unexpected(std::move(frames.error()));
+        auto config = embeddedDataToJson(*frames);
+        if (!config)
+          return std::unexpected(std::move(config.error()));
+        frameConfig = std::move(*config);
+      }
+      if (frameConfig) {
+        auto frames = parseFramesSpecification(*frameConfig, std::move(frameName));
+        if (!frames)
+          return std::unexpected(std::move(frames.error()));
+        data->frames = std::make_shared<FramesSpecification>(std::move(*frames));
+      }
+      return data;
+    });
+  }
   auto image = unlockDuring([&]() { return readImage(path.basePath); });
   if (!image)
     return std::unexpected(std::move(image.error()));
@@ -2324,7 +2409,16 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAudio(AssetPath const& path) const {
   return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto device = open(path.basePath);
+    auto device = [&]() -> std::expected<std::shared_ptr<IODevice>, StarException> {
+      if (!AssetPath::isEmbedded(path.basePath))
+        return open(path.basePath);
+      auto embedded = readEmbedded(path.basePath, m_settings.allowRemoteAssets);
+      if (!embedded)
+        return std::unexpected(std::move(embedded.error()));
+      if (embedded->type != EmbeddedAssetType::Binary)
+        return std::unexpected(AssetException("Embedded audio requires binary data"));
+      return std::make_shared<Buffer>(std::move(embedded->bytes));
+    }();
     if (!device)
       return std::unexpected(std::move(device.error()));
     auto audio = Audio::create(std::move(*device), path.basePath);
@@ -2339,7 +2433,16 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAud
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFont(AssetPath const& path) const {
   return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto bytes = read(path.basePath);
+    auto bytes = [&]() -> std::expected<ByteArray, StarException> {
+      if (!AssetPath::isEmbedded(path.basePath))
+        return read(path.basePath);
+      auto embedded = readEmbedded(path.basePath, m_settings.allowRemoteAssets);
+      if (!embedded)
+        return std::unexpected(std::move(embedded.error()));
+      if (embedded->type != EmbeddedAssetType::Binary)
+        return std::unexpected(AssetException("Embedded font requires binary data"));
+      return std::move(embedded->bytes);
+    }();
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
     auto font = Font::loadFont(*m_fontLibrary, std::make_shared<ByteArray>(std::move(*bytes)));
