@@ -40,6 +40,10 @@ if(NOT STAR_LINK_JOBS STREQUAL "")
 endif()
 
 set(STAR_THINLTO_CACHE_DIR "" CACHE PATH "Persistent ThinLTO object cache (empty disables caching)")
+set(STAR_THINLTO_CACHE_SIZE "512m" CACHE STRING "ThinLTO cache byte budget with an LLVM size suffix (k, m or g)")
+if(NOT STAR_THINLTO_CACHE_SIZE MATCHES "^[1-9][0-9]*[kmg]$")
+  message(FATAL_ERROR "STAR_THINLTO_CACHE_SIZE must be a positive size with a k, m or g suffix.")
+endif()
 if(STAR_ENABLE_THINLTO)
   include(CheckIPOSupported)
   check_ipo_supported(LANGUAGES C CXX)
@@ -71,7 +75,7 @@ if(STAR_ENABLE_THINLTO AND NOT STAR_THINLTO_CACHE_DIR STREQUAL "")
   # All three lld drivers accept this policy. Explicit units are required by
   # LLVM's parser; prune each link so CI does not upload an unbounded cache.
   foreach(cache_option IN ITEMS "${star_thinlto_cache_option}"
-      "LINKER:--thinlto-cache-policy=cache_size=0%:cache_size_bytes=512m:prune_interval=0s")
+      "LINKER:--thinlto-cache-policy=cache_size=0%:cache_size_bytes=${STAR_THINLTO_CACHE_SIZE}:prune_interval=0s")
     target_link_options(star_build_config INTERFACE
       "$<$<AND:$<CONFIG:Release,RelWithDebInfo,RelWithAsserts,MinSizeRel>,${star_config_ipo}>:${cache_option}>")
   endforeach()

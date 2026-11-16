@@ -41,12 +41,17 @@ runs:
         CACHE_SCOPE: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-xclang23.1.5.2-${{ steps.sdk.outputs.sdk }}
         DEPENDENCIES: ${{ hashFiles('source/vcpkg.json', 'source/vcpkg-configuration.json', 'source/CMakePresets.json', 'ports/**', 'triplets/**', 'scripts/ci/*.cmake') }}
         COMPILER_CACHE_REVISION: ${{ runner.os == 'Windows' && format('win-clang-rsp-{0}', hashFiles('scripts/ci/install-sccache.py', 'scripts/ci/sccache-windows-clang-response.patch')) || 'v1' }}
+        COMPILER_CACHE_SIZE: ${{ runner.os == 'Windows' && '2G' || '512M' }}
+        LINK_CACHE_SIZE: ${{ runner.os == 'Windows' && '2g' || '512m' }}
       run: |
         echo "vcpkg=vcpkg-v2-$CACHE_SCOPE-$DEPENDENCIES" >> "$GITHUB_OUTPUT"
         echo "lto=thinlto-v1-$CACHE_SCOPE" >> "$GITHUB_OUTPUT"
         echo "compiler=sccache0.17-$COMPILER_CACHE_REVISION-$CACHE_SCOPE" >> "$GITHUB_OUTPUT"
+        echo "compiler-size=$COMPILER_CACHE_SIZE" >> "$GITHUB_OUTPUT"
+        echo "link-size=$LINK_CACHE_SIZE" >> "$GITHUB_OUTPUT"
 
     - name: Restore vcpkg binary cache
+      id: dependency-cache
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
       with:
         path: ${{ github.workspace }}/.cache/vcpkg
@@ -101,6 +106,7 @@ runs:
         key: ${{ steps.windows-sccache.outputs.cache-primary-key }}
 
     - name: Restore module-aware compiler cache
+      id: compiler-restore
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
       with:
         path: ${{ github.workspace }}/.cache/sccache
@@ -123,10 +129,16 @@ runs:
         VCPKG_FEATURE_FLAGS: binarycaching
         VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.cache/vcpkg,readwrite
         SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
-        SCCACHE_CACHE_SIZE: 512M
+        SCCACHE_CACHE_SIZE: ${{ steps.keys.outputs.compiler-size }}
         SCCACHE_DIRECT: 'false'
         SCCACHE_C_CUSTOM_CACHE_BUSTER: ${{ steps.sdk.outputs.sdk }}
-      run: cmake --preset "$PRESET" -DSTAR_LINK_JOBS=1 "-DSTAR_THINLTO_CACHE_DIR=$GITHUB_WORKSPACE/.cache/thinlto" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        LINK_CACHE_SIZE: ${{ steps.keys.outputs.link-size }}
+      run: |
+        SECONDS=0
+        status=0
+        cmake --preset "$PRESET" -DSTAR_LINK_JOBS=1 "-DSTAR_THINLTO_CACHE_DIR=$GITHUB_WORKSPACE/.cache/thinlto" "-DSTAR_THINLTO_CACHE_SIZE=$LINK_CACHE_SIZE" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache || status=$?
+        echo "seconds=$SECONDS" >> "$GITHUB_OUTPUT"
+        exit "$status"
 
     - name: Inspect completed dependency cache
       id: dependency-state
@@ -144,6 +156,7 @@ runs:
         key: ${{ steps.keys.outputs.vcpkg }}-${{ steps.dependency-state.outputs.inventory }}
 
     - name: Restore ThinLTO cache
+      id: link-cache
       if: ${{ success() }}
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
       with:
@@ -165,7 +178,7 @@ runs:
         PRESET: ${{ inputs.preset }}
         PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
         SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
-        SCCACHE_CACHE_SIZE: 512M
+        SCCACHE_CACHE_SIZE: ${{ steps.keys.outputs.compiler-size }}
         SCCACHE_DIRECT: 'false'
         SCCACHE_C_CUSTOM_CACHE_BUSTER: ${{ steps.sdk.outputs.sdk }}
       run: $PYTHON scripts/ci/build-profile.py --preset "$PRESET" --build-dir "$GITHUB_WORKSPACE/build/$PRESET" --output-dir "$GITHUB_WORKSPACE/build/ci" --sccache
@@ -199,6 +212,40 @@ runs:
       with:
         path: ${{ github.workspace }}/.cache/thinlto
         key: ${{ steps.keys.outputs.lto }}-${{ steps.link-state.outputs.inventory }}
+
+    - name: Summarize cache reuse and build timings
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+        PRESET: ${{ inputs.preset }}
+        CONFIGURE_SECONDS: ${{ steps.configure.outputs.seconds }}
+        COMPILER_CACHE_SIZE: ${{ steps.keys.outputs.compiler-size }}
+        THINLTO_CACHE_SIZE: ${{ steps.keys.outputs.link-size }}
+        CACHE_RESTORES: |
+          {
+            "vcpkg": {
+              "matched_key": ${{ toJSON(steps.dependency-cache.outputs.cache-matched-key) }},
+              "exact_hit": ${{ toJSON(steps.dependency-cache.outputs.cache-hit) }},
+              "outcome": ${{ toJSON(steps.dependency-cache.outcome) }}
+            },
+            "compiler": {
+              "matched_key": ${{ toJSON(steps.compiler-restore.outputs.cache-matched-key) }},
+              "exact_hit": ${{ toJSON(steps.compiler-restore.outputs.cache-hit) }},
+              "outcome": ${{ toJSON(steps.compiler-restore.outcome) }}
+            },
+            "thinlto": {
+              "matched_key": ${{ toJSON(steps.link-cache.outputs.cache-matched-key) }},
+              "exact_hit": ${{ toJSON(steps.link-cache.outputs.cache-hit) }},
+              "outcome": ${{ toJSON(steps.link-cache.outcome) }}
+            },
+            "sccache-executable": {
+              "matched_key": ${{ toJSON(runner.os == 'Windows' && steps.windows-sccache.outputs.cache-matched-key || null) }},
+              "exact_hit": ${{ toJSON(steps.windows-sccache.outputs.cache-hit) }},
+              "outcome": ${{ toJSON(steps.windows-sccache.outcome) }}
+            }
+          }
+      run: $PYTHON scripts/ci/cache-report.py --preset "$PRESET" --output-dir build/ci
 
     - name: Upload build timings and configuration diagnostics
       if: ${{ !cancelled() }}
