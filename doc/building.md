@@ -29,7 +29,8 @@ GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependenci
 
 Optimized profiles retain fast scalar arithmetic through explicit Clang options
 rather than a conflicting `-ffast-math` umbrella. macOS providers share full
-complex arithmetic mode. Color's HSV interpolation and hue divisions retain
+complex arithmetic mode even with caller-selected math flags or Debug builds.
+Color's HSV interpolation and hue divisions retain
 local precise, noncontracting rounding so instrumentation cannot change their
 half-byte regression results; other arithmetic remains optimized.
 

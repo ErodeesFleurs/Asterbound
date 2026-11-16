@@ -119,17 +119,19 @@ endif()
 set(star_fast_math_options
   -fno-honor-infinities -fno-honor-nans -fno-math-errno -fapprox-func
   -fno-signed-zeros -fassociative-math -freciprocal-math
-  -fno-trapping-math -fno-rounding-math -ffp-contract=fast)
-if(STAR_SYSTEM_MACOS)
-  list(APPEND star_fast_math_options -fcomplex-arithmetic=full)
-else()
-  list(APPEND star_fast_math_options -fcomplex-arithmetic=basic)
-endif()
+  -fno-trapping-math -fno-rounding-math -ffp-contract=fast
+  -fcomplex-arithmetic=basic)
 
 foreach(config RelWithAsserts RelWithDebInfo Release)
   star_default_compile_options(${config} optimization -O3)
   star_default_compile_options(${config} math ${star_fast_math_options})
 endforeach()
+# This BMI compatibility requirement also applies to Debug and caller-selected
+# math options; it must not disappear when a default is overridden.
+if(STAR_SYSTEM_MACOS)
+  target_compile_options(star_build_config INTERFACE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fcomplex-arithmetic=full>")
+endif()
 
 
 foreach(config Debug RelWithAsserts RelWithDebInfo)
